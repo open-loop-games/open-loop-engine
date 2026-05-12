@@ -35,14 +35,6 @@ export interface UnlockEffect {
  * - `rel.{categoryId}.{actor}.{dim}` — scalar / vector dim value (number)
  * - `rel.{categoryId}.{actor}.tier` — tier index (number)
  * - `rel.{categoryId}.{actor}.flags.{name}` — boolean flag
- *
- * `StateEffect` + `E.state(...)` and `StateCondition` + `C.state(...)` are
- * the deferred path for content authors gating on relationship state. Bespoke
- * relationship-aware atoms are intentionally not in the builders yet.
- *
- * TODO(expansion): once a second consumer (beyond molcremental + the CDDA
- * reference) needs ergonomic relationship atoms, promote `C.relationship` /
- * `E.relationship` to `core/conditions.ts` + `core/effects.ts`.
  */
 export interface StateEffect {
   type: 'state';

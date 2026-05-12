@@ -45,7 +45,7 @@ typed per-actor / per-faction state with five variant shapes (scalar, faction, t
 
 - `interface FactionRelationshipDef extends RelationshipDefBase` — V2: scalar per-faction with attitude-matrix propagation (Endless Sky, Daggerfall faction tree). `src/primitives/relationship.ts:53`
 - `interface FlagRelationshipDef extends RelationshipDefBase` — V5: boolean flag bag (Exult `Obj_flags` + global `gflags`). `src/primitives/relationship.ts:132`
-- `type RelationshipDef = ScalarRelationshipDef | FactionRelationshipDef | TieredRelationshipDef | VectorRelationshipDef | FlagRelationshipDef` — Discriminated union — every registered relationship def is one of these. `src/primitives/relationship.ts:148`
+- `type RelationshipDef = ScalarRelationshipDef | FactionRelationshipDef | TieredRelationshipDef | VectorRelationshipDef | FlagRelationshipDef` — Discriminated union — every registered relationship def is one of these. `src/primitives/relationship.ts:143`
 - `interface RelationshipDefBase` — Common identity for every relationship def. `src/primitives/relationship.ts:15`
 - `interface ScalarRelationshipDef extends RelationshipDefBase` — V1: scalar per-entity (Tuxemon bond, Level13 trust). `src/primitives/relationship.ts:28`
 - `interface TieredRelationshipDef extends RelationshipDefBase` — V3: ordered tier ladder (Daggerfall guild rank, OpenMW faction rank, molcremental NPC trust). `src/primitives/relationship.ts:82`

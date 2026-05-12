@@ -177,8 +177,7 @@ export * from './dialog-session';
 
 // === RELATIONSHIP SYSTEMS (P-REL) ===
 // Five typed shapes (scalar / tiered / vector / faction / flag) plus category
-// dispatch. Continuous-drives (V6, openc2e) deferred — TODO(expansion) noted
-// in primitives/relationship.ts.
+// dispatch.
 export * from './relationship';
 
 // === ZONES ===

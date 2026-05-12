@@ -139,11 +139,6 @@ export interface FlagRelationshipDef extends RelationshipDefBase {
   flags: readonly string[];
 }
 
-// V6 (Continuous-drives, openc2e biochemistry) is intentionally not typed here.
-// TODO(expansion): add ChemicalRelationshipDef when a second consumer needs it.
-// Single-game prevalence (openc2e is the only known case); the 5 variants here
-// cover the rest of the validated shapes from the Phase 1 study.
-
 /** Discriminated union — every registered relationship def is one of these. */
 export type RelationshipDef =
   | ScalarRelationshipDef
