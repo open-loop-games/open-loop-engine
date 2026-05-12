@@ -1,0 +1,9 @@
+pnpm exec lint-staged && pnpm run typecheck && pnpm run test && pnpm run build:api && {
+  if ! git diff --quiet docs/api/; then
+    echo ""
+    echo "✗ API docs are stale. Stage docs/api/ and re-commit:"
+    echo "    git add docs/api/ && git commit --amend --no-edit"
+    echo ""
+    exit 1
+  fi
+}

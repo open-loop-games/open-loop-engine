@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": {
+        "name": "conventionalcommits",
+        "preMajor": true
+      },
+      "infile": "CHANGELOG.md"
+    }
+  },
+  "git": {
+    "commitMessage": "chore(release): ${version}",
+    "tagName": "v${version}",
+    "push": false,
+    "requireCleanWorkingDir": true
+  },
+  "npm": {
+    "publish": false
+  }
+}

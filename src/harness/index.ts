@@ -1,0 +1,162 @@
+export * from './types';
+export { createWorkPlan } from './work-plan';
+export { diffAggregates } from './aggregate';
+export { runMatrix } from './run-matrix';
+export { runBatch } from './run-batch';
+export { runSensitivity } from './run-sensitivity';
+export { runUntil } from './run-until';
+export { runMatrixUntil } from './run-matrix-until';
+export { createSensitivityCell } from './create-sensitivity-cell';
+export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
+export {
+  createResourcePeakTracker,
+  createLoopFinalizeTracker,
+  defaultAnalyzerPack,
+} from './analyzers';
+export {
+  createPickerSnapshot,
+  type PickerSource,
+  type PickerAddress,
+  type ModifierPickerAddress,
+  type TunablePickerAddress,
+  type PickerEntry,
+  type ModifierPickerEntry,
+  type TunablePickerEntry,
+  type PickerSnapshot,
+} from './picker';
+export { applyPerturbation, type Perturbation } from './perturbation';
+export { runProbe, runWaypointProbe } from './probe';
+export type {
+  BeatProbe,
+  BeatResult,
+  ProbeConfig,
+  Waypoint,
+  WaypointSnapshot,
+  WaypointProbeConfig,
+} from './probe';
+export { bisectTuner } from './solve';
+export type { TunerConfig, TunerResult, Tuner } from './solve';
+export { createTransitionSnapshot, createIncrementalSnapshot } from './walker';
+export type {
+  Transition,
+  TransitionSource,
+  TransitionSnapshot,
+  IncrementalSnapshot,
+  IncrementalSnapshotEntityRef,
+} from './walker';
+
+// === CROSS-LAYER TYPE RE-EXPORTS ===
+// Harness surfaces types from every lower layer (engine build helpers,
+// perturbation targets, sensitivity analyzers). Selective re-exports only;
+// values live in their owning layer.
+
+export type {
+  DecimalSource,
+  Analyzer,
+  AnalyzerResult,
+  InjectionKey,
+  IEffect,
+  ICondition,
+  ResourceCondition,
+  UnlockCondition,
+  StateCondition,
+  AndCondition,
+  OrCondition,
+  NotCondition,
+  UnlockEffect,
+  StateEffect,
+  CompositeEffect,
+  ConditionalEffect,
+  State,
+  Persistent,
+  NonPersistent,
+  Resource,
+  ResourceEffect,
+  Requirement,
+  Requirements,
+  GenericFormula,
+  FormulaSource,
+  FormulaOptions,
+  VariableFormulaOptions,
+  ConstantFormulaOptions,
+  GeneralFormulaOptions,
+  GuardedFormulasToDecimals,
+  TupleGuard,
+  FormulasToDecimals,
+  IntegrableFormula,
+  InvertibleFormula,
+  InvertibleIntegralFormula,
+  EvaluateFunction,
+  InvertFunction,
+  IntegrateFunction,
+  SubstitutionFunction,
+  SubstitutionStack,
+  Computable,
+  Formula,
+  Modifier,
+  ModifierDescription,
+  ModifierChain,
+  ModifierChainEvents,
+  BindOptions,
+  BindingRecord,
+  Grant,
+  MaybeGetter,
+  Emittable,
+  GameLoop,
+  PhaseHooks,
+  TickCallback,
+  TimerProvider,
+  GameStateAccessor,
+  GameStateMutator,
+  SaveManager,
+  SaveLoadResult,
+  SavePeek,
+  SaveSlot,
+  SaveEvents,
+  SaveLoadFailureReason,
+  StorageAdapter,
+  HeadlessResult,
+} from '../core';
+export type {
+  Achievement,
+  AchievementDisplay,
+  AchievementEvents,
+  AchievementCategory,
+  AchievementCategoryEntry,
+  Challenge,
+  ChallengeDef,
+  ChallengeCategory,
+  ChallengeCategoryEntry,
+  ContentRegistry,
+  EngineCategories,
+  Producer,
+  ProducerCategory,
+  ProducerCategoryEntry,
+  Purchasable,
+  PurchasableEvents,
+  PurchasableCategory,
+  PurchasableCategoryEntry,
+  Skill,
+  SkillBase,
+  SkillEvents,
+  AccumulatorSkill,
+  LevelDrivenSkill,
+  SkillCategory,
+  SkillCategoryEntry,
+  LoopLogEntry,
+  LoopLogDelta,
+} from '../systems';
+export type {
+  Engine,
+  EngineConfig,
+  EngineContext,
+  EngineEvents,
+  EngineModule,
+  ModDef,
+  TickHandler,
+  SaveHandler,
+  LoadHandler,
+  ResetHandler,
+} from '../index';
+export { Decimal } from '../primitives/decimal';
+export type { ResettableObject } from '../systems/resettable';

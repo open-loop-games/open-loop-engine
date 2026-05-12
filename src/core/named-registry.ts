@@ -1,0 +1,165 @@
+/**
+ * Named registry — engine-internal id-keyed collection helper shared by
+ * the chain, effect-system, and resource registries.
+ *
+ * Each of those three registries is auto-populated by its corresponding
+ * factory (`createModifierChain`, `createTemporaryEffectSystem` /
+ * `createPersistentEffectSystem`, `createResource`) via an ambient
+ * registry-target that {@link createEngine} sets up around `install()` /
+ * `connect()`. The mechanism — module-private ambient slot, `with*` scope,
+ * `getCurrent*` reader, id-keyed Map plus insertion-order array — is
+ * identical across all three, and growing a fourth registry of the same
+ * shape would duplicate the pattern again. This helper extracts it.
+ *
+ * Two registration semantics are exposed as named methods, mirroring
+ * `ModifierChain.bind` (strict-on-dup) vs `ModifierChain.add` (permissive):
+ *
+ * - `register(entity)` throws on duplicate id. Chain and effect-system
+ *   registries call this — a duplicate id is an authoring mistake.
+ * - `append(entity)` silently appends regardless of id collisions. The
+ *   resource registry calls this — two persistence-context scopes can
+ *   legitimately share display names (e.g. per-prestige `points`), and
+ *   the namespaced resource id falls back to displayName.
+ *
+ * The ambient half is factored separately as {@link createAmbientScope}
+ * because the resource registry pairs its NamedRegistry with a wrapper-
+ * typed ambient (the public ResourceRegistry surface differs from the
+ * underlying NamedRegistry), so the two halves don't always travel
+ * together.
+ *
+ * @cluster registries
+ * @internal Engine-internal — not part of the consumer surface.
+ */
+
+/**
+ * Id-keyed registry with both strict and permissive registration methods,
+ * id lookup, and insertion-order enumeration.
+ *
+ * @typeParam T - Entity type. Entities don't need an `id` field directly;
+ *   the id is extracted via {@link CreateNamedRegistryOptions.idOf}.
+ */
+export interface NamedRegistry<T> {
+  /**
+   * Strict registration — throws if the entity's id is already registered.
+   *
+   * @internal Called by entity factories under an ambient scope; consumer
+   *   code reads via `get` / `has` / `all`.
+   */
+  register(entity: T): void;
+  /**
+   * Permissive registration — silently appends regardless of id collisions.
+   * Lookups (`get` / `has`) report the first-inserted entity for a given id.
+   *
+   * @internal Called by entity factories under an ambient scope.
+   */
+  append(entity: T): void;
+  /** First registered entity for `id`, or `undefined` if none matches. */
+  get(id: string): T | undefined;
+  /** Whether at least one entity with the given id is registered. */
+  has(id: string): boolean;
+  /** Snapshot of all registered entities in insertion order. */
+  all(): readonly T[];
+  /** Number of registered entities (counts every `append` call, not unique ids). */
+  readonly size: number;
+}
+
+export interface CreateNamedRegistryOptions<T> {
+  /** Class-style label used as the duplicate-id error prefix (e.g. `'ChainRegistry'`). */
+  label: string;
+  /** Lowercase noun used in the duplicate-id error message (e.g. `'chain'`, `'effect-system'`). */
+  entityNoun: string;
+  /** Extract the registry id from an entity. The resource registry projects through its entry wrapper; chain and effect-system entities expose `id` directly. */
+  idOf: (entity: T) => string;
+}
+
+/**
+ * Create a fresh, empty {@link NamedRegistry}. Each engine instance gets
+ * its own — scratch-engine forks never cross-contaminate.
+ */
+export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): NamedRegistry<T> {
+  const { label, entityNoun, idOf } = options;
+  const Noun = entityNoun.charAt(0).toUpperCase() + entityNoun.slice(1);
+
+  const byId = new Map<string, T>();
+  const order: T[] = [];
+
+  return {
+    register(entity) {
+      const id = idOf(entity);
+      if (byId.has(id)) {
+        throw new Error(
+          `${label}: duplicate ${entityNoun} id "${id}". ${Noun} ids must be unique within an engine instance.`,
+        );
+      }
+      byId.set(id, entity);
+      order.push(entity);
+    },
+    append(entity) {
+      const id = idOf(entity);
+      if (!byId.has(id)) byId.set(id, entity);
+      order.push(entity);
+    },
+    get(id) {
+      return byId.get(id);
+    },
+    has(id) {
+      return byId.has(id);
+    },
+    all() {
+      return order;
+    },
+    get size() {
+      return order.length;
+    },
+  };
+}
+
+/**
+ * Module-private ambient slot paired with `with` / `getCurrent` accessors.
+ * Each call to {@link createAmbientScope} returns an isolated slot —
+ * different scopes never share state, so chain / effect / resource ambients
+ * stay independent even when minted from the same helper.
+ */
+export interface AmbientScope<T> {
+  /**
+   * Run `fn` with `value` set as the ambient target. Nested calls save
+   * and restore the previous ambient so concurrent setups (e.g. multiple
+   * engines starting simultaneously) don't stomp each other. The previous
+   * ambient is also restored if `fn` throws.
+   *
+   * @internal Consumer code should not call this directly.
+   */
+  with<R>(value: T, fn: () => R): R;
+  /**
+   * Read the current ambient value, or `undefined` if outside a `with`
+   * block (tests, throwaway scripts).
+   *
+   * @internal Used by entity factories to auto-register into the current
+   *   engine's registries.
+   */
+  getCurrent(): T | undefined;
+}
+
+/**
+ * Create a fresh ambient-scope slot. The slot is closure-captured, so
+ * each call returns an independent ambient — chain and effect-system
+ * scopes can never alias even though they share this helper.
+ */
+export function createAmbientScope<T>(): AmbientScope<T> {
+  let current: T | undefined;
+
+  return {
+    with(value, fn) {
+      const prev = current;
+      current = value;
+      try {
+        return fn();
+      } finally {
+        current = prev;
+      }
+    },
+    getCurrent() {
+      return current;
+    },
+  };
+}

@@ -1,0 +1,477 @@
+import { describe, it, expect } from 'vitest';
+import { ref } from 'vue';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import { beginPersistentContext, endPersistentContext, isPersistent } from '@/core/persistence';
+import {
+  createTimedProgress,
+  resourceConsumedAt,
+  stepProgressiveCosts,
+  TimedProgressType,
+} from '@/core/timed-progress';
+
+type TickFn = (dt: number) => void;
+
+function makeTickBus() {
+  const subs = new Set<TickFn>();
+  const registerTick = (cb: TickFn) => {
+    subs.add(cb);
+    return () => {
+      subs.delete(cb);
+    };
+  };
+  const tick = (dt: number) => {
+    for (const cb of subs) cb(dt);
+  };
+  return { registerTick, tick, size: () => subs.size };
+}
+
+describe('createTimedProgress — construction', () => {
+  it('builds a tracker with default speed=1 and zeroed progress', () => {
+    const bus = makeTickBus();
+    const ctxId = 'tp-init';
+    beginPersistentContext(ctxId);
+    const tp = createTimedProgress({
+      id: ctxId,
+      duration: 10,
+      registerTick: bus.registerTick,
+    });
+    endPersistentContext();
+
+    expect(tp.type).toBe(TimedProgressType);
+    expect(tp.id).toBe(ctxId);
+    expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
+    expect(Decimal.eq(tp.tickProgressDelta.value, 0)).toBe(true);
+    expect(tp.percentComplete.value).toBe(0);
+  });
+
+  it('auto-generates an id when none provided', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 10,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+    expect(tp.id).toMatch(/^timedProgress_\d+$/);
+    tp.dispose();
+  });
+});
+
+describe('createTimedProgress — tick advancement', () => {
+  it('accumulates progress at speed * dt each tick', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 100,
+      speed: 5,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+
+    bus.tick(1);
+    expect(Decimal.eq(tp.progress.value, 5)).toBe(true);
+    expect(Decimal.eq(tp.tickProgressDelta.value, 5)).toBe(true);
+
+    bus.tick(2);
+    expect(Decimal.eq(tp.progress.value, 15)).toBe(true);
+    expect(Decimal.eq(tp.tickProgressDelta.value, 10)).toBe(true);
+
+    tp.dispose();
+  });
+
+  it('honors reactive speed via getter', () => {
+    const bus = makeTickBus();
+    const spd = ref<DecimalSource>(2);
+    const tp = createTimedProgress({
+      duration: 100,
+      speed: () => spd.value,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+
+    bus.tick(1);
+    expect(Decimal.eq(tp.progress.value, 2)).toBe(true);
+    spd.value = 10;
+    bus.tick(1);
+    expect(Decimal.eq(tp.progress.value, 12)).toBe(true);
+    tp.dispose();
+  });
+
+  it('zeroes tickProgressDelta and skips onProgress when speed <= 0', () => {
+    const bus = makeTickBus();
+    let calls = 0;
+    const tp = createTimedProgress({
+      duration: 100,
+      speed: 0,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onProgress: () => {
+        calls++;
+      },
+    });
+    bus.tick(1);
+    expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
+    expect(Decimal.eq(tp.tickProgressDelta.value, 0)).toBe(true);
+    expect(calls).toBe(0);
+    tp.dispose();
+  });
+
+  it('percentComplete reflects progress / duration clamped to [0,1]', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 1,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+    bus.tick(5);
+    expect(tp.percentComplete.value).toBeCloseTo(0.5);
+    bus.tick(20); // overshoots
+    expect(tp.percentComplete.value).toBe(1);
+    tp.dispose();
+  });
+});
+
+describe('createTimedProgress — onComplete boundary', () => {
+  it('fires onComplete exactly once on the crossing tick with overflow', () => {
+    const bus = makeTickBus();
+    const completions: DecimalSource[] = [];
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 4,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: (overflow) => completions.push(overflow),
+    });
+
+    bus.tick(1); // progress = 4
+    bus.tick(1); // progress = 8
+    expect(completions.length).toBe(0);
+    bus.tick(1); // progress = 12, crosses duration
+    expect(completions.length).toBe(1);
+    expect(Decimal.eq(completions[0], 2)).toBe(true);
+    tp.dispose();
+  });
+
+  it('does not re-fire onComplete on subsequent ticks when consumer parks progress past duration', () => {
+    const bus = makeTickBus();
+    let fires = 0;
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 20,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: () => {
+        fires++;
+      },
+    });
+    bus.tick(1); // cross
+    bus.tick(1); // already past duration — no crossing
+    bus.tick(1);
+    expect(fires).toBe(1);
+    tp.dispose();
+  });
+
+  it('reset() clears progress so the next crossing fires again', () => {
+    const bus = makeTickBus();
+    let fires = 0;
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 20,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: () => {
+        fires++;
+        tp.reset();
+      },
+    });
+    bus.tick(1);
+    bus.tick(1);
+    bus.tick(1);
+    expect(fires).toBe(3);
+    tp.dispose();
+  });
+
+  it('fires onProgress on every advancing tick', () => {
+    const bus = makeTickBus();
+    const deltas: DecimalSource[] = [];
+    const tp = createTimedProgress({
+      duration: 100,
+      speed: 3,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onProgress: (d) => deltas.push(d),
+    });
+    bus.tick(1);
+    bus.tick(2);
+    expect(deltas.length).toBe(2);
+    expect(Decimal.eq(deltas[0], 3)).toBe(true);
+    expect(Decimal.eq(deltas[1], 6)).toBe(true);
+    tp.dispose();
+  });
+});
+
+describe('createTimedProgress — reset and dispose', () => {
+  it('reset() clears progress and tickProgressDelta', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 2,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+    bus.tick(2);
+    expect(Decimal.eq(tp.progress.value, 4)).toBe(true);
+    tp.reset();
+    expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
+    expect(Decimal.eq(tp.tickProgressDelta.value, 0)).toBe(true);
+    tp.dispose();
+  });
+
+  it('dispose() unsubscribes from the tick loop', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 10,
+      speed: 1,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+    expect(bus.size()).toBe(1);
+    tp.dispose();
+    expect(bus.size()).toBe(0);
+    bus.tick(5);
+    expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
+  });
+});
+
+describe('createTimedProgress — persistence', () => {
+  it('ephemeral: true uses plain refs (not persistent)', () => {
+    const bus = makeTickBus();
+    const tp = createTimedProgress({
+      duration: 10,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+    });
+    expect(isPersistent(tp.progress)).toBe(false);
+    tp.dispose();
+  });
+
+  it('default persists progress inside the ambient context', () => {
+    const bus = makeTickBus();
+    beginPersistentContext('tp-persist');
+    const tp = createTimedProgress({
+      id: 'tp-persist',
+      duration: 10,
+      registerTick: bus.registerTick,
+    });
+    endPersistentContext();
+    expect(isPersistent(tp.progress)).toBe(true);
+    tp.dispose();
+  });
+});
+
+// ============================================================================
+// stepProgressiveCosts
+// ============================================================================
+
+describe('stepProgressiveCosts — no costs', () => {
+  it('advances to proposed with empty costs, never stalled unless proposed <= prev', () => {
+    const step = stepProgressiveCosts({
+      prevProgress: 3,
+      proposedProgress: 7,
+      duration: 10,
+      costs: [],
+    });
+    expect(Decimal.eq(step.cappedProgress, 7)).toBe(true);
+    expect(step.stalled).toBe(false);
+    expect(step.deltas).toEqual([]);
+  });
+
+  it('stalls when proposed <= prev', () => {
+    const step = stepProgressiveCosts({
+      prevProgress: 5,
+      proposedProgress: 5,
+      duration: 10,
+      costs: [],
+    });
+    expect(Decimal.eq(step.cappedProgress, 5)).toBe(true);
+    expect(step.stalled).toBe(true);
+  });
+});
+
+describe('stepProgressiveCosts — single cost', () => {
+  it('advances full proposal when available covers the need', () => {
+    const step = stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 10,
+      duration: 10,
+      costs: [{ amount: 10, available: () => 10 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 10)).toBe(true);
+    expect(step.stalled).toBe(false);
+    expect(Decimal.eq(step.deltas[0], 10)).toBe(true);
+  });
+
+  it('caps progress when available is short of need', () => {
+    // duration 10, cost.amount 10 → interval 1. prev=0, proposed=10 means
+    // we wanted all 10 units but only 4 on hand → cap to progress 4.
+    const step = stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 10,
+      duration: 10,
+      costs: [{ amount: 10, available: () => 4 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 4)).toBe(true);
+    expect(step.stalled).toBe(false);
+    expect(Decimal.eq(step.deltas[0], 4)).toBe(true);
+  });
+
+  it('stalls when zero units affordable', () => {
+    const step = stepProgressiveCosts({
+      prevProgress: 2,
+      proposedProgress: 5,
+      duration: 10,
+      costs: [{ amount: 10, available: () => 0 }],
+    });
+    // prevConsumed(2, 10, 10) = ceil(2/1) = 2; available=0 → maxProg=(2+0)*1=2
+    expect(Decimal.eq(step.cappedProgress, 2)).toBe(true);
+    expect(step.stalled).toBe(true);
+    expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
+  });
+
+  it('treats zero-amount costs as non-capping and produces zero delta', () => {
+    const step = stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 8,
+      duration: 10,
+      costs: [{ amount: 0, available: () => 0 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 8)).toBe(true);
+    expect(step.stalled).toBe(false);
+    expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
+  });
+});
+
+describe('stepProgressiveCosts — multiple costs', () => {
+  it('caps at the tightest constraint', () => {
+    // duration=100, proposed=60 from prev=40:
+    //   wood amount=10, interval=10, available=5, prevConsumed=4 → maxProg=(4+5)*10=90 — no cap
+    //   stone amount=20, interval=5, available=2, prevConsumed=ceil(40/5)=8 → maxProg=(8+2)*5=50 — caps to 50
+    const step = stepProgressiveCosts({
+      prevProgress: 40,
+      proposedProgress: 60,
+      duration: 100,
+      costs: [
+        { amount: 10, available: () => 5 },
+        { amount: 20, available: () => 2 },
+      ],
+    });
+    expect(Decimal.eq(step.cappedProgress, 50)).toBe(true);
+    expect(step.stalled).toBe(false);
+    // wood at 50: consumed(50,100,10)=5, prev=4, delta=1
+    // stone at 50: consumed(50,100,20)=10, prev=8, delta=2
+    expect(Decimal.eq(step.deltas[0], 1)).toBe(true);
+    expect(Decimal.eq(step.deltas[1], 2)).toBe(true);
+  });
+
+  it('produces zero delta for a cost whose ceil threshold is not crossed', () => {
+    // interval=10 (amount=10, dur=100). prev=51 has already consumed 6 units;
+    // advancing to 52 stays within the same [51..60] interval → delta 0.
+    const step = stepProgressiveCosts({
+      prevProgress: 51,
+      proposedProgress: 52,
+      duration: 100,
+      costs: [
+        { amount: 10, available: () => 10 }, // prev consumed 6, would 6 → 0
+        { amount: 100, available: () => 100 }, // interval 1 → prev 51, would 52 → 1
+      ],
+    });
+    expect(Decimal.eq(step.cappedProgress, 52)).toBe(true);
+    expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
+    expect(Decimal.eq(step.deltas[1], 1)).toBe(true);
+  });
+
+  it('order-independent capping', () => {
+    const costsA = [
+      { amount: 10, available: () => 5 },
+      { amount: 20, available: () => 2 },
+    ];
+    const costsB = [
+      { amount: 20, available: () => 2 },
+      { amount: 10, available: () => 5 },
+    ];
+    const stepA = stepProgressiveCosts({
+      prevProgress: 40,
+      proposedProgress: 60,
+      duration: 100,
+      costs: costsA,
+    });
+    const stepB = stepProgressiveCosts({
+      prevProgress: 40,
+      proposedProgress: 60,
+      duration: 100,
+      costs: costsB,
+    });
+    expect(Decimal.eq(stepA.cappedProgress, stepB.cappedProgress)).toBe(true);
+  });
+});
+
+describe('stepProgressiveCosts — invariant parity with resourceConsumedAt', () => {
+  it('each delta matches the consumedAt difference between prev and capped', () => {
+    const costs = [
+      { amount: 10, available: () => 5 },
+      { amount: 20, available: () => 8 },
+      { amount: 4, available: () => 3 },
+    ];
+    const step = stepProgressiveCosts({
+      prevProgress: 12,
+      proposedProgress: 45,
+      duration: 100,
+      costs,
+    });
+    for (let i = 0; i < costs.length; i++) {
+      const before = resourceConsumedAt(12, 100, costs[i].amount);
+      const after = resourceConsumedAt(step.cappedProgress, 100, costs[i].amount);
+      const expected = Decimal.sub(after, before);
+      expect(Decimal.eq(step.deltas[i], Decimal.max(expected, 0))).toBe(true);
+    }
+  });
+});
+
+describe('stepProgressiveCosts — calls available() lazily only once per entry', () => {
+  it('does not invoke available() for zero-amount entries', () => {
+    let calls = 0;
+    stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 5,
+      duration: 10,
+      costs: [
+        {
+          amount: 0,
+          available: () => {
+            calls++;
+            return 0;
+          },
+        },
+      ],
+    });
+    expect(calls).toBe(0);
+  });
+
+  it('invokes available() at most once per entry during capping', () => {
+    let calls = 0;
+    stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 10,
+      duration: 10,
+      costs: [
+        {
+          amount: 10,
+          available: () => {
+            calls++;
+            return 3; // tight enough to trigger capping
+          },
+        },
+      ],
+    });
+    expect(calls).toBe(1);
+  });
+});

@@ -1,0 +1,7 @@
+# Ignore everything in profiles/ by default — `summarize.mjs`, `.cpuprofile`
+# dumps, ad-hoc `--write-to=` JSONs captured during investigation — then
+# allow only the load-bearing baseline back in. Keeps the diff scaffolding
+# (OL-679) from accumulating drift artifacts in the repo.
+*
+!.gitignore
+!baseline.json

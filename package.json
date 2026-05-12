@@ -1,0 +1,87 @@
+{
+  "name": "@open-loop/engine",
+  "version": "0.1.0",
+  "description": "Headless TypeScript substrate for incremental and idle games. Reactive state, big-number math, composable evaluation kernel, registration surfaces for skills/producers/purchasables/achievements/challenges/dialog/zones.",
+  "license": "MIT",
+  "author": "namahanna <namahanna@gmail.com>",
+  "homepage": "https://codeberg.org/namahanna/open-loop-engine",
+  "repository": {
+    "type": "git",
+    "url": "https://codeberg.org/namahanna/open-loop-engine.git"
+  },
+  "bugs": {
+    "url": "https://codeberg.org/namahanna/open-loop-engine/issues"
+  },
+  "keywords": [
+    "incremental",
+    "idle",
+    "idle-game",
+    "incremental-game",
+    "game-engine",
+    "headless",
+    "vue",
+    "reactivity",
+    "break_eternity"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./primitives": "./dist/primitives/index.js",
+    "./core": "./dist/core/index.js",
+    "./systems": "./dist/systems/index.js",
+    "./harness": "./dist/harness/index.js",
+    "./types": "./dist/primitives/types.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
+    "build": "tsc && tsc-alias && pnpm build:api",
+    "build:api": "node scripts/build-api-docs.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
+    "lint": "eslint src/",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "diag": "npx tsx --tsconfig tsconfig.scripts.json scripts/diag.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,json}": "prettier --write",
+    "*.ts": "eslint --fix"
+  },
+  "peerDependencies": {
+    "break_eternity.js": "^2.1.0",
+    "eternal_notations": "^1.1.1",
+    "vue": "^3.4.0"
+  },
+  "dependencies": {
+    "lz-string": "^1.5.0",
+    "nanoevents": "^9.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@release-it/conventional-changelog": "^10.0.0",
+    "@types/node": "^25.6.0",
+    "@vue/reactivity": "^3.5.0",
+    "break_eternity.js": "^2.1.0",
+    "eslint": "^10.1.0",
+    "eternal_notations": "^1.1.1",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "release-it": "^18.0.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^3.0.0",
+    "vue": "^3.5.0"
+  }
+}

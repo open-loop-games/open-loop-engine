@@ -1,0 +1,425 @@
+import { describe, it, expect } from 'vitest';
+import { Decimal } from '@/primitives/decimal';
+import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
+import { createResource } from '@/core/resource';
+import { createCostRequirement } from '@/core/requirements';
+import Formula from '@/core/formulas/formulas';
+
+describe('Purchasable (one-shot, limit: 1)', () => {
+  it('starts as not bought (amount 0)', () => {
+    const p = createPurchasable({
+      display: { title: 'Test', description: 'Test upgrade' },
+      requirements: [],
+      limit: 1,
+    });
+    expect(p.active.value).toBe(false);
+    expect(Decimal.eq(p.amount.value, 0)).toBe(true);
+  });
+
+  it('can be purchased when requirements met', () => {
+    const p = createPurchasable({
+      display: { title: 'Free', description: 'Free upgrade' },
+      requirements: [],
+      limit: 1,
+    });
+    expect(p.canPurchase.value).toBe(true);
+    const result = p.purchase();
+    expect(Decimal.gte(result, 1)).toBe(true);
+    expect(p.active.value).toBe(true);
+  });
+
+  it('cannot be purchased twice', () => {
+    const p = createPurchasable({
+      display: { title: 'Once', description: 'One-time' },
+      requirements: [],
+      limit: 1,
+    });
+    p.purchase();
+    expect(p.canPurchase.value).toBe(false);
+    expect(p.maxed.value).toBe(true);
+    const result = p.purchase();
+    expect(Decimal.eq(result, 0)).toBe(true);
+  });
+
+  it('calls onPurchase callback', () => {
+    let called = false;
+    const p = createPurchasable({
+      display: { title: 'Callback', description: 'With callback' },
+      requirements: [],
+      limit: 1,
+      onPurchase: () => {
+        called = true;
+      },
+    });
+    p.purchase();
+    expect(called).toBe(true);
+  });
+
+  it('defaults bulkPurchase to false when limit is 1', () => {
+    const p = createPurchasable({
+      display: 'one-shot',
+      requirements: [],
+      limit: 1,
+    });
+    expect(p.bulkPurchase).toBe(false);
+  });
+
+  it('defaults showAmount to false when limit is 1', () => {
+    const p = createPurchasable({
+      display: { description: 'one-shot' },
+      requirements: [],
+      limit: 1,
+    });
+    expect(p.display.showAmount).toBe(false);
+  });
+
+  it('exposes static effect as computed', () => {
+    const p = createPurchasable({
+      display: 'effect test',
+      requirements: [],
+      limit: 1,
+      effect: 2,
+    });
+    expect(Decimal.eq(p.effect.value, 2)).toBe(true);
+  });
+});
+
+describe('Purchasable (leveled, limit > 1)', () => {
+  it('starts at amount 0', () => {
+    const p = createPurchasable({
+      display: { title: 'Worker', description: 'Produces gold' },
+      requirements: [],
+    });
+    expect(Decimal.eq(p.amount.value, 0)).toBe(true);
+    expect(p.active.value).toBe(false);
+  });
+
+  it('can be purchased when requirements met', () => {
+    const p = createPurchasable({
+      display: { title: 'Free', description: 'Free repeatable' },
+      requirements: [],
+      bulkPurchase: false,
+    });
+    expect(p.canPurchase.value).toBe(true);
+    p.purchase(1);
+    expect(Decimal.eq(p.amount.value, 1)).toBe(true);
+    expect(p.active.value).toBe(true);
+  });
+
+  it('respects limit', () => {
+    const p = createPurchasable({
+      display: { title: 'Limited', description: 'Max 3' },
+      requirements: [],
+      limit: 3,
+    });
+    p.purchaseMax();
+    expect(p.maxed.value).toBe(true);
+    expect(Decimal.eq(p.amount.value, 3)).toBe(true);
+  });
+
+  it('defaults bulkPurchase to true when limit > 1', () => {
+    const p = createPurchasable({
+      display: 'leveled',
+      requirements: [],
+    });
+    expect(p.bulkPurchase).toBe(true);
+  });
+
+  it('defaults showAmount to true when limit > 1', () => {
+    const p = createPurchasable({
+      display: { description: 'leveled' },
+      requirements: [],
+    });
+    expect(p.display.showAmount).toBe(true);
+  });
+
+  it('computes effect from amount function', () => {
+    const p = createPurchasable({
+      display: 'effect test',
+      requirements: [],
+      effect: (amount) => Decimal.pow(2, amount),
+      bulkPurchase: false,
+    });
+    expect(Decimal.eq(p.effect.value, 1)).toBe(true); // 2^0 = 1
+    p.purchase(1);
+    expect(Decimal.eq(p.effect.value, 2)).toBe(true); // 2^1 = 2
+    p.purchase(1);
+    expect(Decimal.eq(p.effect.value, 4)).toBe(true); // 2^2 = 4
+  });
+
+  it('supports initialAmount', () => {
+    const p = createPurchasable({
+      display: 'pre-purchased',
+      requirements: [],
+      initialAmount: 5,
+      limit: 10,
+    });
+    expect(Decimal.eq(p.amount.value, 5)).toBe(true);
+    expect(p.active.value).toBe(true);
+  });
+});
+
+describe('createScalingPurchasable — effect as Formula', () => {
+  it('DecimalSource shorthand auto-wraps as invertible Formula', () => {
+    const points = createResource(1e6, { displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'shorthand-effect',
+      description: 'Shorthand effect',
+      resource: points,
+      baseCost: 10,
+      costScaling: 1.15,
+      effect: 2, // interpreted as 2^amount
+    });
+
+    expect(p.effectCurve).toBeDefined();
+    // At amount 0: 2^0 = 1
+    expect(Decimal.eq(p.effect.value, 1)).toBe(true);
+    // Invert: 2^level = 8 → level = 3
+    const levelForEight = new Decimal(p.effectCurve!.invert(8)).toNumber();
+    expect(levelForEight).toBeCloseTo(3, 5);
+  });
+
+  it('accepts a Formula factory for effect and exposes effectCurve', () => {
+    const points = createResource(1e6, { displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'factory-effect',
+      description: 'Factory effect',
+      resource: points,
+      baseCost: 10,
+      costScaling: 1.15,
+      // Linear effect: 1 + 0.5 * amount
+      effect: (amount) => Formula.variable(amount).mul(0.5).add(1),
+    });
+
+    expect(p.effectCurve).toBeDefined();
+    // At amount 0: 1 + 0 = 1
+    expect(Decimal.eq(p.effect.value, 1)).toBe(true);
+    p.purchase(1);
+    // At amount 1: 1.5
+    expect(new Decimal(p.effect.value).toNumber()).toBeCloseTo(1.5);
+    // Invert: 1 + 0.5*level = 11 → level = 20
+    const levelForEleven = new Decimal(p.effectCurve!.invert(11)).toNumber();
+    expect(levelForEleven).toBeCloseTo(20, 5);
+  });
+
+  it('opaque value function still works; effectCurve is undefined', () => {
+    const points = createResource(1e6, { displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'opaque-effect',
+      description: 'Opaque effect',
+      resource: points,
+      baseCost: 10,
+      costScaling: 1.15,
+      // Non-Formula function that might do anything
+      effect: (amount) => Decimal.add(Decimal.mul(amount, 3), 7),
+    });
+
+    expect(p.effectCurve).toBeUndefined();
+    // At amount 0: 3*0 + 7 = 7
+    expect(Decimal.eq(p.effect.value, 7)).toBe(true);
+    p.purchase(1);
+    expect(Decimal.eq(p.effect.value, 10)).toBe(true);
+  });
+});
+
+describe('createScalingPurchasable — cost escalation regression', () => {
+  it('getCost(1) reflects the next-level cost after purchase', () => {
+    const r = createResource(1e9, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'ol430-basic',
+      description: 'cost escalation',
+      resource: r,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(10, 5);
+    p.purchase(1);
+    // baseCost * 1.15^1
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(11.5, 5);
+    p.purchase(1);
+    // baseCost * 1.15^2
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(13.225, 4);
+  });
+
+  it('escalates correctly across multiple level steps', () => {
+    const r = createResource(1e9, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'ol430-multi',
+      description: 'multi',
+      resource: r,
+      baseCost: 100,
+      costScaling: 1.2,
+    });
+
+    // Buy 5 via repeated single purchases so the test is independent of bulk math.
+    for (let i = 0; i < 5; i++) {
+      p.purchase(1);
+    }
+    // Cost at level 5: 100 * 1.2^5 = 248.832
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(248.832, 3);
+  });
+
+  it('canPurchase and amountToPurchase reflect escalated affordability', () => {
+    // 500 cookies, cost 100 then 120, 144, 172.8, 207.36, 248.832 ...
+    // Cumulative affordable from 0 with cost 100 * 1.2^k: at most 3 levels
+    // (100 + 120 + 144 = 364 ≤ 500; + 172.8 = 536.8 > 500)
+    const r = createResource(500, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'ol430-afford',
+      description: 'afford',
+      resource: r,
+      baseCost: 100,
+      costScaling: 1.2,
+    });
+
+    p.purchase(1);
+    // After buying one (100 spent, 400 left), next cost is 120 — affordable
+    expect(p.canPurchase.value).toBe(true);
+    p.purchase(1);
+    // After two purchases (220 spent, 280 left), next cost is 144 — affordable
+    expect(p.canPurchase.value).toBe(true);
+    p.purchase(1);
+    // After three purchases (364 spent, 136 left), next cost is 172.8 — NOT affordable
+    expect(p.canPurchase.value).toBe(false);
+  });
+});
+
+describe('createScalingPurchasable — purchaseMax at finite limit regression', () => {
+  it('purchaseMax reaches the declared limit in a single call', () => {
+    const r = createResource(1e308, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'ol433-limit3',
+      description: 'limit 3',
+      resource: r,
+      baseCost: 100,
+      costScaling: 10,
+      limit: 3,
+      effect: (amount) => Formula.variable(amount).times(1).add(1),
+    });
+
+    const bought = p.purchaseMax();
+    expect(new Decimal(p.amount.value).toNumber()).toBe(3);
+    expect(new Decimal(bought).toNumber()).toBe(3);
+    expect(new Decimal(p.effect.value).toNumber()).toBe(4);
+    expect(p.maxed.value).toBe(true);
+  });
+
+  it('createPurchasable with finite limit also reaches the limit via purchaseMax', () => {
+    const r = createResource(1e308, { displayName: 'r' });
+    const p = createPurchasable({
+      display: { description: 'non-scaling limit 3' },
+      requirements: createCostRequirement({
+        resource: r,
+        cost: Formula.variable(0).add(100),
+        maxBulkAmount: 3,
+      }),
+      limit: 3,
+      effect: (amt) => Decimal.add(amt, 1),
+    });
+
+    p.purchaseMax();
+    expect(new Decimal(p.amount.value).toNumber()).toBe(3);
+    expect(p.maxed.value).toBe(true);
+  });
+});
+
+describe('createScalingPurchasable — closure cost (costFormula)', () => {
+  it('opaque closure cost reads through scalingAmount as level rises', () => {
+    const r = createResource(1e9, { displayName: 'r' });
+    // Super-exponential: 10^(1 + level²) — not expressible in engine Formula
+    // vocabulary, so the consumer takes the opaque-closure path.
+    const p = createScalingPurchasable({
+      id: 'closure-superexp',
+      description: 'superexp',
+      resource: r,
+      costFormula: (level) => Decimal.pow(10, Decimal.add(1, Decimal.pow(level, 2))),
+      bulkPurchase: false,
+    });
+
+    expect(Decimal.eq(p.getCost(1), 10)).toBe(true); // 10^(1+0) at level 0
+    p.purchase();
+    expect(Decimal.eq(p.getCost(1), 100)).toBe(true); // 10^(1+1) at level 1
+    p.purchase();
+    expect(Decimal.eq(p.getCost(1), 1e5)).toBe(true); // 10^(1+4) at level 2
+  });
+
+  it('opaque closure cost is paid against the resource', () => {
+    const r = createResource(500, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'closure-pay',
+      description: 'closure pay',
+      resource: r,
+      costFormula: (level) => Decimal.add(100, Decimal.mul(level, 50)),
+      bulkPurchase: false,
+    });
+
+    p.purchase();
+    expect(Decimal.eq(r.value, 400)).toBe(true); // paid 100 at level 0
+    p.purchase();
+    expect(Decimal.eq(r.value, 250)).toBe(true); // paid 150 at level 1
+  });
+
+  it('Formula factory closure produces an invertible bulk-aware cost', () => {
+    const r = createResource(1000, { displayName: 'r' });
+    // 100 + level² via Formula vocabulary — bulk math should work.
+    const p = createScalingPurchasable({
+      id: 'formula-factory',
+      description: 'formula factory',
+      resource: r,
+      costFormula: (amount) =>
+        (Formula.variable(amount) as ReturnType<typeof Formula.variable>).pow(2).add(100),
+    });
+
+    expect(Decimal.eq(p.getCost(1), 100)).toBe(true); // 0²+100 at level 0
+    p.purchase(1);
+    expect(Decimal.eq(p.getCost(1), 101)).toBe(true); // 1²+100 at level 1
+    p.purchase(1);
+    expect(Decimal.eq(p.getCost(1), 104)).toBe(true); // 2²+100 at level 2
+  });
+
+  it('opaque closure disables bulk purchase (maxBulkAmount = 1)', () => {
+    const r = createResource(1e6, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'closure-no-bulk',
+      description: 'no bulk',
+      resource: r,
+      costFormula: (level) => Decimal.add(10, Decimal.mul(level, 1)),
+    });
+
+    // amountToPurchase caps at 1 because the cost is non-Formula.
+    expect(new Decimal(p.amountToPurchase.value).toNumber()).toBe(1);
+  });
+
+  it('geometric path remains unchanged (regression)', () => {
+    const r = createResource(1e9, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'geometric-regression',
+      description: 'geometric',
+      resource: r,
+      baseCost: 100,
+      costScaling: 2,
+    });
+
+    expect(Decimal.eq(p.getCost(1), 100)).toBe(true);
+    p.purchase(1);
+    expect(Decimal.eq(p.getCost(1), 200)).toBe(true);
+    p.purchase(1);
+    expect(Decimal.eq(p.getCost(1), 400)).toBe(true);
+  });
+
+  it('closure cost reactively flips canPurchase when resource crosses threshold', () => {
+    const r = createResource(50, { displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'closure-canpurchase',
+      description: 'reactive',
+      resource: r,
+      costFormula: (level) => Decimal.add(100, Decimal.mul(level, 100)),
+      bulkPurchase: false,
+    });
+
+    expect(p.canPurchase.value).toBe(false); // 50 < 100
+    r.value = new Decimal(150);
+    expect(p.canPurchase.value).toBe(true); // 150 ≥ 100
+  });
+});

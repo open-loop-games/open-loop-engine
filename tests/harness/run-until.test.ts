@@ -1,0 +1,202 @@
+import { describe, it, expect } from 'vitest';
+import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Engine } from '@/index';
+import { runUntil } from '@/harness';
+
+// --- helpers ---
+
+/** Minimal Engine shape for testing harness behavior in isolation.
+ *  Only `engine.loop.simulateTick` is exercised by runUntil; the rest of
+ *  the Engine surface is irrelevant here. A monotonic counter gives
+ *  predicates something to close over; the stub also records the most
+ *  recent dt so tests can pin the caller's tickDelta reaches the engine. */
+function createTestEngine(): Engine & {
+  readonly tickCount: number;
+  readonly lastDt: number;
+  readonly dts: readonly number[];
+} {
+  let tickCount = 0;
+  let lastDt = 0;
+  const dts: number[] = [];
+  const engine = {
+    loop: {
+      simulateTick: (dt: number) => {
+        tickCount += 1;
+        lastDt = dt;
+        dts.push(dt);
+      },
+    },
+    get tickCount() {
+      return tickCount;
+    },
+    get lastDt() {
+      return lastDt;
+    },
+    get dts() {
+      return dts;
+    },
+  };
+  return engine as unknown as Engine & {
+    readonly tickCount: number;
+    readonly lastDt: number;
+    readonly dts: readonly number[];
+  };
+}
+
+/** Analyzer factory that records lifecycle calls as metrics. */
+function createLifecycleAnalyzer(): Analyzer {
+  let starts = 0;
+  let ticks = 0;
+  let ends = 0;
+  const tickIndices: number[] = [];
+  return {
+    name: 'lifecycle',
+    onStart: () => {
+      starts += 1;
+    },
+    onTick: (i) => {
+      ticks += 1;
+      tickIndices.push(i);
+    },
+    onEnd: () => {
+      ends += 1;
+    },
+    summarize: (): AnalyzerResult => ({
+      name: 'lifecycle',
+      metrics: {
+        starts,
+        ticks,
+        ends,
+        firstTickIndex: tickIndices[0] ?? -1,
+        lastTickIndex: tickIndices[tickIndices.length - 1] ?? -1,
+      },
+    }),
+  };
+}
+
+describe('runUntil', () => {
+  it('terminates at tick 0 when the predicate is satisfied before stepping', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: () => true,
+      maxSimTime: 10,
+    });
+    expect(result.terminated).toBe('predicate');
+    expect(result.totalTicks).toBe(0);
+    expect(result.elapsedSimulated).toBe(0);
+    expect(engine.tickCount).toBe(0);
+  });
+
+  it('terminates mid-run with the correct tick count and sim-time', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: ({ tick }) => tick >= 5,
+      maxSimTime: 10,
+      tickDelta: 0.1,
+    });
+    expect(result.terminated).toBe('predicate');
+    expect(result.totalTicks).toBe(5);
+    expect(result.elapsedSimulated).toBeCloseTo(0.5, 10);
+    expect(engine.tickCount).toBe(5);
+  });
+
+  it('returns terminated: maxSimTime when the predicate never fires', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: () => false,
+      maxSimTime: 1,
+      tickDelta: 0.1,
+    });
+    expect(result.terminated).toBe('maxSimTime');
+    // Math.floor(1 / 0.1) === 10 ticks, stepped 10 times with sim-time 1.0.
+    expect(result.totalTicks).toBe(10);
+    expect(result.elapsedSimulated).toBeCloseTo(1.0, 10);
+  });
+
+  it('defaults tickDelta to 0.05', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: ({ tick }) => tick >= 3,
+      maxSimTime: 1,
+    });
+    expect(result.elapsedSimulated).toBeCloseTo(0.15, 10);
+  });
+
+  it('fires analyzer lifecycle onStart/onTick/onEnd in order', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: ({ tick }) => tick >= 3,
+      maxSimTime: 1,
+      tickDelta: 0.1,
+      setup: () => [createLifecycleAnalyzer()],
+    });
+    const metrics = result.analyzerResults[0]!.metrics;
+    expect(metrics.starts).toBe(1);
+    expect(metrics.ticks).toBe(3);
+    expect(metrics.ends).toBe(1);
+    // onTick receives the index of the tick just stepped (0..totalTicks-1).
+    expect(metrics.firstTickIndex).toBe(0);
+    expect(metrics.lastTickIndex).toBe(2);
+  });
+
+  it('does not fire analyzer onTick when the predicate fires at tick 0', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: () => true,
+      maxSimTime: 1,
+      setup: () => [createLifecycleAnalyzer()],
+    });
+    const metrics = result.analyzerResults[0]!.metrics;
+    expect(metrics.starts).toBe(1);
+    expect(metrics.ticks).toBe(0);
+    expect(metrics.ends).toBe(1);
+  });
+
+  it('passes tick and simTime in the predicate context', () => {
+    const engine = createTestEngine();
+    const seen: Array<{ tick: number; simTime: number }> = [];
+    runUntil({
+      engine,
+      until: (ctx) => {
+        seen.push(ctx);
+        return ctx.tick >= 2;
+      },
+      maxSimTime: 1,
+      tickDelta: 0.1,
+    });
+    expect(seen).toEqual([
+      { tick: 0, simTime: 0 },
+      { tick: 1, simTime: 0.1 },
+      { tick: 2, simTime: 0.2 },
+    ]);
+  });
+
+  it("forwards caller's tickDelta to engine.loop.simulateTick", () => {
+    const engine = createTestEngine();
+    runUntil({
+      engine,
+      until: ({ tick }) => tick >= 3,
+      maxSimTime: 10,
+      tickDelta: 0.25,
+    });
+    expect(engine.tickCount).toBe(3);
+    expect(engine.lastDt).toBe(0.25);
+    expect([...engine.dts]).toEqual([0.25, 0.25, 0.25]);
+  });
+
+  it('omits setup when no analyzers are configured', () => {
+    const engine = createTestEngine();
+    const result = runUntil({
+      engine,
+      until: ({ tick }) => tick >= 1,
+      maxSimTime: 1,
+    });
+    expect(result.analyzerResults).toEqual([]);
+  });
+});

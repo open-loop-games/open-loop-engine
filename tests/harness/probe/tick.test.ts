@@ -1,0 +1,105 @@
+import { describe, it, expect } from 'vitest';
+import type { Engine } from '@/index';
+import { runProbe } from '@/harness';
+import type { BeatProbe } from '@/harness';
+
+/** Minimal engine shaped object whose counter advances one tick per simulateTick. */
+function buildTickCounterEngine(state: { tick: number }): Engine {
+  const engine = {
+    loop: {
+      simulateTick: (_dt: number) => {
+        state.tick += 1;
+      },
+    },
+    // Used by the beat predicate via closure; attach state reference for clarity.
+    __state: state,
+  };
+  return engine as unknown as Engine;
+}
+
+describe('runProbe', () => {
+  it('fires predicate once the counter crosses the threshold (stats over all seeds)', () => {
+    const sinks = new Map<number, { tick: number }>();
+    const beat: BeatProbe = {
+      id: 'fires-at-5',
+      predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
+    };
+
+    const results = runProbe({
+      buildEngine: ({ seed }) => {
+        const state = { tick: 0 };
+        sinks.set(seed, state);
+        return buildTickCounterEngine(state);
+      },
+      beats: [beat],
+      seeds: [1, 2, 3],
+      maxSimTime: 100,
+      tickDelta: 1,
+    });
+
+    expect(results).toHaveLength(1);
+    const r = results[0]!;
+    expect(r.beatId).toBe('fires-at-5');
+    expect(r.counts).toEqual({ predicate: 3, maxSimTime: 0, unreachable: 0 });
+    expect(r.terminationTime).toBeDefined();
+    // tickDelta=1s, predicate fires at tick 5 → simTime 5s.
+    expect(r.terminationTime!.p50).toBeCloseTo(5, 5);
+  });
+
+  it('preserves beat order and counts runs that hit maxSimTime', () => {
+    const neverFires: BeatProbe = { id: 'never', predicate: () => false };
+    const firesAt3: BeatProbe = {
+      id: 'at-3',
+      predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 3,
+    };
+
+    const results = runProbe({
+      buildEngine: () => buildTickCounterEngine({ tick: 0 }),
+      beats: [neverFires, firesAt3],
+      seeds: [1, 2],
+      maxSimTime: 10,
+      tickDelta: 1,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results[0]!.beatId).toBe('never');
+    expect(results[0]!.counts).toEqual({ predicate: 0, maxSimTime: 2, unreachable: 0 });
+    expect(results[0]!.terminationTime).toBeUndefined();
+
+    expect(results[1]!.beatId).toBe('at-3');
+    expect(results[1]!.counts).toEqual({ predicate: 2, maxSimTime: 0, unreachable: 0 });
+    expect(results[1]!.terminationTime!.p50).toBeCloseTo(3, 5);
+  });
+
+  it('populates inWindow when the beat carries a targetWindow', () => {
+    const inside: BeatProbe = {
+      id: 'inside',
+      predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
+      targetWindow: [4, 6],
+    };
+    const outside: BeatProbe = {
+      id: 'outside',
+      predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
+      targetWindow: [10, 20],
+    };
+    const noWindow: BeatProbe = {
+      id: 'no-window',
+      predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
+    };
+
+    const results = runProbe({
+      buildEngine: () => buildTickCounterEngine({ tick: 0 }),
+      beats: [inside, outside, noWindow],
+      seeds: [1],
+      maxSimTime: 100,
+      tickDelta: 1,
+    });
+
+    expect(results[0]!.inWindow).toBe(true);
+    expect(results[0]!.targetWindow).toEqual([4, 6]);
+    expect(results[1]!.inWindow).toBe(false);
+    expect(results[1]!.targetWindow).toEqual([10, 20]);
+    expect(results[2]!.inWindow).toBeUndefined();
+    expect(results[2]!.targetWindow).toBeUndefined();
+  });
+});
