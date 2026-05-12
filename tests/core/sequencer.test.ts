@@ -1090,3 +1090,191 @@ describe('Sequencer — hold state invariants', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['replaced']);
   });
 });
+
+describe('Sequencer — enqueue positional `at`', () => {
+  it('omitted `at` appends (existing behavior unchanged)', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.enqueue(qi('c'));
+    // a is current, b and c waiting in that order
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.items.value.map((i) => i.id)).toEqual(['b', 'c']);
+  });
+
+  it('`at: 0` prepends ahead of waiting items', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.enqueue(qi('c'));
+    q.enqueue(qi('jump'), { at: 0 });
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.items.value.map((i) => i.id)).toEqual(['jump', 'b', 'c']);
+  });
+
+  it('`at: 0` into an empty sequencer auto-starts the inserted item', () => {
+    const q = makeQueue();
+    const started: string[] = [];
+    q.on('start', (i) => started.push(i.id));
+    expect(q.enqueue(qi('first'), { at: 0 })).toBe(true);
+    expect(q.currentItem?.id).toBe('first');
+    expect(started).toEqual(['first']);
+  });
+
+  it('arbitrary-position insert splices into the waiting list', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.enqueue(qi('c'));
+    q.enqueue(qi('d'));
+    // current=a; waiting=[b, c, d]
+    q.enqueue(qi('mid'), { at: 1 });
+    expect(q.items.value.map((i) => i.id)).toEqual(['b', 'mid', 'c', 'd']);
+  });
+
+  it('`at >= length` falls through to append', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.enqueue(qi('tail'), { at: 99 });
+    expect(q.items.value.map((i) => i.id)).toEqual(['b', 'tail']);
+  });
+
+  it('emits `enqueue` event regardless of position', () => {
+    const q = makeQueue();
+    const events: string[] = [];
+    q.on('enqueue', (i) => events.push(i.id));
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'), { at: 0 });
+    q.enqueue(qi('c'), { at: 1 });
+    expect(events).toEqual(['a', 'b', 'c']);
+  });
+
+  it('rejects when `maxSize` would be exceeded, no event fires', () => {
+    const q = makeQueue({ maxSize: 2 });
+    const events: string[] = [];
+    q.on('enqueue', (i) => events.push(i.id));
+    q.enqueue(qi('a')); // current
+    q.enqueue(qi('b')); // waiting (size 1)
+    q.enqueue(qi('c')); // waiting (size 2 = max)
+    expect(q.enqueue(qi('reject'), { at: 0 })).toBe(false);
+    expect(q.items.value.map((i) => i.id)).toEqual(['b', 'c']);
+    expect(events).toEqual(['a', 'b', 'c']);
+  });
+
+  it('throws RangeError on negative `at`', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    expect(() => q.enqueue(qi('bad'), { at: -1 })).toThrow(RangeError);
+  });
+
+  it('list mode: `at: 0` while running shifts cursor forward to track current', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.enqueue(qi('c'));
+    // a is current, cursor=0
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.cursor).toBe(0);
+
+    q.enqueue(qi('jump'), { at: 0 });
+    // items now [jump, a, b, c]; current still 'a' which is at index 1
+    expect(q.items.value.map((i) => i.id)).toEqual(['jump', 'a', 'b', 'c']);
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.cursor).toBe(1);
+  });
+
+  it('list mode: insert at cursor position with no running item makes it next dispatch', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.enqueue(qi('a'));
+    q.cancel(); // empty current, cursor=0
+    expect(q.currentItem).toBeNull();
+    expect(q.cursor).toBe(0);
+
+    // edit-mode insert: prepend with no running item should not skip past
+    q.enqueue(qi('first'), { at: 0 });
+    // currentItem auto-started because current was empty
+    expect(q.currentItem?.id).toBe('first');
+    expect(q.cursor).toBe(0);
+  });
+});
+
+describe('Sequencer — enqueue positional `at` × hold state', () => {
+  it('queue mode: `at: 0` while holding drops the hold and dispatches the new item', () => {
+    const tm = createTickManager();
+    const ctxId = `pos-hold-q-${Math.random().toString(36).slice(2, 8)}`;
+
+    beginPersistentContext(ctxId);
+    const gate: StartResult = 'notNow';
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
+    });
+    endPersistentContext();
+
+    q.enqueue(qi('wait-me'));
+    expect(q.holding).toBe(true);
+    expect(q.currentItem).toBeNull();
+
+    // New item jumps the queue; dispatch decision must re-run on it.
+    q.enqueue(qi('jump'), { at: 0 });
+    expect(q.holding).toBe(false);
+    expect(q.currentItem?.id).toBe('jump');
+    // wait-me still in the waiting list behind the dispatched jump
+    // (jump was dequeued for current, wait-me remains)
+    expect(q.items.value.map((i) => i.id)).toEqual(['wait-me']);
+
+    // Unrelated: gate stays 'notNow', so future dequeue still respects canRun.
+    void gate;
+  });
+
+  it('queue mode: positional insert AFTER the held item leaves the hold intact', () => {
+    const tm = createTickManager();
+    const ctxId = `pos-hold-q-after-${Math.random().toString(36).slice(2, 8)}`;
+
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+
+    q.enqueue(qi('wait-me'));
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    expect(q.holding).toBe(true);
+
+    // Insert between a and b — does not touch index 0 (held position).
+    q.enqueue(qi('mid'), { at: 2 });
+    expect(q.holding).toBe(true);
+    expect(q.items.value.map((i) => i.id)).toEqual(['wait-me', 'a', 'mid', 'b']);
+  });
+
+  it('list mode: insert AT the held cursor drops the hold and re-drives', () => {
+    const tm = createTickManager();
+    const ctxId = `pos-hold-list-${Math.random().toString(36).slice(2, 8)}`;
+
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+
+    q.enqueue(qi('wait-me')); // cursor=0, held
+    expect(q.holding).toBe(true);
+    expect(q.cursor).toBe(0);
+
+    q.enqueue(qi('jump'), { at: 0 });
+    expect(q.holding).toBe(false);
+    expect(q.currentItem?.id).toBe('jump');
+    // cursor points at the newly-dispatched 'jump' at index 0
+    expect(q.cursor).toBe(0);
+    // wait-me is now at index 1 (behind jump)
+    expect(q.items.value.map((i) => i.id)).toEqual(['jump', 'wait-me']);
+  });
+});

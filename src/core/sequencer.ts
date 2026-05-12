@@ -163,8 +163,22 @@ export interface Sequencer<M = void> {
   readonly currentMetadata: M | undefined;
 
   // --- Mutation operations ---
-  /** Append an item to the waiting sequence. Auto-starts if nothing running. */
-  enqueue(item: SequencerItem<M>): boolean;
+  /**
+   * Insert an item into the waiting sequence. Auto-starts if nothing running.
+   *
+   * @param item - The item to insert.
+   * @param options - Optional. `at` selects an insert index:
+   * - omitted or `>= items.value.length` → append (default)
+   * - `0` → prepend (front-insert; covers interrupt / push-to-front)
+   * - `0 < at < items.value.length` → arbitrary-position insert
+   *
+   * Negative `at` throws `RangeError`.
+   *
+   * Returns `false` when `maxSize` would be exceeded; the item is not inserted
+   * and no event fires. Positional inserts run the same `maxSize`, `enqueue`
+   * event emit, and auto-start guard as the append path.
+   */
+  enqueue(item: SequencerItem<M>, options?: { at?: number }): boolean;
   /** Pop from items → set as current. Falls back to fill strategy if items empty. */
   dequeueNext(): SequencerItem<M> | null;
   /** Mark current as completed, emit 'complete', then dequeueNext. */
@@ -660,16 +674,56 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       return getCurrentItem()?.metadata;
     },
 
-    enqueue(item: SequencerItem<M>): boolean {
-      if (currentView().length >= maxSize) return false;
-      _liveItems.push(item);
+    enqueue(item: SequencerItem<M>, options?: { at?: number }): boolean {
+      const viewLen = _liveItems.length - _head;
+      if (viewLen >= maxSize) return false;
+
+      const at = options?.at;
+      if (at !== undefined && at < 0) {
+        throw new RangeError(`Sequencer.enqueue: negative 'at' (${at}) not supported`);
+      }
+      const isAppend = at === undefined || at >= viewLen;
+
+      // List-mode hold breaks only when the insert lands AT the cursor with
+      // no running item (the cursor's "next dispatch" slot now points at the
+      // new item rather than the held one). For at < cur the cursor shifts
+      // and the held item stays tracked; for at > cur nothing changes.
+      const heldBroken =
+        _holding &&
+        !isAppend &&
+        (isList ? (at as number) === rawCursor!.value : (at as number) === 0);
+
+      if (isAppend) {
+        _liveItems.push(item);
+      } else {
+        // Splice into the live array offset by _head so the public view sees
+        // the insert at the requested index. `at` here is 0..viewLen-1.
+        _liveItems.splice(_head + (at as number), 0, item);
+        if (isList) {
+          const cur = rawCursor!.value;
+          // Cursor follows when the insert lands behind it (cursor's
+          // already-passed prefix grew by one). At-cursor only shifts when a
+          // running item must stay tracked; when current is empty, the
+          // cursor is a "next dispatch" pointer and the inserted item
+          // should become next.
+          if ((at as number) < cur || ((at as number) === cur && current.value !== '')) {
+            rawCursor!.value = cur + 1;
+          }
+        }
+      }
       bumpLive();
       syncItems();
       handle.emit('enqueue', item);
 
+      if (heldBroken) {
+        clearHold();
+        if (current.value === '' && !paused.value) dequeueNext();
+        return true;
+      }
+
       // Auto-start if nothing running and not paused. Skip while holding —
       // the retry tick owns the current dispatch decision, and the new item
-      // is appended behind the held one anyway.
+      // sits behind the held one (append, or non-affecting positional insert).
       if (startOnEnqueue && !_holding && current.value === '' && !paused.value) {
         dequeueNext();
       }
