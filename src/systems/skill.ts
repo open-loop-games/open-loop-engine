@@ -36,7 +36,12 @@
 
 import { computed, watch, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { persistent, type Persistent, withPersistentContext } from '@/core/persistence';
+import {
+  getCurrentContext,
+  persistent,
+  type Persistent,
+  withPersistentContext,
+} from '@/core/persistence';
 import {
   createMultiplicativeModifier,
   createModifierChain,
@@ -207,12 +212,25 @@ function toFormula(source: FormulaSource): GenericFormula {
   return source instanceof Formula ? (source as GenericFormula) : Formula.constant(source);
 }
 
-/** Allocate xp (and permanentBonus, accumulator-only) under the skill's persistence context. */
+/**
+ * Allocate xp (and permanentBonus, accumulator-only) under the skill's
+ * persistence context. When invoked inside an enclosing context (the
+ * common case — `createSkillCategory`'s `registerOne` opens
+ * `${categoryId}/${defId}` around `buildInstance`), the skill context
+ * is prefixed by the enclosing one so two categories that share skill
+ * ids (e.g. looper's stat-level + talent both keyed by `Dex` / `Str`)
+ * don't collide on the per-skill `xp` persistent ref.
+ *
+ * Standalone `createSkill` calls (no enclosing context) keep the
+ * legacy `skill:${id}` context unchanged.
+ */
 function buildSkillState(
   id: string,
   isLevelDriven: boolean,
 ): { xp: Persistent<DecimalSource>; permanentBonus: Persistent<DecimalSource> | null } {
-  return withPersistentContext(`skill:${id}`, () => ({
+  const parent = getCurrentContext();
+  const ctxId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
+  return withPersistentContext(ctxId, () => ({
     xp: persistent<DecimalSource>(0, { name: 'xp' }),
     permanentBonus: isLevelDriven ? null : persistent<DecimalSource>(0, { name: 'permanentBonus' }),
   }));
@@ -362,7 +380,12 @@ export function createSkill(options: SkillOptions): Skill {
     isLevelDriven,
   );
 
-  const gainChain = createModifierChain(`skill:${id}:gain`);
+  // Namespace the gain chain id by the enclosing context (when present)
+  // so two categories sharing a skill id don't collide on the ChainRegistry.
+  // Same posture as `buildSkillState` above.
+  const gainChainParent = getCurrentContext();
+  const gainChainId = gainChainParent ? `${gainChainParent}/skill:${id}:gain` : `skill:${id}:gain`;
+  const gainChain = createModifierChain(gainChainId);
   const processedMaxXp = options.maxXp != null ? processGetter(options.maxXp) : undefined;
   const { addXp, gainInProgress } = buildAddXp(xp, gainChain, processedMaxXp);
   const handle = createEmitHandle<SkillEvents>();

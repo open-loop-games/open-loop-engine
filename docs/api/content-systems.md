@@ -179,28 +179,28 @@ Three factories in increasing flexibility: `createSimplePurchasable` for static 
 
 Skill helper for dual-tier loop incremental skills
 
-- `interface AccumulatorSkill extends SkillBase` — Accumulator skill — modifier = 1 + permanentBonus. `src/systems/skill.ts:178`
-- `interface AccumulatorSkillOptions extends SkillOptionsBase` — Accumulator mode — permanent bonus accumulates across loops. `src/systems/skill.ts:106`
-- `function createSkill(options: AccumulatorSkillOptions): AccumulatorSkill` — Create a skill with XP tracking, computed level, and a reactive modifier. `src/systems/skill.ts:350`
+- `interface AccumulatorSkill extends SkillBase` — Accumulator skill — modifier = 1 + permanentBonus. `src/systems/skill.ts:183`
+- `interface AccumulatorSkillOptions extends SkillOptionsBase` — Accumulator mode — permanent bonus accumulates across loops. `src/systems/skill.ts:111`
+- `function createSkill(options: AccumulatorSkillOptions): AccumulatorSkill` — Create a skill with XP tracking, computed level, and a reactive modifier. `src/systems/skill.ts:368`
 - `function createSkillCategory<Def extends { id: string; }, State = void>(options: SkillCategoryOptions<Def, State>): SkillCategory<Def, State>` — Create a skill category — batch registration of Skills from definitions. `src/systems/skill-category.ts:179`
-- `function getSkillProgress(skill: Skill): number` — Progress fraction (0–1) within the current level, for progress bar display. `src/systems/skill.ts:431`
-- `function getSkillXPWindow(skill: Skill): { current: Decimal; needed: Decimal; }` — XP window for "N / M" display — how much XP into the current level and how much the current level spans. `src/systems/skill.ts:450`
-- `function isAccumulatorSkill(value: unknown): value is AccumulatorSkill` — Check if a skill is in accumulator mode (has permanentBonus + accumulateBonus). `src/systems/skill.ts:420`
-- `function isSkill(value: unknown): value is Skill` — Check if a value is a Skill (either mode). `src/systems/skill.ts:415`
+- `function getSkillProgress(skill: Skill): number` — Progress fraction (0–1) within the current level, for progress bar display. `src/systems/skill.ts:454`
+- `function getSkillXPWindow(skill: Skill): { current: Decimal; needed: Decimal; }` — XP window for "N / M" display — how much XP into the current level and how much the current level spans. `src/systems/skill.ts:473`
+- `function isAccumulatorSkill(value: unknown): value is AccumulatorSkill` — Check if a skill is in accumulator mode (has permanentBonus + accumulateBonus). `src/systems/skill.ts:443`
+- `function isSkill(value: unknown): value is Skill` — Check if a value is a Skill (either mode). `src/systems/skill.ts:438`
 - `function isSkillCategory(value: unknown): value is SkillCategory<{ id: string; }, unknown>` — Type guard: returns `true` if the value is a SkillCategory instance. `src/systems/skill-category.ts:259`
-- `interface LevelDrivenSkill extends SkillBase` — Level-driven skill — modifier = levelToMultiplier(level), no accumulator. `src/systems/skill.ts:166`
-- `interface LevelDrivenSkillOptions extends SkillOptionsBase` — Level-driven mode — modifier tracks level reactively. `src/systems/skill.ts:122`
-- `type Skill = LevelDrivenSkill | AccumulatorSkill` — A Skill in either mode — discriminated by the presence of `permanentBonus`. `src/systems/skill.ts:201`
-- `interface SkillBase` — Fields present on all skills regardless of mode. `src/systems/skill.ts:136`
+- `interface LevelDrivenSkill extends SkillBase` — Level-driven skill — modifier = levelToMultiplier(level), no accumulator. `src/systems/skill.ts:171`
+- `interface LevelDrivenSkillOptions extends SkillOptionsBase` — Level-driven mode — modifier tracks level reactively. `src/systems/skill.ts:127`
+- `type Skill = LevelDrivenSkill | AccumulatorSkill` — A Skill in either mode — discriminated by the presence of `permanentBonus`. `src/systems/skill.ts:206`
+- `interface SkillBase` — Fields present on all skills regardless of mode. `src/systems/skill.ts:141`
 - `interface SkillCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A skill category — batch-registered Skills with a shared shape. `src/systems/skill-category.ts:104`
 - `interface SkillCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Skill instance + optional state + introspection signals. `src/systems/skill-category.ts:91`
 - `interface SkillCategoryOptions<Def extends { id: string; }, State = void>` — Options for createSkillCategory. `src/systems/skill-category.ts:61`
 - `const SkillCategoryType: unique symbol` — Symbol identifying SkillCategory features. `src/systems/skill-category.ts:52`
-- `type SkillCurve = (variable: MaybeRef<DecimalSource>) => FormulaSource` — Factory that binds a Formula to an engine-owned reactive variable. `src/systems/skill.ts:74`
-- `interface SkillEvents` — Events emitted by a Skill instance. `src/systems/skill.ts:60`
-- `type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions` — Discriminated union of createSkill option shapes — accumulator (XP banks for retention) vs level-driven (level multiplies a curve). `src/systems/skill.ts:133`
-- `interface SkillOptionsBase` — Shared option fields present in both skill modes. `src/systems/skill.ts:80`
-- `const SkillType: unique symbol` — Symbol identifying Skill features (both modes). `src/systems/skill.ts:55`
+- `type SkillCurve = (variable: MaybeRef<DecimalSource>) => FormulaSource` — Factory that binds a Formula to an engine-owned reactive variable. `src/systems/skill.ts:79`
+- `interface SkillEvents` — Events emitted by a Skill instance. `src/systems/skill.ts:65`
+- `type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions` — Discriminated union of createSkill option shapes — accumulator (XP banks for retention) vs level-driven (level multiplies a curve). `src/systems/skill.ts:138`
+- `interface SkillOptionsBase` — Shared option fields present in both skill modes. `src/systems/skill.ts:85`
+- `const SkillType: unique symbol` — Symbol identifying Skill features (both modes). `src/systems/skill.ts:60`
 
 ## Slot
 
