@@ -261,7 +261,7 @@ export function beginPersistentContext(id: string): void {
     persistentRefs[fullId] = new Set();
     contextNamespaces[fullId] = activeNamespace ?? '';
   }
-  if (parent !== undefined) {
+  if (parent !== undefined && parent !== fullId) {
     (contextChildren[parent] ??= new Set()).add(fullId);
   }
 }

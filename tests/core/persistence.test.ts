@@ -607,4 +607,24 @@ describe('getModulePersistentRefs', () => {
 
     expect(getModulePersistentRefs('mod-cleartest').size).toBe(0);
   });
+
+  // Re-entering the same context (e.g. createTimedProgress calling
+  // withPersistentContext(getCurrentContext()) when no nesting is intended)
+  // used to register the context as its own child, causing the
+  // reset-scope walker to loop indefinitely.
+  it('does not register a context as its own child on same-id re-entry', () => {
+    beginPersistentContext('mod-reentry');
+    const outerRef = persistent(0);
+
+    beginPersistentContext('mod-reentry');
+    const innerRef = persistent(1);
+    endPersistentContext();
+
+    endPersistentContext();
+
+    const refs = getModulePersistentRefs('mod-reentry');
+    expect(refs.size).toBe(2);
+    expect(refs.has(outerRef)).toBe(true);
+    expect(refs.has(innerRef)).toBe(true);
+  });
 });
