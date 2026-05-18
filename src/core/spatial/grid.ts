@@ -511,7 +511,3 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
   return grid;
 }
-
-// TODO(expansion): `createPlacementResolver<TCell, TBonus>(grid, scoring, onResolve)` sugar for Packer +
-// Auto-battler grid-placement-auto-resolve substrate. Park until two consumers hand-roll the wrapper.
-// Ref: open-loop-research/reports/studies/arcade-market-archetypes/arcade-market-archetypes-primitive-surface.md § 3.

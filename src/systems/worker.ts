@@ -137,7 +137,3 @@ export function isWorker<TaskDef extends { id: string } = { id: string }>(
 ): value is Worker<TaskDef> {
   return isType(value, WorkerType);
 }
-
-// TODO(expansion): Bundle sequencer + ephemeral tracker + FillStrategy + grab-on-claim
-// into a `createWorkerBundle` / `createSharedTaskPool` helper when a second Majesty-shape
-// consumer appears. Recipe today lives in docs/consumer-guide.md § Indirect-control worker pools.

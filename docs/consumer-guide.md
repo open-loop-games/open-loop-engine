@@ -478,6 +478,57 @@ sequencer.fillStrategy = createConditionalStrategy(() => [
 
 Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. The OL-714 cautionary case (`4e5fc39`, rolled back `c96ec42`) established that a `createPersonalityRoster` wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit (see breadcrumb in `docs/candidate-primitives.md`). Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
 
+## Priority-weighted fill across multiple content categories
+
+Composition recipe for action-queue automation that needs to interleave entries from multiple content-type categories (gathering, crafting, research, …) under one priority order. Built on `createPriorityStrategy` plus a per-content-type `passBonus` map that breaks ties between equal-priority entries from different categories.
+
+The convergent shape across consumers (incloneution `src/modules/automation.ts`, maldacena `src/modules/action-fill.ts`):
+
+- Each content-type entry carries a player-set `automationPriority` and a static category-level `passBonus`.
+- Score is `priority * 10 + passBonus[contentType]` — the multiplier preserves player priority dominance while the pass-bonus map deterministically orders cross-category ties.
+- A single fill strategy walks every relevant `category.getAll()`, filters by unlock + visibility, builds a candidate list, sorts descending by score, and returns the first item whose task's `canRun()` returns `'now'`.
+
+```ts
+import { computed } from 'vue';
+import type { FillStrategy, SequencerItem } from '@open-loop/engine';
+
+const PASS_BONUS = {
+  gathering: 5,
+  research:  4,
+  crafting:  3,
+  // ...
+} as const;
+
+const candidates = computed(() => {
+  const out: { item: SequencerItem<ActionMeta>; score: number }[] = [];
+
+  for (const entry of gatheringCategory.getAll()) {
+    if (!entry.state.isAutomationUnlocked.value) continue;
+    const priority = entry.state.automationPriority.value;
+    if (priority === AutomationPriority.Disabled) continue;
+    out.push({
+      item: actions.buildItem('gathering', entry.def.id),
+      score: priority * 10 + PASS_BONUS.gathering,
+    });
+  }
+  // ...repeat per content-type category
+
+  return out.sort((a, b) => b.score - a.score);
+});
+
+const strategy: FillStrategy<ActionMeta> = {
+  next() {
+    for (const { item } of candidates.value) {
+      const task = actions.getTask(item.id);
+      if (task?.canRun?.() === 'now') return item;
+    }
+    return null;
+  },
+};
+```
+
+The shape is convergent today but the pass-bonus map is the consumer-side knob: bonuses encode "when priorities tie, gathering wins over crafting" and are tuned per game. No engine helper because the category list and pass-bonus axis vary per consumer — engine `createPriorityStrategy` covers the single-category case; this recipe is the multi-category extension. If a third consumer hand-rolls the same shape with the same pass-bonus map shape, drop a candidate entry.
+
 ## Character interaction surface
 
 Composition recipe for games with named characters that the player returns to — companions, mentors, merchants, faction contacts. The engine provides a dialog runtime and a relationship-state category; both are Tier-4 surfaces (specialized in incremental, near-default in narrative-adjacent codebases). Pattern definitions live in `open-loop-research/patterns/tier-4-specialized/character-interaction-systems.md` and `open-loop-research/patterns/tier-4-specialized/relationship-systems.md`.

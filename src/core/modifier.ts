@@ -460,10 +460,6 @@ export type Grant =
       when?: Computable<boolean>;
     };
 
-// TODO(expansion): `createPhaseMachine({ phases, transitions, on<phase>Enter })` sugar over `Grant.when`
-// for Phase-Alternation consumers (build ↔ defend cycling). Park until raw `when`-gate idiom feels verbose.
-// Ref: open-loop-research/reports/studies/arcade-market-archetypes/arcade-market-archetypes-primitive-surface.md § 4.
-
 /**
  * A named, auto-composing sequential modifier that acts as a registry.
  * Other modules add modifiers via `add()` (raw) or `bind()` (with attribution).

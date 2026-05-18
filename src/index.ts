@@ -12,6 +12,22 @@ export * from './core';
 export * from './systems';
 export * from './harness';
 
+// Reactivity API re-exported from the engine's `vue` instance. Vue's
+// `activeEffect` is module-scoped — consumers that subscribe via a
+// separately-resolved `vue` won't track engine refs.
+export {
+  effect,
+  watchEffect,
+  watch,
+  computed,
+  ref,
+  shallowRef,
+  reactive,
+  isRef,
+  unref,
+  effectScope,
+} from 'vue';
+
 // === MODULE SYSTEM ===
 
 import { createGameLoop } from './core/game-loop';

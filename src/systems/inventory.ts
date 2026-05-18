@@ -251,7 +251,3 @@ export function createInventory(options: InventoryOptions): Inventory {
 export function isInventory(value: unknown): value is Inventory {
   return isType(value, InventoryType);
 }
-
-// TODO(expansion): Packer-shape consumers (Backpack Battles lineage) may pressure `createPlacementResolver`
-// around Inventory + shape-adjacency-synergy scoring. Park until two consumers hand-roll the wrapper.
-// Ref: open-loop-research/reports/studies/arcade-market-archetypes/arcade-market-archetypes-primitive-surface.md § 3.
