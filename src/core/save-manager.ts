@@ -259,6 +259,37 @@ export interface SaveManager extends Emittable<SaveEvents> {
   findSlotByName(name: string): SaveSlot | undefined;
   /** Set a callback that provides metadata to include in save envelopes. */
   setMetadataProvider(fn: () => Record<string, unknown>): void;
+
+  // --- Slot-to-slot copy (run-branching, accept-branch, portable snapshots) ---
+  /**
+   * Allocate a new slot and copy `srcId`'s on-disk envelope into it byte-for-byte.
+   * Source slot must exist; if it has no saved data, the new slot is created
+   * empty (mirroring `createSlot()` alone). Does not touch the active slot.
+   * Returns the new slot's id.
+   */
+  duplicateSlot(srcId: number, name?: string): number;
+  /**
+   * Overwrite `destId`'s on-disk envelope with `srcId`'s. Both slots must exist.
+   * If the source has no saved data, the destination is cleared. Does not touch
+   * the active slot. Used by accept-branch flows that promote a branch slot's
+   * state into the parent slot.
+   */
+  replaceSlot(srcId: number, destId: number): void;
+  /**
+   * Return the raw on-disk envelope JSON for `slotId`, or `null` if the slot
+   * has no saved data. Slot must exist. Unlike `exportSave()`, this does not
+   * serialize live state — it reads what's currently persisted for that slot,
+   * regardless of whether it is the active slot.
+   */
+  exportSlot(slotId: number): string | null;
+  /**
+   * Write a raw envelope into a slot's storage entry without deserializing it
+   * into the live engine. Validates that the envelope parses and that its
+   * `gameId` matches; emits `save:load-failed` and returns failure otherwise.
+   * When `slotId` is omitted, allocates a new slot and writes into it. Use
+   * `selectSlot(id)` + `load()` to activate the imported slot afterwards.
+   */
+  importSlot(data: string, slotId?: number): SaveLoadResult & { slotId?: number };
 }
 
 // === INTERNAL TYPES ===
@@ -623,6 +654,17 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     }
   }
 
+  function allocSlot(name?: string): number {
+    if (_slots.length >= maxSlots) {
+      throw new Error(`Maximum save slots (${maxSlots}) reached`);
+    }
+    const nextId = Math.max(..._slots.map((s) => s.id)) + 1;
+    const slotName = name ?? `Save ${nextId}`;
+    _slots.push({ id: nextId, name: slotName });
+    saveSlotIndex();
+    return nextId;
+  }
+
   // === PUBLIC API ===
 
   return {
@@ -723,14 +765,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     createSlot(name?: string): number {
-      if (_slots.length >= maxSlots) {
-        throw new Error(`Maximum save slots (${maxSlots}) reached`);
-      }
-      const nextId = Math.max(..._slots.map((s) => s.id)) + 1;
-      const slotName = name ?? `Save ${nextId}`;
-      _slots.push({ id: nextId, name: slotName });
-      saveSlotIndex();
-      return nextId;
+      return allocSlot(name);
     },
 
     deleteSlot(slotId: number): void {
@@ -773,6 +808,67 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
 
     setMetadataProvider(fn: () => Record<string, unknown>): void {
       _metadataProvider = fn;
+    },
+
+    // === SLOT-TO-SLOT COPY ===
+
+    duplicateSlot(srcId: number, name?: string): number {
+      if (!_slots.find((s) => s.id === srcId)) {
+        throw new Error(`Save slot ${srcId} not found`);
+      }
+      const destId = allocSlot(name);
+      const raw = storage.getItem(slotStorageKey(srcId));
+      if (raw !== null) storage.setItem(slotStorageKey(destId), raw);
+      return destId;
+    },
+
+    replaceSlot(srcId: number, destId: number): void {
+      if (!_slots.find((s) => s.id === srcId)) {
+        throw new Error(`Save slot ${srcId} not found`);
+      }
+      if (!_slots.find((s) => s.id === destId)) {
+        throw new Error(`Save slot ${destId} not found`);
+      }
+      const raw = storage.getItem(slotStorageKey(srcId));
+      if (raw !== null) {
+        storage.setItem(slotStorageKey(destId), raw);
+      } else {
+        storage.removeItem(slotStorageKey(destId));
+      }
+    },
+
+    exportSlot(slotId: number): string | null {
+      if (!_slots.find((s) => s.id === slotId)) {
+        throw new Error(`Save slot ${slotId} not found`);
+      }
+      return storage.getItem(slotStorageKey(slotId));
+    },
+
+    importSlot(data: string, slotId?: number): SaveLoadResult & { slotId?: number } {
+      let envelope: SaveEnvelope;
+      try {
+        envelope = JSON.parse(data) as SaveEnvelope;
+      } catch (detail) {
+        const targetId = slotId ?? _activeSlotId;
+        handle.emit('save:load-failed', { slotId: targetId, reason: 'parse-error', detail });
+        return { success: false };
+      }
+      if (envelope.gameId !== gameId) {
+        const targetId = slotId ?? _activeSlotId;
+        handle.emit('save:load-failed', { slotId: targetId, reason: 'wrong-game-id' });
+        return { success: false };
+      }
+      let targetId: number;
+      if (slotId === undefined) {
+        targetId = allocSlot();
+      } else {
+        if (!_slots.find((s) => s.id === slotId)) {
+          throw new Error(`Save slot ${slotId} not found`);
+        }
+        targetId = slotId;
+      }
+      storage.setItem(slotStorageKey(targetId), data);
+      return { success: true, timestamp: envelope.timestamp, slotId: targetId };
     },
   };
 }

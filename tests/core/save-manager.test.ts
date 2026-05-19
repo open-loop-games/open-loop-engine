@@ -302,6 +302,190 @@ describe('SaveManager — slot management', () => {
   });
 });
 
+describe('SaveManager — slot-to-slot copy', () => {
+  it('duplicateSlot allocates a new slot and byte-copies the source envelope', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-dup');
+    const v = persistent(0);
+    endPersistentContext();
+    v.value = 42;
+    mgr.save(); // slot 0
+    const srcBytes = storage.getItem('test-slot-0');
+
+    const newId = mgr.duplicateSlot(0, 'Branch');
+    expect(newId).toBe(1);
+    expect(mgr.slots.find((s) => s.id === newId)?.name).toBe('Branch');
+    expect(storage.getItem(`test-slot-${newId}`)).toBe(srcBytes);
+    expect(mgr.activeSlotId).toBe(0); // active slot unchanged
+  });
+
+  it('duplicateSlot leaves destination empty when source has no save data', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    const newId = mgr.duplicateSlot(0);
+    expect(mgr.slots).toHaveLength(2);
+    expect(storage.getItem(`test-slot-${newId}`)).toBeNull();
+  });
+
+  it('duplicateSlot creates an independent copy — mutating source does not affect destination', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-dup-indep');
+    const v = persistent(0);
+    endPersistentContext();
+    v.value = 100;
+    mgr.save();
+
+    const branchId = mgr.duplicateSlot(0, 'Branch');
+
+    v.value = 999;
+    mgr.save(); // overwrites slot 0 only
+
+    mgr.selectSlot(branchId);
+    resetPersistent(v);
+    expect(v.value).toBe(0);
+    expect(mgr.load().success).toBe(true);
+    expect(v.value).toBe(100);
+  });
+
+  it('duplicateSlot throws for unknown source slot', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    expect(() => mgr.duplicateSlot(99)).toThrow('Save slot 99 not found');
+  });
+
+  it('replaceSlot overwrites destination with source bytes', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-rep');
+    const v = persistent(0);
+    endPersistentContext();
+    v.value = 1;
+    mgr.save(); // slot 0 = 1
+    const destId = mgr.createSlot('Dest');
+    mgr.selectSlot(destId);
+    v.value = 2;
+    mgr.save(); // slot destId = 2
+
+    mgr.replaceSlot(0, destId);
+    resetPersistent(v);
+    expect(mgr.load().success).toBe(true);
+    expect(v.value).toBe(1);
+  });
+
+  it('replaceSlot clears destination when source has no save data', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-rep-clear');
+    persistent(0);
+    endPersistentContext();
+    const destId = mgr.createSlot('Dest');
+    mgr.selectSlot(destId);
+    mgr.save();
+    expect(storage.getItem(`test-slot-${destId}`)).not.toBeNull();
+
+    mgr.replaceSlot(0, destId); // slot 0 is empty
+    expect(storage.getItem(`test-slot-${destId}`)).toBeNull();
+  });
+
+  it('replaceSlot throws for unknown source or destination', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    expect(() => mgr.replaceSlot(99, 0)).toThrow('Save slot 99 not found');
+    expect(() => mgr.replaceSlot(0, 99)).toThrow('Save slot 99 not found');
+  });
+
+  it('exportSlot returns the raw on-disk envelope for any slot', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-exp');
+    persistent(0);
+    endPersistentContext();
+    mgr.save();
+    const exp = mgr.exportSlot(0);
+    expect(exp).not.toBeNull();
+    expect(exp).toBe(storage.getItem('test-slot-0'));
+  });
+
+  it('exportSlot returns null when the slot has no save data', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    const id = mgr.createSlot('Empty');
+    expect(mgr.exportSlot(id)).toBeNull();
+  });
+
+  it('exportSlot throws for unknown slot', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    expect(() => mgr.exportSlot(99)).toThrow('Save slot 99 not found');
+  });
+
+  it('importSlot allocates a new slot when slotId is omitted', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-imp-new');
+    const v = persistent(0);
+    endPersistentContext();
+    v.value = 77;
+    mgr.save();
+    const exp = mgr.exportSlot(0)!;
+
+    const result = mgr.importSlot(exp);
+    expect(result.success).toBe(true);
+    expect(result.slotId).toBe(1);
+    expect(mgr.slots).toHaveLength(2);
+    expect(storage.getItem(`test-slot-${result.slotId}`)).toBe(exp);
+  });
+
+  it('importSlot writes into a specific slot when slotId is provided', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
+    beginPersistentContext('sm-imp-target');
+    persistent(0);
+    endPersistentContext();
+    mgr.save();
+    const exp = mgr.exportSlot(0)!;
+    const destId = mgr.createSlot('Dest');
+
+    const result = mgr.importSlot(exp, destId);
+    expect(result.success).toBe(true);
+    expect(result.slotId).toBe(destId);
+    expect(storage.getItem(`test-slot-${destId}`)).toBe(exp);
+  });
+
+  it('importSlot rejects malformed JSON and emits save:load-failed', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    const fail = vi.fn();
+    mgr.on('save:load-failed', fail);
+    const result = mgr.importSlot('{not json');
+    expect(result.success).toBe(false);
+    expect(fail).toHaveBeenCalledWith(expect.objectContaining({ reason: 'parse-error' }));
+  });
+
+  it('importSlot rejects mismatched gameId and emits save:load-failed', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    const fail = vi.fn();
+    mgr.on('save:load-failed', fail);
+    const foreign = JSON.stringify({
+      version: 1,
+      gameId: 'other-game',
+      timestamp: 1000,
+      data: {},
+    });
+    const result = mgr.importSlot(foreign);
+    expect(result.success).toBe(false);
+    expect(fail).toHaveBeenCalledWith(expect.objectContaining({ reason: 'wrong-game-id' }));
+  });
+
+  it('importSlot throws for unknown target slot', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    const envelope = JSON.stringify({
+      version: 1,
+      gameId: 'test',
+      timestamp: 1000,
+      data: {},
+    });
+    expect(() => mgr.importSlot(envelope, 99)).toThrow('Save slot 99 not found');
+  });
+});
+
 describe('SaveManager — legacy migration', () => {
   it('migrates single-slot save to slot 0', () => {
     const storage = createMapStorage();
