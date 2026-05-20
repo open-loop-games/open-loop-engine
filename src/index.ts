@@ -359,6 +359,15 @@ export interface Engine {
    * selectMod() + start().
    */
   peekSave(): SavePeek | null;
+
+  /**
+   * Live interval in milliseconds between autosaves. Mirrors
+   * {@link EngineConfig.autoSaveInterval} but is mutable at runtime —
+   * setting it re-arms the autosave timer with the new period (or stops
+   * it when set to 0). No effect when `persistence: false` was passed to
+   * {@link createEngine}. Symmetric to `engine.loop.tickRate`.
+   */
+  autoSaveInterval: number;
 }
 
 /**
@@ -414,8 +423,22 @@ export function createEngine(config: EngineConfig): Engine {
       : undefined;
 
   let autoSaveTimer: number | null = null;
+  let autoSaveInterval = config.autoSaveInterval ?? 0;
   let installed = false;
   let disposed = false;
+
+  function stopAutoSaveTimer(): void {
+    if (autoSaveTimer !== null) {
+      timers.clearInterval(autoSaveTimer);
+      autoSaveTimer = null;
+    }
+  }
+
+  function startAutoSaveTimer(): void {
+    if (saveManager && autoSaveInterval > 0 && !autoSaveTimer) {
+      autoSaveTimer = timers.setInterval(() => performSave(), autoSaveInterval);
+    }
+  }
   const moduleCleanups = new Map<string, (() => void)[]>();
   // Populated at start() with the per-engine injection map built from
   // install() / connect() `provide()` calls. Exposed via engine.tryInject
@@ -594,17 +617,11 @@ export function createEngine(config: EngineConfig): Engine {
       }
 
       loop.start();
-
-      if (saveManager && config.autoSaveInterval && config.autoSaveInterval > 0 && !autoSaveTimer) {
-        autoSaveTimer = timers.setInterval(() => performSave(), config.autoSaveInterval);
-      }
+      startAutoSaveTimer();
     },
     stop() {
       loop.stop();
-      if (autoSaveTimer !== null) {
-        timers.clearInterval(autoSaveTimer);
-        autoSaveTimer = null;
-      }
+      stopAutoSaveTimer();
     },
     dispose() {
       if (disposed) return;
@@ -643,6 +660,20 @@ export function createEngine(config: EngineConfig): Engine {
 
     peekSave(): SavePeek | null {
       return saveManager?.peek() ?? null;
+    },
+
+    get autoSaveInterval(): number {
+      return autoSaveInterval;
+    },
+    set autoSaveInterval(value: number) {
+      autoSaveInterval = value;
+      // Re-arm the timer: stop the old (if any), start the new (if running
+      // and value > 0). Mirrors loop.tickRate's restart-when-running shape.
+      const wasRunning = autoSaveTimer !== null;
+      stopAutoSaveTimer();
+      if (wasRunning || (installed && loop.running)) {
+        startAutoSaveTimer();
+      }
     },
   };
   return engine;

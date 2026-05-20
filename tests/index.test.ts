@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createEngine,
   persistent,
@@ -1027,5 +1027,108 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
     const engine = createEngine({ gameId: 'test', persistence: false });
     engine.use(mod);
     expect(() => engine.start()).toThrow(/duplicate effect-system id "dup"/);
+  });
+});
+
+describe('autoSaveInterval — runtime-tunable', () => {
+  function mockTimers() {
+    let nextId = 1;
+    const setInterval = vi.fn(() => nextId++);
+    const clearInterval = vi.fn();
+    return { setInterval, clearInterval };
+  }
+
+  it('exposes the initial config value', () => {
+    const engine = createEngine({ gameId: 'test', autoSaveInterval: 5000 });
+    expect(engine.autoSaveInterval).toBe(5000);
+  });
+
+  it('defaults to 0 when not configured', () => {
+    const engine = createEngine({ gameId: 'test' });
+    expect(engine.autoSaveInterval).toBe(0);
+  });
+
+  it('schedules autosave at the configured interval on start()', () => {
+    const timers = mockTimers();
+    const engine = createEngine({
+      gameId: 'test',
+      autoSaveInterval: 5000,
+      timerProvider: timers,
+    });
+    engine.start();
+    // Two setInterval calls: one for the game loop, one for autosave.
+    const autoSaveCall = timers.setInterval.mock.calls.find((c) => c[1] === 5000);
+    expect(autoSaveCall).toBeDefined();
+    engine.stop();
+  });
+
+  it('setter re-arms the autosave timer while running', () => {
+    const timers = mockTimers();
+    const engine = createEngine({
+      gameId: 'test',
+      autoSaveInterval: 5000,
+      timerProvider: timers,
+    });
+    engine.start();
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 5000)).toHaveLength(1);
+
+    engine.autoSaveInterval = 10000;
+    expect(engine.autoSaveInterval).toBe(10000);
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 10000)).toHaveLength(1);
+    // Old timer was cleared (we don't care which id, just that clearInterval ran).
+    expect(timers.clearInterval).toHaveBeenCalled();
+    engine.stop();
+  });
+
+  it('setter to 0 stops the autosave timer without stopping the engine', () => {
+    const timers = mockTimers();
+    const engine = createEngine({
+      gameId: 'test',
+      autoSaveInterval: 5000,
+      timerProvider: timers,
+    });
+    engine.start();
+    const clearCallsBefore = timers.clearInterval.mock.calls.length;
+
+    engine.autoSaveInterval = 0;
+    expect(engine.autoSaveInterval).toBe(0);
+    // One additional clearInterval call (the autosave timer).
+    expect(timers.clearInterval.mock.calls.length).toBe(clearCallsBefore + 1);
+    // No new autosave setInterval call.
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 0)).toHaveLength(0);
+    engine.stop();
+  });
+
+  it('setter from 0 to >0 starts the autosave timer when engine is running', () => {
+    const timers = mockTimers();
+    const engine = createEngine({
+      gameId: 'test',
+      autoSaveInterval: 0,
+      timerProvider: timers,
+    });
+    engine.start();
+    // No autosave timer yet — only the game loop's setInterval.
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 5000)).toHaveLength(0);
+
+    engine.autoSaveInterval = 5000;
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 5000)).toHaveLength(1);
+    engine.stop();
+  });
+
+  it('does not start an autosave timer when persistence is disabled', () => {
+    const timers = mockTimers();
+    const engine = createEngine({
+      gameId: 'test',
+      persistence: false,
+      autoSaveInterval: 5000,
+      timerProvider: timers,
+    });
+    engine.start();
+    // Only the game-loop setInterval should fire; autosave should be inert.
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 5000)).toHaveLength(0);
+
+    engine.autoSaveInterval = 10000;
+    expect(timers.setInterval.mock.calls.filter((c) => c[1] === 10000)).toHaveLength(0);
+    engine.stop();
   });
 });
