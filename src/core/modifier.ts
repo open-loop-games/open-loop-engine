@@ -9,7 +9,6 @@
  * - {@link createMultiplicativeModifier} — `value × multiplier`
  * - {@link createExponentialModifier} — `value ^ exponent`
  * - {@link createSequentialModifier} — compose modifiers into a pipeline
- * - {@link createModifierSection} — generate UI-ready breakdown of a modifier chain
  * - {@link computeModifiedValue} — reactive computed applying modifiers to a base
  */
 
@@ -38,7 +37,7 @@ export interface Modifier {
   invert?: (gain: DecimalSource) => DecimalSource;
   /** When `false`, this modifier is skipped in apply/invert chains. Can be a ref for reactive toggling. */
   enabled?: MaybeRef<boolean>;
-  /** Human-readable description for UI breakdown panels (see {@link createModifierSection}) */
+  /** Human-readable description for UI breakdown panels */
   description?: MaybeGetter<ModifierDescription>;
 }
 
@@ -512,8 +511,8 @@ export interface ModifierChain extends Modifier {
  *
  * The chain composes all added modifiers via {@link createSequentialModifier}
  * and re-exposes `apply`, `invert`, `enabled`, and `description`. Implements
- * `Modifier` so it can be used directly in `createModifierSection` or
- * `computeModifiedValue`.
+ * `Modifier` so it can be used directly in {@link computeModifiedValue} or
+ * other consumers of the `Modifier` shape.
  *
  * Share chains across modules either explicitly via `engine.provide()` /
  * `engine.inject()`, or implicitly via the engine-wide chain registry:
@@ -691,96 +690,6 @@ function resolveDescriptionText(modifier: Modifier): string | undefined {
     return texts.length > 0 ? texts.join('+') : undefined;
   }
   return (resolved as ModifierDescription).text;
-}
-
-// === MODIFIER SECTION ===
-
-/** Options for {@link createModifierSection} */
-export interface ModifierSectionOptions {
-  /** Header title (e.g., "Point Production", "Prestige Gain") */
-  title: string;
-  /** Optional subtitle shown after the title */
-  subtitle?: string;
-  /** The modifier (or sequential modifier) to break down. Must have descriptions. */
-  modifier: WithRequired<Modifier, 'description'>;
-  /** Starting value before any modifiers are applied. Default: `1` */
-  base?: DecimalSource;
-  /** Unit suffix for formatted values (e.g., `"/s"`, `"%"`) */
-  unit?: string;
-  /** Label for the base row. Default: `"Base"` */
-  baseText?: string;
-  /** If true, a total > base is flagged as bad (for costs or penalties) */
-  smallerIsBetter?: boolean;
-}
-
-/** The computed breakdown from {@link createModifierSection}, ready for rendering */
-export interface ModifierSectionResult {
-  /** Section header */
-  title: string;
-  /** Optional subtitle */
-  subtitle?: string;
-  /** The base value row (label + formatted value) */
-  base: { text: string; value: string };
-  /** One row per active modifier in the chain */
-  modifiers: ModifierDescription[];
-  /** The final result after all modifiers, with a bad/good flag */
-  total: { value: string; isBad: boolean };
-  /** The unit suffix, if configured */
-  unit?: string;
-}
-
-/**
- * Create a displayable breakdown of a modifier's effects.
- * Useful for showing tooltips or info panels explaining how a value is calculated.
- *
- * @param options - Section configuration
- * @returns A function that computes the current modifier breakdown
- *
- * @example
- * ```ts
- * const productionBreakdown = createModifierSection({
- *   title: "Point Production",
- *   modifier: totalProductionModifier,
- *   base: 1,
- *   unit: "/s"
- * })
- *
- * // In UI:
- * const breakdown = productionBreakdown()
- * // breakdown.base = { text: "Base", value: "1" }
- * // breakdown.modifiers = [{ text: "Upgrade 1", formattedValue: "×2", isBad: false }, ...]
- * // breakdown.total = { value: "10", isBad: false }
- * ```
- */
-export function createModifierSection(
-  options: ModifierSectionOptions,
-): () => ModifierSectionResult {
-  const { title, subtitle, modifier, base = 1, unit, baseText = 'Base', smallerIsBetter } = options;
-
-  return () => {
-    const total = modifier.apply(base);
-    const desc = modifier.description;
-    let modifierDescs: ModifierDescription[] = [];
-    if (desc) {
-      const resolved = typeof desc === 'function' ? desc() : desc;
-      modifierDescs = Array.isArray(resolved) ? resolved : [resolved];
-    }
-
-    return {
-      title,
-      subtitle,
-      base: {
-        text: baseText,
-        value: formatSmall(base) + (unit ?? ''),
-      },
-      modifiers: modifierDescs,
-      total: {
-        value: formatSmall(total) + (unit ?? ''),
-        isBad: smallerIsBetter ? Decimal.gt(total, base) : Decimal.lt(total, base),
-      },
-      unit,
-    };
-  };
 }
 
 // === UTILITY FUNCTIONS ===
