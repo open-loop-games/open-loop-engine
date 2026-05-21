@@ -37,7 +37,7 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 
 - `resources.md` — Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, randomness, and notations sit underneath `createResource`, which produces the reactive game values everything else reads. Conversion and resource bags layer on top. Start here when modelling a new countable quantity.
 - `mechanics.md` — The composable evaluation kernel. Modifier chains, requirements, formulas, computed bindings, conditions, effects, gates, and trace. Pure-function evaluation (no Vue dependency in the core) plus reactive wrappers — the substrate the content systems compose against.
-- `composition.md` — Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) and `Worker` are reusable composition primitives used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
+- `composition.md` — Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
 - `content-systems.md` — Currency-flow and long-arc structure systems — the validated incremental-game primitives. Purchasable / Producer / Achievement / Inventory / BestOf for economy; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog for progression. Each is a typed registration surface over the mechanics kernel; category factories batch-register many definitions.
 - `content-narrative.md` — Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Relationship (five typed sub-primitives: scalar / faction / tiered / vector / flag). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
@@ -114,7 +114,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel
 - **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives
 - **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection
-- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, composition.md#worker, ../consumer-guide.md#indirect-control-worker-pools
+- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide.md#indirect-control-worker-pools
 - **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide.md#persona-roster-composition, composition.md#sequencer
 - **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resets-and-conversions
 - **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resets-and-conversions
@@ -206,7 +206,6 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `content-registry` — generic typed registry for game content definitions → composition.md#content-registry
 - `feature` — base types and utilities for game features → composition.md#feature
 - `sequencer` — core primitive for ordered execution of items with optional metadata → composition.md#sequencer
-- `worker` — pure identity container over a Sequencer + TimedProgress + task lookup → composition.md#worker
 
 ### Content Systems
 

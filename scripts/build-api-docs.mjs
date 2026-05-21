@@ -356,7 +356,7 @@ function renderIndex(byCluster) {
     '- **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel',
     '- **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives',
     '- **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection',
-    '- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, composition.md#worker, ../consumer-guide.md#indirect-control-worker-pools',
+    '- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide.md#indirect-control-worker-pools',
     '- **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide.md#persona-roster-composition, composition.md#sequencer',
     '- **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resets-and-conversions',
     '- **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resets-and-conversions',

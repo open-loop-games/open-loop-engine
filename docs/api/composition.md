@@ -1,6 +1,6 @@
 # Composition
 
-Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) and `Worker` are reusable composition primitives used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
+Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
 
 ## Canonical entrypoints
 
@@ -9,7 +9,6 @@ Start with these public symbols before scanning the full inventory below.
 - `createCategoryBase` — build a custom batch-registration category when built-ins do not fit.
 - `createContentRegistry` — hold patchable content definitions for mods and registration.
 - `createSequencer` and fill strategies — ordered queues, rotations, persona dispatch, and task scheduling.
-- `createWorker` — identity wrapper over a sequencer plus timed progress for indirect-control workers.
 
 ## Category Base
 
@@ -66,13 +65,3 @@ core primitive for ordered execution of items with optional metadata
 - `interface SequencerItem<M = void>` — A sequencer entry: string ID plus optional typed metadata. `src/core/sequencer.ts:29`
 - `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:86`
 - `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canRun check. `src/core/sequencer.ts:46`
-
-## Worker
-
-pure identity container over a Sequencer + TimedProgress + task lookup
-
-- `function createWorker<TaskDef extends { id: string; }>(options: WorkerOptions<TaskDef>): Worker<TaskDef>` — Creates a pure identity container binding a sequencer, a progress tracker, and a task lookup into one addressable unit. `src/systems/worker.ts:107`
-- `function isWorker<TaskDef extends { id: string; } = { id: string; }>(value: unknown): value is Worker<TaskDef>` — Type guard for Worker instances. `src/systems/worker.ts:135`
-- `interface Worker<TaskDef extends { id: string; }>` — A named execution unit built by createWorker. `src/systems/worker.ts:61`
-- `interface WorkerOptions<TaskDef extends { id: string; }>` — Configuration for createWorker. `src/systems/worker.ts:45`
-- `const WorkerType: unique symbol` — Symbol identifying Worker instances. `src/systems/worker.ts:42`

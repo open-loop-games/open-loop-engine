@@ -183,7 +183,7 @@ export * from './goal-picker';
 // axis (RecommendationSystem = inter-loop; RuleAdvisor = intra-session).
 export * from './rule-advisor';
 
-// === CHARACTER INTERACTION (P-CIS) ===
+// === CHARACTER INTERACTION () ===
 // Dialog: authored conversation graphs (DialogNode/DialogChoice/DialogGraph)
 // + the engine-native runtime that walks them. Conditions accept ICondition
 // or Gate transparently — Gate predicates resolve via the ambient triple.
@@ -195,7 +195,7 @@ export * from './dialog';
 export * from './dialog-category';
 export * from './dialog-session';
 
-// === RELATIONSHIP SYSTEMS (P-REL) ===
+// === RELATIONSHIP SYSTEMS () ===
 // Five typed shapes (scalar / tiered / vector / faction / flag) registered
 // through `createRelationshipCategory`. Raw `createRelationship` is
 // @internal — consumers use the category factory.
@@ -227,7 +227,6 @@ export * from './automation';
 // Pure identity container binding Sequencer + TimedProgress + task lookup into
 // one addressable unit ("player", "clone-0", "predictor"). No behavior — the
 // struct exposes its inputs plus currentTaskId/currentTask computeds.
-export * from './worker';
 
 // === CROSS-LAYER TYPE RE-EXPORTS ===
 

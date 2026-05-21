@@ -419,7 +419,7 @@ Key naming convention: namespace with `category/entity/field` slashes (`'produce
 
 ## Indirect-control worker pools
 
-Composition recipe for games where the player posts tasks and a pool of N autonomous workers claims them — Majesty-style bounties, DK-style imps, DF-style job queues. The engine provides the primitives; the coordination lives consumer-side until a second independent consumer pressure-tests the shape.
+Composition recipe for games where the player posts tasks and a pool of N autonomous workers claims them — Majesty-style bounties, DK-style imps, DF-style job queues. The engine provides the primitives; the coordination — both the per-worker wiring and the pool-shared state — lives consumer-side.
 
 Primitives that compose, per worker:
 
@@ -427,7 +427,22 @@ Primitives that compose, per worker:
 - `TimedProgress` (ephemeral) — the execution accumulator
 - `FillStrategy` (e.g. `createRoundRobinStrategy`) closing over a shared `Persistent<TaskId[]>` — the claim
 - `sequencer.on('start', ...)` handler that splices the claimed id from the shared ref — grab-on-claim
-- `createWorker` — identity wrapper exposing `currentTask` + `dispose`
+
+The per-worker bundle is a plain object the consumer assembles — addressable identity (`id`), the two underlying primitives (`sequencer`, `tracker`), plus the `currentTaskId` / `currentTask` computeds and a `dispose` that tears down the tracker. This is the actual shape consumers use today:
+
+```ts
+function buildWorker(id: string, sequencer: Sequencer<unknown>, tracker: TimedProgress) {
+  const currentTaskId = computed(() => sequencer.currentItem?.id);
+  const currentTask = computed(() => {
+    const taskId = currentTaskId.value;
+    return taskId !== undefined ? getTask(taskId) : undefined;
+  });
+  return {
+    id, sequencer, tracker, currentTaskId, currentTask,
+    dispose() { tracker.dispose(); },
+  };
+}
+```
 
 Shared across the pool:
 
@@ -435,9 +450,9 @@ Shared across the pool:
 - A `getTask(id)` lookup over the union of task defs all workers might execute
 - Consumer-owned policy: post-bounty, recall, wake-idle orchestration, pin-to-role strategy swaps
 
-Reference implementation: `tiny-civ/workers.ts` in open-loop-starter. The `buildWorker(id)` local factory wires all five primitives; `wakeIdleWorkers(exceptId?)` and `recall()` sit outside the factory because they're policy, not pool state.
+Single-worker case: same shape with one instance (`id: 'player'`). spell-compiler and maldacena both follow this pattern in their action/spell-execution modules.
 
-Why no engine helper today: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. The second Majesty-shape consumer is the trigger to revisit (see `TODO(expansion)` in `src/systems/worker.ts`).
+Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (defender towers, OL-1021) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
 
 ## Persona-roster composition
 
@@ -556,7 +571,7 @@ Native runtime is the default — pick it for content authored as `DialogGraph` 
 
 ### Relationships: one category, five typed sub-primitives
 
-`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional decay/derivation), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `ICondition` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). Each variation lives in its own factory under `src/systems/relationship-variants/` and can be reached directly when category dispatch is overkill.
+`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `ICondition` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — the per-variant builders live inside `src/systems/relationship.ts` and dispatch on `def.kind` internally; there's no L3 standalone factory.
 
 Cross-cutting axes — decay rate, derivation function, propagation matrix, permanent/temporary split — are options on the variation defs, not separate primitives. This keeps the variation count finite (5) while letting each shape parameterize its own policy.
 
