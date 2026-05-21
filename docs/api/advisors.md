@@ -1,12 +1,11 @@
 # Advisors
 
-Decision-support systems that observe the engine and rank or recommend actions. The rule advisor + evaluator (rank candidates against a rule set), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
+Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
 
 ## Canonical entrypoints
 
 Start with these public symbols before scanning the full inventory below.
 
-- `createRuleEvaluator` — pure state-to-action rule dispatch.
 - `selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.
 - `createGoalPicker` — pick weighted goals from a candidate pool.
 - `createRecommendationSystem` — arbitrate and surface strategies between loop runs.
@@ -67,13 +66,3 @@ intra-session profile-history aggregator with ranked suggestions
 - `interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined>` — Configuration for createRuleAdvisor. `src/systems/rule-advisor.ts:126`
 - `interface Suggestion<TPayload = unknown>` — One advisory output. `src/systems/rule-advisor.ts:46`
 - `type SuggestionRankFn<TPayload> = (a: Suggestion<TPayload>, b: Suggestion<TPayload>) => number` — Comparator for ranking the merged suggestion list. `src/systems/rule-advisor.ts:111`
-
-## Rule evaluator
-
-pure `evaluate(state) → action` primitive for consumer-driven rule sets
-
-- `function createRuleEvaluator<TState, TAction>(options: RuleEvaluatorOptions<TState, TAction>): RuleEvaluator<TState, TAction>` — Creates a pure rule evaluator over consumer-provided state and action types. `src/core/rule-evaluator.ts:150`
-- `interface EvaluatorResult<TAction>` — Structured result of one RuleEvaluator.evaluate pass. `src/core/rule-evaluator.ts:53`
-- `interface EvaluatorRule<TState, TAction>` — One rule — a predicate closure over a context snapshot, mapped to an action. `src/core/rule-evaluator.ts:40`
-- `interface RuleEvaluator<TState, TAction>` — A rule evaluator instance, returned by createRuleEvaluator. `src/core/rule-evaluator.ts:112`
-- `interface RuleEvaluatorOptions<TState, TAction>` — Configuration for createRuleEvaluator. `src/core/rule-evaluator.ts:75`

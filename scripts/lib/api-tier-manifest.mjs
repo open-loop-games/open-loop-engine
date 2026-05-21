@@ -164,15 +164,14 @@ export const TIER_MANIFEST = [
     tier: 'advisors',
     title: 'Advisors',
     scope:
-      'Decision-support systems that observe the engine and rank or recommend actions. The rule advisor + evaluator (rank candidates against a rule set), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.',
+      'Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.',
     entrypoints: [
-      '`createRuleEvaluator` — pure state-to-action rule dispatch.',
       '`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.',
       '`createGoalPicker` — pick weighted goals from a candidate pool.',
       '`createRecommendationSystem` — arbitrate and surface strategies between loop runs.',
       '`createRuleAdvisor` — aggregate history and surface ranked suggestions.',
     ],
-    clusters: ['goal-picker', 'policy', 'recommendation', 'rule-advisor', 'rule-evaluator'],
+    clusters: ['goal-picker', 'policy', 'recommendation', 'rule-advisor'],
   },
   {
     tier: 'spatial',

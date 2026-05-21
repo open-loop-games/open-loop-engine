@@ -278,15 +278,6 @@ export {
   selectionComposite,
 } from './policy';
 
-// === RULE EVALUATOR ===
-export type {
-  EvaluatorRule,
-  EvaluatorResult,
-  RuleEvaluatorOptions,
-  RuleEvaluator,
-} from './rule-evaluator';
-export { createRuleEvaluator } from './rule-evaluator';
-
 // === SPATIAL PRIMITIVES ===
 export type {
   GridCoord,

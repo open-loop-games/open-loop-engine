@@ -43,7 +43,7 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
 - `runtime.md` — The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the game loop (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
 - `introspection.md` — The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.
-- `advisors.md` — Decision-support systems that observe the engine and rank or recommend actions. The rule advisor + evaluator (rank candidates against a rule set), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
+- `advisors.md` — Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
 - `spatial.md` — Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal.
 - `harness.md` — Headless-sim substrate. Matrix and predicate-bounded runners, probes, content walkers, the picker for solver/UI enumeration, solvers (bisection), perturbation, analyzers, run pools, and typed harness contracts. Separable from the rest of the engine — game code never imports harness; balance tooling does.
 
@@ -92,7 +92,6 @@ Common consumer tasks resolved to their starting tier. Land in the tier file and
 | expose a tunable knob to a slider / mod config | introspection.md#override-registry |
 | in-game devtools / balance UI / walk all content | introspection.md#engine-categories |
 | upcoming unlock / "what changes next?" | harness.md#content-walker, runtime.md#transition-distance-primitives |
-| rule-driven AI decision | advisors.md#rule-evaluator |
 | schedule jobs / persona rotation / ordered dispatch | composition.md#sequencer |
 | recommendation between loops | advisors.md#recommendation |
 | spatial adjacency / grid bonuses | spatial.md#grid, spatial.md#graph |
@@ -136,7 +135,6 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
 - **Loop disambiguation** — `GameLoop` (runtime) vs `Loop` (gameplay) vs `LoopLog` (metrics) — same stem, three meanings → INDEX.md#reserved-names
 - **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation
-- **rule-driven decision** — pure `evaluate(state) → action` over consumer rule sets + selection policies → advisors.md#rule-evaluator, advisors.md#selection-policies
 
 ## Common disambiguators
 
@@ -259,7 +257,6 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `policy` — score-and-pick over a candidate list → advisors.md#selection-policies
 - `recommendation` — inter-loop strategy arbitration → advisors.md#recommendation
 - `rule-advisor` — intra-session profile-history aggregator with ranked suggestions → advisors.md#rule-advisor
-- `rule-evaluator` — pure `evaluate(state) → action` primitive for consumer-driven rule sets → advisors.md#rule-evaluator
 
 ### Spatial
 

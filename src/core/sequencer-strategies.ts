@@ -39,14 +39,9 @@ export interface ConditionalRule<M = void> {
 /**
  * Pick the first item whose condition evaluates to `true` (top-to-bottom).
  *
- * This is the `FillStrategy` variant: the Sequencer drives invocation by calling
- * `next()` when its queue runs dry, and conditions close over reactive state
- * directly. For consumer-driven `evaluate(state) → action` with structured rule
- * attribution (mid-cycle preemption, profile-attributed firings), see
- * `createRuleEvaluator` — different lifecycle, same first-match semantics.
- *
- * Rules are evaluated lazily each call to `next()` — conditions that reference
- * reactive state naturally reflect current values.
+ * The Sequencer drives invocation by calling `next()` when its queue runs dry;
+ * conditions close over reactive state directly and re-evaluate lazily on each
+ * call, so referenced reactive state naturally reflects current values.
  *
  * Compose with {@link createCompositeStrategy} for fallback behavior:
  * ```ts

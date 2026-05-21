@@ -22,15 +22,12 @@ import {
   createEngine,
   createResource,
   createRuleAdvisor,
-  createRuleEvaluator,
   createSkillCategory,
   createSpatialGrid,
   type Engine,
   type EngineContext,
-  type EvaluatorResult,
   type InjectionKey,
   type RuleAdvisor,
-  type RuleEvaluator,
   type SpatialGrid,
   type SpatialGridSnapshot,
   type Suggestion,
@@ -319,58 +316,6 @@ describe('Relationship surface type pins', () => {
     expectTypeOf((def: FactionRelationshipDef) =>
       createRelationship(def),
     ).returns.toEqualTypeOf<FactionRelationship>();
-  });
-});
-
-describe('createRuleEvaluator type surface', () => {
-  interface TState {
-    mana: number;
-  }
-  interface TAction {
-    kind: 'cast' | 'skip';
-  }
-
-  it('infers RuleEvaluator<TState, TAction> from the options generics', () => {
-    const evaluator = createRuleEvaluator<TState, TAction>({
-      getRules: () => [],
-    });
-    expectTypeOf(evaluator).toEqualTypeOf<RuleEvaluator<TState, TAction>>();
-    // evaluate() takes the snapshot type exactly — widening to `unknown` would
-    // strip the contract that consumers pass their own typed state.
-    expectTypeOf(evaluator.evaluate).parameter(0).toEqualTypeOf<TState>();
-    expectTypeOf(evaluator.evaluate).returns.toEqualTypeOf<EvaluatorResult<TAction>>();
-  });
-
-  it('pins EvaluatorResult.action as TAction | null (OTHERWISE invariant)', () => {
-    // matched: false + no eligible fallback → action is null. Narrowing this to
-    // just TAction would let consumers skip the null-check and crash on no-match.
-    expectTypeOf<EvaluatorResult<TAction>['action']>().toEqualTypeOf<TAction | null>();
-    expectTypeOf<EvaluatorResult<TAction>['matched']>().toBeBoolean();
-    expectTypeOf<EvaluatorResult<TAction>['ruleIndex']>().toBeNumber();
-  });
-
-  it('canUse receives both action and state — snapshot-only reads', () => {
-    // Dropping the state parameter would silently remove the
-    // affordability-over-snapshot contract and force callers to re-close over
-    // reactive sources.
-    createRuleEvaluator<TState, TAction>({
-      getRules: () => [],
-      canUse: (action, state) => {
-        expectTypeOf(action).toEqualTypeOf<TAction>();
-        expectTypeOf(state).toEqualTypeOf<TState>();
-        return true;
-      },
-    });
-  });
-
-  it('onEvaluate receives result plus the same state snapshot passed to evaluate()', () => {
-    createRuleEvaluator<TState, TAction>({
-      getRules: () => [],
-      onEvaluate: (result, state) => {
-        expectTypeOf(result).toEqualTypeOf<EvaluatorResult<TAction>>();
-        expectTypeOf(state).toEqualTypeOf<TState>();
-      },
-    });
   });
 });
 
