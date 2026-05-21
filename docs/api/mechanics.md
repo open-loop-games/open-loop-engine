@@ -97,25 +97,25 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 ## Gate
 
-consumer-facing predicate-spec data shape over the engine's existing substrate. Cross-cuts every requirement-bearing field where today consumers either reach for `C.*` (exposes engine-internal vocabulary) or fall back to opaque `Computable<boolean>` closures (loses predictor introspection)
+typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
-- `interface AllGate` — True when every child Gate is true. `src/systems/gate.ts:141`
-- `interface AnyGate` — True when at least one child Gate is true. `src/systems/gate.ts:147`
-- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/systems/gate.ts:91`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:453`
-- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/systems/gate.ts:79`
-- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:269`
-- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/systems/gate.ts:135`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/systems/gate.ts:165`
-- `interface GateRequirementOptions` — Options for createGateRequirement. `src/systems/gate.ts:420`
-- `interface GateRuntime` — The three engine handles evaluateGate and timeUntilGateFlip need at runtime. `src/systems/gate.ts:187`
-- `function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRuntime` — Resolve the three ambient handles into a GateRuntime bundle. `src/systems/gate.ts:207`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/systems/gate.ts:232`
-- `interface NotGate` — True when the wrapped Gate is false. `src/systems/gate.ts:153`
-- `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/systems/gate.ts:66`
-- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/systems/gate.ts:115`
-- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:314`
-- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/systems/gate.ts:103`
+- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:95`
+- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:101`
+- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:45`
+- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:33`
+- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:89`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:120`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:142`
+- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:107`
+- `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:20`
+- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:69`
+- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:57`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:278`
+- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:143`
+- `interface GateRequirementOptions` — Options for createGateRequirement. `src/systems/gate.ts:245`
+- `interface GateRuntime` — The three engine handles evaluateGate and timeUntilGateFlip need at runtime. `src/systems/gate.ts:89`
+- `function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRuntime` — Resolve the three ambient handles into a GateRuntime bundle. `src/systems/gate.ts:109`
+- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:188`
 
 ## Modifier
 

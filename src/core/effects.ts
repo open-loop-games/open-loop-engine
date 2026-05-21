@@ -4,7 +4,6 @@
 
 import type { DecimalSource } from '@/primitives/decimal';
 import type {
-  ICondition,
   IEffect,
   GameStateAccessor,
   ResourceEffect,
@@ -14,6 +13,7 @@ import type {
   ConditionalEffect,
 } from '@/primitives/types';
 import { evaluateCondition } from './conditions';
+import { gateToCondition, type Gate } from './gate';
 
 // === TYPES ===
 /** A fully resolved effect with all formulas evaluated — ready for mutation. */
@@ -148,7 +148,20 @@ export const E = {
   composite(...effects: IEffect[]): CompositeEffect {
     return { type: 'composite', effects };
   },
-  conditional(condition: ICondition, then: IEffect, otherwise?: IEffect): ConditionalEffect {
-    return { type: 'conditional', condition, then, else: otherwise };
+  /**
+   * Build a conditional effect — `then` applies when `gate` evaluates true,
+   * `otherwise` (if provided) applies when false. The {@link Gate} is
+   * projected to the internal {@link ICondition} IR via `gateToCondition`
+   * at build time, so the returned `ConditionalEffect` is fully serializable
+   * and the resolution path stays predictor-friendly.
+   *
+   * `gate` must be a rate-aware Gate — category-aware kinds (`count-gte`,
+   * `unlock`) and combinators containing them have no `ICondition`
+   * projection and `gateToCondition` throws. For category-aware conditional
+   * effects, gate the application at the consumer (only build the effect
+   * inside the branch you want), not via `E.conditional`.
+   */
+  conditional(gate: Gate, then: IEffect, otherwise?: IEffect): ConditionalEffect {
+    return { type: 'conditional', condition: gateToCondition(gate), then, else: otherwise };
   },
 };

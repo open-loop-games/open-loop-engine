@@ -190,7 +190,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `computed` — `Computable<T>` and getter utilities for Vue reactive inputs → mechanics.md#computed
 - `effects` — declarative game-state mutations from `IEffect` ASTs → mechanics.md#effects
 - `formulas` — Algebraic expression trees with evaluate / invert / integrate. → mechanics.md#formulas
-- `gate` — consumer-facing predicate-spec data shape over the engine's existing substrate. Cross-cuts every requirement-bearing… → mechanics.md#gate
+- `gate` — typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other… → mechanics.md#gate
 - `modifier` — composable value calculation chains → mechanics.md#modifier
 - `requirements` — Requirements system for gating purchases, unlocks, and actions → mechanics.md#requirements
 - `timed-progress` — stateless tickable progress accumulator → mechanics.md#timedprogress
