@@ -301,7 +301,18 @@ If you want completions to reset with a prestige tier, list the per-challenge co
 
 Modifier bindings (`chain.bind`, `Grant` lowerings, `PersistentEffectSystem.register`) aren't serialized — closures can't round-trip. They live in module install code, which re-runs on every load. Bind unconditionally with `active` / `multiplier` closing over persistent refs; on load those refs hydrate before install reads them, so the chain reflects post-load state the same tick.
 
-The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads once at install and never re-fires. Always pass `active: () => upgrade.active.value` and let the predicate gate.
+The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads once at install and never re-fires. Bind unconditionally and let `active` gate. `active` is a `Computable<boolean>` (`T | Readonly<Ref<T>> | () => T`), so all three of these are valid:
+
+```ts
+// Ref in hand — preferred, no closure
+chain.bind({ active: upgrade.active, modifier })
+// Derived predicate — getter form
+chain.bind({ active: () => hasResource(ref.action, 1) && upgrade.active.value, modifier })
+// Constant — always-on binding with attribution
+chain.bind({ modifier })  // omit `active` entirely
+```
+
+Reach for the getter only when the predicate is derived from more than one source; if you already have a `Ref<boolean>`, pass it as-is.
 
 ### Writing migrations
 
