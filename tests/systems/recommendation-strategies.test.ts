@@ -6,7 +6,7 @@ import { beginPersistentContext, endPersistentContext } from '@/core/persistence
 import { createLoop } from '@/systems/loop';
 import { createLoopLog } from '@/systems/loop-log';
 import { createBestOf } from '@/systems/best-of';
-import { createBestReplayStrategy, createGoalStrategy } from '@/systems/recommendation-strategies';
+import { createBestReplayDef, createGoalDef } from '@/systems/recommendation-strategies';
 import type { RecommendationContext } from '@/systems/recommendation';
 
 /** Simple tick manager matching the existing test pattern */
@@ -75,14 +75,14 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
   return { tick, gold, loop, loopLog, bestOf, runLoop, buildContext };
 }
 
-describe('createBestReplayStrategy', () => {
+describe('createBestReplayDef', () => {
   // ==========================================================================
   // canApply
   // ==========================================================================
 
   it('canApply returns false when no best entry exists', () => {
     const { buildContext } = createPopulatedStack('br-noentry');
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
 
     expect(strategy.canApply(buildContext())).toBe(false);
   });
@@ -94,7 +94,7 @@ describe('createBestReplayStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
@@ -104,7 +104,7 @@ describe('createBestReplayStrategy', () => {
     runLoop(100, 5);
     bestOf.invalidate('gold');
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
@@ -113,7 +113,7 @@ describe('createBestReplayStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
@@ -122,7 +122,7 @@ describe('createBestReplayStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createBestReplayStrategy('gold', { minLoops: 3 });
+    const strategy = createBestReplayDef('gold', { minLoops: 3 });
     // loop.count is 1 after one completed loop
     expect(strategy.canApply(buildContext())).toBe(false);
 
@@ -144,7 +144,7 @@ describe('createBestReplayStrategy', () => {
 
     runLoop(200, 10);
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
     expect(strategy.canApply(ctx)).toBe(true);
 
@@ -162,7 +162,7 @@ describe('createBestReplayStrategy', () => {
 
     runLoop(150, 5);
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
     const result = strategy.recommend(ctx);
 
@@ -177,7 +177,7 @@ describe('createBestReplayStrategy', () => {
     // Second loop: gold = 50 (worse, doesn't beat best)
     runLoop(50, 5);
 
-    const strategy = createBestReplayStrategy('gold');
+    const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
     const result = strategy.recommend(ctx);
 
@@ -195,7 +195,7 @@ describe('createBestReplayStrategy', () => {
     const { runLoop, buildContext } = createPopulatedStack('br-custom-id');
     runLoop(100, 5);
 
-    const strategy = createBestReplayStrategy('gold', { id: 'my-replay' });
+    const strategy = createBestReplayDef('gold', { id: 'my-replay' });
     expect(strategy.id).toBe('my-replay');
 
     const result = strategy.recommend(buildContext());
@@ -203,14 +203,14 @@ describe('createBestReplayStrategy', () => {
   });
 });
 
-describe('createGoalStrategy', () => {
+describe('createGoalDef', () => {
   // ==========================================================================
   // canApply
   // ==========================================================================
 
   it('canApply returns false with no best entry', () => {
     const { buildContext } = createPopulatedStack('gs-noentry');
-    const strategy = createGoalStrategy({ id: 'goal', metric: 'gold' });
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
 
     expect(strategy.canApply(buildContext())).toBe(false);
   });
@@ -220,7 +220,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(50, 5);
 
-    const strategy = createGoalStrategy({
+    const strategy = createGoalDef({
       id: 'goal',
       metric: 'gold',
       threshold: 100,
@@ -233,7 +233,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(150, 5);
 
-    const strategy = createGoalStrategy({
+    const strategy = createGoalDef({
       id: 'goal',
       metric: 'gold',
       threshold: 100,
@@ -246,7 +246,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(10, 5);
 
-    const strategy = createGoalStrategy({ id: 'goal', metric: 'gold' });
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
@@ -259,7 +259,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(200, 10);
 
-    const strategy = createGoalStrategy({
+    const strategy = createGoalDef({
       id: 'goal',
       metric: 'gold',
       prefer: 'maximize',
@@ -273,7 +273,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(200, 8);
 
-    const strategy = createGoalStrategy({
+    const strategy = createGoalDef({
       id: 'goal',
       metric: 'gold',
       prefer: 'minimize',
@@ -291,7 +291,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createGoalStrategy({ id: 'goal', metric: 'gold' });
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     const result = strategy.recommend(buildContext());
 
     expect(result.snapshot).toEqual({ queue: ['spell-a', 'spell-b'] });
@@ -304,7 +304,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createGoalStrategy({ id: 'goal', metric: 'gold' });
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     // canApply still true (goal strategy doesn't require snapshot)
     const ctx = buildContext({ fallback: true });
     const result = strategy.recommend(ctx);
@@ -317,12 +317,12 @@ describe('createGoalStrategy', () => {
 
     runLoop(100, 5);
 
-    const maxStrategy = createGoalStrategy({
+    const maxStrategy = createGoalDef({
       id: 'max',
       metric: 'gold',
       prefer: 'maximize',
     });
-    const minStrategy = createGoalStrategy({
+    const minStrategy = createGoalDef({
       id: 'min',
       metric: 'gold',
       prefer: 'minimize',
@@ -340,7 +340,7 @@ describe('createGoalStrategy', () => {
 
     runLoop(100, 5);
 
-    const strategy = createGoalStrategy({ id: 'goal', metric: 'gold' });
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     const result = strategy.recommend(buildContext());
     expect(result.rationale.summary).toContain('highest');
   });

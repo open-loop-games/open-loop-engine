@@ -1,28 +1,28 @@
 /**
- * Recommendation system — inter-loop strategy arbitration
+ * Recommendation system — inter-loop arbitration across registered defs
  *
  * Composes LoopLog (per-loop metric history), BestOf (best-of-run records),
  * and Loop (lifecycle events) into a score-based recommendation surface.
- * Registered strategies evaluate historical data and propose configurations
- * for the next loop; the system picks the highest-scoring winner.
+ * Registered defs evaluate historical data and propose configurations for
+ * the next loop; the system picks the highest-scoring winner.
  *
  * - {@link createRecommendationSystem} — sole factory, wires into Loop lifecycle
  *
  * Key features:
- * - Pluggable strategy registration with `canApply` / `score` / `recommend`
- * - Score-based arbitration across multiple strategies (highest wins)
+ * - Pluggable def registration with `canApply` / `score` / `recommend`
+ * - Score-based arbitration across registered defs (highest wins)
  * - Persistent last recommendation with dismiss/apply lifecycle
  * - Auto-apply mode for full automation (T6 Optimizer pattern)
  * - Advisory mode for surfacing suggestions (T5 Advisor pattern)
  *
- * Strategies are the inter-loop equivalent of {@link FillStrategy}: FillStrategy
- * picks the next action *within* a loop; recommendation strategies pick the
- * configuration *between* loops.
+ * `RecommendationDef` is the inter-loop sibling of {@link FillStrategy}:
+ * FillStrategy picks the next action *within* a loop; recommendation defs
+ * pick the configuration *between* loops.
  *
  * @see {@link createLoopLog} for the per-loop metric source
  * @see {@link createBestOf} for per-metric best tracking with snapshots
  * @see {@link createLoop} for the lifecycle this wires into
- * @see ./recommendation-strategies.ts for built-in strategy factories
+ * @see ./recommendation-strategies.ts for built-in def factories
  * @see {@link createRuleAdvisor} for the intra-session sibling — same advisory
  *   shape, but re-fired on consumer signals (rule edits, encounter changes)
  *   instead of `loop.afterRestart`, and emits a ranked list of independent
@@ -46,7 +46,7 @@ import type { BestOf } from './best-of';
 // === TYPES ===
 
 /**
- * The evaluation context passed to every strategy's `canApply`, `score`,
+ * The evaluation context passed to every def's `canApply`, `score`,
  * and `recommend` methods. Built fresh each `evaluate()` call.
  */
 export interface RecommendationContext {
@@ -71,15 +71,15 @@ export interface RecommendationMetricComparison {
 
 /** Structured explanation of why a recommendation was made */
 export interface RecommendationRationale {
-  /** Which strategy produced this recommendation */
+  /** Which def produced this recommendation */
   strategyId: string;
   /** Per-metric comparison: current performance vs projected with recommended config */
   metrics: Record<string, RecommendationMetricComparison>;
-  /** Human-readable summary for UI display (consumer-provided via strategy) */
+  /** Human-readable summary for UI display (consumer-provided via def) */
   summary: string;
 }
 
-/** The output of a strategy's `recommend()` method */
+/** The output of a def's `recommend()` method */
 export interface RecommendationResult {
   /** The proposed configuration to apply next loop (opaque to the engine) */
   snapshot: State;
@@ -88,34 +88,35 @@ export interface RecommendationResult {
 }
 
 /**
- * A recommendation strategy definition. Consumers implement this interface
- * and register it with the system.
+ * A recommendation definition. Consumers implement this interface and
+ * register it with the system; the system scores registered defs and runs
+ * the winner.
  *
  * Evaluation order: `canApply` → `score` (if applicable) → `recommend` (winner only).
  */
-export interface RecommendationStrategyDef {
-  /** Unique strategy identifier */
+export interface RecommendationDef {
+  /** Unique def identifier */
   id: string;
   /**
-   * Returns `true` if this strategy can produce a meaningful recommendation.
-   * Strategies where `canApply` returns `false` are excluded from arbitration.
+   * Returns `true` if this def can produce a meaningful recommendation.
+   * Defs where `canApply` returns `false` are excluded from arbitration.
    */
   canApply: (ctx: RecommendationContext) => boolean;
   /**
    * Numeric score for arbitration. Higher wins. Only called when `canApply`
-   * returns `true`. On ties, the first-registered strategy wins.
+   * returns `true`. On ties, the first-registered def wins.
    */
   score: (ctx: RecommendationContext) => number;
   /**
-   * Produce the recommendation. Only called for the winning strategy
-   * (highest score among applicable strategies).
+   * Produce the recommendation. Only called for the winning def
+   * (highest score among applicable defs).
    */
   recommend: (ctx: RecommendationContext) => RecommendationResult;
 }
 
 /** A produced recommendation stored by the system */
 export interface Recommendation {
-  /** Which strategy produced this */
+  /** Which def produced this */
   strategyId: string;
   /** The proposed configuration snapshot */
   snapshot: State;
@@ -187,13 +188,13 @@ export interface RecommendationSystemOptions {
   applySnapshot: (snapshot: State) => void;
 
   /**
-   * Strategy definitions to register at construction time.
-   * Additional strategies can be added later via `.register()`.
+   * Definitions to register at construction time.
+   * Additional defs can be added later via `.register()`.
    */
-  strategies?: RecommendationStrategyDef[];
+  defs?: RecommendationDef[];
 
   /**
-   * Called each `evaluate()` to provide game-specific state for strategy
+   * Called each `evaluate()` to provide game-specific state for def
    * evaluation. Populates {@link RecommendationContext.state}.
    */
   getState?: () => Record<string, unknown>;
@@ -203,7 +204,7 @@ export interface RecommendationSystemOptions {
  * A recommendation system instance — the returned object from
  * {@link createRecommendationSystem}.
  *
- * Evaluates registered strategies after each loop restart, picks the
+ * Evaluates registered defs after each loop restart, picks the
  * highest-scoring applicable one, and either surfaces it as an advisory
  * recommendation or auto-applies it.
  */
@@ -220,28 +221,28 @@ export interface RecommendationSystem {
    */
   readonly autoApply: Persistent<boolean>;
 
-  /** Registered strategy definitions (ordered; first-registered wins on tie) */
-  readonly strategies: readonly RecommendationStrategyDef[];
+  /** Registered definitions (ordered; first-registered wins on tie) */
+  readonly defs: readonly RecommendationDef[];
 
   /**
-   * Register an additional strategy at runtime.
-   * No-op if a strategy with the same `id` is already registered.
+   * Register an additional def at runtime.
+   * No-op if a def with the same `id` is already registered.
    */
-  register(def: RecommendationStrategyDef): void;
+  register(def: RecommendationDef): void;
 
-  /** Remove a strategy by id. No-op if not found. */
-  unregister(strategyId: string): void;
+  /** Remove a def by id. No-op if not found. */
+  unregister(defId: string): void;
 
   /**
    * Run the full evaluation cycle synchronously:
    * 1. Build context from options callbacks
-   * 2. Filter strategies via `canApply`
+   * 2. Filter defs via `canApply`
    * 3. Score and pick highest (ties: first-registered wins)
    * 4. Call `recommend()` on the winner
    * 5. Store as `lastRecommendation`, emit `'recommend'`
    * 6. If `autoApply`, call `applySnapshot` + emit `'apply'`
    *
-   * Returns the produced {@link Recommendation} or `null` if no strategy applied
+   * Returns the produced {@link Recommendation} or `null` if no def applied
    * or the BestOf resolver returned `null` (no active context).
    * Called automatically on `loop.on('afterRestart')` and can also be called manually.
    */
@@ -317,15 +318,15 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
 // === FACTORIES ===
 
 /**
- * Create a recommendation system that evaluates strategies after each loop
- * restart and surfaces or auto-applies the winning configuration.
+ * Create a recommendation system that evaluates registered defs after
+ * each loop restart and surfaces or auto-applies the winning configuration.
  *
  * Composes LoopLog (metric history), BestOf (best configs), and Loop
- * (lifecycle) into a score-based recommendation surface. Strategies are
- * the inter-loop equivalent of FillStrategy: they pick *what configuration
- * to use next*, not what action to run within a loop.
+ * (lifecycle) into a score-based recommendation surface. Defs are the
+ * inter-loop sibling of FillStrategy: they pick *what configuration to
+ * use next*, not what action to run within a loop.
  *
- * @param options - Loop/LoopLog/BestOf to compose with, snapshot callbacks, and optional strategies
+ * @param options - Loop/LoopLog/BestOf to compose with, snapshot callbacks, and optional defs
  * @returns A RecommendationSystem with evaluate/apply/dismiss lifecycle and event hooks
  *
  * @example
@@ -337,9 +338,9 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  *   bestOf: myBestOf,
  *   getCurrentSnapshot: () => ({ loadout: currentLoadout.snapshot() }),
  *   applySnapshot: (snap) => currentLoadout.restore(snap.loadout),
- *   strategies: [
- *     createBestReplayStrategy('gold'),
- *     createGoalStrategy({ id: 'max-xp', metric: 'xp' }),
+ *   defs: [
+ *     createBestReplayDef('gold'),
+ *     createGoalDef({ id: 'max-xp', metric: 'xp' }),
  *   ],
  * });
  *
@@ -363,7 +364,7 @@ export function createRecommendationSystem(
     bestOf,
     getCurrentSnapshot,
     applySnapshot,
-    strategies: initialStrategies,
+    defs: initialDefs,
     getState,
   } = options;
 
@@ -378,8 +379,8 @@ export function createRecommendationSystem(
 
   const handle = createEmitHandle<RecommendationSystemEvents>();
 
-  // --- Strategy registry ---
-  const registeredStrategies: RecommendationStrategyDef[] = [...(initialStrategies ?? [])];
+  // --- Def registry ---
+  const registeredDefs: RecommendationDef[] = [...(initialDefs ?? [])];
 
   // --- Deserialized view ---
   const lastRecommendation = computed<Recommendation | null>(() => {
@@ -404,12 +405,12 @@ export function createRecommendationSystem(
   }
 
   function evaluate(): Recommendation | null {
-    if (registeredStrategies.length === 0) return null;
+    if (registeredDefs.length === 0) return null;
 
     const ctx = buildContext();
     if (!ctx) return null;
 
-    const applicable = registeredStrategies.filter((s) => s.canApply(ctx));
+    const applicable = registeredDefs.filter((s) => s.canApply(ctx));
     if (applicable.length === 0) return null;
 
     // Score and pick highest (first-registered wins ties via strict >)
@@ -455,18 +456,18 @@ export function createRecommendationSystem(
   return {
     lastRecommendation,
     autoApply,
-    get strategies() {
-      return registeredStrategies as readonly RecommendationStrategyDef[];
+    get defs() {
+      return registeredDefs as readonly RecommendationDef[];
     },
 
-    register(def: RecommendationStrategyDef) {
-      if (registeredStrategies.some((s) => s.id === def.id)) return;
-      registeredStrategies.push(def);
+    register(def: RecommendationDef) {
+      if (registeredDefs.some((s) => s.id === def.id)) return;
+      registeredDefs.push(def);
     },
 
-    unregister(strategyId: string) {
-      const idx = registeredStrategies.findIndex((s) => s.id === strategyId);
-      if (idx >= 0) registeredStrategies.splice(idx, 1);
+    unregister(defId: string) {
+      const idx = registeredDefs.findIndex((s) => s.id === defId);
+      if (idx >= 0) registeredDefs.splice(idx, 1);
     },
 
     evaluate,

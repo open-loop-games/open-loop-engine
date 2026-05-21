@@ -251,7 +251,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 - `goal-picker` — weighted-goal selection over a candidate pool → advisors.md#goal-picker
 - `policy` — score-and-pick over a candidate list → advisors.md#selection-policies
-- `recommendation` — inter-loop strategy arbitration → advisors.md#recommendation
+- `recommendation` — inter-loop arbitration across registered defs → advisors.md#recommendation
 - `rule-advisor` — intra-session profile-history aggregator with ranked suggestions → advisors.md#rule-advisor
 
 ### Spatial

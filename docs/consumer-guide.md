@@ -208,7 +208,7 @@ These are the choices that most often look similar from the outside. The API ind
 
 **Sequencer vs advisor.** A sequencer owns ordered dispatch: queues, rotations, fill strategies, and current item state. Advisors rank or recommend choices based on observed state. If the system must remember what is currently scheduled, use a sequencer. If it only needs to choose or recommend from candidates, use advisors or selection policies.
 
-**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different lifecycles. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is sequencer-driven: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is passive: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationStrategy` (via `createRecommendationSystem`) is between-loop: every strategy runs on `Loop.restart`, scores the snapshot, and the winner surfaces as a recommendation. Three lifecycles — *pulled by a sequencer*, *invoked passively*, *fired on loop boundaries* — three primitives. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state (round-robin's cursor), selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`). See `policy.ts` and `sequencer-strategies.ts` headers for the cross-references.
+**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a stateful generator: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a stateless selector: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`, with `createBestReplayDef` / `createGoalDef` as the built-in factories) is a scored candidate: every registered def runs `canApply` / `score` on `Loop.restart`, and the highest-scoring winner runs `recommend()`. Three shapes — *stateful generator*, *stateless selector*, *scored candidate* — three primitives. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state (round-robin's cursor), selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`). See `policy.ts` and `sequencer-strategies.ts` headers for the cross-references.
 
 **Introspection vs harness.** Introspection discovers the live engine surface: categories, chains, resources, effects, tunables, and diagnostics. Harness executes simulations: headless runs, matrices, sensitivity sweeps, probes, perturbations, and transition walkers. A dev panel usually starts with introspection; a balance experiment starts with harness.
 
@@ -220,53 +220,35 @@ Content modules keep `data/*.ts` engine-runtime-free: data files describe what c
 
 The trick is when data needs to express predicates over live game state. An achievement's `requirement` has to look at a resource value; an unlock's gate has to check a threshold against a lifetime accumulator; a dialog node's condition has to read relationship state. Those are runtime questions, but the *shape* of the question is part of the content definition.
 
-The pattern: data declares a `GameState` interface describing the predicate-shaped queries it wants to make; modules implement that interface over live engine refs.
+`Gate` (level 4 above) is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
 
 ```ts
-// data/types.ts — engine-runtime-free
-export interface GameState {
-  primaryAtLeast(n: number): boolean;
-  primaryLifetimeAtLeast(n: number): boolean;
-  producerCountAtLeast(id: string, n: number): boolean;
-  unlockVisible(id: string): boolean;
-}
+// data/achievements.ts — pure data, no engine imports
+import type { Gate } from 'open-loop-engine';
 
 export interface AchievementDef {
   id: string;
   description: string;
-  requirement: (s: GameState) => boolean;
+  requirement: Gate;
 }
 
-// data/achievements.ts — pure data, no engine imports
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: 'first-handful', description: 'Ten saved.', requirement: (s) => s.primaryLifetimeAtLeast(10) },
-  { id: 'coop-built', description: 'Hens settle in.', requirement: (s) => s.producerCountAtLeast('coop', 1) },
+  {
+    id: 'first-handful',
+    description: 'Ten saved.',
+    requirement: { kind: 'cumulative-gte', resource: 'eggs', value: 10 },
+  },
+  {
+    id: 'coop-built',
+    description: 'Hens settle in.',
+    requirement: { kind: 'count-gte', category: 'producers', entity: 'coop', value: 1 },
+  },
 ];
-
-// modules/achievements.ts — wires the interface to live engine state
-function createAchievementsModule(data: GameData): EngineModule {
-  return {
-    install(ctx) {
-      const primary = ctx.inject(PrimaryResourceKey);
-      const producers = ctx.inject(ProducersCategoryKey);
-      const unlocks = ctx.inject(UnlocksCategoryKey);
-
-      const state: GameState = {
-        primaryAtLeast: (n) => primary.value.gte(n),
-        primaryLifetimeAtLeast: (n) => primary.lifetime.value.gte(n),
-        producerCountAtLeast: (id, n) => producers.getInstance(id)?.amount.value.gte(n) ?? false,
-        unlockVisible: (id) => unlocks.getPurchasable(id)?.active.value ?? false,
-      };
-
-      // hand `state` to the achievement category's registration so requirements close over it
-    },
-  };
-}
 ```
 
-Helpers extend incrementally — add a method to the interface when a predicate needs it, implement it module-side. The interface is the contract; what fills it changes per-archetype, the data stays portable.
+No per-game predicate interface, no module-side implementation table, no closures handed into registration. The Gate union grows engine-side when a validated kind shows up across consumers; consumer code stays a tree of typed data. `count-gte` and `unlock` already resolve through `CategoryEntrySignals` — "is producer Coop at >= 1" and "is purchasable X owned/visible" are built-in kinds, not predicates any module has to write. The would-be side-table for "what's currently visible?" never materializes because the Gate kind reads `unlocks.getPurchasable(id)?.active.value` through the category-signals layer.
 
-The payoff: predicates resolve to category accessors automatically. `unlockVisible(id)` is `unlocks.getPurchasable(id)?.active.value`, not a parallel visibility store. The temptation to hand-roll a side-table for "what's currently visible?" disappears once data is typed against the helper interface — there's nothing for the side-table to compete with.
+When a predicate genuinely doesn't fit a Gate kind, the escape hatch is `Computable<boolean>` on fields that accept the `Gate | Computable<boolean>` union arm (or `createBooleanRequirement` on requirement-shaped fields) — a typed closure expressed game-side, outside the data layer. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way. See idle-loops-ng's `data/builders.ts` for the worked pattern. Before reaching for the closure, check whether a derived counter exposed at a `StateGate` path (see Gate section above) covers the case as data.
 
 ## Persistence
 
@@ -295,6 +277,18 @@ const prestigeReset = createReset({
 
 This means adding a resource, upgrade, producer, or category entry inside one of those module scopes automatically includes it in resets that reference that module — no cross-file coordination. Lifetime refs such as `resource.cumulative` and `resource.best` are skipped by module-scoped resets by default; pass them directly through `thingsToReset` only for hard resets that should wipe lifetime statistics.
 
+Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved scope, evaluated at reset time. Refs in `keep` survive verbatim; refs in `retain` are snapshot before the wipe, run through the supplied transform, and written back after:
+
+```ts
+const prestigeReset = createReset({
+  resetModules: ['resources', 'upgrades'],
+  keep: [premium.amount],
+  retain: new Map([[skillLevel, fractional(0.1)]]),
+});
+```
+
+To exclude a `Resource` from a module-scoped reset, pass its underlying persistent handle (`resource.amount`) — `keep` and `retain` operate on `Persistent` refs, not on the wrappers built over them. Inline `keep`/`retain` is shorthand for `createRetentionPolicy`; drop to the standalone factory only when the same policy spans more than one reset.
+
 ### Category systems scope their own persistence
 
 Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory`, etc.) wrap each registered definition in its own persistent context — `{categoryId}/{def.id}` — regardless of the ambient `withPersistentContext` in effect. See `category-base.ts` (the `beginPersistentContext` call inside `registerOne`).
@@ -302,6 +296,12 @@ Category factories (`createSkillCategory`, `createChallengeCategory`, `createPur
 This matters most for challenges: `active` and `completions` refs scope to per-challenge contexts and are **not** included in any ambient reset scope by default. Completions survive every prestige tier unless a consumer explicitly lists the per-challenge contexts in `resetModules` — which matches the usual game-design pattern where challenge completions are permanent rewards (AD canon, TMT convention).
 
 If you want completions to reset with a prestige tier, list the per-challenge contexts explicitly (e.g. `'my-challenges/ic1'`) in the reset's `resetModules`.
+
+### Bindings re-hydrate from install, not from save
+
+Modifier bindings (`chain.bind`, `Grant` lowerings, `PersistentEffectSystem.register`) aren't serialized — closures can't round-trip. They live in module install code, which re-runs on every load. Bind unconditionally with `active` / `multiplier` closing over persistent refs; on load those refs hydrate before install reads them, so the chain reflects post-load state the same tick.
+
+The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads once at install and never re-fires. Always pass `active: () => upgrade.active.value` and let the predicate gate.
 
 ### Writing migrations
 
@@ -422,7 +422,7 @@ For conditional modifiers (active only when a condition is met), there are three
   });
   ```
 
-- **`chain.bind({ active, modifier })`** — the primitive the declarative fields lower to. Use directly when you have a one-off 1:1 binding that doesn't fit a category signal (ad-hoc module-level buffs, unlock-gated conditional modifiers). Auto-derives an attribution id from the ambient `withPersistentContext` scope and the modifier's description; duplicate ids within one chain throw. Binding is **synchronous** — purchase an upgrade and `chain.apply(...)` reflects the contribution the same tick, no `nextTick()` needed.
+- **`chain.bind({ active, modifier })`** — the primitive the declarative fields lower to. Use directly when you have a one-off 1:1 binding that doesn't fit a category signal (ad-hoc module-level buffs, unlock-gated conditional modifiers). Auto-derives an attribution id from the ambient `withPersistentContext` scope and the modifier's description; duplicate ids within one chain throw. Binding is **synchronous** — purchase an upgrade and `chain.apply(...)` reflects the contribution the same tick, no `nextTick()` needed. Bindings aren't persisted — the install-time call re-runs on load (see § Bindings re-hydrate from install, not from save).
 
 - **`createPersistentEffectSystem`** — keep this for cases that `chain.bind` can't cover cleanly: multi-chain atomic bindings where all chains must activate/deactivate together, bindings with `onActivate` / `onDeactivate` side-effect hooks, or explicit registration outside any category-driven lifecycle.
 

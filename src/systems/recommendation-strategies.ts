@@ -1,18 +1,18 @@
 /**
- * Built-in recommendation strategies — common inter-loop patterns
+ * Built-in recommendation defs — common inter-loop patterns
  *
  * Sugar factories for the two most common recommendation patterns found
  * across incremental games with loop mechanics:
  *
- * - {@link createBestReplayStrategy} — "replay the best-known config for this metric"
+ * - {@link createBestReplayDef} — "replay the best-known config for this metric"
  *   (Cavernous II loadBestRoute, Melvor Idle combat loadouts)
  *
- * - {@link createGoalStrategy} — "optimize for a specific metric goal"
+ * - {@link createGoalDef} — "optimize for a specific metric goal"
  *   (Spell Compiler farming goals, NGU Idle energy allocation)
  *
  * These are thin wrappers over {@link BestOf} data. Games with more complex
  * needs (adaptive responses, trend detection, route generation) implement
- * custom strategies against the {@link RecommendationStrategyDef} interface.
+ * custom defs against the {@link RecommendationDef} interface.
  *
  * @see {@link createRecommendationSystem} for the system these register with
  * @see {@link createBestOf} for the data source these read from
@@ -21,25 +21,25 @@
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import type { RecommendationStrategyDef, RecommendationContext } from './recommendation';
+import type { RecommendationDef, RecommendationContext } from './recommendation';
 import type { BestOfEntry } from './best-of';
 
 // === TYPES ===
 
-/** Options for {@link createBestReplayStrategy} */
-export interface BestReplayStrategyOptions {
-  /** Override the strategy id. Default: `best-replay:${metricKey}` */
+/** Options for {@link createBestReplayDef} */
+export interface BestReplayDefOptions {
+  /** Override the def id. Default: `best-replay:${metricKey}` */
   id?: string;
   /**
-   * Minimum completed loops before this strategy becomes applicable.
+   * Minimum completed loops before this def becomes applicable.
    * Default: 1 (needs at least one recorded best).
    */
   minLoops?: number;
 }
 
-/** Options for {@link createGoalStrategy} */
-export interface GoalStrategyOptions {
-  /** Strategy id (required — you may register multiple goal strategies) */
+/** Options for {@link createGoalDef} */
+export interface GoalDefOptions {
+  /** Def id (required — you may register multiple goal defs) */
   id: string;
   /** The BestOf metric key to optimize for */
   metric: string;
@@ -49,7 +49,7 @@ export interface GoalStrategyOptions {
    */
   prefer?: 'maximize' | 'minimize';
   /**
-   * Minimum acceptable value for the metric. Strategy is not applicable
+   * Minimum acceptable value for the metric. Def is not applicable
    * until at least one BestOf entry meets this threshold.
    */
   threshold?: DecimalSource;
@@ -60,32 +60,32 @@ export interface GoalStrategyOptions {
 // --- Best replay ---
 
 /**
- * Create a strategy that replays the configuration that produced the best
- * value for a given metric. The simplest recommendation pattern — just
- * load whatever worked best last time.
+ * Create a def that replays the configuration that produced the best value
+ * for a given metric. The simplest recommendation pattern — just load
+ * whatever worked best last time.
  *
  * Requires that {@link BestOf} was created with a `captureStrategy` callback
  * so that strategy snapshots are recorded alongside best entries.
  *
  * @param metricKey - The BestOf metric key to optimize for
  * @param options - Optional id override and minimum loop count
- * @returns A {@link RecommendationStrategyDef} ready to register
+ * @returns A {@link RecommendationDef} ready to register
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   // ...
- *   strategies: [
- *     createBestReplayStrategy('gold'),
- *     createBestReplayStrategy('xp', { minLoops: 3 }),
+ *   defs: [
+ *     createBestReplayDef('gold'),
+ *     createBestReplayDef('xp', { minLoops: 3 }),
  *   ],
  * });
  * ```
  */
-export function createBestReplayStrategy(
+export function createBestReplayDef(
   metricKey: string,
-  options?: BestReplayStrategyOptions,
-): RecommendationStrategyDef {
+  options?: BestReplayDefOptions,
+): RecommendationDef {
   const strategyId = options?.id ?? `best-replay:${metricKey}`;
   const minLoops = options?.minLoops ?? 1;
 
@@ -146,20 +146,20 @@ export function createBestReplayStrategy(
 // goal-directed shape is corpus-validated. Graduate or delete based on real usage.
 
 /**
- * Create a strategy that selects the configuration optimizing for a specific
- * metric goal. More opinionated than {@link createBestReplayStrategy} — it
+ * Create a def that selects the configuration optimizing for a specific
+ * metric goal. More opinionated than {@link createBestReplayDef} — it
  * supports goal direction (maximize value vs minimize time) and threshold gating.
  *
  * @param options - Goal definition with metric, direction, and optional threshold
- * @returns A {@link RecommendationStrategyDef} ready to register
+ * @returns A {@link RecommendationDef} ready to register
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   // ...
- *   strategies: [
- *     createGoalStrategy({ id: 'farm-gold', metric: 'gold', prefer: 'maximize' }),
- *     createGoalStrategy({
+ *   defs: [
+ *     createGoalDef({ id: 'farm-gold', metric: 'gold', prefer: 'maximize' }),
+ *     createGoalDef({
  *       id: 'speed-clear', metric: 'damage', prefer: 'minimize',
  *       threshold: 1000,  // only suggest when damage > 1000 is achievable
  *     }),
@@ -167,7 +167,7 @@ export function createBestReplayStrategy(
  * });
  * ```
  */
-export function createGoalStrategy(options: GoalStrategyOptions): RecommendationStrategyDef {
+export function createGoalDef(options: GoalDefOptions): RecommendationDef {
   const { id, metric, prefer = 'maximize', threshold } = options;
 
   function getEntry(ctx: RecommendationContext): BestOfEntry | null {

@@ -7,7 +7,7 @@ import { createLoopLog } from '@/systems/loop-log';
 import { createBestOf } from '@/systems/best-of';
 import { createRecommendationSystem } from '@/systems/recommendation';
 import type {
-  RecommendationStrategyDef,
+  RecommendationDef,
   Recommendation,
   RecommendationContext,
 } from '@/systems/recommendation';
@@ -59,9 +59,7 @@ function createTestStack(prefix: string) {
 }
 
 /** A simple strategy factory for tests */
-function makeStrategy(
-  overrides: Partial<RecommendationStrategyDef> & { id: string },
-): RecommendationStrategyDef {
+function makeStrategy(overrides: Partial<RecommendationDef> & { id: string }): RecommendationDef {
   return {
     canApply: () => true,
     score: () => 1,
@@ -95,7 +93,7 @@ describe('createRecommendationSystem', () => {
 
     expect(recs.lastRecommendation.value).toBeNull();
     expect(recs.autoApply.value).toBe(false);
-    expect(recs.strategies).toHaveLength(0);
+    expect(recs.defs).toHaveLength(0);
   });
 
   it('pre-registers strategies from options', () => {
@@ -109,12 +107,12 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [s1, s2],
+      defs: [s1, s2],
     });
 
-    expect(recs.strategies).toHaveLength(2);
-    expect(recs.strategies[0].id).toBe('a');
-    expect(recs.strategies[1].id).toBe('b');
+    expect(recs.defs).toHaveLength(2);
+    expect(recs.defs[0].id).toBe('a');
+    expect(recs.defs[1].id).toBe('b');
   });
 
   // ==========================================================================
@@ -144,7 +142,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'nope', canApply: () => false })],
+      defs: [makeStrategy({ id: 'nope', canApply: () => false })],
     });
 
     expect(recs.evaluate()).toBeNull();
@@ -159,7 +157,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'winner' })],
+      defs: [makeStrategy({ id: 'winner' })],
     });
 
     const result = recs.evaluate();
@@ -178,7 +176,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({ id: 'low', score: () => 1 }),
         makeStrategy({ id: 'high', score: () => 10 }),
         makeStrategy({ id: 'mid', score: () => 5 }),
@@ -198,7 +196,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({ id: 'first', score: () => 5 }),
         makeStrategy({ id: 'second', score: () => 5 }),
       ],
@@ -217,7 +215,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({ id: 'blocked', canApply: () => false, score: () => 100 }),
         makeStrategy({ id: 'available', score: () => 1 }),
       ],
@@ -243,7 +241,7 @@ describe('createRecommendationSystem', () => {
       getCurrentSnapshot: () => ({ loadout: 'fire' }),
       applySnapshot: () => {},
       getState: () => ({ goal: 'gold' }),
-      strategies: [
+      defs: [
         makeStrategy({
           id: 'spy',
           canApply: (ctx) => {
@@ -274,7 +272,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({
           id: 'spy',
           canApply: (ctx) => {
@@ -304,7 +302,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('recommend', (rec) => received.push(rec));
@@ -325,7 +323,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'skip', canApply: () => false })],
+      defs: [makeStrategy({ id: 'skip', canApply: () => false })],
     });
 
     recs.on('recommend', (rec) => received.push(rec));
@@ -349,7 +347,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.evaluate();
@@ -369,7 +367,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.autoApply.value = true;
@@ -398,7 +396,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('apply', (rec) => applyEvents.push(rec));
@@ -439,7 +437,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.autoApply.value = true;
@@ -465,7 +463,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('dismiss', () => {
@@ -514,7 +512,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'auto' })],
+      defs: [makeStrategy({ id: 'auto' })],
     });
 
     recs.on('recommend', (rec) => received.push(rec));
@@ -540,7 +538,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('recommend', (rec) => received.push(rec));
@@ -585,11 +583,11 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.register(makeStrategy({ id: 'a', score: () => 999 }));
-    expect(recs.strategies).toHaveLength(1);
+    expect(recs.defs).toHaveLength(1);
   });
 
   it('unregister() removes a strategy', () => {
@@ -601,12 +599,12 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'b' })],
+      defs: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'b' })],
     });
 
     recs.unregister('a');
-    expect(recs.strategies).toHaveLength(1);
-    expect(recs.strategies[0].id).toBe('b');
+    expect(recs.defs).toHaveLength(1);
+    expect(recs.defs[0].id).toBe('b');
   });
 
   it('unregister() is a no-op for unknown ids', () => {
@@ -618,11 +616,11 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [makeStrategy({ id: 'a' })],
+      defs: [makeStrategy({ id: 'a' })],
     });
 
     recs.unregister('nonexistent');
-    expect(recs.strategies).toHaveLength(1);
+    expect(recs.defs).toHaveLength(1);
   });
 
   // ==========================================================================
@@ -638,7 +636,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({
           id: 'persisted',
           recommend: () => ({
@@ -683,7 +681,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      strategies: [
+      defs: [
         makeStrategy({
           id: 'counter',
           recommend: () => {
