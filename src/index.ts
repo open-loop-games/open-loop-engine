@@ -263,6 +263,17 @@ export interface EngineConfig {
   storageAdapter?: StorageAdapter;
   /** Maximum number of save slots. Default: 10 */
   maxSaveSlots?: number;
+  /**
+   * When true, any save validation failure aborts the load with
+   * `save:load-failed { reason: 'validation' }`. When false, failing leaves
+   * are self-healed to their persistent ref's default value and the load
+   * proceeds. `save:validation-error` is emitted per field in both modes.
+   *
+   * Defaults to dev-mode detection in the underlying save manager: fail-loud
+   * in development (so bugs surface early), self-heal in production (so
+   * player saves stay protected).
+   */
+  strictValidation?: boolean;
   /** Available game mods. One may be selected before start(). */
   mods?: ModDef[];
   /**
@@ -419,6 +430,7 @@ export function createEngine(config: EngineConfig): Engine {
           storageAdapter: config.storageAdapter,
           maxSlots: config.maxSaveSlots,
           persistenceNamespace: config.persistenceNamespace,
+          strictValidation: config.strictValidation,
         })
       : undefined;
 

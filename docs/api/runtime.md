@@ -17,10 +17,10 @@ Start with these public symbols before scanning the full inventory below.
 top-level facade composing every layer
 
 - `const computed: typeof computed$1` — _(no summary)_ `src/index.ts`
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the game loop, save manager, module system, and mod support. `src/index.ts:390`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the game loop, save manager, module system, and mod support. `src/index.ts:401`
 - `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/index.ts`
 - `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/index.ts`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:300`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:311`
 - `interface EngineConfig` — Configuration passed to createEngine. `src/index.ts:230`
 - `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/index.ts:122`
 - `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/index.ts:98`

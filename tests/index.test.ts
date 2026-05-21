@@ -1132,3 +1132,65 @@ describe('autoSaveInterval — runtime-tunable', () => {
     engine.stop();
   });
 });
+
+describe('EngineConfig.strictValidation', () => {
+  // Hand-build a corrupted uncompressed envelope and feed it through importSave;
+  // skips needing the save-manager's compressSave knob plumbed through EngineConfig.
+  function corruptedEnvelope(gameId: string, moduleId: string): string {
+    return JSON.stringify({
+      version: 1,
+      gameId,
+      timestamp: Date.now(),
+      data: { [moduleId]: { count: { not: 'a number' } } },
+      _engine: { version: 3 },
+    });
+  }
+
+  function makeCountModule(id: string): EngineModule {
+    return {
+      id,
+      install() {
+        persistent(0, { name: 'count' });
+      },
+    };
+  }
+
+  it('strictValidation: true aborts load on validation failure via createEngine', () => {
+    const moduleId = 'strict-true-mod';
+    const engine = createEngine({
+      gameId: 'strict-true',
+      strictValidation: true,
+      saveVersion: 1,
+    });
+    engine.use(makeCountModule(moduleId));
+    engine.start();
+
+    const failed = vi.fn();
+    engine.saveManager!.on('save:load-failed', failed);
+    const result = engine.saveManager!.importSave(corruptedEnvelope('strict-true', moduleId));
+
+    expect(result.success).toBe(false);
+    expect(failed).toHaveBeenCalledWith({
+      slotId: 0,
+      reason: 'validation',
+      detail: undefined,
+    });
+    engine.dispose();
+  });
+
+  it('strictValidation: false self-heals on validation failure via createEngine', () => {
+    const moduleId = 'strict-false-mod';
+    const engine = createEngine({
+      gameId: 'strict-false',
+      strictValidation: false,
+      saveVersion: 1,
+    });
+    engine.use(makeCountModule(moduleId));
+    engine.start();
+
+    const result = engine.saveManager!.importSave(corruptedEnvelope('strict-false', moduleId));
+
+    expect(result.success).toBe(true);
+    engine.dispose();
+  });
+});
