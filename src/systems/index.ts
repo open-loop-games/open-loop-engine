@@ -183,7 +183,7 @@ export * from './goal-picker';
 // axis (RecommendationSystem = inter-loop; RuleAdvisor = intra-session).
 export * from './rule-advisor';
 
-// === CHARACTER INTERACTION () ===
+// === CHARACTER INTERACTION ===
 // Dialog: authored conversation graphs (DialogNode/DialogChoice/DialogGraph)
 // + the engine-native runtime that walks them. Conditions accept ICondition
 // or Gate transparently — Gate predicates resolve via the ambient triple.
@@ -195,7 +195,7 @@ export * from './dialog';
 export * from './dialog-category';
 export * from './dialog-session';
 
-// === RELATIONSHIP SYSTEMS () ===
+// === RELATIONSHIP SYSTEMS ===
 // Five typed shapes (scalar / tiered / vector / faction / flag) registered
 // through `createRelationshipCategory`. Raw `createRelationship` is
 // @internal — consumers use the category factory.

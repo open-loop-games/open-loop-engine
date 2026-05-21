@@ -238,7 +238,7 @@ describe('createSpatialGrid type surface', () => {
   });
 });
 
-describe('Dialog surface (P-CIS) type pins', () => {
+describe('Dialog surface type pins', () => {
   it('createDialogCategory returns DialogCategory<Def>', async () => {
     const { createDialogCategory } = await import('@/systems/dialog-category');
     type DialogCategory<D extends { id: string }> =
@@ -283,7 +283,7 @@ describe('Dialog surface (P-CIS) type pins', () => {
   });
 });
 
-describe('Relationship surface (P-REL) type pins', () => {
+describe('Relationship surface type pins', () => {
   it('createRelationshipCategory<TieredRelationshipDef> narrows getInstance<"tiered">', async () => {
     const { createRelationshipCategory } = await import('@/systems/relationship');
     type TieredRelationshipDef = import('@/primitives/relationship').TieredRelationshipDef;

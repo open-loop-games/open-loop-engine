@@ -1,14 +1,14 @@
 /**
- * Relationship system — P-REL pattern variants and category dispatch
+ * Relationship system — variant shapes and category dispatch
  *
  * Five typed relationship shapes (scalar / tiered / vector / faction / flag)
  * registered through {@link createRelationshipCategory}, which dispatches
  * per-def by `kind`. The raw `createRelationship` factory underneath is
  * engine-internal.
  *
- * Per the P-REL solution: don't mix shapes within an owner class. If guilds
- * are tier-ladders and NPCs are multi-dim vectors, register them as two
- * separate defs (each with its own kind) — not as two dimensions on one def.
+ * Don't mix shapes within an owner class. If guilds are tier-ladders and
+ * NPCs are multi-dim vectors, register them as two separate defs (each with
+ * its own kind) — not as two dimensions on one def.
  */
 
 import { persistent, type Persistent } from '@/core/persistence';
@@ -532,7 +532,7 @@ export function createRelationship(def: RelationshipDef): RelationshipInstance {
 
 /**
  * Create a relationship category that dispatches per-def to one of the five
- * P-REL variants by `def.kind`.
+ * variant shapes by `def.kind`.
  *
  * @param options - Persistence-context id; per-def sub-context is `{id}/{def.id}`.
  * @returns A {@link RelationshipCategory} with `register` / `getDef` /
