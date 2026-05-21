@@ -2,7 +2,7 @@
 
 How to express a game with `@open-loop/engine`. Read this after forking `open-loop-starter` and before writing your first module.
 
-This guide covers **how to think about using the engine** — levels of abstraction, composition, when to reach for which surface. For the mechanical per-symbol lookup ("does X exist? where?"), see [docs/api/INDEX.md](api/INDEX.md). For traps surfaced during consumer ports (counter drift, dual-write hazards), see [docs/migration-notes.md](./migration-notes.md). For the **math underpinning** the formula primitives — when each rate function is the right shape, what closes in closed form, where the algebra ends and named adjacent math takes over — see `open-loop-research/methodology/techniques/closed-form-progression/`. This file answers *what shape* your module should take; INDEX answers *which symbol* to call; migration-notes answers *how to get there from existing code*; closed-form-progression answers *what math you're choosing among*.
+This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [migration-notes.md](./migration-notes.md) for port traps; `open-loop-research/methodology/techniques/closed-form-progression/` for the math underpinning the formula primitives.
 
 > References below to sibling repos (`open-loop-research`, `open-loop-starter`, etc.) and to `docs/candidate-primitives.md` describe studio-internal resources — they're load-bearing for our own workflow but won't resolve from a standalone clone of this repo.
 
@@ -28,7 +28,7 @@ These aren't sugar — they're the correct API. `subtractResource` returns a boo
 
 ### Level 2: Category systems (the default for content)
 
-Categories are the engine's standard shape for registering content. Each category factory — `createSkillCategory`, `createProducerCategory`, `createPurchasableCategory`, `createAchievementCategory`, `createChallengeCategory`, `createDialogCategory`, `createSubjectCategory`, `createZoneSystem` — exposes a typed registration contract and produces live engine objects per definition. Define a custom definition type, provide a mapper, register in bulk:
+Categories are the engine's standard shape for registering content. Each category factory exposes a typed registration contract and produces live engine objects per definition. Define a custom definition type, provide a mapper, register in bulk. The full factory list lives in `api/content-systems.md` and `api/content-narrative.md` — read the **Canonical entrypoints** block of each before reaching for raw primitives.
 
 ```ts
 const skills = createSkillCategory<MySkillDef>({
@@ -139,7 +139,7 @@ for (const def of spellDefs) {
 }
 ```
 
-Path C trades self-registration for direct control: the resulting purchasables aren't enrolled in a category registry, so tooling that walks categories won't see them unless you wrap with `createPurchasableGroup` for batch operations.
+Path C trades self-registration for direct control: the resulting purchasables aren't enrolled in a category registry, so tooling that walks `CategoriesKey` (devtools panels, balance probes, mods) won't see them. Track them at the consumer (`Map<id, Purchasable>` keyed however the game already addresses them) if anything needs batch access.
 
 ### Level 3: Raw primitives (when categories don't fit)
 
@@ -153,66 +153,23 @@ This is the normal path for one-off constructs, not a failure. The engine's syst
 
 ### Level 4: Declarative gates and effects (the data-driven escape hatch)
 
-`Gate` is the typed predicate-spec data shape; `IEffect` / `E` builder / `GameStateMutator` are the matching write side. Gates and effects are plain data objects — no closures, no typed refs — evaluated through pure functions against the engine's ambient runtime (accessor + categories + registry) or applied via the mutator.
-
-```ts
-// Data-driven: typed Gate AST, evaluated through the ambient runtime
-{ kind: 'resource-gte', resource: 'wood', value: 50 }
-{
-  kind: 'all',
-  of: [
-    { kind: 'resource-gte', resource: 'gold', value: 10 },
-    { kind: 'flag', id: 'forest' },
-  ],
-}
-```
-
-Gate kinds split into two flavors:
-
-- **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) — declarative against the accessor, predictor-friendly distance via `timeUntilGateFlip` where the kind admits it.
-- **Category-aware leaves** (`count-gte`, `unlock`) — read through `CategoryEntrySignals`, opaque-predicate distance. Use when the unlock or count *is* a registered category entry.
-
-Combinators (`all`, `any`, `not`) compose either flavor.
-
-**When to use this level:**
-
-- Save-file replay or headless simulation where typed refs don't exist
-- Mod configs loaded from JSON/YAML where closures can't be serialized
-- Balance-sim tools that need to evaluate predicates without instantiating game state
-- Content-registry patches that override behavior via data, not code
-
-**When NOT to use this level:**
-
-- When you have direct typed references in scope. A challenge that checks `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }` when you're holding `wood` already.
-- When the predicate involves game logic that doesn't map to one of Gate's kinds.
-
-**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A borglike-style "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }` with an accessor that walks `bestiary[goblin].kills`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
-
-A custom-predicate Gate kind (one carrying a closure) is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed closure game-side via `Computable<boolean>` on fields that accept that union arm (see idle-loops-ng's `data/builders.ts` pattern) and keep it out of `Gate` entirely.
-
-The typed path (levels 1-3) is the default for game modules. The data-driven path is for systems that need to operate on game state *generically* — without knowing the specific game's types at compile time.
+`Gate` is the typed predicate-spec data shape; `IEffect` / `E` builder / `GameStateMutator` are the matching write side — plain data objects evaluated through pure functions against the engine's ambient runtime. Reach for this level when typed refs aren't available: save-file replay, mod configs loaded from JSON/YAML, balance-sim tools, content-registry patches that override behavior via data. The full treatment — Gate kind flavors, when to use vs. avoid, `StateGate` for indexed runtime collections, the closure escape hatch — lives in [§Data and runtime separation](#data-and-runtime-separation). For symbol-level detail see `api/mechanics.md#gate` and `api/mechanics.md#effects`; for the form-choice table (Gate vs Requirement vs `Computable<boolean>`) see `api/INDEX.md#predicate-forms`.
 
 ## Common disambiguators
 
-These are the choices that most often look similar from the outside. The API index gives the short routing answer; this section gives the consumer-level reason.
+`api/INDEX.md#common-disambiguators` is the short routing table; this section gives the consumer-level *why* for the cases where the routing answer alone isn't enough.
 
-**Producer vs purchasable.** Use `createProducerCategory` when owning something creates continuous resource flow: buildings, generators, workers producing a rate. Use `createPurchasableCategory` when buying something changes state or grants an effect: upgrades, gates, capped repeatables, perks, and visibility unlocks. A purchasable can be predicate-gated with `createBooleanRequirement`, but it does not become a producer unless ownership contributes to a rate.
+**Purchasable vs achievement.** Player-initiated through requirements (and may spend resources) → purchasable. Observed by the game, auto-earns when true → achievement.
 
-**Purchasable vs achievement.** A purchasable is player-initiated or system-purchased through requirements and may spend resources. An achievement is observed: it completes when its requirement becomes true and then stays earned. If the player decides to buy it, use a purchasable. If the game notices it happened, use an achievement.
+**Producer vs predicate-gated purchasable.** Ownership contributes to a rate → producer. Ownership flips a boolean / grants an effect → purchasable (with `createBooleanRequirement` or a Gate-backed requirement). A predicate-gated purchasable doesn't become a producer just because it's gated.
 
-**Category vs raw primitive.** Categories are the default for authored content because they provide registration, per-definition persistence, patching, reset traversal, and introspection. Raw primitives are for one-off systems or cases where post-creation wiring needs direct closure over an instance. Dropping to raw is fine, but it trades away automatic category visibility unless you wrap the result in an appropriate group or custom category.
+**TickDriver vs Loop vs RunPool.** "How does time advance?" → `TickDriver`. "Restart this gameplay run" → `Loop`. "Track many independent concurrent run instances" → `RunPool`. The three primitives don't substitute for each other — a game can use all three.
 
-**ResourceBag vs inventory.** `createResourceBag` is the generic container: many resource types, capacity limits, transfers, and serialization helpers. `createInventory` is the game-facing item system backed by a `ResourceBag`, with known item IDs, per-item capacity, modifier-driven capacity, and optional auto-persistence.
+**Sequencer vs advisor.** If the system has to remember what is currently scheduled, it's a sequencer. If it only needs to choose or recommend from candidates each time it's asked, it's an advisor / selection policy.
 
-**TickDriver vs Loop vs RunPool.** `TickDriver` is the engine tick scheduler. `Loop` is a gameplay primitive for loop-incremental runs with reset scope and lifecycle events. `RunPool` manages many opaque concurrent runs, each with its own step/death lifecycle. If the question is "how does time advance?", start at `TickDriver`; if it is "restart this gameplay run", start at `Loop`; if it is "track many independent run instances", start at `RunPool`.
+**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` on `Loop.restart`, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
 
-**Sequencer vs advisor.** A sequencer owns ordered dispatch: queues, rotations, fill strategies, and current item state. Advisors rank or recommend choices based on observed state. If the system must remember what is currently scheduled, use a sequencer. If it only needs to choose or recommend from candidates, use advisors or selection policies.
-
-**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a stateful generator: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a stateless selector: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`, with `createBestReplayDef` / `createGoalDef` as the built-in factories) is a scored candidate: every registered def runs `canApply` / `score` on `Loop.restart`, and the highest-scoring winner runs `recommend()`. Three shapes — *stateful generator*, *stateless selector*, *scored candidate* — three primitives. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state (round-robin's cursor), selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`). See `policy.ts` and `sequencer-strategies.ts` headers for the cross-references.
-
-**Introspection vs harness.** Introspection discovers the live engine surface: categories, chains, resources, effects, tunables, and diagnostics. Harness executes simulations: headless runs, matrices, sensitivity sweeps, probes, perturbations, and transition walkers. A dev panel usually starts with introspection; a balance experiment starts with harness.
-
-**SpatialGrid vs SpatialGraph.** Use `createSpatialGrid` for bounded coordinate boards where adjacency comes from x/y positions. Use `createSpatialGraph` for arbitrary node topology, rooms, nested spaces, world maps, or places where edges are authored rather than implied by coordinates. `createScopeStack` layers active-location navigation over a recursive graph.
+**Introspection vs harness.** "Discover what's live in this engine right now" → introspection. "Run a simulation against this engine state" → harness. A dev panel usually starts with introspection; a balance experiment starts with harness.
 
 ## Data and runtime separation
 
@@ -220,11 +177,15 @@ Content modules keep `data/*.ts` engine-runtime-free: data files describe what c
 
 The trick is when data needs to express predicates over live game state. An achievement's `requirement` has to look at a resource value; an unlock's gate has to check a threshold against a lifetime accumulator; a dialog node's condition has to read relationship state. Those are runtime questions, but the *shape* of the question is part of the content definition.
 
-`Gate` (level 4 above) is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
+`Gate` is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
+
+Gate kinds split into two flavors. **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) are declarative against the accessor with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor.
+
+**When NOT to reach for Gate.** When you have direct typed refs in scope, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is about *content definitions* (where the closure can't live anyway) — typed callsites inside engine module code stay typed.
 
 ```ts
 // data/achievements.ts — pure data, no engine imports
-import type { Gate } from 'open-loop-engine';
+import type { Gate } from '@open-loop/engine';
 
 export interface AchievementDef {
   id: string;
@@ -246,9 +207,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 ];
 ```
 
-No per-game predicate interface, no module-side implementation table, no closures handed into registration. The Gate union grows engine-side when a validated kind shows up across consumers; consumer code stays a tree of typed data. `count-gte` and `unlock` already resolve through `CategoryEntrySignals` — "is producer Coop at >= 1" and "is purchasable X owned/visible" are built-in kinds, not predicates any module has to write. The would-be side-table for "what's currently visible?" never materializes because the Gate kind reads `unlocks.getPurchasable(id)?.active.value` through the category-signals layer.
+No per-game predicate interface, no module-side implementation table, no closures handed into registration. The Gate union grows engine-side when a validated kind shows up across consumers; consumer code stays a tree of typed data. The would-be side-table for "what's currently visible?" never materializes because `unlock` reads `unlocks.getPurchasable(id)?.active.value` through the category-signals layer.
 
-When a predicate genuinely doesn't fit a Gate kind, the escape hatch is `Computable<boolean>` on fields that accept the `Gate | Computable<boolean>` union arm (or `createBooleanRequirement` on requirement-shaped fields) — a typed closure expressed game-side, outside the data layer. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way. See idle-loops-ng's `data/builders.ts` for the worked pattern. Before reaching for the closure, check whether a derived counter exposed at a `StateGate` path (see Gate section above) covers the case as data.
+**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A borglike-style "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
+
+A custom-predicate Gate kind carrying a closure is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed closure game-side via `Computable<boolean>` on fields that accept that union arm (or `createBooleanRequirement` on requirement-shaped fields) and keep it out of `Gate` entirely. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way. See idle-loops-ng's `data/builders.ts` for the worked pattern.
 
 ## Persistence
 
@@ -287,7 +250,7 @@ const prestigeReset = createReset({
 });
 ```
 
-To exclude a `Resource` from a module-scoped reset, pass its underlying persistent handle (`resource.amount`) — `keep` and `retain` operate on `Persistent` refs, not on the wrappers built over them. Inline `keep`/`retain` is shorthand for `createRetentionPolicy`; drop to the standalone factory only when the same policy spans more than one reset.
+A `Resource` returned by `createResource` is itself the `Persistent` handle (`Resource<T> & Persistent<T>`), so pass it directly to `keep` / `retain` — no `.amount` indirection. Inline `keep`/`retain` is shorthand for `createRetentionPolicy`; drop to the standalone factory only when the same policy spans more than one reset.
 
 ### Category systems scope their own persistence
 
@@ -362,17 +325,11 @@ const saveMigrations = {
 
 The engine emits `save:migration-step { from, to }` for each consumer migration that runs, so per-step logging belongs in an event listener, not inside the migration body.
 
-## Resets and conversions
+## Conversions
 
-`createReset` bundles a list of things to reset into a single callable. Use it wherever you'd otherwise manually zero out refs:
+`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs through formulas over a snapshot of consumed amounts. Prestige is the canonical shape — convert resources to prestige points then reset everything — but the primitive also covers non-prestige transformations: crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`). The output formula receives a snapshot of consumed inputs taken before any mutation, so same-resource compounding (output produces more of an input type) is well-defined.
 
-```ts
-const prestigeReset = createReset({
-  resetModules: ['resources', 'upgrades', 'producers'],
-});
-```
-
-`createConversion` and reset are composed externally — the conversion factory holds no `Reset` reference. The standard prestige pattern wires them together at the call site, either by calling reset right after `convert()` or by firing the reset from `afterConvert`:
+Conversion and reset are composed externally — the factory holds no `Reset` reference. The standard prestige pattern wires them together at the call site by firing the reset from `afterConvert`:
 
 ```ts
 const prestige = createConversion({
@@ -397,8 +354,6 @@ function onPrestigeButton() {
   prestige.convert();
 }
 ```
-
-Conversions also cover non-prestige cross-resource transformations: crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange-style actions like buy-mana (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`). The output formula receives a snapshot of consumed input amounts taken before any mutation, so same-resource compounding (output produces more of an input type) is well-defined.
 
 ## Modifier chains and effects
 
@@ -470,7 +425,7 @@ def.gainChain.bind({
 });
 ```
 
-**When to reach for `createPersistentEffectSystem` instead.** Binary-gate + single chain + no side-effect hook is `chain.bind` territory. Drop to `createPersistentEffectSystem` when any of the following hold: the binding spans multiple chains that must activate/deactivate atomically; `onActivate` / `onDeactivate` hooks fire game-side side-effects; or registration happens outside any category-driven persistent context (attribution auto-derivation needs a scope). idle-loops-ng's `affected-by.ts` uses `PersistentEffectSystem.register` for that last reason — the helper is called from content modules that each hold their own `PersistentEffectSystem` instance and pass it through — but the shape itself is `chain.bind` idiomatic.
+The ladder choice between `chain.bind` and `createPersistentEffectSystem` is the same one described at the top of §Modifier chains and effects — cross-action bonuses are just the most common shape that hits it. idle-loops-ng's `affected-by.ts` uses `PersistentEffectSystem.register` because registration happens outside any category-driven persistent context (attribution auto-derivation needs a scope), not because the bonus shape itself requires it.
 
 ## Tunable knobs
 
@@ -496,9 +451,26 @@ The scoped stack means transient takeovers — sim runs, what-if probes, balance
 
 Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
 
-## Indirect-control worker pools
+For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `tunable()` enrolls the key into a `TuningRegistry` that the harness picker enumerates via `TuningRegistriesKey`. Distinct from the `OverrideRegistry`-replacing pattern used by `replacementBinding` for modifier chains (§Modifier chains): `replacementBinding` keeps attribution intact on the chain, `OverrideRegistry` bypasses it.
 
-Composition recipe for games where the player posts tasks and a pool of N autonomous workers claims them — Majesty-style bounties, DK-style imps, DF-style job queues. The engine provides the primitives; the coordination — both the per-worker wiring and the pool-shared state — lives consumer-side.
+## Introspection
+
+External tools (devtools panels, balance probes, UI hints, mods) walk the live engine surface through opt-in injection keys — `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. No install-time coupling: anything with an engine handle can enumerate without being wired into its module graph. Two query shapes recur:
+
+- **"What modifiers are live, and where did they come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. See `api/harness.md#picker`.
+- **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#content-walker`.
+
+Null `distance.seconds` is intentional and consumer-interpreted: a stasis analyzer treats it as "cannot rule out this transition"; a countdown UI hides null rows entirely. The walker never makes that policy call.
+
+Neither snapshot subscribes to reactive changes — consumers drive recomputation cadence themselves. Broader "can this predicate still fire?" coverage is the target of the parked `InfeasibilityOracle` candidate (see `docs/candidate-primitives.md`), which would compose the walker with rate and input checks under a budget-bounded surface.
+
+## Composition recipes
+
+Recurring shapes consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol — single-consumer hand-rolls; an engine helper would over-fit. When a second consumer reaches for the same wrapper, the pattern graduates via `docs/candidate-primitives.md`.
+
+### Indirect-control worker pools
+
+Games where the player posts tasks and a pool of N autonomous workers claims them — Majesty-style bounties, DK-style imps, DF-style job queues. The engine provides the primitives; the coordination — both the per-worker wiring and the pool-shared state — lives consumer-side.
 
 Primitives that compose, per worker:
 
@@ -533,7 +505,7 @@ Single-worker case: same shape with one instance (`id: 'player'`). spell-compile
 
 Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (defender towers, OL-1021) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
 
-## Persona-roster composition
+### Persona-roster composition
 
 Composition recipe for games with opponent AI, automated playtest bots, or content-agent populations that need behavioral variety. The engine provides the selection and dispatch primitives; the personality definitions stay consumer-side until a second independent consumer pressure-tests the shape.
 
@@ -572,7 +544,7 @@ sequencer.fillStrategy = createConditionalStrategy(() => [
 
 Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. The OL-714 cautionary case (`4e5fc39`, rolled back `c96ec42`) established that a `createPersonalityRoster` wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit (see breadcrumb in `docs/candidate-primitives.md`). Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
 
-## Priority-weighted fill across multiple content categories
+### Priority-weighted fill across multiple content categories
 
 Composition recipe for action-queue automation that needs to interleave entries from multiple content-type categories (gathering, crafting, research, …) under one priority order. Built on `createPriorityStrategy` plus a per-content-type `passBonus` map that breaks ties between equal-priority entries from different categories.
 
@@ -623,11 +595,11 @@ const strategy: FillStrategy<ActionMeta> = {
 
 The shape is convergent today but the pass-bonus map is the consumer-side knob: bonuses encode "when priorities tie, gathering wins over crafting" and are tuned per game. No engine helper because the category list and pass-bonus axis vary per consumer — engine `createPriorityStrategy` covers the single-category case; this recipe is the multi-category extension. If a third consumer hand-rolls the same shape with the same pass-bonus map shape, drop a candidate entry.
 
-## Character interaction surface
+### Character interaction surface
 
 Composition recipe for games with named characters that the player returns to — companions, mentors, merchants, faction contacts. The engine provides a dialog runtime and a relationship-state category; both are Tier-4 surfaces (specialized in incremental, near-default in narrative-adjacent codebases). Pattern definitions live in `open-loop-research/patterns/tier-4-specialized/character-interaction-systems.md` and `open-loop-research/patterns/tier-4-specialized/relationship-systems.md`.
 
-### Dialog: contract first, runtime second
+#### Dialog: contract first, runtime second
 
 Dialog content is a graph of nodes with text, gates, choices, and outcomes. The engine ships:
 
@@ -648,7 +620,7 @@ const session = createDialogSession({
 
 Native runtime is the default — pick it for content authored as `DialogGraph` data. Reach for an external adapter when the authoring team already knows Ink/Yarn or when the dialog volume justifies a dedicated authoring tool. Both flow through the same `DialogSession` surface; UI and save format don't care which is wired underneath.
 
-### Subjects: addressable named entities with typed multi-field state
+#### Subjects: addressable named entities with typed multi-field state
 
 `createSubjectCategory` registers subjects (NPCs, factions, regions, single entities) against a shared field schema. Each schema field picks one of five kinds via its `kind` discriminator: `scalar` (single value per subject, optional `derive` projection), `vector` (N independent dims, CDDA-style opinion), `tier` (ordered tier ladder with per-transition `Gate` gates, Daggerfall-style rank), `flag` (single persistent boolean per subject, Exult-style named event), `enum` (single nullable enum value per subject — commitment locks, path selection). The category is the only public entry point; per-kind field-builders are private. Reach a subject through `cat.get('subject-id')`; the typed `subject.fields.<name>` accessor narrows to the right per-kind shape at the callsite from schema inference — no runtime narrowing helpers.
 
@@ -682,32 +654,11 @@ entity.get('the-entity')!.fields.trust.add(0.05);
 
 Cross-cutting concerns the field kinds don't carry — time decay, propagation (faction-tree / attitude matrix / chemical-reaction), perma+temp layered store — aren't schema features. Compose them at the consumer: a tick handler that calls `field.add(-rate * dt)` for decay, two scalar fields plus a derived projection for perma+temp layering, a separate broadcast helper for propagation. The substrate stays shape-fixed; the axes earn standalone primitives when consumer demand surfaces.
 
-### When dialog and subjects connect
+#### When dialog and subjects connect
 
 Both surfaces share the engine's predicate / effect machinery. A dialog node gates on subject state through the typed `StateGate` path: `{ kind: 'state', key: 'subject.npc-trust.mentor-rask.trust', operator: 'gte', value: 2 }` — the path is `{categoryId}.{subjectId}.{fieldName}` for scalar/tier/flag/enum fields, with an extra `.{dim}` segment for vector dimensions. A choice writes back through `E.state('subject.npc-trust.mentor-rask.trust', 3)` — the predicate side is Gate (typed AST); the effect side is the `E` builder (consumer-facing). Reserved path conventions are documented in `src/primitives/types.ts`.
 
 Bespoke subject-aware atoms (a `SubjectGate` kind / `E.subject`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics.
-
-## Introspection
-
-Harness-layer helpers walk the engine's auto-registered content and return sorted snapshots — one shape for modifiers, another for upcoming state transitions. All read opt-in injection keys (`CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`), so there's no install-time coupling: a devtools panel, a balance probe, or a UI hint can call them against a running engine without being wired into its module graph.
-
-### Modifier discovery
-
-`createPickerSnapshot(engine)` — returns `{ all, content, chains, categories }`, deduplicated by `Modifier` object identity. Use to enumerate every live modifier the engine has attached, with attribution back to its source (content-registered bindings, `chain.bind` calls, category auto-registration). Built fresh on each call; no reactive subscription, no internal cache.
-
-### Pending-transition discovery — two tiers
-
-The walker family answers "what changes next?" — pending state transitions across challenges, purchasables, and producers, with a `TransitionDistance` per emission. The canonical engine-internal consumers are `eventDrivenProbe` (event-stepping headless sim) and `stasisAwareTickProbe` (run-until-stasis predicate). Broader external adoption — devtools panels, UI unlock hints, tutorial reachability, mod-QA — is the target of the parked `InfeasibilityOracle` candidate (see `docs/candidate-primitives.md`), which would compose the walker with rate and input checks under a budget-bounded "can this predicate still fire?" surface.
-
-Two adoption shapes, picked by the consumer's recomputation cadence:
-
-- **One-shot snapshot** — `createTransitionSnapshot(engine, accessor)`. Returns `{ all, challenges, purchasables, producers }`, sorted by `distance.seconds` (finite ascending, null last, tie-broken by label). Each entry carries `{ source, kind, categoryId, entityId, currentValue, distance, label }`. Cheap to rebuild from scratch; no internal state. The right shape for one-shot predicates ("any reachable transitions?"), batch probes, and any caller that recomputes on a coarse cadence. Stasis analyzers use this tier.
-- **Incremental cache** — `createIncrementalSnapshot(engine, accessor)`. Builds a cached snapshot plus per-label `TransitionDeps` reverse-indexed by resource / rate / unlock / state-path. Consumers signal dirty axes via `invalidateResource`/`invalidateRate`/`invalidateUnlock`/`invalidateState` and call `rebuild()`; the cache re-emits only the affected entries. `invalidateAll()` forces a full re-walk and is required after entity-set mutations (registry patches, new categories) — the entity set is frozen per instance. The right shape for event-stepping probes that rebuild per simulated event. `eventDrivenProbe` uses this tier.
-
-Null `distance.seconds` is intentional and consumer-interpreted: a stasis analyzer treats it as "cannot rule out this transition"; a countdown UI hides null rows entirely. The walker never makes that policy call.
-
-The one-shot snapshot is built fresh on each call. The incremental cache holds state but only between explicit `rebuild()` calls — neither subscribes to reactive changes; consumers drive recomputation cadence themselves.
 
 ## When the engine should grow
 

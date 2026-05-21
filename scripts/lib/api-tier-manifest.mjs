@@ -55,7 +55,7 @@ export const TIER_MANIFEST = [
     tier: 'composition',
     title: 'Composition',
     scope:
-      'Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.',
+      'Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.',
     entrypoints: [
       '`createCategoryBase` — build a custom batch-registration category when built-ins do not fit.',
       '`createContentRegistry` — hold patchable content definitions for mods and registration.',

@@ -29,7 +29,7 @@ Most game modules should start at the highest-level surface that fits, then drop
 | **L1: Resource helpers** | Direct currency mutation, display, checks, and resource lifetime trackers | resources.md#resource |
 | **L2: Category systems** | Repeatable authored content: producers, purchasables, achievements, skills, challenges, dialog, subjects | content-systems.md, content-narrative.md |
 | **L3: Raw primitives** | One-off systems or custom registration shapes where category mapping is too constraining | content-systems.md, composition.md, mechanics.md, lifecycle.md |
-| **L4: Declarative data** | JSON/mod/save/sim-friendly conditions, effects, and gates | mechanics.md#conditions, mechanics.md#effects, mechanics.md#gate |
+| **L4: Declarative data** | JSON/mod/save/sim-friendly gates and effects | mechanics.md#gate, mechanics.md#effects |
 
 ## Tier map
 
@@ -37,7 +37,7 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 
 - `resources.md` — Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, randomness, and notations sit underneath `createResource`, which produces the reactive game values everything else reads. Conversion and resource bags layer on top. Start here when modelling a new countable quantity.
 - `mechanics.md` — The composable evaluation kernel. Modifier chains, requirements, formulas, computed bindings, conditions, effects, gates, and trace. Pure-function evaluation (no Vue dependency in the core) plus reactive wrappers — the substrate the content systems compose against.
-- `composition.md` — Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
+- `composition.md` — Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
 - `content-systems.md` — Currency-flow and long-arc structure systems — the validated incremental-game primitives. Purchasable / Producer / Achievement / Inventory / BestOf for economy; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog for progression. Each is a typed registration surface over the mechanics kernel; category factories batch-register many definitions.
 - `content-narrative.md` — Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
@@ -113,12 +113,12 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection
 - **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide.md#indirect-control-worker-pools
 - **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide.md#persona-roster-composition, composition.md#sequencer
-- **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resets-and-conversions
-- **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resets-and-conversions
+- **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resetting-persistent-refs-in-bulk
+- **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resetting-persistent-refs-in-bulk
 - **save lifecycle hooks** — `SaveHandler` / `LoadHandler` / `save:loaded` events → lifecycle.md#save-manager, runtime.md#engine-entrypoint
 - **offline catch-up** — `processOfflineTime`, chunked simulation of elapsed seconds → lifecycle.md#offline
 - **tunable knob** — `tunable()` + `TuningRegistry`, scoped-stack override of balance constants → introspection.md#override-registry, ../consumer-guide.md#tunable-knobs
-- **declarative gate predicate** — `Gate` AST, evaluable + flip-distance + condition projection → mechanics.md#gate, ../consumer-guide.md#level-4-declarative-conditions-and-effects-the-data-driven-escape-hatch
+- **declarative gate predicate** — `Gate` AST, evaluable + flip-distance + condition projection → mechanics.md#gate, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch
 - **predicate form choice** — Gate vs Requirement vs `Computable<boolean>` for gating fields → INDEX.md#predicate-forms, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch
 - **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects
 - **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide.md#choosing-among-purchasable-primitives
