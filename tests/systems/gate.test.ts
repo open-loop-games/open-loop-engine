@@ -13,7 +13,6 @@ import {
   createResource,
   createSkillCategory,
   evaluateGate,
-  gateToCondition,
   timeUntilGateFlip,
   type EngineCategories,
   type EngineModule,
@@ -24,6 +23,7 @@ import {
 } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
+import { gateToCondition } from '@/systems/gate';
 
 beforeEach(() => {
   resetAllPersistentContexts();

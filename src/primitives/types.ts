@@ -71,7 +71,10 @@ export type IEffect =
   | CompositeEffect
   | ConditionalEffect;
 
-/** Tests a resource amount against a threshold using a comparison operator. */
+/**
+ * Tests a resource amount against a threshold using a comparison operator.
+ * @internal
+ */
 export interface ResourceCondition {
   type: 'resource';
   target: string;
@@ -81,13 +84,19 @@ export interface ResourceCondition {
   value: DecimalSource;
 }
 
-/** True when the named unlock flag is set. Used to gate content behind prior progression. */
+/**
+ * True when the named unlock flag is set. Used to gate content behind prior progression.
+ * @internal
+ */
 export interface UnlockCondition {
   type: 'unlock';
   target: string;
 }
 
-/** Compares an arbitrary game state value at a dot-path against an expected value. */
+/**
+ * Compares an arbitrary game state value at a dot-path against an expected value.
+ * @internal
+ */
 export interface StateCondition {
   type: 'state';
   /** Dot-separated path into game state (e.g. `"player.phase"`). */
@@ -97,28 +106,44 @@ export interface StateCondition {
   value: unknown;
 }
 
-/** True only when every child condition holds (short-circuits on first false). */
+/**
+ * True only when every child condition holds (short-circuits on first false).
+ * @internal
+ */
 export interface AndCondition {
   type: 'and';
   conditions: ICondition[];
 }
 
-/** True when at least one child condition holds (short-circuits on first true). */
+/**
+ * True when at least one child condition holds (short-circuits on first true).
+ * @internal
+ */
 export interface OrCondition {
   type: 'or';
   conditions: ICondition[];
 }
 
-/** Inverts a condition: true when the wrapped condition is false, and vice versa. */
+/**
+ * Inverts a condition: true when the wrapped condition is false, and vice versa.
+ * @internal
+ */
 export interface NotCondition {
   type: 'not';
   condition: ICondition;
 }
 
 /**
- * Tagged-union root for declarative conditions — the data shape content
- * authors hand to category factories. Evaluated via {@link evaluateCondition}
- * against a {@link GameStateAccessor}.
+ * Engine-internal IR for declarative predicates. Consumers author {@link Gate}
+ * literals on content-def fields; the engine projects rate-aware Gate leaves
+ * to ICondition via `gateToCondition` for walker / predictor reuse. Embedded
+ * by {@link ConditionalEffect} as the conditional-effect IR.
+ *
+ * Not part of the public surface — kept as a typed interchange shape between
+ * the Gate projection and the IEffect / walker machinery that already speaks
+ * it. Import from `@/primitives/types` for cross-module internal use.
+ *
+ * @internal
  */
 export type ICondition =
   | ResourceCondition

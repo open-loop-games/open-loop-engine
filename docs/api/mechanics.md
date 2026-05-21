@@ -9,7 +9,7 @@ Start with these public symbols before scanning the full inventory below.
 - `createModifierChain` plus `chain.bind` — shared bonus surfaces and attributed conditional modifiers.
 - `createCostRequirement` / `createBooleanRequirement` — spend-bearing and predicate-only requirements.
 - `F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion, and max-buy previews.
-- `Gate` / `C` / `E` — declarative predicates and effects when save/mod/sim data needs serializable shape.
+- `Gate` / `E` — declarative predicates and effects when save/mod/sim data needs serializable shape.
 - `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.
 
 ## Closed-form beat-timing math
@@ -34,14 +34,6 @@ shared generic type utilities and dev-mode helpers
 - `type MaybeGetter<T> = T | (() => T)` — A value that may be a direct value or a getter function (no refs). `src/core/computed.ts:25`
 - `function processGetter<T>(obj: Computable<T>): MaybeRef<T>` — Process a value that may be a getter function. `src/core/computed.ts:63`
 - `function resolveComputable<T>(value: Computable<T>): T` — Unwrap a Computable to its current value in a single step. `src/core/computed.ts:36`
-
-## Conditions
-
-declarative predicate evaluation over `GameStateAccessor`
-
-- `const C` — Ergonomic factories for constructing ICondition values. `src/core/conditions.ts:152`
-- `function evaluateCondition(condition: ICondition, accessor: GameStateAccessor): boolean` — Evaluate a declarative ICondition against the given game-state accessor. `src/core/conditions.ts:78`
-- `function extractDependencies(condition: ICondition): string[]` — Collect the dotted-path dependencies referenced by a condition tree — `resources.<id>.amount`, `unlocks.<id>`, and any state targets — deduped and returned as a flat array. `src/core/conditions.ts:126`
 
 ## Effects
 
@@ -110,14 +102,13 @@ consumer-facing predicate-spec data shape over the engine's existing substrate. 
 - `interface AllGate` — True when every child Gate is true. `src/systems/gate.ts:141`
 - `interface AnyGate` — True when at least one child Gate is true. `src/systems/gate.ts:147`
 - `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/systems/gate.ts:91`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:451`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:453`
 - `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/systems/gate.ts:79`
 - `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:269`
 - `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/systems/gate.ts:135`
 - `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/systems/gate.ts:165`
-- `interface GateRequirementOptions` — Options for createGateRequirement. `src/systems/gate.ts:418`
+- `interface GateRequirementOptions` — Options for createGateRequirement. `src/systems/gate.ts:420`
 - `interface GateRuntime` — The three engine handles evaluateGate and timeUntilGateFlip need at runtime. `src/systems/gate.ts:187`
-- `function gateToCondition(gate: Gate): ICondition` — Project a Gate AST to ICondition. `src/systems/gate.ts:386`
 - `function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRuntime` — Resolve the three ambient handles into a GateRuntime bundle. `src/systems/gate.ts:207`
 - `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/systems/gate.ts:232`
 - `interface NotGate` — True when the wrapped Gate is false. `src/systems/gate.ts:153`

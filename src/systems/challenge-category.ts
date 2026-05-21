@@ -246,8 +246,10 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
   mutuallyExclusive?: boolean;
 
   /**
-   * Game state accessor for evaluating ICondition fields
-   * (visible, canStart, goal). Required if any defs use ICondition.
+   * Game state accessor. Falls back to the ambient accessor wired by
+   * `createEngine`. The category resolves the Gate runtime triple (accessor +
+   * categories + registry) ambiently at construction time; Gate-typed visible
+   * / canStart / goal fields evaluate through that captured runtime.
    */
   accessor?: GameStateAccessor;
 

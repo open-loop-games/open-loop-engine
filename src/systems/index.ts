@@ -34,10 +34,10 @@ export type { EngineCategories } from './engine-categories';
 export { CategoriesKey, findCategoryEntrySignals } from './engine-categories';
 
 // === GATE ===
-// Consumer-facing predicate-spec data shape over ICondition + CategoryEntrySignals
-// + ResourceRegistry + GameStateAccessor. Authored as plain data in content
-// definitions; evaluated through evaluateGate, predicted through
-// timeUntilGateFlip, projected to ICondition (rate-aware kinds) via gateToCondition.
+// Consumer-facing predicate-spec data shape over CategoryEntrySignals + ResourceRegistry +
+// GameStateAccessor. Authored as plain data in content definitions; evaluated through
+// evaluateGate, predicted through timeUntilGateFlip. `gateToCondition` is engine-internal
+// (projects rate-aware Gate leaves to the ICondition IR for walker / predictor reuse).
 export type {
   Gate,
   ResourceGteGate,
@@ -55,7 +55,6 @@ export type {
 export {
   evaluateGate,
   timeUntilGateFlip,
-  gateToCondition,
   getAmbientGateRuntime,
   isGate,
   createGateRequirement,
@@ -184,8 +183,8 @@ export * from './rule-advisor';
 
 // === CHARACTER INTERACTION ===
 // Dialog: authored conversation graphs (DialogNode/DialogChoice/DialogGraph)
-// + the engine-native runtime that walks them. Conditions accept ICondition
-// or Gate transparently — Gate predicates resolve via the ambient triple.
+// + the engine-native runtime that walks them. Choice/node conditions accept
+// Gate — predicates resolve via the ambient triple at evaluation.
 // Dialog category: batch-register DialogGraph content per NPC / scene.
 // Dialog session: wraps a DialogRuntime in a persistent envelope with
 // lifecycle event emission. Default runtime is the engine-native walker;
@@ -229,18 +228,11 @@ export * from './automation';
 export type {
   DecimalSource,
   IEffect,
-  ICondition,
   ResourceEffect,
   UnlockEffect,
   StateEffect,
   CompositeEffect,
   ConditionalEffect,
-  ResourceCondition,
-  UnlockCondition,
-  StateCondition,
-  AndCondition,
-  OrCondition,
-  NotCondition,
   GameStateAccessor,
   Analyzer,
   AnalyzerResult,

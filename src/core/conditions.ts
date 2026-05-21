@@ -74,6 +74,8 @@ export function compareState(
  * Evaluate a declarative {@link ICondition} against the given game-state
  * accessor. Recurses through `and` / `or` / `not` nodes; leaves resolve via
  * the accessor's `getResource` / `isUnlocked` / `getState` lookups.
+ *
+ * @internal
  */
 export function evaluateCondition(condition: ICondition, accessor: GameStateAccessor): boolean {
   switch (condition.type) {
@@ -122,6 +124,8 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
  * `resources.<id>.amount`, `unlocks.<id>`, and any state targets — deduped
  * and returned as a flat array. Used by reactivity-aware consumers to wire
  * `computed` subscriptions over arbitrary {@link ICondition} graphs.
+ *
+ * @internal
  */
 export function extractDependencies(condition: ICondition): string[] {
   const deps: string[] = [];
@@ -131,23 +135,13 @@ export function extractDependencies(condition: ICondition): string[] {
 
 // === CONDITION BUILDERS ===
 /**
- * Ergonomic factories for constructing {@link ICondition} values.
+ * Ergonomic factories for constructing {@link ICondition} values — the
+ * internal IR. Consumers author {@link Gate} literals on content fields
+ * instead; engine-internal code reaches `C` via the `@/core/conditions`
+ * import path when it needs to construct ICondition values directly (tests,
+ * walker projection round-trips, internal-effect machinery).
  *
- * Produces plain data objects (no classes, fully serializable). Use in content
- * definitions to declare visibility/unlock/start gates without closures.
- *
- * @example
- * ```ts
- * import { C } from '@open-loop/engine';
- *
- * const def = {
- *   visible: C.state('progressLevel:Wander', 'gte', 10),
- *   canStart: C.and(
- *     C.resource('gold', 'gte', 50),
- *     C.state('guild', 'eq', ''),
- *   ),
- * };
- * ```
+ * @internal
  */
 export const C = {
   resource(

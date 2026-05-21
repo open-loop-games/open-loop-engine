@@ -11,7 +11,7 @@ Three ways to land:
 Two quick-reference disambiguators (consult before grep-by-stem or choosing a predicate type):
 
 - **Reserved names** — symbols that share a stem (`Loop` family, etc.).
-- **Predicate forms** — choosing between `Gate` / `ICondition` / `Requirement` / `Computable<boolean>`.
+- **Predicate forms** — choosing between `Gate` / `Requirement` / `Computable<boolean>`.
 
 Companion docs (do not duplicate — link):
 
@@ -121,7 +121,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **offline catch-up** — `processOfflineTime`, chunked simulation of elapsed seconds → lifecycle.md#offline
 - **tunable knob** — `tunable()` + `TuningRegistry`, scoped-stack override of balance constants → introspection.md#override-registry, ../consumer-guide.md#tunable-knobs
 - **declarative gate predicate** — `Gate` AST, evaluable + flip-distance + condition projection → mechanics.md#gate, ../consumer-guide.md#level-4-declarative-conditions-and-effects-the-data-driven-escape-hatch
-- **predicate form choice** — Gate vs ICondition vs Requirement vs `Computable<boolean>` for gating fields → INDEX.md#predicate-forms, ../consumer-guide.md#level-4-declarative-conditions-and-effects-the-data-driven-escape-hatch
+- **predicate form choice** — Gate vs Requirement vs `Computable<boolean>` for gating fields → INDEX.md#predicate-forms, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch
 - **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects
 - **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide.md#choosing-among-purchasable-primitives
 - **inversion-driven affordability** — `calculateMaxAffordable`, `InvertibleFormula` → mechanics.md#formulas
@@ -159,18 +159,17 @@ Short answers only; consumer-level reasoning lives in ../consumer-guide.md#commo
 
 ## Predicate forms
 
-Engine fields that gate behavior accept one of four shapes. Pick the most-specific that fits.
+Engine fields that gate behavior accept one of three shapes. Pick the most-specific that fits.
 
 | Form | Shape | Use when | Predictor-friendly | Serializable | Tier anchor |
 | --- | --- | --- | --- | --- | --- |
-| `Gate` | typed AST (`ResourceGteGate`, `UnlockGate`, …) | category-aware predicate; want `timeUntilGateFlip` + projection to `ICondition` | yes (typed) | yes | mechanics.md#gate |
-| `ICondition` | declarative AST over `GameStateAccessor` | save-replay, mod configs, balance sim — predicates resolved by dot-path string IDs | yes (`extractDependencies`) | yes | mechanics.md#conditions |
+| `Gate` | typed AST (`ResourceGteGate`, `UnlockGate`, `FlagGate`, …) | declarative predicate; want `timeUntilGateFlip` + save/mod/sim serializability | yes (typed) | yes | mechanics.md#gate |
 | `Requirement` | cost-bearing predicate with pay strategy | the predicate also charges a resource (cost, bulk-buy via inversion, pay-by-reset / pay-by-division) | partial | no (closures) | mechanics.md#requirements |
 | `Computable<boolean>` | ref / computed / getter | typed refs already in scope; no introspection needed; predicate doesn't fit dot-paths | no | no | mechanics.md#computed |
 
-Fields accepting multiple forms: `ChallengeDef.{visible, canStart, goal}` (`Gate` | `ICondition` | closure), `PurchasableOptions.requirements` (`Requirement[]`), `AchievementOptions.requirement` (`Computable<boolean>` | `Gate`). When a field accepts a `Gate`, prefer it — `Gate` is the only form that gives both flip-distance introspection and category awareness without a `GameStateAccessor` mapping.
+Fields accepting multiple forms: `ChallengeDef.{visible, canStart}` (`Gate` | `boolean`), `ChallengeDef.goal` (`Gate` | closure), `PurchasableOptions.requirements` (`Requirement[]`), `AchievementOptions.requirement` (`Computable<boolean>` | `Gate`). When a field accepts a `Gate`, prefer it — `Gate` is the only form that gives both flip-distance introspection and category awareness without a `GameStateAccessor` mapping.
 
-Prose: ../consumer-guide.md#level-4-declarative-conditions-and-effects-the-data-driven-escape-hatch.
+Prose: ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch.
 
 ## Cluster directory
 
@@ -189,7 +188,6 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `beat-timing` — computes the `T(n) = Cost(n) / Production(n)` snapshot used by balance/devtools to label arbitrary (cost, rate,… → mechanics.md#closed-form-beat-timing-math
 - `common` — shared generic type utilities and dev-mode helpers → mechanics.md#common
 - `computed` — `Computable<T>` and getter utilities for Vue reactive inputs → mechanics.md#computed
-- `conditions` — declarative predicate evaluation over `GameStateAccessor` → mechanics.md#conditions
 - `effects` — declarative game-state mutations from `IEffect` ASTs → mechanics.md#effects
 - `formulas` — Algebraic expression trees with evaluate / invert / integrate. → mechanics.md#formulas
 - `gate` — consumer-facing predicate-spec data shape over the engine's existing substrate. Cross-cuts every requirement-bearing… → mechanics.md#gate
@@ -290,14 +288,14 @@ The expression spectrum from `consumer-guide.md`: pick the most specific level t
 - **L1: Resource helpers** — `addResource`, `subtractResource`, `hasResource`, `displayResource`, `Resource.best`, `Resource.cumulative` → resources.md#resource
 - **L2: Category systems** — `createSkillCategory`, `createPurchasableCategory`, `createProducerCategory`, `createAchievementCategory`, `createDialogCategory`, `createRelationshipCategory`, … the default for game content → content-systems.md, content-narrative.md
 - **L3: Raw primitives** — `createScalingPurchasable`, `createLoop`, `createModifierChain`, `createCategoryBase` → content-systems.md, composition.md, mechanics.md, lifecycle.md
-- **L4: Declarative data** — `C` / `E` builders, `ICondition` / `IEffect`, `Gate`. The data-driven escape hatch for save replay, mod configs, balance tools → mechanics.md#conditions, mechanics.md#effects, mechanics.md#gate
+- **L4: Declarative data** — `E` builder, `IEffect`, `Gate`. The data-driven escape hatch for save replay, mod configs, balance tools → mechanics.md#effects, mechanics.md#gate
 
 ### By layer
 
 Engine source layers `primitives → core → systems → harness` with one-way imports. Tier ≠ layer — most tier files mix layers:
 
-- **primitives/** — zero-Vue foundational types and helpers (`Decimal`, `RNG`, `ICondition` / `IEffect` types, `Analyzer` shape).
-- **core/** — generic reactive primitives (modifiers, conditions, effects, persistence, save manager, game loop, transitions).
+- **primitives/** — zero-Vue foundational types and helpers (`Decimal`, `RNG`, `IEffect` types, `Analyzer` shape).
+- **core/** — generic reactive primitives (modifiers, effects, persistence, save manager, game loop, transitions).
 - **systems/** — typed registration surfaces (every category factory; reset / retention; dialog runtime; advisors; gate).
 - **harness/** — headless-sim substrate (runners, probes, walkers, picker, perturbation, solvers, run pool).
 

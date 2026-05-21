@@ -7,18 +7,11 @@ export type { DecimalSource } from '../primitives/decimal';
 export type { RequiredKeys } from './common';
 export type {
   IEffect,
-  ICondition,
   ResourceEffect,
   UnlockEffect,
   StateEffect,
   CompositeEffect,
   ConditionalEffect,
-  ResourceCondition,
-  UnlockCondition,
-  StateCondition,
-  AndCondition,
-  OrCondition,
-  NotCondition,
   GameStateAccessor,
   Analyzer,
   AnalyzerResult,
@@ -134,8 +127,10 @@ export * from './formulas';
 // === BEAT TIMING ===
 export * from './beat-timing';
 
-// === CONDITIONS & EFFECTS ===
-export { evaluateCondition, extractDependencies, C } from './conditions';
+// === EFFECTS ===
+// ICondition + C are engine-internal IR — imported via `@/core/conditions` /
+// `@/primitives/types` from tests and from systems-layer callers that need
+// the projection target. Not part of the public surface.
 export type { ResolvedEffect, GameStateMutator } from './effects';
 export { resolveEffect, applyEffect, E } from './effects';
 

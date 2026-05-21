@@ -372,16 +372,18 @@ function combinatorFlip(
  * needed. Rate-aware kinds map directly; combinators recurse.
  *
  * **Throws on category kinds** (`count-gte`, `unlock`) and on combinators
- * with any category descendant. The projection is partial by design — under
- * (D) there is no `ICondition` equivalent for category-aware predicates,
- * and a synthetic-path encoding would just relocate the consumer-side tax
- * Gate is meant to retire.
+ * with any category descendant. The projection is partial by design — there
+ * is no `ICondition` equivalent for category-aware predicates, and a
+ * synthetic-path encoding would just relocate the consumer-side tax Gate is
+ * meant to retire.
  *
- * Used by walkers and consumer surfaces that today only speak `ICondition`:
- * for rate-aware Gate fields the projection is the bridge; for fields that
- * mix rate-aware and category leaves, the walker degrades to opaque-predicate
- * semantics on the throw and treats the Gate as it would any other
- * non-projectable predicate.
+ * Used internally by walkers and the predictor that operate on the
+ * ICondition IR: for rate-aware Gate fields the projection is the bridge;
+ * for fields that mix rate-aware and category leaves, the walker degrades
+ * to opaque-predicate semantics on the throw and treats the Gate as it
+ * would any other non-projectable predicate.
+ *
+ * @internal
  */
 export function gateToCondition(gate: Gate): ICondition {
   switch (gate.kind) {

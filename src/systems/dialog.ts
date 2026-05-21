@@ -1,13 +1,12 @@
 /**
  * Dialog — authored conversation graphs and the engine-native runtime that
- * walks them. The runtime composes engine substrate (conditions, effects,
- * events, Gate) into a save-friendly conversation driver.
+ * walks them. The runtime composes engine substrate (Gate predicates, effects,
+ * events) into a save-friendly conversation driver.
  *
  * Composes with:
- * - `ICondition` + `evaluateCondition` for plain rate-aware predicates.
- * - `Gate` + `evaluateGate` (resolved via the ambient Gate runtime) for
- *   category-aware predicates — both dialog node-entry conditions and per-choice
- *   visibility gates accept the union shape transparently.
+ * - `Gate` + `evaluateGate` (resolved via the ambient Gate runtime) — both
+ *   dialog node-entry conditions and per-choice visibility gates dispatch
+ *   through Gate evaluation.
  * - `IEffect` + `applyEffect` for `onEnter` and choice `outcomes`.
  * - `createEmitHandle` for lifecycle events.
  *
@@ -26,8 +25,8 @@ import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
 
 /**
  * A single line/branch in a dialog graph. Pure data — references to host
- * variables flow through {@link ICondition} / {@link Gate} / {@link IEffect},
- * not closures, so graphs serialize and survive save/load.
+ * variables flow through {@link Gate} / {@link IEffect}, not closures, so
+ * graphs serialize and survive save/load.
  */
 export interface DialogNode {
   id: string;
@@ -142,7 +141,7 @@ export interface DialogRuntimeEvents {
 export interface NativeDialogRuntimeOptions {
   /** Authored graphs available to this runtime. Looked up by graph.id on start(). */
   graphs: DialogGraph[];
-  /** Read side — predicate evaluation for `ICondition` predicates. */
+  /** Read side — predicate evaluation and outcome read-back. */
   accessor: GameStateAccessor;
   /** Write side — outcome dispatch. */
   mutator: GameStateMutator;
@@ -156,20 +155,19 @@ export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRunt
 /**
  * Construct a native dialog runtime backed by the supplied graphs + accessor + mutator.
  *
- * `condition` fields on nodes and choices accept `ICondition | Gate` — Gate-shaped
- * predicates dispatch through {@link evaluateGate} against the ambient Gate
- * runtime (resolved per evaluation via {@link getAmbientGateRuntime}). This is
- * transparent to authoring: graphs containing Gate predicates Just Work as long
- * as the engine's ambient triple (accessor / categories / registry) is wired —
- * standard inside `createEngine`'s install/connect.
+ * `condition` fields on nodes and choices accept `Gate` — predicates dispatch
+ * through {@link evaluateGate} against the ambient Gate runtime (resolved per
+ * evaluation via {@link getAmbientGateRuntime}). The engine's ambient triple
+ * (accessor / categories / registry) must be wired — standard inside
+ * `createEngine`'s install/connect.
  *
  * Standard composition path: register dialog content via `createDialogCategory`,
  * then pass `category.getAll().flatMap(e => e.graphs)` as `graphs`. For tests
  * or one-off use, construct graphs inline.
  *
  * @param options Graphs + ambient accessor/mutator. The runtime captures these
- *   and uses them for the `ICondition` evaluation and outcome dispatch paths;
- *   Gate predicates resolve their own ambient triple at evaluation time.
+ *   and uses them for outcome dispatch and condition read-back; Gate
+ *   predicates resolve their own ambient triple at evaluation time.
  * @returns A {@link NativeDialogRuntime} — the {@link DialogRuntime} adapter
  *   contract plus an event subscription handle.
  *
