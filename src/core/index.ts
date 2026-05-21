@@ -131,8 +131,8 @@ export {
 // === FORMULAS ===
 export * from './formulas';
 
-// === PACING ===
-export * from './pacing';
+// === BEAT TIMING ===
+export * from './beat-timing';
 
 // === CONDITIONS & EFFECTS ===
 export { evaluateCondition, extractDependencies, C } from './conditions';

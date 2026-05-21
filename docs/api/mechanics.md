@@ -12,6 +12,14 @@ Start with these public symbols before scanning the full inventory below.
 - `Gate` / `C` / `E` — declarative predicates and effects when save/mod/sim data needs serializable shape.
 - `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.
 
+## Closed-form beat-timing math
+
+computes the `T(n) = Cost(n) / Production(n)` snapshot used by balance/devtools to label arbitrary (cost, rate, level) samples without booting a live engine
+
+- `interface BeatTimingParams` — Parameters for calculateBeatTiming. `src/core/beat-timing.ts:20`
+- `function calculateBeatTiming(params: BeatTimingParams): Decimal` — Closed-form beat timing: time (in seconds) to afford the next purchase at level `n`, given a fully-stacked per-unit production rate. `src/core/beat-timing.ts:61`
+- `type CostScalingType = 'exponential' | 'linear' | 'polynomial'` — Cost scaling family for calculateBeatTiming. `src/core/beat-timing.ts:17`
+
 ## Common
 
 shared generic type utilities and dev-mode helpers
@@ -145,17 +153,6 @@ composable value calculation chains
 - `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:45`
 - `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:120`
 - `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:55`
-
-## Flow-channel classification + closed-form beat-timing math
-
-maps beat duration to Csikszentmihalyi's Flow Theory engagement bands, and computes the T(n) = Cost(n)/Production(n) snapshot used by balance/devtools to label arbitrary (cost, rate, level) samples without booting a live engine
-
-- `interface BeatTimingParams` — Parameters for calculateBeatTiming. `src/core/pacing.ts:84`
-- `function calculateBeatTiming(params: BeatTimingParams): Decimal` — Closed-form beat timing: time (in seconds) to afford the next purchase at level `n`, given a fully-stacked per-unit production rate. `src/core/pacing.ts:125`
-- `function classifyFlowChannel(beatTimeSeconds: number): FlowChannel` — Classify a beat duration (in seconds) into its flow channel. `src/core/pacing.ts:50`
-- `type CostScalingType = 'exponential' | 'linear' | 'polynomial'` — Cost scaling family for calculateBeatTiming. `src/core/pacing.ts:81`
-- `type FlowChannel = 'arousal' | 'flow' | 'flow-upper' | 'boredom' | 'frustration' | 'breakdown'` — Flow-channel classification based on Csikszentmihalyi's Flow Theory (1990). `src/core/pacing.ts:25`
-- `function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]>` — Get flow-channel threshold boundaries as `[min, max)` pairs in seconds. `src/core/pacing.ts:66`
 
 ## Requirements
 

@@ -25,6 +25,7 @@ export {
   type PickerSnapshot,
 } from './picker';
 export { applyPerturbation, type Perturbation } from './perturbation';
+export { classifyFlowChannel, getFlowChannelBoundaries, type FlowChannel } from './flow-channel';
 export { runProbe, runWaypointProbe } from './probe';
 export type {
   BeatProbe,

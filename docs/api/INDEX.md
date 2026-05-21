@@ -126,7 +126,8 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects
 - **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide.md#choosing-among-purchasable-primitives
 - **inversion-driven affordability** — `calculateMaxAffordable`, `InvertibleFormula` → mechanics.md#formulas
-- **flow-channel classification** — `FlowChannel`, `calculateBeatTiming`, Csikszentmihalyi-style pacing → mechanics.md#formulas
+- **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel
+- **closed-form beat timing** — `calculateBeatTiming`, `T(n) = Cost(n) / Production(n)` snapshot for balance/devtools → mechanics.md#beat-timing
 - **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide.md#dialog-contract-first-runtime-second
@@ -187,6 +188,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 ### Mechanics
 
+- `beat-timing` — computes the `T(n) = Cost(n) / Production(n)` snapshot used by balance/devtools to label arbitrary (cost, rate,… → mechanics.md#closed-form-beat-timing-math
 - `common` — shared generic type utilities and dev-mode helpers → mechanics.md#common
 - `computed` — `Computable<T>` and getter utilities for Vue reactive inputs → mechanics.md#computed
 - `conditions` — declarative predicate evaluation over `GameStateAccessor` → mechanics.md#conditions
@@ -194,7 +196,6 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `formulas` — Algebraic expression trees with evaluate / invert / integrate. → mechanics.md#formulas
 - `gate` — consumer-facing predicate-spec data shape over the engine's existing substrate. Cross-cuts every requirement-bearing… → mechanics.md#gate
 - `modifier` — composable value calculation chains → mechanics.md#modifier
-- `pacing` — maps beat duration to Csikszentmihalyi's Flow Theory engagement bands, and computes the T(n) = Cost(n)/Production(n)… → mechanics.md#flow-channel-classification-closed-form-beat-timing-math
 - `requirements` — Requirements system for gating purchases, unlocks, and actions → mechanics.md#requirements
 - `timed-progress` — stateless tickable progress accumulator → mechanics.md#timedprogress
 - `trace` — Resource mutation tracing system → mechanics.md#trace
@@ -272,6 +273,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 ### Harness
 
 - `analyzers` — Reusable in-run trackers (resource peaks, loop finalize, default pack). → harness.md#analyzers
+- `flow-channel` — maps beat duration to Csikszentmihalyi's Flow Theory engagement bands. Opinionated balance-tooling surface: lives in… → harness.md#flow-channel-classification
 - `headless` — synchronous tick loop for deterministic simulation and tests → harness.md#headless-runner
 - `perturbation` — address→override mechanism for the balance workbench → harness.md#perturbation-applier
 - `picker` — Walk engine state to enumerate addressable choices for solvers / UIs. → harness.md#picker

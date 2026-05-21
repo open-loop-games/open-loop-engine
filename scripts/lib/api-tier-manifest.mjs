@@ -39,6 +39,7 @@ export const TIER_MANIFEST = [
       '`createTimedProgress` — tick-driven progress for actions, workers, and staged costs.',
     ],
     clusters: [
+      'beat-timing',
       'common',
       'computed',
       'conditions',
@@ -46,7 +47,6 @@ export const TIER_MANIFEST = [
       'formulas',
       'gate',
       'modifier',
-      'pacing',
       'requirements',
       'timed-progress',
       'trace',
@@ -202,6 +202,7 @@ export const TIER_MANIFEST = [
     ],
     clusters: [
       'analyzers',
+      'flow-channel',
       'headless',
       'perturbation',
       'picker',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFlowChannel, getFlowChannelBoundaries } from '@/core/pacing';
+import { classifyFlowChannel, getFlowChannelBoundaries } from '@/harness/flow-channel';
 
 describe('classifyFlowChannel', () => {
   it('classifies durations into Csikszentmihalyi flow channels', () => {

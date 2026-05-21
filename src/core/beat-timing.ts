@@ -1,78 +1,14 @@
 /**
- * Flow-channel classification + closed-form beat-timing math — maps beat
- * duration to Csikszentmihalyi's Flow Theory engagement bands, and computes
- * the T(n) = Cost(n)/Production(n) snapshot used by balance/devtools to
- * label arbitrary (cost, rate, level) samples without booting a live engine.
+ * Closed-form beat-timing math — computes the `T(n) = Cost(n) / Production(n)`
+ * snapshot used by balance/devtools to label arbitrary (cost, rate, level)
+ * samples without booting a live engine.
  *
- * The flow-channel thresholds come from the incremental-games research corpus
- * (`open-loop-research/patterns/cross-pattern-properties/automation.md`)
- * and match Flow Theory's original engagement bands (Csikszentmihalyi 1990):
- *
- * - **arousal** `[5, 30)` — learning phase, building engagement
- * - **flow** `[30, 120)` — optimal engagement zone (target)
- * - **flow-upper** `[120, 300)` — extended flow, beginning to slow
- * - **boredom** `[300, 900)` — disengagement risk
- * - **frustration** `[900, 3600)` — high disengagement
- * - **breakdown** `[3600, ∞)` — player abandonment likely
+ * Pure algebra: no game-pattern opinions, no engine state, no reactive refs.
+ * Three cost-scaling families (`exponential` / `linear` / `polynomial`) cover
+ * the canonical incremental shapes.
  */
 
 import { bn, Decimal, type DecimalSource } from '@/primitives';
-
-/**
- * Flow-channel classification based on Csikszentmihalyi's Flow Theory (1990).
- * Maps beat duration to a player engagement band.
- */
-export type FlowChannel =
-  | 'arousal'
-  | 'flow'
-  | 'flow-upper'
-  | 'boredom'
-  | 'frustration'
-  | 'breakdown';
-
-/**
- * Classify a beat duration (in seconds) into its flow channel.
- *
- * Boundaries are half-open `[min, max)`: a beat of exactly `30s` is `'flow'`,
- * not `'arousal'`. Negative or zero durations classify as `'arousal'`.
- *
- * @param beatTimeSeconds - Beat duration in seconds
- * @returns Flow channel classification
- *
- * @example
- * ```ts
- * classifyFlowChannel(60);   // 'flow'       — optimal
- * classifyFlowChannel(10);   // 'arousal'    — learning
- * classifyFlowChannel(600);  // 'boredom'    — warning
- * classifyFlowChannel(1800); // 'frustration'— critical
- * ```
- */
-export function classifyFlowChannel(beatTimeSeconds: number): FlowChannel {
-  if (beatTimeSeconds < 30) return 'arousal';
-  if (beatTimeSeconds < 120) return 'flow';
-  if (beatTimeSeconds < 300) return 'flow-upper';
-  if (beatTimeSeconds < 900) return 'boredom';
-  if (beatTimeSeconds < 3600) return 'frustration';
-  return 'breakdown';
-}
-
-/**
- * Get flow-channel threshold boundaries as `[min, max)` pairs in seconds.
- *
- * Useful for rendering boundary markers on a beat chart, or for consumer
- * code that needs to quantize beats into channels without re-calling the
- * classifier per value.
- */
-export function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]> {
-  return {
-    arousal: [5, 30],
-    flow: [30, 120],
-    'flow-upper': [120, 300],
-    boredom: [300, 900],
-    frustration: [900, 3600],
-    breakdown: [3600, Infinity],
-  };
-}
 
 /**
  * Cost scaling family for {@link calculateBeatTiming}. Determines how
