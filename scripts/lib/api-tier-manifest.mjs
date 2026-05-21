@@ -128,9 +128,11 @@ export const TIER_MANIFEST = [
       '`createTickDriver` — standalone tick scheduler when not using the full engine facade.',
       '`createEmitHandle` — typed per-instance events for systems and categories.',
       '`timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
+      '`ref` / `computed` / `watch` / `effect` (re-exported from Vue) — reactivity API; import via the engine, not directly from `vue`, so subscriptions share the engine\'s `activeEffect` scope.',
     ],
     clusters: [
       'engine',
+      'reactivity',
       'events',
       'tick-driver',
       'game-state-accessor',

@@ -11,34 +11,40 @@ Start with these public symbols before scanning the full inventory below.
 - `createTickDriver` — standalone tick scheduler when not using the full engine facade.
 - `createEmitHandle` — typed per-instance events for systems and categories.
 - `timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
+- `ref` / `computed` / `watch` / `effect` (re-exported from Vue) — reactivity API; import via the engine, not directly from `vue`, so subscriptions share the engine's `activeEffect` scope.
 
 ## Engine entrypoint
 
 top-level facade composing every layer
 
-- `const computed: typeof computed$1` — _(no summary)_ `src/index.ts`
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/index.ts:403`
-- `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/index.ts`
-- `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/index.ts`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:313`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/index.ts:232`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/index.ts:124`
-- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/index.ts:98`
-- `interface EngineModule` — A registerable unit of game content. `src/index.ts:188`
-- `function isRef<T>(r: Ref<T> | unknown): r is Ref<T>` — Checks if a value is a ref object. `src/index.ts`
-- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/index.ts:74`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/index.ts:210`
-- `function reactive<T extends object>(target: T): Reactive<T>` — Returns a reactive proxy of the object. `src/index.ts`
-- `function ref<T>(value: T): [T] extends [Ref] ? IfAny<T, Ref<T>, T> : Ref<UnwrapRef<T>, UnwrapRef<T> | T>` — Takes an inner value and returns a reactive and mutable ref object, which has a single property `.value` that points to the inner value. `src/index.ts`
-- `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/index.ts:76`
-- `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/index.ts:72`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/index.ts:109`
-- `function shallowRef<T>(value: T): Ref extends T ? T extends Ref ? IfAny<T, ShallowRef<T>, T> : ShallowRef<T> : ShallowRef<T>` — Shallow version of ref. `src/index.ts`
-- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/index.ts:104`
-- `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/index.ts:70`
-- `function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T` — Returns the inner value if the argument is a ref, otherwise return the argument itself. `src/index.ts`
-- `function watch<T, Immediate extends Readonly<boolean> = false>(source: WatchSource<T>, cb: WatchCallback<T, MaybeUndefined<T, Immediate>>, options?: WatchOptions<Immediate>): WatchHandle` — _(no summary)_ `src/index.ts`
-- `function watchEffect(effect: WatchEffect, options?: WatchEffectOptions): WatchHandle` — _(no summary)_ `src/index.ts`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/index.ts:388`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:298`
+- `interface EngineConfig` — Configuration passed to createEngine. `src/index.ts:217`
+- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/index.ts:109`
+- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/index.ts:83`
+- `interface EngineModule` — A registerable unit of game content. `src/index.ts:173`
+- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/index.ts:59`
+- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/index.ts:195`
+- `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/index.ts:61`
+- `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/index.ts:57`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/index.ts:94`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/index.ts:89`
+- `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/index.ts:55`
+
+## Reactivity re-exports
+
+Vue's reactivity API surfaced through the engine
+
+- `const computed: typeof computed$1` — _(no summary)_ `src/reactivity-reexports.ts`
+- `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/reactivity-reexports.ts`
+- `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/reactivity-reexports.ts`
+- `function isRef<T>(r: Ref<T> | unknown): r is Ref<T>` — Checks if a value is a ref object. `src/reactivity-reexports.ts`
+- `function reactive<T extends object>(target: T): Reactive<T>` — Returns a reactive proxy of the object. `src/reactivity-reexports.ts`
+- `function ref<T>(value: T): [T] extends [Ref] ? IfAny<T, Ref<T>, T> : Ref<UnwrapRef<T>, UnwrapRef<T> | T>` — Takes an inner value and returns a reactive and mutable ref object, which has a single property `.value` that points to the inner value. `src/reactivity-reexports.ts`
+- `function shallowRef<T>(value: T): Ref extends T ? T extends Ref ? IfAny<T, ShallowRef<T>, T> : ShallowRef<T> : ShallowRef<T>` — Shallow version of ref. `src/reactivity-reexports.ts`
+- `function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T` — Returns the inner value if the argument is a ref, otherwise return the argument itself. `src/reactivity-reexports.ts`
+- `function watch<T, Immediate extends Readonly<boolean> = false>(source: WatchSource<T>, cb: WatchCallback<T, MaybeUndefined<T, Immediate>>, options?: WatchOptions<Immediate>): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
+- `function watchEffect(effect: WatchEffect, options?: WatchEffectOptions): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
 
 ## Events
 
