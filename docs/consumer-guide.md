@@ -169,7 +169,22 @@ This is the normal path for one-off constructs, not a failure. The engine's syst
 
 **Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` on `Loop.restart`, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
 
+Two adjacent primitives sit in the wider advisor family but don't fit the immediate-choice shape above. `createGoalPicker` maintains a **weighted active-goal pool** (between-tick goal arbitration with persistent state, not a one-shot pick). `createRuleAdvisor` aggregates **observation history** into ranked suggestions surfaced to the player (derived from what happened, not selected from candidates). Both live in `api/advisors.md`; read its Canonical entrypoints block for the one-liner role of each.
+
 **Introspection vs harness.** "Discover what's live in this engine right now" → introspection. "Run a simulation against this engine state" → harness. A dev panel usually starts with introspection; a balance experiment starts with harness.
+
+**Unlock taxonomy.** Several primitives flip availability; pick by *who* trips the flip and *what* it gates.
+
+| Shape | Use | Flips |
+|---|---|---|
+| Player action that charges a cost | `createPurchasableCategory` with `createCostRequirement` | per-instance `active` / `amount` |
+| Predicate flips, no cost | `createPurchasableCategory` with `createGateRequirement` (`+ setupSweepAutoPurchase`) | per-instance `active` |
+| Observed milestone, auto-earns when true | `createAchievementCategory` | per-instance `earned` |
+| Named region grouping content | `createZoneCategory` | which entries are *addressable* |
+| Ordered ladder of feature availability | `createAutomationTiers` | which features are exposed |
+| Entity rank / relationship state | `createSubjectCategory` tier field | per-subject tier value |
+
+The first three flip per-instance bits the rest of the game reads directly (`active.value`, `earned.value`). The last three flip *what's even surfaced* — they restructure the addressable set, not a single boolean.
 
 ## Data and runtime separation
 
@@ -357,6 +372,8 @@ function onPrestigeButton() {
 
 ## Modifier chains and effects
 
+The word "effect" wears two hats in this section. `IEffect` / the `E` builder / `GameStateMutator` are the **state-mutation AST** — declarative writes evaluated against the ambient runtime. `createPersistentEffectSystem` / `createTemporaryEffectSystem` are **binding-lifecycle managers** — they hold live modifier registrations and activate/deactivate them as predicates flip. "Persistent" in the system name refers to the binding's durability across reloads, not to save serialization — the bindings themselves re-hydrate from install code on every load (see § Bindings re-hydrate from install). The modifier chain is the surface that bindings (from either source) push onto.
+
 `createModifierChain` is a named, composable modifier that multiple modules can push modifiers onto. Use it as a shared surface for production bonuses, yield multipliers, or any value that multiple systems contribute to:
 
 ```ts
@@ -429,11 +446,11 @@ The ladder choice between `chain.bind` and `createPersistentEffectSystem` is the
 
 ## Tunable knobs
 
-Balance constants — base rates, cost growth factors, multipliers — sit in `data/balance.ts` as plain values most of the time. When something external needs to perturb them (a balance solver bisecting against beat windows, a dev panel sliding values live, a mod config swapping a coefficient, an A/B harness comparing two parameter sets), wrap them in `tunable()` to expose them through an override registry that any external surface can read.
+Balance constants — base rates, cost growth factors, multipliers — sit in `data/balance.ts` as plain values most of the time. When something external needs to perturb them (a balance solver bisecting against beat windows, a dev panel sliding values live, a mod config swapping a coefficient, an A/B harness comparing two parameter sets), wrap them in `tunable()` to expose them through a tuning registry that any external surface can read.
 
 ```ts
 // data/balance.ts
-const tuning = createOverrideRegistry<MyTunables>('my-archetype');
+const tuning = createTuningRegistry('my-archetype');
 
 export const balance = {
   tier1BaseRate:        tunable(tuning, 'producers/tier1/baseRate', () => 0.5),
@@ -451,11 +468,15 @@ The scoped stack means transient takeovers — sim runs, what-if probes, balance
 
 Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
 
-For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `tunable()` enrolls the key into a `TuningRegistry` that the harness picker enumerates via `TuningRegistriesKey`. Distinct from the `OverrideRegistry`-replacing pattern used by `replacementBinding` for modifier chains (§Modifier chains): `replacementBinding` keeps attribution intact on the chain, `OverrideRegistry` bypasses it.
+For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `createTuningRegistry` auto-enrolls into `TuningRegistriesKey` (the picker's enumeration surface) when constructed inside the engine's install/connect ambient. `createOverrideRegistry` is the broader primitive underneath — reach for it directly when the override target is a non-numeric function the picker shouldn't surface (challenge takeover, mod fn replacement, sim swap). For modifier-chain replacement specifically, use `replacementBinding` (§Modifier chains): it keeps attribution intact on the chain, where a raw `OverrideRegistry` swap would bypass it.
 
 ## Introspection
 
-External tools (devtools panels, balance probes, UI hints, mods) walk the live engine surface through opt-in injection keys — `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. No install-time coupling: anything with an engine handle can enumerate without being wired into its module graph. Two query shapes recur:
+External tools (devtools panels, balance probes, UI hints, mods) walk the live engine surface through opt-in injection keys — `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. No install-time coupling: anything with an engine handle can enumerate without being wired into its module graph.
+
+The layering rule "game code never imports harness" applies to runtime gameplay modules — the per-tick logic, content registrations, effect bindings that the engine ticks. Tooling consumers (devtools panels, balance probes, "upcoming unlock" UI hints, mods that introspect content) are a separate class and may import the harness walkers and picker freely; that's what the snapshot helpers below are for. Keep the import surface for tooling in its own module so the gameplay/tooling boundary stays legible.
+
+Two query shapes recur:
 
 - **"What modifiers are live, and where did they come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. See `api/harness.md#picker`.
 - **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#content-walker`.

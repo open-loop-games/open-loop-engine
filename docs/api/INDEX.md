@@ -167,6 +167,8 @@ Engine fields that gate behavior accept one of three shapes. Pick the most-speci
 
 Fields accepting multiple forms: `ChallengeDef.{visible, canStart}` (`Gate` | `boolean`), `ChallengeDef.goal` (`Gate` | closure), `PurchasableOptions.requirements` (`Requirement[]`), `AchievementOptions.requirement` (`Computable<boolean>` | `Gate`). When a field accepts a `Gate`, prefer it — `Gate` is the only form that gives both flip-distance introspection and category awareness without a `GameStateAccessor` mapping.
 
+**Adapters across forms.** Where a field wants `Requirement` but the predicate is declarative, `createGateRequirement({ gate })` adapts a `Gate` into a no-cost `Requirement` — the Gate stays the source of truth for serializability and `timeUntilGateFlip`. Where the predicate is an opaque closure, `createBooleanRequirement({ requirement })` is the escape hatch (same runtime shape, no introspection). Both keep the chosen form on the *Gate / Computable* side of the boundary; only `createCostRequirement` introduces real cost behaviour.
+
 Prose: ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch.
 
 ## Cluster directory
