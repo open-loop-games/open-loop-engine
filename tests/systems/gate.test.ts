@@ -234,6 +234,14 @@ describe('evaluateGate — per-kind dispatch', () => {
     f.stop();
   });
 
+  it('flag reads accessor.isUnlocked by flat id', () => {
+    const f = buildFixture();
+    expect(evaluateGate({ kind: 'flag', id: 'knowledge-rask' }, f.runtime)).toBe(false);
+    f.setUnlocked('knowledge-rask', true);
+    expect(evaluateGate({ kind: 'flag', id: 'knowledge-rask' }, f.runtime)).toBe(true);
+    f.stop();
+  });
+
   it('unknown category id evaluates to false (does not throw)', () => {
     const f = buildFixture();
     expect(
@@ -352,7 +360,7 @@ describe('timeUntilGateFlip — dispatch table', () => {
     f.stop();
   });
 
-  it('count-gte / unlock / state are opaque-predicate', () => {
+  it('count-gte / unlock / state / flag are opaque-predicate', () => {
     const f = buildFixture();
     expect(
       timeUntilGateFlip(
@@ -368,6 +376,9 @@ describe('timeUntilGateFlip — dispatch table', () => {
       timeUntilGateFlip({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' }, f.runtime)
         .reason,
     ).toBe('opaque-predicate');
+    expect(timeUntilGateFlip({ kind: 'flag', id: 'knowledge-rask' }, f.runtime).reason).toBe(
+      'opaque-predicate',
+    );
     f.stop();
   });
 
@@ -433,6 +444,13 @@ describe('gateToCondition — partial projection', () => {
     expect(gateToCondition({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' })).toEqual(
       { type: 'state', target: 'phase', operator: 'eq', value: 'idle' },
     );
+  });
+
+  it('flag → UnlockCondition (1:1, name-preserving projection)', () => {
+    expect(gateToCondition({ kind: 'flag', id: 'knowledge-rask' })).toEqual({
+      type: 'unlock',
+      target: 'knowledge-rask',
+    });
   });
 
   it('rate-aware all/any/not round-trips through evaluateCondition', () => {

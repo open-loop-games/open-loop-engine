@@ -24,6 +24,7 @@
  * | cumulative-gte | registry.findById(id).cumulative.value >= value     | same as resource-gte over cumulative ref |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | unlock         | findCategoryEntrySignals(...).unlock                | 'opaque-predicate'                       |
+ * | flag           | accessor.isUnlocked(id)                             | 'opaque-predicate'                       |
  * | state          | compareState(accessor.getState(...), op, val)       | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
@@ -118,6 +119,24 @@ export interface StateGate {
   value: unknown;
 }
 
+/**
+ * True when `accessor.isUnlocked(id)` returns true. Escape hatch for
+ * progression flags the engine doesn't model as category entries
+ * (knowledge-discovery IDs, UI-panel reveals, info-reveals). Peer to
+ * {@link StateGate} for the unlock namespace — projects 1:1 to
+ * {@link UnlockCondition} via {@link gateToCondition}. Predictor-opaque,
+ * matching how flat unlocks already behave at the ICondition layer.
+ *
+ * Use the category-aware {@link UnlockGate} when the unlock you're gating
+ * on *is* a registered category entry — that path gets
+ * {@link CategoryEntrySignals}-backed introspection. Use this when the
+ * unlock is a consumer-side progression flag with no category structure.
+ */
+export interface FlagGate {
+  kind: 'flag';
+  id: string;
+}
+
 /** True when every child Gate is true. Short-circuits on first false. */
 export interface AllGate {
   kind: 'all';
@@ -149,6 +168,7 @@ export type Gate =
   | CountGteGate
   | UnlockGate
   | StateGate
+  | FlagGate
   | AllGate
   | AnyGate
   | NotGate;
@@ -218,6 +238,7 @@ export function isGate(value: unknown): value is Gate {
     case 'count-gte':
     case 'unlock':
     case 'state':
+    case 'flag':
     case 'all':
     case 'any':
     case 'not':
@@ -264,6 +285,8 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
     }
     case 'state':
       return compareState(runtime.accessor.getState(gate.key), gate.operator, gate.value);
+    case 'flag':
+      return runtime.accessor.isUnlocked(gate.id);
     case 'all':
       return gate.of.every((g) => evaluateGate(g, runtime));
     case 'any':
@@ -319,6 +342,7 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
     case 'count-gte':
     case 'unlock':
     case 'state':
+    case 'flag':
       return { seconds: null, reason: 'opaque-predicate' };
     case 'all':
     case 'any':
@@ -372,6 +396,8 @@ export function gateToCondition(gate: Gate): ICondition {
       };
     case 'state':
       return { type: 'state', target: gate.key, operator: gate.operator, value: gate.value };
+    case 'flag':
+      return { type: 'unlock', target: gate.id };
     case 'all':
       return { type: 'and', conditions: gate.of.map(gateToCondition) };
     case 'any':

@@ -45,6 +45,7 @@ export type {
   CountGteGate,
   UnlockGate,
   StateGate,
+  FlagGate,
   AllGate,
   AnyGate,
   NotGate,
