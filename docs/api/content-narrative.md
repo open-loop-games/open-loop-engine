@@ -1,6 +1,6 @@
 # Narrative
 
-Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Relationship (five typed sub-primitives: scalar / faction / tiered / vector / flag). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
+Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
 
 ## Canonical entrypoints
 
@@ -9,7 +9,7 @@ Start with these public symbols before scanning the full inventory below.
 - `createDialogCategory` — batch-register authored conversation graphs.
 - `createDialogSession` — persistent UI/runtime envelope for driving dialog.
 - `createNativeDialogRuntime` / `DialogRuntime` — default runtime and adapter contract for external dialog tools.
-- `createRelationshipCategory` — scalar, faction, tiered, vector, and flag relationship state by definition.
+- `createSubjectCategory` — addressable subjects (NPCs, factions, regions, single entities) with typed multi-field state (scalar / vector / tier / flag / enum).
 
 ## Dialog
 
@@ -35,19 +35,27 @@ authored conversation graphs and the engine-native runtime that walks them. The 
 - `interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRuntimeEvents>` — Native dialog runtime instance — implements DialogRuntime plus event subscription. `src/systems/dialog.ts:151`
 - `interface NativeDialogRuntimeOptions` — Options for createNativeDialogRuntime — the authored graphs plus the read/write side (GameStateAccessor for predicates, GameStateMutator for outcome dispatch). `src/systems/dialog.ts:141`
 
-## Relationship
+## Subject Category
 
-variant shapes and category dispatch
+addressable subjects with typed multi-field state
 
-- `function createRelationshipCategory<Def extends RelationshipDef = RelationshipDef>(options: RelationshipCategoryOptions): RelationshipCategory<Def>` — Create a relationship category that dispatches per-def to one of the five variant shapes by `def.kind`. `src/systems/relationship.ts:571`
-- `interface FactionRelationshipDef extends RelationshipDefBase` — Scalar per-faction with attitude-matrix propagation (Endless Sky, Daggerfall faction tree). `src/systems/relationship-defs.ts:56`
-- `interface FlagRelationshipDef extends RelationshipDefBase` — Boolean flag bag (Exult `Obj_flags` + global `gflags`). `src/systems/relationship-defs.ts:127`
-- `interface RelationshipCategory<Def extends RelationshipDef> extends ResettableObject` — Container that registers a heterogeneous mix of relationship defs (scalar / vector / tiered / faction / flag) and builds the matching live instance for each by dispatching on `def.kind`. `src/systems/relationship.ts:209`
-- `interface RelationshipCategoryEntry<Def extends RelationshipDef>` — One entry inside a RelationshipCategory — the authored def paired with the live RelationshipInstance dispatched from it. `src/systems/relationship.ts:199`
-- `interface RelationshipCategoryOptions` — Options for createRelationshipCategory. `src/systems/relationship.ts:190`
-- `type RelationshipDef = ScalarRelationshipDef | FactionRelationshipDef | TieredRelationshipDef | VectorRelationshipDef | FlagRelationshipDef` — Discriminated union — every registered relationship def is one of these. `src/systems/relationship-defs.ts:138`
-- `interface RelationshipDefBase` — Common identity for every relationship def. `src/systems/relationship-defs.ts:22`
-- `type RelationshipInstance = ScalarRelationship | TieredRelationship | VectorRelationship | FactionRelationship | FlagRelationship` — Discriminated runtime instance — one variant per registered def. `src/systems/relationship.ts:180`
-- `interface ScalarRelationshipDef extends RelationshipDefBase` — Scalar per-entity (Tuxemon bond, Level13 trust). `src/systems/relationship-defs.ts:33`
-- `interface TieredRelationshipDef extends RelationshipDefBase` — Ordered tier ladder (Daggerfall guild rank, OpenMW faction rank, molcremental NPC trust). `src/systems/relationship-defs.ts:78`
-- `interface VectorRelationshipDef extends RelationshipDefBase` — Multi-dimensional vector (CDDA opinion: `{trust, fear, value, anger, owed, sold}`). `src/systems/relationship-defs.ts:102`
+- `function createSubjectCategory<S extends FieldSchema>(options: SubjectCategoryOptions<S>): SubjectCategory<S>` — Create a subject category. `src/systems/subject-category.ts:550`
+- `interface EnumFieldDef<V extends string = string>` — Single nullable enum value per subject. `src/systems/subject-category.ts:80`
+- `interface EnumFieldInstance<V extends string = string> extends Emittable<EnumFieldEvents<V>>` — Live nullable-enum accessor built from an EnumFieldDef. `src/systems/subject-category.ts:163`
+- `type FieldDef = ScalarFieldDef | VectorFieldDef | TierFieldDef | FlagFieldDef | EnumFieldDef` — Discriminated field def — every schema field is one of these. `src/systems/subject-category.ts:87`
+- `type FieldInstance<F extends FieldDef>` — Mapped type — produces the right accessor per field kind without runtime narrowing. `src/systems/subject-category.ts:174`
+- `type FieldSchema = Record<string, FieldDef>` — A schema describes the shared field shape every registered subject carries. `src/systems/subject-category.ts:90`
+- `interface FlagFieldDef` — Single persistent boolean per subject. `src/systems/subject-category.ts:70`
+- `interface FlagFieldInstance extends Emittable<FlagFieldEvents>` — Live boolean accessor built from a FlagFieldDef. `src/systems/subject-category.ts:150`
+- `type PerSubjectOverride<F extends FieldDef>` — Per-subject overrides — only the obviously-per-subject bits (initial values, tier gates). `src/systems/subject-category.ts:193`
+- `interface ScalarFieldDef` — Single persistent number per subject. `src/systems/subject-category.ts:41`
+- `interface ScalarFieldInstance extends Emittable<ScalarFieldEvents>` — Live scalar accessor built from a ScalarFieldDef. `src/systems/subject-category.ts:99`
+- `interface SubjectCategory<S extends FieldSchema> extends ResettableObject` — Container that registers subjects against a shared schema and builds the matching typed instance for each. `src/systems/subject-category.ts:241`
+- `interface SubjectCategoryEntry<S extends FieldSchema>` — One entry inside a SubjectCategory — authored def + live instance. `src/systems/subject-category.ts:221`
+- `interface SubjectCategoryOptions<S extends FieldSchema>` — Options for createSubjectCategory. `src/systems/subject-category.ts:228`
+- `interface SubjectDef<S extends FieldSchema>` — Authoring shape for one subject in a SubjectCategory. `src/systems/subject-category.ts:208`
+- `interface SubjectInstance<S extends FieldSchema>` — Live subject — typed field accessors keyed by schema field name. `src/systems/subject-category.ts:215`
+- `interface TierFieldDef` — Ordered tier ladder with per-transition advancement gates. `src/systems/subject-category.ts:62`
+- `interface TierFieldInstance extends Emittable<TierFieldEvents>` — Live tier-ladder accessor built from a TierFieldDef. `src/systems/subject-category.ts:129`
+- `interface VectorFieldDef<Dims extends string = string>` — N persistent numbers per subject, one per named dimension. `src/systems/subject-category.ts:50`
+- `interface VectorFieldInstance<Dims extends string = string> extends Emittable<VectorFieldEvents<Dims>>` — Live vector accessor built from a VectorFieldDef. `src/systems/subject-category.ts:114`

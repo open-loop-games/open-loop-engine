@@ -27,7 +27,7 @@ Most game modules should start at the highest-level surface that fits, then drop
 | Level | Reach for | Start at |
 | --- | --- | --- |
 | **L1: Resource helpers** | Direct currency mutation, display, checks, and resource lifetime trackers | resources.md#resource |
-| **L2: Category systems** | Repeatable authored content: producers, purchasables, achievements, skills, challenges, dialog, relationships | content-systems.md, content-narrative.md |
+| **L2: Category systems** | Repeatable authored content: producers, purchasables, achievements, skills, challenges, dialog, subjects | content-systems.md, content-narrative.md |
 | **L3: Raw primitives** | One-off systems or custom registration shapes where category mapping is too constraining | content-systems.md, composition.md, mechanics.md, lifecycle.md |
 | **L4: Declarative data** | JSON/mod/save/sim-friendly conditions, effects, and gates | mechanics.md#conditions, mechanics.md#effects, mechanics.md#gate |
 
@@ -39,7 +39,7 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 - `mechanics.md` — The composable evaluation kernel. Modifier chains, requirements, formulas, computed bindings, conditions, effects, gates, and trace. Pure-function evaluation (no Vue dependency in the core) plus reactive wrappers — the substrate the content systems compose against.
 - `composition.md` — Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` + `Feature` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
 - `content-systems.md` — Currency-flow and long-arc structure systems — the validated incremental-game primitives. Purchasable / Producer / Achievement / Inventory / BestOf for economy; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog for progression. Each is a typed registration surface over the mechanics kernel; category factories batch-register many definitions.
-- `content-narrative.md` — Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Relationship (five typed sub-primitives: scalar / faction / tiered / vector / flag). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
+- `content-narrative.md` — Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
 - `runtime.md` — The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
 - `introspection.md` — The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.
@@ -79,7 +79,7 @@ Common consumer tasks resolved to their starting tier. Land in the tier file and
 | new content category (skill, purchasable, producer, …) | composition.md#category-base |
 | dialog tree with branching | content-narrative.md#dialog |
 | dialog choice effects / authored outcomes | content-narrative.md#dialog, mechanics.md#effects |
-| faction reputation / NPC relationships | content-narrative.md#relationship |
+| faction reputation / NPC relationships | content-narrative.md#subject-category |
 | achievement tier ladder | content-systems.md#achievement |
 | save migration / version bump | lifecycle.md#save-manager |
 | offline catch-up after long absence | lifecycle.md#offline |
@@ -128,7 +128,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide.md#dialog-contract-first-runtime-second
-- **relationship variants** — five `kind` dispatches: scalar / faction / tiered / vector / flag → content-narrative.md#relationship, ../consumer-guide.md#relationships-one-category-five-typed-sub-primitives
+- **subject field kinds** — typed multi-field state per subject: scalar / vector / tier / flag / enum → content-narrative.md#subject-category, ../consumer-guide.md#character-interaction-surface
 - **best-of run recording** — per-metric best with optional projection, BestOf events → content-systems.md#bestof-tracker
 - **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
 - **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
@@ -218,7 +218,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 ### Narrative
 
 - `dialog` — authored conversation graphs and the engine-native runtime that walks them. The runtime composes engine substrate… → content-narrative.md#dialog
-- `relationship` — variant shapes and category dispatch → content-narrative.md#relationship
+- `subject-category` — addressable subjects with typed multi-field state → content-narrative.md#subject-category
 
 ### Lifecycle
 
@@ -284,7 +284,7 @@ The default lens is **by-question** — the task table at the top of this file. 
 The expression spectrum from `consumer-guide.md`: pick the most specific level that fits, drop down only when the level above is fighting you. Full prose: ../consumer-guide.md#the-expression-spectrum.
 
 - **L1: Resource helpers** — `addResource`, `subtractResource`, `hasResource`, `displayResource`, `Resource.best`, `Resource.cumulative` → resources.md#resource
-- **L2: Category systems** — `createSkillCategory`, `createPurchasableCategory`, `createProducerCategory`, `createAchievementCategory`, `createDialogCategory`, `createRelationshipCategory`, … the default for game content → content-systems.md, content-narrative.md
+- **L2: Category systems** — `createSkillCategory`, `createPurchasableCategory`, `createProducerCategory`, `createAchievementCategory`, `createDialogCategory`, `createSubjectCategory`, … the default for game content → content-systems.md, content-narrative.md
 - **L3: Raw primitives** — `createScalingPurchasable`, `createLoop`, `createModifierChain`, `createCategoryBase` → content-systems.md, composition.md, mechanics.md, lifecycle.md
 - **L4: Declarative data** — `E` builder, `IEffect`, `Gate`. The data-driven escape hatch for save replay, mod configs, balance tools → mechanics.md#effects, mechanics.md#gate
 

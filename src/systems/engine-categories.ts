@@ -33,6 +33,7 @@ import type { ChallengeCategory } from './challenge-category';
 import type { ProducerCategory } from './producer-category';
 import type { PurchasableCategory } from './purchasable-category';
 import type { SkillCategory } from './skill-category';
+import type { SubjectCategory } from './subject-category';
 import type { CategoryEntrySignals } from './category-base';
 
 /**
@@ -75,6 +76,9 @@ export interface EngineCategories {
   /** Producer categories (generators, pools) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   producers?: ProducerCategory<any, any>[];
+  /** Subject categories (named entities with typed multi-field state — NPCs, factions, regions) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  subjects?: SubjectCategory<any>[];
   /**
    * Game-published resource list. Optional — the engine already maintains
    * a per-engine resource registry (see {@link ResourceRegistryKey}), so
@@ -153,11 +157,11 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
  * primitive (or walker, devtool, UI hint) can read "is this entity active /
  * how many do I have" without consumer-side path conventions.
  *
- * Walks the five typed slots in order (`purchasables`, `skills`,
- * `achievements`, `challenges`, `producers`); the first category whose `id`
- * matches `categoryId` is consulted. Returns `undefined` if no matching
- * category is registered, or if the matching category has no entry under
- * `entityId`.
+ * Walks the six typed slots in order (`purchasables`, `skills`,
+ * `achievements`, `challenges`, `producers`, `subjects`); the first category
+ * whose `id` matches `categoryId` is consulted. Returns `undefined` if no
+ * matching category is registered, or if the matching category has no entry
+ * under `entityId`.
  *
  * @example
  * ```ts
@@ -178,6 +182,7 @@ export function findCategoryEntrySignals(
     categories.achievements,
     categories.challenges,
     categories.producers,
+    categories.subjects,
   ];
   for (const bucket of buckets) {
     if (!bucket) continue;

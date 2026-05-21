@@ -28,7 +28,7 @@ These aren't sugar — they're the correct API. `subtractResource` returns a boo
 
 ### Level 2: Category systems (the default for content)
 
-Categories are the engine's standard shape for registering content. Each category factory — `createSkillCategory`, `createProducerCategory`, `createPurchasableCategory`, `createAchievementCategory`, `createChallengeCategory`, `createDialogCategory`, `createRelationshipCategory`, `createZoneSystem` — exposes a typed registration contract and produces live engine objects per definition. Define a custom definition type, provide a mapper, register in bulk:
+Categories are the engine's standard shape for registering content. Each category factory — `createSkillCategory`, `createProducerCategory`, `createPurchasableCategory`, `createAchievementCategory`, `createChallengeCategory`, `createDialogCategory`, `createSubjectCategory`, `createZoneSystem` — exposes a typed registration contract and produces live engine objects per definition. Define a custom definition type, provide a mapper, register in bulk:
 
 ```ts
 const skills = createSkillCategory<MySkillDef>({
@@ -637,17 +637,45 @@ const session = createDialogSession({
 
 Native runtime is the default — pick it for content authored as `DialogGraph` data. Reach for an external adapter when the authoring team already knows Ink/Yarn or when the dialog volume justifies a dedicated authoring tool. Both flow through the same `DialogSession` surface; UI and save format don't care which is wired underneath.
 
-### Relationships: one category, five typed sub-primitives
+### Subjects: addressable named entities with typed multi-field state
 
-`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `Gate` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — per-variant builders and per-variant instance interfaces are `@internal`. Reach instances through `cat.getInstance<'scalar'>(id)`; the generic narrows the return to the matching variant. Type locals as `ReturnType<typeof cat.getInstance<'scalar'>>` when needed.
+`createSubjectCategory` registers subjects (NPCs, factions, regions, single entities) against a shared field schema. Each schema field picks one of five kinds via its `kind` discriminator: `scalar` (single value per subject, optional `derive` projection), `vector` (N independent dims, CDDA-style opinion), `tier` (ordered tier ladder with per-transition `Gate` gates, Daggerfall-style rank), `flag` (single persistent boolean per subject, Exult-style named event), `enum` (single nullable enum value per subject — commitment locks, path selection). The category is the only public entry point; per-kind field-builders are private. Reach a subject through `cat.get('subject-id')`; the typed `subject.fields.<name>` accessor narrows to the right per-kind shape at the callsite from schema inference — no runtime narrowing helpers.
 
-Cross-cutting concerns the variants don't carry — time decay, auto-advance, loop-temporary layers — aren't schema fields. Compose them at the consumer: a `TickDriver` tick handler that calls `instance.add(actor, -rate * dt)` for decay, `instance.tryAdvance(actor)` for auto-advance, a separate registration with a `Resettable` scope for the temporary layer. Variant defs stay shape-only; engine substrate handles the rest.
+Per-subject overrides cover only the obviously-per-subject bits (initial values, tier gates). Structural shape (tiers list, vector dimensions, scalar min/max) stays schema-frozen so save round-trip is stable across subjects. Two complementary shapes:
 
-### When dialog and relationships connect
+```ts
+// Many subjects, one field per subject — molcremental-style per-NPC trust ladder
+const npcs = createSubjectCategory({
+  id: 'npc-trust',
+  fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend', 'confidant'] } },
+});
+npcs.register({
+  id: 'mentor-rask',
+  fields: { trust: { gates: protocolStepGates(npc) } },
+});
+npcs.get('mentor-rask')!.fields.trust.tryAdvance();
 
-Both surfaces share the engine's predicate / effect machinery. A dialog node gates on relationship state through the typed `StateGate` path: `{ kind: 'state', key: 'rel.npc-trust.mentor-rask.tier', operator: 'gte', value: 2 }`. A choice writes back through `E.state('rel.npc-trust.mentor-rask.tier', 3)` — the predicate side is Gate (typed AST); the effect side is still the `E` builder (consumer-facing). The reserved path conventions are documented in `src/primitives/types.ts`.
+// One subject, many fields — maldacena-style single Entity with mixed state
+const entity = createSubjectCategory({
+  id: 'entity',
+  fields: {
+    trust:        { kind: 'scalar', min: 0, max: 100 },
+    pathTendency: { kind: 'vector', dimensions: ['scientific', 'cooperative'] },
+    discovered:   { kind: 'flag' },
+    pathLocked:   { kind: 'enum', values: ['scientific', 'cooperative'] },
+  },
+});
+entity.register({ id: 'the-entity' });
+entity.get('the-entity')!.fields.trust.add(0.05);
+```
 
-Bespoke relationship-aware atoms (a `RelationshipGate` kind / `E.relationship`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics. The relevant `TODO(expansion)` is co-located with the relationship category.
+Cross-cutting concerns the field kinds don't carry — time decay, propagation (faction-tree / attitude matrix / chemical-reaction), perma+temp layered store — aren't schema features. Compose them at the consumer: a tick handler that calls `field.add(-rate * dt)` for decay, two scalar fields plus a derived projection for perma+temp layering, a separate broadcast helper for propagation. The substrate stays shape-fixed; the axes earn standalone primitives when consumer demand surfaces.
+
+### When dialog and subjects connect
+
+Both surfaces share the engine's predicate / effect machinery. A dialog node gates on subject state through the typed `StateGate` path: `{ kind: 'state', key: 'subject.npc-trust.mentor-rask.trust', operator: 'gte', value: 2 }` — the path is `{categoryId}.{subjectId}.{fieldName}` for scalar/tier/flag/enum fields, with an extra `.{dim}` segment for vector dimensions. A choice writes back through `E.state('subject.npc-trust.mentor-rask.trust', 3)` — the predicate side is Gate (typed AST); the effect side is the `E` builder (consumer-facing). Reserved path conventions are documented in `src/primitives/types.ts`.
+
+Bespoke subject-aware atoms (a `SubjectGate` kind / `E.subject`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics.
 
 ## Introspection
 

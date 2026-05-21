@@ -193,17 +193,34 @@ export * from './dialog';
 export * from './dialog-category';
 export * from './dialog-session';
 
-// === RELATIONSHIP SYSTEMS ===
-// Five typed shapes (scalar / tiered / vector / faction / flag) registered
-// through `createRelationshipCategory`. Raw `createRelationship` is
-// @internal — consumers use the category factory.
+// === SUBJECT CATEGORIES ===
+// Addressable subjects (NPCs, factions, regions, single entities) with typed
+// multi-field state under a shared schema. Field kinds: scalar / vector /
+// tier / flag / enum. Replaces the prior variant-dispatched relationship
+// category; `subject.fields.<name>` access is typed at the callsite, no
+// runtime narrowing. Auto-registers into `EngineCategories.subjects`.
 export {
-  createRelationshipCategory,
-  type RelationshipInstance,
-  type RelationshipCategoryOptions,
-  type RelationshipCategoryEntry,
-  type RelationshipCategory,
-} from './relationship';
+  createSubjectCategory,
+  type SubjectCategory,
+  type SubjectCategoryOptions,
+  type SubjectCategoryEntry,
+  type SubjectDef,
+  type SubjectInstance,
+  type FieldDef,
+  type FieldSchema,
+  type FieldInstance,
+  type PerSubjectOverride,
+  type ScalarFieldDef,
+  type VectorFieldDef,
+  type TierFieldDef,
+  type FlagFieldDef,
+  type EnumFieldDef,
+  type ScalarFieldInstance,
+  type VectorFieldInstance,
+  type TierFieldInstance,
+  type FlagFieldInstance,
+  type EnumFieldInstance,
+} from './subject-category';
 
 // === ZONES ===
 // Named content groupings (towns, chapters, eras) with progressive unlock.
@@ -282,13 +299,4 @@ export type {
   TimedProgress,
   HeadlessResult,
 } from '../core';
-export type {
-  RelationshipDefBase,
-  ScalarRelationshipDef,
-  FactionRelationshipDef,
-  TieredRelationshipDef,
-  VectorRelationshipDef,
-  FlagRelationshipDef,
-  RelationshipDef,
-} from './relationship-defs';
 export { Decimal } from '../primitives/decimal';

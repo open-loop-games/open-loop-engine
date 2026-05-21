@@ -40,7 +40,15 @@ import type { AchievementCategory } from '@/systems/achievement-category';
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
 import type { PurchasableCategory } from '@/systems/purchasable-category';
 import type { ChallengeCategory, ChallengeDef } from '@/systems/challenge-category';
-import type { RelationshipCategory } from '@/systems/relationship-category';
+import type {
+  SubjectCategory,
+  SubjectDef,
+  FieldDef,
+  ScalarFieldInstance,
+  TierFieldInstance,
+  FlagFieldInstance,
+  EnumFieldInstance,
+} from '@/systems/subject-category';
 import type { DialogCategory } from '@/systems/dialog-category';
 import type { ResettableObject } from '@/systems/resettable';
 import type { Purchasable } from '@/systems/purchasable';
@@ -280,42 +288,57 @@ describe('Dialog surface type pins', () => {
   });
 });
 
-describe('Relationship surface type pins', () => {
-  it('createRelationshipCategory<TieredRelationshipDef> narrows getInstance<"tiered">', async () => {
-    const { createRelationshipCategory } = await import('@/systems/relationship');
-    type TieredRelationshipDef = import('@/primitives/relationship').TieredRelationshipDef;
-    type TieredRelationship = import('@/systems/relationship').TieredRelationship;
-
-    const cat = createRelationshipCategory<TieredRelationshipDef>({ id: 'r' });
-    expectTypeOf(cat.getInstance<'tiered'>('x')).toEqualTypeOf<TieredRelationship | undefined>();
+describe('Subject category surface type pins', () => {
+  it('createSubjectCategory infers field-instance types from the schema', async () => {
+    const { createSubjectCategory } = await import('@/systems/subject-category');
+    const cat = createSubjectCategory({
+      id: 'npcs',
+      fields: {
+        trust: { kind: 'tier', tiers: ['stranger', 'friend'] } as const,
+      },
+    });
+    // get() returns the typed SubjectInstance; fields.trust narrows to TierFieldInstance
+    // without runtime narrowing helpers — the schema literal drives inference.
+    const inst = cat.get('x');
+    expectTypeOf(inst?.fields.trust).toEqualTypeOf<TierFieldInstance | undefined>();
   });
 
-  it('RelationshipDef discriminated union covers all 5 variants', async () => {
-    type RelationshipDef = import('@/primitives/relationship').RelationshipDef;
-    type Kinds = RelationshipDef['kind'];
-    // Compile-time enumeration: any drift from these 5 values fails here.
-    expectTypeOf<Kinds>().toEqualTypeOf<'scalar' | 'faction' | 'tiered' | 'vector' | 'flag'>();
+  it('FieldDef discriminated union covers all 5 field kinds', () => {
+    type Kinds = FieldDef['kind'];
+    // Compile-time enumeration — any drift from these 5 values fails here.
+    expectTypeOf<Kinds>().toEqualTypeOf<'scalar' | 'vector' | 'tier' | 'flag' | 'enum'>();
   });
 
-  it('createRelationship overloads narrow by def.kind', async () => {
-    const { createRelationship } = await import('@/systems/relationship');
-    type ScalarRelationshipDef = import('@/primitives/relationship').ScalarRelationshipDef;
-    type TieredRelationshipDef = import('@/primitives/relationship').TieredRelationshipDef;
-    type FactionRelationshipDef = import('@/primitives/relationship').FactionRelationshipDef;
-    type ScalarRelationship = import('@/systems/relationship').ScalarRelationship;
-    type TieredRelationship = import('@/systems/relationship').TieredRelationship;
-    type FactionRelationship = import('@/systems/relationship').FactionRelationship;
+  it('SubjectInstance.fields preserves per-kind accessor shape for each schema field', async () => {
+    const { createSubjectCategory } = await import('@/systems/subject-category');
+    const cat = createSubjectCategory({
+      id: 'entity',
+      fields: {
+        trust: { kind: 'scalar', min: 0, max: 100 } as const,
+        rank: { kind: 'tier', tiers: ['a', 'b', 'c'] } as const,
+        met: { kind: 'flag' } as const,
+        path: { kind: 'enum', values: ['scientific', 'cooperative'] as const },
+      },
+    });
+    const e = cat.get('the-entity');
+    // Each field narrows to its kind-specific instance — no getInstance<K> ceremony.
+    expectTypeOf(e?.fields.trust).toEqualTypeOf<ScalarFieldInstance | undefined>();
+    expectTypeOf(e?.fields.rank).toEqualTypeOf<TierFieldInstance | undefined>();
+    expectTypeOf(e?.fields.met).toEqualTypeOf<FlagFieldInstance | undefined>();
+    expectTypeOf(e?.fields.path).toEqualTypeOf<
+      EnumFieldInstance<'scientific' | 'cooperative'> | undefined
+    >();
+  });
 
-    // Wrap in arrow functions so the body is type-checked without invoking at runtime.
-    expectTypeOf((def: ScalarRelationshipDef) =>
-      createRelationship(def),
-    ).returns.toEqualTypeOf<ScalarRelationship>();
-    expectTypeOf((def: TieredRelationshipDef) =>
-      createRelationship(def),
-    ).returns.toEqualTypeOf<TieredRelationship>();
-    expectTypeOf((def: FactionRelationshipDef) =>
-      createRelationship(def),
-    ).returns.toEqualTypeOf<FactionRelationship>();
+  it('SubjectDef.fields override accepts the per-kind partial shape', () => {
+    type S = { trust: { kind: 'tier'; tiers: readonly ['a', 'b'] } };
+    type Def = SubjectDef<S>;
+    // Per-subject override on a tier field accepts initial + gates only — schema-frozen
+    // tiers list isn't overridable. If the override shape regresses to a broader type,
+    // this pin fails.
+    expectTypeOf<NonNullable<Def['fields']>['trust']>().toMatchTypeOf<
+      { initial?: number; gates?: ReadonlyArray<unknown> } | undefined
+    >();
   });
 });
 
@@ -417,7 +440,7 @@ describe('Category wrappers conform to Resettable protocol', () => {
     expectTypeOf<ProducerCategory<AnyDef>>().toMatchTypeOf<ResettableObject>();
     expectTypeOf<PurchasableCategory<AnyDef>>().toMatchTypeOf<ResettableObject>();
     expectTypeOf<ChallengeCategory<ChallengeDef>>().toMatchTypeOf<ResettableObject>();
-    expectTypeOf<RelationshipCategory>().toMatchTypeOf<ResettableObject>();
+    expectTypeOf<SubjectCategory<Record<string, FieldDef>>>().toMatchTypeOf<ResettableObject>();
     expectTypeOf<DialogCategory<AnyDef>>().toMatchTypeOf<ResettableObject>();
   });
 });

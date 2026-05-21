@@ -94,14 +94,14 @@ export const TIER_MANIFEST = [
     tier: 'content-narrative',
     title: 'Narrative',
     scope:
-      'Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Relationship (five typed sub-primitives: scalar / faction / tiered / vector / flag). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.',
+      'Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.',
     entrypoints: [
       '`createDialogCategory` — batch-register authored conversation graphs.',
       '`createDialogSession` — persistent UI/runtime envelope for driving dialog.',
       '`createNativeDialogRuntime` / `DialogRuntime` — default runtime and adapter contract for external dialog tools.',
-      '`createRelationshipCategory` — scalar, faction, tiered, vector, and flag relationship state by definition.',
+      '`createSubjectCategory` — addressable subjects (NPCs, factions, regions, single entities) with typed multi-field state (scalar / vector / tier / flag / enum).',
     ],
-    clusters: ['dialog', 'relationship'],
+    clusters: ['dialog', 'subject-category'],
   },
   {
     tier: 'lifecycle',

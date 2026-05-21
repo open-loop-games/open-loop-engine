@@ -1,5 +1,5 @@
 /**
- * Integration tests for the Phase 3 dialog + relationship surface.
+ * Integration tests for the dialog + subject-category surface.
  *
  * Covers four acceptance scenarios:
  *   1. One NPC, one knowledge-gated conversation.
@@ -14,7 +14,7 @@ import { resetAllPersistentContexts } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
-import { createRelationshipCategory } from '@/systems/relationship';
+import { createSubjectCategory } from '@/systems/subject-category';
 import { createReset } from '@/systems/reset';
 import { withPersistentContext } from '@/core/persistence';
 import {
@@ -24,14 +24,13 @@ import {
   type DialogPresentation,
   type DialogRuntimeState,
 } from '@/systems/dialog';
-import type { TieredRelationshipDef } from '@/systems/relationship-defs';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 
 /**
  * Run `fn` inside an engine install hook so the ambient GateRuntime triple
  * (accessor + categories + registry) is wired — required for Gate-based
- * predicates (dialog conditions, relationship tier gates).
+ * predicates (dialog conditions, subject-category tier gates).
  */
 function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
   let result: T;
@@ -145,31 +144,42 @@ describe('Scenario 2 — multi-loop persistence', () => {
   it('resets trust per loop while knowledge unlocks survive', () => {
     const accessor = buildAccessor();
     withEngine(accessor, () => {
-      // Simulate the engine's install wrapper: the relationships *module*
-      // owns the category, so category refs become children of the module's
-      // context. Matches how molcremental's relationshipsModule actually
-      // runs inside `engine.use()`.
-      const cat = withPersistentContext('relationships', () => {
-        const c = createRelationshipCategory<TieredRelationshipDef>({ id: 'npc-trust' });
-        c.register({
+      // Simulate the engine's install wrapper: the subjects *module* owns the
+      // category, so subject refs become children of the module's context.
+      // Matches how molcremental's relationshipsModule actually runs inside
+      // `engine.use()`.
+      const cat = withPersistentContext('relationships', () =>
+        createSubjectCategory({
+          id: 'npc-trust',
+          fields: {
+            trust: {
+              kind: 'tier',
+              tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
+            },
+          },
+        }),
+      );
+
+      withPersistentContext('relationships', () => {
+        cat.register({
           id: 'mentor-rask',
-          kind: 'tiered',
-          actors: ['mentor-rask'],
-          tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
-          gates: [
-            { kind: 'flag', id: 'knowledge-rask-approach' },
-            { kind: 'flag', id: 'knowledge-rask-competence' },
-            { kind: 'flag', id: 'knowledge-rask-task' },
-          ],
+          fields: {
+            trust: {
+              gates: [
+                { kind: 'flag', id: 'knowledge-rask-approach' },
+                { kind: 'flag', id: 'knowledge-rask-competence' },
+                { kind: 'flag', id: 'knowledge-rask-task' },
+              ],
+            },
+          },
         });
-        return c;
       });
 
       // Player unlocks the first protocol step's knowledge and advances trust.
       accessor.setUnlocked('knowledge-rask-approach', true);
-      const trust = cat.getInstance<'tiered'>('mentor-rask')!;
-      expect(trust.tryAdvance('mentor-rask')).toBe('acquaintance');
-      expect(trust.getIndex('mentor-rask')).toBe(1);
+      const rask = cat.get('mentor-rask')!;
+      expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
+      expect(rask.fields.trust.getIndex()).toBe(1);
 
       // End-of-loop: reset the `relationships` module. Knowledge is in a
       // separate persistence scope (here, the accessor's `unlocks` Map) and
@@ -177,12 +187,12 @@ describe('Scenario 2 — multi-loop persistence', () => {
       const reset = createReset({ resetModules: ['relationships'] });
       reset.reset();
 
-      expect(trust.getIndex('mentor-rask')).toBe(0);
+      expect(rask.fields.trust.getIndex()).toBe(0);
       // Knowledge unlock survived the relationship reset.
       expect(accessor.isUnlocked('knowledge-rask-approach')).toBe(true);
       // Player can re-advance trust without re-discovering the knowledge — the
       // gate still passes.
-      expect(trust.tryAdvance('mentor-rask')).toBe('acquaintance');
+      expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
     });
   });
 });
@@ -305,27 +315,28 @@ describe('Scenario 4 — save round-trip', () => {
     });
   });
 
-  it('relationship state lives in a deterministic persistent namespace', () => {
+  it('subject state lives in a deterministic persistent namespace', () => {
     // Pin the persistent-context naming convention so save-manager round-trip
     // (covered in save-manager.test.ts) knows exactly what key shape to expect.
-    // The category opens `{categoryId}/{def.id}` contexts; within each, per-
-    // actor persistent refs are named after the actor id.
+    // The category opens `{categoryId}/{subjectId}` contexts; within each, per-
+    // field persistent refs are named after the field id.
     const accessor = buildAccessor();
     withGameStateAccessor(accessor, () => {
-      const cat = createRelationshipCategory<TieredRelationshipDef>({ id: 'npc-trust' });
-      cat.register({
-        id: 'mentor-rask',
-        kind: 'tiered',
-        actors: ['mentor-rask'],
-        tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
+      const cat = createSubjectCategory({
+        id: 'npc-trust',
+        fields: {
+          trust: { kind: 'tier', tiers: ['stranger', 'acquaintance', 'student', 'trusted'] },
+        },
       });
-      const trust = cat.getInstance<'tiered'>('mentor-rask')!;
-      // The ref exists and is addressable by actor id — that's the contract
+      cat.register({ id: 'mentor-rask' });
+
+      const rask = cat.get('mentor-rask')!;
+      // The ref exists and is addressable by field name — that's the contract
       // save/load relies on. Tier value survives export/import because
       // persistent refs in a known namespace are automatically serialized.
-      expect(trust.refs.get('mentor-rask')).toBeDefined();
-      trust.setIndex('mentor-rask', 2);
-      expect(trust.refs.get('mentor-rask')?.value).toBe(2);
+      expect(rask.fields.trust.ref).toBeDefined();
+      rask.fields.trust.setIndex(2);
+      expect(rask.fields.trust.ref.value).toBe(2);
     });
   });
 });
