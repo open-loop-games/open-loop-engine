@@ -24,7 +24,7 @@ import {
 import { createConversion, createSqrtFormula } from '@/systems/conversion';
 import { createCostRequirement } from '@/core/requirements';
 import { createReset } from '@/systems/reset';
-import { createSimplePurchasable } from '@/systems/purchasable';
+import { createPurchasable } from '@/systems/purchasable';
 import { createAchievement } from '@/systems/achievement';
 import { runHeadless } from '@/core/headless';
 import type { Analyzer } from '@/primitives/types';
@@ -38,20 +38,20 @@ function createPrestigeTreeGame() {
   beginPersistentContext('layer0');
   const points = createResource(bn(0), { displayName: 'points' });
 
-  const pointUpgrade1 = createSimplePurchasable({
+  const pointUpgrade1 = createPurchasable({
     id: 'pt-up1',
-    description: 'Double point gain',
-    resource: points,
-    cost: 10,
+    display: { description: 'Double point gain' },
+    requirements: createCostRequirement({ resource: points, cost: 10 }),
     effect: 2,
+    limit: 1,
   });
 
-  const pointUpgrade2 = createSimplePurchasable({
+  const pointUpgrade2 = createPurchasable({
     id: 'pt-up2',
-    description: 'Triple point gain',
-    resource: points,
-    cost: 100,
+    display: { description: 'Triple point gain' },
+    requirements: createCostRequirement({ resource: points, cost: 100 }),
     effect: 3,
+    limit: 1,
   });
   endPersistentContext();
 
@@ -59,12 +59,12 @@ function createPrestigeTreeGame() {
   beginPersistentContext('layer1');
   const prestige = createResource(bn(0), { displayName: 'prestige points' });
 
-  const prestigeUpgrade1 = createSimplePurchasable({
+  const prestigeUpgrade1 = createPurchasable({
     id: 'p-up1',
-    description: 'Prestige boosts point gain',
-    resource: prestige,
-    cost: 3,
+    display: { description: 'Prestige boosts point gain' },
+    requirements: createCostRequirement({ resource: prestige, cost: 3 }),
     effect: 2,
+    limit: 1,
   });
   endPersistentContext();
 

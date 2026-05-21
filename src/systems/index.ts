@@ -74,7 +74,18 @@ export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 // === PURCHASES ===
 // Purchasable: unified purchase system (one-shot via limit:1, leveled, infinite).
 // PurchasableCategory: batch-register Purchasables from content definitions.
-export * from './purchasable';
+// Raw `createPurchasable` is @internal — consumers use the category factory
+// (L2 default) or `createScalingPurchasable` (L3 escape) instead.
+export {
+  PurchasableType,
+  createScalingPurchasable,
+  type Purchasable,
+  type PurchasableDisplay,
+  type PurchasableEvents,
+  type PurchasableOptions,
+  type ScalingPurchasableCost,
+  type ScalingPurchasableOptions,
+} from './purchasable';
 export * from './purchasable-category';
 
 // === ACHIEVEMENTS ===

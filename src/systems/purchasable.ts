@@ -8,10 +8,11 @@
  * - `limit: N` — capped leveled purchase (amount tracks levels, maxes at N)
  * - `limit: Infinity` — uncapped repeatable (buy forever, default)
  *
- * Factories:
- * - {@link createPurchasable} — full-control factory with arbitrary requirements
- * - {@link createSimplePurchasable} — shorthand for "costs X of resource Y", defaults `limit: 1`
- * - {@link createScalingPurchasable} — shorthand for exponential cost scaling, defaults `limit: Infinity`
+ * The category factory {@link createPurchasableCategory} is the consumer
+ * front door. {@link createScalingPurchasable} is the L3 escape hatch for
+ * per-instance customized leveled purchases that don't fit a category's
+ * map shape — it does Formula-aware cost+effect setup the raw factory
+ * can't express cleanly. {@link createPurchasable} is engine-internal.
  *
  * For auto-buy, see {@link setupSweepAutoPurchase} /
  * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
@@ -73,10 +74,13 @@ export interface PurchasableDisplay {
 // array to options, expose `stage` ref on instance. Deferred: no consumer need yet.
 
 /**
- * Full options for {@link createPurchasable}.
+ * Full options for {@link createPurchasable} — the engine-internal raw
+ * factory. Consumers reach this shape through `mapPurchasable` on
+ * {@link createPurchasableCategory}; the field set is the contract that
+ * shape returns.
  *
- * Use {@link SimplePurchasableOptions} for one-shot "costs X of resource Y",
- * or {@link ScalingPurchasableOptions} for exponential cost scaling.
+ * For leveled cost scaling outside a category, use
+ * {@link ScalingPurchasableOptions} on {@link createScalingPurchasable}.
  */
 export interface PurchasableOptions {
   /** Persistence ID. Auto-generated if omitted, but explicit IDs are safer for save compatibility. */
@@ -110,32 +114,6 @@ export interface PurchasableOptions {
    * Default: `false` when limit is 1, `true` otherwise.
    */
   bulkPurchase?: Computable<boolean>;
-}
-
-/**
- * Shorthand options for {@link createSimplePurchasable} — the "costs X of resource Y" pattern.
- *
- * Defaults `limit: 1` (one-shot). Set `limit` to override for leveled purchases.
- */
-export interface SimplePurchasableOptions {
-  /** Persistence ID. Auto-generated if omitted. */
-  id?: string;
-  /** Display title */
-  title?: Computable<string>;
-  /** Description of what this purchasable does */
-  description: Computable<string>;
-  /** The resource spent to purchase */
-  resource: Resource;
-  /** How much of the resource it costs. Can be a ref/getter for dynamic pricing. */
-  cost: Computable<DecimalSource>;
-  /** Numeric effect value exposed on the purchasable */
-  effect?: Computable<DecimalSource>;
-  /** Maximum number of purchases. Default: `1` (one-shot) */
-  limit?: Computable<DecimalSource>;
-  /** Callback fired after a successful purchase */
-  onPurchase?: (amount: DecimalSource) => void;
-  /** Whether this purchasable is visible. Default: `true` */
-  visibility?: Computable<boolean>;
 }
 
 /**
@@ -502,24 +480,16 @@ function buildScalingEffect(
 // === FACTORIES ===
 
 /**
- * Create a purchasable with full control over requirements.
+ * Engine-internal raw Purchasable factory. Consumers reach this through
+ * {@link createPurchasableCategory} (the L2 front door) or
+ * {@link createScalingPurchasable} (the L3 Formula-aware escape).
  *
  * State is always amount-based (`Persistent<DecimalSource>`). One-shot behavior
  * emerges from `limit: 1` — the `bought` computed provides boolean convenience.
  *
+ * @internal
  * @param options - Configuration for the purchasable
  * @returns A {@link Purchasable} with `purchase()`, `amount`, `bought`, `effect`, and event hooks
- *
- * @example One-shot upgrade
- * ```ts
- * const doubleProduction = createPurchasable({
- *   display: { title: 'Double Production', description: 'Multiply all output by 2' },
- *   requirements: createCostRequirement({ resource: points, cost: 100 }),
- *   effect: 2,
- *   limit: 1,
- * });
- * if (doubleProduction.active.value) { ... }
- * ```
  *
  * @example Leveled repeatable
  * ```ts
@@ -638,48 +608,8 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
 }
 
 /**
- * Create a purchasable with a simple resource cost — the most common one-shot pattern.
- *
- * Wraps {@link createPurchasable} with an auto-generated cost requirement.
- * Defaults to `limit: 1` (one-shot). Set `limit` to override for leveled purchases.
- *
- * @param options - Shorthand configuration with resource and cost
- * @returns A {@link Purchasable} (same return type as createPurchasable)
- *
- * @example
- * ```ts
- * const cheapBoost = createSimplePurchasable({
- *   description: '+1 base production',
- *   resource: points,
- *   cost: 10,
- *   effect: 1,
- * });
- * ```
- */
-export function createSimplePurchasable<T extends SimplePurchasableOptions>(
-  options: T,
-): Purchasable {
-  const { id, title, description, resource, cost, effect, limit, onPurchase, visibility } = options;
-
-  return createPurchasable({
-    id,
-    display: {
-      title,
-      description,
-    },
-    requirements: createCostRequirement({
-      resource,
-      cost,
-    }),
-    effect,
-    limit: limit ?? 1,
-    onPurchase,
-    visibility,
-  });
-}
-
-/**
- * Create a purchasable with leveled cost scaling — the most common leveled pattern.
+ * Create a purchasable with leveled cost scaling — the L3 escape hatch for
+ * per-instance customized leveled purchases.
  *
  * Cost configuration is a discriminated union (see {@link ScalingPurchasableCost}):
  * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ amount`.
