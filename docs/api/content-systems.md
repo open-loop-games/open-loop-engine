@@ -16,31 +16,25 @@ Start with these public symbols before scanning the full inventory below.
 
 milestone tracking with auto-unlock and tiered rewards
 
-- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:109`
+- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:106`
 - `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:106`
 - `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:93`
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` — Options for createAchievementCategory. `src/systems/achievement-category.ts:61`
 - `const AchievementCategoryType: unique symbol` — Symbol identifying AchievementCategory features. `src/systems/achievement-category.ts:52`
-- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:45`
-- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:204`
-- `interface AchievementGroup` — A named collection of achievements with aggregate completion tracking. `src/systems/achievement.ts:158`
-- `interface AchievementGroupOptions` — Options for createAchievementGroup. `src/systems/achievement.ts:148`
-- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:63`
-- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:42`
-- `function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T>` — Create an achievement — a once-and-stay-earned milestone with optional reactive effect and auto-completing requirement watch. `src/systems/achievement.ts:238`
+- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:42`
+- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:175`
+- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:60`
+- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:39`
+- `function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T>` — Create an achievement — a once-and-stay-earned milestone with optional reactive effect and auto-completing requirement watch. `src/systems/achievement.ts:209`
 - `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:174`
-- `function createAchievementGroup(options: AchievementGroupOptions): AchievementGroup` — Bundle a fixed list of achievements into a named AchievementGroup with reactive earned-count, completion-percent, and all-earned aggregates. `src/systems/achievement.ts:458`
-- `function createSimpleAchievement<T = unknown>(id: string, title: string, description: string, requirement: Computable<boolean> | Gate, effect?: T): Achievement<T>` — Positional shorthand over createAchievement for the common case of a one-line title + description and a single boolean requirement. `src/systems/achievement.ts:368`
-- `function createTieredAchievement<T = number>(options: TieredAchievementOptions<T>): Achievement<T>[]` — Creates a series of achievements from threshold tiers, each auto-wired to complete when `getValue()` reaches its tier's threshold. `src/systems/achievement.ts:406`
-- `function formatAchievementStatus(achievement: Achievement): string` — Localize an achievement's earned status as a human-readable string. `src/systems/achievement.ts:564`
-- `function getAchievementEffect<T>(achievement: Achievement<T>, defaultValue: T): T` — Read an achievement's effect value, falling back to `defaultValue` when the achievement is unearned or has no effect configured. `src/systems/achievement.ts:495`
-- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:511`
-- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:550`
-- `function getSummedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Additive counterpart to getCombinedAchievementEffect: sum effect values across earned achievements onto a base. `src/systems/achievement.ts:534`
-- `function getVisibleAchievements(achievements: Achievement[]): Achievement[]` — Filter a list to the achievements that should be rendered in the UI. `src/systems/achievement.ts:581`
-- `function isAchievement(value: unknown): value is Achievement` — Type guard for Achievement instances created by createAchievement. `src/systems/achievement.ts:555`
+- `function createSimpleAchievement<T = unknown>(id: string, title: string, description: string, requirement: Computable<boolean> | Gate, effect?: T): Achievement<T>` — Positional shorthand over createAchievement for the common case of a one-line title + description and a single boolean requirement. `src/systems/achievement.ts:339`
+- `function createTieredAchievement<T = number>(options: TieredAchievementOptions<T>): Achievement<T>[]` — Creates a series of achievements from threshold tiers, each auto-wired to complete when `getValue()` reaches its tier's threshold. `src/systems/achievement.ts:377`
+- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:412`
+- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:428`
+- `function getVisibleAchievements(achievements: Achievement[]): Achievement[]` — Filter a list to the achievements that should be rendered in the UI. `src/systems/achievement.ts:442`
+- `function isAchievement(value: unknown): value is Achievement` — Type guard for Achievement instances created by createAchievement. `src/systems/achievement.ts:433`
 - `function isAchievementCategory(value: unknown): value is AchievementCategory<{ id: string; }, unknown>` — Type guard: returns `true` if the value is an AchievementCategory instance. `src/systems/achievement-category.ts:260`
-- `interface TieredAchievementOptions<T = number>` — Options for createTieredAchievement. `src/systems/achievement.ts:174`
+- `interface TieredAchievementOptions<T = number>` — Options for createTieredAchievement. `src/systems/achievement.ts:145`
 
 ## Automation tiers
 
@@ -142,38 +136,31 @@ unified purchase primitives for incremental games
 
 Three factories in increasing flexibility: `createSimplePurchasable` for static one-shot costs, `createScalingPurchasable` for leveled geometric scaling, `createPurchasable` for arbitrary requirements. See consumer-guide.md §Choosing among purchasable primitives.
 
-- `function additiveEffect(perLevel: DecimalSource, base?: DecimalSource): (amount: DecimalSource) => DecimalSource` — Create an effect function where each level adds a flat amount: `base + perLevel * amount`. `src/systems/purchasable-effects.ts:59`
-- `function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable` — Create a purchasable with full control over requirements. `src/systems/purchasable.ts:574`
+- `function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable` — Create a purchasable with full control over requirements. `src/systems/purchasable.ts:569`
 - `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:188`
-- `function createPurchasableGroup(options: PurchasableGroupOptions): PurchasableGroup` — Group purchasables for aggregate tracking and bulk purchase. `src/systems/purchasable.ts:840`
-- `function createScalingPurchasable<T extends ScalingPurchasableOptions>(options: T): Purchasable` — Create a purchasable with leveled cost scaling — the most common leveled pattern. `src/systems/purchasable.ts:755`
-- `function createSimplePurchasable<T extends SimplePurchasableOptions>(options: T): Purchasable` — Create a purchasable with a simple resource cost — the most common one-shot pattern. `src/systems/purchasable.ts:696`
-- `function diminishingEffect(cap: DecimalSource, rate?: DecimalSource): (amount: DecimalSource) => DecimalSource` — Create an effect function with diminishing returns that asymptotically approaches a cap. `src/systems/purchasable-effects.ts:112`
-- `function formatPurchasable(purchasable: Purchasable): ComputedRef<string>` — Format a purchasable's amount as "N" or "N/limit" (e.g., "5/10"). `src/systems/purchasable.ts:864`
-- `function getPurchasableEffect(purchasables: Purchasable[], base?: DecimalSource): ComputedRef<DecimalSource>` — Compute the multiplicative product of all purchasables' effects. `src/systems/purchasable-effects.ts:138`
-- `function getPurchasableSum(purchasables: Purchasable[], base?: DecimalSource): ComputedRef<DecimalSource>` — Compute the additive sum of all purchasables' effects. `src/systems/purchasable-effects.ts:164`
-- `function isPurchasable(value: unknown): value is Purchasable` — Type guard: returns `true` if the value is a Purchasable instance. `src/systems/purchasable.ts:874`
+- `function createPurchasableGroup(options: PurchasableGroupOptions): PurchasableGroup` — Group purchasables for aggregate tracking and bulk purchase. `src/systems/purchasable.ts:835`
+- `function createScalingPurchasable<T extends ScalingPurchasableOptions>(options: T): Purchasable` — Create a purchasable with leveled cost scaling — the most common leveled pattern. `src/systems/purchasable.ts:750`
+- `function createSimplePurchasable<T extends SimplePurchasableOptions>(options: T): Purchasable` — Create a purchasable with a simple resource cost — the most common one-shot pattern. `src/systems/purchasable.ts:691`
+- `function formatPurchasable(purchasable: Purchasable): ComputedRef<string>` — Format a purchasable's amount as "N" or "N/limit" (e.g., "5/10"). `src/systems/purchasable.ts:859`
+- `function isPurchasable(value: unknown): value is Purchasable` — Type guard: returns `true` if the value is a Purchasable instance. `src/systems/purchasable.ts:869`
 - `function isPurchasableCategory(value: unknown): value is PurchasableCategory<{ id: string; }, unknown>` — Type guard: returns `true` if the value is a PurchasableCategory instance. `src/systems/purchasable-category.ts:263`
-- `function multiplicativeEffect(factor: DecimalSource): (amount: DecimalSource) => DecimalSource` — Create an effect function where each level multiplies: `factor ^ amount`. `src/systems/purchasable-effects.ts:36`
-- `function polynomialEffect(power: DecimalSource, scale?: DecimalSource, base?: DecimalSource): (amount: DecimalSource) => DecimalSource` — Create an effect function with polynomial scaling: `base + scale * amount ^ power`. `src/systems/purchasable-effects.ts:84`
-- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:233`
+- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:228`
 - `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:110`
 - `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:97`
 - `interface PurchasableCategoryOptions<Def extends { id: string; }, State = void>` — Options for createPurchasableCategory. `src/systems/purchasable-category.ts:64`
 - `const PurchasableCategoryType: unique symbol` — Symbol identifying PurchasableCategory features. `src/systems/purchasable-category.ts:55`
-- `interface PurchasableDisplay` — UI text for a purchasable. `src/systems/purchasable.ts:66`
-- `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:60`
-- `interface PurchasableGroup` — A managed collection of purchasables with aggregate queries and bulk operations. `src/systems/purchasable.ts:296`
-- `interface PurchasableGroupOptions` — Options for createPurchasableGroup. `src/systems/purchasable.ts:290`
-- `function purchasableModifierBinding(purchasable: Purchasable, effectOverride?: DecimalSource): { multiplier: ComputedRef<DecimalSource>; enabled: ComputedRef<boolean>; }` — Build a `{ multiplier, enabled }` binding from a purchasable, shaped for direct hand-off to a modifier chain. `src/systems/purchasable-effects.ts:207`
-- `interface PurchasableOptions` — Full options for createPurchasable. `src/systems/purchasable.ts:90`
-- `const PurchasableType: unique symbol` — Symbol identifying Purchasable features. `src/systems/purchasable.ts:57`
-- `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:159`
-- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:189`
+- `interface PurchasableDisplay` — UI text for a purchasable. `src/systems/purchasable.ts:61`
+- `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:55`
+- `interface PurchasableGroup` — A managed collection of purchasables with aggregate queries and bulk operations. `src/systems/purchasable.ts:291`
+- `interface PurchasableGroupOptions` — Options for createPurchasableGroup. `src/systems/purchasable.ts:285`
+- `interface PurchasableOptions` — Full options for createPurchasable. `src/systems/purchasable.ts:85`
+- `const PurchasableType: unique symbol` — Symbol identifying Purchasable features. `src/systems/purchasable.ts:52`
+- `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:154`
+- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:184`
 - `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:191`
 - `interface SetupPolicyAutoPurchaseOptions` — Options for setupPolicyAutoPurchase. `src/systems/auto-purchase.ts:106`
 - `function setupSweepAutoPurchase(purchasables: Purchasable[] | PurchasableGroup, enabled: Computable<boolean>, registerTick: (callback: (dt: number) => void) => () => void): () => void` — Register a tick handler that sweeps a purchasable list each frame, calling `purchaseMax()` on every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:79`
-- `interface SimplePurchasableOptions` — Shorthand options for createSimplePurchasable — the "costs X of resource Y" pattern. `src/systems/purchasable.ts:129`
+- `interface SimplePurchasableOptions` — Shorthand options for createSimplePurchasable — the "costs X of resource Y" pattern. `src/systems/purchasable.ts:124`
 
 ## Skill
 

@@ -26,10 +26,9 @@ export type {
 } from '../primitives/types';
 
 // === RESOURCES ===
-export type { Resource, ResourceOptions, OOMPSRef, SubtractResourceOptions } from './resource';
+export type { Resource, ResourceOptions, SubtractResourceOptions } from './resource';
 export {
   createResource,
-  trackOOMPS,
   displayResource,
   unwrapResource,
   addResource,

@@ -75,7 +75,6 @@ export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 // Purchasable: unified purchase system (one-shot via limit:1, leveled, infinite).
 // PurchasableCategory: batch-register Purchasables from content definitions.
 export * from './purchasable';
-export * from './purchasable-effects';
 export * from './purchasable-category';
 
 // === ACHIEVEMENTS ===

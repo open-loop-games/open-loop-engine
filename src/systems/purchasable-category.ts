@@ -16,7 +16,7 @@
  *     display: { title: def.name, description: `Level up ${def.name}` },
  *     requirements: createCostRequirement({ resource: gold, cost: def.baseCost }),
  *     limit: def.maxLevel,
- *     effect: multiplicativeEffect(1.1),
+ *     effect: (amount) => Decimal.pow(1.1, amount),
  *   }),
  * });
  *

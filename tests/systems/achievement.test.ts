@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import {
-  createAchievement,
-  createAchievementGroup,
-  createTieredAchievement,
-} from '@/systems/achievement';
+import { createAchievement, createTieredAchievement } from '@/systems/achievement';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import Formula from '@/core/formulas/formulas';
 
@@ -131,38 +127,5 @@ describe('createTieredAchievement', () => {
     gold.value = 250;
     await nextTick();
     expect(ach.earned.value).toBe(true);
-  });
-});
-
-describe('createAchievementGroup', () => {
-  it('allEarned is false for an empty group', () => {
-    const group = createAchievementGroup({
-      id: 'empty-group',
-      name: 'Empty',
-      achievements: [],
-    });
-    expect(group.allEarned.value).toBe(false);
-    expect(group.earnedCount.value).toBe(0);
-    expect(group.totalCount).toBe(0);
-    expect(group.completionPercent.value).toBe(0);
-  });
-
-  it('allEarned tracks earned count against totalCount', () => {
-    const a = createAchievement({ id: 'g1-a', display: { title: 'A' } });
-    const b = createAchievement({ id: 'g1-b', display: { title: 'B' } });
-    const group = createAchievementGroup({
-      id: 'g1',
-      name: 'Group 1',
-      achievements: [a, b],
-    });
-
-    expect(group.allEarned.value).toBe(false);
-    a.complete();
-    expect(group.earnedCount.value).toBe(1);
-    expect(group.allEarned.value).toBe(false);
-    expect(group.completionPercent.value).toBe(50);
-    b.complete();
-    expect(group.allEarned.value).toBe(true);
-    expect(group.completionPercent.value).toBe(100);
   });
 });

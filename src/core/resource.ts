@@ -8,7 +8,6 @@
  * - {@link createResource} — create a named value with auto-persistence,
  *   engine-scoped registration, and the always-present `cumulative` / `best`
  *   trackers
- * - {@link trackOOMPS} — orders-of-magnitude-per-second display for hyper-growth phases
  * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic helpers
  * - {@link displayResource} — formatted string using the resource's precision settings
  * - {@link unwrapResource} — dereference a Resource | Ref | DecimalSource to its current Decimal
@@ -20,7 +19,7 @@
  * the registry via `engine.tryInject(ResourceRegistryKey)`.
  */
 
-import { computed, isRef, ref, unref, watch, type ComputedRef, type Ref } from 'vue';
+import { isRef, unref, watch, type Ref } from 'vue';
 import { Decimal, format, formatWhole } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import {
@@ -259,100 +258,6 @@ export function createResource<T>(
   });
 
   return resource as Resource<T>;
-}
-
-// Constants for OOMPS calculation
-const TETRA_8 = new Decimal('10^^8');
-const E_100 = new Decimal('1e100');
-
-/**
- * A reactive string showing the current growth rate, with a tick-driven updater.
- *
- * Read `.value` for the formatted display string.
- * Call `.update(dt)` each tick to recalculate.
- */
-export interface OOMPSRef extends Ref<string> {
-  /** Recalculate growth rate. Call once per tick with the delta time in seconds. */
-  update: (diff: number) => void;
-}
-
-/**
- * Track orders of magnitude per second for rapidly growing resources.
- * Useful when numbers grow so fast that normal rate display is meaningless.
- *
- * @param resource - The resource to track
- * @param pointGain - Optional computed ref for current gain rate (shown when not in OOMPS mode)
- * @returns A computed string describing the growth rate, with an update() method for the game loop
- *
- * @example
- * ```ts
- * const points = createResource(0, { displayName: "points" })
- * const gain = computed(() => calculateGain())
- * const oomps = trackOOMPS(points, gain)
- * // Shows "1.5e6 points/s" normally, or "2.5 OOM^2s/sec" for very fast growth
- * // Call oomps.update(deltaTime) each frame
- * ```
- */
-export function trackOOMPS(resource: Resource, pointGain?: ComputedRef<DecimalSource>): OOMPSRef {
-  const oomps = ref<DecimalSource>(0);
-  const oompsMag = ref(0);
-  const lastPoints = ref<DecimalSource>(0);
-
-  // Update on each frame - this will be called by the game loop
-  const update = (diff: number) => {
-    oompsMag.value = 0;
-
-    // Only track OOMPS for very large numbers
-    if (Decimal.lte(resource.value, E_100)) {
-      lastPoints.value = resource.value;
-      return;
-    }
-
-    let curr = new Decimal(resource.value);
-    let prev = new Decimal(lastPoints.value);
-    lastPoints.value = curr;
-
-    if (Decimal.gt(curr, prev)) {
-      // For tetrational numbers, use slog
-      if (Decimal.gte(curr, TETRA_8)) {
-        curr = Decimal.slog(curr, 1e10);
-        prev = Decimal.slog(prev, 1e10);
-        oomps.value = curr.sub(prev).div(diff);
-        oompsMag.value = -1;
-      } else {
-        // Calculate orders of magnitude
-        while (
-          new Decimal(Decimal.div(curr, prev)).log(10).div(diff).gte(100) &&
-          oompsMag.value <= 5 &&
-          Decimal.gt(prev, 0)
-        ) {
-          curr = Decimal.log10(curr);
-          prev = Decimal.log10(prev);
-          oomps.value = curr.sub(prev).div(diff);
-          oompsMag.value++;
-        }
-      }
-    }
-  };
-
-  const oompsString = computed(() => {
-    if (oompsMag.value === 0) {
-      return pointGain
-        ? format(pointGain.value, resource.precision, resource.small) +
-            ' ' +
-            resource.displayName +
-            '/s'
-        : '';
-    }
-    return (
-      format(oomps.value) + ' OOM' + (oompsMag.value < 0 ? '^OOM' : '^' + oompsMag.value) + 's/sec'
-    );
-  });
-
-  // Return computed with update method attached
-  const result = oompsString as unknown as OOMPSRef;
-  result.update = update;
-  return result;
 }
 
 /**

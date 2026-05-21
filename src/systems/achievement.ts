@@ -10,14 +10,11 @@
  * - {@link createAchievement} — full-control factory with arbitrary requirement and effect
  * - {@link createSimpleAchievement} — positional shorthand for "earn when this boolean ref is true"
  * - {@link createTieredAchievement} — fan a single value-getter into N threshold-gated tiers
- * - {@link createAchievementGroup} — manage a fixed list of achievements with aggregate counts
  *
- * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative,
- * {@link getSummedAchievementEffect} additive) and the
- * {@link getAchievementEffect} short-circuit live alongside the factory and
- * mirror the shape of `purchasable-effects.ts`. {@link getVisibleAchievements}
- * applies the hidden+visible filter for tile rendering;
- * {@link formatAchievementStatus} returns a localized "Earned on ..." string.
+ * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative)
+ * live alongside the factory. {@link getVisibleAchievements} applies the
+ * hidden+visible filter for tile rendering; {@link getEarnedCount} returns
+ * a reactive count of earned achievements in a list.
  *
  * Batch-registration over a content registry lives in
  * `./achievement-category` ({@link createAchievementCategory}).
@@ -142,32 +139,6 @@ export interface Achievement<T = unknown> {
   canComplete: Ref<boolean>;
   /** Subscribe to this achievement's events */
   on: Emittable<AchievementEvents>['on'];
-}
-
-/** Options for {@link createAchievementGroup} */
-export interface AchievementGroupOptions {
-  id: string;
-  name: string;
-  /** Flavour text shown beneath the group header */
-  description?: string;
-  /** Achievements that belong to this group */
-  achievements: Achievement[];
-}
-
-/** A named collection of achievements with aggregate completion tracking */
-export interface AchievementGroup {
-  id: string;
-  name: string;
-  description?: string;
-  achievements: Achievement[];
-  /** Number of achievements in this group that have been earned (reactive) */
-  earnedCount: Ref<number>;
-  /** Total number of achievements in this group */
-  totalCount: number;
-  /** Earned as a percentage of total, rounded to the nearest integer (reactive) */
-  completionPercent: Ref<number>;
-  /** True when every achievement in the group has been earned (reactive) */
-  allEarned: Ref<boolean>;
 }
 
 /** Options for {@link createTieredAchievement} */
@@ -429,80 +400,10 @@ export function createTieredAchievement<T = number>(
   }) as Achievement<T>[];
 }
 
-/**
- * Bundle a fixed list of achievements into a named {@link AchievementGroup}
- * with reactive earned-count, completion-percent, and all-earned aggregates.
- *
- * For batch-registered, content-driven achievement collections prefer
- * {@link createAchievementCategory} from `./achievement-category`; groups
- * are for hand-curated tile collections (e.g. story chapters).
- *
- * @param options - Group ID, display name, optional flavour, and the
- *   pre-created achievement instances to bundle
- * @returns AchievementGroup with `earnedCount`, `totalCount`,
- *   `completionPercent`, and `allEarned` (false for an empty group)
- *
- * @example
- * ```ts
- * const chapterOne = createAchievementGroup({
- *   id: 'chapter-1',
- *   name: 'Chapter 1: Awakening',
- *   description: 'First steps into the world',
- *   achievements: [firstClick, firstUpgrade, firstPrestige],
- * });
- *
- * chapterOne.completionPercent.value; // 0–100
- * if (chapterOne.allEarned.value) showChapterTwoUnlock();
- * ```
- */
-export function createAchievementGroup(options: AchievementGroupOptions): AchievementGroup {
-  const { id, name, description, achievements } = options;
-
-  const earnedCount = computed(() => achievements.filter((a) => a.earned.value).length);
-
-  const totalCount = achievements.length;
-
-  const completionPercent = computed(() =>
-    totalCount > 0 ? Math.round((earnedCount.value / totalCount) * 100) : 0,
-  );
-
-  const allEarned = computed(
-    () => achievements.length > 0 && achievements.every((a) => a.earned.value),
-  );
-
-  return {
-    id,
-    name,
-    description,
-    achievements,
-    earnedCount,
-    totalCount,
-    completionPercent,
-    allEarned,
-  };
-}
-
 // === PUBLIC UTILITIES ===
 
 /**
- * Read an achievement's effect value, falling back to `defaultValue` when the
- * achievement is unearned or has no effect configured.
- *
- * @param achievement - The achievement to query
- * @param defaultValue - Value returned when the achievement is unearned or effect-less
- * @returns The current effect value or `defaultValue`
- */
-export function getAchievementEffect<T>(achievement: Achievement<T>, defaultValue: T): T {
-  if (!achievement.earned.value || !achievement.effect) {
-    return defaultValue;
-  }
-  return achievement.effect.value;
-}
-
-/**
- * Multiply effect values across earned achievements onto a base. Mirrors the
- * multiplicative semantics of `getPurchasableEffect` from
- * `./purchasable-effects`.
+ * Multiply effect values across earned achievements onto a base.
  *
  * @param achievements - Achievements whose `effect` values to multiply when earned
  * @param base - Starting value (defaults to `1`, the multiplicative identity)
@@ -523,29 +424,6 @@ export function getCombinedAchievementEffect(
   return result;
 }
 
-/**
- * Additive counterpart to {@link getCombinedAchievementEffect}: sum effect
- * values across earned achievements onto a base.
- *
- * @param achievements - Achievements whose `effect` values to add when earned
- * @param base - Starting value (defaults to `0`, the additive identity)
- * @returns `base + effect₁ + effect₂ + …` over earned achievements
- */
-export function getSummedAchievementEffect(
-  achievements: Achievement<number>[],
-  base: DecimalSource = 0,
-): Decimal {
-  let result = new Decimal(base);
-
-  for (const achievement of achievements) {
-    if (achievement.earned.value && achievement.effect) {
-      result = result.add(achievement.effect.value);
-    }
-  }
-
-  return result;
-}
-
 /** Reactive count of how many achievements in the list are currently earned. */
 export function getEarnedCount(achievements: Achievement[]): number {
   return achievements.filter((a) => a.earned.value).length;
@@ -554,23 +432,6 @@ export function getEarnedCount(achievements: Achievement[]): number {
 /** Type guard for {@link Achievement} instances created by {@link createAchievement}. */
 export function isAchievement(value: unknown): value is Achievement {
   return isType(value, AchievementType);
-}
-
-/**
- * Localize an achievement's earned status as a human-readable string. Returns
- * `"Earned on {date}"` when an `earnedAt` timestamp is present, `"Earned"`
- * when earned without a timestamp (e.g. legacy save), or `"Not earned"`.
- */
-export function formatAchievementStatus(achievement: Achievement): string {
-  if (achievement.earned.value) {
-    const earnedTime = achievement.earnedAt.value;
-    if (earnedTime) {
-      const date = new Date(earnedTime);
-      return `Earned on ${date.toLocaleDateString()}`;
-    }
-    return 'Earned';
-  }
-  return 'Not earned';
 }
 
 /**

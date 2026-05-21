@@ -14,11 +14,6 @@
  * - {@link createScalingPurchasable} — shorthand for exponential cost scaling, defaults `limit: Infinity`
  * - {@link createPurchasableGroup} — manage a set of purchasables as a unit
  *
- * Effect helpers (multiplicativeEffect, additiveEffect, polynomialEffect,
- * diminishingEffect), aggregation utilities (getPurchasableEffect,
- * getPurchasableSum), and the per-purchasable binding helper
- * (purchasableModifierBinding) live in `./purchasable-effects`.
- *
  * Utilities: {@link formatPurchasable}. For auto-buy, see
  * {@link setupSweepAutoPurchase} / {@link setupPolicyAutoPurchase} in
  * `./auto-purchase`.
