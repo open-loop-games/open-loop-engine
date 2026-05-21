@@ -1,28 +1,28 @@
 /**
- * Offline — catch-up progress by replaying elapsed seconds through the game loop in chunks
+ * Offline — catch-up progress by replaying elapsed seconds through the TickDriver in chunks
  */
 
-import type { GameLoop } from './game-loop';
+import type { TickDriver } from './tick-driver';
 
 /** Options for {@link processOfflineTime} — caps the catch-up window and the per-step chunk size. */
 export interface OfflineProgressOptions {
   /** Maximum offline seconds to process (default: 259200 = 3 days) */
   maxOfflineSeconds?: number;
-  /** Seconds per simulateTick call (default: 1). Must be <= loop's maxDeltaTime. */
+  /** Seconds per simulateTick call (default: 1). Must be <= driver's maxDeltaTime. */
   chunkSize?: number;
 }
 
 /**
- * Process offline elapsed time by feeding it through the game loop in chunks.
+ * Process offline elapsed time by feeding it through the TickDriver in chunks.
  *
- * Each chunk is passed to `loop.simulateTick()`, which caps at `maxDeltaTime` and
+ * Each chunk is passed to `tickDriver.simulateTick()`, which caps at `maxDeltaTime` and
  * passes the dt directly to tick callbacks (no speedMultiplier applied — offline
  * processing is wall-clock faithful).
  *
  * @returns Actual seconds processed (capped by maxOfflineSeconds).
  */
 export function processOfflineTime(
-  loop: GameLoop,
+  tickDriver: TickDriver,
   elapsedSeconds: number,
   options?: OfflineProgressOptions,
 ): number {
@@ -32,11 +32,11 @@ export function processOfflineTime(
 
   let remaining = capped;
   while (remaining >= chunkSize) {
-    loop.simulateTick(chunkSize);
+    tickDriver.simulateTick(chunkSize);
     remaining -= chunkSize;
   }
   if (remaining > 0) {
-    loop.simulateTick(remaining);
+    tickDriver.simulateTick(remaining);
   }
 
   return capped;

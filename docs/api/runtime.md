@@ -1,14 +1,14 @@
 # Runtime
 
-The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the game loop (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
+The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
 
 ## Canonical entrypoints
 
 Start with these public symbols before scanning the full inventory below.
 
-- `createEngine` — assemble modules, loop, persistence, events, registries, and mods.
+- `createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.
 - `EngineModule` / `EngineContext` — install/connect game content and share engine services.
-- `createGameLoop` — standalone tick scheduler when not using the full engine facade.
+- `createTickDriver` — standalone tick scheduler when not using the full engine facade.
 - `createEmitHandle` — typed per-instance events for systems and categories.
 - `timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
 
@@ -17,24 +17,24 @@ Start with these public symbols before scanning the full inventory below.
 top-level facade composing every layer
 
 - `const computed: typeof computed$1` — _(no summary)_ `src/index.ts`
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the game loop, save manager, module system, and mod support. `src/index.ts:401`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/index.ts:403`
 - `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/index.ts`
 - `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/index.ts`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:311`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/index.ts:230`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/index.ts:122`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/index.ts:313`
+- `interface EngineConfig` — Configuration passed to createEngine. `src/index.ts:232`
+- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/index.ts:124`
 - `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/index.ts:98`
-- `interface EngineModule` — A registerable unit of game content. `src/index.ts:186`
-- `const GameLoopKey: InjectionKey<GameLoop>` — Inject the game loop instance. `src/index.ts:104`
+- `interface EngineModule` — A registerable unit of game content. `src/index.ts:188`
 - `function isRef<T>(r: Ref<T> | unknown): r is Ref<T>` — Checks if a value is a ref object. `src/index.ts`
 - `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/index.ts:74`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/index.ts:208`
+- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/index.ts:210`
 - `function reactive<T extends object>(target: T): Reactive<T>` — Returns a reactive proxy of the object. `src/index.ts`
 - `function ref<T>(value: T): [T] extends [Ref] ? IfAny<T, Ref<T>, T> : Ref<UnwrapRef<T>, UnwrapRef<T> | T>` — Takes an inner value and returns a reactive and mutable ref object, which has a single property `.value` that points to the inner value. `src/index.ts`
 - `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/index.ts:76`
 - `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/index.ts:72`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/index.ts:107`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/index.ts:109`
 - `function shallowRef<T>(value: T): Ref extends T ? T extends Ref ? IfAny<T, ShallowRef<T>, T> : ShallowRef<T> : ShallowRef<T>` — Shallow version of ref. `src/index.ts`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/index.ts:104`
 - `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/index.ts:70`
 - `function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T` — Returns the inner value if the argument is a ref, otherwise return the argument itself. `src/index.ts`
 - `function watch<T, Immediate extends Readonly<boolean> = false>(source: WatchSource<T>, cb: WatchCallback<T, MaybeUndefined<T, Immediate>>, options?: WatchOptions<Immediate>): WatchHandle` — _(no summary)_ `src/index.ts`
@@ -49,16 +49,16 @@ Typed per-instance event emitter primitive
 - `interface EmitHandleOptions` — Options for createEmitHandle. `src/core/events.ts:36`
 - `interface Emittable<E>` — Public event interface exposed on system instances — subscribe only, emit is internal. `src/core/events.ts:19`
 
-## Game Loop
+## TickDriver
 
-worker-timer scheduled loop with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
+worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
 
-- `function createGameLoop(config?: GameLoopConfig): GameLoop` — Creates a game loop with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/game-loop.ts:201`
-- `interface GameLoop` — The game loop instance returned by createGameLoop. `src/core/game-loop.ts:125`
-- `interface GameLoopConfig` — Configuration accepted by createGameLoop. `src/core/game-loop.ts:62`
-- `interface PhaseHooks` — Lifecycle hooks for a named game phase, registered via `loop.registerPhase()`. `src/core/game-loop.ts:110`
-- `type TickCallback = (dt: number) => void` — Tick-handler signature for `loop.onTick`: receives the elapsed dt in seconds. `src/core/game-loop.ts:117`
-- `interface TimerProvider` — Timer functions for scheduling. `src/core/game-loop.ts:52`
+- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:201`
+- `interface PhaseHooks` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:110`
+- `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: receives the elapsed dt in seconds. `src/core/tick-driver.ts:117`
+- `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:125`
+- `interface TickDriverConfig` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:62`
+- `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:52`
 
 ## Ambient game-state-accessor context
 

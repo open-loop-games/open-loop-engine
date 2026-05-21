@@ -1,7 +1,7 @@
 /**
- * Game Loop — worker-timer scheduled loop with EWMA lag compensation. Two dt modes:
- * variable (default, genre-standard) and fixed-step accumulator (opt-in, for
- * source-faithful ports with clamp-on-overshoot tick math).
+ * TickDriver — worker-timer scheduled tick dispatcher with EWMA lag compensation.
+ * Two dt modes: variable (default, genre-standard) and fixed-step accumulator
+ * (opt-in, for source-faithful ports with clamp-on-overshoot tick math).
  *
  * Scheduling: Uses `setInterval` (optionally backed by worker-timers for background-tab
  * immunity) at the configured tick rate. Each tick measures real elapsed time via
@@ -43,10 +43,10 @@ import { persistent, withPersistentContext } from './persistence';
 import { beginTraceTick, endTraceTick } from './trace';
 import { beginProfileTick, endProfileTick } from './profiler';
 
-// Monotonic counter for per-loop persistent context ids. Multiple loops in a
-// single runtime (tests, multi-engine setups) each get a distinct context so
+// Monotonic counter for per-driver persistent context ids. Multiple drivers in
+// a single runtime (tests, multi-engine setups) each get a distinct context so
 // the `accumulator` key doesn't collide.
-let gameLoopCounter = 0;
+let tickDriverCounter = 0;
 
 /** Timer functions for scheduling. Defaults to native setInterval/clearInterval. */
 export interface TimerProvider {
@@ -55,11 +55,11 @@ export interface TimerProvider {
 }
 
 /**
- * Configuration accepted by {@link createGameLoop}. Tunes cadence, dt mode,
+ * Configuration accepted by {@link createTickDriver}. Tunes cadence, dt mode,
  * overflow diagnostics, and the timer provider; every field has a default
  * matching the genre-standard 20 Hz variable-dt shape.
  */
-export interface GameLoopConfig {
+export interface TickDriverConfig {
   /** Ticks per second (default 20). Controls the setInterval cadence. */
   tickRate?: number;
   /** Maximum seconds of game time per tick (default 1). Caps variable dt. */
@@ -106,23 +106,23 @@ export interface GameLoopConfig {
   timerProvider?: TimerProvider;
 }
 
-/** Lifecycle hooks for a named game phase, registered via `loop.registerPhase()`. */
+/** Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. */
 export interface PhaseHooks {
   onEnter?: () => void;
   onExit?: () => void;
   onTick?: (dt: number) => void;
 }
 
-/** Tick-handler signature for `loop.onTick`: receives the elapsed dt in seconds. */
+/** Tick-handler signature for `tickDriver.onTick`: receives the elapsed dt in seconds. */
 export type TickCallback = (dt: number) => void;
 
 /**
- * The game loop instance returned by {@link createGameLoop}. Exposes
+ * The TickDriver instance returned by {@link createTickDriver}. Exposes
  * start/stop control, deterministic `stepOnce` / `simulateTick` entry points
  * for tests and offline processing, named-phase hooks, and live-settable
  * overflow diagnostics.
  */
-export interface GameLoop {
+export interface TickDriver {
   onTick(callback: TickCallback): () => void;
   /**
    * Feed raw seconds through the loop (for offline processing). Does NOT apply
@@ -172,25 +172,25 @@ const FILTER_STRENGTH = 20;
 const ACCUMULATOR_EPSILON = 1e-9;
 
 /**
- * Creates a game loop with EWMA lag compensation, speed control, named phase hooks, and
+ * Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and
  * a choice of variable-dt (default) or fixed-step accumulator mode.
  *
- * @param config - Loop configuration: tick rate, max delta, speed multiplier, `tickMode`
+ * @param config - Driver configuration: tick rate, max delta, speed multiplier, `tickMode`
  *   (`'variable'` or `'fixed'`), plus fixed-mode knobs (`stepSize`, `maxStepsPerTick`,
  *   `onStepsOverflow`) and an optional custom timer provider for Web Workers or testing.
- * @returns A game loop that can be started/stopped, supports per-phase enter/exit/tick
+ * @returns A TickDriver that can be started/stopped, supports per-phase enter/exit/tick
  *   hooks, and exposes `simulateTick()` / `stepOnce()` for deterministic testing.
  *
  * @example
  * ```ts
  * // Variable mode (genre default)
- * const loop = createGameLoop({ tickRate: 20 });
- * loop.onTick((dt) => updateResources(dt));
- * loop.registerPhase('combat', { onTick: (dt) => tickCombat(dt) });
- * loop.start();
+ * const tickDriver = createTickDriver({ tickRate: 20 });
+ * tickDriver.onTick((dt) => updateResources(dt));
+ * tickDriver.registerPhase('combat', { onTick: (dt) => tickCombat(dt) });
+ * tickDriver.start();
  *
  * // Fixed mode (source-faithful ports)
- * const fixed = createGameLoop({
+ * const fixed = createTickDriver({
  *   tickRate: 50,
  *   tickMode: 'fixed',
  *   stepSize: 0.020, // 20 ms sub-tick
@@ -198,7 +198,7 @@ const ACCUMULATOR_EPSILON = 1e-9;
  * });
  * ```
  */
-export function createGameLoop(config: GameLoopConfig = {}): GameLoop {
+export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   let tickRate = config.tickRate ?? 20;
   const maxDeltaTime = config.maxDeltaTime ?? 1;
   let tickInterval = 1 / tickRate;
@@ -214,8 +214,8 @@ export function createGameLoop(config: GameLoopConfig = {}): GameLoop {
   // sub-tick (≤ `stepSize`) remainder desynced from resources after a mid-run
   // snapshot restore, breaking deterministic-replay and bisection flows.
   // Unused in variable mode; value stays 0 so the context key costs nothing.
-  const loopContextId = `game-loop_${++gameLoopCounter}`;
-  const accumulator = withPersistentContext(loopContextId, () =>
+  const driverContextId = `tick-driver_${++tickDriverCounter}`;
+  const accumulator = withPersistentContext(driverContextId, () =>
     persistent<number>(0, { name: 'accumulator' }),
   );
 

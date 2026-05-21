@@ -14,10 +14,10 @@ Start with these public symbols before scanning the full inventory below.
 
 ## Offline
 
-catch-up progress by replaying elapsed seconds through the game loop in chunks
+catch-up progress by replaying elapsed seconds through the TickDriver in chunks
 
 - `interface OfflineProgressOptions` — Options for processOfflineTime — caps the catch-up window and the per-step chunk size. `src/core/offline.ts:8`
-- `function processOfflineTime(loop: GameLoop, elapsedSeconds: number, options?: OfflineProgressOptions): number` — Process offline elapsed time by feeding it through the game loop in chunks. `src/core/offline.ts:24`
+- `function processOfflineTime(tickDriver: TickDriver, elapsedSeconds: number, options?: OfflineProgressOptions): number` — Process offline elapsed time by feeding it through the TickDriver in chunks. `src/core/offline.ts:24`
 
 ## Persistence
 

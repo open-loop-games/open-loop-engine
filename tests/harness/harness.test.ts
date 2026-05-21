@@ -374,7 +374,7 @@ describe('runSensitivity', () => {
     }
     const buildEngine = (mul: number): Engine =>
       ({
-        loop: {
+        tickDriver: {
           simulateTick: () => {
             state.tick += mul;
           },
@@ -429,7 +429,7 @@ describe('runSensitivity', () => {
   it('throws when until is set without maxSimTime', () => {
     const baseline: UntilCell = {
       name: 'baseline',
-      buildEngine: () => ({ loop: { simulateTick: () => {} } }) as unknown as Engine,
+      buildEngine: () => ({ tickDriver: { simulateTick: () => {} } }) as unknown as Engine,
     };
     expect(() =>
       runSensitivity({

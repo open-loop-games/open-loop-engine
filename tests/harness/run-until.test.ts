@@ -6,7 +6,7 @@ import { runUntil } from '@/harness';
 // --- helpers ---
 
 /** Minimal Engine shape for testing harness behavior in isolation.
- *  Only `engine.loop.simulateTick` is exercised by runUntil; the rest of
+ *  Only `engine.tickDriver.simulateTick` is exercised by runUntil; the rest of
  *  the Engine surface is irrelevant here. A monotonic counter gives
  *  predicates something to close over; the stub also records the most
  *  recent dt so tests can pin the caller's tickDelta reaches the engine. */
@@ -19,7 +19,7 @@ function createTestEngine(): Engine & {
   let lastDt = 0;
   const dts: number[] = [];
   const engine = {
-    loop: {
+    tickDriver: {
       simulateTick: (dt: number) => {
         tickCount += 1;
         lastDt = dt;
@@ -177,7 +177,7 @@ describe('runUntil', () => {
     ]);
   });
 
-  it("forwards caller's tickDelta to engine.loop.simulateTick", () => {
+  it("forwards caller's tickDelta to engine.tickDriver.simulateTick", () => {
     const engine = createTestEngine();
     runUntil({
       engine,

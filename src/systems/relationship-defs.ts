@@ -10,7 +10,7 @@
  *
  * Cross-cutting concerns (time decay, auto-advance, loop-temporary layers)
  * are intentionally not schema fields — compose them at the consumer using
- * the engine's GameLoop ticks and Resettable scopes against the instance's
+ * the engine's TickDriver ticks and Resettable scopes against the instance's
  * `get`/`set`/`tryAdvance` surface.
  *
  * @cluster relationship

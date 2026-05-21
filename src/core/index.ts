@@ -152,15 +152,15 @@ export {
 // === GAME STATE ACCESSOR ===
 export type { GameStateAccessorMutator } from './game-state-accessor';
 
-// === GAME LOOP ===
+// === TICK DRIVER ===
 export type {
-  GameLoopConfig,
+  TickDriverConfig,
   PhaseHooks,
-  GameLoop,
+  TickDriver,
   TimerProvider,
   TickCallback,
-} from './game-loop';
-export { createGameLoop } from './game-loop';
+} from './tick-driver';
+export { createTickDriver } from './tick-driver';
 
 // === HEADLESS RUNNER ===
 export type { HeadlessConfig, HeadlessResult } from './headless';

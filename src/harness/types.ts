@@ -354,7 +354,7 @@ export interface SensitivityResult {
 // =============================================================================
 // Until-runners — predicate-driven alternatives to the fixed-tick primitives.
 // Engine-aware (consume `Engine` directly and call
-// `engine.loop.simulateTick(tickDelta)`), in contrast to the decoupled
+// `engine.tickDriver.simulateTick(tickDelta)`), in contrast to the decoupled
 // `tick`-callback shape of {@link runHeadless} and {@link runMatrix}. The
 // matrix variant's headline output is the distribution of *termination times*
 // — when each seed's predicate fired — surfaced as first-class fields on
@@ -369,7 +369,7 @@ export interface SensitivityResult {
  * engine or setup-captured refs.
  */
 export interface UntilContext {
-  /** Number of `engine.loop.simulateTick(tickDelta)` calls completed so far. */
+  /** Number of `engine.tickDriver.simulateTick(tickDelta)` calls completed so far. */
   tick: number;
   /** Simulated seconds elapsed so far (`tick * tickDelta`). */
   simTime: number;
@@ -383,7 +383,7 @@ export type UntilPredicate = (ctx: UntilContext) => boolean;
 
 /**
  * Configuration for a single predicate-bounded run. The engine is consumed
- * directly — `runUntil` drives it via `engine.loop.simulateTick(tickDelta)`
+ * directly — `runUntil` drives it via `engine.tickDriver.simulateTick(tickDelta)`
  * rather than a consumer-supplied tick callback. The engine must be started
  * (`engine.start()`) before calling `runUntil`.
  */

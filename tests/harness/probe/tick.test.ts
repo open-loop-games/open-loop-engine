@@ -6,7 +6,7 @@ import type { BeatProbe } from '@/harness';
 /** Minimal engine shaped object whose counter advances one tick per simulateTick. */
 function buildTickCounterEngine(state: { tick: number }): Engine {
   const engine = {
-    loop: {
+    tickDriver: {
       simulateTick: (_dt: number) => {
         state.tick += 1;
       },

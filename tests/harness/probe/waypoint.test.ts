@@ -5,7 +5,7 @@ import { runWaypointProbe } from '@/harness';
 /** Minimal engine whose counter advances one tick per simulateTick(dt) call. */
 function buildTickCounterEngine(state: { tick: number; simTime: number }): Engine {
   const engine = {
-    loop: {
+    tickDriver: {
       simulateTick: (dt: number) => {
         state.tick += 1;
         state.simTime += dt;

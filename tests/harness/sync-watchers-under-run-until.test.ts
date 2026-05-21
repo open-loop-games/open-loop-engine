@@ -7,7 +7,7 @@ import type { Engine } from '@/index';
 
 /**
  * Regression pins: engine primitives that internally use `watch()` must keep
- * firing under sim harnesses that drive `engine.loop.simulateTick(dt)` in a
+ * firing under sim harnesses that drive `engine.tickDriver.simulateTick(dt)` in a
  * tight loop. Vue's default async scheduler never flushes inside such a
  * loop — so `Resource.cumulative` / `Resource.best` and `createAchievement`
  * use `flush: 'sync'`.
@@ -19,7 +19,7 @@ import type { Engine } from '@/index';
 // Minimal engine shape runUntil needs — simulateTick is the only method it calls.
 function buildStepEngine(onStep: () => void): Engine {
   return {
-    loop: { simulateTick: (_dt: number) => onStep() },
+    tickDriver: { simulateTick: (_dt: number) => onStep() },
   } as unknown as Engine;
 }
 

@@ -44,7 +44,7 @@ import type { RelationshipCategory } from '@/systems/relationship-category';
 import type { DialogCategory } from '@/systems/dialog-category';
 import type { ResettableObject } from '@/systems/resettable';
 import type { Purchasable } from '@/systems/purchasable';
-import type { GameLoopConfig } from '@/core/game-loop';
+import type { TickDriverConfig } from '@/core/tick-driver';
 import type { BindOptions, BindingRecord, Grant, ModifierChain } from '@/core/modifier';
 
 describe('createEngine type surface', () => {
@@ -136,22 +136,22 @@ describe('Producer type surface', () => {
   });
 });
 
-describe('GameLoopConfig type surface', () => {
+describe('TickDriverConfig type surface', () => {
   it('pins tickMode as a literal union, not widened string', () => {
     // Widening tickMode to `string` would let typos like `'fiexd'` compile;
     // this catches it. New modes require updating the pin in the same commit.
-    expectTypeOf<GameLoopConfig['tickMode']>().toEqualTypeOf<'variable' | 'fixed' | undefined>();
+    expectTypeOf<TickDriverConfig['tickMode']>().toEqualTypeOf<'variable' | 'fixed' | undefined>();
   });
 
   it('pins fixed-mode numeric knobs as optional numbers', () => {
-    expectTypeOf<GameLoopConfig['stepSize']>().toEqualTypeOf<number | undefined>();
-    expectTypeOf<GameLoopConfig['maxStepsPerTick']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverConfig['stepSize']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverConfig['maxStepsPerTick']>().toEqualTypeOf<number | undefined>();
   });
 
   it('pins onStepsOverflow as a diagnostic callback, not a thrown-error channel', () => {
     // The overflow path is non-fatal — the callback signature shape records that
     // consumers receive a dropped-steps count and return nothing.
-    expectTypeOf<GameLoopConfig['onStepsOverflow']>().toEqualTypeOf<
+    expectTypeOf<TickDriverConfig['onStepsOverflow']>().toEqualTypeOf<
       ((droppedSteps: number) => void) | undefined
     >();
   });

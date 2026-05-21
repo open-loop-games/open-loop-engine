@@ -17,7 +17,7 @@ interface TestState {
 
 function buildTestEngine(state: TestState): Engine {
   const engine = {
-    loop: {
+    tickDriver: {
       simulateTick: (dt: number) => {
         state.tick += 1;
         state.lastDt = dt;
@@ -237,7 +237,7 @@ describe('runMatrixUntil', () => {
             seenSeeds.push(ctx.seed);
             // Closure captures the engine — a real consumer would read its state
             // here. For this test we just verify the analyzer runs and returns.
-            const state = (engine.loop as unknown as { _state?: TestState })._state;
+            const state = (engine.tickDriver as unknown as { _state?: TestState })._state;
             return [createTickRecorder(state ?? { tick: 0 })];
           },
           tickDelta: 0.1,

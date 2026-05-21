@@ -84,7 +84,7 @@ describe('createSensitivityCell', () => {
       },
       perturb,
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
-      tick: (engine) => engine.loop.stepOnce(),
+      tick: (engine) => engine.tickDriver.stepOnce(),
       ticks: 20,
     });
   }
@@ -141,7 +141,7 @@ describe('createSensitivityCell', () => {
         goldBySeed.push(economy?._refs.gold?.value ?? NaN);
       },
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
-      tick: (engine) => engine.loop.stepOnce(),
+      tick: (engine) => engine.tickDriver.stepOnce(),
       ticks: 1,
     });
 

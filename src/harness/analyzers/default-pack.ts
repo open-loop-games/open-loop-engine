@@ -35,7 +35,7 @@ import { createResourcePeakTracker } from './resource-peak';
  *   saveBlob,
  *   modules: () => [createGoldModule()],
  *   buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
- *   tick: (engine) => engine.loop.stepOnce(),
+ *   tick: (engine) => engine.tickDriver.stepOnce(),
  *   ticks: 1000,
  * });
  * ```

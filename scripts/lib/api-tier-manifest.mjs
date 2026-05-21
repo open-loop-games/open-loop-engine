@@ -121,18 +121,18 @@ export const TIER_MANIFEST = [
     tier: 'runtime',
     title: 'Runtime',
     scope:
-      'The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the game loop (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.',
+      'The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.',
     entrypoints: [
-      '`createEngine` — assemble modules, loop, persistence, events, registries, and mods.',
+      '`createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.',
       '`EngineModule` / `EngineContext` — install/connect game content and share engine services.',
-      '`createGameLoop` — standalone tick scheduler when not using the full engine facade.',
+      '`createTickDriver` — standalone tick scheduler when not using the full engine facade.',
       '`createEmitHandle` — typed per-instance events for systems and categories.',
       '`timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
     ],
     clusters: [
       'engine',
       'events',
-      'game-loop',
+      'tick-driver',
       'game-state-accessor',
       'throttle',
       'time',

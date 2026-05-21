@@ -95,7 +95,7 @@ export type {
   Grant,
   MaybeGetter,
   Emittable,
-  GameLoop,
+  TickDriver,
   PhaseHooks,
   TickCallback,
   TimerProvider,

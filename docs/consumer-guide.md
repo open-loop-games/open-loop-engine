@@ -204,7 +204,7 @@ These are the choices that most often look similar from the outside. The API ind
 
 **ResourceBag vs inventory.** `createResourceBag` is the generic container: many resource types, capacity limits, transfers, and serialization helpers. `createInventory` is the game-facing item system backed by a `ResourceBag`, with known item IDs, per-item capacity, modifier-driven capacity, and optional auto-persistence.
 
-**GameLoop vs Loop vs RunPool.** `GameLoop` is the engine tick scheduler. `Loop` is a gameplay primitive for loop-incremental runs with reset scope and lifecycle events. `RunPool` manages many opaque concurrent runs, each with its own step/death lifecycle. If the question is "how does time advance?", start at `GameLoop`; if it is "restart this gameplay run", start at `Loop`; if it is "track many independent run instances", start at `RunPool`.
+**TickDriver vs Loop vs RunPool.** `TickDriver` is the engine tick scheduler. `Loop` is a gameplay primitive for loop-incremental runs with reset scope and lifecycle events. `RunPool` manages many opaque concurrent runs, each with its own step/death lifecycle. If the question is "how does time advance?", start at `TickDriver`; if it is "restart this gameplay run", start at `Loop`; if it is "track many independent run instances", start at `RunPool`.
 
 **Sequencer vs advisor.** A sequencer owns ordered dispatch: queues, rotations, fill strategies, and current item state. Advisors rank or recommend choices based on observed state. If the system must remember what is currently scheduled, use a sequencer. If it only needs to choose or recommend from candidates, use advisors or selection policies.
 
@@ -641,7 +641,7 @@ Native runtime is the default — pick it for content authored as `DialogGraph` 
 
 `createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `Gate` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — per-variant builders and per-variant instance interfaces are `@internal`. Reach instances through `cat.getInstance<'scalar'>(id)`; the generic narrows the return to the matching variant. Type locals as `ReturnType<typeof cat.getInstance<'scalar'>>` when needed.
 
-Cross-cutting concerns the variants don't carry — time decay, auto-advance, loop-temporary layers — aren't schema fields. Compose them at the consumer: a `GameLoop` tick handler that calls `instance.add(actor, -rate * dt)` for decay, `instance.tryAdvance(actor)` for auto-advance, a separate registration with a `Resettable` scope for the temporary layer. Variant defs stay shape-only; engine substrate handles the rest.
+Cross-cutting concerns the variants don't carry — time decay, auto-advance, loop-temporary layers — aren't schema fields. Compose them at the consumer: a `TickDriver` tick handler that calls `instance.add(actor, -rate * dt)` for decay, `instance.tryAdvance(actor)` for auto-advance, a separate registration with a `Resettable` scope for the temporary layer. Variant defs stay shape-only; engine substrate handles the rest.
 
 ### When dialog and relationships connect
 

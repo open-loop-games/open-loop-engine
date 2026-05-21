@@ -30,7 +30,7 @@ export {
 
 // === MODULE SYSTEM ===
 
-import { createGameLoop } from './core/game-loop';
+import { createTickDriver } from './core/tick-driver';
 import { createSaveManager } from './core/save-manager';
 import {
   withPersistentContext,
@@ -63,7 +63,7 @@ import {
   type EngineCategories,
 } from './systems/engine-categories';
 
-import type { GameLoop, TimerProvider } from './core/game-loop';
+import type { TickDriver, TimerProvider } from './core/tick-driver';
 import type { SaveManager, SaveLoadResult, SavePeek, StorageAdapter } from './core/save-manager';
 
 /** Callback invoked every game tick with the elapsed delta time in seconds. */
@@ -100,8 +100,10 @@ export interface EngineEvents {}
 // === BUILT-IN INJECTION KEYS ===
 // Engine services pre-provided before any module installs.
 
-/** Inject the game loop instance. Always available. */
-export const GameLoopKey: InjectionKey<GameLoop> = Symbol('engine:loop') as InjectionKey<GameLoop>;
+/** Inject the TickDriver instance. Always available. */
+export const TickDriverKey: InjectionKey<TickDriver> = Symbol(
+  'engine:tick-driver',
+) as InjectionKey<TickDriver>;
 
 /** Inject the save manager. Available when `persistence` is not `false`. */
 export const SaveManagerKey: InjectionKey<SaveManager> = Symbol(
@@ -224,7 +226,7 @@ export interface ModDef {
 
 /**
  * Configuration passed to {@link createEngine}. `gameId` is required; every
- * other field tunes loop timing, save behavior, mod support, or persistence
+ * other field tunes tick cadence, save behavior, mod support, or persistence
  * namespacing.
  */
 export interface EngineConfig {
@@ -236,7 +238,7 @@ export interface EngineConfig {
   /**
    * dt handling mode. `'variable'` (default) passes real elapsed dt to callbacks.
    * `'fixed'` accumulates and drains at `stepSize` per sub-tick — for source-faithful
-   * ports with clamp-on-overshoot tick math. See `createGameLoop` for details.
+   * ports with clamp-on-overshoot tick math. See `createTickDriver` for details.
    */
   tickMode?: 'variable' | 'fixed';
   /** Seconds per sub-tick in fixed mode. Defaults to `1 / tickRate`. */
@@ -246,7 +248,7 @@ export interface EngineConfig {
   /** Diagnostic callback when fixed-mode `intervalTick` drops sub-steps. */
   onStepsOverflow?: (droppedSteps: number) => void;
   /**
-   * Custom timer functions for scheduling the game loop and autosave.
+   * Custom timer functions for scheduling the TickDriver and autosave.
    * Pass `worker-timers` functions for background-tab immunity.
    * Defaults to native setInterval/clearInterval.
    */
@@ -313,7 +315,7 @@ export interface Engine {
   start(): void;
   stop(): void;
   /**
-   * Tear down the engine: stop the loop and release every persistent context
+   * Tear down the engine: stop the TickDriver and release every persistent context
    * this engine registered under its `persistenceNamespace`. Required when a
    * fresh engine sharing the same module ids will be constructed in the same
    * page-lifetime — e.g. the gallery sandbox remounting an archetype. Save
@@ -328,7 +330,7 @@ export interface Engine {
   save(): void;
   /** Load game state, firing all onLoad callbacks after. */
   load(): SaveLoadResult;
-  readonly loop: GameLoop;
+  readonly tickDriver: TickDriver;
   readonly saveManager: SaveManager | undefined;
   /**
    * The module set registered via `use()` plus any mod modules appended at
@@ -376,19 +378,19 @@ export interface Engine {
    * {@link EngineConfig.autoSaveInterval} but is mutable at runtime —
    * setting it re-arms the autosave timer with the new period (or stops
    * it when set to 0). No effect when `persistence: false` was passed to
-   * {@link createEngine}. Symmetric to `engine.loop.tickRate`.
+   * {@link createEngine}. Symmetric to `engine.tickDriver.tickRate`.
    */
   autoSaveInterval: number;
 }
 
 /**
- * Creates the top-level engine orchestrator that wires together the game loop,
+ * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
  *
- * @param config - Engine configuration including game ID, loop settings, persistence
+ * @param config - Engine configuration including game ID, TickDriver settings, persistence
  *   options, and available mods
  * @returns An engine instance that accepts modules via `use()`, then `start()` to begin
- *   ticking. Exposes the game loop, save manager, and mod selection.
+ *   ticking. Exposes the TickDriver, save manager, and mod selection.
  *
  * @example
  * ```ts
@@ -411,7 +413,7 @@ export function createEngine(config: EngineConfig): Engine {
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };
 
-  const loop = createGameLoop({
+  const tickDriver = createTickDriver({
     tickRate: config.tickRate,
     maxDeltaTime: config.maxDeltaTime,
     speedMultiplier: config.speedMultiplier,
@@ -500,7 +502,7 @@ export function createEngine(config: EngineConfig): Engine {
   }
 
   const engine: Engine = {
-    loop,
+    tickDriver,
     saveManager,
     save() {
       performSave();
@@ -521,7 +523,7 @@ export function createEngine(config: EngineConfig): Engine {
         const eventBus = createEmitHandle<EngineEvents>();
 
         const sharedContext: EngineContext = {
-          onTick: (cb) => loop.onTick(cb),
+          onTick: (cb) => tickDriver.onTick(cb),
           onSave: (cb) => saveCallbacks.push(cb),
           onLoad: (cb) => loadCallbacks.push(cb),
           onReset: (cb) => resetCallbacks.push(cb),
@@ -566,7 +568,7 @@ export function createEngine(config: EngineConfig): Engine {
         const tuningRegistries = new Set<TuningRegistry>();
 
         // Pre-provide engine services before any module installs
-        sharedContext.provide(GameLoopKey, loop);
+        sharedContext.provide(TickDriverKey, tickDriver);
         if (saveManager) sharedContext.provide(SaveManagerKey, saveManager);
         sharedContext.provide(ChainRegistryKey, chainRegistry);
         sharedContext.provide(EffectSystemRegistryKey, effectSystemRegistry);
@@ -628,11 +630,11 @@ export function createEngine(config: EngineConfig): Engine {
         installed = true;
       }
 
-      loop.start();
+      tickDriver.start();
       startAutoSaveTimer();
     },
     stop() {
-      loop.stop();
+      tickDriver.stop();
       stopAutoSaveTimer();
     },
     dispose() {
@@ -680,10 +682,10 @@ export function createEngine(config: EngineConfig): Engine {
     set autoSaveInterval(value: number) {
       autoSaveInterval = value;
       // Re-arm the timer: stop the old (if any), start the new (if running
-      // and value > 0). Mirrors loop.tickRate's restart-when-running shape.
+      // and value > 0). Mirrors tickDriver.tickRate's restart-when-running shape.
       const wasRunning = autoSaveTimer !== null;
       stopAutoSaveTimer();
-      if (wasRunning || (installed && loop.running)) {
+      if (wasRunning || (installed && tickDriver.running)) {
         startAutoSaveTimer();
       }
     },

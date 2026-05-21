@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createEngine,
   persistent,
-  GameLoopKey,
+  TickDriverKey,
   SaveManagerKey,
   CategoriesKey,
   ChainRegistryKey,
@@ -453,19 +453,19 @@ describe('provide/inject', () => {
 });
 
 describe('built-in injection keys', () => {
-  it('GameLoopKey is pre-provided and injectable', () => {
-    let loopRef: unknown;
+  it('TickDriverKey is pre-provided and injectable', () => {
+    let driverRef: unknown;
     const mod: EngineModule = {
-      id: 'loop-consumer',
+      id: 'tick-driver-consumer',
       install(ctx) {
-        loopRef = ctx.inject(GameLoopKey);
+        driverRef = ctx.inject(TickDriverKey);
       },
     };
     const engine = createEngine({ gameId: 'test', persistence: false });
     engine.use(mod);
     engine.start();
-    expect(loopRef).toBeDefined();
-    expect(loopRef).toBe(engine.loop);
+    expect(driverRef).toBeDefined();
+    expect(driverRef).toBe(engine.tickDriver);
     engine.stop();
   });
 
@@ -1124,7 +1124,7 @@ describe('autoSaveInterval — runtime-tunable', () => {
       timerProvider: timers,
     });
     engine.start();
-    // Only the game-loop setInterval should fire; autosave should be inert.
+    // Only the TickDriver setInterval should fire; autosave should be inert.
     expect(timers.setInterval.mock.calls.filter((c) => c[1] === 5000)).toHaveLength(0);
 
     engine.autoSaveInterval = 10000;

@@ -3,7 +3,7 @@
  *
  * `runHeadless` takes a tick callback and a fixed tick budget. `runUntil`
  * takes an `Engine` and a predicate, driving the engine via
- * `engine.loop.simulateTick(tickDelta)` until the predicate fires or
+ * `engine.tickDriver.simulateTick(tickDelta)` until the predicate fires or
  * `maxSimTime` is reached. Headless beat-timing tests (archetype sim
  * suites) are the canonical consumer — they want "how long does it take
  * for state X to hold?" rather than "what does state look like after N
@@ -44,7 +44,7 @@ import { runEventModeLoop, isStasis } from './run-until-helpers/event-mode';
 import type { RunUntilConfig, RunUntilResult } from './types';
 
 /**
- * Drive `config.engine` via `engine.loop.simulateTick(tickDelta)` until
+ * Drive `config.engine` via `engine.tickDriver.simulateTick(tickDelta)` until
  * `config.until` returns `true` or `config.maxSimTime` sim-seconds have
  * elapsed, whichever comes first. Returns the tick count, elapsed sim-time,
  * termination reason, and analyzer results.
@@ -114,7 +114,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
       }
     }
     if (tick === maxTicks) break;
-    engine.loop.simulateTick(tickDelta);
+    engine.tickDriver.simulateTick(tickDelta);
     tick++;
     for (const a of analyzers) a.onTick?.(tick - 1);
   }

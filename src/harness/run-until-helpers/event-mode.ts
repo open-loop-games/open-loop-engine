@@ -10,7 +10,7 @@
  *
  * 1. {@link createIncrementalSnapshot} each iteration — finite-distance head is
  *    the next walker-visible event.
- * 2. {@link advanceToNextEvent} drives `engine.loop.simulateTick(dt)` with
+ * 2. {@link advanceToNextEvent} drives `engine.tickDriver.simulateTick(dt)` with
  *    `dt = smallest finite distance`. The engine must be built with
  *    `maxDeltaTime` raised to cover the largest expected advance — otherwise
  *    `simulateTick` clamps and the loop degrades toward fixed-tick.
@@ -92,7 +92,7 @@ export function advanceToNextEvent(
     else break;
   }
 
-  engine.loop.simulateTick(dt);
+  engine.tickDriver.simulateTick(dt);
   return { advanced: dt, fired };
 }
 
@@ -255,7 +255,7 @@ export function runEventModeLoop(
       const dt = Math.min(tickDelta, remaining);
       if (dt <= 0) break;
       const opaqueStart = profileStart();
-      engine.loop.simulateTick(dt);
+      engine.tickDriver.simulateTick(dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
       const after = sampleDeps(inc, accessor);
@@ -334,7 +334,7 @@ function fastTickDuringStasis(
     const remaining = maxSimTime - simTime;
     const dt = Math.min(tickDelta, remaining);
     if (dt <= 0) break;
-    engine.loop.simulateTick(dt);
+    engine.tickDriver.simulateTick(dt);
     simTime += dt;
     ticks++;
 
@@ -370,7 +370,7 @@ function fastTickDuringTie(
     const remaining = maxSimTime - simTime;
     const dt = Math.min(tickDelta, remaining);
     if (dt <= 0) break;
-    engine.loop.simulateTick(dt);
+    engine.tickDriver.simulateTick(dt);
     simTime += dt;
     ticks++;
 
@@ -436,7 +436,7 @@ function bisectFireTime(
     const mid = (low + high) / 2;
     engine.saveManager!.importSave(checkpoint.blob);
     setRNGState(checkpoint.rng);
-    engine.loop.simulateTick(mid);
+    engine.tickDriver.simulateTick(mid);
     if (predicate({ tick: 0, simTime: mid })) high = mid;
     else low = mid;
   }
@@ -444,7 +444,7 @@ function bisectFireTime(
   // the run ends in the fired state rather than a bisect intermediate.
   engine.saveManager!.importSave(checkpoint.blob);
   setRNGState(checkpoint.rng);
-  engine.loop.simulateTick(high);
+  engine.tickDriver.simulateTick(high);
   return high;
 }
 

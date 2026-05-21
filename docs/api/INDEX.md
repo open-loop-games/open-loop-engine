@@ -41,7 +41,7 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 - `content-systems.md` — Currency-flow and long-arc structure systems — the validated incremental-game primitives. Purchasable / Producer / Achievement / Inventory / BestOf for economy; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog for progression. Each is a typed registration surface over the mechanics kernel; category factories batch-register many definitions.
 - `content-narrative.md` — Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Relationship (five typed sub-primitives: scalar / faction / tiered / vector / flag). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
-- `runtime.md` — The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the game loop (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
+- `runtime.md` — The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
 - `introspection.md` — The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.
 - `advisors.md` — Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
 - `spatial.md` — Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal.
@@ -51,12 +51,10 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 
 A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
-- **GameLoop** — engine tick scheduler. `createGameLoop`. → runtime.md#game-loop
 - **Loop** — loop-incremental gameplay run (Idle Loops, Cavernous, Loopy Loops). `createLoop`. → content-systems.md#loop
 - **LoopLog** — per-loop metric delta recorder; observes a `Loop`'s lifecycle. `createLoopLog`. → content-systems.md#looplog
 - **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.
-
-In prose: "Loop" alone always means the gameplay primitive. Engine substrate is always "GameLoop." Tick-cadence concepts are "tick" or "frame," never "loop."
+- **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine's `TickDriver` (tick scheduler).
 
 ## Task → tier
 
@@ -133,7 +131,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **relationship variants** — five `kind` dispatches: scalar / faction / tiered / vector / flag → content-narrative.md#relationship, ../consumer-guide.md#relationships-one-category-five-typed-sub-primitives
 - **best-of run recording** — per-metric best with optional projection, BestOf events → content-systems.md#bestof-tracker
 - **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
-- **Loop disambiguation** — `GameLoop` (runtime) vs `Loop` (gameplay) vs `LoopLog` (metrics) — same stem, three meanings → INDEX.md#reserved-names
+- **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
 - **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation
 
 ## Common disambiguators
@@ -147,7 +145,7 @@ Short answers only; consumer-level reasoning lives in ../consumer-guide.md#commo
 | Observed milestone that auto-earns | `createAchievement` / `createAchievementCategory` → content-systems.md#achievement |
 | Generic multi-resource container | `createResourceBag` → resources.md#resource |
 | Game-facing item inventory with capacities | `createInventory` → content-systems.md#inventory |
-| Engine tick scheduler | `createGameLoop` → runtime.md#game-loop |
+| Engine tick scheduler | `createTickDriver` → runtime.md#tick-driver |
 | Loop-incremental gameplay run | `createLoop` → content-systems.md#loop |
 | Many opaque concurrent runs | `createRunPool` → harness.md#runpool |
 | Ordered schedule or persona dispatch | `createSequencer` and fill strategies → composition.md#sequencer |
@@ -224,7 +222,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 ### Lifecycle
 
-- `offline` — catch-up progress by replaying elapsed seconds through the game loop in chunks → lifecycle.md#offline
+- `offline` — catch-up progress by replaying elapsed seconds through the TickDriver in chunks → lifecycle.md#offline
 - `persistence` — auto-saved refs with context-scoped registration → lifecycle.md#persistence
 - `reset` — prestige and layer mechanics → lifecycle.md#reset
 - `resettable` — opt-in interface for objects that can yield their resettable contents to _resetObject_ in the reset system → lifecycle.md#resettable-protocol
@@ -235,7 +233,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 - `engine` — top-level facade composing every layer → runtime.md#engine-entrypoint
 - `events` — Typed per-instance event emitter primitive → runtime.md#events
-- `game-loop` — worker-timer scheduled loop with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and… → runtime.md#game-loop
+- `tick-driver` — worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard)… → runtime.md#tickdriver
 - `game-state-accessor` — the fifth cross-cutting ambient scope alongside chain registry, effect-system registry, resource registry, and… → runtime.md#ambient-game-state-accessor-context
 - `throttle` — lightweight tick-callback rate limiter → runtime.md#throttle
 - `time` — persistent elapsed/total play time and reactive speed multiplier → runtime.md#time-tracking

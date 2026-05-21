@@ -218,8 +218,8 @@ export function createResource<T>(
           lifetime: true,
         });
 
-        // flush: 'sync' so sim harnesses driving engine.loop.stepOnce() in a
-        // tight loop (no microtask boundary between ticks) still observe
+        // flush: 'sync' so sim harnesses driving engine.tickDriver.stepOnce()
+        // in a tight loop (no microtask boundary between ticks) still observe
         // updates on the same tick the source resource changed.
         watch(
           resource as Ref<DecimalSource>,
