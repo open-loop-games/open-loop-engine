@@ -146,31 +146,44 @@ If a category's `map*` is fighting you — the shape is too different, the timin
 
 This is the normal path for one-off constructs, not a failure. The engine's systems layer composes from these same primitives — dropping down gives you the same building blocks with full control. For the purchasable family specifically, the three-path table above resolves most "category or raw?" questions; reach here for the rest.
 
-### Level 4: Declarative conditions and effects (the data-driven escape hatch)
+### Level 4: Declarative gates and effects (the data-driven escape hatch)
 
-`ICondition` / `C` builder / `GameStateAccessor` and `IEffect` / `E` builder / `GameStateMutator` are the engine's data-driven evaluation system. Conditions and effects are plain data objects — no closures, no typed refs — evaluated by pure functions against an accessor.
+`Gate` is the typed predicate-spec data shape; `IEffect` / `E` builder / `GameStateMutator` are the matching write side. Gates and effects are plain data objects — no closures, no typed refs — evaluated through pure functions against the engine's ambient runtime (accessor + categories + registry) or applied via the mutator.
 
 ```ts
-// Data-driven: string IDs resolved at evaluation time
-C.resource('wood', 'gte', 50)
-C.and(C.resource('gold', 'gte', 10), C.unlock('forest'))
+// Data-driven: typed Gate AST, evaluated through the ambient runtime
+{ kind: 'resource-gte', resource: 'wood', value: 50 }
+{
+  kind: 'all',
+  of: [
+    { kind: 'resource-gte', resource: 'gold', value: 10 },
+    { kind: 'flag', id: 'forest' },
+  ],
+}
 ```
+
+Gate kinds split into two flavors:
+
+- **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) — declarative against the accessor, predictor-friendly distance via `timeUntilGateFlip` where the kind admits it.
+- **Category-aware leaves** (`count-gte`, `unlock`) — read through `CategoryEntrySignals`, opaque-predicate distance. Use when the unlock or count *is* a registered category entry.
+
+Combinators (`all`, `any`, `not`) compose either flavor.
 
 **When to use this level:**
 
 - Save-file replay or headless simulation where typed refs don't exist
 - Mod configs loaded from JSON/YAML where closures can't be serialized
-- Balance-sim tools that need to evaluate conditions without instantiating game state
+- Balance-sim tools that need to evaluate predicates without instantiating game state
 - Content-registry patches that override behavior via data, not code
 
 **When NOT to use this level:**
 
-- When you have direct typed references in scope. A challenge that checks `hasResource(wood, 50)` is clearer than `C.resource('wood', 'gte', 50)` when you're holding `wood` already.
-- When the condition involves game logic that doesn't map to resource/unlock/state checks.
+- When you have direct typed references in scope. A challenge that checks `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }` when you're holding `wood` already.
+- When the predicate involves game logic that doesn't map to one of Gate's kinds.
 
-**Runtime collection queries — use the accessor, not a new condition type.** Unlock predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateCondition` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A borglike-style "killed ≥5 goblins" check becomes `C.state('bestiary.goblin.kills', 'gte', 5)` with an accessor that walks `bestiary[goblin].kills`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
+**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A borglike-style "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }` with an accessor that walks `bestiary[goblin].kills`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
 
-A `CustomCondition` with a user-provided predicate is deliberately *not* part of the union: it would break `C`-builder serializability and `extractDependencies` reactive dep extraction. When neither `StateCondition` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed closure game-side (see idle-loops-ng's `data/builders.ts` pattern) and keep it out of `ICondition` entirely.
+A custom-predicate Gate kind (one carrying a closure) is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed closure game-side via `Computable<boolean>` on fields that accept that union arm (see idle-loops-ng's `data/builders.ts` pattern) and keep it out of `Gate` entirely.
 
 The typed path (levels 1-3) is the default for game modules. The data-driven path is for systems that need to operate on game state *generically* — without knowing the specific game's types at compile time.
 
@@ -556,7 +569,7 @@ Dialog content is a graph of nodes with text, gates, choices, and outcomes. The 
 
 - An authored data shape (`DialogGraph` — `DialogNode[]` with an `entry` pointer) — declarative, serializable, no closures.
 - An adapter contract (`DialogRuntime`) — anything that can drive a conversation: `start` / `present` / `choose` / `finish` plus `exportState` / `importState`.
-- A native runtime implementation (`createNativeDialogRuntime`) that walks `DialogGraph` nodes, evaluates `ICondition` gates, dispatches `IEffect` outcomes, and maintains visit counts.
+- A native runtime implementation (`createNativeDialogRuntime`) that walks `DialogGraph` nodes, evaluates `Gate` predicates on choices/nodes through the ambient Gate runtime, dispatches `IEffect` outcomes, and maintains visit counts.
 - A registration surface (`createDialogCategory`, `createDialogSession`) that wraps the runtime in a persistent envelope and emits `presented` / `chosen` / `finished` events.
 
 The contract is the boundary. External adapters — Ink (Inkle), Yarn Spinner, Ren'Py, Dialogic — implement `DialogRuntime` against their own content shape and runtime. They live as separate consumer packages (e.g. a hypothetical `open-loop-ink-adapter`); the engine never depends on any specific framework. To swap an adapter into a session, pass it through `createDialogSession`'s `runtimeFactory` option:
@@ -573,15 +586,15 @@ Native runtime is the default — pick it for content authored as `DialogGraph` 
 
 ### Relationships: one category, five typed sub-primitives
 
-`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `ICondition` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — per-variant builders and per-variant instance interfaces are `@internal`. Reach instances through `cat.getInstance<'scalar'>(id)`; the generic narrows the return to the matching variant. Type locals as `ReturnType<typeof cat.getInstance<'scalar'>>` when needed.
+`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `Gate` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — per-variant builders and per-variant instance interfaces are `@internal`. Reach instances through `cat.getInstance<'scalar'>(id)`; the generic narrows the return to the matching variant. Type locals as `ReturnType<typeof cat.getInstance<'scalar'>>` when needed.
 
 Cross-cutting concerns the variants don't carry — time decay, auto-advance, loop-temporary layers — aren't schema fields. Compose them at the consumer: a `GameLoop` tick handler that calls `instance.add(actor, -rate * dt)` for decay, `instance.tryAdvance(actor)` for auto-advance, a separate registration with a `Resettable` scope for the temporary layer. Variant defs stay shape-only; engine substrate handles the rest.
 
 ### When dialog and relationships connect
 
-Both surfaces share the engine's existing condition/effect machinery. A dialog node gates on relationship state through the standard `StateCondition` path: `C.state('rel.npc-trust.mentor-rask.tier', 'gte', 2)`. A choice writes back through `E.state('rel.npc-trust.mentor-rask.tier', 'set', 3)`. The reserved path conventions are documented in `src/primitives/types.ts`.
+Both surfaces share the engine's predicate / effect machinery. A dialog node gates on relationship state through the typed `StateGate` path: `{ kind: 'state', key: 'rel.npc-trust.mentor-rask.tier', operator: 'gte', value: 2 }`. A choice writes back through `E.state('rel.npc-trust.mentor-rask.tier', 3)` — the predicate side is Gate (typed AST); the effect side is still the `E` builder (consumer-facing). The reserved path conventions are documented in `src/primitives/types.ts`.
 
-Bespoke relationship-aware atoms (`C.relationship` / `E.relationship`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics. The relevant `TODO(expansion)` is co-located with the relationship category.
+Bespoke relationship-aware atoms (a `RelationshipGate` kind / `E.relationship`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics. The relevant `TODO(expansion)` is co-located with the relationship category.
 
 ## Introspection
 
@@ -610,6 +623,6 @@ The engine evolves as consumers use it. Two signals:
 
 **`TODO(ergonomics)`** — a working but verbose path. When two independent consumers build the same wrapper around the same ceremony, that's the signal to promote it to engine sugar. One consumer's wrapper is a game-side helper; two is a missing engine primitive.
 
-**The 10% threshold** — the data-driven escape hatch (level 4) is designed for the ~10% of game logic that a generic engine can't express in typed systems. If your game is spending more than 10% of its module code in `ICondition`/`C`/`GameStateAccessor` territory, that's a signal: either the engine needs a new typed system for the pattern you're expressing, or the existing system needs a higher-level entry point. File a research ticket, not a workaround.
+**The 10% threshold** — the data-driven escape hatch (level 4) is designed for the ~10% of game logic that a generic engine can't express in typed systems. If your game is spending more than 10% of its module code in `Gate` / `GameStateAccessor` territory, that's a signal: either the engine needs a new typed system for the pattern you're expressing, or the existing system needs a higher-level entry point. File a research ticket, not a workaround.
 
 The test from [CLAUDE.md](../CLAUDE.md): if you'd copy-paste the same wiring between two different games, it belongs in the engine. If it only makes sense for one game's design, it stays game-side. If it has no opinion about game design at all, it's core.
