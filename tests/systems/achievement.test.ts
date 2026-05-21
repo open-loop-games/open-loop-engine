@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { createAchievement, createTieredAchievement } from '@/systems/achievement';
+import { createAchievement } from '@/systems/achievement';
+import {
+  createAchievementCategory,
+  type BaseTieredAchievementDef,
+} from '@/systems/achievement-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import Formula from '@/core/formulas/formulas';
 
@@ -53,10 +57,23 @@ describe('Achievement', () => {
   });
 });
 
-describe('createTieredAchievement', () => {
+// Helper: build a category that maps the base tiered Def directly into
+// AchievementOptions for `registerTiered` tests.
+function makeTieredCategory(id: string) {
+  return createAchievementCategory<BaseTieredAchievementDef>({
+    id,
+    mapAchievement: (def) => ({
+      display: { title: def.title, description: def.description },
+      requirement: def.requirement,
+    }),
+  });
+}
+
+describe('AchievementCategory.registerTiered', () => {
   it('earns tiers in order as static thresholds are crossed', async () => {
     const gold = ref<DecimalSource>(0);
-    const achievements = createTieredAchievement({
+    const cat = makeTieredCategory('gold-hoarder-cat');
+    const achievements = cat.registerTiered({
       baseId: 'gold-hoarder',
       baseName: 'Gold Hoarder',
       getValue: () => gold.value,
@@ -82,7 +99,8 @@ describe('createTieredAchievement', () => {
     // Threshold grows with prestige count: 100 * prestige^2
     const dynamicThreshold = Formula.variable(prestige).pow(2).mul(100);
 
-    const [ach] = createTieredAchievement({
+    const cat = makeTieredCategory('scaling-hoarder-cat');
+    const [ach] = cat.registerTiered({
       baseId: 'scaling-hoarder',
       baseName: 'Scaling Hoarder',
       getValue: () => gold.value,
@@ -92,13 +110,14 @@ describe('createTieredAchievement', () => {
     // prestige=1 → threshold=100
     gold.value = 150;
     await nextTick();
-    expect(ach.earned.value).toBe(true);
+    expect(ach!.earned.value).toBe(true);
 
     // Separate instance with prestige=2 — threshold=400
     const gold2 = ref<DecimalSource>(0);
     const prestige2 = ref<DecimalSource>(2);
     const threshold2 = Formula.variable(prestige2).pow(2).mul(100);
-    const [ach2] = createTieredAchievement({
+    const cat2 = makeTieredCategory('scaling-hoarder-2-cat');
+    const [ach2] = cat2.registerTiered({
       baseId: 'scaling-hoarder-2',
       baseName: 'Scaling Hoarder',
       getValue: () => gold2.value,
@@ -106,16 +125,17 @@ describe('createTieredAchievement', () => {
     });
     gold2.value = 300; // under 400
     await nextTick();
-    expect(ach2.earned.value).toBe(false);
+    expect(ach2!.earned.value).toBe(false);
     gold2.value = 500;
     await nextTick();
-    expect(ach2.earned.value).toBe(true);
+    expect(ach2!.earned.value).toBe(true);
   });
 
   it('Formula threshold with no variable works as a constant', async () => {
     const gold = ref<DecimalSource>(0);
     const staticFormula = Formula.constant(new Decimal(250));
-    const [ach] = createTieredAchievement({
+    const cat = makeTieredCategory('const-formula-cat');
+    const [ach] = cat.registerTiered({
       baseId: 'const-formula',
       baseName: 'Const Formula',
       getValue: () => gold.value,
@@ -123,9 +143,9 @@ describe('createTieredAchievement', () => {
     });
     gold.value = 249;
     await nextTick();
-    expect(ach.earned.value).toBe(false);
+    expect(ach!.earned.value).toBe(false);
     gold.value = 250;
     await nextTick();
-    expect(ach.earned.value).toBe(true);
+    expect(ach!.earned.value).toBe(true);
   });
 });

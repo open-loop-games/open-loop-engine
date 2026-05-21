@@ -16,22 +16,24 @@ Start with these public symbols before scanning the full inventory below.
 
 milestone tracking with auto-unlock and tiered rewards
 
-- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:103`
-- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:105`
-- `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:92`
-- `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` — Options for createAchievementCategory. `src/systems/achievement-category.ts:60`
-- `const AchievementCategoryType: unique symbol` — Symbol identifying AchievementCategory features. `src/systems/achievement-category.ts:51`
-- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:39`
-- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:172`
-- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
-- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:36`
-- `function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T>` — Create an achievement — a once-and-stay-earned milestone with optional reactive effect and auto-completing requirement watch. `src/systems/achievement.ts:206`
-- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:173`
-- `function createSimpleAchievement<T = unknown>(id: string, title: string, description: string, requirement: Computable<boolean> | Gate, effect?: T): Achievement<T>` — Positional shorthand over createAchievement for the common case of a one-line title + description and a single boolean requirement. `src/systems/achievement.ts:336`
-- `function createTieredAchievement<T = number>(options: TieredAchievementOptions<T>): Achievement<T>[]` — Creates a series of achievements from threshold tiers, each auto-wired to complete when `getValue()` reaches its tier's threshold. `src/systems/achievement.ts:374`
-- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:409`
-- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:425`
-- `interface TieredAchievementOptions<T = number>` — Options for createTieredAchievement. `src/systems/achievement.ts:142`
+- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:101`
+- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:194`
+- `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:95`
+- `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` — Options for createAchievementCategory. `src/systems/achievement-category.ts:63`
+- `const AchievementCategoryType: unique symbol` — Symbol identifying AchievementCategory features. `src/systems/achievement-category.ts:54`
+- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:37`
+- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:142`
+- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:55`
+- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:34`
+- `interface BaseTieredAchievementDef` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:108`
+- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:277`
+- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:275`
+- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:291`
+- `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:141`
+- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — Optional `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:173`
+- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:158`
+- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:183`
+- `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:119`
 
 ## Automation tiers
 

@@ -90,8 +90,18 @@ export * from './purchasable-category';
 
 // === ACHIEVEMENTS ===
 // Milestone tracking with auto-unlock conditions and tiered rewards.
-// AchievementCategory: batch-register Achievements from content definitions.
-export * from './achievement';
+// AchievementCategory: batch-register Achievements from content definitions,
+// with `registerTiered` for threshold-ladder fanout. Raw `createAchievement`
+// is @internal — consumers use the category factory.
+export {
+  AchievementType,
+  getCombinedAchievementEffect,
+  getEarnedCount,
+  type Achievement,
+  type AchievementDisplay,
+  type AchievementEvents,
+  type AchievementOptions,
+} from './achievement';
 export * from './achievement-category';
 
 // === PRODUCERS ===

@@ -18,13 +18,13 @@ import {
   createGateRequirement,
   createReset,
   createResource,
-  createSimpleAchievement,
   createCostRequirement,
   requirementsMet,
   type EngineModule,
   type GameStateAccessor,
   type Resource,
 } from '@/index';
+import { createAchievement } from '@/systems/achievement';
 import { resetAllPersistentContexts } from '@/core/persistence';
 
 beforeEach(() => {
@@ -88,10 +88,14 @@ interface BootstrapApi {
 describe('Achievement adoption — requirement accepts Gate', () => {
   it('auto-earns when a resource-gte Gate first holds', () => {
     const { result, stop } = bootstrap((api) => {
-      const ach = createSimpleAchievement('rich', 'Rich', '100 points', {
-        kind: 'resource-gte',
-        resource: 'points',
-        value: 100,
+      const ach = createAchievement({
+        id: 'rich',
+        display: { title: 'Rich', description: '100 points' },
+        requirement: {
+          kind: 'resource-gte',
+          resource: 'points',
+          value: 100,
+        },
       });
 
       expect(ach.earned.value).toBe(false);
@@ -105,12 +109,20 @@ describe('Achievement adoption — requirement accepts Gate', () => {
 
   it('exposes the Gate spec on the instance', () => {
     const { result, stop } = bootstrap(() => {
-      const gateAch = createSimpleAchievement('gated', 'Gated', '50 points', {
-        kind: 'resource-gte',
-        resource: 'points',
-        value: 50,
+      const gateAch = createAchievement({
+        id: 'gated',
+        display: { title: 'Gated', description: '50 points' },
+        requirement: {
+          kind: 'resource-gte',
+          resource: 'points',
+          value: 50,
+        },
       });
-      const closureAch = createSimpleAchievement('closure', 'Closure', 'always', () => false);
+      const closureAch = createAchievement({
+        id: 'closure',
+        display: { title: 'Closure', description: 'always' },
+        requirement: () => false,
+      });
       return { gateAch, closureAch };
     });
 
@@ -126,7 +138,11 @@ describe('Achievement adoption — requirement accepts Gate', () => {
   it('back-compat: Computable<boolean> requirements still work unchanged', () => {
     const flag = ref(false);
     const { result, stop } = bootstrap(() =>
-      createSimpleAchievement('flag', 'Flag', 'set true', flag),
+      createAchievement({
+        id: 'flag',
+        display: { title: 'Flag', description: 'set true' },
+        requirement: flag,
+      }),
     );
 
     expect(result.earned.value).toBe(false);

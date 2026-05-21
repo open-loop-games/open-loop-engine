@@ -33,6 +33,9 @@
  */
 
 import { computed, type ComputedRef } from 'vue';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import Formula from '@/core/formulas/formulas';
+import type { FormulaSource } from '@/core/formulas/types';
 import {
   setupDeclarativeBindings,
   createCategoryBase,
@@ -97,6 +100,92 @@ export interface AchievementCategoryEntry<Def extends { id: string }, State = vo
 }
 
 /**
+ * Minimum Def shape that {@link AchievementCategory.registerTiered}'s default
+ * `buildDef` can synthesize without a consumer callback. Extend this when
+ * authoring a Def type that participates in tier registration but doesn't
+ * carry consumer-specific fields beyond the base authoring contract.
+ */
+export interface BaseTieredAchievementDef {
+  id: string;
+  title: string;
+  description: string;
+  requirement: () => boolean;
+}
+
+/**
+ * One tier in a {@link TieredAchievementSpec}. Each tier becomes one
+ * Achievement registered into the category.
+ */
+export interface TieredAchievementTier<T = number> {
+  /**
+   * The value `getValue()` must reach to earn this tier.
+   *
+   * Accepts a plain `DecimalSource` for static thresholds or a
+   * {@link FormulaSource} for dynamic thresholds that scale with other game
+   * state. Formula thresholds are re-evaluated each time the tier is checked.
+   */
+  threshold: DecimalSource | FormulaSource;
+  /** Appended to `baseName` for this tier's display title (e.g. `"I"`, `"II"`). */
+  suffix: string;
+  /** Override the auto-generated description for this tier. */
+  description?: string;
+  /** Bonus value applied when this tier is earned. */
+  effect?: T;
+}
+
+/**
+ * Spec for {@link AchievementCategory.registerTiered}. Fans a single
+ * value-getter into N threshold-gated achievements, each registered into the
+ * category via the standard `register()` path.
+ */
+export interface TieredAchievementBaseSpec<T = number> {
+  /** Prefix for generated achievement IDs (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`). */
+  baseId: string;
+  /** Display name prefix shared by all tiers. */
+  baseName: string;
+  /** Reactive getter for the tracked value compared against each tier's threshold. */
+  getValue: () => DecimalSource;
+  /** Ordered list of thresholds, each producing one achievement. */
+  tiers: ReadonlyArray<TieredAchievementTier<T>>;
+}
+
+/**
+ * Parameters passed to a {@link TieredAchievementSpec.buildDef} callback.
+ * The base authoring fields (`id`/`title`/`description`/`requirement`) are
+ * synthesized from the tier spec; tier metadata (`tierIndex`, `tier`) is
+ * available for consumer Def fields that need it.
+ */
+export interface TieredAchievementBuildDefParams<T = number> {
+  id: string;
+  title: string;
+  description: string;
+  requirement: () => boolean;
+  tierIndex: number;
+  tier: TieredAchievementTier<T>;
+}
+
+/**
+ * Optional `buildDef` callback type for the `registerTiered` spec. Required
+ * when the category's `Def` shape has fields beyond
+ * {@link BaseTieredAchievementDef}; optional otherwise (default builds a
+ * base-shape Def).
+ */
+export type TieredAchievementBuildDef<Def, T = number> = (
+  params: TieredAchievementBuildDefParams<T>,
+) => Def;
+
+/**
+ * `registerTiered` parameter type. Carries the spec plus a `buildDef` that
+ * is *required* when `Def` widens beyond {@link BaseTieredAchievementDef}
+ * and *optional* (default = identity over base fields) when `Def` is the
+ * base shape.
+ */
+export type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> &
+  (Def extends BaseTieredAchievementDef
+    ? { buildDef?: TieredAchievementBuildDef<Def, T> }
+    : { buildDef: TieredAchievementBuildDef<Def, T> });
+
+/**
  * An achievement category — batch-registered Achievements with a shared shape.
  *
  * @typeParam Def - Content definition type
@@ -118,6 +207,21 @@ export interface AchievementCategory<
    * Can be called multiple times (base game + mods).
    */
   register(defs: Def | Def[]): void;
+
+  /**
+   * Fan a single value-getter into N threshold-gated achievements, each
+   * registered into this category through the standard `register()` path.
+   *
+   * Each tier becomes one `Def` (via the spec's `buildDef`, or a default
+   * identity over `{id, title, description, requirement}` when the
+   * category's `Def` is the base shape). The resulting achievements appear
+   * in `getAll()`, `registry`, reset traversal, and EngineCategories walks
+   * just like normal entries.
+   *
+   * @returns The tier achievements in tier order, suitable for binding
+   *   directly (e.g. `getEarnedCount(tiers)`) without re-querying.
+   */
+  registerTiered<T = number>(spec: TieredAchievementSpec<Def, T>): Achievement<T>[];
 
   /** Get the Achievement instance for a definition ID */
   getAchievement(id: string): Achievement | undefined;
@@ -206,6 +310,46 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     register: base.register,
     getDef: base.getDef,
 
+    registerTiered<T = number>(spec: TieredAchievementSpec<Def, T>): Achievement<T>[] {
+      const { baseId, baseName, getValue, tiers } = spec;
+      const buildDef = (spec as { buildDef?: TieredAchievementBuildDef<Def, T> }).buildDef;
+
+      const defs: Def[] = [];
+      for (let index = 0; index < tiers.length; index++) {
+        const tier = tiers[index]!;
+        const tierId = `${baseId}-${index + 1}`;
+        const isFormulaThreshold = tier.threshold instanceof Formula;
+        const evalThreshold = (): DecimalSource =>
+          isFormulaThreshold
+            ? (tier.threshold as InstanceType<typeof Formula>).evaluate()
+            : (tier.threshold as DecimalSource);
+        const formatted = formatThreshold(new Decimal(evalThreshold()));
+
+        const params: TieredAchievementBuildDefParams<T> = {
+          id: tierId,
+          title: `${baseName} ${tier.suffix}`,
+          description: tier.description ?? `Reach ${formatted}`,
+          requirement: () => Decimal.gte(getValue(), evalThreshold()),
+          tierIndex: index,
+          tier,
+        };
+
+        const def = buildDef
+          ? buildDef(params)
+          : ({
+              id: params.id,
+              title: params.title,
+              description: params.description,
+              requirement: params.requirement,
+            } as unknown as Def);
+        defs.push(def);
+      }
+
+      base.register(defs);
+
+      return defs.map((d) => base.getEntry(d.id)!.instance) as Achievement<T>[];
+    },
+
     getAchievement(id: string): Achievement | undefined {
       return base.getEntry(id)?.instance;
     },
@@ -251,4 +395,22 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
   if (ec) (ec.achievements ??= []).push(category);
 
   return category;
+}
+
+// === INTERNAL HELPERS ===
+
+/**
+ * Format a {@link TieredAchievementTier} threshold for the default tier
+ * description: exponential for values ≥ 1e9, `"X.YM"` ≥ 1e6, `"X.YK"`
+ * ≥ 1e3, integer otherwise.
+ */
+function formatThreshold(value: Decimal): string {
+  if (value.gte(1e9)) {
+    return value.toExponential(2);
+  } else if (value.gte(1e6)) {
+    return (value.toNumber() / 1e6).toFixed(1) + 'M';
+  } else if (value.gte(1e3)) {
+    return (value.toNumber() / 1e3).toFixed(1) + 'K';
+  }
+  return value.toFixed(0);
 }

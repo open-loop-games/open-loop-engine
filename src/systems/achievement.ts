@@ -6,10 +6,10 @@
  * `effect` value granted while earned, and a `requirement` watch that
  * auto-completes the achievement the moment the requirement first holds.
  *
- * Factories:
- * - {@link createAchievement} — full-control factory with arbitrary requirement and effect
- * - {@link createSimpleAchievement} — positional shorthand for "earn when this boolean ref is true"
- * - {@link createTieredAchievement} — fan a single value-getter into N threshold-gated tiers
+ * The category factory {@link createAchievementCategory} is the consumer
+ * front door for batch-registering achievements; its `registerTiered`
+ * method covers the threshold-ladder fanout. {@link createAchievement}
+ * is engine-internal.
  *
  * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative,
  * {@link getEarnedCount} reactive count) live alongside the factory.
@@ -26,8 +26,6 @@ import { computed, type Ref, unref, watch } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import Formula from '@/core/formulas/formulas';
-import type { FormulaSource } from '@/core/formulas/types';
 import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
 
 // === TYPES ===
@@ -138,34 +136,6 @@ export interface Achievement<T = unknown> {
   on: Emittable<AchievementEvents>['on'];
 }
 
-/** Options for {@link createTieredAchievement} */
-export interface TieredAchievementOptions<T = number> {
-  /** Prefix for generated achievement IDs (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`) */
-  baseId: string;
-  /** Display name prefix shared by all tiers */
-  baseName: string;
-  /** Reactive getter for the tracked value compared against each tier's threshold */
-  getValue: () => DecimalSource;
-  /** Ordered list of thresholds, each producing one achievement */
-  tiers: Array<{
-    /**
-     * The value `getValue()` must reach to earn this tier.
-     *
-     * Accepts a plain `DecimalSource` for static thresholds or a
-     * {@link FormulaSource} for dynamic thresholds that scale with other game
-     * state (e.g. prestige count, unlock progression). Formula thresholds are
-     * re-evaluated each time the tier is checked.
-     */
-    threshold: DecimalSource | FormulaSource;
-    /** Appended to `baseName` for this tier's display title (e.g. `"I"`, `"II"`) */
-    suffix: string;
-    /** Override the auto-generated description for this tier */
-    description?: string;
-    /** Bonus value applied when this tier is earned */
-    effect?: T;
-  }>;
-}
-
 /**
  * Events emitted by an Achievement instance
  */
@@ -177,31 +147,14 @@ export interface AchievementEvents {
 // === FACTORIES ===
 
 /**
- * Create an achievement — a once-and-stay-earned milestone with optional
- * reactive effect and auto-completing requirement watch.
+ * Engine-internal raw Achievement factory. Consumers reach this through
+ * {@link createAchievementCategory} (the L2 front door); tier ladders go
+ * through `category.registerTiered({...})`.
  *
- * @param options - {@link AchievementOptions} for display, requirement, effect, and visibility
- * @returns Achievement instance with persistent `earned`/`earnedAt` refs, a
- *   reactive `effect` (when configured), `complete()`, `canComplete`, and an
- *   `on('earned')` event subscription
+ * A once-and-stay-earned milestone with optional reactive effect and
+ * auto-completing requirement watch.
  *
- * @example
- * ```ts
- * const gold = ref(new Decimal(0));
- *
- * const richMilestone = createAchievement({
- *   id: 'first-million',
- *   display: {
- *     title: 'Millionaire',
- *     description: 'Reach 1M gold',
- *     effectDescription: '+10% gold gain',
- *   },
- *   requirement: () => Decimal.gte(gold.value, 1e6),
- *   effect: 1.1,
- * });
- *
- * richMilestone.on('earned', () => console.log('Millionaire unlocked'));
- * ```
+ * @internal
  */
 export function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T> {
   const {
@@ -310,93 +263,6 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
   return achievement;
 }
 
-/**
- * Positional shorthand over {@link createAchievement} for the common case of
- * a one-line title + description and a single boolean requirement. Equivalent
- * to calling `createAchievement({ id, display: { title, description },
- * requirement, effect })`.
- *
- * @param id - Unique identifier; also the persistence sub-context name
- * @param title - Display title shown on the tile
- * @param description - Flavour text or requirement hint
- * @param requirement - Boolean ref or getter; achievement auto-earns when true
- * @param effect - Optional reactive bonus value while earned
- * @returns The created Achievement instance
- *
- * @example
- * ```ts
- * const firstClick = createSimpleAchievement(
- *   'first-click',
- *   'First Click',
- *   'Click anything once',
- *   () => totalClicks.value >= 1,
- * );
- * ```
- */
-export function createSimpleAchievement<T = unknown>(
-  id: string,
-  title: string,
-  description: string,
-  requirement: Computable<boolean> | Gate,
-  effect?: T,
-): Achievement<T> {
-  return createAchievement({
-    id,
-    display: { title, description },
-    requirement,
-    effect,
-  });
-}
-
-/**
- * Creates a series of achievements from threshold tiers, each auto-wired to
- * complete when `getValue()` reaches its tier's threshold.
- *
- * @param options - Base ID/name, a reactive value getter, and an array of tiers
- *   with thresholds, name suffixes, and optional effects
- * @returns An array of Achievement instances, one per tier, with IDs like
- *   `"${baseId}-1"`, `"${baseId}-2"`, etc.
- *
- * @example
- * ```ts
- * const goldAchievements = createTieredAchievement({
- *   baseId: 'gold-hoarder',
- *   baseName: 'Gold Hoarder',
- *   getValue: () => gold.value,
- *   tiers: [
- *     { threshold: 100, suffix: 'I' },
- *     { threshold: 1000, suffix: 'II', effect: 1.1 },
- *     { threshold: 1e6, suffix: 'III', effect: 1.5 },
- *   ],
- * });
- * ```
- */
-export function createTieredAchievement<T = number>(
-  options: TieredAchievementOptions<T>,
-): Achievement<T>[] {
-  const { baseId, baseName, getValue, tiers } = options;
-
-  return tiers.map((tier, index) => {
-    const isFormulaThreshold = tier.threshold instanceof Formula;
-    const evalThreshold = (): DecimalSource =>
-      isFormulaThreshold
-        ? (tier.threshold as InstanceType<typeof Formula>).evaluate()
-        : (tier.threshold as DecimalSource);
-    // For display, use the current value (static literal or Formula snapshot at registration time).
-    const formatted = formatThreshold(new Decimal(evalThreshold()));
-
-    return createAchievement<T>({
-      id: `${baseId}-${index + 1}`,
-      display: {
-        title: `${baseName} ${tier.suffix}`,
-        description: tier.description ?? `Reach ${formatted}`,
-      },
-      requirement: () => Decimal.gte(getValue(), evalThreshold()),
-      effect: tier.effect,
-    });
-  }) as Achievement<T>[];
-}
-
 // === PUBLIC UTILITIES ===
 
 /**
@@ -424,21 +290,4 @@ export function getCombinedAchievementEffect(
 /** Reactive count of how many achievements in the list are currently earned. */
 export function getEarnedCount(achievements: Achievement[]): number {
   return achievements.filter((a) => a.earned.value).length;
-}
-
-// === INTERNAL HELPERS ===
-
-/**
- * Format a {@link createTieredAchievement} threshold for display: exponential
- * for values ≥ 1e9, `"X.YM"` ≥ 1e6, `"X.YK"` ≥ 1e3, integer otherwise.
- */
-function formatThreshold(value: Decimal): string {
-  if (value.gte(1e9)) {
-    return value.toExponential(2);
-  } else if (value.gte(1e6)) {
-    return (value.toNumber() / 1e6).toFixed(1) + 'M';
-  } else if (value.gte(1e3)) {
-    return (value.toNumber() / 1e3).toFixed(1) + 'K';
-  }
-  return value.toFixed(0);
 }
