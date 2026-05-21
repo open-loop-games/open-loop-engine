@@ -14,6 +14,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import { isTracing, recordTrace } from './trace';
 import type { Resource } from './resource';
 import { isDev } from './common';
+import { getNested, setNested } from './save-migrations';
 
 // === STATE TYPES ===
 
@@ -917,25 +918,17 @@ export function serializePersistents(refs: Map<string, Persistent>): Record<stri
   const save: Record<string, unknown> = {};
 
   for (const [path, persistentRef] of refs) {
-    const parts = path.split('.');
-    let current = save;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!(parts[i] in current)) {
-        current[parts[i]] = {};
-      }
-      current = current[parts[i]] as Record<string, unknown>;
-    }
-
     const value = persistentRef.value;
+    let encoded: unknown;
     if (value instanceof Decimal) {
-      current[parts[parts.length - 1]] = value.toString();
+      encoded = value.toString();
     } else if (typeof value === 'number' && !Number.isFinite(value)) {
       // JSON.stringify(Infinity|NaN) → null, so encode as string
-      current[parts[parts.length - 1]] = String(value);
+      encoded = String(value);
     } else {
-      current[parts[parts.length - 1]] = value;
+      encoded = value;
     }
+    setNested(save, path, encoded);
   }
 
   return save;
@@ -1016,16 +1009,7 @@ export function deserializePersistents(
 
   try {
     for (const [path, persistentRef] of refs) {
-      const parts = path.split('.');
-      let current: unknown = save;
-
-      for (const part of parts) {
-        if (current == null || typeof current !== 'object') {
-          current = undefined;
-          break;
-        }
-        current = (current as Record<string, unknown>)[part];
-      }
+      let current = getNested(save, path);
 
       if (current !== undefined) {
         // Recover non-finite numbers encoded as strings during serialization

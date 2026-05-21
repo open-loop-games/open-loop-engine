@@ -179,6 +179,18 @@ export type {
 } from './save-manager';
 export { createSaveManager, createMemoryStorage, ENGINE_SAVE_VERSION } from './save-manager';
 
+// === SAVE MIGRATIONS ===
+export type { AddFieldOptions } from './save-migrations';
+export {
+  getNested,
+  setNested,
+  renameField,
+  retypeField,
+  dropField,
+  addField,
+  forEachDefinition,
+} from './save-migrations';
+
 // === SAVE VALIDATION ===
 export type {
   ValidationIssue,

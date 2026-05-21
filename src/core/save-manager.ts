@@ -33,6 +33,7 @@ import {
   SaveDataPath,
   type Persistent,
 } from './persistence';
+import { setNested } from './save-migrations';
 import { createEmitHandle, type Emittable } from './events';
 import { validateSaveData, type ValidationIssue } from './save-validation';
 import { isDev } from './common';
@@ -369,7 +370,7 @@ function migrateIndexToNamed(
         );
         continue;
       }
-      writeNested(remapped, name.split('.'), oldVal);
+      setNested(remapped, name, oldVal);
     }
     out[contextId] = remapped;
   }
@@ -392,18 +393,6 @@ function describeType(v: unknown): string {
   if (v === null) return 'null';
   if (Array.isArray(v)) return 'array';
   return typeof v;
-}
-
-function writeNested(target: Record<string, unknown>, parts: string[], value: unknown): void {
-  let cur = target;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const k = parts[i];
-    if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) {
-      cur[k] = {};
-    }
-    cur = cur[k] as Record<string, unknown>;
-  }
-  cur[parts[parts.length - 1]] = value;
 }
 
 // === FACTORY ===

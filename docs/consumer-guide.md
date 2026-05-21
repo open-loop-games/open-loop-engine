@@ -298,6 +298,54 @@ This matters most for challenges: `active` and `completions` refs scope to per-c
 
 If you want completions to reset with a prestige tier, list the per-challenge contexts explicitly (e.g. `'my-challenges/ic1'`) in the reset's `resetModules`.
 
+### Writing migrations
+
+When you bump `EngineConfig.saveVersion`, supply a `saveMigrations` entry for each version that transforms data from `v → v+1`. Migrations run sequentially over the raw decoded save object before validation and deserialize. The engine ships a small kit of pure transforms — compose them in the migration body rather than hand-rolling traversal each time.
+
+```ts
+import {
+  renameField,
+  retypeField,
+  dropField,
+  addField,
+  forEachDefinition,
+} from '@open-loop/engine';
+
+const saveMigrations = {
+  // v1 → v2: definitions in three contexts gained two derived fields. Iterate
+  // each entry and seed defaults with `??=` against the prior shape.
+  1: (data) => {
+    for (const group of ['jobs', 'constructions', 'exploration']) {
+      forEachDefinition(data as Record<string, unknown>, group, (entry) => {
+        entry.genStartCompletions ??= entry.timesCompleted ?? 0;
+        entry.hadEncounteredBeforeGeneration ??= entry.hasEncountered ?? false;
+      });
+    }
+    return data;
+  },
+  // v2 → v3: rename a top-level group.
+  2: (data) => renameField(data as Record<string, unknown>, 'oldModule', 'newModule'),
+  // v3 → v4: a nested record's keys no longer make sense — clear it.
+  3: (data) =>
+    addField(data as Record<string, unknown>, 'stats.chapterTimes', {}, { overwrite: true }),
+  // v4 → v5: a field changed from `number` to `Decimal`. Engine deserialize
+  // accepts string-encoded Decimals natively, so `String(v)` is enough.
+  4: (data) => retypeField(data as Record<string, unknown>, 'inventory.gold', (v) => String(v)),
+};
+```
+
+**Path convention.** Helpers split on `.` to walk nested objects — `'jobs.warrior.progress'` reaches `data.jobs.warrior.progress`. The engine's serialized shape is nested object trees, never flat dot-keyed records, so the convention matches what the helpers traverse. `PersistentName` segments are guaranteed not to contain a literal `.`.
+
+**Missing-path semantic.** Every helper silently no-ops when the target path is missing. Migrations need to tolerate already-absent fields — a player loaded a save from a fork that opted out of the feature, or a previous migration dropped the field. Don't add presence checks before the helper call; that's what the helper covers.
+
+**Mutate-and-return.** Helpers mutate the same data ref and return it for chain ergonomics. Cloning a large save tree per step is wasteful; the migration callback owns the data while it runs.
+
+**Foundation primitives.** `getNested` and `setNested` are exported for one-off migrations that don't fit a named shape. They share semantics with the engine's serialize/deserialize paths — what they read and write is what those paths read and write.
+
+**When to drop to a hand-rolled callback.** Reach past the helpers when a migration needs cross-field invariants (compute one field from two others), structural reshaping (collapse two contexts into one), or interaction with the persistent-ref registry (legacy ID-to-name remaps — the engine already handles that one internally). Anything else, the helpers cover.
+
+The engine emits `save:migration-step { from, to }` for each consumer migration that runs, so per-step logging belongs in an event listener, not inside the migration body.
+
 ## Resets and conversions
 
 `createReset` bundles a list of things to reset into a single callable. Use it wherever you'd otherwise manually zero out refs:
