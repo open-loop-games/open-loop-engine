@@ -479,7 +479,8 @@ if (!existsSync(ENGINE_ROOT_DTS)) {
   process.exit(1)
 }
 
-const { records, unresolved } = parseEntrypoint(ENGINE_ROOT_DTS)
+const { records: allRecords, unresolved } = parseEntrypoint(ENGINE_ROOT_DTS)
+const records = allRecords.filter((r) => r.tag === 'public')
 const byCluster = bucketByCluster(records)
 
 // Validate every cluster has exactly one tier slot.
@@ -516,10 +517,9 @@ for (const tier of TIER_MANIFEST) {
 // Render INDEX.md.
 writeFileSync(join(API_DIR, 'INDEX.md'), renderIndex(byCluster))
 
-// Coverage report.
-const publicRecs = records.filter((r) => r.tag === 'public')
-const missingSummary = publicRecs.filter((r) => !r.tsdocSummary)
-const missingLine = publicRecs.filter((r) => r.line == null)
+// Coverage report — `records` is already filtered to public symbols above.
+const missingSummary = records.filter((r) => !r.tsdocSummary)
+const missingLine = records.filter((r) => r.line == null)
 
 console.log(
   `Wrote ${TIER_MANIFEST.length} tier files + INDEX.md — ${records.length} symbols across ${parsedClusters.size} clusters`

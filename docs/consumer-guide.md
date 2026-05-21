@@ -571,9 +571,9 @@ Native runtime is the default — pick it for content authored as `DialogGraph` 
 
 ### Relationships: one category, five typed sub-primitives
 
-`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `ICondition` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — the per-variant builders live inside `src/systems/relationship.ts` and dispatch on `def.kind` internally; there's no L3 standalone factory.
+`createRelationshipCategory` registers per-actor or per-faction state. Each registered def picks one of five variation shapes via its `kind` discriminator: `scalar` (single value per entity, optional `derive` projection), `faction` (per-faction with attitude-matrix propagation), `tiered` (ordered tier ladder with per-transition `ICondition` gates), `vector` (N independent dims per actor, CDDA-style opinion), `flag` (named booleans per actor, Exult-style). The category is the only public entry point — per-variant builders and per-variant instance interfaces are `@internal`. Reach instances through `cat.getInstance<'scalar'>(id)`; the generic narrows the return to the matching variant. Type locals as `ReturnType<typeof cat.getInstance<'scalar'>>` when needed.
 
-Cross-cutting axes — decay rate, derivation function, propagation matrix, permanent/temporary split — are options on the variation defs, not separate primitives. This keeps the variation count finite (5) while letting each shape parameterize its own policy.
+Cross-cutting concerns the variants don't carry — time decay, auto-advance, loop-temporary layers — aren't schema fields. Compose them at the consumer: a `GameLoop` tick handler that calls `instance.add(actor, -rate * dt)` for decay, `instance.tryAdvance(actor)` for auto-advance, a separate registration with a `Resettable` scope for the temporary layer. Variant defs stay shape-only; engine substrate handles the rest.
 
 ### When dialog and relationships connect
 

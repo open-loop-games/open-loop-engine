@@ -31,7 +31,14 @@ import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
 
-/** Shared fields present on every relationship variant. */
+/**
+ * Shared fields present on every relationship variant. Structural backbone
+ * for the per-variant interfaces below; consumers reach instances through
+ * {@link RelationshipInstance} (the union) and narrow via
+ * {@link RelationshipCategory.getInstance}.
+ *
+ * @internal
+ */
 export interface RelationshipBase<
   TKind extends RelationshipInstance['kind'],
   TDef extends RelationshipDef,
@@ -50,6 +57,9 @@ interface ScalarRelationshipEvents {
 /**
  * Scalar relationship instance — one persistent number per actor with optional
  * clamping and an optional `derive` projection. Built when `def.kind === 'scalar'`.
+ *
+ * @internal Reach through {@link RelationshipCategory.getInstance}`<'scalar'>`;
+ *   type locally as `ReturnType<typeof cat.getInstance<'scalar'>>`.
  */
 export interface ScalarRelationship
   extends RelationshipBase<'scalar', ScalarRelationshipDef>, Emittable<ScalarRelationshipEvents> {
@@ -71,6 +81,9 @@ interface TieredRelationshipEvents {
 /**
  * Tiered relationship instance — per-actor discrete tier index 0..N-1 with
  * per-transition advancement gates. Built when `def.kind === 'tiered'`.
+ *
+ * @internal Reach through {@link RelationshipCategory.getInstance}`<'tiered'>`;
+ *   type locally as `ReturnType<typeof cat.getInstance<'tiered'>>`.
  */
 export interface TieredRelationship
   extends RelationshipBase<'tiered', TieredRelationshipDef>, Emittable<TieredRelationshipEvents> {
@@ -99,6 +112,9 @@ interface VectorRelationshipEvents {
 /**
  * Vector relationship instance — N independent scalar dimensions per actor,
  * each with its own bounds and policy. Built when `def.kind === 'vector'`.
+ *
+ * @internal Reach through {@link RelationshipCategory.getInstance}`<'vector'>`;
+ *   type locally as `ReturnType<typeof cat.getInstance<'vector'>>`.
  */
 export interface VectorRelationship
   extends RelationshipBase<'vector', VectorRelationshipDef>, Emittable<VectorRelationshipEvents> {
@@ -118,6 +134,9 @@ interface FactionRelationshipEvents {
 /**
  * Faction relationship instance — one persistent scalar per faction, with
  * attitude-matrix propagation via `applyTo`. Built when `def.kind === 'faction'`.
+ *
+ * @internal Reach through {@link RelationshipCategory.getInstance}`<'faction'>`;
+ *   type locally as `ReturnType<typeof cat.getInstance<'faction'>>`.
  */
 export interface FactionRelationship
   extends
@@ -145,6 +164,9 @@ interface FlagRelationshipEvents {
 /**
  * Flag relationship instance — per-actor named booleans encoding scripted
  * social events. Built when `def.kind === 'flag'`.
+ *
+ * @internal Reach through {@link RelationshipCategory.getInstance}`<'flag'>`;
+ *   type locally as `ReturnType<typeof cat.getInstance<'flag'>>`.
  */
 export interface FlagRelationship
   extends RelationshipBase<'flag', FlagRelationshipDef>, Emittable<FlagRelationshipEvents> {
