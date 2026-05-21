@@ -136,31 +136,25 @@ unified purchase primitives for incremental games
 
 Three factories in increasing flexibility: `createSimplePurchasable` for static one-shot costs, `createScalingPurchasable` for leveled geometric scaling, `createPurchasable` for arbitrary requirements. See consumer-guide.md §Choosing among purchasable primitives.
 
-- `function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable` — Create a purchasable with full control over requirements. `src/systems/purchasable.ts:569`
-- `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:188`
-- `function createPurchasableGroup(options: PurchasableGroupOptions): PurchasableGroup` — Group purchasables for aggregate tracking and bulk purchase. `src/systems/purchasable.ts:835`
-- `function createScalingPurchasable<T extends ScalingPurchasableOptions>(options: T): Purchasable` — Create a purchasable with leveled cost scaling — the most common leveled pattern. `src/systems/purchasable.ts:750`
-- `function createSimplePurchasable<T extends SimplePurchasableOptions>(options: T): Purchasable` — Create a purchasable with a simple resource cost — the most common one-shot pattern. `src/systems/purchasable.ts:691`
-- `function formatPurchasable(purchasable: Purchasable): ComputedRef<string>` — Format a purchasable's amount as "N" or "N/limit" (e.g., "5/10"). `src/systems/purchasable.ts:859`
-- `function isPurchasable(value: unknown): value is Purchasable` — Type guard: returns `true` if the value is a Purchasable instance. `src/systems/purchasable.ts:869`
-- `function isPurchasableCategory(value: unknown): value is PurchasableCategory<{ id: string; }, unknown>` — Type guard: returns `true` if the value is a PurchasableCategory instance. `src/systems/purchasable-category.ts:263`
-- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:228`
-- `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:110`
-- `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:97`
-- `interface PurchasableCategoryOptions<Def extends { id: string; }, State = void>` — Options for createPurchasableCategory. `src/systems/purchasable-category.ts:64`
-- `const PurchasableCategoryType: unique symbol` — Symbol identifying PurchasableCategory features. `src/systems/purchasable-category.ts:55`
-- `interface PurchasableDisplay` — UI text for a purchasable. `src/systems/purchasable.ts:61`
-- `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:55`
-- `interface PurchasableGroup` — A managed collection of purchasables with aggregate queries and bulk operations. `src/systems/purchasable.ts:291`
-- `interface PurchasableGroupOptions` — Options for createPurchasableGroup. `src/systems/purchasable.ts:285`
-- `interface PurchasableOptions` — Full options for createPurchasable. `src/systems/purchasable.ts:85`
-- `const PurchasableType: unique symbol` — Symbol identifying Purchasable features. `src/systems/purchasable.ts:52`
-- `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:154`
-- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:184`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:191`
-- `interface SetupPolicyAutoPurchaseOptions` — Options for setupPolicyAutoPurchase. `src/systems/auto-purchase.ts:106`
-- `function setupSweepAutoPurchase(purchasables: Purchasable[] | PurchasableGroup, enabled: Computable<boolean>, registerTick: (callback: (dt: number) => void) => () => void): () => void` — Register a tick handler that sweeps a purchasable list each frame, calling `purchaseMax()` on every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:79`
-- `interface SimplePurchasableOptions` — Shorthand options for createSimplePurchasable — the "costs X of resource Y" pattern. `src/systems/purchasable.ts:124`
+- `function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable` — Create a purchasable with full control over requirements. `src/systems/purchasable.ts:537`
+- `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:186`
+- `function createScalingPurchasable<T extends ScalingPurchasableOptions>(options: T): Purchasable` — Create a purchasable with leveled cost scaling — the most common leveled pattern. `src/systems/purchasable.ts:718`
+- `function createSimplePurchasable<T extends SimplePurchasableOptions>(options: T): Purchasable` — Create a purchasable with a simple resource cost — the most common one-shot pattern. `src/systems/purchasable.ts:659`
+- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:224`
+- `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:108`
+- `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:95`
+- `interface PurchasableCategoryOptions<Def extends { id: string; }, State = void>` — Options for createPurchasableCategory. `src/systems/purchasable-category.ts:62`
+- `const PurchasableCategoryType: unique symbol` — Symbol identifying PurchasableCategory features. `src/systems/purchasable-category.ts:53`
+- `interface PurchasableDisplay` — UI text for a purchasable. `src/systems/purchasable.ts:57`
+- `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:51`
+- `interface PurchasableOptions` — Full options for createPurchasable. `src/systems/purchasable.ts:81`
+- `const PurchasableType: unique symbol` — Symbol identifying Purchasable features. `src/systems/purchasable.ts:48`
+- `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:150`
+- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:180`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:190`
+- `interface SetupPolicyAutoPurchaseOptions` — Options for setupPolicyAutoPurchase. `src/systems/auto-purchase.ts:105`
+- `function setupSweepAutoPurchase(purchasables: Purchasable[], enabled: Computable<boolean>, registerTick: (callback: (dt: number) => void) => () => void): () => void` — Register a tick handler that sweeps a purchasable list each frame, calling `purchaseMax()` on every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:79`
+- `interface SimplePurchasableOptions` — Shorthand options for createSimplePurchasable — the "costs X of resource Y" pattern. `src/systems/purchasable.ts:120`
 
 ## Skill
 

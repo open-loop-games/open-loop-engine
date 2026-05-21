@@ -12,16 +12,13 @@
  * - {@link createPurchasable} — full-control factory with arbitrary requirements
  * - {@link createSimplePurchasable} — shorthand for "costs X of resource Y", defaults `limit: 1`
  * - {@link createScalingPurchasable} — shorthand for exponential cost scaling, defaults `limit: Infinity`
- * - {@link createPurchasableGroup} — manage a set of purchasables as a unit
  *
- * Utilities: {@link formatPurchasable}. For auto-buy, see
- * {@link setupSweepAutoPurchase} / {@link setupPolicyAutoPurchase} in
- * `./auto-purchase`.
+ * For auto-buy, see {@link setupSweepAutoPurchase} /
+ * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
  */
 
 import { computed, unref, watch, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
-import { getPurchasableAggregates } from './purchasable-aggregate';
 import { processGetter, type Computable } from '@/core/computed';
 import {
   persistent,
@@ -42,7 +39,6 @@ import {
 } from '@/core/requirements';
 import type { Resource } from '@/core/resource';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
@@ -226,7 +222,7 @@ export type ScalingPurchasableOptions = {
  * Call `purchase()` or `purchaseMax()` to buy.
  */
 export interface Purchasable {
-  /** Feature type discriminator for {@link isPurchasable} checks */
+  /** Feature type discriminator. */
   type: typeof PurchasableType;
   /** Unique identifier */
   id: string;
@@ -279,34 +275,6 @@ export interface Purchasable {
   onPurchase?: (amount: DecimalSource) => void;
   /** Subscribe to purchasable lifecycle events */
   on: Emittable<PurchasableEvents>['on'];
-}
-
-/** Options for {@link createPurchasableGroup} */
-export interface PurchasableGroupOptions {
-  /** The purchasables in this group */
-  purchasables: Purchasable[];
-}
-
-/** A managed collection of purchasables with aggregate queries and bulk operations. */
-export interface PurchasableGroup {
-  /** All purchasables in the group */
-  purchasables: Purchasable[];
-  /** How many purchasables have been bought at least once (amount >= 1) */
-  purchasedCount: ComputedRef<number>;
-  /** Total number of purchasables in the group (static) */
-  totalCount: number;
-  /** Sum of all purchasables' amounts */
-  totalAmount: ComputedRef<DecimalSource>;
-  /** Product of all purchasables' effects */
-  totalEffect: ComputedRef<DecimalSource>;
-  /** True when every purchasable in the group has reached its limit */
-  allMaxed: ComputedRef<boolean>;
-  /** Return all purchasables that can currently be afforded */
-  getAffordable: () => Purchasable[];
-  /** Purchase all affordable purchasables (buy-max each). Returns total levels bought. */
-  purchaseAffordable: () => DecimalSource;
-  /** Look up a purchasable by ID */
-  getById: (id: string) => Purchasable | undefined;
 }
 
 // === CONSTANTS ===
@@ -813,59 +781,4 @@ export function createScalingPurchasable<T extends ScalingPurchasableOptions>(
   );
 
   return purchasable;
-}
-
-// === PURCHASABLE GROUPS ===
-
-/**
- * Group purchasables for aggregate tracking and bulk purchase.
- *
- * @param options - The purchasables to group
- * @returns A {@link PurchasableGroup} with progress tracking and bulk operations
- *
- * @example
- * ```ts
- * const tier1 = createPurchasableGroup({
- *   purchasables: [genA, genB, genC],
- * });
- * tier1.purchaseAffordable();
- * console.log(`${tier1.purchasedCount.value}/${tier1.totalCount} purchased`);
- * ```
- */
-export function createPurchasableGroup(options: PurchasableGroupOptions): PurchasableGroup {
-  const { purchasables } = options;
-
-  const aggregates = getPurchasableAggregates(() => purchasables);
-
-  return {
-    purchasables,
-    totalCount: purchasables.length,
-    ...aggregates,
-
-    getById(id: string): Purchasable | undefined {
-      return purchasables.find((p) => p.id === id);
-    },
-  };
-}
-
-// === PUBLIC UTILITIES ===
-
-/**
- * Format a purchasable's amount as "N" or "N/limit" (e.g., "5/10").
- *
- * @param purchasable - The purchasable to format
- * @returns Reactive computed string
- */
-export function formatPurchasable(purchasable: Purchasable): ComputedRef<string> {
-  return computed(() => {
-    const amt = purchasable.amount.value;
-    const limit = unref(purchasable.limit);
-    const limitStr = Decimal.isFinite(limit) ? `/${formatSmall(limit, 0)}` : '';
-    return `${formatSmall(amt, 0)}${limitStr}`;
-  });
-}
-
-/** Type guard: returns `true` if the value is a {@link Purchasable} instance */
-export function isPurchasable(value: unknown): value is Purchasable {
-  return isType(value, PurchasableType);
 }

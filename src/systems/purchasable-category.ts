@@ -34,8 +34,7 @@
  */
 
 import { computed, type ComputedRef } from 'vue';
-import { type DecimalSource } from '@/primitives/decimal';
-import { isType } from '@/core/feature';
+import { Decimal, type DecimalSource, renormIfLayer0 } from '@/primitives/decimal';
 import {
   setupDeclarativeBindings,
   createCategoryBase,
@@ -45,7 +44,6 @@ import {
 import { type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { createPurchasable, type Purchasable, type PurchasableOptions } from './purchasable';
-import { getPurchasableAggregates } from './purchasable-aggregate';
 import { getCurrentEngineCategories } from './engine-categories';
 import type { Grant } from '@/core/modifier';
 
@@ -111,7 +109,7 @@ export interface PurchasableCategory<
   Def extends { id: string },
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator for {@link isPurchasableCategory} checks */
+  /** Feature type discriminator. */
   type: typeof PurchasableCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -205,7 +203,30 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     }),
   });
 
-  const aggregates = getPurchasableAggregates(() => base.getAll().map((e) => e.instance));
+  const list = (): readonly Purchasable[] => base.getAll().map((e) => e.instance);
+
+  const purchasedCount = computed(() => list().filter((p) => p.active.value).length);
+
+  const totalAmount = computed(
+    (): DecimalSource =>
+      list().reduce<DecimalSource>(
+        (sum, p) => renormIfLayer0(Decimal.add(sum, p.amount.value)),
+        Decimal.dZero,
+      ),
+  );
+
+  const totalEffect = computed(
+    (): DecimalSource =>
+      list().reduce<DecimalSource>(
+        (product, p) => renormIfLayer0(Decimal.mul(product, p.effect.value)),
+        Decimal.dOne,
+      ),
+  );
+
+  const allMaxed = computed(() => {
+    const l = list();
+    return l.length > 0 && l.every((p) => p.maxed.value);
+  });
 
   const category: PurchasableCategory<Def, State> = {
     type: PurchasableCategoryType,
@@ -242,7 +263,24 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
       }));
     },
 
-    ...aggregates,
+    purchasedCount,
+    totalAmount,
+    totalEffect,
+    allMaxed,
+
+    getAffordable(): Purchasable[] {
+      return list().filter((p) => p.canPurchase.value);
+    },
+
+    purchaseAffordable(): DecimalSource {
+      let total: DecimalSource = Decimal.dZero;
+      for (const p of list()) {
+        if (p.canPurchase.value) {
+          total = Decimal.add(total, p.purchaseMax());
+        }
+      }
+      return total;
+    },
 
     get size(): number {
       return base.size;
@@ -255,13 +293,4 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
   if (ec) (ec.purchasables ??= []).push(category);
 
   return category;
-}
-
-// === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link PurchasableCategory} instance */
-export function isPurchasableCategory(
-  value: unknown,
-): value is PurchasableCategory<{ id: string }, unknown> {
-  return isType(value, PurchasableCategoryType);
 }

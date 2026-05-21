@@ -28,7 +28,7 @@ import { profile, profileStart, profileEnd } from '@/core/profiler';
 import type { Resource } from '@/core/resource';
 import type { RegisterTick } from '@/core/sequencer';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
-import type { Purchasable, PurchasableGroup } from './purchasable';
+import type { Purchasable } from './purchasable';
 import type { Producer, ProducerCategory } from './producer-category';
 
 // === CONSTANTS ===
@@ -61,7 +61,7 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
  * candidates. For producer chains where costs grow into each other, see
  * {@link setupPolicyAutoPurchase} instead.
  *
- * @param purchasables - Purchasable list or group to auto-buy from
+ * @param purchasables - Purchasable list to auto-buy from
  * @param enabled - Reactive toggle for the auto-purchase behavior
  * @param registerTick - Function to register a per-tick callback (e.g., `ctx.onTick`)
  * @returns Cleanup function that unregisters the tick handler
@@ -77,17 +77,16 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
  * ```
  */
 export function setupSweepAutoPurchase(
-  purchasables: Purchasable[] | PurchasableGroup,
+  purchasables: Purchasable[],
   enabled: Computable<boolean>,
   registerTick: (callback: (dt: number) => void) => () => void,
 ): () => void {
   const processedEnabled = processGetter(enabled);
-  const list = Array.isArray(purchasables) ? purchasables : purchasables.purchasables;
 
   return registerTick(() => {
     if (!unref(processedEnabled)) return;
 
-    for (const p of list) {
+    for (const p of purchasables) {
       if (p.canPurchase.value) {
         p.purchaseMax();
       }
