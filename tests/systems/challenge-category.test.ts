@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { createModifierChain } from '@/core/modifier';
 import { Decimal } from '@/primitives/decimal';
 
@@ -39,45 +38,6 @@ describe('ChallengeDef.goal callback form', () => {
     expect(ch.completed.value).toBe(false);
 
     progress.value = 10;
-    tickHandlers.forEach((h) => h(0.016));
-    expect(ch.completed.value).toBe(true);
-  });
-
-  it('declarative goal via ICondition still works alongside the callback form', () => {
-    const tickHandlers: Array<(dt: number) => void> = [];
-    const registerTick = (cb: (dt: number) => void) => {
-      tickHandlers.push(cb);
-      return () => {};
-    };
-
-    // Minimal accessor backing a single state key for the declarative check
-    const stateFlag = ref(false);
-    const accessor = {
-      getResource: () => undefined,
-      hasUnlock: () => false,
-      getState: (id: string) => (id === 'done' ? stateFlag.value : undefined),
-    };
-
-    const challenges = createChallengeCategory({
-      id: 'cbgoal-decl',
-      mutuallyExclusive: true,
-      accessor,
-      registerTick,
-    });
-
-    challenges.register({
-      id: 'flag',
-      name: 'Flag',
-      goal: C.state('done', 'eq', true),
-    });
-
-    const ch = challenges.getChallenge('flag')!;
-    ch.enter();
-
-    tickHandlers.forEach((h) => h(0.016));
-    expect(ch.completed.value).toBe(false);
-
-    stateFlag.value = true;
     tickHandlers.forEach((h) => h(0.016));
     expect(ch.completed.value).toBe(true);
   });

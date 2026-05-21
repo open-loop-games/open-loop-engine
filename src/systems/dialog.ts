@@ -17,11 +17,10 @@
  * @cluster dialog
  */
 
-import type { ICondition, IEffect, GameStateAccessor } from '@/primitives/types';
-import { evaluateCondition } from '@/core/conditions';
+import type { IEffect, GameStateAccessor } from '@/primitives/types';
 import { applyEffect, type GameStateMutator } from '@/core/effects';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
+import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
 
 // === TYPES ===
 
@@ -35,11 +34,10 @@ export interface DialogNode {
   /** Displayed line. Template variables `{name}` are interpolated by the host. */
   text: string;
   /**
-   * Skip this node when present and falsy. Either an `ICondition` (plain
-   * predicate over resources / unlocks / state) or a `Gate` (category-aware
-   * predicate; evaluated via the ambient Gate runtime).
+   * Skip this node when present and falsy. Evaluated as a {@link Gate}
+   * through the ambient Gate runtime — typed predicate spec, no closures.
    */
-  condition?: ICondition | Gate;
+  condition?: Gate;
   /** Player-facing choices. Empty (or omitted) = terminal node. */
   choices?: DialogChoice[];
   /** Effects emitted on node entry, before choice presentation. */
@@ -54,9 +52,9 @@ export interface DialogChoice {
   text: string;
   /**
    * Hide this choice from the presented list when present and falsy. Same
-   * `ICondition | Gate` union as {@link DialogNode.condition}.
+   * {@link Gate} contract as {@link DialogNode.condition}.
    */
-  condition?: ICondition | Gate;
+  condition?: Gate;
   /** Effects emitted when this choice is selected. */
   outcomes?: IEffect[];
   /** Target node id. Omit for "end conversation". */
@@ -212,11 +210,8 @@ export function createNativeDialogRuntime(
     return n;
   }
 
-  function holds(predicate: ICondition | Gate): boolean {
-    if (isGate(predicate)) {
-      return evaluateGate(predicate, getAmbientGateRuntime());
-    }
-    return evaluateCondition(predicate, accessor);
+  function holds(predicate: Gate): boolean {
+    return evaluateGate(predicate, getAmbientGateRuntime());
   }
 
   function recordVisit(graphId: string, nodeId: string): void {

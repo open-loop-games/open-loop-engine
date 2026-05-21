@@ -299,5 +299,5 @@ export type {
   VectorRelationshipDef,
   FlagRelationshipDef,
   RelationshipDef,
-} from '../primitives/relationship';
+} from './relationship-defs';
 export { Decimal } from '../primitives/decimal';

@@ -235,38 +235,6 @@ describe('ChallengeCategory adoption — visible / canStart / goal accept Gate',
     expect(result.after).toEqual({ visible: true, canStart: true });
     stop();
   });
-
-  it('back-compat: ICondition + boolean fields evaluate alongside Gate', () => {
-    const { result, stop } = bootstrap((api) => {
-      const cat = createChallengeCategory<{
-        id: string;
-        name: string;
-        visible?: any;
-        canStart?: any;
-        goal?: () => boolean;
-      }>({
-        id: 'challenges',
-        mutuallyExclusive: false,
-      });
-      cat.register({
-        id: 'mixed',
-        name: 'Mixed',
-        visible: true,
-        canStart: {
-          type: 'resource',
-          target: 'points',
-          operator: 'gte',
-          value: 5,
-        },
-      });
-      api.points.value = 5;
-      return cat.getChallenge('mixed')!;
-    });
-
-    expect(result.visible.value).toBe(true);
-    expect(result.canStart.value).toBe(true);
-    stop();
-  });
 });
 
 // ============================================================================

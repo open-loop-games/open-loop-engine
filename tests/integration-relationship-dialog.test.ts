@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
-import { C } from '@/core/conditions';
+import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
 import { createRelationshipCategory } from '@/systems/relationship';
 import { createReset } from '@/systems/reset';
@@ -24,9 +24,29 @@ import {
   type DialogPresentation,
   type DialogRuntimeState,
 } from '@/systems/dialog';
-import type { TieredRelationshipDef } from '@/primitives/relationship';
+import type { TieredRelationshipDef } from '@/systems/relationship-defs';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
+
+/**
+ * Run `fn` inside an engine install hook so the ambient GateRuntime triple
+ * (accessor + categories + registry) is wired — required for Gate-based
+ * predicates (dialog conditions, relationship tier gates).
+ */
+function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
+  let result: T;
+  const mod: EngineModule = {
+    id: 'test',
+    install() {
+      result = fn();
+    },
+  };
+  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  engine.use(mod);
+  engine.start();
+  engine.stop();
+  return result!;
+}
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -62,7 +82,7 @@ const raskGreeting: DialogGraph = {
         {
           id: 'ask-restricted',
           text: 'Ask about the restricted library.',
-          condition: { type: 'unlock', target: 'knowledge-restricted-library-tip' },
+          condition: { kind: 'flag', id: 'knowledge-restricted-library-tip' },
           next: 'restricted',
         },
         { id: 'ask-mundane', text: 'Pleasantries.', next: 'mundane' },
@@ -86,7 +106,7 @@ const raskGreeting: DialogGraph = {
 describe('Scenario 1 — knowledge-gated conversation', () => {
   it('hides a gated choice until the knowledge is discovered, then reveals it', () => {
     const accessor = buildAccessor();
-    withGameStateAccessor(accessor, () => {
+    withEngine(accessor, () => {
       const session = createDialogSession({
         id: 'rask-conversation',
         graphs: [raskGreeting],
@@ -124,7 +144,7 @@ describe('Scenario 1 — knowledge-gated conversation', () => {
 describe('Scenario 2 — multi-loop persistence', () => {
   it('resets trust per loop while knowledge unlocks survive', () => {
     const accessor = buildAccessor();
-    withGameStateAccessor(accessor, () => {
+    withEngine(accessor, () => {
       // Simulate the engine's install wrapper: the relationships *module*
       // owns the category, so category refs become children of the module's
       // context. Matches how molcremental's relationshipsModule actually
@@ -137,9 +157,9 @@ describe('Scenario 2 — multi-loop persistence', () => {
           actors: ['mentor-rask'],
           tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
           gates: [
-            C.unlock('knowledge-rask-approach'),
-            C.unlock('knowledge-rask-competence'),
-            C.unlock('knowledge-rask-task'),
+            { kind: 'flag', id: 'knowledge-rask-approach' },
+            { kind: 'flag', id: 'knowledge-rask-competence' },
+            { kind: 'flag', id: 'knowledge-rask-task' },
           ],
         });
         return c;
@@ -253,26 +273,36 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
 
 describe('Scenario 4 — save round-trip', () => {
   it('a fresh native runtime restores active node + visit counts from a snapshot', () => {
-    const accessor = buildAccessor() as GameStateAccessor;
+    const accessor = buildAccessor();
     const mutator = buildAccessor() as GameStateMutator;
 
-    // First runtime: walk through a conversation to accumulate state.
-    const r1 = createNativeDialogRuntime({ graphs: [raskGreeting], accessor, mutator });
-    r1.start('rask-greeting');
-    r1.choose('ask-mundane');
-    expect(r1.present()?.nodeId).toBe('mundane');
-    const snapshot = r1.exportState();
-    expect(snapshot.activeGraphId).toBe('rask-greeting');
-    expect(snapshot.activeNodeId).toBe('mundane');
-    expect(snapshot.visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
+    withEngine(accessor, () => {
+      // First runtime: walk through a conversation to accumulate state.
+      const r1 = createNativeDialogRuntime({
+        graphs: [raskGreeting],
+        accessor: accessor as GameStateAccessor,
+        mutator,
+      });
+      r1.start('rask-greeting');
+      r1.choose('ask-mundane');
+      expect(r1.present()?.nodeId).toBe('mundane');
+      const snapshot = r1.exportState();
+      expect(snapshot.activeGraphId).toBe('rask-greeting');
+      expect(snapshot.activeNodeId).toBe('mundane');
+      expect(snapshot.visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
 
-    // Fresh runtime + import — exactly what save/load does.
-    const r2 = createNativeDialogRuntime({ graphs: [raskGreeting], accessor, mutator });
-    expect(r2.isActive()).toBe(false);
-    r2.importState(snapshot);
-    expect(r2.isActive()).toBe(true);
-    expect(r2.present()?.nodeId).toBe('mundane');
-    expect(r2.exportState().visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
+      // Fresh runtime + import — exactly what save/load does.
+      const r2 = createNativeDialogRuntime({
+        graphs: [raskGreeting],
+        accessor: accessor as GameStateAccessor,
+        mutator,
+      });
+      expect(r2.isActive()).toBe(false);
+      r2.importState(snapshot);
+      expect(r2.isActive()).toBe(true);
+      expect(r2.present()?.nodeId).toBe('mundane');
+      expect(r2.exportState().visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
+    });
   });
 
   it('relationship state lives in a deterministic persistent namespace', () => {

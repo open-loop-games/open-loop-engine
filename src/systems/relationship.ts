@@ -13,9 +13,8 @@
 
 import { persistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { evaluateCondition } from '@/core/conditions';
-import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import type { GameStateAccessor } from '@/primitives/types';
+import { evaluateGate, getAmbientGateRuntime } from './gate';
 import type {
   RelationshipDef,
   ScalarRelationshipDef,
@@ -23,7 +22,7 @@ import type {
   VectorRelationshipDef,
   FactionRelationshipDef,
   FlagRelationshipDef,
-} from '@/primitives/relationship';
+} from './relationship-defs';
 import { createCategoryBase } from './category-base';
 import type { ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
@@ -329,13 +328,8 @@ function buildTiered(def: TieredRelationshipDef): TieredRelationship {
     if (current >= maxIndex) return null;
     const gate = def.gates?.[current];
     if (gate) {
-      const eff = accessor ?? getCurrentGameStateAccessor();
-      if (!eff) {
-        throw new Error(
-          `Tiered relationship "${def.id}" has gates but no accessor — pass one to tryAdvance() or wire ambient accessor`,
-        );
-      }
-      if (!evaluateCondition(gate, eff)) return null;
+      const runtime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
+      if (!evaluateGate(gate, runtime)) return null;
     }
     setIndex(actor, current + 1);
     return def.tiers[current + 1] ?? null;

@@ -1,9 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import { resetAllPersistentContexts } from '@/core/persistence';
-import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
+import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
+import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
 import type { DialogGraph } from '@/systems/dialog';
+
+/**
+ * Run `fn` inside an engine install hook so the ambient GateRuntime triple
+ * (accessor + categories + registry) is wired — required for dialog choice
+ * conditions that dispatch through evaluateGate.
+ */
+function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
+  let result: T;
+  const mod: EngineModule = {
+    id: 'test',
+    install() {
+      result = fn();
+    },
+  };
+  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  engine.use(mod);
+  engine.start();
+  engine.stop();
+  return result!;
+}
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -38,7 +59,7 @@ const greetingGraph: DialogGraph = {
         {
           id: 'ask-secret',
           text: 'Ask about the restricted library.',
-          condition: { type: 'unlock', target: 'knowledge-restricted-tip' },
+          condition: { kind: 'flag', id: 'knowledge-restricted-tip' },
           next: 'secret',
         },
       ],
@@ -57,7 +78,7 @@ const greetingGraph: DialogGraph = {
 
 describe('createDialogSession', () => {
   it('starts a graph and presents the entry node', () => {
-    withGameStateAccessor(buildAccessor(), () => {
+    withEngine(buildAccessor(), () => {
       const session = createDialogSession({
         id: 'main',
         graphs: [greetingGraph],
@@ -74,7 +95,7 @@ describe('createDialogSession', () => {
   it('reveals gated choices once the gate flips true', () => {
     const accessor = buildAccessor();
     accessor.setUnlocked('knowledge-restricted-tip', true);
-    withGameStateAccessor(accessor, () => {
+    withEngine(accessor, () => {
       const session = createDialogSession({
         id: 'main',
         graphs: [greetingGraph],
@@ -86,7 +107,7 @@ describe('createDialogSession', () => {
   });
 
   it('emits presented / chosen / finished events', () => {
-    withGameStateAccessor(buildAccessor(), () => {
+    withEngine(buildAccessor(), () => {
       const session = createDialogSession({
         id: 'main',
         graphs: [greetingGraph],
@@ -122,7 +143,7 @@ describe('createDialogSession', () => {
   it('writes choice outcomes via the mutator', () => {
     const accessor = buildAccessor();
     const setStateSpy = vi.spyOn(accessor, 'setState');
-    withGameStateAccessor(accessor, () => {
+    withEngine(accessor, () => {
       const session = createDialogSession({
         id: 'main',
         graphs: [greetingGraph],
@@ -135,7 +156,7 @@ describe('createDialogSession', () => {
   });
 
   it('snapshots runtime state into the persistent ref on every choose', () => {
-    withGameStateAccessor(buildAccessor(), () => {
+    withEngine(buildAccessor(), () => {
       const session = createDialogSession({
         id: 'snapshot',
         graphs: [greetingGraph],

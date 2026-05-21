@@ -5,7 +5,6 @@ import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -147,8 +146,8 @@ function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        canStart: C.resource('gems', 'gte', 5), // gems rate 1/s → 5s
-        goal: C.resource('gems', 'gte', 10),
+        canStart: { kind: 'resource-gte', resource: 'gems', value: 5 }, // gems rate 1/s → 5s
+        goal: { kind: 'resource-gte', resource: 'gems', value: 10 },
       });
 
       ctx.provide(CategoriesKey, {
@@ -238,7 +237,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
         challenges.register({
           id: 'bronze',
           name: 'Bronze',
-          canStart: C.resource('gems', 'gte', 5),
+          canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
           goal: () => false,
         });
 

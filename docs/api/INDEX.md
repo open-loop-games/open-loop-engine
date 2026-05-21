@@ -222,7 +222,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 ### Narrative
 
 - `dialog` — authored conversation graphs and the engine-native runtime that walks them. The runtime composes engine substrate… → content-narrative.md#dialog
-- `relationship` — typed per-actor / per-faction state with five variant shapes (scalar, faction, tiered, vector, flag) → content-narrative.md#relationship
+- `relationship` — variant shapes and category dispatch → content-narrative.md#relationship
 
 ### Lifecycle
 

@@ -25,15 +25,6 @@ export type {
   GameStateAccessor,
   InjectionKey,
 } from './types';
-export type {
-  RelationshipDefBase,
-  ScalarRelationshipDef,
-  FactionRelationshipDef,
-  TieredRelationshipDef,
-  VectorRelationshipDef,
-  FlagRelationshipDef,
-  RelationshipDef,
-} from './relationship';
 export {
   seedRNG,
   getSeed,

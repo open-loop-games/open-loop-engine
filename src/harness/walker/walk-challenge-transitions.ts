@@ -2,23 +2,25 @@
  * Content walker leaf C1 — enumerate pending challenge transitions.
  *
  * Challenges are the best case for precise distances: `ChallengeDef` carries
- * `visible`, `canStart`, and `goal` as `ICondition | boolean | (() =>
- * boolean)`. The declarative branches are fully pattern-matchable via
- * {@link timeUntilConditionFlip}; the closure/boolean branches degrade to
- * no-emission (they can't express "when").
+ * `visible`, `canStart`, and `goal` as `boolean | Gate | (() => boolean)`.
+ * Gate fields with rate-aware leaves project to {@link ICondition} via
+ * {@link gateToCondition} and feed {@link timeUntilConditionFlip}; the
+ * closure / boolean / category-aware-Gate branches degrade to no-emission
+ * (they can't express "when").
  *
  * Emissions per challenge entity:
  *
- * - `visibility-reveal` — `visible` is `ICondition` and currently false.
- * - `start-unlock` — `canStart` is `ICondition` and currently false.
- * - `goal-complete` — `active === true` and `goal` is `ICondition`.
- * - `challenge-maxed` — `active === true`, `goal` is `ICondition`, and
+ * - `visibility-reveal` — `visible` projects to a rate-aware ICondition and is currently false.
+ * - `start-unlock` — `canStart` projects to a rate-aware ICondition and is currently false.
+ * - `goal-complete` — `active === true` and `goal` projects to a rate-aware ICondition.
+ * - `challenge-maxed` — `active === true`, `goal` projects, and
  *   `completions === completionLimit - 1`. Second emission with the same
  *   distance as `goal-complete`; drops out of the goal math for free.
  *
- * Closure-form `goal`, boolean-form gates, and inactive-challenge goals are
- * all intentionally skipped — "no mechanical distance" is cleaner as a
- * missing emission than as a null-distance sentinel for this walker.
+ * Closure-form `goal`, boolean-form gates, category-aware Gate descendants,
+ * and inactive-challenge goals are all intentionally skipped — "no
+ * mechanical distance" is cleaner as a missing emission than as a
+ * null-distance sentinel for this walker.
  */
 
 import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
@@ -28,6 +30,7 @@ import {
   timeUntilConditionFlip,
   type TransitionDeps,
 } from '@/core/transitions';
+import { gateToCondition, isGate, type Gate } from '@/systems/gate';
 import { CategoriesKey } from '@/index';
 import type { Engine } from '@/index';
 import { forEachCategoryEntity } from '../walk';
@@ -47,13 +50,19 @@ interface ChallengeEntity {
 // PRIVATE BUILDERS
 // ============================================================================
 
-function isCondition(value: unknown): value is ICondition {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    typeof (value as { type: unknown }).type === 'string'
-  );
+/**
+ * Project a ChallengeDef field to a rate-aware ICondition for distance/dep
+ * extraction, or undefined when the field has no mechanical distance
+ * (boolean, closure, category-aware Gate, or undefined).
+ */
+function toRateAwareCondition(value: unknown): ICondition | undefined {
+  if (!isGate(value)) return undefined;
+  try {
+    return gateToCondition(value as Gate);
+  } catch {
+    // category-aware Gate (count-gte / unlock) — opaque to this walker.
+    return undefined;
+  }
 }
 
 function buildTransition(
@@ -83,42 +92,46 @@ function emitForEntity(
   const { def, challenge } = entity;
   const entityId = def.id;
 
-  // visibility-reveal: declarative `visible` currently false → emit when it flips true.
-  if (isCondition(def.visible) && !challenge.visible.value) {
+  // visibility-reveal: rate-aware `visible` currently false → emit when it flips true.
+  const visibleCond = toRateAwareCondition(def.visible);
+  if (visibleCond && !challenge.visible.value) {
     out.push({
       transition: buildTransition(
         categoryId,
         entityId,
         'visibility-reveal',
         challenge.visible.value,
-        timeUntilConditionFlip(def.visible, accessor),
+        timeUntilConditionFlip(visibleCond, accessor),
       ),
-      deps: collectConditionDeps(def.visible),
+      deps: collectConditionDeps(visibleCond),
     });
   }
 
-  // start-unlock: declarative `canStart` currently false → emit when it flips true.
+  // start-unlock: rate-aware `canStart` currently false → emit when it flips true.
   // `Challenge.canStart` also folds in maxed/active guards, so read the raw def
   // condition via the accessor to keep the emission purely about the gate.
-  if (isCondition(def.canStart) && !challenge.canStart.value) {
+  const canStartCond = toRateAwareCondition(def.canStart);
+  if (canStartCond && !challenge.canStart.value) {
     out.push({
       transition: buildTransition(
         categoryId,
         entityId,
         'start-unlock',
         challenge.canStart.value,
-        timeUntilConditionFlip(def.canStart, accessor),
+        timeUntilConditionFlip(canStartCond, accessor),
       ),
-      deps: collectConditionDeps(def.canStart),
+      deps: collectConditionDeps(canStartCond),
     });
   }
 
   // goal-complete / challenge-maxed: only meaningful while the challenge is
-  // entered AND the goal is declarative. Closure-form goals are opaque by
-  // construction, inactive-challenge goals have no "next tick" to fire against.
-  if (challenge.active.value && isCondition(def.goal)) {
-    const goalDistance = timeUntilConditionFlip(def.goal, accessor);
-    const goalDeps = collectConditionDeps(def.goal);
+  // entered AND the goal projects to a rate-aware ICondition. Closure-form
+  // goals and category-aware Gates are opaque by construction; inactive-challenge
+  // goals have no "next tick" to fire against.
+  const goalCond = toRateAwareCondition(def.goal);
+  if (challenge.active.value && goalCond) {
+    const goalDistance = timeUntilConditionFlip(goalCond, accessor);
+    const goalDeps = collectConditionDeps(goalCond);
     out.push({
       transition: buildTransition(
         categoryId,

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
 import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -122,7 +121,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
         c.register({
           id: 'secret',
           name: 'Secret',
-          visible: C.resource('gold', 'gte', 100),
+          visible: { kind: 'resource-gte', resource: 'gold', value: 100 },
         }),
       accessor,
     );
@@ -147,7 +146,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
         c.register({
           id: 's',
           name: 'S',
-          visible: C.resource('gold', 'gte', 100),
+          visible: { kind: 'resource-gte', resource: 'gold', value: 100 },
           // Closure-form goal keeps other emissions off while we assert visibility silence.
           goal: () => false,
         }),
@@ -188,7 +187,7 @@ describe('walkChallengeTransitions — start-unlock', () => {
         c.register({
           id: 'gated',
           name: 'Gated',
-          canStart: C.resource('mana', 'gte', 20),
+          canStart: { kind: 'resource-gte', resource: 'mana', value: 20 },
         }),
       accessor,
     );
@@ -232,7 +231,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
         c.register({
           id: 'survive',
           name: 'Survive',
-          goal: C.resource('xp', 'gte', 100),
+          goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         }),
       accessor,
     );
@@ -265,7 +264,13 @@ describe('walkChallengeTransitions — goal-complete', () => {
           name: 'Both',
           // AND currently-false → max over child flip-to-true distances.
           // a reaches 10 in 10s; b reaches 10 in 5s; max = 10s.
-          goal: C.and(C.resource('a', 'gte', 10), C.resource('b', 'gte', 10)),
+          goal: {
+            kind: 'all',
+            of: [
+              { kind: 'resource-gte', resource: 'a', value: 10 },
+              { kind: 'resource-gte', resource: 'b', value: 10 },
+            ],
+          },
         }),
       accessor,
     );
@@ -304,7 +309,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
         c.register({
           id: 'idle',
           name: 'Idle',
-          goal: C.resource('xp', 'gte', 100),
+          goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         }),
       accessor,
     );
@@ -326,7 +331,7 @@ describe('walkChallengeTransitions — challenge-maxed', () => {
         c.register({
           id: 'grind',
           name: 'Grind',
-          goal: C.resource('xp', 'gte', 10),
+          goal: { kind: 'resource-gte', resource: 'xp', value: 10 },
           completionLimit: 2,
         }),
       accessor,

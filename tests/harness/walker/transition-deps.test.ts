@@ -5,7 +5,6 @@ import { createCostRequirement } from '@/core/requirements';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -236,7 +235,13 @@ describe('emitChallengeTransitionsWithDeps', () => {
       c.register({
         id: 'secret',
         name: 'Secret',
-        visible: C.and(C.resource('gold', 'gte', 100), C.unlock('smithing')),
+        visible: {
+          kind: 'all',
+          of: [
+            { kind: 'resource-gte', resource: 'gold', value: 100 },
+            { kind: 'flag', id: 'smithing' },
+          ],
+        },
       });
     }, accessor);
 
@@ -261,7 +266,13 @@ describe('emitChallengeTransitionsWithDeps', () => {
       c.register({
         id: 'gated',
         name: 'Gated',
-        canStart: C.or(C.resource('mana', 'gte', 20), C.state('player.phase', 'eq', 'combat')),
+        canStart: {
+          kind: 'any',
+          of: [
+            { kind: 'resource-gte', resource: 'mana', value: 20 },
+            { kind: 'state', key: 'player.phase', operator: 'eq', value: 'combat' },
+          ],
+        },
       });
     }, accessor);
 
@@ -283,7 +294,10 @@ describe('emitChallengeTransitionsWithDeps', () => {
         id: 'survive',
         name: 'Survive',
         // Challenge succeeds when xp is NOT below 100 — i.e. xp >= 100.
-        goal: C.not(C.resource('xp', 'lt', 100)),
+        goal: {
+          kind: 'not',
+          of: { kind: 'resource-gte', resource: 'xp', value: 100 },
+        },
       });
     }, accessor);
     const challenges = (engine.tryInject(CategoriesKey) as EngineCategories).challenges![0];
@@ -306,7 +320,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
       c.register({
         id: 'once',
         name: 'Once',
-        goal: C.resource('xp', 'gte', 100),
+        goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         completionLimit: 1,
       });
     }, accessor);
@@ -332,10 +346,28 @@ describe('emitChallengeTransitionsWithDeps', () => {
       c.register({
         id: 'deep',
         name: 'Deep',
-        visible: C.and(
-          C.or(C.resource('gold', 'gte', 10), C.not(C.resource('wood', 'lt', 5))),
-          C.and(C.unlock('smithing'), C.state('player.phase', 'eq', 'combat')),
-        ),
+        visible: {
+          kind: 'all',
+          of: [
+            {
+              kind: 'any',
+              of: [
+                { kind: 'resource-gte', resource: 'gold', value: 10 },
+                {
+                  kind: 'not',
+                  of: { kind: 'resource-gte', resource: 'wood', value: 5 },
+                },
+              ],
+            },
+            {
+              kind: 'all',
+              of: [
+                { kind: 'flag', id: 'smithing' },
+                { kind: 'state', key: 'player.phase', operator: 'eq', value: 'combat' },
+              ],
+            },
+          ],
+        },
       });
     }, accessor);
 

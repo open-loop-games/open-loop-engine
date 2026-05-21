@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
-import { C } from '@/core/conditions';
+import { createEngine, type EngineModule } from '@/index';
 import { createRelationshipCategory } from '@/systems/relationship';
 import type {
   ScalarRelationshipDef,
@@ -11,7 +11,7 @@ import type {
   FactionRelationshipDef,
   FlagRelationshipDef,
   RelationshipDef,
-} from '@/primitives/relationship';
+} from '@/systems/relationship-defs';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -30,6 +30,26 @@ function buildAccessor(): GameStateAccessorMutator {
     },
     setState: () => {},
   };
+}
+
+/**
+ * Run `fn` inside an engine install hook so the ambient GateRuntime triple
+ * (accessor + categories + registry) is wired — required for tryAdvance to
+ * evaluate Gate-typed `gates[]`.
+ */
+function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
+  let result: T;
+  const mod: EngineModule = {
+    id: 'test',
+    install() {
+      result = fn();
+    },
+  };
+  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  engine.use(mod);
+  engine.start();
+  engine.stop();
+  return result!;
 }
 
 describe('createRelationshipCategory', () => {
@@ -103,7 +123,7 @@ describe('createRelationshipCategory', () => {
   describe('tiered variant (molcremental shape)', () => {
     it('advances through tiers when gates pass', () => {
       const accessor = buildAccessor();
-      withGameStateAccessor(accessor, () => {
+      withEngine(accessor, () => {
         const cat = createRelationshipCategory<TieredRelationshipDef>({ id: 'npc-trust' });
         cat.register({
           id: 'mentor-rask',
@@ -111,9 +131,9 @@ describe('createRelationshipCategory', () => {
           actors: ['mentor-rask'],
           tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
           gates: [
-            C.unlock('knowledge-rask-approach'),
-            C.unlock('knowledge-rask-competence'),
-            C.unlock('knowledge-rask-task'),
+            { kind: 'flag', id: 'knowledge-rask-approach' },
+            { kind: 'flag', id: 'knowledge-rask-competence' },
+            { kind: 'flag', id: 'knowledge-rask-task' },
           ],
         });
         const inst = cat.getInstance<'tiered'>('mentor-rask')!;
@@ -170,7 +190,10 @@ describe('createRelationshipCategory', () => {
           kind: 'tiered',
           actors: ['mages-guild'],
           tiers: ['novice', 'apprentice', 'master'],
-          gates: [C.unlock('never'), C.unlock('never')],
+          gates: [
+            { kind: 'flag', id: 'never' },
+            { kind: 'flag', id: 'never' },
+          ],
         });
         const inst = cat.getInstance<'tiered'>('guild-rank')!;
         // tryAdvance would be blocked, but setIndex bypasses

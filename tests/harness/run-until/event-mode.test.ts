@@ -11,7 +11,6 @@ import { createMemoryStorage } from '@/core/save-manager';
 import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -95,7 +94,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        canStart: C.unlock('unreachable-flag'),
+        canStart: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
       ctx.provide(CategoriesKey, { challenges: [challenges] } as EngineCategories);

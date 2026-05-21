@@ -45,14 +45,13 @@ import type { ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import type { OverrideRegistry } from '@/core/override-registry';
 import type { Reset } from './reset';
-import type { ICondition, IEffect, GameStateAccessor } from '@/primitives/types';
+import type { IEffect, GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
-import { evaluateCondition } from '@/core/conditions';
 import { applyEffect } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentResourceRegistry } from '@/core/registries';
 import { getCurrentEngineCategories } from './engine-categories';
-import { evaluateGate, isGate, type Gate, type GateRuntime } from './gate';
+import { evaluateGate, type Gate, type GateRuntime } from './gate';
 import type { Grant } from '@/core/modifier';
 import type { DecimalSource } from '@/primitives/decimal';
 
@@ -76,20 +75,19 @@ export interface ChallengeDef<
   /**
    * Visibility gate — hidden challenges don't appear in UI.
    *
-   * Accepts a plain `boolean`, an {@link ICondition} evaluated against the
-   * accessor, or a {@link Gate} resolved through the ambient
-   * {@link GateRuntime} (the option-then-ambient triple). Gate is the
-   * preferred declarative form — predictor-friendly and category-aware
-   * without consumer-side path conventions.
+   * Accepts a plain `boolean` or a {@link Gate} resolved through the ambient
+   * {@link GateRuntime}. Gate is the declarative form — predictor-friendly,
+   * category-aware, with the flat-id escape hatch for consumer-side
+   * progression flags.
    */
-  visible?: ICondition | boolean | Gate;
+  visible?: boolean | Gate;
 
   /**
    * Start gate — prevents entering when not met.
    *
-   * Accepts the same three forms as {@link visible}.
+   * Accepts the same two forms as {@link visible}.
    */
-  canStart?: ICondition | boolean | Gate;
+  canStart?: boolean | Gate;
 
   /**
    * Overrides pushed to the override registry while this challenge is active.
@@ -107,17 +105,15 @@ export interface ChallengeDef<
   /**
    * Completion goal — auto-completes when met while active.
    *
-   * Three forms:
+   * Two forms:
    * - {@link Gate} — declarative typed predicate spec. Resolved through the
    *   ambient {@link GateRuntime}. Predictor- and devtool-friendly, no
    *   consumer-side path conventions; preferred for category-aware goals.
-   * - `ICondition` — declarative; evaluated against the accessor.
-   *   Introspectable by balance-sim / devtools, but requires a
-   *   `GameStateAccessor` mapping string IDs to live refs.
-   * - `() => boolean` — callback form; skips the accessor map. Prefer when the
-   *   check naturally reads typed refs in scope and introspection isn't needed.
+   * - `() => boolean` — callback form; skips Gate's introspection. Prefer
+   *   when the check naturally reads typed refs in scope and introspection
+   *   isn't needed.
    */
-  goal?: ICondition | (() => boolean) | Gate;
+  goal?: (() => boolean) | Gate;
 
   /** Maximum number of completions. Default: 1. AD Eternity Challenges use 5. */
   completionLimit?: number;
@@ -375,23 +371,16 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   // Track cleanup functions for each active challenge's scoped overrides/patches
   const activeCleanups = new Map<string, Array<() => void>>();
 
-  /** Evaluate an ICondition / boolean / Gate, defaulting to fallback if undefined. */
-  function evalCondition(
-    cond: ICondition | boolean | Gate | undefined,
-    fallback: boolean,
-  ): boolean {
+  /** Evaluate a boolean / Gate field, defaulting to fallback if undefined. */
+  function evalCondition(cond: boolean | Gate | undefined, fallback: boolean): boolean {
     if (cond === undefined) return fallback;
     if (typeof cond === 'boolean') return cond;
-    if (isGate(cond)) {
-      if (!gateRuntime) {
-        throw new Error(
-          'createChallengeCategory: a Gate field was supplied but the ambient runtime triple (accessor + categories + registry) was incomplete at category construction time. Call createChallengeCategory inside engine install/connect.',
-        );
-      }
-      return evaluateGate(cond, gateRuntime);
+    if (!gateRuntime) {
+      throw new Error(
+        'createChallengeCategory: a Gate field was supplied but the ambient runtime triple (accessor + categories + registry) was incomplete at category construction time. Call createChallengeCategory inside engine install/connect.',
+      );
     }
-    if (!accessor) return fallback;
-    return evaluateCondition(cond, accessor);
+    return evaluateGate(cond, gateRuntime);
   }
 
   /** Push scoped overrides and content patches for a challenge def */

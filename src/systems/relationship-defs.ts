@@ -1,5 +1,5 @@
 /**
- * Relationship — typed per-actor / per-faction state with five variant shapes (scalar, faction, tiered, vector, flag).
+ * Relationship def shapes — typed per-actor / per-faction state with five variant shapes (scalar, faction, tiered, vector, flag).
  *
  * The variant set is `kind`-discriminated: a single `RelationshipDef` union
  * covers Tuxemon-style scalar bonds, Daggerfall faction trees, ranked guild
@@ -12,9 +12,11 @@
  * are intentionally not schema fields — compose them at the consumer using
  * the engine's GameLoop ticks and Resettable scopes against the instance's
  * `get`/`set`/`tryAdvance` surface.
+ *
+ * @cluster relationship
  */
 
-import type { ICondition } from './types';
+import type { Gate } from './gate';
 
 /** Common identity for every relationship def. */
 export interface RelationshipDefBase {
@@ -71,7 +73,7 @@ export interface FactionRelationshipDef extends RelationshipDefBase {
  * Ordered tier ladder (Daggerfall guild rank, OpenMW faction rank,
  * molcremental NPC trust). Discrete 0..N progression; per-transition
  * advancement gates let the consumer encode time-based, skill-based, or
- * discovery-based prerequisites as an {@link ICondition}.
+ * discovery-based prerequisites as a {@link Gate}.
  */
 export interface TieredRelationshipDef extends RelationshipDefBase {
   kind: 'tiered';
@@ -82,10 +84,12 @@ export interface TieredRelationshipDef extends RelationshipDefBase {
   initial?: number;
   /**
    * Per-transition advancement gate. `gates[from]` must evaluate true (or be
-   * absent) to advance from index `from` to `from + 1`. Game-side modules
-   * supply these as ICondition references to module state.
+   * absent) to advance from index `from` to `from + 1`. Gate literals are the
+   * declarative authoring form — predictor-friendly, category-aware, with the
+   * flat-id escape hatch ({@link FlagGate}) for progression flags that aren't
+   * category entries.
    */
-  gates?: ReadonlyArray<ICondition | undefined>;
+  gates?: ReadonlyArray<Gate | undefined>;
 }
 
 /**
