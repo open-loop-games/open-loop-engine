@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
-import type { IEffect, GameStateAccessor } from '@/primitives/types';
+import type { IEffect, IEffectInternal, GameStateAccessor } from '@/primitives/types';
 import { resolveEffect, applyEffect, type GameStateMutator } from '@/core/effects';
 
 function mockAccessor(): GameStateAccessor {
@@ -33,7 +33,7 @@ describe('resolveEffect', () => {
     expect(resolveEffect(e, mockAccessor())).toHaveLength(2);
   });
   it('conditional true branch', () => {
-    const e: IEffect = {
+    const e: IEffectInternal = {
       type: 'conditional',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
@@ -42,7 +42,7 @@ describe('resolveEffect', () => {
     expect(resolveEffect(e, mockAccessor())[0].target).toBe('gems');
   });
   it('conditional false branch', () => {
-    const e: IEffect = {
+    const e: IEffectInternal = {
       type: 'conditional',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
@@ -51,7 +51,7 @@ describe('resolveEffect', () => {
     expect(resolveEffect(e, mockAccessor())[0].target).toBe('dust');
   });
   it('conditional no else returns empty', () => {
-    const e: IEffect = {
+    const e: IEffectInternal = {
       type: 'conditional',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },

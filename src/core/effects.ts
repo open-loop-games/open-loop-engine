@@ -5,12 +5,12 @@
 import type { DecimalSource } from '@/primitives/decimal';
 import type {
   IEffect,
+  IEffectInternal,
   GameStateAccessor,
   ResourceEffect,
   UnlockEffect,
   StateEffect,
   CompositeEffect,
-  ConditionalEffect,
 } from '@/primitives/types';
 import { evaluateCondition } from './conditions';
 import { gateToCondition, type Gate } from './gate';
@@ -51,12 +51,18 @@ function isEvaluable(v: unknown): v is { evaluate(): DecimalSource } {
 
 // === RESOLUTION & APPLICATION ===
 /**
- * Flatten a declarative {@link IEffect} into a list of concrete
+ * Flatten a declarative {@link IEffectInternal} into a list of concrete
  * {@link ResolvedEffect} steps. Recurses through `composite` and `conditional`
  * nodes (evaluating gates via the supplied accessor); evaluates
  * {@link Evaluable} value sources at resolution time.
+ *
+ * Accepts the full internal IR including {@link ConditionalEffect}; the
+ * narrower public {@link IEffect} is a structural subtype and assigns freely.
  */
-export function resolveEffect(effect: IEffect, accessor: GameStateAccessor): ResolvedEffect[] {
+export function resolveEffect(
+  effect: IEffectInternal,
+  accessor: GameStateAccessor,
+): ResolvedEffect[] {
   switch (effect.type) {
     case 'resource':
       return [
@@ -90,7 +96,7 @@ export function resolveEffect(effect: IEffect, accessor: GameStateAccessor): Res
  * `applyEffect` handles mutation via the mutator interface.
  */
 export function applyEffect(
-  effect: IEffect,
+  effect: IEffectInternal,
   accessor: GameStateAccessor,
   mutator: GameStateMutator,
 ): void {
@@ -151,9 +157,13 @@ export const E = {
   /**
    * Build a conditional effect — `then` applies when `gate` evaluates true,
    * `otherwise` (if provided) applies when false. The {@link Gate} is
-   * projected to the internal {@link ICondition} IR via `gateToCondition`
-   * at build time, so the returned `ConditionalEffect` is fully serializable
-   * and the resolution path stays predictor-friendly.
+   * projected to the internal `ICondition` IR via `gateToCondition` at build
+   * time, so the returned effect is fully serializable and the resolution
+   * path stays predictor-friendly.
+   *
+   * Returns `IEffect` opaquely — the internal `ConditionalEffect` shape isn't
+   * part of the public union, so consumers can't narrow to it and the
+   * embedded ICondition stays unreachable through the public type system.
    *
    * `gate` must be a rate-aware Gate — category-aware kinds (`count-gte`,
    * `unlock`) and combinators containing them have no `ICondition`
@@ -161,7 +171,12 @@ export const E = {
    * effects, gate the application at the consumer (only build the effect
    * inside the branch you want), not via `E.conditional`.
    */
-  conditional(gate: Gate, then: IEffect, otherwise?: IEffect): ConditionalEffect {
-    return { type: 'conditional', condition: gateToCondition(gate), then, else: otherwise };
+  conditional(gate: Gate, then: IEffect, otherwise?: IEffect): IEffect {
+    return {
+      type: 'conditional',
+      condition: gateToCondition(gate),
+      then,
+      else: otherwise,
+    } as unknown as IEffect;
   },
 };

@@ -39,11 +39,11 @@ shared generic type utilities and dev-mode helpers
 
 declarative game-state mutations from `IEffect` ASTs
 
-- `function applyEffect(effect: IEffect, accessor: GameStateAccessor, mutator: GameStateMutator): void` — Resolve an effect and apply it to game state via the mutator. `src/core/effects.ts:92`
-- `const E` — Ergonomic factories for constructing IEffect values. `src/core/effects.ts:134`
+- `function applyEffect(effect: IEffectInternal, accessor: GameStateAccessor, mutator: GameStateMutator): void` — Resolve an effect and apply it to game state via the mutator. `src/core/effects.ts:98`
+- `const E` — Ergonomic factories for constructing IEffect values. `src/core/effects.ts:140`
 - `interface GameStateMutator` — Mutation interface for applying resolved effects to game state. `src/core/effects.ts:32`
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
-- `function resolveEffect(effect: IEffect, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffect into a list of concrete ResolvedEffect steps. `src/core/effects.ts:59`
+- `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:62`
 - `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:171`
 - `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:194`
 - `interface EffectModifierBinding` — Binds a modifier to a `ModifierChain` while the effect is active. `src/systems/effect-modifier-binding.ts:20`

@@ -232,7 +232,6 @@ export type {
   UnlockEffect,
   StateEffect,
   CompositeEffect,
-  ConditionalEffect,
   GameStateAccessor,
   Analyzer,
   AnalyzerResult,

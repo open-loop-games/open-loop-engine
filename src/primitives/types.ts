@@ -49,7 +49,15 @@ export interface CompositeEffect {
   effects: IEffect[];
 }
 
-/** Applies one of two effects depending on whether a condition holds at evaluation time. */
+/**
+ * Applies one of two effects depending on whether a condition holds at evaluation time.
+ *
+ * Engine-internal IR: consumers construct via `E.conditional(gate, then, otherwise?)`
+ * which returns the public {@link IEffect} opaquely, so the embedded
+ * {@link ICondition} is unreachable through the public type system.
+ *
+ * @internal
+ */
 export interface ConditionalEffect {
   type: 'conditional';
   condition: ICondition;
@@ -63,13 +71,22 @@ export interface ConditionalEffect {
  * Tagged-union root for declarative effects — the data shape content
  * authors hand to category factories. Resolved via {@link resolveEffect} and
  * applied through a {@link GameStateMutator}.
+ *
+ * Conditional effects (built via `E.conditional`) are part of the internal IR
+ * ({@link IEffectInternal}) and aren't members of this public union — consumers
+ * receive them opaquely typed as `IEffect`, so the embedded ICondition can't
+ * be reached through union narrowing.
  */
-export type IEffect =
-  | ResourceEffect
-  | UnlockEffect
-  | StateEffect
-  | CompositeEffect
-  | ConditionalEffect;
+export type IEffect = ResourceEffect | UnlockEffect | StateEffect | CompositeEffect;
+
+/**
+ * Engine-internal effect IR — the full union including {@link ConditionalEffect}.
+ * Used by `resolveEffect` / `applyEffect` / walker machinery that needs to
+ * narrow on `type: 'conditional'`. Not part of the public surface.
+ *
+ * @internal
+ */
+export type IEffectInternal = IEffect | ConditionalEffect;
 
 /**
  * Tests a resource amount against a threshold using a comparison operator.
@@ -137,7 +154,8 @@ export interface NotCondition {
  * Engine-internal IR for declarative predicates. Consumers author {@link Gate}
  * literals on content-def fields; the engine projects rate-aware Gate leaves
  * to ICondition via `gateToCondition` for walker / predictor reuse. Embedded
- * by {@link ConditionalEffect} as the conditional-effect IR.
+ * by the internal {@link ConditionalEffect} as the conditional-effect IR
+ * (unreachable from the public {@link IEffect} union).
  *
  * Not part of the public surface — kept as a typed interchange shape between
  * the Gate projection and the IEffect / walker machinery that already speaks

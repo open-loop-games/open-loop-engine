@@ -11,7 +11,6 @@ export type {
   UnlockEffect,
   StateEffect,
   CompositeEffect,
-  ConditionalEffect,
   Analyzer,
   AnalyzerResult,
   WeightedItem,

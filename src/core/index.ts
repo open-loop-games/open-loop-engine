@@ -11,7 +11,6 @@ export type {
   UnlockEffect,
   StateEffect,
   CompositeEffect,
-  ConditionalEffect,
   GameStateAccessor,
   Analyzer,
   AnalyzerResult,
@@ -128,9 +127,10 @@ export * from './formulas';
 export * from './beat-timing';
 
 // === EFFECTS ===
-// ICondition + C are engine-internal IR — imported via `@/core/conditions` /
-// `@/primitives/types` from tests and from systems-layer callers that need
-// the projection target. Not part of the public surface.
+// ICondition + C and ConditionalEffect + IEffectInternal are engine-internal
+// IR — imported via `@/core/conditions` / `@/primitives/types` from tests and
+// from systems-layer callers that need the projection target. Not part of
+// the public surface.
 export type { ResolvedEffect, GameStateMutator } from './effects';
 export { resolveEffect, applyEffect, E } from './effects';
 

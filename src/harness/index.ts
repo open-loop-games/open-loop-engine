@@ -60,7 +60,6 @@ export type {
   UnlockEffect,
   StateEffect,
   CompositeEffect,
-  ConditionalEffect,
   State,
   Persistent,
   NonPersistent,
