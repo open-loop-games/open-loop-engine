@@ -9,9 +9,13 @@
  * the player-facing automation surface with the sim/recommendation/balance
  * machinery without forcing either side to adopt the other's lifecycle.
  *
- * Built-in factories follow the constructor-as-data carve-out
- * (see `src/systems/CLAUDE.md` § Naming verbs): call sites read as
- * configuration, not as actions — `policy: selectionHybridPayback({ ... })`.
+ * Built-in factories follow the constructor-as-data carve-out (see
+ * `open-loop-engine/CLAUDE.md` § Naming, noun-form helpers): call sites
+ * read as configuration, not as actions — `policy: selectionHybridPayback({ ... })`.
+ * `FillStrategy` factories keep the verb form (`create*Strategy`) because
+ * round-robin binds persistent cursor state; the convention extends across
+ * that family for symmetry. See `core/sequencer-strategies.ts` for the
+ * mirrored cross-reference.
  *
  * Affordability filtering is the consumer's responsibility, not the policy's.
  * Each helper that drives a policy (e.g. `setupPolicyAutoPurchase`) filters

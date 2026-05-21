@@ -7,6 +7,16 @@
  * - Round-robin: cycle through candidates in rotation (Increlution)
  * - Composite: chain strategies with first-match semantics (emergency + round-robin)
  *
+ * Sibling axes for "choose one from a list" — each with a different lifecycle:
+ * - `FillStrategy` (this file) — sequencer-driven, `next()` returns `SequencerItem<M> | null`.
+ *   Verb form (`create*Strategy`) because round-robin binds a persistent cursor; the
+ *   convention extends across the family for symmetry.
+ * - `SelectionPolicy` ({@link ../core/policy}) — passive, `pick(candidates) → T | undefined`.
+ *   Noun form (`selection*`) per the constructor-as-data carve-out — call sites read as
+ *   configuration (`policy: selectionHybridPayback({ ... })`).
+ * - `RecommendationStrategy` ({@link ../systems/recommendation}) — between-loop, runs on
+ *   `Loop.restart` and surfaces winning configurations.
+ *
  * @cluster sequencer
  */
 
