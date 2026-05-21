@@ -3,7 +3,7 @@ import { ref, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { createModifierChain, createMultiplicativeModifier } from '@/core/modifier';
 import { createPersistentEffectSystem } from '@/systems/persistent-effect';
-import { replacementBinding } from '@/systems/effect-modifier-binding';
+import { replacementBinding } from '@/systems/modifier-binding';
 
 describe('replacementBinding', () => {
   it('cancels the target multiplier and applies the replacement', async () => {

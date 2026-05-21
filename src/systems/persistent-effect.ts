@@ -7,9 +7,9 @@
  * them. No timers, no countdown, no save-state duplication.
  *
  * Symmetric to {@link createTemporaryEffectSystem} with one swap:
- * `duration` → `active: Computable<boolean>`. Same `EffectModifierBinding[]`
- * shape, so the two systems are drop-in compatible for consumers migrating
- * between time-limited and condition-driven lifecycles.
+ * `duration` → `active: Computable<boolean>`. Same `ModifierBinding[]` shape,
+ * so the two systems are drop-in compatible for consumers migrating between
+ * time-limited and condition-driven lifecycles.
  *
  * Key features:
  * - Declarative condition — bindings track a reactive predicate
@@ -42,12 +42,12 @@ import { processGetter, type Computable } from '@/core/computed';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Modifier } from '@/core/modifier';
-import type { EffectModifierBinding } from './effect-modifier-binding';
+import type { ModifierBinding } from './modifier-binding';
 
 // === TYPES ===
 
 // TODO(ergonomics): string-keyed effect dict shorthand — Kittens Game-style
-// `effects: { "goldPerTick": 0.01 }` mapped to EffectModifierBinding[].
+// `effects: { "goldPerTick": 0.01 }` mapped to ModifierBinding[].
 // Consumer-side helper first; promote to engine if two consumers converge.
 
 /** Definition for a persistent effect, registered at startup. */
@@ -66,7 +66,7 @@ export interface PersistentEffectDef {
    * Can be a static array or a factory evaluated on each activation — use a factory
    * when bindings depend on runtime state.
    */
-  modifiers?: EffectModifierBinding[] | (() => EffectModifierBinding[]);
+  modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
   /** Called on the rising edge (`false → true`), including on registration if already active */
   onActivate?: (def: PersistentEffectDef) => void;
   /** Called on the falling edge (`true → false`) */
@@ -174,7 +174,7 @@ export function createPersistentEffectSystem(
   const entries = new Map<string, DefEntry>();
   const handle = createEmitHandle<PersistentEffectEvents>();
 
-  function resolveModifier(binding: EffectModifierBinding): Modifier {
+  function resolveModifier(binding: ModifierBinding): Modifier {
     return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
   }
 

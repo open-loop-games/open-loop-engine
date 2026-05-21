@@ -1,10 +1,11 @@
 /**
- * Effect-modifier binding contract + helpers.
+ * Modifier-binding contract + helpers.
  *
- * The `EffectModifierBinding` interface is the contract both effect systems
+ * The `ModifierBinding` interface is the shape both effect systems
  * (`createTemporaryEffectSystem`, `createPersistentEffectSystem`) accept on
- * their `modifiers` field. This module also hosts factories that produce
- * values of that contract for common patterns.
+ * their `modifiers` field — a chain plus the modifier (or factory) to bind to
+ * it while the effect is active. This module also hosts factories that produce
+ * `ModifierBinding[]` for common patterns.
  *
  * @cluster effects
  */
@@ -16,8 +17,15 @@ import { createMultiplicativeModifier, type Modifier, type ModifierChain } from 
 
 // === TYPES ===
 
-/** Binds a modifier to a `ModifierChain` while the effect is active. */
-export interface EffectModifierBinding {
+/**
+ * Binds a modifier to a `ModifierChain` while an effect-system entry is active.
+ *
+ * @internal Structural contract for `PersistentEffectDef.modifiers` /
+ * `TemporaryEffectDef.modifiers`. Consumers write object literals into those
+ * fields and let inference handle the type; named imports are not part of the
+ * public surface.
+ */
+export interface ModifierBinding {
   /** Which modifier chain to target */
   chain: ModifierChain;
   /**
@@ -68,8 +76,8 @@ export interface ReplacementBindingOptions {
  * chain entries.
  *
  * @param options - Cancel/replacement value sources + target chain + description
- * @returns Two {@link EffectModifierBinding} entries (cancel + replacement)
- *   suitable for `PersistentEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
+ * @returns Two binding entries (cancel + replacement) suitable for
+ *   `PersistentEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
  *
  * @example
  * ```ts
@@ -89,7 +97,7 @@ export interface ReplacementBindingOptions {
  * });
  * ```
  */
-export function replacementBinding(options: ReplacementBindingOptions): EffectModifierBinding[] {
+export function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[] {
   const { chain, cancel, replacement, description } = options;
   const cancelSrc = processGetter(cancel);
   const replacementSrc = processGetter(replacement);

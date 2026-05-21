@@ -1,12 +1,12 @@
 /**
  * Content walker — emit one {@link ModifierPickerEntry} per
- * `EffectModifierBinding` on every effect-system def registered in
+ * `ModifierBinding` on every effect-system def registered in
  * {@link EffectSystemRegistryKey}.
  *
  * @internal
  */
 
-import type { Engine, EffectModifierBinding } from '@/index';
+import type { Engine, ModifierBinding } from '@/index';
 import { EffectSystemRegistryKey } from '@/index';
 import { forEachEffectDef } from '../walk';
 import type { ModifierPickerEntry } from './types';
@@ -14,7 +14,7 @@ import type { ModifierPickerEntry } from './types';
 /**
  * Walk every effect system (temporary + persistent) auto-registered into
  * the engine's {@link EffectSystemRegistryKey} and emit one
- * {@link ModifierPickerEntry} per `EffectModifierBinding` on each def.
+ * {@link ModifierPickerEntry} per `ModifierBinding` on each def.
  *
  * Bindings whose `modifiers` field is a factory function are called once
  * at walk time — this is the same semantics the effect systems use
@@ -39,15 +39,15 @@ export function walkContent(engine: Engine): ModifierPickerEntry[] {
   forEachEffectDef(registry, ({ systemId, def }) => {
     // Narrow: EffectDefLike carries `modifiers?: readonly unknown[] | (() => readonly unknown[])`
     // but the real defs (TemporaryEffectDef / PersistentEffectDef) both
-    // carry `EffectModifierBinding[] | (() => EffectModifierBinding[])` per
+    // carry `ModifierBinding[] | (() => ModifierBinding[])` per
     // src/systems/{temporary,persistent}-effect.ts.
     const raw = (
       def as {
-        modifiers?: EffectModifierBinding[] | (() => EffectModifierBinding[]);
+        modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
       }
     ).modifiers;
     if (!raw) return;
-    const bindings: readonly EffectModifierBinding[] = typeof raw === 'function' ? raw() : raw;
+    const bindings: readonly ModifierBinding[] = typeof raw === 'function' ? raw() : raw;
 
     bindings.forEach((binding, bindingIndex) => {
       const modifier =

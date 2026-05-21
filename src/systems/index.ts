@@ -157,12 +157,12 @@ export * from './temporary-effect';
 // predicate; state is implicit in the game so load reconstruction is automatic.
 export * from './persistent-effect';
 
-// === EFFECT BINDING HELPERS ===
-// EffectModifierBinding contract type + factories that return
-// EffectModifierBinding[] for common patterns. Sibling to temporary-effect /
-// persistent-effect; consumers pass the factory output as the `modifiers`
-// field on a def.
-export * from './effect-modifier-binding';
+// === MODIFIER BINDING HELPERS ===
+// `ModifierBinding` shape (internal — inferred at consumer call sites) plus
+// public factories that return `ModifierBinding[]` for common patterns.
+// Sibling to temporary-effect / persistent-effect; consumers pass the factory
+// output as the `modifiers` field on a def.
+export * from './modifier-binding';
 
 // === SLOTS ===
 // Constrained persistent selection from a pool (equipment slots, spell slots, policy picks).

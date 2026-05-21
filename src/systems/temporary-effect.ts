@@ -48,7 +48,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Modifier } from '@/core/modifier';
 import type { RegisterTick } from '@/core/sequencer';
-import type { EffectModifierBinding } from './effect-modifier-binding';
+import type { ModifierBinding } from './modifier-binding';
 
 // === TYPES ===
 
@@ -75,7 +75,7 @@ export interface TemporaryEffectDef {
    * Can be a static array or a factory evaluated at each `apply()` — use a factory
    * when bindings depend on runtime state (e.g., which chain to target).
    */
-  modifiers?: EffectModifierBinding[] | (() => EffectModifierBinding[]);
+  modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
   /** Called when the effect is applied */
   onApply?: (instance: TemporaryEffectInstance) => void;
   /** Called every tick while the effect is active */
@@ -213,7 +213,7 @@ export function createTemporaryEffectSystem(
     return new Decimal(unref(processGetter(def.duration))).toNumber();
   }
 
-  function resolveModifier(binding: EffectModifierBinding): Modifier {
+  function resolveModifier(binding: ModifierBinding): Modifier {
     return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
   }
 

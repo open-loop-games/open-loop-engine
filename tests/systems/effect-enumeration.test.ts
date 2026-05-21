@@ -16,7 +16,7 @@ import {
 } from '@/core/modifier';
 import { createEffectSystemRegistry, withEffectSystemRegistry } from '@/core/registries';
 import { createChainRegistry, withChainRegistry } from '@/core/registries';
-import type { EffectModifierBinding } from '@/systems/effect-modifier-binding';
+import type { ModifierBinding } from '@/systems/modifier-binding';
 
 // ============================================================================
 // Helpers
@@ -102,7 +102,7 @@ describe('balance-sim enumeration', () => {
       const attribution = new Map<string, string[]>();
 
       for (const def of defs) {
-        const bindings = def.modifiers as EffectModifierBinding[] | undefined;
+        const bindings = def.modifiers as ModifierBinding[] | undefined;
         if (!bindings) continue;
         attribution.set(
           def.id,
@@ -138,7 +138,7 @@ describe('balance-sim enumeration', () => {
       // Count modifiers reachable via effect-system path (active defs only)
       let effectPathCount = 0;
       for (const def of defs) {
-        const bindings = def.modifiers as EffectModifierBinding[] | undefined;
+        const bindings = def.modifiers as ModifierBinding[] | undefined;
         if (!bindings) continue;
         // Only count if the def is active (has applied modifiers on chains)
         const isActive = system.isActive(def.id).value;
@@ -200,7 +200,7 @@ describe('balance-sim enumeration', () => {
       const allBindings: { systemId: string; defId: string; chainId: string }[] = [];
       for (const sys of effectReg.all()) {
         for (const def of sys.allDefs()) {
-          const bindings = def.modifiers as EffectModifierBinding[] | undefined;
+          const bindings = def.modifiers as ModifierBinding[] | undefined;
           if (!bindings) continue;
           for (const b of bindings) {
             allBindings.push({ systemId: sys.id, defId: def.id, chainId: b.chain.id });
@@ -243,14 +243,12 @@ describe('balance-sim enumeration', () => {
 
     expect(chain.modifiers).toHaveLength(0);
     expect(effectReg.get('buffs')!.allDefs()).toHaveLength(1);
-    expect((effectReg.get('buffs')!.allDefs()[0].modifiers as EffectModifierBinding[]).length).toBe(
-      1,
-    );
+    expect((effectReg.get('buffs')!.allDefs()[0].modifiers as ModifierBinding[]).length).toBe(1);
 
     // Effect-system path still shows the binding definition
     // (attribution is "what could modify this" not just "what is active now")
     const def = effectReg.get('buffs')!.allDefs()[0];
-    const bindings = def.modifiers as EffectModifierBinding[];
+    const bindings = def.modifiers as ModifierBinding[];
     expect(bindings[0].chain.id).toBe('speed');
 
     // Re-activate — chain picks it back up

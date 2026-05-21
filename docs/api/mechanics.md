@@ -46,13 +46,12 @@ declarative game-state mutations from `IEffect` ASTs
 - `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:62`
 - `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:171`
 - `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:194`
-- `interface EffectModifierBinding` — Binds a modifier to a `ModifierChain` while the effect is active. `src/systems/effect-modifier-binding.ts:20`
 - `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:54`
 - `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:77`
 - `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:91`
 - `interface PersistentEffectSystemOptions` — Options for createPersistentEffectSystem. `src/systems/persistent-effect.ts:85`
-- `function replacementBinding(options: ReplacementBindingOptions): EffectModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/effect-modifier-binding.ts:92`
-- `interface ReplacementBindingOptions` — Options for replacementBinding. `src/systems/effect-modifier-binding.ts:31`
+- `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:100`
+- `interface ReplacementBindingOptions` — Options for replacementBinding. `src/systems/modifier-binding.ts:39`
 - `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:56`
 - `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:106`
 - `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:90`
