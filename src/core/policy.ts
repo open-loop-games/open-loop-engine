@@ -1,13 +1,19 @@
 /**
  * Selection policies — score-and-pick over a candidate list.
  *
- * Sibling axis to {@link FillStrategy} (sequencer-driven, closure-bound `next()`)
- * and {@link RecommendationStrategyDef} (BestOf-coupled, between-loop arbitration).
- * Where those primitives drive their own invocation, a `SelectionPolicy` is
- * passive: a consumer hands it a pre-filtered candidate list and asks "which
- * one wins?". This is the shape automation auto-buy actually wants — bridging
- * the player-facing automation surface with the sim/recommendation/balance
- * machinery without forcing either side to adopt the other's lifecycle.
+ * One of three sibling "choose one from a list" primitives. The axis is
+ * shape, not lifecycle:
+ *
+ * - {@link FillStrategy} — *stateful generator*. Asked `next()` by the
+ *   sequencer when its queue runs dry; round-robin binds a persistent
+ *   cursor.
+ * - `SelectionPolicy` (this file) — *stateless selector*. Given a
+ *   pre-filtered candidate list, scores and returns the winner. No
+ *   internal state; pure function-shape consumed as configuration.
+ * - {@link RecommendationDef} — *scored candidate*. IS one of many
+ *   candidates the recommendation system arbitrates between; the system
+ *   filters via `canApply`, scores via `score`, runs `recommend()` on the
+ *   winner.
  *
  * Built-in factories follow the constructor-as-data carve-out (see
  * `open-loop-engine/CLAUDE.md` § Naming, noun-form helpers): call sites

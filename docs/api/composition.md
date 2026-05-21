@@ -31,11 +31,11 @@ generic typed registry for game content definitions
 
 core primitive for ordered execution of items with optional metadata
 
-- `interface ConditionalRule<M = void>` — A rule mapping a boolean condition to a sequencer item. `src/core/sequencer-strategies.ts:32`
-- `function createCompositeStrategy<M = void>(...strategies: FillStrategy<M>[]): FillStrategy<M>` — Chain multiple strategies with first-match semantics. `src/core/sequencer-strategies.ts:149`
-- `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:66`
-- `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:90`
-- `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:115`
+- `interface ConditionalRule<M = void>` — A rule mapping a boolean condition to a sequencer item. `src/core/sequencer-strategies.ts:36`
+- `function createCompositeStrategy<M = void>(...strategies: FillStrategy<M>[]): FillStrategy<M>` — Chain multiple strategies with first-match semantics. `src/core/sequencer-strategies.ts:153`
+- `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:70`
+- `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:94`
+- `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:119`
 - `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:309`
 - `interface FillStrategy<M = void>` — Strategy for automatically filling the sequencer when it runs dry. `src/core/sequencer.ts:56`
 - `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration function — matches `EngineContext.onTick` signature. `src/core/sequencer.ts:49`
