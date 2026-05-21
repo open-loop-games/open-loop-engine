@@ -43,14 +43,14 @@ authored conversation graphs and the engine-native runtime that walks them. The 
 
 typed per-actor / per-faction state with five variant shapes (scalar, faction, tiered, vector, flag)
 
-- `interface FactionRelationshipDef extends RelationshipDefBase` — V2: scalar per-faction with attitude-matrix propagation (Endless Sky, Daggerfall faction tree). `src/primitives/relationship.ts:53`
-- `interface FlagRelationshipDef extends RelationshipDefBase` — V5: boolean flag bag (Exult `Obj_flags` + global `gflags`). `src/primitives/relationship.ts:132`
-- `type RelationshipDef = ScalarRelationshipDef | FactionRelationshipDef | TieredRelationshipDef | VectorRelationshipDef | FlagRelationshipDef` — Discriminated union — every registered relationship def is one of these. `src/primitives/relationship.ts:143`
-- `interface RelationshipDefBase` — Common identity for every relationship def. `src/primitives/relationship.ts:15`
-- `interface ScalarRelationshipDef extends RelationshipDefBase` — V1: scalar per-entity (Tuxemon bond, Level13 trust). `src/primitives/relationship.ts:28`
-- `interface TieredRelationshipDef extends RelationshipDefBase` — V3: ordered tier ladder (Daggerfall guild rank, OpenMW faction rank, molcremental NPC trust). `src/primitives/relationship.ts:82`
-- `interface VectorRelationshipDef extends RelationshipDefBase` — V4: multi-dimensional vector (CDDA opinion: `{trust, fear, value, anger, owed, sold}`). `src/primitives/relationship.ts:106`
-- `function createRelationshipCategory<Def extends RelationshipDef = RelationshipDef>(options: RelationshipCategoryOptions): RelationshipCategory<Def>` — Create a relationship category that dispatches per-def to one of the five P-REL variants by `def.kind`. `src/systems/relationship.ts:561`
+- `interface FactionRelationshipDef extends RelationshipDefBase` — V2: scalar per-faction with attitude-matrix propagation (Endless Sky, Daggerfall faction tree). `src/primitives/relationship.ts:54`
+- `interface FlagRelationshipDef extends RelationshipDefBase` — V5: boolean flag bag (Exult `Obj_flags` + global `gflags`). `src/primitives/relationship.ts:123`
+- `type RelationshipDef = ScalarRelationshipDef | FactionRelationshipDef | TieredRelationshipDef | VectorRelationshipDef | FlagRelationshipDef` — Discriminated union — every registered relationship def is one of these. `src/primitives/relationship.ts:134`
+- `interface RelationshipDefBase` — Common identity for every relationship def. `src/primitives/relationship.ts:20`
+- `interface ScalarRelationshipDef extends RelationshipDefBase` — V1: scalar per-entity (Tuxemon bond, Level13 trust). `src/primitives/relationship.ts:31`
+- `interface TieredRelationshipDef extends RelationshipDefBase` — V3: ordered tier ladder (Daggerfall guild rank, OpenMW faction rank, molcremental NPC trust). `src/primitives/relationship.ts:76`
+- `interface VectorRelationshipDef extends RelationshipDefBase` — V4: multi-dimensional vector (CDDA opinion: `{trust, fear, value, anger, owed, sold}`). `src/primitives/relationship.ts:98`
+- `function createRelationshipCategory<Def extends RelationshipDef = RelationshipDef>(options: RelationshipCategoryOptions): RelationshipCategory<Def>` — Create a relationship category that dispatches per-def to one of the five variant shapes by `def.kind`. `src/systems/relationship.ts:561`
 - `interface FactionRelationship extends RelationshipBase<'faction', FactionRelationshipDef>, Emittable<FactionRelationshipEvents>` — Faction relationship instance — one persistent scalar per faction, with attitude-matrix propagation via `applyTo`. `src/systems/relationship.ts:122`
 - `interface FlagRelationship extends RelationshipBase<'flag', FlagRelationshipDef>, Emittable<FlagRelationshipEvents>` — Flag relationship instance — per-actor named booleans encoding scripted social events. `src/systems/relationship.ts:149`
 - `function isRelationshipCategory(value: unknown): value is RelationshipCategory<RelationshipDef>` — Type guard: returns `true` if the value is a RelationshipCategory instance. `src/systems/relationship.ts:597`

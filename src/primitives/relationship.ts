@@ -4,9 +4,14 @@
  * The variant set is `kind`-discriminated: a single `RelationshipDef` union
  * covers Tuxemon-style scalar bonds, Daggerfall faction trees, ranked guild
  * ladders, CDDA multi-axis opinions, and Exult-style flag bags. Each variant
- * carries its own policy options (decay, derivation, propagation matrix,
- * tier-transition gates) without forcing the others to model what they don't
- * need. The matching runtime instances live in `systems/relationship.ts`.
+ * carries its own shape (bounds, attitude matrix, tier ladder, dimensions,
+ * flag names) without forcing the others to model what they don't need. The
+ * matching runtime instances live in `systems/relationship.ts`.
+ *
+ * Cross-cutting concerns (time decay, auto-advance, loop-temporary layers)
+ * are intentionally not schema fields — compose them at the consumer using
+ * the engine's GameLoop ticks and Resettable scopes against the instance's
+ * `get`/`set`/`tryAdvance` surface.
  */
 
 import type { ICondition } from './types';
@@ -14,12 +19,10 @@ import type { ICondition } from './types';
 /** Common identity for every relationship def. */
 export interface RelationshipDefBase {
   id: string;
-  /** Display name for UI / debug. Defaults to id. */
-  displayName?: string;
 }
 
 /**
- * V1: scalar per-entity (Tuxemon bond, Level13 trust). One number per
+ * Scalar per-entity (Tuxemon bond, Level13 trust). One number per
  * relationship-holder. Optionally derived-on-read from input fields to
  * sidestep the affinity-grinding failure mode (Level13 takes
  * `Math.max(dialogueValue, explorationValue, fightValue)` over persistent
@@ -35,8 +38,6 @@ export interface ScalarRelationshipDef extends RelationshipDefBase {
   min?: number;
   /** Inclusive upper bound. Default Infinity. */
   max?: number;
-  /** Optional time-decay rate (per second toward neutral = 0). Default 0 (no decay). */
-  decayPerSecond?: number;
   /**
    * When present, stored fields are inputs and reads call `derive(inputs)`.
    * Use for trust-from-play-stats shapes (Level13's `max` over per-stat
@@ -46,7 +47,7 @@ export interface ScalarRelationshipDef extends RelationshipDefBase {
 }
 
 /**
- * V2: scalar per-faction with attitude-matrix propagation (Endless Sky,
+ * Scalar per-faction with attitude-matrix propagation (Endless Sky,
  * Daggerfall faction tree). Asymmetric attitude: a write of +N to faction A
  * propagates `N * attitude[A][B]` to every faction B above `weightFloor`.
  */
@@ -64,17 +65,10 @@ export interface FactionRelationshipDef extends RelationshipDefBase {
   attitude?: Record<string, Record<string, number>>;
   /** Below this absolute weight, propagation is suppressed. Default 0.05 (Endless Sky's value). */
   weightFloor?: number;
-  /**
-   * Permanent/temporary split — when true, the variant maintains a separate
-   * "temporary" layer per faction that's cleared on `dailyReset()` calls.
-   * Models Endless Sky's `provoked` / `bribed` / `fined` sets.
-   */
-  temporaryLayer?: boolean;
-  decayPerSecond?: number;
 }
 
 /**
- * V3: ordered tier ladder (Daggerfall guild rank, OpenMW faction rank,
+ * Ordered tier ladder (Daggerfall guild rank, OpenMW faction rank,
  * molcremental NPC trust). Discrete 0..N progression; per-transition
  * advancement gates let the consumer encode time-based, skill-based, or
  * discovery-based prerequisites as an {@link ICondition}.
@@ -92,12 +86,10 @@ export interface TieredRelationshipDef extends RelationshipDefBase {
    * supply these as ICondition references to module state.
    */
   gates?: ReadonlyArray<ICondition | undefined>;
-  /** When true, advancement is checked on every tick rather than only on explicit `tryAdvance()`. */
-  autoAdvance?: boolean;
 }
 
 /**
- * V4: multi-dimensional vector (CDDA opinion:
+ * Multi-dimensional vector (CDDA opinion:
  * `{trust, fear, value, anger, owed, sold}`). N independent scalars per
  * actor; each dimension drives a different output surface asymmetrically.
  * The value is in the asymmetry — don't fold dimensions that share an
@@ -108,7 +100,7 @@ export interface VectorRelationshipDef extends RelationshipDefBase {
   actors: readonly string[];
   /** Dimension names — each becomes a separate persistent scalar per actor. */
   dimensions: readonly string[];
-  /** Per-dimension policy overrides. Defaults: initial = 0, no clamp, no decay. */
+  /** Per-dimension policy overrides. Defaults: initial = 0, no clamp. */
   dimensionConfig?: Partial<
     Record<
       string,
@@ -116,14 +108,13 @@ export interface VectorRelationshipDef extends RelationshipDefBase {
         initial?: number;
         min?: number;
         max?: number;
-        decayPerSecond?: number;
       }
     >
   >;
 }
 
 /**
- * V5: boolean flag bag (Exult `Obj_flags` + global `gflags`). No scalars;
+ * Boolean flag bag (Exult `Obj_flags` + global `gflags`). No scalars;
  * per-actor named flags. Use when the design encodes social state as
  * authored events (`MET_GORDON`, `HIRED_BY_GORDON`) rather than aggregate
  * values. Does not scale past a few hundred named events without a scripted
