@@ -12,8 +12,10 @@ beforeEach(() => {
   resetAllPersistentContexts();
 });
 import { createSkillCategory } from '@/systems/skill-category';
-import { isAccumulatorSkill } from '@/systems/skill';
+import type { AccumulatorSkill, Skill } from '@/systems/skill';
 import Formula from '@/core/formulas/formulas';
+
+const isAccumulator = (s: Skill): s is AccumulatorSkill => s.permanentBonus != null;
 
 // ============================================================================
 // Types for tests
@@ -255,9 +257,9 @@ describe('createSkillCategory', () => {
     category.register({ id: 'mastery', name: 'Mastery', retentionRate: 0.01 });
 
     const skill = category.getSkill('mastery')!;
-    expect(isAccumulatorSkill(skill)).toBe(true);
+    expect(isAccumulator(skill)).toBe(true);
 
-    if (isAccumulatorSkill(skill)) {
+    if (isAccumulator(skill)) {
       // Add 100 XP → level = floor(sqrt(100)) = 10
       skill.addXp(100);
       expect(new Decimal(skill.level.value).eq(10)).toBe(true);
@@ -295,8 +297,8 @@ describe('createSkillCategory', () => {
     const combat = category.getSkill('combat')!;
     const mastery = category.getSkill('mastery')!;
 
-    expect(isAccumulatorSkill(combat)).toBe(false);
-    expect(isAccumulatorSkill(mastery)).toBe(true);
+    expect(isAccumulator(combat)).toBe(false);
+    expect(isAccumulator(mastery)).toBe(true);
   });
 
   // ==========================================================================

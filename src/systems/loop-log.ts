@@ -20,14 +20,10 @@ import { ref, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { isPersistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import type { InjectionKey } from '@/primitives/types';
 import type { Loop } from './loop';
 
 // === TYPES ===
-
-/** Symbol identifying LoopLog features */
-export const LoopLogType = Symbol('LoopLog');
 
 /**
  * Opt-in discovery key for introspection tools (sim, balance workbench,
@@ -96,7 +92,6 @@ export interface LoopLogEvents {
  * per-loop metric deltas in a reactive ring buffer.
  */
 export interface LoopLog {
-  type: typeof LoopLogType;
   /** Reactive history buffer — newest entry is last */
   readonly history: Ref<LoopLogEntry[]>;
   /** Subscribe to LoopLog events */
@@ -214,7 +209,6 @@ export function createLoopLog(options: LoopLogOptions): LoopLog {
   });
 
   return {
-    type: LoopLogType,
     history,
     on: handle.on,
     setContext(key: string, value: unknown) {
@@ -236,8 +230,3 @@ export function createLoopLog(options: LoopLogOptions): LoopLog {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link LoopLog} instance */
-export function isLoopLog(value: unknown): value is LoopLog {
-  return isType(value, LoopLogType);
-}

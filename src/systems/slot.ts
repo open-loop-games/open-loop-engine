@@ -46,12 +46,8 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 
 // === TYPES ===
-
-/** Symbol identifying Slot features */
-export const SlotType = Symbol('Slot');
 
 /** Configuration for {@link createSlot}. */
 export interface SlotOptions {
@@ -99,8 +95,6 @@ export interface SlotEvents {
  * emits events on state changes, and persists across saves.
  */
 export interface Slot {
-  /** Feature type discriminator for {@link isSlot} checks */
-  type: typeof SlotType;
   readonly id: string;
   readonly mode: 'single' | 'multi';
 
@@ -283,7 +277,6 @@ export function createSlot(options: SlotOptions): Slot {
   }
 
   return {
-    type: SlotType,
     id,
     mode,
     selected,
@@ -303,8 +296,3 @@ export function createSlot(options: SlotOptions): Slot {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link Slot} instance */
-export function isSlot(value: unknown): value is Slot {
-  return isType(value, SlotType);
-}

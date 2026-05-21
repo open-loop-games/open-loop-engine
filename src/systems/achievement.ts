@@ -30,9 +30,6 @@ import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
 
 // === TYPES ===
 
-/** Symbol to identify Achievement features */
-export const AchievementType = Symbol('Achievement');
-
 /** Display text shown on an achievement tile */
 export interface AchievementDisplay {
   title: string;
@@ -99,7 +96,6 @@ export interface AchievementOptions<T = unknown> {
 
 /** A live achievement instance created by {@link createAchievement} */
 export interface Achievement<T = unknown> {
-  type: typeof AchievementType;
   id: string;
   display: AchievementDisplay;
   /**
@@ -218,7 +214,6 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
   const handle = createEmitHandle<AchievementEvents>();
 
   const achievement: Achievement<T> = {
-    type: AchievementType,
     id,
     display,
     gate: gateField,

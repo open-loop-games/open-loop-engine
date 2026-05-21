@@ -1,14 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import {
-  createSkill,
-  SkillType,
-  isSkill,
-  isAccumulatorSkill,
-  getSkillProgress,
-  getSkillXPWindow,
-} from '@/systems/skill';
+import { createSkill, getSkillProgress, getSkillXPWindow } from '@/systems/skill';
 import { createMultiplicativeModifier } from '@/core/modifier';
 import Formula from '@/core/formulas/formulas';
 
@@ -34,7 +27,6 @@ describe('createSkill — accumulator mode', () => {
     expect(Decimal.eq(skill.xp.value, 0)).toBe(true);
     expect(Decimal.eq(skill.level.value, 0)).toBe(true);
     expect(Decimal.eq(skill.permanentBonus.value, 0)).toBe(true);
-    expect(skill.type).toBe(SkillType);
     expect(skill.id).toBe('combat');
   });
 
@@ -143,7 +135,6 @@ describe('createSkill — level-driven mode', () => {
     });
     expect(Decimal.eq(skill.xp.value, 0)).toBe(true);
     expect(Decimal.eq(skill.level.value, 0)).toBe(true);
-    expect(skill.type).toBe(SkillType);
     expect(skill.id).toBe('gen-combat');
   });
 
@@ -344,39 +335,7 @@ describe('Formula inversion via xpCurve', () => {
   });
 });
 
-describe('type guards', () => {
-  it('isSkill identifies both modes', () => {
-    const levelDriven = createSkill({
-      id: 'ld',
-      xpToLevel: quadraticXpToLevel,
-      levelToMultiplier: expMultiplier(1.05),
-    });
-    const accumulator = createSkill({
-      id: 'acc',
-      xpToLevel: quadraticXpToLevel,
-      retentionFormula: percentRetention,
-    });
-    expect(isSkill(levelDriven)).toBe(true);
-    expect(isSkill(accumulator)).toBe(true);
-    expect(isSkill({})).toBe(false);
-    expect(isSkill(null)).toBe(false);
-  });
-
-  it('isAccumulatorSkill distinguishes modes', () => {
-    const levelDriven = createSkill({
-      id: 'ld2',
-      xpToLevel: quadraticXpToLevel,
-      levelToMultiplier: expMultiplier(1.05),
-    });
-    const accumulator = createSkill({
-      id: 'acc2',
-      xpToLevel: quadraticXpToLevel,
-      retentionFormula: percentRetention,
-    });
-    expect(isAccumulatorSkill(levelDriven)).toBe(false);
-    expect(isAccumulatorSkill(accumulator)).toBe(true);
-  });
-
+describe('mode shape', () => {
   it('xp is a persistent ref in both modes', () => {
     const ld = createSkill({
       id: 'ld3',

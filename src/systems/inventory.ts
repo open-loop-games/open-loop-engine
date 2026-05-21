@@ -11,13 +11,9 @@ import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
 import { createResource, type Resource } from '@/core/resource';
 import { withPersistentContext } from '@/core/persistence';
-import { isType } from '@/core/feature';
 import type { Modifier } from '@/core/modifier';
 
 // === TYPES ===
-
-/** Symbol identifying Inventory features */
-export const InventoryType = Symbol('Inventory');
 
 /** Options for {@link createInventory} — capacity, overflow behavior, and the initial item list. */
 export interface InventoryOptions {
@@ -48,8 +44,6 @@ export interface InventoryOptions {
  * accessors, and an optional auto-persistence layer for known item ids.
  */
 export interface Inventory {
-  /** Feature type discriminator for {@link isInventory} checks */
-  type: typeof InventoryType;
   readonly id: string;
   /** Underlying ResourceBag — escape hatch for advanced use */
   readonly bag: ResourceBag;
@@ -164,7 +158,6 @@ export function createInventory(options: InventoryOptions): Inventory {
   }
 
   const inventory: Inventory = {
-    type: InventoryType,
     id,
     bag,
 
@@ -246,8 +239,3 @@ export function createInventory(options: InventoryOptions): Inventory {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is an {@link Inventory} instance */
-export function isInventory(value: unknown): value is Inventory {
-  return isType(value, InventoryType);
-}

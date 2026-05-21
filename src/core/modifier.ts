@@ -16,7 +16,6 @@ import { computed, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
-import type { WithRequired } from './feature';
 import { processGetter, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import { getCurrentChainRegistry } from './registries';
@@ -50,6 +49,8 @@ export interface ModifierDescription {
   /** If `true`, this modifier is detrimental — UI should render in red/warning style */
   isBad?: boolean;
 }
+
+type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
 
 /** Utility type for modifiers that have all optional methods defined */
 export type OperationModifier<T> = WithRequired<

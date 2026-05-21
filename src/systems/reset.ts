@@ -16,8 +16,6 @@
  * Inline `keep`/`retain` options on `createReset` are shorthand for
  * {@link createRetentionPolicy} — drop down to a standalone retention policy
  * when the policy needs to outlive any single Reset.
- *
- * Type guard: {@link isReset}.
  */
 
 import { ref, unref, type Ref } from 'vue';
@@ -33,16 +31,12 @@ import {
   getModulePersistentRefs,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import { isFormula } from '@/core/formulas';
 import { Resettable } from './resettable';
 import { createRetentionPolicy } from './retention';
 import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
 
 // === TYPES ===
-
-/** Symbol identifying Reset features */
-export const ResetType = Symbol('Reset');
 
 /**
  * Any object exposing a resolved set of persistent refs for composable reset
@@ -139,9 +133,6 @@ export interface ResetOptions {
  * A reset mechanic that can reset game progress
  */
 export interface Reset extends ScopedReset {
-  /** Feature type identifier */
-  type: typeof ResetType;
-
   /** Things that will be reset (from thingsToReset option) */
   thingsToReset: Ref<unknown[]> | unknown[] | undefined;
 
@@ -250,7 +241,6 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
   const retainedRefs = new Set<Persistent>([...(keep ?? []), ...(retain ? retain.keys() : [])]);
 
   const reset: Reset = {
-    type: ResetType,
     thingsToReset: processedThingsToReset,
     resolvedScope: scope,
     onBeforeReset,
@@ -396,21 +386,6 @@ export function createResetTimer(reset: Reset): Ref<number> {
 }
 
 // === TYPE GUARDS ===
-
-/**
- * Check whether a value is a {@link Reset} instance.
- *
- * @param value - Any value to test
- * @returns `true` when `value` carries the {@link ResetType} brand
- *
- * @example
- * ```ts
- * if (isReset(thing)) thing.reset()
- * ```
- */
-export function isReset(value: unknown): value is Reset {
-  return isType(value, ResetType);
-}
 
 /**
  * Check if a value is a Vue ref

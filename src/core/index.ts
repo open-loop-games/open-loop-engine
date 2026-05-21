@@ -258,12 +258,7 @@ export type {
   ProgressiveCostEntry,
   ProgressiveCostStep,
 } from './timed-progress';
-export {
-  createTimedProgress,
-  TimedProgressType,
-  resourceConsumedAt,
-  stepProgressiveCosts,
-} from './timed-progress';
+export { createTimedProgress, resourceConsumedAt, stepProgressiveCosts } from './timed-progress';
 
 // === SEQUENCER STRATEGIES ===
 export type { ConditionalRule } from './sequencer-strategies';
@@ -290,7 +285,7 @@ export type {
   RuleEvaluatorOptions,
   RuleEvaluator,
 } from './rule-evaluator';
-export { createRuleEvaluator, isRuleEvaluator, RuleEvaluatorType } from './rule-evaluator';
+export { createRuleEvaluator } from './rule-evaluator';
 
 // === SPATIAL PRIMITIVES ===
 export type {
@@ -327,29 +322,6 @@ export {
   gaussianFalloff,
   exponentialFalloff,
 } from './spatial';
-
-// === FEATURE UTILITIES ===
-// common helpers for building features (systems layer + advanced consumers)
-export type {
-  BaseFeatureOptions,
-  BaseFeature,
-  FirstFeatureResult,
-  GenericFeature,
-  WithRequired,
-} from './feature';
-export {
-  getUniqueID,
-  resetUniqueID,
-  Visibility,
-  isType,
-  findFeatures,
-  excludeFeatures,
-  createBaseFeature,
-  getFirstFeature,
-  computeVisibility,
-  computeCondition,
-  isFeature,
-} from './feature';
 
 // === DEV TOOLS & ADVANCED CONSUMER HELPERS ===
 

@@ -39,15 +39,11 @@ import {
   type State,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import type { Loop } from './loop';
 import type { LoopLog } from './loop-log';
 import type { BestOf } from './best-of';
 
 // === TYPES ===
-
-/** Symbol identifying RecommendationSystem features */
-export const RecommendationSystemType = Symbol('RecommendationSystem');
 
 /**
  * The evaluation context passed to every strategy's `canApply`, `score`,
@@ -212,9 +208,6 @@ export interface RecommendationSystemOptions {
  * recommendation or auto-applies it.
  */
 export interface RecommendationSystem {
-  /** Feature type discriminator for {@link isRecommendationSystem} checks */
-  type: typeof RecommendationSystemType;
-
   /**
    * The last produced recommendation, or null. Persistent — survives save/load.
    * Cleared by `dismiss()`, replaced by each `evaluate()` that produces a winner.
@@ -460,7 +453,6 @@ export function createRecommendationSystem(
 
   // --- Public API ---
   return {
-    type: RecommendationSystemType,
     lastRecommendation,
     autoApply,
     get strategies() {
@@ -503,8 +495,3 @@ export function createRecommendationSystem(
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link RecommendationSystem} instance */
-export function isRecommendationSystem(value: unknown): value is RecommendationSystem {
-  return isType(value, RecommendationSystemType);
-}

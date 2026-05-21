@@ -3,7 +3,7 @@ import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
-import { createLoop, LoopType, isLoop } from '@/systems/loop';
+import { createLoop } from '@/systems/loop';
 import { fractional } from '@/systems/retention';
 
 /** Simple tick manager matching the action test pattern */
@@ -34,7 +34,6 @@ describe('createLoop', () => {
     expect(loop.bestTime.value).toBe(Infinity);
     expect(loop.elapsed.value).toBe(0);
     expect(loop.running.value).toBe(false);
-    expect(loop.type).toBe(LoopType);
   });
 
   it('tracks elapsed time while running', () => {
@@ -235,17 +234,6 @@ describe('createLoop', () => {
 
     unsub1();
     unsub2();
-  });
-
-  it('isLoop type guard works', () => {
-    const { registerTick } = createTickManager();
-    const loop = createLoop({
-      thingsToReset: [],
-      registerTick,
-    });
-    expect(isLoop(loop)).toBe(true);
-    expect(isLoop({})).toBe(false);
-    expect(isLoop(null)).toBe(false);
   });
 });
 

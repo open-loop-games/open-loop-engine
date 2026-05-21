@@ -45,9 +45,6 @@ import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
 // === TYPES ===
 
-/** Symbol identifying Purchasable features */
-export const PurchasableType = Symbol('Purchasable');
-
 /** Events emitted by a {@link Purchasable} instance */
 export interface PurchasableEvents {
   /** Fired after each purchase, with the number of levels bought in this transaction */
@@ -200,8 +197,6 @@ export type ScalingPurchasableOptions = {
  * Call `purchase()` or `purchaseMax()` to buy.
  */
 export interface Purchasable {
-  /** Feature type discriminator. */
-  type: typeof PurchasableType;
   /** Unique identifier */
   id: string;
   /** Current number of purchases (persistent, saved/loaded automatically) */
@@ -560,7 +555,6 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
   const handle = createEmitHandle<PurchasableEvents>();
 
   const purchasable: Purchasable = {
-    type: PurchasableType,
     id: actualId,
     amount,
     active,

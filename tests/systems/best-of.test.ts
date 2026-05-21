@@ -5,7 +5,7 @@ import { createResource, addResource } from '@/core/resource';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
 import { createLoop } from '@/systems/loop';
 import { createLoopLog } from '@/systems/loop-log';
-import { createBestOf, isBestOf } from '@/systems/best-of';
+import { createBestOf } from '@/systems/best-of';
 import type { BestOfEntry } from '@/systems/best-of';
 
 /** Simple tick manager matching the existing test pattern */
@@ -518,16 +518,5 @@ describe('createBestOf', () => {
     loop.end();
     // Still 50 — disposed, so the second finalize was not tracked
     expect(bestOf.entries.value.gold!.value.eq(50)).toBe(true);
-  });
-
-  it('isBestOf type guard', () => {
-    const bestOf = createBestOf({
-      id: 'bo-typeguard',
-      metrics: {},
-    });
-
-    expect(isBestOf(bestOf)).toBe(true);
-    expect(isBestOf({})).toBe(false);
-    expect(isBestOf(null)).toBe(false);
   });
 });

@@ -5,7 +5,7 @@ import { beginPersistentContext, endPersistentContext } from '@/core/persistence
 import { createLoop } from '@/systems/loop';
 import { createLoopLog } from '@/systems/loop-log';
 import { createBestOf } from '@/systems/best-of';
-import { createRecommendationSystem, isRecommendationSystem } from '@/systems/recommendation';
+import { createRecommendationSystem } from '@/systems/recommendation';
 import type {
   RecommendationStrategyDef,
   Recommendation,
@@ -711,24 +711,4 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
   // Type guard
   // ==========================================================================
-
-  it('isRecommendationSystem returns true for system instances', () => {
-    const { loop, loopLog, bestOf } = createTestStack('guard-pos');
-    const recs = createRecommendationSystem({
-      id: 'rec-guard',
-      loop,
-      loopLog,
-      bestOf,
-      getCurrentSnapshot: () => ({}),
-      applySnapshot: () => {},
-    });
-
-    expect(isRecommendationSystem(recs)).toBe(true);
-  });
-
-  it('isRecommendationSystem returns false for non-system values', () => {
-    expect(isRecommendationSystem({})).toBe(false);
-    expect(isRecommendationSystem(null)).toBe(false);
-    expect(isRecommendationSystem(undefined)).toBe(false);
-  });
 });

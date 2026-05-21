@@ -27,13 +27,9 @@
  */
 
 import { unref } from 'vue';
-import { isType } from '@/core/feature';
 import type { Slot } from './slot';
 
 // === TYPES ===
-
-/** Symbol identifying {@link GoalPicker} instances. */
-export const GoalPickerType = Symbol('GoalPicker');
 
 /**
  * Score function. MUST be pure: no writes, no reactive reads.
@@ -138,8 +134,6 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
 
 /** A goal picker instance, returned by {@link createGoalPicker}. */
 export interface GoalPicker<TCandidate, TContext, TWeights> {
-  type: typeof GoalPickerType;
-
   /**
    * Run one pick cycle:
    *   1. If `mode` is `'fresh-each-cycle'`, deselect every active candidate
@@ -312,7 +306,6 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
   }
 
   return {
-    type: GoalPickerType,
     pick,
     get active() {
       return readActive();
@@ -322,8 +315,3 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
 }
 
 // === PUBLIC UTILITIES ===
-
-/** Type guard: returns `true` if the value is a {@link GoalPicker} instance. */
-export function isGoalPicker(value: unknown): value is GoalPicker<unknown, unknown, unknown> {
-  return isType(value, GoalPickerType);
-}

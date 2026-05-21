@@ -78,11 +78,9 @@ lightweight tick-callback rate limiter
 
 persistent elapsed/total play time and reactive speed multiplier
 
-- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:65`
-- `function isTimeSystem(value: unknown): value is TimeSystem` — Type guard: returns `true` if the value is a TimeSystem instance. `src/systems/time.ts:91`
-- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:31`
-- `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:25`
-- `const TimeSystemType: unique symbol` — Symbol identifying TimeSystem features. `src/systems/time.ts:22`
+- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:59`
+- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:27`
+- `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:21`
 
 ## Transition-distance primitives
 

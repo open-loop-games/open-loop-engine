@@ -4,7 +4,7 @@ import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
 import { createLoop } from '@/systems/loop';
-import { createLoopLog, isLoopLog } from '@/systems/loop-log';
+import { createLoopLog } from '@/systems/loop-log';
 import type { LoopLogEntry } from '@/systems/loop-log';
 import type { Analyzer } from '@/primitives/types';
 import { runHeadless } from '@/core/headless';
@@ -485,17 +485,5 @@ describe('createLoopLog', () => {
     dispose();
     loop.end();
     expect(entries).toHaveLength(1);
-  });
-
-  it('isLoopLog type guard', () => {
-    const { registerTick } = createTickManager();
-
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
-
-    expect(isLoopLog(log)).toBe(true);
-    expect(isLoopLog({})).toBe(false);
-    expect(isLoopLog(null)).toBe(false);
-    expect(isLoopLog(loop)).toBe(false);
   });
 });

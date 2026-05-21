@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
-import { createGoalPicker, isGoalPicker, type GoalPickResult } from '@/systems/goal-picker';
+import { createGoalPicker, type GoalPickResult } from '@/systems/goal-picker';
 import { createSlot } from '@/systems/slot';
 import {
   beginPersistentContext,
@@ -388,24 +388,6 @@ describe('createGoalPicker — onPick', () => {
 // ============================================================================
 // Type guard
 // ============================================================================
-
-describe('isGoalPicker', () => {
-  it('returns true for picker instances', () => {
-    const picker = createGoalPicker<string, void, void>({
-      pool: () => [],
-      weights: undefined,
-      scorer: () => 0,
-    });
-    expect(isGoalPicker(picker)).toBe(true);
-  });
-
-  it('returns false for non-pickers', () => {
-    expect(isGoalPicker(null)).toBe(false);
-    expect(isGoalPicker({})).toBe(false);
-    expect(isGoalPicker({ type: Symbol('Other') })).toBe(false);
-    expect(isGoalPicker(createTestSlot({ id: 's', mode: 'single' }))).toBe(false);
-  });
-});
 
 // ============================================================================
 // Composition-shape sanity checks

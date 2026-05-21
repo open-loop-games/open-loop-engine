@@ -38,7 +38,6 @@
 
 import { computed } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { isType } from '@/core/feature';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
 import { type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
@@ -47,9 +46,6 @@ import { getCurrentEngineCategories } from './engine-categories';
 import { type Modifier } from '@/core/modifier';
 
 // === TYPES ===
-
-/** Symbol identifying SkillCategory features */
-export const SkillCategoryType = Symbol('SkillCategory');
 
 /**
  * Options for {@link createSkillCategory}.
@@ -102,8 +98,6 @@ export interface SkillCategoryEntry<Def extends { id: string }, State = void> {
  * @typeParam State - Per-instance state type (void if none)
  */
 export interface SkillCategory<Def extends { id: string }, State = void> extends ResettableObject {
-  /** Feature type discriminator for {@link isSkillCategory} checks */
-  type: typeof SkillCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry — mods can call `registry.register()` or `registry.patch()` */
@@ -198,7 +192,6 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
   });
 
   const category: SkillCategory<Def, State> = {
-    type: SkillCategoryType,
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -254,8 +247,3 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link SkillCategory} instance */
-export function isSkillCategory(value: unknown): value is SkillCategory<{ id: string }, unknown> {
-  return isType(value, SkillCategoryType);
-}

@@ -6,7 +6,6 @@ import {
   createTimedProgress,
   resourceConsumedAt,
   stepProgressiveCosts,
-  TimedProgressType,
 } from '@/core/timed-progress';
 
 type TickFn = (dt: number) => void;
@@ -37,7 +36,6 @@ describe('createTimedProgress — construction', () => {
     });
     endPersistentContext();
 
-    expect(tp.type).toBe(TimedProgressType);
     expect(tp.id).toBe(ctxId);
     expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
     expect(Decimal.eq(tp.tickProgressDelta.value, 0)).toBe(true);

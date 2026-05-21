@@ -35,7 +35,6 @@
 import { computed, type ComputedRef } from 'vue';
 import type { Persistent } from '@/core/persistence';
 import { persistent } from '@/core/persistence';
-import { isType } from '@/core/feature';
 import {
   setupDeclarativeBindings,
   createCategoryBase,
@@ -58,12 +57,6 @@ import type { Grant } from '@/core/modifier';
 import type { DecimalSource } from '@/primitives/decimal';
 
 // === TYPES ===
-
-/** Symbol identifying Challenge features */
-export const ChallengeType = Symbol('Challenge');
-
-/** Symbol identifying ChallengeCategory features */
-export const ChallengeCategoryType = Symbol('ChallengeCategory');
 
 /**
  * Definition for a challenge. Registered via
@@ -169,8 +162,6 @@ export interface ChallengeDef<
 
 /** A challenge instance with persistent state and lifecycle methods */
 export interface Challenge {
-  /** Feature type discriminator for {@link isChallenge} checks */
-  type: typeof ChallengeType;
   readonly id: string;
 
   /** Whether this challenge is currently active (persistent) */
@@ -293,8 +284,6 @@ export interface ChallengeCategory<
   Def extends ChallengeDef,
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator for {@link isChallengeCategory} checks */
-  type: typeof ChallengeCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry for challenge definitions */
@@ -529,7 +518,6 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       setupDeclarativeBindings(def.rewards, completed);
 
       return {
-        type: ChallengeType,
         id: def.id,
         active,
         completions,
@@ -577,7 +565,6 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   });
 
   const category: ChallengeCategory<Def, State> = {
-    type: ChallengeCategoryType,
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -647,18 +634,4 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   if (ec) (ec.challenges ??= []).push(category);
 
   return category;
-}
-
-// === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link Challenge} instance */
-export function isChallenge(value: unknown): value is Challenge {
-  return isType(value, ChallengeType);
-}
-
-/** Type guard: returns `true` if the value is a {@link ChallengeCategory} instance */
-export function isChallengeCategory(
-  value: unknown,
-): value is ChallengeCategory<ChallengeDef, unknown> {
-  return isType(value, ChallengeCategoryType);
 }

@@ -62,7 +62,7 @@ export const TIER_MANIFEST = [
       '`createContentRegistry` — hold patchable content definitions for mods and registration.',
       '`createSequencer` and fill strategies — ordered queues, rotations, persona dispatch, and task scheduling.',
     ],
-    clusters: ['category-base', 'content-registry', 'feature', 'sequencer'],
+    clusters: ['category-base', 'content-registry', 'sequencer'],
   },
   {
     tier: 'content-systems',

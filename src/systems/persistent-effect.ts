@@ -41,14 +41,10 @@ import { computed, watch, unref, type ComputedRef, type WatchStopHandle } from '
 import { processGetter, type Computable } from '@/core/computed';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import { isType } from '@/core/feature';
 import type { Modifier } from '@/core/modifier';
 import type { EffectModifierBinding } from './effect-modifier-binding';
 
 // === TYPES ===
-
-/** Symbol identifying PersistentEffectSystem features */
-export const PersistentEffectSystemType = Symbol('PersistentEffectSystem');
 
 // TODO(ergonomics): string-keyed effect dict shorthand — Kittens Game-style
 // `effects: { "goldPerTick": 0.01 }` mapped to EffectModifierBinding[].
@@ -93,8 +89,6 @@ export interface PersistentEffectSystemOptions {
 
 /** Manages persistent effects: registration, condition watching, and edge-triggered binding. */
 export interface PersistentEffectSystem {
-  /** Feature type discriminator for {@link isPersistentEffectSystem} checks */
-  type: typeof PersistentEffectSystemType;
   /** System identifier (from {@link PersistentEffectSystemOptions.id}) */
   readonly id: string;
   /** Kind tag used by the effect-system registry / picker discovery */
@@ -275,7 +269,6 @@ export function createPersistentEffectSystem(
   }
 
   const system: PersistentEffectSystem = {
-    type: PersistentEffectSystemType,
     id: options.id,
     kind: 'persistent',
     register,
@@ -298,8 +291,3 @@ export function createPersistentEffectSystem(
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link PersistentEffectSystem} instance */
-export function isPersistentEffectSystem(value: unknown): value is PersistentEffectSystem {
-  return isType(value, PersistentEffectSystemType);
-}

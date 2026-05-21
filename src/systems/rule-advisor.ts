@@ -34,13 +34,9 @@
  */
 
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
-import { isLoopLog, type LoopLog, type LoopLogEntry } from './loop-log';
+import type { LoopLog, LoopLogEntry } from './loop-log';
 
 // === TYPES ===
-
-/** Symbol identifying {@link RuleAdvisor} instances. */
-export const RuleAdvisorType = Symbol('RuleAdvisor');
 
 /**
  * One advisory output. The `key` is the stable identity used for dismissal
@@ -209,8 +205,6 @@ export interface RuleAdvisorEvents<TPayload> {
 
 /** A rule advisor instance, returned by {@link createRuleAdvisor}. */
 export interface RuleAdvisor<TPayload> {
-  type: typeof RuleAdvisorType;
-
   /**
    * Currently-visible suggestions: post-rank, post-cap, post-dismissal-filter.
    * Plain readonly array; wrap in a Vue ref via the `'suggestions'` event if
@@ -273,10 +267,8 @@ function normalizeMaxSuggestions(c: number | (() => number) | undefined): () => 
 }
 
 function resolveHistory<TEntry>(source: HistorySource<TEntry>): readonly TEntry[] {
-  if (isLoopLog(source)) {
-    return source.history.value as unknown as readonly TEntry[];
-  }
-  return source();
+  if (typeof source === 'function') return source();
+  return source.history.value as unknown as readonly TEntry[];
 }
 
 function resolveContext<TContext>(context: TContext | (() => TContext) | undefined): TContext {
@@ -406,7 +398,6 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
   }
 
   return {
-    type: RuleAdvisorType,
     get suggestions() {
       return visible;
     },
@@ -418,8 +409,3 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
 }
 
 // === PUBLIC UTILITIES ===
-
-/** Type guard: returns `true` if the value is a {@link RuleAdvisor} instance. */
-export function isRuleAdvisor(value: unknown): value is RuleAdvisor<unknown> {
-  return isType(value, RuleAdvisorType);
-}

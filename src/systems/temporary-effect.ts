@@ -46,15 +46,11 @@ import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import { isType } from '@/core/feature';
 import type { Modifier } from '@/core/modifier';
 import type { RegisterTick } from '@/core/sequencer';
 import type { EffectModifierBinding } from './effect-modifier-binding';
 
 // === TYPES ===
-
-/** Symbol identifying TemporaryEffectSystem features */
-export const TemporaryEffectSystemType = Symbol('TemporaryEffectSystem');
 
 /** Definition for a temporary effect, registered at startup. */
 export interface TemporaryEffectDef {
@@ -126,8 +122,6 @@ export interface TemporaryEffectSystemOptions {
 
 /** Manages temporary effects: registration, activation, tick countdown, and cleanup. */
 export interface TemporaryEffectSystem {
-  /** Feature type discriminator for {@link isTemporaryEffectSystem} checks */
-  type: typeof TemporaryEffectSystemType;
   /** System identifier (from {@link TemporaryEffectSystemOptions.id}) */
   readonly id: string;
   /** Kind tag used by the effect-system registry / picker discovery */
@@ -445,7 +439,6 @@ export function createTemporaryEffectSystem(
   }
 
   const system: TemporaryEffectSystem = {
-    type: TemporaryEffectSystemType,
     id: options.id,
     kind: 'temporary',
     register,
@@ -473,8 +466,3 @@ export function createTemporaryEffectSystem(
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link TemporaryEffectSystem} instance */
-export function isTemporaryEffectSystem(value: unknown): value is TemporaryEffectSystem {
-  return isType(value, TemporaryEffectSystemType);
-}

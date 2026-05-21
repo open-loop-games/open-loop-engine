@@ -13,13 +13,9 @@
 import { ref } from 'vue';
 import type { Ref } from 'vue';
 import { persistent } from '@/core/persistence';
-import { isType } from '@/core/feature';
 import { formatTime } from '@/primitives/decimal';
 
 // === TYPES ===
-
-/** Symbol identifying TimeSystem features */
-export const TimeSystemType = Symbol('TimeSystem');
 
 /** Configuration for {@link createTimeSystem}. */
 export interface TimeSystemConfig {
@@ -29,8 +25,6 @@ export interface TimeSystemConfig {
 
 /** Time tracking system with persistent elapsed and total play time. */
 export interface TimeSystem {
-  /** Feature type discriminator for {@link isTimeSystem} checks */
-  type: typeof TimeSystemType;
   /** Seconds elapsed since last reset (persistent). */
   elapsed: Ref<number>;
   /** Total seconds played across all resets (persistent). */
@@ -67,7 +61,6 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
   const totalPlayTime = persistent(0, { name: 'totalPlayTime' });
   const speedMultiplier = ref(config.speedMultiplier ?? 1);
   return {
-    type: TimeSystemType,
     elapsed,
     totalPlayTime,
     speedMultiplier,
@@ -86,8 +79,3 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link TimeSystem} instance */
-export function isTimeSystem(value: unknown): value is TimeSystem {
-  return isType(value, TimeSystemType);
-}

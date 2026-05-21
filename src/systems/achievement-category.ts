@@ -50,9 +50,6 @@ import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
 
-/** Symbol identifying AchievementCategory features */
-export const AchievementCategoryType = Symbol('AchievementCategory');
-
 /**
  * Options for {@link createAchievementCategory}.
  *
@@ -195,8 +192,6 @@ export interface AchievementCategory<
   Def extends { id: string },
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator. */
-  type: typeof AchievementCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry — mods can call `registry.register()` or `registry.patch()` */
@@ -304,7 +299,6 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
   });
 
   const category: AchievementCategory<Def, State> = {
-    type: AchievementCategoryType,
     id: base.id,
     registry: base.registry,
     register: base.register,

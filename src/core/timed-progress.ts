@@ -29,9 +29,6 @@ import type { RegisterTick } from './sequencer';
 // `from '@/core/timed-progress'` consumers keep working.
 export type { RegisterTick };
 
-/** Symbol identifying TimedProgress features. */
-export const TimedProgressType = Symbol('TimedProgress');
-
 /** Options for {@link createTimedProgress}. */
 export interface TimedProgressOptions {
   id?: string;
@@ -67,7 +64,6 @@ export interface TimedProgressOptions {
  * A stateless ticking progress accumulator created by {@link createTimedProgress}.
  */
 export interface TimedProgress {
-  type: typeof TimedProgressType;
   id: string;
   /** Accumulated progress. Persistent unless `ephemeral: true`. */
   progress: Ref<DecimalSource>;
@@ -242,7 +238,6 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
   );
 
   return {
-    type: TimedProgressType,
     id: actualId,
     progress: state.progress,
     duration: processed.duration,

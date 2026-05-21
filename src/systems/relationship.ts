@@ -14,7 +14,6 @@
 import { persistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { evaluateCondition } from '@/core/conditions';
-import { isType } from '@/core/feature';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import type { GameStateAccessor } from '@/primitives/types';
 import type {
@@ -188,9 +187,6 @@ export type RelationshipInstance =
 
 // -- Category --
 
-/** Symbol identifying RelationshipCategory features */
-export const RelationshipCategoryType = Symbol('RelationshipCategory');
-
 /** Options for {@link createRelationshipCategory}. */
 export interface RelationshipCategoryOptions {
   /** Persistence context name. Each def gets a sub-context `{id}/{def.id}`. */
@@ -212,8 +208,6 @@ export interface RelationshipCategoryEntry<Def extends RelationshipDef> {
  * for each by dispatching on `def.kind`.
  */
 export interface RelationshipCategory<Def extends RelationshipDef> extends ResettableObject {
-  /** Feature type discriminator. */
-  type: typeof RelationshipCategoryType;
   readonly registry: ContentRegistry<Def>;
   register(defs: Def | Def[]): void;
   getDef(id: string): Def | undefined;
@@ -589,7 +583,6 @@ export function createRelationshipCategory<Def extends RelationshipDef = Relatio
   });
 
   return {
-    type: RelationshipCategoryType,
     registry: base.registry,
     register: base.register,
     getDef: base.getDef,
@@ -611,13 +604,4 @@ export function createRelationshipCategory<Def extends RelationshipDef = Relatio
 
     [Resettable]: base[Resettable],
   };
-}
-
-// === PUBLIC UTILITIES ===
-
-/** Type guard: returns `true` if the value is a {@link RelationshipCategory} instance */
-export function isRelationshipCategory(
-  value: unknown,
-): value is RelationshipCategory<RelationshipDef> {
-  return isType(value, RelationshipCategoryType);
 }

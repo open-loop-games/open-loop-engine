@@ -52,24 +52,20 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface GameStateMutator` — Mutation interface for applying resolved effects to game state. `src/core/effects.ts:32`
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
 - `function resolveEffect(effect: IEffect, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffect into a list of concrete ResolvedEffect steps. `src/core/effects.ts:59`
-- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:177`
-- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:200`
+- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:171`
+- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:194`
 - `interface EffectModifierBinding` — Binds a modifier to a `ModifierChain` while the effect is active. `src/systems/effect-modifier-binding.ts:20`
-- `function isPersistentEffectSystem(value: unknown): value is PersistentEffectSystem` — Type guard: returns `true` if the value is a PersistentEffectSystem instance. `src/systems/persistent-effect.ts:303`
-- `function isTemporaryEffectSystem(value: unknown): value is TemporaryEffectSystem` — Type guard: returns `true` if the value is a TemporaryEffectSystem instance. `src/systems/temporary-effect.ts:478`
-- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:58`
-- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:81`
-- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:95`
-- `interface PersistentEffectSystemOptions` — Options for createPersistentEffectSystem. `src/systems/persistent-effect.ts:89`
-- `const PersistentEffectSystemType: unique symbol` — Symbol identifying PersistentEffectSystem features. `src/systems/persistent-effect.ts:51`
+- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:54`
+- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:77`
+- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:91`
+- `interface PersistentEffectSystemOptions` — Options for createPersistentEffectSystem. `src/systems/persistent-effect.ts:85`
 - `function replacementBinding(options: ReplacementBindingOptions): EffectModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/effect-modifier-binding.ts:92`
 - `interface ReplacementBindingOptions` — Options for replacementBinding. `src/systems/effect-modifier-binding.ts:31`
-- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:60`
-- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:110`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:94`
-- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:128`
-- `interface TemporaryEffectSystemOptions` — Options for createTemporaryEffectSystem. `src/systems/temporary-effect.ts:120`
-- `const TemporaryEffectSystemType: unique symbol` — Symbol identifying TemporaryEffectSystem features. `src/systems/temporary-effect.ts:57`
+- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:56`
+- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:106`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:90`
+- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:124`
+- `interface TemporaryEffectSystemOptions` — Options for createTemporaryEffectSystem. `src/systems/temporary-effect.ts:116`
 
 ## Formulas
 
@@ -133,26 +129,26 @@ consumer-facing predicate-spec data shape over the engine's existing substrate. 
 
 composable value calculation chains
 
-- `interface AdditiveModifierOptions` — Options for createAdditiveModifier. `src/core/modifier.ts:63`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:704`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:718`
-- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:401`
-- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:373`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:757`
-- `function createAdditiveModifier<T extends AdditiveModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that adds a value to the input. `src/core/modifier.ts:89`
-- `function createExponentialModifier<T extends ExponentialModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that raises the input to a power. `src/core/modifier.ts:221`
-- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:561`
-- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:158`
-- `function createSequentialModifier<T extends Modifier, S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }>(modifiers: T[]): S` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:304`
-- `interface ExponentialModifierOptions` — Options for createExponentialModifier. `src/core/modifier.ts:189`
-- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:429`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:731`
-- `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:33`
-- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:470`
-- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:360`
-- `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:45`
-- `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:120`
-- `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:55`
+- `interface AdditiveModifierOptions` — Options for createAdditiveModifier. `src/core/modifier.ts:64`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:705`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:719`
+- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:402`
+- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:374`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:758`
+- `function createAdditiveModifier<T extends AdditiveModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that adds a value to the input. `src/core/modifier.ts:90`
+- `function createExponentialModifier<T extends ExponentialModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that raises the input to a power. `src/core/modifier.ts:222`
+- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:562`
+- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:159`
+- `function createSequentialModifier<T extends Modifier, S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }>(modifiers: T[]): S` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:305`
+- `interface ExponentialModifierOptions` — Options for createExponentialModifier. `src/core/modifier.ts:190`
+- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:430`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:732`
+- `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:32`
+- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:471`
+- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:361`
+- `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:44`
+- `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:121`
+- `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:56`
 
 ## Requirements
 
@@ -180,14 +176,13 @@ Requirements system for gating purchases, unlocks, and actions
 
 stateless tickable progress accumulator
 
-- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates a stateless progress accumulator that ticks on every registered tick, advancing `progress` by `speed * dt` each time. `src/core/timed-progress.ts:223`
-- `interface ProgressiveCostEntry` — One progressive-cost entry — amount total across a full run, plus a live balance getter the primitive calls to decide affordability. `src/core/timed-progress.ts:281`
-- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:289`
-- `function resourceConsumedAt(progress: DecimalSource, duration: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units should be consumed at a given progress level. `src/core/timed-progress.ts:268`
-- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; duration: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:372`
-- `interface TimedProgress` — A stateless ticking progress accumulator created by createTimedProgress. `src/core/timed-progress.ts:69`
-- `interface TimedProgressOptions` — Options for createTimedProgress. `src/core/timed-progress.ts:36`
-- `const TimedProgressType: unique symbol` — Symbol identifying TimedProgress features. `src/core/timed-progress.ts:33`
+- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates a stateless progress accumulator that ticks on every registered tick, advancing `progress` by `speed * dt` each time. `src/core/timed-progress.ts:219`
+- `interface ProgressiveCostEntry` — One progressive-cost entry — amount total across a full run, plus a live balance getter the primitive calls to decide affordability. `src/core/timed-progress.ts:276`
+- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:284`
+- `function resourceConsumedAt(progress: DecimalSource, duration: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units should be consumed at a given progress level. `src/core/timed-progress.ts:263`
+- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; duration: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:367`
+- `interface TimedProgress` — A stateless ticking progress accumulator created by createTimedProgress. `src/core/timed-progress.ts:66`
+- `interface TimedProgressOptions` — Options for createTimedProgress. `src/core/timed-progress.ts:33`
 
 ## Trace
 

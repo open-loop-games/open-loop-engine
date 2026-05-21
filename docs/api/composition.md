@@ -27,27 +27,6 @@ generic typed registry for game content definitions
 - `interface ContentRegistry<T extends { id: string; }>` — A typed, Map-backed registry for game content definitions. `src/systems/content-registry.ts:39`
 - `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:103`
 
-## Feature
-
-base types and utilities for game features
-
-- `interface BaseFeature` — Base properties that all features have after creation. `src/core/feature.ts:177`
-- `interface BaseFeatureOptions` — Base options that all features can have. `src/core/feature.ts:166`
-- `function computeCondition(condition: Computable<boolean>): ComputedRef<boolean>` — Create a computed boolean indicating if a feature meets some condition. `src/core/feature.ts:279`
-- `function computeVisibility(visibility: Computable<Visibility | boolean> | undefined): ComputedRef<boolean>` — Create a computed boolean indicating if a feature is visible. `src/core/feature.ts:262`
-- `function createBaseFeature<T extends BaseFeatureOptions>(featureName: string, type: symbol, options: T): BaseFeature` — Create base feature properties from options. `src/core/feature.ts:195`
-- `function excludeFeatures(obj: Record<string, unknown>, ...types: symbol[]): unknown[]` — Traverse an object recursively and collect all features that are NOT of the specified types. `src/core/feature.ts:133`
-- `function findFeatures(obj: object, ...types: symbol[]): unknown[]` — Traverse an object recursively and collect all features of the specified types. `src/core/feature.ts:97`
-- `interface FirstFeatureResult<T>` — Result of filtering features with getFirstFeature. `src/core/feature.ts:211`
-- `type GenericFeature` — Generic feature with visibility that can be required or optional. `src/core/feature.ts:301`
-- `function getFirstFeature<T extends { visibility?: MaybeRef<Visibility | boolean>; }>(features: T[], filter: (feature: T) => boolean): FirstFeatureResult<T>` — Filter features and get access to the first one separately. `src/core/feature.ts:239`
-- `function getUniqueID(prefix?: string): string` — Gets a unique ID for a feature. `src/core/feature.ts:30`
-- `function isFeature(value: unknown): value is BaseFeature` — Check if something is a feature (has a symbol type property). `src/core/feature.ts:288`
-- `function isType<T extends symbol>(object: unknown, type: T): object is { type: T; }` — Check if an object is a specific type of feature. `src/core/feature.ts:78`
-- `function resetUniqueID(): void` — Reset the ID counter. `src/core/feature.ts:37`
-- `enum Visibility` — Visibility states for features and components. `src/core/feature.ts:46`
-- `type WithRequired<T, K extends keyof T>` — Make certain properties of a type required. `src/core/feature.ts:309`
-
 ## Sequencer
 
 core primitive for ordered execution of items with optional metadata

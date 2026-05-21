@@ -21,13 +21,9 @@ import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { persistent, withPersistentContext, type State } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import type { LoopLog, LoopLogEntry } from './loop-log';
 
 // === TYPES ===
-
-/** Symbol identifying BestOf features */
-export const BestOfType = Symbol('BestOf');
 
 /** How to compare candidates: highest absolute delta or highest delta/second */
 export type ComparisonMode = 'absolute' | 'perSecond';
@@ -149,7 +145,6 @@ export interface BestOfOptions {
  * and optional LoopLog integration.
  */
 export interface BestOf {
-  type: typeof BestOfType;
   /** Reactive map of current best per metric key (null if no best recorded) */
   readonly entries: ComputedRef<Record<string, BestOfEntry | null>>;
   /** Subscribe to BestOf events */
@@ -403,7 +398,6 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
   // --- Public API ---
   return {
-    type: BestOfType,
     entries,
     on: handle.on,
     submit: trySubmit,
@@ -451,8 +445,3 @@ export function createBestOf(options: BestOfOptions): BestOf {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link BestOf} instance */
-export function isBestOf(value: unknown): value is BestOf {
-  return isType(value, BestOfType);
-}

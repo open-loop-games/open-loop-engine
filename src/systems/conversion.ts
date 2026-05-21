@@ -27,12 +27,8 @@ import {
   requirementsMet,
   type Requirement,
 } from '@/core/requirements';
-import { isType } from '@/core/feature';
 
 // === TYPES ===
-
-/** Symbol identifying Conversion features. */
-export const ConversionType = Symbol('Conversion');
 
 /**
  * One output of a conversion: which Resource gets the gain, and how much.
@@ -71,8 +67,6 @@ export interface ConversionOptions<
 
 /** A conversion instance returned by {@link createConversion}. */
 export interface Conversion {
-  /** Feature type discriminator for {@link isConversion} checks. */
-  type: typeof ConversionType;
   /** Input requirements keyed as supplied to the factory. */
   inputs: Record<string, Requirement>;
   /** Output resources keyed as supplied (UI lookup of `displayName`). */
@@ -181,7 +175,6 @@ export function createConversion<
   });
 
   const conversion: Conversion = {
-    type: ConversionType,
     inputs,
     outputs: outputResources,
     canConvert,
@@ -263,8 +256,3 @@ export function createPolynomialFormula(
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link Conversion} instance. */
-export function isConversion(value: unknown): value is Conversion {
-  return isType(value, ConversionType);
-}

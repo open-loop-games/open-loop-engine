@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { bn, Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
-import { createConversion, isConversion, ConversionType } from '@/systems/conversion';
+import { createConversion } from '@/systems/conversion';
 
 describe('Conversion', () => {
   it('single-input single-output exchange — pays cost, adds output', () => {
@@ -261,18 +261,5 @@ describe('Conversion', () => {
     expect(trade.currentGain.value.wood.eq(7)).toBe(true);
     trade.convert();
     expect(wood.value.eq(7)).toBe(true);
-  });
-
-  it('isConversion type guard', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
-    const conv = createConversion({
-      inputs: { gold: createCostRequirement({ resource: gold, cost: 1 }) },
-      outputs: { wood: { resource: wood, amount: 1 } },
-    });
-    expect(isConversion(conv)).toBe(true);
-    expect(conv.type).toBe(ConversionType);
-    expect(isConversion({})).toBe(false);
-    expect(isConversion(null)).toBe(false);
   });
 });

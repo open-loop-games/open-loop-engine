@@ -14,7 +14,6 @@ import { processGetter, type Computable } from '@/core/computed';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
 import { addResource, type Resource } from '@/core/resource';
-import { isType } from '@/core/feature';
 import {
   createCategoryBase,
   setupCategoryTick,
@@ -28,9 +27,6 @@ import { getCurrentEngineCategories } from './engine-categories';
 import type { RegisterTick } from '@/core/sequencer';
 
 // === TYPES ===
-
-/** Symbol identifying ProducerCategory features */
-export const ProducerCategoryType = Symbol('ProducerCategory');
 
 /**
  * Context passed to the {@link ProducerCategoryOptions.mapProducer} callback.
@@ -206,8 +202,6 @@ export interface ProducerCategory<
   Def extends { id: string },
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator for {@link isProducerCategory} checks */
-  type: typeof ProducerCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry — mods can call `registry.register()` or `registry.patch()` */
@@ -397,7 +391,6 @@ export function createProducerCategory<Def extends { id: string }, State = void>
   });
 
   const category: ProducerCategory<Def, State> = {
-    type: ProducerCategoryType,
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -449,13 +442,4 @@ export function createProducerCategory<Def extends { id: string }, State = void>
   if (ec) (ec.producers ??= []).push(category);
 
   return category;
-}
-
-// === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link ProducerCategory} instance */
-export function isProducerCategory(
-  value: unknown,
-): value is ProducerCategory<{ id: string }, unknown> {
-  return isType(value, ProducerCategoryType);
 }

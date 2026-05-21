@@ -77,12 +77,10 @@ the fundamental currency of incremental games
 
 atomic multi-resource transformation
 
-- `interface Conversion` — A conversion instance returned by createConversion. `src/systems/conversion.ts:73`
-- `interface ConversionOptions<I extends Record<string, Requirement> = Record<string, Requirement>, O extends Record<string, ConversionOutput> = Record<string, ConversionOutput>>` — Options for createConversion. `src/systems/conversion.ts:52`
-- `interface ConversionOutput` — One output of a conversion: which Resource gets the gain, and how much. `src/systems/conversion.ts:44`
-- `const ConversionType: unique symbol` — Symbol identifying Conversion features. `src/systems/conversion.ts:35`
-- `function createConversion<I extends Record<string, Requirement>, O extends Record<string, ConversionOutput>>(options: ConversionOptions<I, O>): Conversion` — Create a conversion that atomically transforms input resources into output resources. `src/systems/conversion.ts:140`
-- `function createLogFormula(base?: DecimalSource, scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a logarithmic formula: `floor(log_base(x / scale))`. `src/systems/conversion.ts:240`
-- `function createPolynomialFormula(exponent?: DecimalSource, scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a polynomial formula: `floor((x / scale) ^ exponent)`. `src/systems/conversion.ts:256`
-- `function createSqrtFormula(scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a square-root formula: `floor(√(x / scale))`. `src/systems/conversion.ts:228`
-- `function isConversion(value: unknown): value is Conversion` — Type guard: returns `true` if the value is a Conversion instance. `src/systems/conversion.ts:268`
+- `interface Conversion` — A conversion instance returned by createConversion. `src/systems/conversion.ts:69`
+- `interface ConversionOptions<I extends Record<string, Requirement> = Record<string, Requirement>, O extends Record<string, ConversionOutput> = Record<string, ConversionOutput>>` — Options for createConversion. `src/systems/conversion.ts:48`
+- `interface ConversionOutput` — One output of a conversion: which Resource gets the gain, and how much. `src/systems/conversion.ts:40`
+- `function createConversion<I extends Record<string, Requirement>, O extends Record<string, ConversionOutput>>(options: ConversionOptions<I, O>): Conversion` — Create a conversion that atomically transforms input resources into output resources. `src/systems/conversion.ts:134`
+- `function createLogFormula(base?: DecimalSource, scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a logarithmic formula: `floor(log_base(x / scale))`. `src/systems/conversion.ts:233`
+- `function createPolynomialFormula(exponent?: DecimalSource, scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a polynomial formula: `floor((x / scale) ^ exponent)`. `src/systems/conversion.ts:249`
+- `function createSqrtFormula(scale?: DecimalSource): (x: DecimalSource) => DecimalSource` — Create a square-root formula: `floor(√(x / scale))`. `src/systems/conversion.ts:221`

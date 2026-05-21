@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ref, nextTick } from 'vue';
-import {
-  createAutomationTiers,
-  isAutomationTiers,
-  AutomationTiersType,
-} from '@/systems/automation';
+import { createAutomationTiers } from '@/systems/automation';
 
 const TIERS = [
   { id: 'manual', name: 'Manual', order: 0 },
@@ -25,7 +21,6 @@ describe('AutomationTiers', () => {
       ],
     });
     expect(at.tiers.map((t) => t.id)).toEqual(['a', 'b', 'c']);
-    expect(at.type).toBe(AutomationTiersType);
   });
 
   it('defaults lowest-order tier as initially unlocked', () => {
@@ -203,11 +198,4 @@ describe('AutomationTiers', () => {
   });
 
   // --- Type guard ---
-
-  it('isAutomationTiers identifies instances', () => {
-    const at = createAutomationTiers({ tiers: TIERS });
-    expect(isAutomationTiers(at)).toBe(true);
-    expect(isAutomationTiers({})).toBe(false);
-    expect(isAutomationTiers(null)).toBe(false);
-  });
 });

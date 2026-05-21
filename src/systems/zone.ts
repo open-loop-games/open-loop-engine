@@ -32,7 +32,6 @@
  */
 
 import { computed, type ComputedRef } from 'vue';
-import { isType } from '@/core/feature';
 import {
   persistent,
   type Persistent,
@@ -43,9 +42,6 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { createContentRegistry, type ContentRegistry } from './content-registry';
 
 // === TYPES ===
-
-/** Symbol identifying ZoneSystem features */
-export const ZoneSystemType = Symbol('ZoneSystem');
 
 /** Definition for a zone in the content registry */
 export interface ZoneDef {
@@ -84,9 +80,6 @@ export interface ZoneSystemOptions {
  * Exposes the content registry for mod extension.
  */
 export interface ZoneSystem {
-  /** Feature type discriminator for {@link isZoneSystem} checks */
-  type: typeof ZoneSystemType;
-
   /** Content registry — mods inject this to add/patch zones */
   readonly registry: ContentRegistry<ZoneDef>;
 
@@ -172,7 +165,6 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
   });
 
   const zoneSystem: ZoneSystem = {
-    type: ZoneSystemType,
     registry,
     current,
     unlocked,
@@ -211,8 +203,3 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link ZoneSystem} instance */
-export function isZoneSystem(value: unknown): value is ZoneSystem {
-  return isType(value, ZoneSystemType);
-}

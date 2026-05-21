@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  createRuleEvaluator,
-  isRuleEvaluator,
-  RuleEvaluatorType,
-  type EvaluatorResult,
-} from '@/core/rule-evaluator';
+import { createRuleEvaluator, type EvaluatorResult } from '@/core/rule-evaluator';
 
 interface TestState {
   health: number;
@@ -233,13 +228,6 @@ describe('createRuleEvaluator', () => {
     });
   });
 
-  it('returns an object branded with the RuleEvaluatorType symbol', () => {
-    const evaluator = createRuleEvaluator<TestState, string>({
-      getRules: () => [],
-    });
-    expect(evaluator.type).toBe(RuleEvaluatorType);
-  });
-
   it('works with non-string action types (structured dispatch records)', () => {
     interface ActionRecord {
       kind: 'cast' | 'move';
@@ -250,20 +238,5 @@ describe('createRuleEvaluator', () => {
     });
 
     expect(evaluator.evaluate(makeState()).action).toEqual({ kind: 'cast', target: 'self' });
-  });
-});
-
-describe('isRuleEvaluator', () => {
-  it('returns true for instances from createRuleEvaluator', () => {
-    const evaluator = createRuleEvaluator<TestState, string>({ getRules: () => [] });
-    expect(isRuleEvaluator(evaluator)).toBe(true);
-  });
-
-  it('returns false for unrelated objects', () => {
-    expect(isRuleEvaluator({})).toBe(false);
-    expect(isRuleEvaluator({ type: Symbol('other') })).toBe(false);
-    expect(isRuleEvaluator(null)).toBe(false);
-    expect(isRuleEvaluator(undefined)).toBe(false);
-    expect(isRuleEvaluator('string')).toBe(false);
   });
 });

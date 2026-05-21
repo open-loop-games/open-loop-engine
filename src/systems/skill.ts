@@ -48,16 +48,12 @@ import {
   type Modifier,
   type ModifierChain,
 } from '@/core/modifier';
-import { isType } from '@/core/feature';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { processGetter, type Computable } from '@/core/computed';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
 // === TYPES ===
-
-/** Symbol identifying Skill features (both modes). */
-export const SkillType = Symbol('Skill');
 
 /**
  * Events emitted by a Skill instance.
@@ -139,7 +135,6 @@ export type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions;
 
 /** Fields present on all skills regardless of mode */
 export interface SkillBase {
-  type: typeof SkillType;
   id: string;
   /** Current XP — include in loop's thingsToReset or RetentionPolicy as needed */
   readonly xp: Persistent<DecimalSource>;
@@ -395,7 +390,6 @@ export function createSkill(options: SkillOptions): Skill {
   }
 
   const base: SkillBase = {
-    type: SkillType,
     id,
     xp,
     level,
@@ -433,16 +427,6 @@ export function createSkill(options: SkillOptions): Skill {
 }
 
 // === PUBLIC UTILITIES ===
-
-/** Check if a value is a Skill (either mode) */
-export function isSkill(value: unknown): value is Skill {
-  return isType(value, SkillType);
-}
-
-/** Check if a skill is in accumulator mode (has permanentBonus + accumulateBonus) */
-export function isAccumulatorSkill(value: unknown): value is AccumulatorSkill {
-  return isSkill(value) && value.permanentBonus != null;
-}
 
 /**
  * Progress fraction (0–1) within the current level, for progress bar display.

@@ -204,7 +204,6 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 - `category-base` — shared skeleton for batch-registration categories → composition.md#category-base
 - `content-registry` — generic typed registry for game content definitions → composition.md#content-registry
-- `feature` — base types and utilities for game features → composition.md#feature
 - `sequencer` — core primitive for ordered execution of items with optional metadata → composition.md#sequencer
 
 ### Content Systems

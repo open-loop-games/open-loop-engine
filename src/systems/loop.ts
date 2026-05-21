@@ -17,7 +17,6 @@
 
 import { ref, type Ref } from 'vue';
 import type { Computable } from '@/core/computed';
-import { isType } from '@/core/feature';
 import {
   persistent,
   type Persistent,
@@ -28,9 +27,6 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
 
 // === TYPES ===
-
-/** Symbol identifying Loop features */
-export const LoopType = Symbol('Loop');
 
 /** Events emitted by a {@link Loop} instance */
 export interface LoopEvents {
@@ -101,9 +97,6 @@ export interface LoopOptions {
  * the restart sequence. Stats (`count`, `bestTime`) persist across saves.
  */
 export interface Loop extends ScopedReset {
-  /** Feature type discriminator for {@link isLoop} checks */
-  type: typeof LoopType;
-
   /** Total completed loops (persistent, saved automatically) */
   readonly count: Persistent<number>;
 
@@ -235,7 +228,6 @@ export function createLoop(options: LoopOptions): Loop {
   });
 
   const loop: Loop = {
-    type: LoopType,
     count,
     bestTime,
     elapsed,
@@ -259,8 +251,3 @@ export function createLoop(options: LoopOptions): Loop {
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is a {@link Loop} instance */
-export function isLoop(value: unknown): value is Loop {
-  return isType(value, LoopType);
-}

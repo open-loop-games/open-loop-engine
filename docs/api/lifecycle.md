@@ -47,15 +47,13 @@ auto-saved refs with context-scoped registration
 
 prestige and layer mechanics
 
-- `function createReset<T extends ResetOptions>(options: T): Reset` — Create a reset mechanic. `src/systems/reset.ts:232`
-- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:388`
-- `function isReset(value: unknown): value is Reset` — Check whether a value is a Reset instance. `src/systems/reset.ts:411`
-- `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:141`
-- `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:171`
-- `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:65`
-- `type ResetScope = string | ScopedReset` — A reset scope entry: either a module ID (string) resolved via the persistent ref registry, or another Reset/Loop whose resolved scope is unioned in. `src/systems/reset.ts:60`
-- `const ResetType: unique symbol` — Symbol identifying Reset features. `src/systems/reset.ts:45`
-- `interface ScopedReset` — Any object exposing a resolved set of persistent refs for composable reset scope. `src/systems/reset.ts:52`
+- `function createReset<T extends ResetOptions>(options: T): Reset` — Create a reset mechanic. `src/systems/reset.ts:223`
+- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:378`
+- `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:135`
+- `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:162`
+- `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:59`
+- `type ResetScope = string | ScopedReset` — A reset scope entry: either a module ID (string) resolved via the persistent ref registry, or another Reset/Loop whose resolved scope is unioned in. `src/systems/reset.ts:54`
+- `interface ScopedReset` — Any object exposing a resolved set of persistent refs for composable reset scope. `src/systems/reset.ts:46`
 
 ## Resettable protocol
 

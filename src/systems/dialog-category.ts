@@ -15,15 +15,11 @@
  */
 
 import type { DialogGraph } from './dialog';
-import { isType } from '@/core/feature';
 import { createCategoryBase, type CategoryBase } from './category-base';
 import type { ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
-
-/** Symbol identifying DialogCategory features */
-export const DialogCategoryType = Symbol('DialogCategory');
 
 /** Options for {@link createDialogCategory}. */
 export interface DialogCategoryOptions<Def extends { id: string }> {
@@ -45,8 +41,6 @@ export interface DialogCategoryEntry<Def extends { id: string }> {
 
 /** A dialog category — batch-registered NPC/scene dialog content. */
 export interface DialogCategory<Def extends { id: string }> extends ResettableObject {
-  /** Feature type discriminator for {@link isDialogCategory} checks */
-  type: typeof DialogCategoryType;
   /** The content registry — mods can call `registry.register()` or `registry.patch()`. */
   readonly registry: ContentRegistry<Def>;
   register(defs: Def | Def[]): void;
@@ -102,7 +96,6 @@ export function createDialogCategory<Def extends { id: string }>(
   );
 
   return {
-    type: DialogCategoryType,
     registry: base.registry,
     register: base.register,
     getDef: base.getDef,
@@ -134,8 +127,3 @@ export function createDialogCategory<Def extends { id: string }>(
 }
 
 // === PUBLIC UTILITIES ===
-
-/** Type guard: returns `true` if the value is a {@link DialogCategory} instance */
-export function isDialogCategory(value: unknown): value is DialogCategory<{ id: string }> {
-  return isType(value, DialogCategoryType);
-}

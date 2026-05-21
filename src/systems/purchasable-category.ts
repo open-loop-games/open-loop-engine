@@ -49,9 +49,6 @@ import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
 
-/** Symbol identifying PurchasableCategory features */
-export const PurchasableCategoryType = Symbol('PurchasableCategory');
-
 /**
  * Options for {@link createPurchasableCategory}.
  *
@@ -109,8 +106,6 @@ export interface PurchasableCategory<
   Def extends { id: string },
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator. */
-  type: typeof PurchasableCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry — mods can call `registry.register()` or `registry.patch()` */
@@ -229,7 +224,6 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
   });
 
   const category: PurchasableCategory<Def, State> = {
-    type: PurchasableCategoryType,
     id: base.id,
     registry: base.registry,
     register: base.register,

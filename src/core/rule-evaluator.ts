@@ -30,12 +30,7 @@
  * and never introspects `TState` or `TAction`.
  */
 
-import { isType } from './feature';
-
 // === TYPES ===
-/** Symbol identifying {@link RuleEvaluator} instances (for type guards). */
-export const RuleEvaluatorType = Symbol('RuleEvaluator');
-
 /**
  * One rule — a predicate closure over a context snapshot, mapped to an action.
  *
@@ -115,8 +110,6 @@ export interface RuleEvaluatorOptions<TState, TAction> {
 
 /** A rule evaluator instance, returned by {@link createRuleEvaluator}. */
 export interface RuleEvaluator<TState, TAction> {
-  type: typeof RuleEvaluatorType;
-
   /**
    * Evaluate rules against the given state snapshot. Pure: no reactive reads
    * inside. The snapshot must be built by the caller before invocation.
@@ -195,13 +188,6 @@ export function createRuleEvaluator<TState, TAction>(
   }
 
   return {
-    type: RuleEvaluatorType,
     evaluate,
   };
-}
-
-// === PUBLIC UTILITIES ===
-/** Type guard: returns `true` if `value` is a {@link RuleEvaluator} instance. */
-export function isRuleEvaluator(value: unknown): value is RuleEvaluator<unknown, unknown> {
-  return isType(value, RuleEvaluatorType);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createZoneSystem, isZoneSystem, ZoneSystemType } from '@/systems/zone';
+import { createZoneSystem } from '@/systems/zone';
 
 describe('ZoneSystem', () => {
   // --- Factory ---
@@ -9,7 +9,6 @@ describe('ZoneSystem', () => {
     expect(zs.registry.size).toBe(0);
     expect(zs.current.value).toBe('');
     expect(zs.unlocked.value).toEqual([]);
-    expect(zs.type).toBe(ZoneSystemType);
   });
 
   it('registers initial zones', () => {
@@ -234,11 +233,4 @@ describe('ZoneSystem', () => {
   });
 
   // --- Type guard ---
-
-  it('isZoneSystem identifies zone systems', () => {
-    const zs = createZoneSystem();
-    expect(isZoneSystem(zs)).toBe(true);
-    expect(isZoneSystem({})).toBe(false);
-    expect(isZoneSystem(null)).toBe(false);
-  });
 });

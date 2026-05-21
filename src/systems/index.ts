@@ -77,7 +77,6 @@ export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 // Raw `createPurchasable` is @internal — consumers use the category factory
 // (L2 default) or `createScalingPurchasable` (L3 escape) instead.
 export {
-  PurchasableType,
   createScalingPurchasable,
   type Purchasable,
   type PurchasableDisplay,
@@ -94,7 +93,6 @@ export * from './purchasable-category';
 // with `registerTiered` for threshold-ladder fanout. Raw `createAchievement`
 // is @internal — consumers use the category factory.
 export {
-  AchievementType,
   getCombinedAchievementEffect,
   getEarnedCount,
   type Achievement,
@@ -200,9 +198,7 @@ export * from './dialog-session';
 // through `createRelationshipCategory`. Raw `createRelationship` is
 // @internal — consumers use the category factory.
 export {
-  RelationshipCategoryType,
   createRelationshipCategory,
-  isRelationshipCategory,
   type RelationshipInstance,
   type RelationshipCategoryOptions,
   type RelationshipCategoryEntry,

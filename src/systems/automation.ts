@@ -35,7 +35,6 @@
  */
 
 import { computed, unref, watch, type ComputedRef, type WatchStopHandle } from 'vue';
-import { isType } from '@/core/feature';
 import {
   persistent,
   withPersistentContext,
@@ -46,9 +45,6 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { processGetter, type Computable } from '@/core/computed';
 
 // === TYPES ===
-
-/** Symbol identifying AutomationTiers features */
-export const AutomationTiersType = Symbol('AutomationTiers');
 
 /** Definition for a single automation tier. */
 export interface AutomationTierDef {
@@ -99,9 +95,6 @@ export interface AutomationTiersOptions {
  * automation systems (strategies, auto-buy, conditional rules, etc.).
  */
 export interface AutomationTiers {
-  /** Feature type discriminator for {@link isAutomationTiers} checks */
-  type: typeof AutomationTiersType;
-
   /** All tier definitions sorted by order (ascending). */
   readonly tiers: readonly AutomationTierDef[];
 
@@ -215,7 +208,6 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   // --- Public API ---
   const automationTiers: AutomationTiers = {
-    type: AutomationTiersType,
     tiers,
     currentTierId,
     currentTierOrder,
@@ -273,8 +265,3 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 }
 
 // === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is an {@link AutomationTiers} instance */
-export function isAutomationTiers(value: unknown): value is AutomationTiers {
-  return isType(value, AutomationTiersType);
-}

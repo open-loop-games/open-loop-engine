@@ -31,7 +31,6 @@ import {
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
-import { isType } from '@/core/feature';
 import {
   createNativeDialogRuntime,
   type DialogRuntime,
@@ -41,9 +40,6 @@ import {
 } from './dialog';
 
 // === TYPES ===
-
-/** Symbol identifying DialogSession features */
-export const DialogSessionType = Symbol('DialogSession');
 
 /** Lifecycle events emitted by a {@link DialogSession}. */
 export interface DialogSessionEvents {
@@ -87,8 +83,6 @@ export interface DialogSessionOptions {
 
 /** A dialog session — the public surface for driving conversations from a UI / module. */
 export interface DialogSession extends Emittable<DialogSessionEvents> {
-  /** Feature type discriminator for {@link isDialogSession} checks */
-  type: typeof DialogSessionType;
   /** Activate a graph at its entry node (or an explicit node id). */
   start(graphId: string, entryNode?: string): void;
   /** Return the current presentation snapshot, or null when no graph is active. */
@@ -214,7 +208,6 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   return {
-    type: DialogSessionType,
     start,
     present: () => runtime.present(),
     choose,
@@ -226,8 +219,3 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 }
 
 // === PUBLIC UTILITIES ===
-
-/** Type guard: returns `true` if the value is a {@link DialogSession} instance */
-export function isDialogSession(value: unknown): value is DialogSession {
-  return isType(value, DialogSessionType);
-}

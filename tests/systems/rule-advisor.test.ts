@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
-import { createRuleAdvisor, isRuleAdvisor, type Suggestion } from '@/systems/rule-advisor';
-import { LoopLogType, type LoopLog, type LoopLogEntry } from '@/systems/loop-log';
+import { createRuleAdvisor, type Suggestion } from '@/systems/rule-advisor';
+import { type LoopLog, type LoopLogEntry } from '@/systems/loop-log';
 
 beforeEach(() => {
   // Stateless primitive — no shared persistent state to reset.
@@ -14,7 +14,7 @@ beforeEach(() => {
 
 function fakeLoopLog<T = LoopLogEntry>(history: T[] = []): LoopLog {
   const h = ref<T[]>(history);
-  return { type: LoopLogType, history: h } as unknown as LoopLog;
+  return { history: h } as unknown as LoopLog;
 }
 
 // ============================================================================
@@ -499,23 +499,6 @@ describe('createRuleAdvisor — onAggregate', () => {
 // ============================================================================
 // Type guard
 // ============================================================================
-
-describe('isRuleAdvisor', () => {
-  it('returns true for advisor instances', () => {
-    const advisor = createRuleAdvisor({
-      historySource: () => [],
-      aggregate: () => undefined,
-      analyzers: [],
-    });
-    expect(isRuleAdvisor(advisor)).toBe(true);
-  });
-
-  it('returns false for non-advisors', () => {
-    expect(isRuleAdvisor(null)).toBe(false);
-    expect(isRuleAdvisor({})).toBe(false);
-    expect(isRuleAdvisor({ type: Symbol('Other') })).toBe(false);
-  });
-});
 
 // ============================================================================
 // Consumer callsite shapes — structural-generality tests for the design doc
