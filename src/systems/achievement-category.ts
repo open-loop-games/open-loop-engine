@@ -33,7 +33,6 @@
  */
 
 import { computed, type ComputedRef } from 'vue';
-import { isType } from '@/core/feature';
 import {
   setupDeclarativeBindings,
   createCategoryBase,
@@ -107,7 +106,7 @@ export interface AchievementCategory<
   Def extends { id: string },
   State = void,
 > extends ResettableObject {
-  /** Feature type discriminator for {@link isAchievementCategory} checks */
+  /** Feature type discriminator. */
   type: typeof AchievementCategoryType;
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -252,13 +251,4 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
   if (ec) (ec.achievements ??= []).push(category);
 
   return category;
-}
-
-// === TYPE GUARDS ===
-
-/** Type guard: returns `true` if the value is an {@link AchievementCategory} instance */
-export function isAchievementCategory(
-  value: unknown,
-): value is AchievementCategory<{ id: string }, unknown> {
-  return isType(value, AchievementCategoryType);
 }

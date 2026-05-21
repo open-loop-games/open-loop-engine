@@ -11,10 +11,8 @@
  * - {@link createSimpleAchievement} — positional shorthand for "earn when this boolean ref is true"
  * - {@link createTieredAchievement} — fan a single value-getter into N threshold-gated tiers
  *
- * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative)
- * live alongside the factory. {@link getVisibleAchievements} applies the
- * hidden+visible filter for tile rendering; {@link getEarnedCount} returns
- * a reactive count of earned achievements in a list.
+ * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative,
+ * {@link getEarnedCount} reactive count) live alongside the factory.
  *
  * Batch-registration over a content registry lives in
  * `./achievement-category` ({@link createAchievementCategory}).
@@ -28,7 +26,6 @@ import { computed, type Ref, unref, watch } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { isType } from '@/core/feature';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource } from '@/core/formulas/types';
 import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
@@ -427,24 +424,6 @@ export function getCombinedAchievementEffect(
 /** Reactive count of how many achievements in the list are currently earned. */
 export function getEarnedCount(achievements: Achievement[]): number {
   return achievements.filter((a) => a.earned.value).length;
-}
-
-/** Type guard for {@link Achievement} instances created by {@link createAchievement}. */
-export function isAchievement(value: unknown): value is Achievement {
-  return isType(value, AchievementType);
-}
-
-/**
- * Filter a list to the achievements that should be rendered in the UI.
- * Honours each entry's reactive `hidden` (suppress until earned) and
- * `visible` (suppress unconditionally) flags.
- */
-export function getVisibleAchievements(achievements: Achievement[]): Achievement[] {
-  return achievements.filter((a) => {
-    if (a.earned.value) return a.visible.value;
-    if (a.hidden.value) return false;
-    return a.visible.value;
-  });
 }
 
 // === INTERNAL HELPERS ===

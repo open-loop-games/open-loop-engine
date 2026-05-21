@@ -16,25 +16,22 @@ Start with these public symbols before scanning the full inventory below.
 
 milestone tracking with auto-unlock and tiered rewards
 
-- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:106`
-- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:106`
-- `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:93`
-- `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` — Options for createAchievementCategory. `src/systems/achievement-category.ts:61`
-- `const AchievementCategoryType: unique symbol` — Symbol identifying AchievementCategory features. `src/systems/achievement-category.ts:52`
-- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:42`
-- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:175`
-- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:60`
-- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:39`
-- `function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T>` — Create an achievement — a once-and-stay-earned milestone with optional reactive effect and auto-completing requirement watch. `src/systems/achievement.ts:209`
-- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:174`
-- `function createSimpleAchievement<T = unknown>(id: string, title: string, description: string, requirement: Computable<boolean> | Gate, effect?: T): Achievement<T>` — Positional shorthand over createAchievement for the common case of a one-line title + description and a single boolean requirement. `src/systems/achievement.ts:339`
-- `function createTieredAchievement<T = number>(options: TieredAchievementOptions<T>): Achievement<T>[]` — Creates a series of achievements from threshold tiers, each auto-wired to complete when `getValue()` reaches its tier's threshold. `src/systems/achievement.ts:377`
-- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:412`
-- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:428`
-- `function getVisibleAchievements(achievements: Achievement[]): Achievement[]` — Filter a list to the achievements that should be rendered in the UI. `src/systems/achievement.ts:442`
-- `function isAchievement(value: unknown): value is Achievement` — Type guard for Achievement instances created by createAchievement. `src/systems/achievement.ts:433`
-- `function isAchievementCategory(value: unknown): value is AchievementCategory<{ id: string; }, unknown>` — Type guard: returns `true` if the value is an AchievementCategory instance. `src/systems/achievement-category.ts:260`
-- `interface TieredAchievementOptions<T = number>` — Options for createTieredAchievement. `src/systems/achievement.ts:145`
+- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:103`
+- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:105`
+- `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:92`
+- `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` — Options for createAchievementCategory. `src/systems/achievement-category.ts:60`
+- `const AchievementCategoryType: unique symbol` — Symbol identifying AchievementCategory features. `src/systems/achievement-category.ts:51`
+- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:39`
+- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:172`
+- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
+- `const AchievementType: unique symbol` — Symbol to identify Achievement features. `src/systems/achievement.ts:36`
+- `function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T>` — Create an achievement — a once-and-stay-earned milestone with optional reactive effect and auto-completing requirement watch. `src/systems/achievement.ts:206`
+- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:173`
+- `function createSimpleAchievement<T = unknown>(id: string, title: string, description: string, requirement: Computable<boolean> | Gate, effect?: T): Achievement<T>` — Positional shorthand over createAchievement for the common case of a one-line title + description and a single boolean requirement. `src/systems/achievement.ts:336`
+- `function createTieredAchievement<T = number>(options: TieredAchievementOptions<T>): Achievement<T>[]` — Creates a series of achievements from threshold tiers, each auto-wired to complete when `getValue()` reaches its tier's threshold. `src/systems/achievement.ts:374`
+- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:409`
+- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:425`
+- `interface TieredAchievementOptions<T = number>` — Options for createTieredAchievement. `src/systems/achievement.ts:142`
 
 ## Automation tiers
 
