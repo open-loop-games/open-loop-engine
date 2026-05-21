@@ -196,9 +196,24 @@ export * from './dialog-category';
 export * from './dialog-session';
 
 // === RELATIONSHIP SYSTEMS (P-REL) ===
-// Five typed shapes (scalar / tiered / vector / faction / flag) plus category
-// dispatch.
-export * from './relationship';
+// Five typed shapes (scalar / tiered / vector / faction / flag) registered
+// through `createRelationshipCategory`. Raw `createRelationship` is
+// @internal — consumers use the category factory.
+export {
+  RelationshipCategoryType,
+  createRelationshipCategory,
+  isRelationshipCategory,
+  type RelationshipBase,
+  type ScalarRelationship,
+  type TieredRelationship,
+  type VectorRelationship,
+  type FactionRelationship,
+  type FlagRelationship,
+  type RelationshipInstance,
+  type RelationshipCategoryOptions,
+  type RelationshipCategoryEntry,
+  type RelationshipCategory,
+} from './relationship';
 
 // === ZONES ===
 // Named content groupings (towns, chapters, eras) with progressive unlock.

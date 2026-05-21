@@ -2,9 +2,9 @@
  * Relationship system — P-REL pattern variants and category dispatch
  *
  * Five typed relationship shapes (scalar / tiered / vector / faction / flag)
- * built by a single overloaded {@link createRelationship} factory, or
- * dispatched through {@link createRelationshipCategory} when a heterogeneous
- * mix is needed.
+ * registered through {@link createRelationshipCategory}, which dispatches
+ * per-def by `kind`. The raw `createRelationship` factory underneath is
+ * engine-internal.
  *
  * Per the P-REL solution: don't mix shapes within an owner class. If guilds
  * are tier-ladders and NPCs are multi-dim vectors, register them as two
@@ -49,8 +49,7 @@ interface ScalarRelationshipEvents {
 
 /**
  * Scalar relationship instance — one persistent number per actor with optional
- * clamping and an optional `derive` projection. Returned by
- * {@link createRelationship} when `def.kind === 'scalar'`.
+ * clamping and an optional `derive` projection. Built when `def.kind === 'scalar'`.
  */
 export interface ScalarRelationship
   extends RelationshipBase<'scalar', ScalarRelationshipDef>, Emittable<ScalarRelationshipEvents> {
@@ -71,8 +70,7 @@ interface TieredRelationshipEvents {
 
 /**
  * Tiered relationship instance — per-actor discrete tier index 0..N-1 with
- * per-transition advancement gates. Returned by {@link createRelationship}
- * when `def.kind === 'tiered'`.
+ * per-transition advancement gates. Built when `def.kind === 'tiered'`.
  */
 export interface TieredRelationship
   extends RelationshipBase<'tiered', TieredRelationshipDef>, Emittable<TieredRelationshipEvents> {
@@ -100,8 +98,7 @@ interface VectorRelationshipEvents {
 
 /**
  * Vector relationship instance — N independent scalar dimensions per actor,
- * each with its own bounds and policy. Returned by {@link createRelationship}
- * when `def.kind === 'vector'`.
+ * each with its own bounds and policy. Built when `def.kind === 'vector'`.
  */
 export interface VectorRelationship
   extends RelationshipBase<'vector', VectorRelationshipDef>, Emittable<VectorRelationshipEvents> {
@@ -120,8 +117,7 @@ interface FactionRelationshipEvents {
 
 /**
  * Faction relationship instance — one persistent scalar per faction, with
- * attitude-matrix propagation via `applyTo`. Returned by
- * {@link createRelationship} when `def.kind === 'faction'`.
+ * attitude-matrix propagation via `applyTo`. Built when `def.kind === 'faction'`.
  */
 export interface FactionRelationship
   extends
@@ -148,8 +144,7 @@ interface FlagRelationshipEvents {
 
 /**
  * Flag relationship instance — per-actor named booleans encoding scripted
- * social events. Returned by {@link createRelationship} when
- * `def.kind === 'flag'`.
+ * social events. Built when `def.kind === 'flag'`.
  */
 export interface FlagRelationship
   extends RelationshipBase<'flag', FlagRelationshipDef>, Emittable<FlagRelationshipEvents> {
@@ -192,10 +187,10 @@ export interface RelationshipCategoryEntry<Def extends RelationshipDef> {
 /**
  * Container that registers a heterogeneous mix of relationship defs (scalar /
  * vector / tiered / faction / flag) and builds the matching live instance
- * for each by dispatching through {@link createRelationship}.
+ * for each by dispatching on `def.kind`.
  */
 export interface RelationshipCategory<Def extends RelationshipDef> extends ResettableObject {
-  /** Feature type discriminator for {@link isRelationshipCategory} checks */
+  /** Feature type discriminator. */
   type: typeof RelationshipCategoryType;
   readonly registry: ContentRegistry<Def>;
   register(defs: Def | Def[]): void;
@@ -507,48 +502,12 @@ function buildFlag(def: FlagRelationshipDef): FlagRelationship {
 // === FACTORIES ===
 
 /**
- * Create a relationship instance — one of five P-REL variants, dispatched by
- * `def.kind`.
+ * Engine-internal raw relationship factory dispatching by `def.kind` to the
+ * matching variant builder. Consumers reach this through
+ * {@link createRelationshipCategory}, which opens the per-def persistent
+ * context and dispatches automatically.
  *
- * Caller is responsible for opening the appropriate persistent context — when
- * dispatched through {@link createRelationshipCategory} this is handled by the
- * category's `buildInstance`. Direct callers wrap in `withPersistentContext`.
- *
- * @param def - One of the five `*RelationshipDef` shapes. The `kind`
- *   discriminator selects the returned variant.
- * @returns The matching variant instance — overload-narrowed by `def.kind`.
- *
- * @example
- * // Scalar — per-actor bond / trust counter
- * const bond = createRelationship({
- *   id: 'npc-bond',
- *   kind: 'scalar',
- *   actors: ['mentor-rask', 'rival-vex'],
- *   initial: 0, min: -100, max: 100,
- * });
- * bond.add('mentor-rask', 5);
- *
- * @example
- * // Tiered — guild rank with per-transition gates
- * const rank = createRelationship({
- *   id: 'guild-rank',
- *   kind: 'tiered',
- *   actors: ['mages-guild'],
- *   tiers: ['novice', 'apprentice', 'journeyman', 'master'],
- *   gates: [C.skillAtLeast('arcane', 5), C.skillAtLeast('arcane', 15), C.questDone('master-trial')],
- * });
- * rank.tryAdvance('mages-guild');
- *
- * @example
- * // Faction — attitude-matrix propagation
- * const standing = createRelationship({
- *   id: 'faction-standing',
- *   kind: 'faction',
- *   factions: ['empire', 'rebels', 'pirates'],
- *   initial: 0, min: -100, max: 100,
- *   attitude: { empire: { rebels: -0.8, pirates: -0.5 } },
- * });
- * standing.applyTo('pirates', -10);  // lifts empire standing
+ * @internal
  */
 export function createRelationship(def: ScalarRelationshipDef): ScalarRelationship;
 export function createRelationship(def: TieredRelationshipDef): TieredRelationship;
