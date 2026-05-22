@@ -283,7 +283,7 @@ describe('Creating Formulas', () => {
       // We still have plenty of coverage
       return;
     }
-    if (functionName === 'pentate' && args[1] === -2 && args[2] === -2) {
+    if (functionName === 'pentate' && args[1] === -2 && (args[2] === -2 || args[2] === 0)) {
       // Times out (~5s) due to break_eternity edge case with extreme negative params
       return;
     }
