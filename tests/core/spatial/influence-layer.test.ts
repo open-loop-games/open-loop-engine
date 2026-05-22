@@ -13,26 +13,31 @@ const numericGrid = (width: number, height: number) =>
   createSpatialGrid<number>({ width, height, initializer: () => 0 });
 
 describe('falloff functions', () => {
-  it('linearFalloff: 1 at d=0, 0 at d>=r, halfway at d=r/2', () => {
-    expect(linearFalloff(0, 4)).toBeCloseTo(1);
-    expect(linearFalloff(2, 4)).toBeCloseTo(0.5);
-    expect(linearFalloff(4, 4)).toBeCloseTo(0);
-    expect(linearFalloff(5, 4)).toBe(0);
-    expect(linearFalloff(0, 0)).toBe(0);
+  it('linearFalloff: 1 at d=0, 0 at d>=r, halfway at d=r/2 (Euclidean)', () => {
+    expect(linearFalloff(0, 0, 4)).toBeCloseTo(1);
+    expect(linearFalloff(2, 0, 4)).toBeCloseTo(0.5);
+    expect(linearFalloff(0, 2, 4)).toBeCloseTo(0.5);
+    expect(linearFalloff(4, 0, 4)).toBeCloseTo(0);
+    expect(linearFalloff(5, 0, 4)).toBe(0);
+    expect(linearFalloff(0, 0, 0)).toBe(0);
+    // Diagonal: Euclidean d = sqrt(2)
+    expect(linearFalloff(1, 1, 4)).toBeCloseTo(1 - Math.SQRT2 / 4);
   });
 
-  it('gaussianFalloff: 1 at d=0, exp(-2) at d=r, never zero', () => {
-    expect(gaussianFalloff(0, 5)).toBeCloseTo(1);
-    expect(gaussianFalloff(5, 5)).toBeCloseTo(Math.exp(-2));
-    expect(gaussianFalloff(10, 5)).toBeCloseTo(Math.exp(-8));
-    expect(gaussianFalloff(0, 0)).toBe(0);
+  it('gaussianFalloff: 1 at d=0, exp(-2) at d=r, never zero (Euclidean)', () => {
+    expect(gaussianFalloff(0, 0, 5)).toBeCloseTo(1);
+    expect(gaussianFalloff(5, 0, 5)).toBeCloseTo(Math.exp(-2));
+    expect(gaussianFalloff(0, 5, 5)).toBeCloseTo(Math.exp(-2));
+    expect(gaussianFalloff(10, 0, 5)).toBeCloseTo(Math.exp(-8));
+    expect(gaussianFalloff(0, 0, 0)).toBe(0);
   });
 
-  it('exponentialFalloff: 1 at d=0, exp(-1) at d=r', () => {
-    expect(exponentialFalloff(0, 3)).toBeCloseTo(1);
-    expect(exponentialFalloff(3, 3)).toBeCloseTo(Math.exp(-1));
-    expect(exponentialFalloff(6, 3)).toBeCloseTo(Math.exp(-2));
-    expect(exponentialFalloff(0, 0)).toBe(0);
+  it('exponentialFalloff: 1 at d=0, exp(-1) at d=r (Euclidean)', () => {
+    expect(exponentialFalloff(0, 0, 3)).toBeCloseTo(1);
+    expect(exponentialFalloff(3, 0, 3)).toBeCloseTo(Math.exp(-1));
+    expect(exponentialFalloff(0, 3, 3)).toBeCloseTo(Math.exp(-1));
+    expect(exponentialFalloff(6, 0, 3)).toBeCloseTo(Math.exp(-2));
+    expect(exponentialFalloff(0, 0, 0)).toBe(0);
   });
 });
 
@@ -238,6 +243,35 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(profileHook).toHaveBeenCalledTimes(1);
     // 3x3 Chebyshev box centered at (2,2) → 9 samples.
     expect(profileHook).toHaveBeenCalledWith(9);
+  });
+
+  it('supports custom Chebyshev falloff via lookup table (roguelike danger pattern)', () => {
+    const grid = numericGrid(11, 11);
+    const DANGER = [2.0, 1.0, 0.6, 0.35, 0.2];
+    const chebyshevDanger: import('@/core/spatial').FalloffFunction = (dx, dy, _r) => {
+      const d = Math.max(Math.abs(dx), Math.abs(dy));
+      return d < DANGER.length ? DANGER[d] : 0;
+    };
+    const layer = createInfluenceLayer(grid, {
+      defaultRadius: 4,
+      falloff: chebyshevDanger,
+    });
+    layer.addSource({ id: 'm', x: 5, y: 5, strength: 10 });
+    layer.update();
+    // Center: 10 * 2.0 = 20.
+    expect(layer.read().at(5, 5)).toBeCloseTo(20);
+    // Chebyshev d=1 ring (all 8 neighbours): 10 * 1.0 = 10.
+    expect(layer.read().at(6, 5)).toBeCloseTo(10);
+    expect(layer.read().at(6, 6)).toBeCloseTo(10);
+    expect(layer.read().at(5, 4)).toBeCloseTo(10);
+    // Chebyshev d=2 ring corner — Euclidean ≈ 2.83 but Chebyshev = 2: 10 * 0.6 = 6.
+    expect(layer.read().at(7, 7)).toBeCloseTo(6);
+    // Chebyshev d=4 ring corner — Euclidean ≈ 5.66 but Chebyshev = 4: 10 * 0.2 = 2.
+    // A Euclidean linearFalloff with r=4 would clamp this to 0; the custom
+    // falloff is the whole point of the broadened signature.
+    expect(layer.read().at(9, 9)).toBeCloseTo(2);
+    // Beyond table: 0.
+    expect(layer.read().at(10, 5)).toBe(0);
   });
 
   it('zero-strength source contributes no samples', () => {

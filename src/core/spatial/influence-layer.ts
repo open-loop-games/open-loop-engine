@@ -15,10 +15,14 @@
  * + spatial classification + opponent density) consumes a single layer's
  * `read()` reader so all three axes share one storage substrate.
  *
- * Distance metric: Euclidean. The accumulation iterates the grid's
- * Chebyshev `inRange` (square bounding box), then computes
- * `Math.hypot(dx, dy)` and hands that to the falloff function. Built-in
- * falloffs naturally clamp or asymptote past `radius`.
+ * Distance metric: chosen by the falloff function. Accumulation iterates
+ * the grid's Chebyshev `inRange` (square bounding box) and hands each cell's
+ * `(dx, dy, radius)` to the falloff — the falloff decides how to collapse
+ * the coordinate delta into a scalar. Built-in falloffs are Euclidean
+ * (`Math.hypot(dx, dy)`); custom falloffs are free to pick Chebyshev
+ * (`Math.max(|dx|, |dy|)`), Manhattan (`|dx| + |dy|`), or hex-axial
+ * (`(|dx| + |dy| + |dx + dy|) / 2`). Built-ins clamp or asymptote past
+ * `radius`; custom falloffs are responsible for their own cutoff.
  *
  * Update order: evaporate → accumulate. `decay` is the *retention* factor
  * (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = full reset).
@@ -62,14 +66,32 @@ export interface InfluenceSource {
 /**
  * Falloff curve applied per cell during accumulation.
  *
- * Receives the Euclidean distance from source to cell and the source's
+ * Receives the cell-to-source coordinate delta (`dx`, `dy`) and the source's
  * effective radius (per-source override or `defaultRadius`). Returns a
- * scalar multiplier applied to the source's `strength`. Implementations
- * are responsible for clamping at distance ≥ radius if a hard cutoff is
- * desired; built-in falloffs do this where it makes sense (`linearFalloff`
- * clamps; `gaussianFalloff` and `exponentialFalloff` asymptote).
+ * scalar multiplier applied to the source's `strength`. The falloff owns
+ * the choice of distance metric — collapse `(dx, dy)` to whatever scalar
+ * fits the grid topology:
+ *
+ * - Euclidean: `Math.hypot(dx, dy)` (built-in default)
+ * - Chebyshev: `Math.max(Math.abs(dx), Math.abs(dy))` (square / diagonal-equal grids)
+ * - Manhattan: `Math.abs(dx) + Math.abs(dy)` (4-connected boards)
+ * - Hex axial: `(Math.abs(dx) + Math.abs(dy) + Math.abs(dx + dy)) / 2`
+ *
+ * Implementations are responsible for clamping at distance ≥ radius if a
+ * hard cutoff is desired; built-in falloffs do this where it makes sense
+ * (`linearFalloff` clamps; `gaussianFalloff` and `exponentialFalloff`
+ * asymptote).
+ *
+ * @example Chebyshev lookup table for a roguelike danger map
+ * ```ts
+ * const DANGER = [2.0, 1.0, 0.6, 0.35, 0.2];
+ * const dangerFalloff: FalloffFunction = (dx, dy, _r) => {
+ *   const d = Math.max(Math.abs(dx), Math.abs(dy));
+ *   return d < DANGER.length ? DANGER[d] : 0;
+ * };
+ * ```
  */
-export type FalloffFunction = (distance: number, radius: number) => number;
+export type FalloffFunction = (dx: number, dy: number, radius: number) => number;
 
 /** Options accepted by {@link createInfluenceLayer}. */
 export interface InfluenceLayerOptions {
@@ -77,8 +99,9 @@ export interface InfluenceLayerOptions {
   defaultRadius: number;
   /**
    * Falloff curve. Built-ins: {@link linearFalloff}, {@link gaussianFalloff},
-   * {@link exponentialFalloff}. Custom curves are plain `(d, r) => number`
-   * functions.
+   * {@link exponentialFalloff} (all Euclidean). Custom curves are plain
+   * `(dx, dy, radius) => number` functions and may use any distance metric —
+   * see {@link FalloffFunction} for Chebyshev / Manhattan / hex examples.
    */
   falloff: FalloffFunction;
   /**
@@ -179,24 +202,27 @@ export interface InfluenceLayer {
 }
 
 // === BUILT-IN FALLOFF FUNCTIONS ===
-/** Linear falloff `(1 - d/r)`, clamped to `[0, 1]`. */
-export const linearFalloff: FalloffFunction = (d, r) => {
+// All built-ins use Euclidean distance (`Math.hypot(dx, dy)`). Custom
+// falloffs may pick any metric — see {@link FalloffFunction}.
+
+/** Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. */
+export const linearFalloff: FalloffFunction = (dx, dy, r) => {
   if (r <= 0) return 0;
-  const v = 1 - d / r;
+  const v = 1 - Math.hypot(dx, dy) / r;
   return v > 0 ? v : 0;
 };
 
-/** Gaussian falloff `exp(-(d/r)^2 * 2)`. Asymptotes; never zero. */
-export const gaussianFalloff: FalloffFunction = (d, r) => {
+/** Gaussian falloff `exp(-(d/r)^2 * 2)`, Euclidean `d`. Asymptotes; never zero. */
+export const gaussianFalloff: FalloffFunction = (dx, dy, r) => {
   if (r <= 0) return 0;
-  const x = d / r;
+  const x = Math.hypot(dx, dy) / r;
   return Math.exp(-(x * x) * 2);
 };
 
-/** Exponential falloff `exp(-d/r)`. Asymptotes; never zero. */
-export const exponentialFalloff: FalloffFunction = (d, r) => {
+/** Exponential falloff `exp(-d/r)`, Euclidean `d`. Asymptotes; never zero. */
+export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
   if (r <= 0) return 0;
-  return Math.exp(-d / r);
+  return Math.exp(-Math.hypot(dx, dy) / r);
 };
 
 // === CREATEINFLUENCELAYER ===
@@ -294,16 +320,16 @@ export function createInfluenceLayer(
     for (const source of sources.values()) {
       const r = source.radius ?? defaultRadius;
       if (r <= 0 || source.strength === 0) continue;
-      // grid.inRange iterates a Chebyshev square; Euclidean falloff lives
-      // inside the falloff function. For source positions clamped via
-      // checkSource at registration time the iteration is in-bounds.
+      // grid.inRange iterates a Chebyshev square; the falloff function
+      // chooses how to collapse (dx, dy) into a scalar distance for its
+      // metric. For source positions clamped via checkSource at
+      // registration time the iteration is in-bounds.
       for (const cell of grid.inRange(source.x, source.y, r)) {
         const idx = cell.y * width + cell.x;
         if (respectPassability && grid.passable[idx] === 0) continue;
         const dx = cell.x - source.x;
         const dy = cell.y - source.y;
-        const distance = Math.hypot(dx, dy);
-        const contribution = source.strength * falloff(distance, r);
+        const contribution = source.strength * falloff(dx, dy, r);
         samples++;
         if (contribution === 0) continue;
         grid.set(cell.x, cell.y, grid.cells[idx] + contribution);
