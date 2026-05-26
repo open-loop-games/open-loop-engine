@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ref } from 'vue';
+import { computed, ref, unref } from 'vue';
 import { Decimal, bn } from '@/primitives/decimal';
 import {
   createAdditiveModifier,
@@ -216,6 +216,30 @@ describe('createModifierChain', () => {
   it('has correct id', () => {
     const chain = createModifierChain('my-chain');
     expect(chain.id).toBe('my-chain');
+  });
+
+  it('chain.enabled stays reactive when modifiers are added after first read', () => {
+    // Pre-fix, `recompose` reassigned `chain.enabled` to a fresh ComputedRef on
+    // every add/remove. A consumer that already captured the original ref
+    // stayed attached to it, and modifiers added later — along with any
+    // toggles on their `enabled` flags — were invisible until something else
+    // forced the consumer to re-evaluate. The fix made `chain.enabled` a
+    // stable ComputedRef whose body re-reads `items` on each evaluation,
+    // triggered by an `itemsVersion` bump inside recompose.
+    const chain = createModifierChain('enabled-add-reactivity');
+    const firstEnabled = ref(false);
+    chain.add(createAdditiveModifier({ addend: 10, enabled: firstEnabled }));
+
+    const observed = computed(() => unref(chain.enabled));
+    expect(observed.value).toBe(false);
+
+    // Add a second modifier with enabled=true. Without re-touching firstEnabled,
+    // observed must reflect the new chain state — i.e. some flagged modifier
+    // is now active.
+    const secondEnabled = ref(true);
+    chain.add(createAdditiveModifier({ addend: 20, enabled: secondEnabled }));
+
+    expect(observed.value).toBe(true);
   });
 });
 

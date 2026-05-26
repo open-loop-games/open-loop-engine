@@ -12,7 +12,7 @@
  * - {@link computeModifiedValue} — reactive computed applying modifiers to a base
  */
 
-import { computed, unref, type ComputedRef, type MaybeRef } from 'vue';
+import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
@@ -564,13 +564,24 @@ export function createModifierChain(id: string): ModifierChain {
   const bindingsById = new Map<string, BindingRecord>();
   const handle = createEmitHandle<ModifierChainEvents>();
 
+  // `chain.enabled` is a stable ComputedRef rather than a property the chain
+  // reassigns each recompose. The previous shape (reassigning a new
+  // ComputedRef on add/remove) orphaned any consumer effect that captured
+  // the old ref's value — Vue tracks the inner ref, not the plain-object
+  // property slot, so new modifiers' `enabled` refs never reached the
+  // consumer. `itemsVersion` is the dependency `recompose` bumps so this
+  // stable computed re-evaluates and re-attaches deps to whatever items
+  // currently hold. `apply`/`invert`/`description` stay reassign-on-recompose
+  // — they're functions read fresh on each call, no reactivity capture.
+  const itemsVersion = ref(0);
+
   function recompose(): void {
     profile('modifier.chain.recompose', () => {
       const composed = createSequentialModifier(items);
       chain.apply = composed.apply;
       chain.invert = composed.invert;
-      chain.enabled = composed.enabled;
       chain.description = composed.description;
+      itemsVersion.value++;
       handle.emit('change');
     });
   }
@@ -579,7 +590,14 @@ export function createModifierChain(id: string): ModifierChain {
     id,
     apply: (gain: DecimalSource) => gain,
     invert: (gain: DecimalSource) => gain,
-    enabled: undefined,
+    enabled: computed<boolean>(() => {
+      void itemsVersion.value;
+      // Empty chain or no modifier declares an `enabled` flag → treat as
+      // always-enabled. Matches the pre-fix behavior where `composed.enabled`
+      // was `undefined` (and `applyModifier`'s `=== false` check passed).
+      if (items.length === 0 || items.every((m) => m.enabled == null)) return true;
+      return items.some((m) => unref(m.enabled) !== false);
+    }),
     description: undefined,
 
     add(modifier: Modifier): () => void {
