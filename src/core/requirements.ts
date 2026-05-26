@@ -414,6 +414,11 @@ export function requirementsMet(requirements: Requirements): boolean {
  */
 export function maxRequirementsMet(requirements: Requirements): DecimalSource {
   if (Array.isArray(requirements)) {
+    // Empty array is vacuously satisfied (matches `requirementsMet([])`'s
+    // `every` shape). Returning Decimal.dInf mirrors the boolean-true branch
+    // below — "satisfiable any number of times" — and avoids the empty-reduce
+    // throw the public bulk-purchase callers would otherwise propagate.
+    if (requirements.length === 0) return Decimal.dInf;
     // Return the minimum across all requirements. Renorm after each min so the
     // typeof fast path can fire on subsequent iterations. No initial
     // value — first-element type determines starting shape; renorm applies to

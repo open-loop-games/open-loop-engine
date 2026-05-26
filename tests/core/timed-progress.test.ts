@@ -346,6 +346,37 @@ describe('stepProgressiveCosts — single cost', () => {
     expect(step.stalled).toBe(false);
     expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
   });
+
+  it('does not over-request when available is fractional below 1', () => {
+    // duration 10, amount 10, interval 1. Available is 0.7 — caller can spend
+    // 0 whole units this tick. Pre-fix, maxUnits = 0 + 0.7 → maxProg = 0.7,
+    // and ceil(0.7) bumped the delta to 1 unit (over-requesting by 0.3).
+    const step = stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 10,
+      duration: 10,
+      costs: [{ amount: 10, available: () => 0.7 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 0)).toBe(true);
+    expect(step.stalled).toBe(true);
+    expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
+  });
+
+  it('caps to floor(available) when available is fractional above 1', () => {
+    // duration 100, amount 10, interval 10. prev=5 → prevConsumed=1.
+    // Available is 1.7; the caller can spend 1 whole unit. Pre-fix, maxUnits
+    // = 1 + 1.7 = 2.7, maxProg = 27, and ceil pushed the delta to 2 units
+    // (over-requesting by 0.7).
+    const step = stepProgressiveCosts({
+      prevProgress: 5,
+      proposedProgress: 35,
+      duration: 100,
+      costs: [{ amount: 10, available: () => 1.7 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 20)).toBe(true);
+    expect(step.stalled).toBe(false);
+    expect(Decimal.eq(step.deltas[0], 1)).toBe(true);
+  });
 });
 
 describe('stepProgressiveCosts — multiple costs', () => {

@@ -390,7 +390,11 @@ export function stepProgressiveCosts(opts: {
 
     const available = new Decimal(cost.available());
     if (Decimal.lt(available, needed)) {
-      const maxUnits = Decimal.add(prevConsumed, available);
+      // Floor `available` so maxUnits stays on the same integer-threshold grid
+      // that resourceConsumedAt's ceil produces. Without it, a fractional
+      // available propagates into maxProg and the later ceil rounds back up,
+      // making the delta over-request by up to one unit (delta > available).
+      const maxUnits = Decimal.add(prevConsumed, Decimal.floor(available));
       const interval = Decimal.div(dur, amt);
       const maxProg = new Decimal(Decimal.mul(maxUnits, interval));
       if (maxProg.lt(capped)) capped = maxProg;

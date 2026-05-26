@@ -1173,6 +1173,31 @@ describe('Buy Max', () => {
       const calculatedCost = calculateCost(formula, maxAffordable.value, false, 4);
       expect(calculatedCost).compare_tolerance(actualCost);
     });
+    test('Returns purchase count, not absolute level, when currentVariable > 0', () => {
+      // invert(100000) for 100·1.05^x is floor(log_1.05(1000)) = 141. With
+      // currentVariable=10, the bug-shaped result (absolute level) is 141; the
+      // correct count of additional purchases is 141 - 10 = 131.
+      const purchases = ref(10);
+      const variable = Formula.variable(purchases);
+      const formula = Formula.pow(1.05, variable).times(100);
+      const maxAffordable = calculateMaxAffordable(formula, resource, false);
+      expect(maxAffordable.value).compare_tolerance(131);
+
+      // Round-trip: paying for 131 levels (non-cumulative) costs evaluate(141).
+      expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
+        Decimal.pow(1.05, 141).times(100),
+      );
+    });
+    test('Clamps to 0 when currentVariable already exceeds invert(resource)', () => {
+      // At level 200, cost = 100·1.05^200 ≈ 1.7M, well above resource (100k).
+      // invert(100000) = 141 < 200, so count must clamp to 0 — without the
+      // clamp, the result would be negative and poison downstream callers.
+      const purchases = ref(200);
+      const variable = Formula.variable(purchases);
+      const formula = Formula.pow(1.05, variable).times(100);
+      const maxAffordable = calculateMaxAffordable(formula, resource, false);
+      expect(maxAffordable.value).compare_tolerance(0);
+    });
   });
   describe('With cumulative cost', () => {
     test('Errors on calculating max affordable of non-invertible formula', () => {

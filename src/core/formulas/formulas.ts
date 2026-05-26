@@ -1257,7 +1257,17 @@ export function calculateMaxAffordable(
             ).sub(currentVariable);
           });
         } else {
-          affordable = Decimal.floor(formula.invert(resource.value));
+          // invert(R) returns the absolute variable level at which evaluate
+          // equals R; for non-cumulative cost (a single payment of
+          // evaluate(targetLevel) covers reaching that level), the buyable
+          // count is invert(R) − currentVariable. Mirrors the cumulative
+          // branch's `.sub(currentVariable)` above. Clamped to 0 because
+          // invert can drop below currentVariable when even the current
+          // level's cost exceeds R.
+          affordable = Decimal.max(
+            Decimal.floor(formula.invert(resource.value)).sub(currentVariable),
+            0,
+          );
         }
       }
       affordable = Decimal.clampMax(affordable, maxBulkAmount);

@@ -275,5 +275,11 @@ describe('requirements module', () => {
       );
       expect(Decimal.eq(maxRequirementsMet(req), 0)).toBe(true);
     });
+
+    it('returns dInf for empty requirements array', () => {
+      // Mirrors `requirementsMet([]) === true` (vacuous .every). Bulk-purchase
+      // callers passing a possibly-empty array must not crash.
+      expect(Decimal.eq(maxRequirementsMet([]), Decimal.dInf)).toBe(true);
+    });
   });
 });
