@@ -7,7 +7,7 @@ import {
   resetPersistent,
   createDefinitionStates,
 } from '@/core/persistence';
-import { bn } from '@/primitives/decimal';
+import { bn, Decimal } from '@/primitives/decimal';
 
 function createMapStorage() {
   const m = new Map<string, string>();
@@ -78,6 +78,21 @@ describe('SaveManager', () => {
     expect(result.success).toBe(true);
     expect(result.timestamp).toBeDefined();
     expect(v.value).toBe(999);
+  });
+
+  it('importSave rejects mismatched gameId and emits save:load-failed', () => {
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
+    const fail = vi.fn();
+    mgr.on('save:load-failed', fail);
+    const foreign = JSON.stringify({
+      version: 1,
+      gameId: 'other-game',
+      timestamp: 1000,
+      data: {},
+    });
+    const result = mgr.importSave(foreign);
+    expect(result.success).toBe(false);
+    expect(fail).toHaveBeenCalledWith(expect.objectContaining({ reason: 'wrong-game-id' }));
   });
 
   it('save includes version', () => {
@@ -563,6 +578,35 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
     expect(result.success).toBe(true);
     expect(score.value).toBe(42);
     expect(label.value).toBe('hello');
+  });
+
+  it('migrates v1 slots whose Decimal-defaulted refs serialized as strings', () => {
+    // Pre-fix: looseTypeMatch rejected `expected: Decimal (typeof 'object') vs
+    // actual: string`, so every Decimal field in a legacy save fell back to
+    // default. The compatibility branch lifts that — strings into Decimal
+    // slots are accepted, and deserialize rehydrates the Decimal instance
+    // (see the persistence.ts:1022 leaf).
+    const storage = createMapStorage();
+    const v1Envelope = {
+      version: 1,
+      gameId: 'v1decimal',
+      timestamp: 1,
+      data: {
+        'v1decimal-ctx': { '0': '12345' },
+      },
+    };
+    storage.setItem('v1decimal-slot-0', JSON.stringify(v1Envelope));
+    storage.setItem('v1decimal-slots', JSON.stringify([{ id: 0, name: 'Autosave' }]));
+
+    const mgr = createSaveManager({ gameId: 'v1decimal', storageAdapter: storage });
+    beginPersistentContext('v1decimal-ctx');
+    const score = persistent(bn(0), { name: 'score' });
+    endPersistentContext();
+
+    const result = mgr.load();
+    expect(result.success).toBe(true);
+    expect(score.value).toBeInstanceOf(Decimal);
+    expect(Decimal.eq(score.value, 12345)).toBe(true);
   });
 
   it('type-mismatched legacy slots fall back to default + warn', () => {

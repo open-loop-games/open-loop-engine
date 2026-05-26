@@ -317,11 +317,17 @@ export function withPersistenceNamespace<T>(namespace: string | undefined, fn: (
  * caller passed to `beginPersistentContext`. Namespace-agnostic code that
  * needs to display or route on the context id (e.g. system fallback ids)
  * should read this, not the raw stack entry.
+ *
+ * The prefix is sliced by the *recorded* namespace length, not by indexOf
+ * on the separator — so context ids that legitimately contain `::` for their
+ * own scoping (e.g. resource lifetime trackers under `${parent}::${id}`)
+ * round-trip with their structure intact instead of collapsing to whatever
+ * follows the first `::`.
  */
 function stripNamespace(fullId: string): string {
-  const sep = fullId.indexOf(NAMESPACE_SEP);
-  if (sep === -1) return fullId;
-  return fullId.slice(sep + NAMESPACE_SEP.length);
+  const ns = contextNamespaces[fullId];
+  if (!ns) return fullId;
+  return fullId.slice(ns.length + NAMESPACE_SEP.length);
 }
 
 /**
@@ -1012,11 +1018,19 @@ export function deserializePersistents(
       let current = getNested(save, path);
 
       if (current !== undefined) {
-        // Recover non-finite numbers encoded as strings during serialization
-        if (typeof current === 'string' && typeof persistentRef[DefaultValue] === 'number') {
-          const numMap: Record<string, number> = { Infinity, '-Infinity': -Infinity, NaN };
-          if (current in numMap) {
-            current = numMap[current];
+        if (typeof current === 'string') {
+          const defaultValue = persistentRef[DefaultValue];
+          if (defaultValue instanceof Decimal) {
+            // serializePersistents writes Decimals as `value.toString()`;
+            // rehydrate so consumer code calling instance methods
+            // (`ref.value.gte(...)`, `.add(...)`, etc.) keeps working post-load.
+            current = new Decimal(current);
+          } else if (typeof defaultValue === 'number') {
+            // Recover non-finite numbers encoded as strings during serialization
+            const numMap: Record<string, number> = { Infinity, '-Infinity': -Infinity, NaN };
+            if (current in numMap) {
+              current = numMap[current];
+            }
           }
         }
         persistentRef[PersistentState].value = current as State;

@@ -140,6 +140,63 @@ describe('Persistence', () => {
     });
   });
 
+  describe('Decimal round-trip', () => {
+    it('rehydrates string-encoded Decimals back into Decimal instances on load', () => {
+      // serializePersistents writes Decimals as `value.toString()`. Without
+      // rehydration, deserialize would leave a raw string in the ref, breaking
+      // any consumer that calls instance methods (`.gte`, `.add`, etc.).
+      beginPersistentContext('test-decimal-roundtrip');
+      const score = persistent(bn(0));
+      endPersistentContext();
+
+      score.value = new Decimal('1e100');
+
+      const refs = getAllPersistentRefs();
+      const serialized = serializePersistents(refs);
+      const parsed = JSON.parse(JSON.stringify(serialized));
+
+      score.value = bn(0);
+      deserializePersistents(refs, parsed);
+
+      expect(score.value).toBeInstanceOf(Decimal);
+      expect((score.value as Decimal).gte('1e99')).toBe(true);
+      expect((score.value as Decimal).add(1).gte('1e100')).toBe(true);
+    });
+  });
+
+  describe('namespace stripping preserves `::` in context ids', () => {
+    // resource.ts registers lifetime trackers under `${parent}::${id}` so two
+    // same-named resources in different parents stay distinct. The earlier
+    // stripNamespace implementation sliced on the first `::` unconditionally,
+    // collapsing `modA::gold` and `modB::gold` to the same save key.
+    it('two contexts sharing a tail id stay distinct in the unnamespaced case', () => {
+      beginPersistentContext('strip-modA::gold');
+      const aRef = persistent(bn(0), { name: 'cumulative' });
+      endPersistentContext();
+
+      beginPersistentContext('strip-modB::gold');
+      const bRef = persistent(bn(0), { name: 'cumulative' });
+      endPersistentContext();
+
+      const refs = getAllPersistentRefs();
+      expect(refs.get('strip-modA::gold.cumulative')).toBe(aRef);
+      expect(refs.get('strip-modB::gold.cumulative')).toBe(bRef);
+      // The collapsed bare-tail key must not exist.
+      expect(refs.has('gold.cumulative')).toBe(false);
+    });
+
+    it('only the recorded namespace prefix is stripped, not arbitrary `::`', () => {
+      withPersistenceNamespace('strip-ns', () => {
+        beginPersistentContext('modX::gold');
+        const ref = persistent(bn(0), { name: 'cumulative' });
+        endPersistentContext();
+
+        const refs = getAllPersistentRefs('strip-ns');
+        expect(refs.get('modX::gold.cumulative')).toBe(ref);
+      });
+    });
+  });
+
   describe('stable named keys', () => {
     it('persistent({ name }) stores the name on the ref', () => {
       beginPersistentContext('test-named-basic');

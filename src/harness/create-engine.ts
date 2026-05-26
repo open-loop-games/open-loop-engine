@@ -45,9 +45,20 @@ export interface CreateEngineFromSaveOptions {
 export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine {
   const { saveBlob, modules, namespace = 'workbench-scratch', config = {} } = options;
 
+  // Adopt the source envelope's gameId so saveManager.importSave's gameId
+  // guard accepts the blob. The scratch engine is otherwise isolated via
+  // memory storage and a unique persistence namespace, so the label itself
+  // carries no further meaning here.
+  let envelopeGameId: string;
+  try {
+    envelopeGameId = (JSON.parse(saveBlob) as { gameId: string }).gameId;
+  } catch {
+    throw new Error('createEngineFromSave: save blob is not valid JSON');
+  }
+
   const engine = createEngine({
     ...config,
-    gameId: namespace,
+    gameId: envelopeGameId,
     persistence: true,
     persistenceNamespace: namespace,
     storageAdapter: createMemoryStorage(),

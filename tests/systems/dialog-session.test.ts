@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
-import { resetAllPersistentContexts } from '@/core/persistence';
+import { getAllPersistentRefs, loadingSave, resetAllPersistentContexts } from '@/core/persistence';
 import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
@@ -167,6 +167,45 @@ describe('createDialogSession', () => {
       session.choose('ask-training');
       // Post-choose presentation reflects the advanced node — proving the
       // session's snapshot logic ran *after* the runtime mutation.
+      expect(session.present()?.nodeId).toBe('training');
+    });
+  });
+
+  it('re-imports state into the runtime when save load writes to the persistent ref', () => {
+    // Engine init order is module-install → save-load, so the session's eager
+    // importState fires against the *default* stateRef value; the saved
+    // active conversation must propagate via the loadingSave-gated watcher.
+    // This test simulates the deserialize step directly: flip loadingSave,
+    // write a non-default state into the ref, flip back. Without the watcher,
+    // session.isActive() would stay false.
+    withEngine(buildAccessor(), () => {
+      const session = createDialogSession({ id: 'load-sync', graphs: [greetingGraph] });
+      expect(session.isActive()).toBe(false);
+
+      const refs = getAllPersistentRefs();
+      const stateRef = refs.get('dialog-sessions/load-sync.state') as
+        | {
+            value: {
+              activeGraphId?: string;
+              activeNodeId?: string;
+              visitCounts: Record<string, Record<string, number>>;
+            };
+          }
+        | undefined;
+      expect(stateRef).toBeDefined();
+
+      loadingSave.value = true;
+      try {
+        stateRef!.value = {
+          activeGraphId: 'rask-greeting',
+          activeNodeId: 'training',
+          visitCounts: {},
+        };
+      } finally {
+        loadingSave.value = false;
+      }
+
+      expect(session.isActive()).toBe(true);
       expect(session.present()?.nodeId).toBe('training');
     });
   });

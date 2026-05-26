@@ -21,11 +21,13 @@
  * @cluster dialog
  */
 
+import { watch } from 'vue';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 import {
   beginPersistentContext,
   endPersistentContext,
+  loadingSave,
   persistent,
   type Persistent,
 } from '@/core/persistence';
@@ -152,10 +154,25 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   const factory = options.runtimeFactory ?? defaultNativeFactory;
   const runtime = factory(options.graphs, accessorMutator, accessorMutator);
 
-  // Hydrate runtime from the persistent state on creation. Covers post-load
-  // engine init (the persistent ref auto-populated from save data), as well as
-  // fresh-game init where the default snapshot lands harmlessly.
+  // Hydrate runtime from the persistent state on creation. Covers the
+  // session-created-after-load path (lazy-instantiated sessions, fresh-game
+  // init where the snapshot lands harmlessly).
   runtime.importState(stateRef.value);
+
+  // Re-import on save load. The typical engine init order is
+  // createEngine → mod.install (where sessions are built) → saveManager.load,
+  // so deserializePersistents writes stateRef *after* the eager import
+  // above. The flush:sync + loadingSave gate mirrors the resource.ts pattern
+  // (inverted gate — we want to act *during* load, not avoid acting then).
+  // snapshot() writes to stateRef outside any load, so the guard returns
+  // immediately on those firings.
+  watch(
+    stateRef,
+    (newState) => {
+      if (loadingSave.value) runtime.importState(newState);
+    },
+    { flush: 'sync' },
+  );
 
   const events = createEmitHandle<DialogSessionEvents>();
 

@@ -37,6 +37,7 @@ import { setNested } from './save-migrations';
 import { createEmitHandle, type Emittable } from './events';
 import { validateSaveData, type ValidationIssue } from './save-validation';
 import { isDev } from './common';
+import { Decimal } from '@/primitives/decimal';
 import LZString from 'lz-string';
 const { compressToBase64, decompressFromBase64 } = LZString;
 
@@ -386,6 +387,7 @@ function looseTypeMatch(expected: unknown, actual: unknown): boolean {
   // Decimal-encoded-as-string round-trips are common; accept string↔number↔boolean pairs loosely only when
   // the expected type is one that the existing deserialize path can coerce.
   if (et === 'number' && at === 'string') return true; // non-finite numbers serialize as strings
+  if (expected instanceof Decimal && at === 'string') return true; // Decimal refs serialize via .toString()
   return false;
 }
 
@@ -708,6 +710,10 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         e = JSON.parse(data) as SaveEnvelope;
       } catch (detail) {
         handle.emit('save:load-failed', { slotId, reason: 'parse-error', detail });
+        return { success: false };
+      }
+      if (e.gameId !== gameId) {
+        handle.emit('save:load-failed', { slotId, reason: 'wrong-game-id' });
         return { success: false };
       }
       try {
