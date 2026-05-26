@@ -15,17 +15,19 @@
  * - `{ restartedWith: step }` — swaps the step in-place; alive stays true
  *   (borglike's in-flight auto-restart shape).
  *
- * Per-instance aliveness is persisted under context `${poolId}:${id}`,
- * following the engine's per-element persistence convention shared by
- * `createAchievement`, `createPurchasable`, etc. The pool's own context
- * stores the instance-id list.
+ * Pool persists its instance-id list and per-id aliveness map under
+ * context `${poolId}`. Consumers recreate instances post-load via
+ * `addInstance` — the saved aliveness map is consulted so previously-dead
+ * instances stay dead across save/load regardless of when they're
+ * recreated, fixing the lazy-context gap an earlier per-instance layout
+ * had with dynamically-spawned runs (borglike clones, Cavernous loops).
  *
  * Design study: `reports/studies/multi-run-orchestration/`.
  */
 
-import { computed, shallowRef, type Ref } from 'vue';
+import { computed, ref, shallowRef, watch, type Ref } from 'vue';
 import { createEmitHandle, type Emittable } from './events';
-import { persistent, withPersistentContext } from './persistence';
+import { loadingSave, persistent, withPersistentContext } from './persistence';
 
 // === TYPES ===
 /**
@@ -49,9 +51,11 @@ export type RunDeathOutcome = 'destroyed' | 'parked' | { readonly restartedWith:
 export interface RunHandle<Id = string> {
   readonly id: Id;
   /**
-   * Reactive aliveness flag. Persisted under `${poolId}:${id}` context.
-   * Flipped to `false` on `'destroyed'` or `'parked'` outcomes; stays
-   * `true` through a `restartedWith` outcome.
+   * Reactive aliveness flag. Backed by the pool's persisted `aliveStates`
+   * map; reads and internal flips both route through that map so the value
+   * round-trips through save/load regardless of when this handle was
+   * created. Flipped to `false` on `'destroyed'` or `'parked'` outcomes;
+   * stays `true` through a `restartedWith` outcome.
    */
   readonly alive: Ref<boolean>;
   /**
@@ -197,11 +201,14 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
   const { id: poolId, deathPolicy, maxInstances = Infinity } = options;
 
-  // Pool-level persistence — just the id list for post-load introspection.
-  // Per-instance aliveness lives under nested `${poolId}:${id}` contexts,
-  // registered during `addInstance`.
-  const { instanceIds } = withPersistentContext(poolId, () => ({
+  // Pool-level persistence: instance-id list + per-id aliveness map. Both
+  // live in the pool's own context so they're in the registry at save-load
+  // time — `addInstance` is consulted against the saved `aliveStates`
+  // regardless of when it runs, so dynamic instances created post-load
+  // pick up their saved alive state (no resurrection of dead clones).
+  const { instanceIds, aliveStates } = withPersistentContext(poolId, () => ({
     instanceIds: persistent<string[]>([], { name: 'instanceIds' }),
+    aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates' }),
   }));
 
   // In-memory collection state. `handleArray` + `handleMap` is the canonical
@@ -264,6 +271,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     stepMap.delete(id);
     onDeathMap.delete(id);
     aliveMap.delete(id);
+    delete aliveStates.value[String(id)];
     bumpLive();
     syncInstanceIds();
   }
@@ -315,15 +323,36 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       throw new Error(`RunPool(${poolId}): maxInstances (${maxInstances}) exceeded`);
     }
 
-    // Per-instance persistent context. Re-using an id that was previously
-    // destroyed in this session will hit `setPersistentName` collision —
-    // ids are effectively burn-once within a session. Both validated
-    // consumers (borglike, Cavernous family) use unique-per-start or
-    // stable-never-destroyed ids; v1 doesn't support id recycling.
-    const ctxId = `${poolId}:${String(reg.id)}`;
-    const { alive } = withPersistentContext(ctxId, () => ({
-      alive: persistent<boolean>(true, { name: 'alive' }),
-    }));
+    // Resolve initial aliveness from the pool's persisted map. A fresh id
+    // defaults to `true`; an id present in `aliveStates` (e.g. one whose
+    // entry was set by `deserializePersistents` at save-load time) keeps
+    // whatever value was loaded — including `false` for runs that died
+    // before the save was taken. `alive` is a local per-handle ref so a
+    // destroyed handle's `alive.value` stays at its last value after
+    // `removeFromCollection` cleans the map entry; a forward watcher
+    // mirrors flips into `aliveStates` for persistence, and a reverse
+    // watcher gated on `loadingSave` catches mid-session save loads that
+    // replace the entire map.
+    const idKey = String(reg.id);
+    const initialAlive = aliveStates.value[idKey] ?? true;
+    aliveStates.value[idKey] = initialAlive;
+    const alive = ref(initialAlive);
+    watch(
+      alive,
+      (v) => {
+        aliveStates.value[idKey] = v;
+      },
+      { flush: 'sync' },
+    );
+    watch(
+      () => aliveStates.value[idKey],
+      (v) => {
+        if (loadingSave.value && v !== undefined && v !== alive.value) {
+          alive.value = v;
+        }
+      },
+      { flush: 'sync' },
+    );
 
     const handle: RunHandle<Id> = {
       id: reg.id,

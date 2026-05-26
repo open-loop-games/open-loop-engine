@@ -69,28 +69,56 @@ describe('RunPool — construction', () => {
     expect(pool.liveCount.value).toBe(2);
     expect(c.alive.value).toBe(false);
 
-    // Simulate fresh-session load: seed a new pool with a save-shaped
-    // fixture that matches the current on-disk shape, then re-register
-    // instances and assert aliveness survives.
+    // Simulate fresh-session load: seed a new pool, then deserialize a save
+    // shaped to match the pool's persisted layout (instanceIds + aliveStates
+    // both under `${ctxId2}`). Instances are added *after* deserialize to
+    // exercise the post-load addInstance path that motivated the refactor.
     const ctxId2 = `round-trip-2-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId2);
     const pool2 = createRunPool({ id: ctxId2, deathPolicy: 'park' });
-    pool2.addInstance({ id: 'a', step: aliveStep });
-    pool2.addInstance({ id: 'b', step: aliveStep });
-    pool2.addInstance({ id: 'c', step: deadStep });
     endPersistentContext();
 
     deserializePersistents(getAllPersistentRefs(), {
-      [ctxId2]: { instanceIds: JSON.stringify(['a', 'b', 'c']) },
-      [`${ctxId2}:a`]: { alive: true },
-      [`${ctxId2}:b`]: { alive: true },
-      [`${ctxId2}:c`]: { alive: false },
+      [ctxId2]: {
+        instanceIds: ['a', 'b', 'c'],
+        aliveStates: { a: true, b: true, c: false },
+      },
     });
+
+    pool2.addInstance({ id: 'a', step: aliveStep });
+    pool2.addInstance({ id: 'b', step: aliveStep });
+    pool2.addInstance({ id: 'c', step: deadStep });
 
     expect(pool2.getInstance('a')!.alive.value).toBe(true);
     expect(pool2.getInstance('b')!.alive.value).toBe(true);
     expect(pool2.getInstance('c')!.alive.value).toBe(false);
     expect(pool2.liveCount.value).toBe(2);
+  });
+
+  it('saved alive=false survives a mid-session reload that replaces aliveStates', () => {
+    // Mid-session load path: instances are already in the pool, then a
+    // deserialize replaces `aliveStates` with a different snapshot. The
+    // reverse watcher (gated on loadingSave) must re-seed each handle's
+    // local alive ref from the new map values.
+    const ctxId = `mid-session-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const pool = createRunPool({ id: ctxId, deathPolicy: 'park' });
+    endPersistentContext();
+
+    pool.addInstance({ id: 'a', step: aliveStep });
+    pool.addInstance({ id: 'b', step: aliveStep });
+    expect(pool.getInstance('a')!.alive.value).toBe(true);
+    expect(pool.getInstance('b')!.alive.value).toBe(true);
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: {
+        instanceIds: ['a', 'b'],
+        aliveStates: { a: true, b: false },
+      },
+    });
+
+    expect(pool.getInstance('a')!.alive.value).toBe(true);
+    expect(pool.getInstance('b')!.alive.value).toBe(false);
   });
 });
 

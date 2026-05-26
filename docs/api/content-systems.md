@@ -128,7 +128,7 @@ Three factories in increasing flexibility: `createSimplePurchasable` for static 
 - `interface PurchasableOptions` — Full options for createPurchasable — the engine-internal raw factory. `src/systems/purchasable.ts:82`
 - `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:125`
 - `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:155`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:190`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:208`
 - `interface SetupPolicyAutoPurchaseOptions` — Options for setupPolicyAutoPurchase. `src/systems/auto-purchase.ts:105`
 - `function setupSweepAutoPurchase(purchasables: Purchasable[], enabled: Computable<boolean>, registerTick: (callback: (dt: number) => void) => () => void): () => void` — Register a tick handler that sweeps a purchasable list each frame, calling `purchaseMax()` on every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:79`
 
