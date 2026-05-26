@@ -372,31 +372,33 @@ export function stepProgressiveCosts(opts: {
 }): ProgressiveCostStep {
   const { prevProgress, proposedProgress, duration, costs } = opts;
   const prev = new Decimal(prevProgress);
-  const dur = new Decimal(duration);
   let capped = new Decimal(proposedProgress);
 
-  // Walk costs, cap progress to the lowest affordable threshold. Re-read
-  // `capped` each iteration so later costs evaluate against any cap a prior
-  // cost applied — matches the inline loop structure the incloneution
-  // progressive-cost fixture pins.
+  // `resourceConsumedAt` is called with `duration` and `cost.amount` in their
+  // original DecimalSource form (not re-wrapped). Decimal.div between two
+  // already-wrapped Decimals can introduce a tiny precision artifact in the
+  // intermediate `duration/amount`, splitting this primitive's view of
+  // prevConsumed from a caller that passes raw number args to the same helper.
+  // Keeping the args raw here lines the two views up.
   for (const cost of costs) {
-    const amt = new Decimal(cost.amount);
-    if (amt.lte(0)) continue;
+    if (Decimal.lte(cost.amount, 0)) continue;
 
-    const prevConsumed = resourceConsumedAt(prev, dur, amt);
-    const wouldConsume = resourceConsumedAt(capped, dur, amt);
-    const needed = Decimal.sub(wouldConsume, prevConsumed);
-    if (Decimal.lte(needed, 0)) continue;
+    const prevConsumed = resourceConsumedAt(prev, duration, cost.amount);
+    const wouldConsume = resourceConsumedAt(capped, duration, cost.amount);
+    const needed = wouldConsume.sub(prevConsumed);
+    if (needed.lte(0)) continue;
 
     const available = new Decimal(cost.available());
-    if (Decimal.lt(available, needed)) {
+    if (available.lt(needed)) {
       // Floor `available` so maxUnits stays on the same integer-threshold grid
       // that resourceConsumedAt's ceil produces. Without it, a fractional
       // available propagates into maxProg and the later ceil rounds back up,
       // making the delta over-request by up to one unit (delta > available).
-      const maxUnits = Decimal.add(prevConsumed, Decimal.floor(available));
-      const interval = Decimal.div(dur, amt);
-      const maxProg = new Decimal(Decimal.mul(maxUnits, interval));
+      const maxUnits = prevConsumed.add(available.floor());
+      // (maxUnits * duration) / amount, not maxUnits * (duration / amount): the
+      // latter rounds the intermediate ratio and writes state.progress just
+      // above an integer threshold, which then desyncs the next-tick reads.
+      const maxProg = maxUnits.mul(duration).div(cost.amount);
       if (maxProg.lt(capped)) capped = maxProg;
     }
   }
@@ -404,10 +406,9 @@ export function stepProgressiveCosts(opts: {
   const stalled = capped.lte(prev);
 
   const deltas: Decimal[] = costs.map((cost) => {
-    const amt = new Decimal(cost.amount);
-    if (amt.lte(0)) return Decimal.dZero;
-    const prevConsumed = resourceConsumedAt(prev, dur, amt);
-    const newConsumed = resourceConsumedAt(capped, dur, amt);
+    if (Decimal.lte(cost.amount, 0)) return Decimal.dZero;
+    const prevConsumed = resourceConsumedAt(prev, duration, cost.amount);
+    const newConsumed = resourceConsumedAt(capped, duration, cost.amount);
     const delta = new Decimal(Decimal.sub(newConsumed, prevConsumed));
     return delta.lte(0) ? Decimal.dZero : delta;
   });

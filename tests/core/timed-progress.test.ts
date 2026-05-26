@@ -362,6 +362,43 @@ describe('stepProgressiveCosts — single cost', () => {
     expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
   });
 
+  it('writes integer-aligned cappedProgress at the partial-cost boundary', () => {
+    // duration=300000, amount=150, available=149 → max units payable is 149,
+    // and the integer threshold for 149 units is exactly 149/150 * 300000 =
+    // 298000. Naive maxUnits * (duration / amount) computes (duration / amount)
+    // as 2000.0000000000002 first, then 149 * 2000.0000000000002 = 298000.00000000006,
+    // which lands state.progress just above the threshold. The next call sees
+    // ceil(progress / interval) round up by one unit, splitting the
+    // primitive's accounting from a re-call that passes raw number args.
+    // Multiplying first keeps maxProg on the integer grid.
+    const step = stepProgressiveCosts({
+      prevProgress: 0,
+      proposedProgress: 300000,
+      duration: 300000,
+      costs: [{ amount: 150, available: () => 149 }],
+    });
+    expect(Decimal.eq(step.cappedProgress, 298000)).toBe(true);
+  });
+
+  it('heals a prevProgress carrying a sub-epsilon float artifact', () => {
+    // An already-broken save where state.progress was previously written just
+    // above an integer threshold (e.g. 298000.00000000006 instead of 298000).
+    // The consumer asks resourceConsumedAt(state.progress, dur, amt) with raw
+    // number args for dur/amt and gets the full cost as consumed; the
+    // primitive must agree internally rather than wrapping dur/amt and
+    // splitting its view by a fraction of a unit. The next tick advances
+    // through to proposedProgress instead of stalling on a phantom missing
+    // unit that no producer can resolve.
+    const step = stepProgressiveCosts({
+      prevProgress: 298000.00000000006,
+      proposedProgress: 300000,
+      duration: 300000,
+      costs: [{ amount: 150, available: () => 0 }],
+    });
+    expect(step.stalled).toBe(false);
+    expect(Decimal.eq(step.cappedProgress, 300000)).toBe(true);
+  });
+
   it('caps to floor(available) when available is fractional above 1', () => {
     // duration 100, amount 10, interval 10. prev=5 → prevConsumed=1.
     // Available is 1.7; the caller can spend 1 whole unit. Pre-fix, maxUnits
