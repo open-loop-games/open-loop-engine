@@ -372,6 +372,46 @@ describe('setupPolicyAutoPurchase', () => {
     );
   });
 
+  it('bails on the iteration cap and reports dropped iterations via onIterationsOverflow', () => {
+    // Pathological config: tiny interval + a tick whose dt would drain 1M
+    // slots. Without the cap the loop would synchronously freeze; with the
+    // cap, the loop bails at `maxIterationsPerTick`, drops the accumulator,
+    // and fires the diagnostic callback with the floor of the dropped count.
+    const cookies = createTestResource('cookies', new Decimal('1e100'));
+    const { category, registerTick, tick } = makeCategory(cookies);
+
+    category.register({
+      id: 'cursor',
+      name: 'Cursor',
+      baseRate: 1,
+      baseCost: 1,
+      costScaling: 1.0001,
+    });
+
+    let droppedReported: number | undefined;
+    setupPolicyAutoPurchase(
+      category,
+      {
+        enabled: true,
+        interval: 1e-6,
+        maxIterationsPerTick: 100,
+        onIterationsOverflow: (n) => {
+          droppedReported = n;
+        },
+      },
+      registerTick,
+    );
+
+    tick(1); // dt = 1, interval = 1e-6 → 1M iters wanted, but capped at 100.
+
+    // Exactly 100 purchases happen (cap), and the remainder is reported.
+    expect(new Decimal(category.getProducer('cursor')!.repeatable!.amount.value).toNumber()).toBe(
+      100,
+    );
+    expect(droppedReported).toBeGreaterThan(0);
+    expect(droppedReported).toBeLessThanOrEqual(1_000_000);
+  });
+
   it('drain stops firing when reserve filters out all candidates mid-drain', () => {
     const cookies = createTestResource('cookies', 100);
     const { category, registerTick, tick } = makeCategory(cookies);

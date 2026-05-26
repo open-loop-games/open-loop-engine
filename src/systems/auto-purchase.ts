@@ -140,6 +140,24 @@ export interface SetupPolicyAutoPurchaseOptions {
    * designed for).
    */
   reserve?: Computable<DecimalSource>;
+  /**
+   * Safety cap on drain-loop iterations per tick handler invocation
+   * (default `10000`). Mirrors {@link createTickDriver}'s `maxStepsPerTick`:
+   * protects against pathological combinations of tiny `interval` and large
+   * `dt` (24h offline catch-up + 1e-6s interval = millions of iterations
+   * that would freeze the thread). When the cap is hit, the loop bails and
+   * the residual `accumulator` is dropped; consumers observe via
+   * {@link onIterationsOverflow}.
+   */
+  maxIterationsPerTick?: number;
+  /**
+   * Diagnostic callback fired when the drain loop bails on the
+   * {@link maxIterationsPerTick} cap. Receives the floor of the dropped
+   * iteration count (`accumulator / interval` at the bail point). Never
+   * throws on overflow; default is no-op. Useful for surfacing
+   * misconfiguration in dev mode or telemetry-side overflow budgeting.
+   */
+  onIterationsOverflow?: (droppedIterations: number) => void;
 }
 
 /**
@@ -199,6 +217,8 @@ export function setupPolicyAutoPurchase(
   );
   const processedBulk = processGetter<DecimalSource>(options.bulkAmount ?? 1);
   const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
+  const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
+  const onIterationsOverflow = options.onIterationsOverflow;
 
   // Resolve the producer list lazily on each tick so late-registered
   // producers (mods, delayed content unlocks) participate automatically.
@@ -283,7 +303,13 @@ export function setupPolicyAutoPurchase(
     // the accumulator drains regardless, matching the single-slot semantics
     // of the pre-drain implementation. `interval <= 0` collapses to one
     // purchase attempt per tick with the accumulator cleared.
-    while (accumulator.value >= interval) {
+    //
+    // `iterations < maxIterationsPerTick` mirrors createTickDriver's
+    // maxStepsPerTick safety cap — pathological combos (tiny interval +
+    // long offline catch-up dt) would otherwise drain millions of times
+    // synchronously and freeze the thread.
+    let iterations = 0;
+    while (accumulator.value >= interval && iterations < maxIterationsPerTick) {
       headlineRateByResource.clear();
 
       const scanStart = profileStart();
@@ -315,6 +341,13 @@ export function setupPolicyAutoPurchase(
         break;
       }
       accumulator.value -= interval;
+      iterations++;
+    }
+
+    if (iterations >= maxIterationsPerTick && interval > 0 && accumulator.value >= interval) {
+      const dropped = Math.floor(accumulator.value / interval);
+      accumulator.value = 0;
+      onIterationsOverflow?.(dropped);
     }
   });
 }

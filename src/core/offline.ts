@@ -28,6 +28,11 @@ export function processOfflineTime(
 ): number {
   const maxOffline = options?.maxOfflineSeconds ?? 259200;
   const chunkSize = options?.chunkSize ?? 1;
+  if (!Number.isFinite(chunkSize) || chunkSize <= 0) {
+    throw new Error(
+      `processOfflineTime: chunkSize must be a finite positive number, got ${chunkSize}`,
+    );
+  }
   const capped = Math.min(Math.max(elapsedSeconds, 0), maxOffline);
 
   let remaining = capped;

@@ -157,6 +157,22 @@ describe('Reset with resetModules', () => {
     expect(warriorLevel.value).toBe(1);
   });
 
+  it('clones non-primitive defaults so in-place mutation does not corrupt them', () => {
+    beginPersistentContext('rm-clone-default');
+    const inventory = persistent<string[]>([]);
+    endPersistentContext();
+
+    const reset = createReset({ resetModules: ['rm-clone-default'] });
+
+    inventory.value.push('sword');
+    reset.reset();
+    expect(inventory.value).toEqual([]);
+
+    inventory.value.push('shield');
+    reset.reset();
+    expect(inventory.value).toEqual([]);
+  });
+
   it('keep exempts specific refs from reset', () => {
     beginPersistentContext('rm-keep');
     const temp = persistent(0);

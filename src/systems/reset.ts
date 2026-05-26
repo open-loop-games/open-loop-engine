@@ -282,7 +282,7 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
         for (const ref of scope) {
           if (retainedRefs.has(ref)) continue;
           if (DefaultValue in ref) {
-            ref.value = ref[DefaultValue];
+            ref.value = cloneDefault(ref[DefaultValue]);
           }
         }
 

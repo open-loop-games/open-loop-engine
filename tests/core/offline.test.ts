@@ -41,4 +41,12 @@ describe('processOfflineTime', () => {
     const result = processOfflineTime(tickDriver, 1_000_000);
     expect(result).toBe(259200);
   });
+
+  it('throws on non-positive or non-finite chunkSize', () => {
+    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
+    expect(() => processOfflineTime(tickDriver, 10, { chunkSize: 0 })).toThrow(/chunkSize/);
+    expect(() => processOfflineTime(tickDriver, 10, { chunkSize: -1 })).toThrow(/chunkSize/);
+    expect(() => processOfflineTime(tickDriver, 10, { chunkSize: Infinity })).toThrow(/chunkSize/);
+    expect(() => processOfflineTime(tickDriver, 10, { chunkSize: NaN })).toThrow(/chunkSize/);
+  });
 });
