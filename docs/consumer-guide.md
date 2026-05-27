@@ -489,6 +489,24 @@ Neither snapshot subscribes to reactive changes — consumers drive recomputatio
 
 Recurring shapes consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol — single-consumer hand-rolls; an engine helper would over-fit. When a second consumer reaches for the same wrapper, the pattern graduates via `docs/candidate-primitives.md`.
 
+### Action execution: ActionCategory, worker bundle, or Slot
+
+Three engine shapes share the "what's the player doing right now?" surface. The split is queue × per-execution state machine × selection-only.
+
+| Shape | When to reach for |
+|---|---|
+| `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). Idle Loops / Cavernous lineage. |
+| Worker-bundle recipe | Single-active duration-driven execution from `Sequencer` + `TimedProgress` + a `getTask(id)` lookup. No per-execution state machine; the duration accumulator is the lifecycle. spell-compiler and maldacena shape; recipe below. |
+| `createSlot` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. progress-knight-ng's `currentJob` / `currentSkill` shape. |
+
+Decision flow:
+
+- No queue, just "what's equipped or active right now"? → `createSlot`.
+- Queue, but execution is dispatch + duration accumulator with no per-item state machine? → worker-bundle recipe.
+- Queue with lifecycle / progress / error observable per running item? → `createActionCategory`.
+
+For a slot whose selected entry then needs queued execution, compose them: `createSlot` for the selection, `createActionCategory` (or the worker-bundle recipe) reading the slot's current value.
+
 ### Indirect-control worker pools
 
 Games where the player posts tasks and a pool of N autonomous workers claims them — Majesty-style bounties, DK-style imps, DF-style job queues. The engine provides the primitives; the coordination — both the per-worker wiring and the pool-shared state — lives consumer-side.
@@ -525,6 +543,56 @@ Shared across the pool:
 Single-worker case: same shape with one instance (`id: 'player'`). spell-compiler and maldacena both follow this pattern in their action/spell-execution modules.
 
 Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (defender towers, OL-1021) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
+
+### Pre-completion gating in ActionCategory
+
+ActionCategory's `complete` event is a post-event observer — by the time it fires, the item is already terminal. Consumers that need to gate completion (budget caps, mana / effort ceilings, mid-execution termination conditions) do it inside the `tick` closure, before declaring complete:
+
+```ts
+mapAction: (def) => ({
+  tick: ({ entry, dt, category }) => {
+    category.tickItemProgress(def.id, dt);
+
+    // Pre-completion gate: check budget caps before declaring complete
+    if (shouldTerminate(entry, def)) {
+      category.setItemState(def.id, 'completed');
+      category.sequencer.complete();
+      return;
+    }
+
+    if ((category.currentItem!.progress as number) >= def.duration) {
+      category.sequencer.complete();
+    }
+  },
+}),
+```
+
+For chain-with-terminate semantics (idle-loops-ng's omsi-loops lineage runs an array of pre-completion hooks — `maxMana`, `maxEffort`, then content-specific overrides), wrap the body in an iterable:
+
+```ts
+type PreCompletionHook<E, D> = (entry: E, def: D) => 'terminate' | 'continue';
+const preCompletionHooks: PreCompletionHook<Entry, Def>[] = [];
+
+mapAction: (def) => ({
+  tick: ({ entry, dt, category }) => {
+    category.tickItemProgress(def.id, dt);
+
+    for (const hook of preCompletionHooks) {
+      if (hook(entry, def) === 'terminate') {
+        category.setItemState(def.id, 'completed');
+        category.sequencer.complete();
+        return;
+      }
+    }
+
+    if ((category.currentItem!.progress as number) >= def.duration) {
+      category.sequencer.complete();
+    }
+  },
+}),
+```
+
+This is a recipe, not engine API. The chain shape is currently single-lineage (omsi-loops). When a non-omsi consumer surfaces the same chain independently, that's the N=2 signal to graduate it onto ActionCategory — drop a breadcrumb in `docs/candidate-primitives.md`.
 
 ### Persona-roster composition
 

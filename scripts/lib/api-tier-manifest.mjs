@@ -74,7 +74,7 @@ export const TIER_MANIFEST = [
       '`createAchievementCategory` — observed milestones and tier ladders that auto-earn.',
       '`createSkillCategory` — XP/level progression surfaces.',
       '`createLoop`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.',
-      '`createActionCategory` — ordered-execution queues with per-execution state machine for action-runner shapes (Idle Loops / Cavernous II family).',
+      '`createActionCategory` — ordered-execution queues with per-execution state machine.',
     ],
     clusters: [
       'achievement',
