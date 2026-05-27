@@ -19,6 +19,7 @@ import { ref, type ComputedRef, type Ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 
 import {
+  createActionCategory,
   createEngine,
   createResource,
   createRuleAdvisor,
@@ -38,6 +39,11 @@ import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
 import type { AchievementCategory } from '@/systems/achievement-category';
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
+import type {
+  ActionCategory,
+  ActionItemState,
+  ActionItemMetadata,
+} from '@/systems/action-category';
 import type { PurchasableCategory } from '@/systems/purchasable-category';
 import type { ChallengeCategory, ChallengeDef } from '@/systems/challenge-category';
 import type {
@@ -123,6 +129,43 @@ describe('createSkillCategory generic inference', () => {
   it('createSkillCategory itself is generic over Def/State', () => {
     // Pin the factory signature shape without invoking it.
     expectTypeOf(createSkillCategory<MySkillDef, MySkillState>).toBeFunction();
+  });
+});
+
+describe('createActionCategory generic inference', () => {
+  interface MyActionDef {
+    id: string;
+    baseTicks: number;
+  }
+  interface MyActionState {
+    completions: number;
+  }
+  interface MyActionPayload {
+    loops: number;
+  }
+
+  it('propagates Def / State / Payload through accessors and verbs', () => {
+    type Cat = ActionCategory<MyActionDef, MyActionState, MyActionPayload>;
+
+    expectTypeOf<Cat['getDef']>().returns.toEqualTypeOf<MyActionDef | undefined>();
+    expectTypeOf<Cat['getState']>().returns.toEqualTypeOf<MyActionState | undefined>();
+    expectTypeOf<Cat['register']>().parameter(0).toMatchTypeOf<MyActionDef | MyActionDef[]>();
+    expectTypeOf<Cat['currentItem']>().toEqualTypeOf<ActionItemMetadata<MyActionPayload> | null>();
+    expectTypeOf<Cat['patchItemPayload']>()
+      .parameter(1)
+      .toMatchTypeOf<Partial<MyActionPayload> | ((p: MyActionPayload) => MyActionPayload)>();
+  });
+
+  it('ActionItemState is a literal union, not widened string', () => {
+    expectTypeOf<ActionItemState>().toEqualTypeOf<
+      'pending' | 'running' | 'waiting' | 'completed' | 'failed'
+    >();
+  });
+
+  it('createActionCategory itself is generic over Def/State/Payload with void defaults', () => {
+    expectTypeOf(createActionCategory<MyActionDef, MyActionState, MyActionPayload>).toBeFunction();
+    // `State = void`, `Payload = void` defaults — pin the two-generic-default shape.
+    expectTypeOf(createActionCategory<MyActionDef>).toBeFunction();
   });
 });
 

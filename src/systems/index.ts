@@ -107,6 +107,13 @@ export * from './achievement-category';
 // ProducerCategory: batch-register Producers from content definitions.
 export * from './producer-category';
 
+// === ACTIONS ===
+// Ordered-execution queues with per-execution state machine. ActionCategory:
+// batch-register typed action defs onto a Sequencer with engine-managed
+// lifecycle / progress / attempt / error / timing per enqueued item, plus
+// per-mapping tick closures for polymorphic dispatch.
+export * from './action-category';
+
 // === AUTO-PURCHASE ===
 // Tick-driven helpers that automate Purchasable / Producer purchases under
 // a selection policy. Sweep variant for upgrade lists, policy variant for

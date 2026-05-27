@@ -205,6 +205,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 ### Content Systems
 
 - `achievement` — milestone tracking with auto-unlock and tiered rewards → content-systems.md#achievement
+- `action-category` — batch-registered ordered-execution queue with per-execution state machine → content-systems.md#action-category
 - `automation` — progressive unlock of automation features → content-systems.md#automation-tiers
 - `best-of` — per-metric best-of-run recording → content-systems.md#bestof-tracker
 - `challenge-category` — batch-create Challenges from content definitions → content-systems.md#challenge-category

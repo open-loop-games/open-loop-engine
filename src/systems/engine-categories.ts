@@ -29,6 +29,7 @@
 import type { InjectionKey } from '@/primitives/types';
 import type { Resource } from '@/core/resource';
 import type { AchievementCategory } from './achievement-category';
+import type { ActionCategory } from './action-category';
 import type { ChallengeCategory } from './challenge-category';
 import type { ProducerCategory } from './producer-category';
 import type { PurchasableCategory } from './purchasable-category';
@@ -79,6 +80,9 @@ export interface EngineCategories {
   /** Subject categories (named entities with typed multi-field state — NPCs, factions, regions) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   subjects?: SubjectCategory<any>[];
+  /** Action categories (ordered-execution queues with per-execution state machine) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  actions?: ActionCategory<any, any, any>[];
   /**
    * Game-published resource list. Optional — the engine already maintains
    * a per-engine resource registry (see {@link ResourceRegistryKey}), so
@@ -157,11 +161,11 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
  * primitive (or walker, devtool, UI hint) can read "is this entity active /
  * how many do I have" without consumer-side path conventions.
  *
- * Walks the six typed slots in order (`purchasables`, `skills`,
- * `achievements`, `challenges`, `producers`, `subjects`); the first category
- * whose `id` matches `categoryId` is consulted. Returns `undefined` if no
- * matching category is registered, or if the matching category has no entry
- * under `entityId`.
+ * Walks the seven typed slots in order (`purchasables`, `skills`,
+ * `achievements`, `challenges`, `producers`, `subjects`, `actions`); the
+ * first category whose `id` matches `categoryId` is consulted. Returns
+ * `undefined` if no matching category is registered, or if the matching
+ * category has no entry under `entityId`.
  *
  * @example
  * ```ts
@@ -183,6 +187,7 @@ export function findCategoryEntrySignals(
     categories.challenges,
     categories.producers,
     categories.subjects,
+    categories.actions,
   ];
   for (const bucket of buckets) {
     if (!bucket) continue;

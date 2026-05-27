@@ -11,6 +11,7 @@ Start with these public symbols before scanning the full inventory below.
 - `createAchievementCategory` — observed milestones and tier ladders that auto-earn.
 - `createSkillCategory` — XP/level progression surfaces.
 - `createLoop`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.
+- `createActionCategory` — ordered-execution queues with per-execution state machine for action-runner shapes (Idle Loops / Cavernous II family).
 
 ## Achievement
 
@@ -32,6 +33,22 @@ milestone tracking with auto-unlock and tiered rewards
 - `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:155`
 - `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:180`
 - `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:116`
+
+## Action Category
+
+batch-registered ordered-execution queue with per-execution state machine
+
+- `interface ActionCategory<Def extends { id: string; }, State = void, Payload = void> extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>>` — An action category — registered queue with per-execution state machine. `src/systems/action-category.ts:161`
+- `interface ActionCategoryContext` — Context passed to `mapAction` at registration time. `src/systems/action-category.ts:119`
+- `interface ActionCategoryEntry<Def extends { id: string; }, State, Payload>` — A registered entry: definition + per-def state + the current per-execution metadata when this def is the running item. `src/systems/action-category.ts:84`
+- `interface ActionCategoryEvents<Def extends { id: string; }, State, Payload>` — Events emitted by an ActionCategory. `src/systems/action-category.ts:124`
+- `interface ActionCategoryOptions<Def extends { id: string; }, State = void, Payload = void>` — Options for createActionCategory. `src/systems/action-category.ts:138`
+- `interface ActionItemMetadata<Payload>` — Sequencer-item metadata shape for an ActionCategory. `src/systems/action-category.ts:62`
+- `type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 'failed'` — Per-execution lifecycle state. `src/systems/action-category.ts:53`
+- `interface ActionMapping<Def extends { id: string; }, State, Payload>` — Return type of the `mapAction` callback. `src/systems/action-category.ts:95`
+- `interface ActionTickContext<Def extends { id: string; }, State, Payload>` — Context passed to a mapping's `tick` closure. `src/systems/action-category.ts:74`
+- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:304`
+- `function progressToDecimal(progress: number | Record<string, number>, key?: string): DecimalSource` — Coerce a plain progress value to Decimal for downstream rate-math composition. `src/systems/action-category.ts:688`
 
 ## Automation tiers
 
