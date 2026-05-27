@@ -1487,3 +1487,122 @@ describe('Sequencer — repeat()', () => {
     expect(view2.map((i) => i.id)).toEqual(['b']);
   });
 });
+
+describe('Sequencer — patchCurrentItem / patchItem', () => {
+  type Meta = { ticks: number; err?: string };
+  const mi = (id: string, ticks = 0): SequencerItem<Meta> => ({ id, metadata: { ticks } });
+
+  function makeTypedQueue(opts: { mode?: 'queue' | 'list'; id?: string } = {}) {
+    const ctxId = opts.id ?? `q-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer<Meta>({ id: ctxId, ...opts });
+    endPersistentContext();
+    return q;
+  }
+
+  it('patchCurrentItem updates queue-mode current via persistent ref', () => {
+    const q = makeTypedQueue();
+    q.enqueue(mi('a', 5));
+    q.patchCurrentItem((m) => ({ ...m, ticks: m.ticks + 1 }));
+    expect(q.currentMetadata).toEqual({ ticks: 6 });
+    expect(q.currentItem?.id).toBe('a');
+  });
+
+  it('patchCurrentItem is a no-op in queue mode when nothing is running', () => {
+    const q = makeTypedQueue();
+    // No enqueue → no current. Should not throw, should not affect state.
+    expect(() => q.patchCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(q.currentItem).toBeNull();
+  });
+
+  it('patchCurrentItem updates list-mode current and mirrors into items.value at cursor', () => {
+    const q = makeTypedQueue({ mode: 'list' });
+    q.enqueue(mi('a', 0));
+    q.enqueue(mi('b', 0));
+    // 'a' is running at cursor 0.
+    q.patchCurrentItem((m) => ({ ...m, ticks: 42 }));
+    expect(q.currentMetadata).toEqual({ ticks: 42 });
+    expect(q.items.value[0].metadata).toEqual({ ticks: 42 });
+    // Sibling untouched.
+    expect(q.items.value[1].metadata).toEqual({ ticks: 0 });
+  });
+
+  it('patchCurrentItem is a no-op in list mode when no running item', () => {
+    const q = makeTypedQueue({ mode: 'list' });
+    q.enqueue(mi('a', 0));
+    q.pause();
+    q.cancel();
+    // List mode with paused + cancel → no running item, cursor still at 0.
+    expect(q.currentItem).toBeNull();
+    expect(() => q.patchCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(q.items.value[0].metadata).toEqual({ ticks: 0 });
+  });
+
+  it('patchItem updates items.value at index and preserves other identities', () => {
+    const q = makeTypedQueue({ mode: 'list' });
+    q.enqueue(mi('a', 1));
+    q.enqueue(mi('b', 2));
+    q.enqueue(mi('c', 3));
+    const before = q.items.value;
+    q.patchItem(1, (m) => ({ ...m, ticks: 99 }));
+    const after = q.items.value;
+
+    expect(after[1].metadata).toEqual({ ticks: 99 });
+    expect(after[1]).not.toBe(before[1]);
+    // Unpatched siblings keep their object identity.
+    expect(after[0]).toBe(before[0]);
+    expect(after[2]).toBe(before[2]);
+  });
+
+  it('patchItem with out-of-range index is a no-op', () => {
+    const q = makeTypedQueue({ mode: 'list' });
+    q.enqueue(mi('a', 1));
+    const before = q.items.value;
+    expect(() => q.patchItem(-1, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(() => q.patchItem(5, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    // No mutation → version stable → same view reference.
+    expect(q.items.value).toBe(before);
+    expect(q.items.value[0].metadata).toEqual({ ticks: 1 });
+  });
+
+  it('patchItem fires reactive watchers on items.value', () => {
+    const q = makeTypedQueue({ mode: 'list' });
+    q.enqueue(mi('a', 0));
+    q.enqueue(mi('b', 0));
+
+    const seen: number[][] = [];
+    const scope = effectScope();
+    scope.run(() => {
+      watchEffect(
+        () => {
+          seen.push(q.items.value.map((i) => i.metadata.ticks));
+        },
+        { flush: 'sync' },
+      );
+    });
+    // initial effect run captures [0, 0].
+    expect(seen[seen.length - 1]).toEqual([0, 0]);
+    q.patchItem(1, (m) => ({ ...m, ticks: 7 }));
+    expect(seen[seen.length - 1]).toEqual([0, 7]);
+    scope.stop();
+  });
+
+  it('queue-mode patchCurrentItem persists into the current persistent ref', () => {
+    // Queue-mode current item is stored serialized in current.value. Verify
+    // patch reaches that surface (the save manager picks up the change as
+    // part of standard persistent-ref serialization).
+    const ctxId = `patch-save-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer<Meta>({ id: ctxId });
+    endPersistentContext();
+    q.enqueue(mi('a', 0));
+    q.patchCurrentItem((m) => ({ ...m, ticks: 9 }));
+
+    const refs = getAllPersistentRefs();
+    const currentRef = refs.get(`${ctxId}.current`);
+    expect(currentRef).toBeDefined();
+    const serialized = JSON.parse(currentRef!.value as string) as { id: string; m: Meta };
+    expect(serialized.id).toBe('a');
+    expect(serialized.m).toEqual({ ticks: 9 });
+  });
+});

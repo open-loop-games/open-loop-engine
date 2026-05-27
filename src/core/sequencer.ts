@@ -187,6 +187,32 @@ export interface Sequencer<M = void> {
   complete(): void;
   /** Re-dispatch the current item without advancing. Emits 'repeat', then dequeueNext. */
   repeat(): void;
+  /**
+   * Patch the metadata of the current item with the result of `patch(currentMetadata)`.
+   * No-op when no current item. Both modes trigger reactive updates: in list mode
+   * the patched metadata is mirrored to the cursor-position in `items.value`; in
+   * queue mode (where the running item is no longer in `items.value`) the patched
+   * metadata is re-serialized into the underlying current persistent ref.
+   *
+   * @example
+   * ```ts
+   * seq.patchCurrentItem((m) => ({ ...m, ticks: m.ticks + 1 }));
+   * ```
+   */
+  patchCurrentItem(patch: (metadata: M) => M): void;
+  /**
+   * Patch the metadata of the item at the given `items.value` index. No-op when
+   * out of range. Triggers reactive updates on `items.value` via splat-replace
+   * at the targeted slot; other items keep their object identity. In queue mode
+   * the running item is no longer in `items.value` — use `patchCurrentItem` for
+   * that case.
+   *
+   * @example
+   * ```ts
+   * seq.patchItem(3, (m) => ({ ...m, errorMessage: 'blocked' }));
+   * ```
+   */
+  patchItem(index: number, patch: (metadata: M) => M): void;
   /** Clear current without completing, emit 'cancel'. */
   cancel(): void;
   /** Remove an item from the waiting sequence by index. */
@@ -408,6 +434,17 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     const serialized = serializeItems(currentView());
     _lastWritten = serialized;
     rawItems.value = serialized;
+  }
+
+  function patchItemInternal(index: number, patch: (metadata: M) => M): boolean {
+    const viewLen = _liveItems.length - _head;
+    if (index < 0 || index >= viewLen) return false;
+    const liveIdx = _head + index;
+    const existing = _liveItems[liveIdx];
+    _liveItems[liveIdx] = { id: existing.id, metadata: patch(existing.metadata) };
+    bumpLive();
+    syncItems();
+    return true;
   }
 
   // Save-load re-hydration: when `rawItems` changes from outside our own
@@ -762,6 +799,28 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       }
       handle.emit('repeat', captured);
       dequeueNext();
+    },
+
+    patchCurrentItem(patch: (metadata: M) => M): void {
+      if (isList) {
+        // Running item also lives at _liveItems[head + cursor]; patch there
+        // and mirror onto current.value so getCurrentItem()/currentMetadata
+        // observers see the new metadata.
+        const cur = rawCursor!.value;
+        if (current.value === '') return;
+        if (!patchItemInternal(cur, patch)) return;
+        setCurrentRaw(_liveItems[_head + cur]);
+        return;
+      }
+      // Queue mode: dispatched item lives in current.value only (popped from
+      // _liveItems via _head++ on dispatch). Re-serialize with patched meta.
+      const captured = getCurrentItem();
+      if (!captured) return;
+      setCurrentRaw({ id: captured.id, metadata: patch(captured.metadata) });
+    },
+
+    patchItem(index: number, patch: (metadata: M) => M): void {
+      patchItemInternal(index, patch);
     },
 
     cancel(): void {
