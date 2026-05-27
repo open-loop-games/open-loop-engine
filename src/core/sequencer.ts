@@ -64,6 +64,8 @@ export interface SequencerEvents<M = void> {
   start: (item: SequencerItem<M>) => void;
   complete: (item: SequencerItem<M>) => void;
   cancel: (item: SequencerItem<M>) => void;
+  /** Emitted when the current item is re-dispatched via `repeat()` instead of `complete()`. */
+  repeat: (item: SequencerItem<M>) => void;
   /** Emitted when dequeueNext skips an item that failed the canRun check with `'never'`. */
   skip: (item: SequencerItem<M>) => void;
   /**
@@ -183,6 +185,8 @@ export interface Sequencer<M = void> {
   dequeueNext(): SequencerItem<M> | null;
   /** Mark current as completed, emit 'complete', then dequeueNext. */
   complete(): void;
+  /** Re-dispatch the current item without advancing. Emits 'repeat', then dequeueNext. */
+  repeat(): void;
   /** Clear current without completing, emit 'cancel'. */
   cancel(): void;
   /** Remove an item from the waiting sequence by index. */
@@ -741,6 +745,22 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         rawCursor!.value++;
       }
       handle.emit('complete', completed);
+      dequeueNext();
+    },
+
+    repeat(): void {
+      const captured = getCurrentItem();
+      if (!captured) return;
+      current.value = '';
+      // Queue mode: the item was popped via _head++ when it became current,
+      // so restore it to the dispatch position. List mode: cursor already
+      // points AT this item; intentionally skip complete()'s `rawCursor++`.
+      if (!isList) {
+        _liveItems.splice(_head, 0, captured);
+        bumpLive();
+        syncItems();
+      }
+      handle.emit('repeat', captured);
       dequeueNext();
     },
 

@@ -36,11 +36,11 @@ core primitive for ordered execution of items with optional metadata
 - `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:70`
 - `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:94`
 - `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:119`
-- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:309`
+- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:313`
 - `interface FillStrategy<M = void>` — Strategy for automatically filling the sequencer when it runs dry. `src/core/sequencer.ts:56`
 - `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration function — matches `EngineContext.onTick` signature. `src/core/sequencer.ts:49`
-- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:146`
+- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:148`
 - `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:62`
 - `interface SequencerItem<M = void>` — A sequencer entry: string ID plus optional typed metadata. `src/core/sequencer.ts:29`
-- `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:86`
+- `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:88`
 - `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canRun check. `src/core/sequencer.ts:46`

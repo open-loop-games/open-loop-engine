@@ -1278,3 +1278,212 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['jump', 'wait-me']);
   });
 });
+
+describe('Sequencer — repeat()', () => {
+  it('queue mode: re-dispatches the same item and emits repeat, not complete', () => {
+    const q = makeQueue();
+    const starts: string[] = [];
+    const repeats: string[] = [];
+    const completes: string[] = [];
+    const enqueues: string[] = [];
+    q.on('start', (i) => starts.push(i.id));
+    q.on('repeat', (i) => repeats.push(i.id));
+    q.on('complete', (i) => completes.push(i.id));
+    q.on('enqueue', (i) => enqueues.push(i.id));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    expect(q.currentItem?.id).toBe('a');
+
+    q.repeat();
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.items.value.map((i) => i.id)).toEqual(['b']);
+    expect(starts).toEqual(['a', 'a']);
+    expect(repeats).toEqual(['a']);
+    expect(completes).toEqual([]);
+    // Initial enqueue events fire for the two seed items, but repeat must NOT
+    // re-fire enqueue for the re-dispatched item.
+    expect(enqueues).toEqual(['a', 'b']);
+  });
+
+  it('queue mode: no-op when no current item', () => {
+    const q = makeQueue();
+    const repeats: string[] = [];
+    q.on('repeat', (i) => repeats.push(i.id));
+    expect(() => q.repeat()).not.toThrow();
+    expect(repeats).toEqual([]);
+    expect(q.currentItem).toBeNull();
+  });
+
+  it('queue mode: repeat with canRun "never" on re-entry skips and advances', () => {
+    let blockA = false;
+    const ctxId = `repeat-never-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      canRun: (item) => (item.id === 'a' && blockA ? 'never' : 'now'),
+    });
+    endPersistentContext();
+
+    const events: string[] = [];
+    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
+    q.on('skip', (i) => events.push(`skip:${i.id}`));
+    q.on('start', (i) => events.push(`start:${i.id}`));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    expect(q.currentItem?.id).toBe('a');
+
+    blockA = true;
+    q.repeat();
+    expect(events).toEqual(['start:a', 'repeat:a', 'skip:a', 'start:b']);
+    expect(q.currentItem?.id).toBe('b');
+  });
+
+  it('queue mode: repeat with canRun "notNow" on re-entry enters hold', () => {
+    const tm = createTickManager();
+    let blockA = false;
+    const ctxId = `repeat-hold-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+
+    const events: string[] = [];
+    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
+    q.on('hold', (i) => events.push(`hold:${i.id}`));
+    q.on('start', (i) => events.push(`start:${i.id}`));
+
+    q.enqueue(qi('a'));
+    expect(q.currentItem?.id).toBe('a');
+
+    blockA = true;
+    q.repeat();
+    expect(events).toEqual(['start:a', 'repeat:a', 'hold:a']);
+    expect(q.holding).toBe(true);
+    expect(q.currentItem).toBeNull();
+
+    blockA = false;
+    tm.fireTick();
+    expect(q.holding).toBe(false);
+    expect(q.currentItem?.id).toBe('a');
+  });
+
+  it('queue mode: repeat counts toward maxAdvancesPerTick', async () => {
+    const { resetDiagnostics, getDiagnostics } = await import('@/core/safeguards');
+    resetDiagnostics();
+
+    const ctxId = `repeat-cap-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      maxAdvancesPerTick: 3,
+    });
+    endPersistentContext();
+
+    q.enqueue(qi('a'));
+    // Initial dispatch consumed 1 advance. Three repeats trip the cap.
+    for (let i = 0; i < 5; i++) q.repeat();
+
+    expect(getDiagnostics().advanceCapTrips).toBe(1);
+    expect(getDiagnostics().lastAdvanceCapSequencer).toBe(ctxId);
+  });
+
+  it('list mode: cursor does not advance on repeat', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.cursor).toBe(0);
+
+    const cursorBefore = q.cursor;
+    q.repeat();
+    expect(q.cursor).toBe(cursorBefore);
+    expect(q.currentItem?.id).toBe('a');
+    // items unchanged in list mode
+    expect(q.items.value.map((i) => i.id)).toEqual(['a', 'b']);
+  });
+
+  it('list mode: emits repeat not complete; complete still advances after a repeat', () => {
+    const q = makeQueue({ mode: 'list' });
+    const events: string[] = [];
+    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
+    q.on('complete', (i) => events.push(`complete:${i.id}`));
+    q.on('start', (i) => events.push(`start:${i.id}`));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+
+    q.repeat();
+    q.repeat();
+    q.complete();
+
+    expect(events).toEqual([
+      'start:a',
+      'repeat:a',
+      'start:a',
+      'repeat:a',
+      'start:a',
+      'complete:a',
+      'start:b',
+    ]);
+    expect(q.cursor).toBe(1);
+    expect(q.currentItem?.id).toBe('b');
+  });
+
+  it('list mode: repeat with canRun "notNow" on re-entry holds at the same cursor', () => {
+    const tm = createTickManager();
+    let blockA = false;
+    const ctxId = `repeat-list-hold-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.cursor).toBe(0);
+
+    blockA = true;
+    q.repeat();
+    expect(q.holding).toBe(true);
+    expect(q.cursor).toBe(0);
+    expect(q.currentItem).toBeNull();
+
+    blockA = false;
+    tm.fireTick();
+    expect(q.holding).toBe(false);
+    expect(q.cursor).toBe(0);
+    expect(q.currentItem?.id).toBe('a');
+  });
+
+  it('list mode: no-op when no current item', () => {
+    const q = makeQueue({ mode: 'list' });
+    const repeats: string[] = [];
+    q.on('repeat', (i) => repeats.push(i.id));
+    expect(() => q.repeat()).not.toThrow();
+    expect(repeats).toEqual([]);
+  });
+
+  it('items.value identity stays referentially stable across a queue-mode repeat', () => {
+    const q = makeQueue();
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+
+    const view1 = q.items.value;
+    q.repeat();
+    const view2 = q.items.value;
+    // repeat mutates _liveItems (splice), so the cached view rebuilds — new
+    // identity is expected. Content asserts the splice put 'a' back ahead of 'b'.
+    expect(view1).not.toBe(view2);
+    expect(view2.map((i) => i.id)).toEqual(['b']);
+  });
+});
