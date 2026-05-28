@@ -241,6 +241,49 @@ describe('createModifierChain', () => {
 
     expect(observed.value).toBe(true);
   });
+
+  it('chain.apply stays reactive when a modifier is added after first read', () => {
+    // Pre-fix, `chain.apply` was a data-property reassigned by recompose, so a
+    // `computed` reading it captured no dependency on chain composition and
+    // served a stale value. The fix makes `apply` a getter that reads
+    // `itemsVersion`, so adds/removes invalidate the consumer.
+    const chain = createModifierChain('apply-add-reactivity');
+    chain.add(createAdditiveModifier({ addend: 10 }));
+
+    const observed = computed(() => chain.apply(100));
+    expect(Decimal.eq(observed.value, 110)).toBe(true);
+
+    chain.add(createMultiplicativeModifier({ multiplier: 2 }));
+    // (100 + 10) × 2 = 220 — must reflect the modifier added AFTER first read.
+    expect(Decimal.eq(observed.value, 220)).toBe(true);
+  });
+
+  it('chain.apply stays reactive when a modifier is removed after first read', () => {
+    const chain = createModifierChain('apply-remove-reactivity');
+    chain.add(createAdditiveModifier({ addend: 10 }));
+    const mul = createMultiplicativeModifier({ multiplier: 2 });
+    chain.add(mul);
+
+    const observed = computed(() => chain.apply(100));
+    expect(Decimal.eq(observed.value, 220)).toBe(true);
+
+    chain.remove(mul);
+    expect(Decimal.eq(observed.value, 110)).toBe(true);
+  });
+
+  it('chain.description stays reactive when a modifier is added after first read', () => {
+    const chain = createModifierChain('desc-add-reactivity');
+    chain.add(createAdditiveModifier({ addend: 10, description: 'Bonus' }));
+
+    const count = computed(() => {
+      const d = chain.description;
+      return d == null ? 0 : (d as () => { text: string }[])().length;
+    });
+    expect(count.value).toBe(1);
+
+    chain.add(createMultiplicativeModifier({ multiplier: 2, description: 'Upgrade' }));
+    expect(count.value).toBe(2);
+  });
 });
 
 describe('chain.bind', () => {

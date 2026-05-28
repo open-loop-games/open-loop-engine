@@ -564,23 +564,25 @@ export function createModifierChain(id: string): ModifierChain {
   const bindingsById = new Map<string, BindingRecord>();
   const handle = createEmitHandle<ModifierChainEvents>();
 
-  // `chain.enabled` is a stable ComputedRef rather than a property the chain
-  // reassigns each recompose. The previous shape (reassigning a new
-  // ComputedRef on add/remove) orphaned any consumer effect that captured
-  // the old ref's value — Vue tracks the inner ref, not the plain-object
-  // property slot, so new modifiers' `enabled` refs never reached the
-  // consumer. `itemsVersion` is the dependency `recompose` bumps so this
-  // stable computed re-evaluates and re-attaches deps to whatever items
-  // currently hold. `apply`/`invert`/`description` stay reassign-on-recompose
-  // — they're functions read fresh on each call, no reactivity capture.
+  // `enabled`, `apply`, `invert`, and `description` are all composition-reactive:
+  // reading any of them inside a reactive scope (e.g. `computed(() => chain.apply(x))`)
+  // tracks `itemsVersion`, so when `recompose` bumps it on add/remove the consumer
+  // re-runs and re-binds to the freshly composed modifier set — and, via the fresh
+  // apply/invert/description's own reads, to the inner enabled/multiplier refs.
+  // `enabled` is a stable ComputedRef; the other three are getters that read
+  // `itemsVersion` before delegating to the current `composed` snapshot. (A plain
+  // reassigned property would NOT capture this — Vue tracks the inner ref/version,
+  // not the object's property slot.) Do NOT destructure these off the chain
+  // (`const { apply } = chain`): that snapshots the function and severs composition
+  // reactivity. `itemsVersion` is the single dependency `recompose` bumps to drive
+  // all four.
   const itemsVersion = ref(0);
+
+  let composed = createSequentialModifier(items);
 
   function recompose(): void {
     profile('modifier.chain.recompose', () => {
-      const composed = createSequentialModifier(items);
-      chain.apply = composed.apply;
-      chain.invert = composed.invert;
-      chain.description = composed.description;
+      composed = createSequentialModifier(items);
       itemsVersion.value++;
       handle.emit('change');
     });
@@ -588,8 +590,14 @@ export function createModifierChain(id: string): ModifierChain {
 
   const chain: ModifierChain = {
     id,
-    apply: (gain: DecimalSource) => gain,
-    invert: (gain: DecimalSource) => gain,
+    get apply(): (gain: DecimalSource) => DecimalSource {
+      void itemsVersion.value;
+      return composed.apply;
+    },
+    get invert(): ((gain: DecimalSource) => DecimalSource) | undefined {
+      void itemsVersion.value;
+      return composed.invert;
+    },
     enabled: computed<boolean>(() => {
       void itemsVersion.value;
       // Empty chain or no modifier declares an `enabled` flag → treat as
@@ -598,7 +606,10 @@ export function createModifierChain(id: string): ModifierChain {
       if (items.length === 0 || items.every((m) => m.enabled == null)) return true;
       return items.some((m) => unref(m.enabled) !== false);
     }),
-    description: undefined,
+    get description(): MaybeGetter<ModifierDescription> | undefined {
+      void itemsVersion.value;
+      return composed.description;
+    },
 
     add(modifier: Modifier): () => void {
       items.push(modifier);
