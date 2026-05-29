@@ -359,7 +359,7 @@ function renderIndex(byCluster) {
     '- **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resetting-persistent-refs-in-bulk',
     '- **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resetting-persistent-refs-in-bulk',
     '- **save lifecycle hooks** — `SaveHandler` / `LoadHandler` / `save:loaded` events → lifecycle.md#save-manager, runtime.md#engine-entrypoint',
-    '- **offline catch-up** — `processOfflineTime`, chunked simulation of elapsed seconds → lifecycle.md#offline',
+    '- **offline catch-up** — `processOfflineTime`, chunked simulation of elapsed seconds → lifecycle.md#offline; strategy families (extrapolation / tick-sim / cap-and-trickle / banking) and the mechanism-vs-policy split → ../consumer-guide.md#common-disambiguators',
     '- **tunable knob** — `tunable()` + `TuningRegistry`, scoped-stack override of balance constants → introspection.md#override-registry, ../consumer-guide.md#tunable-knobs',
     '- **declarative gate predicate** — `Gate` AST, evaluable + flip-distance + condition projection → mechanics.md#gate, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch',
     '- **predicate form choice** — Gate vs Requirement vs `Computable<boolean>` for gating fields → INDEX.md#predicate-forms, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch',
