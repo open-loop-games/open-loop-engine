@@ -6,6 +6,8 @@ export { runBatch } from './run-batch';
 export { runSensitivity } from './run-sensitivity';
 export { runUntil } from './run-until';
 export { runMatrixUntil } from './run-matrix-until';
+export { replayLive, createTickCounter } from './replay';
+export type { ReplayLiveOptions, TickCounter } from './replay';
 export { createSensitivityCell } from './create-sensitivity-cell';
 export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
 export {

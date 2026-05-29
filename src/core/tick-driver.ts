@@ -23,8 +23,9 @@
  * the accumulator does.
  *
  * Speed control: `speedMultiplier` scales dt before passing to callbacks during live play.
- * `simulateTick()` and `stepOnce()` do NOT apply speedMultiplier — offline processing
- * and tests stay wall-clock faithful and deterministic.
+ * Both the timer loop and `tickRaw()` (the injected-clock live path used by replay) apply
+ * it. `simulateTick()` and `stepOnce()` do NOT — offline processing and tests stay
+ * wall-clock faithful and deterministic.
  *
  * Offline catchup: `simulateTick()` in fixed mode also uses the accumulator but is NOT
  * bounded by `maxStepsPerTick` — that cap is live-play overspill protection only.
@@ -124,6 +125,16 @@ export type TickCallback = (dt: number) => void;
  */
 export interface TickDriver {
   onTick(callback: TickCallback): () => void;
+  /**
+   * Run one live tick from an injected `rawDt` — the speed-aware path the timer
+   * loop runs internally, exposed for deterministic replay. Applies the EWMA
+   * update, the `maxDeltaTime` cap (firing `onDeltaOverflow`), `speedMultiplier`,
+   * and in fixed mode the `maxStepsPerTick`-bounded accumulator drain (firing
+   * `onStepsOverflow`). `intervalTick` is exactly this fed the wall clock; the
+   * harness `replayLive` drives it from a controlled clock. Contrast
+   * `simulateTick`, the offline/test path: no speed scaling, no `maxStepsPerTick`.
+   */
+  tickRaw(rawDt: number): void;
   /**
    * Feed raw seconds through the loop (for offline processing). Does NOT apply
    * speedMultiplier. In fixed mode, drains the accumulator at `stepSize` per sub-tick
@@ -249,11 +260,11 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     endTraceTick();
   }
 
-  function intervalTick(): void {
-    if (!running) return;
-    const now = performance.now();
-    const rawDt = (now - lastTime) / 1000;
-    lastTime = now;
+  // Speed-aware live-tick body, shared by the timer loop and deterministic
+  // replay. The single home for the live dt math: EWMA, maxDeltaTime cap,
+  // speedMultiplier scaling, and the fixed-mode accumulator drain bounded by
+  // maxStepsPerTick.
+  function tickRaw(rawDt: number): void {
     if (rawDt <= 0) return;
 
     // EWMA: track mean raw delta for diagnostics and lag detection (both modes)
@@ -281,6 +292,14 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     }
 
     processTick(cappedDt * speedMultiplier);
+  }
+
+  function intervalTick(): void {
+    if (!running) return;
+    const now = performance.now();
+    const rawDt = (now - lastTime) / 1000;
+    lastTime = now;
+    tickRaw(rawDt);
   }
 
   function simulateTick(rawDt: number): void {
@@ -321,6 +340,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
 
   return {
     onTick,
+    tickRaw,
     simulateTick,
     start,
     stop,

@@ -350,6 +350,7 @@ function renderIndex(byCluster) {
     '- **modifier chain composition** — named chains, `bind`, declarative `grants`/`restricts`/`rewards` → mechanics.md#modifier, ../consumer-guide.md#modifier-chains-and-effects',
     '- **cross-action bonus** — A\'s yield scaled by B\'s state via binary-gate or level-scaled modifier → ../consumer-guide.md#cross-action-bonuses, mechanics.md#modifier',
     '- **predicate-bounded sim** — `runUntil` / `runMatrixUntil`, terminate on shared predicate → harness.md#cell-aggregation-kernel',
+    '- **live-play replay** — `replayLive`, deterministic speed-scaled `intervalTick` cadence; `createTickCounter` for fixed-mode speed-invariance → harness.md#runners',
     '- **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel',
     '- **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives',
     '- **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection',

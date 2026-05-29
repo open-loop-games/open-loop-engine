@@ -196,6 +196,7 @@ export const TIER_MANIFEST = [
       'Headless-sim substrate. Matrix and predicate-bounded runners, probes, content walkers, the picker for solver/UI enumeration, solvers (bisection), perturbation, analyzers, run pools, and typed harness contracts. Separable from the rest of the engine — game code never imports harness; balance tooling does.',
     entrypoints: [
       '`runHeadless` / `runUntil` — deterministic fixed-tick and predicate-bounded simulations.',
+      '`replayLive` / `createTickCounter` — replay live-play dt cadence (speed-scaled) deterministically; count sub-ticks for fixed-mode speed-invariance assertions.',
       '`runMatrix`, `runMatrixUntil`, `runSensitivity` — multi-cell, multi-seed balance sweeps.',
       '`createPickerSnapshot` / `applyPerturbation` — enumerate and perturb tunables/modifiers.',
       '`createTransitionSnapshot` / `createIncrementalSnapshot` — find upcoming content transitions.',
