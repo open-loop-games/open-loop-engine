@@ -28,7 +28,7 @@ These aren't sugar — they're the correct API. `subtractResource` returns a boo
 
 ### Level 2: Category systems (the default for content)
 
-Categories are the engine's standard shape for registering content. Each category factory exposes a typed registration contract and produces live engine objects per definition. Define a custom definition type, provide a mapper, register in bulk. The full factory list lives in `api/content-systems.md` and `api/content-narrative.md` — read the **Canonical entrypoints** block of each before reaching for raw primitives.
+Categories are the engine's standard shape for registering content: each factory exposes a typed registration contract and produces live engine objects per definition. Define a definition type, provide a mapper, register in bulk. The full factory list is in `api/content-systems.md` and `api/content-narrative.md` — read each's **Canonical entrypoints** block before reaching for raw primitives.
 
 ```ts
 const skills = createSkillCategory<MySkillDef>({
@@ -44,7 +44,7 @@ What a category gives you: per-definition persistent context, typed accessors (`
 
 **Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without install-time coupling. No publishing step; reading is opt-in. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
 
-**Predicate-gated purchasables.** A purchasable's "shape" is determined by its requirements, not its name. Drop in a predicate requirement instead of `createCostRequirement` and the same primitive becomes a predicate-gated unlock — no cost charged, the `active` ref flips when the requirement is met. Pair with `setupSweepAutoPurchase` to auto-flip on the first tick the predicate is true. This covers progression gates, tier ladders, era unlocks, and visibility flags through the same accessor the rest of your code already reads — `category.getPurchasable(id)?.active.value` — with no parallel visibility store to keep in sync.
+**Predicate-gated purchasables.** A purchasable's shape is its requirements, not its name. Swap `createCostRequirement` for a predicate requirement and the same primitive becomes an unlock — no cost charged, the `active` ref flips when the requirement is met (pair with `setupSweepAutoPurchase` to auto-flip on the first true tick). Progression gates, tier ladders, era unlocks, and visibility flags all read through the one accessor — `category.getPurchasable(id)?.active.value` — with no parallel visibility store to keep in sync.
 
 Two predicate-requirement forms, in preference order:
 
@@ -76,7 +76,7 @@ Three paths land in the consumer corpus, each fitting a different shape of need.
 | Upgrades / gates / capped repeatables in batch (perks, milestones, sequential tiers, visibility unlocks) | `createPurchasableCategory` |
 | Per-instance customized leveled purchases (heterogeneous `effect` / `onPurchase` per instance, post-creation per-instance wiring) | raw `createScalingPurchasable` |
 
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, `createProducerCategory` is the fit. It bundles cost, count, rate aggregation, autobuy, and payback metric in one definition shape:
+**Rate-bearing → producer category.** When ownership produces a continuous resource flow, `createProducerCategory` bundles cost, count, rate aggregation, autobuy, and payback metric in one definition shape:
 
 ```ts
 const buildings = createProducerCategory<ProducerDef>({
@@ -91,7 +91,7 @@ const buildings = createProducerCategory<ProducerDef>({
 });
 ```
 
-**No rate, batch shape → purchasable category.** When a definition shape covers many instances and their effects fit a shared mapping — capped repeatables, sequential upgrade tiers, predicate-gated unlocks — `createPurchasableCategory` is the fit. The `limit` on the mapped options selects the sub-shape: `1` for upgrades and gates, a finite cap for repeatable perks, omitted for unbounded:
+**No rate, batch shape → purchasable category.** When many instances share an effect mapping — capped repeatables, sequential upgrade tiers, predicate-gated unlocks — `createPurchasableCategory` fits. The mapped `limit` selects the sub-shape: `1` for upgrades and gates, a finite cap for repeatable perks, omitted for unbounded:
 
 ```ts
 const perks = createPurchasableCategory<PerkDef>({
@@ -125,7 +125,7 @@ for (const def of spellDefs) {
 }
 ```
 
-Path C trades self-registration for direct control: the resulting purchasables aren't enrolled in a category registry, so tooling that walks `CategoriesKey` (devtools panels, balance probes, mods) won't see them. Track them at the consumer (`Map<id, Purchasable>` keyed however the game already addresses them) if anything needs batch access.
+Path C trades self-registration for direct control — like any raw-primitive bypass, the purchasables fall outside the category registry (see *Categories self-register* above), so track them at the consumer (`Map<id, Purchasable>`) if anything needs batch access.
 
 ### Level 3: Raw primitives (when categories don't fit)
 
@@ -231,7 +231,7 @@ const prestigeReset = createReset({
 });
 ```
 
-This means adding a resource, upgrade, producer, or category entry inside one of those module scopes automatically includes it in resets that reference that module — no cross-file coordination. Lifetime refs such as `resource.cumulative` and `resource.best` are skipped by module-scoped resets by default; pass them directly through `thingsToReset` only for hard resets that should wipe lifetime statistics.
+So adding a resource, upgrade, producer, or category entry inside a module scope automatically joins resets that reference that module — no cross-file coordination. Lifetime refs (`resource.cumulative`, `resource.best`) are skipped by default; pass them through `thingsToReset` only for hard resets meant to wipe lifetime stats.
 
 Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved scope, evaluated at reset time. Refs in `keep` survive verbatim; refs in `retain` are snapshot before the wipe, run through the supplied transform, and written back after:
 
@@ -294,21 +294,13 @@ const saveMigrations = {
 };
 ```
 
-**Path convention.** Helpers split on `.` to walk nested objects — `'jobs.warrior.progress'` reaches `data.jobs.warrior.progress`. The engine's serialized shape is nested object trees, never flat dot-keyed records, so the convention matches what the helpers traverse. `PersistentName` segments are guaranteed not to contain a literal `.`.
+The helpers share their `.`-split nested-path convention, silent no-op on missing paths, and mutate-and-return semantics with the engine's serialize/deserialize paths — read their tsdoc for the per-helper detail. `getNested` / `setNested` are the raw escape hatch for one-off shapes that don't fit a named helper.
 
-**Missing-path semantic.** Every helper silently no-ops when the target path is missing. Migrations need to tolerate already-absent fields — a player loaded a save from a fork that opted out of the feature, or a previous migration dropped the field. Don't add presence checks before the helper call; that's what the helper covers.
-
-**Mutate-and-return.** Helpers mutate the same data ref and return it for chain ergonomics. Cloning a large save tree per step is wasteful; the migration callback owns the data while it runs.
-
-**Foundation primitives.** `getNested` and `setNested` are exported for one-off migrations that don't fit a named shape. They share semantics with the engine's serialize/deserialize paths — what they read and write is what those paths read and write.
-
-**When to drop to a hand-rolled callback.** Reach past the helpers when a migration needs cross-field invariants (compute one field from two others), structural reshaping (collapse two contexts into one), or interaction with the persistent-ref registry (legacy ID-to-name remaps — the engine already handles that one internally). Anything else, the helpers cover.
-
-The engine emits `save:migration-step { from, to }` for each consumer migration that runs, so per-step logging belongs in an event listener, not inside the migration body.
+Drop to a hand-rolled callback only when a migration needs cross-field invariants (compute one field from two others), structural reshaping (collapse two contexts into one), or persistent-ref-registry interaction (legacy ID-to-name remaps — already handled internally). The engine emits `save:migration-step { from, to }` per migration, so per-step logging belongs in an event listener, not the migration body.
 
 ## Conversions
 
-`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs through formulas over a snapshot of consumed amounts. Prestige is the canonical shape — convert resources to prestige points then reset everything — but the primitive also covers non-prestige transformations: crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`). The output formula receives a snapshot of consumed inputs taken before any mutation, so same-resource compounding (output produces more of an input type) is well-defined.
+`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs through formulas over a snapshot of consumed amounts. Prestige is the canonical shape (convert to prestige points, then reset), but it equally covers crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`). The input snapshot is taken before any mutation, so same-resource compounding (output produces more of an input type) is well-defined.
 
 Conversion and reset are composed externally — the factory holds no `Reset` reference. The standard prestige pattern wires them together at the call site by firing the reset from `afterConvert`:
 
@@ -330,7 +322,7 @@ const prestige = createConversion({
 
 The word "effect" wears two hats in this section. `IEffect` / the `E` builder / `GameStateMutator` are the **state-mutation AST** — declarative writes evaluated against the ambient runtime. `createPersistentEffectSystem` / `createTemporaryEffectSystem` are **binding-lifecycle managers** — they hold live modifier registrations and activate/deactivate them as predicates flip. "Persistent" in the system name refers to the binding's durability across reloads, not to save serialization — the bindings themselves re-hydrate from install code on every load (see § Bindings re-hydrate from install). The modifier chain is the surface that bindings (from either source) push onto.
 
-`createModifierChain` is a named, composable modifier that multiple modules can push modifiers onto. Use it as a shared surface for production bonuses, yield multipliers, or any value that multiple systems contribute to:
+`createModifierChain` is a named, composable modifier multiple modules can push onto — a shared surface for production bonuses, yield multipliers, or any value many systems contribute to:
 
 ```ts
 // Module A creates the chain
@@ -398,11 +390,11 @@ def.gainChain.bind({
 });
 ```
 
-The ladder choice between `chain.bind` and `createPersistentEffectSystem` is the same one described at the top of §Modifier chains and effects — cross-action bonuses are just the most common shape that hits it. idle-loops-ng's `affected-by.ts` uses `PersistentEffectSystem.register` because registration happens outside any category-driven persistent context (attribution auto-derivation needs a scope), not because the bonus shape itself requires it.
+The `chain.bind` vs `createPersistentEffectSystem` choice here is the same ladder from the top of this section. idle-loops-ng's `affected-by.ts` uses `PersistentEffectSystem.register` only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
 
 ## Tunable knobs
 
-Balance constants — base rates, cost growth factors, multipliers — sit in `data/balance.ts` as plain values most of the time. When something external needs to perturb them (a balance solver bisecting against beat windows, a dev panel sliding values live, a mod config swapping a coefficient, an A/B harness comparing two parameter sets), wrap them in `tunable()` to expose them through a tuning registry that any external surface can read.
+Balance constants — base rates, cost growth, multipliers — sit in `data/balance.ts` as plain values most of the time. When something external needs to perturb them (a balance solver bisecting against beat windows, a live dev-panel slider, a mod config, an A/B harness), wrap them in `tunable()` to expose them through a tuning registry any external surface can read.
 
 ```ts
 // data/balance.ts
@@ -416,21 +408,17 @@ export const balance = {
 };
 ```
 
-The wrap turns the constant into a `ComputedRef` that consults the registry first and falls back to the default closure. Anything with a handle to the registry — typically via injection key — calls `pushScope(name, overrides)` to install a layer of overrides; every reader sees the new value reactively until the returned `restore()` thunk pops the scope. Reads inside the default fn register their own deps, so the computed also tracks the underlying state when no override is active.
-
-Wrap values you want external surfaces to touch; leave structural constants (thresholds that mean something architectural, fixed step counts, level boundaries) unwrapped. The wrap surface doubles as documentation of *what's a knob*: a reviewer scanning the registry sees exactly what's intentionally exposed for tuning, distinct from coefficients that aren't safe to perturb.
-
-The scoped stack means transient takeovers — sim runs, what-if probes, balance bisections — don't have to undo themselves manually. Push a scope, run, restore. The base values come back without any cleanup ceremony, and reactive readers re-render once on each transition.
+The wrap returns a `ComputedRef` that reads registry-then-default; `pushScope` / `restore` install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
 
 Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
 
-For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `createTuningRegistry` auto-enrolls into `TuningRegistriesKey` (the picker's enumeration surface) when constructed inside the engine's install/connect ambient. `createOverrideRegistry` is the broader primitive underneath — reach for it directly when the override target is a non-numeric function the picker shouldn't surface (challenge takeover, mod fn replacement, sim swap). For modifier-chain replacement specifically, use `replacementBinding` (§Modifier chains): it keeps attribution intact on the chain, where a raw `OverrideRegistry` swap would bypass it.
+For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `createTuningRegistry` auto-enrolls into `TuningRegistriesKey` (the picker's enumeration surface) when constructed inside the engine's install/connect ambient. `createOverrideRegistry` is the broader primitive underneath — reach for it directly when the override target is a non-numeric function the picker shouldn't surface (challenge takeover, mod fn replacement, sim swap). For modifier-chain replacement specifically, prefer `replacementBinding` (§Modifier chains) over a raw `OverrideRegistry` swap — it keeps chain attribution intact.
 
 ## Introspection
 
 External tools (devtools panels, balance probes, UI hints, mods) walk the live engine surface through opt-in injection keys — `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. No install-time coupling: anything with an engine handle can enumerate without being wired into its module graph.
 
-The layering rule "game code never imports harness" applies to runtime gameplay modules — the per-tick logic, content registrations, effect bindings that the engine ticks. Tooling consumers (devtools panels, balance probes, "upcoming unlock" UI hints, mods that introspect content) are a separate class and may import the harness walkers and picker freely; that's what the snapshot helpers below are for. Keep the import surface for tooling in its own module so the gameplay/tooling boundary stays legible.
+The "game code never imports harness" rule applies to runtime gameplay modules (per-tick logic, content registrations, effect bindings). Tooling consumers — devtools panels, balance probes, "upcoming unlock" hints, content-introspecting mods — are a separate class and may import the harness walkers and picker freely. Keep tooling imports in their own module so the gameplay/tooling boundary stays legible.
 
 Two query shapes recur:
 
