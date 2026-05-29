@@ -440,6 +440,10 @@ Recurring shapes consumers assemble from engine primitives — worked patterns f
 - **Priority-weighted fill** — interleave multiple content categories under one priority order via a `passBonus` map.
 - **Character interaction** — dialog (contract-first runtime) and subjects (typed multi-field relationship state), and where they connect.
 
+## Domain-language map
+
+Past a certain vocabulary size, re-reading your `data/` types to recall "what's an action vs a job, what references what" costs more than maintaining a small generated map. The engine ships `ol-domain-map` (a bin) for exactly this: point a per-game `domain-map.config.mjs` at your domain files and it emits a committed `domain-map.md` — vocabulary (enums + string-literal/discriminated unions, where membership is an is-a relation), the def inventory, and a field-name reference graph (the untyped-ID edges like `requiredExplorations` that type-graph tools miss). Source of truth is code STRUCTURE, not tsdoc — it regenerates from your types every run, so it can't drift. The config carries the dialect knobs (`scope` globs, `defSuffixes`, optional `nouns`/`stopwords`) plus a small hand-authored `curated` block for the cross-symbol concepts no single type owns. Wire `"domain-map": "ol-domain-map src/domain-map.config.mjs"` and commit both files; edit the config, never the `.md`. See the seven `domain-map.config.mjs` in `open-loop-starter/src/archetypes/*` for worked examples across dialects (`Def` vs `Spec` suffixes). Note `ts-morph` must resolve for the bin — workspace consumers get it through the engine's own `node_modules`; a registry install needs it added consumer-side.
+
 ## When the engine should grow
 
 The engine evolves as consumers use it. Two signals:
