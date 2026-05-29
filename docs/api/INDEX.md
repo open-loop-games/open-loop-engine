@@ -112,8 +112,8 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel
 - **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives
 - **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection
-- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide.md#indirect-control-worker-pools
-- **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide.md#persona-roster-composition, composition.md#sequencer
+- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide-recipes.md#indirect-control-worker-pools
+- **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide-recipes.md#persona-roster-composition, composition.md#sequencer
 - **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resetting-persistent-refs-in-bulk
 - **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resetting-persistent-refs-in-bulk
 - **save lifecycle hooks** — `SaveHandler` / `LoadHandler` / `save:loaded` events → lifecycle.md#save-manager, runtime.md#engine-entrypoint
@@ -128,8 +128,8 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **closed-form beat timing** — `calculateBeatTiming`, `T(n) = Cost(n) / Production(n)` snapshot for balance/devtools → mechanics.md#beat-timing
 - **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content
-- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide.md#dialog-contract-first-runtime-second
-- **subject field kinds** — typed multi-field state per subject: scalar / vector / tier / flag / enum → content-narrative.md#subject-category, ../consumer-guide.md#character-interaction-surface
+- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second
+- **subject field kinds** — typed multi-field state per subject: scalar / vector / tier / flag / enum → content-narrative.md#subject-category, ../consumer-guide-recipes.md#character-interaction-surface
 - **best-of run recording** — per-metric best with optional projection, BestOf events → content-systems.md#bestof-tracker
 - **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
 - **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
