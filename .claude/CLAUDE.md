@@ -176,3 +176,6 @@ Three tiers based on audience. IDE hover is the primary delivery mechanism — n
 
 **Do not use:** `@since`, `@deprecated` (pre-1.0), redundant `@see` cross-references, or `@module` tags.
 
+
+<!-- Private, gitignored per-repo notes (replaces auto-memory). Resolves to .claude/CLAUDE.local.md. -->
+@CLAUDE.local.md

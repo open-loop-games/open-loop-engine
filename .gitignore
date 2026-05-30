@@ -7,3 +7,9 @@ temp
 # reference sibling repos. Not part of the public engine surface.
 docs/candidate-primitives.md
 docs/notes/
+
+# Claude: commit .claude/CLAUDE.md and rules/, keep the rest private
+.claude/*
+!.claude/CLAUDE.md
+!.claude/rules/
+.claude/CLAUDE.local.md
