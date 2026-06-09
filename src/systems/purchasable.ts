@@ -103,9 +103,9 @@ export interface PurchasableOptions {
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
   visibility?: Computable<boolean>;
-  // TODO(expansion): widen to `Computable<boolean> | Gate` once OL-844 lands and a consumer
-  // wants declarative visibility for devtools / balance-sim introspection.
-  // Ref: docs/candidate-primitives.md `Gate` core primitive entry.
+  // TODO(expansion): widen to `Computable<boolean> | Gate` when a consumer wants declarative
+  // visibility for devtools / balance-sim introspection. Gate already exists
+  // (src/systems/gate.ts); only consumer demand is pending.
   /**
    * Whether bulk purchasing (buy-max) is enabled.
    * Default: `false` when limit is 1, `true` otherwise.

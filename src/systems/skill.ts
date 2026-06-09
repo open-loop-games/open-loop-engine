@@ -75,9 +75,9 @@ export interface SkillEvents {
 export type SkillCurve = (variable: MaybeRef<DecimalSource>) => FormulaSource;
 
 /** Shared option fields present in both skill modes */
-// TODO(expansion): add `unlockGate?: Gate` (and possibly `prerequisites?: Gate`) once OL-844
-// lands and a consumer wants declarative skill unlocks instead of consumer-side gating closures.
-// Ref: docs/candidate-primitives.md `Gate` core primitive entry.
+// TODO(expansion): add `unlockGate?: Gate` (and possibly `prerequisites?: Gate`) when a
+// consumer wants declarative skill unlocks instead of consumer-side gating closures.
+// Gate already exists (src/systems/gate.ts); only consumer demand is pending.
 export interface SkillOptionsBase {
   id: string;
   /** Formula factory — receives the internal xp ref, returns a FormulaSource. */

@@ -2,7 +2,7 @@
 
 How to express a game with `@open-loop/engine`. Read this after forking `open-loop-starter` and before writing your first module.
 
-This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [migration-notes.md](./migration-notes.md) for port traps; `open-loop-research/methodology/techniques/closed-form-progression/` for the math underpinning the formula primitives.
+This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: `CHANGELOG.md` for breaking-change migration blocks; `open-loop-research/methodology/techniques/closed-form-progression/` for the math underpinning the formula primitives.
 
 > References below to sibling repos (`open-loop-research`, `open-loop-starter`, etc.) and to `docs/candidate-primitives.md` describe studio-internal resources — they're load-bearing for our own workflow but won't resolve from a standalone clone of this repo.
 

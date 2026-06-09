@@ -57,7 +57,7 @@ Shared across the pool:
 
 Single-worker case: same shape with one instance (`id: 'player'`). spell-compiler and maldacena both follow this pattern in their action/spell-execution modules.
 
-Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (defender towers, OL-1021) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
+Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (a defender-tower game evaluated during the createWorker retirement) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
 
 ## Pre-completion gating in ActionCategory
 
@@ -146,7 +146,7 @@ sequencer.fillStrategy = createConditionalStrategy(() => [
 
 **Harness integration.** The `src/harness/` picker/runner/sweep substrate already covers persona-population sweeps: `runMatrix` over a personality param axis, or `createPickerSnapshot` to enumerate what the sequencer has loaded. Procedural personas (objective variation in search-based agents) live here — vary the objective the search optimizes rather than the policy params; see `open-loop-research/practical/composition-cookbook/procedural-personas.md`.
 
-Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. The OL-714 cautionary case (`4e5fc39`, rolled back `c96ec42`) established that a `createPersonalityRoster` wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit (see breadcrumb in `docs/candidate-primitives.md`). Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
+Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. A cautionary case (a `createPersonalityRoster` wrapper shipped and then rolled back pre-release) established that the wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit (see breadcrumb in `docs/candidate-primitives.md`). Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
 
 ## Priority-weighted fill across multiple content categories
 

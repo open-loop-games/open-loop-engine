@@ -15,7 +15,7 @@ Start with these public symbols before scanning the full inventory below.
 
 Bounded 2D grid with adjacency, BFS, FOV adapter, and snapshot persistence. Shared coordinate types (`GridCoord`, `PassabilityFn`, `Unsubscribe`) sit here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:212`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:210`
 - `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:75`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
 - `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:25`

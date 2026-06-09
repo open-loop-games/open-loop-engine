@@ -96,8 +96,6 @@ export interface SpatialGrid<T> {
    *
    * During a consumer port, reading this before every legacy write path
    * routes through the FOV adapter is the classic counter-drift trap.
-   * See [migration-notes.md](../../docs/migration-notes.md) §
-   * Counter drift during consumer migration.
    */
   readonly exploredCount: number;
 

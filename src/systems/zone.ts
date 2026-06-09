@@ -94,9 +94,9 @@ export interface ZoneSystem {
 
   /** Unlock a zone by ID. No-op if already unlocked. */
   unlock(zoneId: string): void;
-  // TODO(expansion): add `unlockGate?: Gate` to ZoneDef once OL-844 lands and a consumer
-  // wants declarative auto-unlock instead of imperative `zones.unlock(id)` calls.
-  // Ref: docs/candidate-primitives.md `Gate` core primitive entry.
+  // TODO(expansion): add `unlockGate?: Gate` to ZoneDef when a consumer wants declarative
+  // auto-unlock instead of imperative `zones.unlock(id)` calls. Gate already exists
+  // (src/systems/gate.ts); only consumer demand is pending.
 
   /** Check if a zone is unlocked */
   isUnlocked(zoneId: string): boolean;
