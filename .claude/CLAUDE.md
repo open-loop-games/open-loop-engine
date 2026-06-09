@@ -176,6 +176,14 @@ Three tiers based on audience. IDE hover is the primary delivery mechanism — n
 
 **Do not use:** `@since`, `@deprecated` (pre-1.0), redundant `@see` cross-references, or `@module` tags.
 
+## Quality passes & triage
+
+- **Read before you frame.** Read an abstraction's full source before treating a contract question as an architectural decision — existing optional/polymorphic fields often already answer it. Recorded cross-cuts and codified rules are sanity checks to apply *after* reading, not a checklist to execute; findings drive structure, not the reverse.
+- **Substance over surface.** A leaf that produces only banner/TSDoc/naming-nit deltas wasn't worth running. Code-quality findings (dead-surface trims, fixes, primitive simplifications) outrank codification-of-divergence.
+- **Best shape is found by comparison.** When auditing "what's the right shape for X?", sweep across `systems/`, `harness/`, `primitives/`, and consumer hand-rolls — not the folder under audit. Resolve divergence by picking the right shape and aligning the laggards (or proving both contexts genuinely differ); never ship both with part tagged "legacy".
+- **Audit before answering strict validation.** When a ticket frames multiple zero-adoption surfaces as Path-A/B/C choices, audit real adoption first (load-bearing / calcified / latent contract / aspirational framing); the per-subsystem disposition shape is often the actual finding.
+- **Corpus-test ambiguous structure.** For a structural choice (organization axis, taxonomy, boundaries) where iteration isn't converging, spray ~4 subagents (2 sonnet + 2 opus) on the same structural questions with different concrete tasks, briefed not to affirm a prior plan — convergence plus novel ideas beats single-mind iteration.
+- **Distill or drop at close.** In-thread codifications (CC-N labels, scoped notes) earn at most a 1–2 bullet code-shape rule here, or get dropped; keep this file light, and no per-folder `CLAUDE.md`.
 
 <!-- Private, gitignored per-repo notes (replaces auto-memory). Resolves to .claude/CLAUDE.local.md. -->
 @CLAUDE.local.md
