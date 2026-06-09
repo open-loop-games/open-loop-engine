@@ -24,7 +24,25 @@
  *
  * @cluster domain-map
  */
-import { Project } from 'ts-morph'
+import { createRequire } from 'node:module'
+
+/**
+ * ts-morph is an optional peer dependency — declared in package.json
+ * `peerDependenciesMeta` as optional so the engine install stays lean.
+ * Loaded lazily so importing this module never fails; only running the
+ * extractor without ts-morph installed does, with an actionable message.
+ */
+function loadProject() {
+  try {
+    const require = createRequire(import.meta.url)
+    return require('ts-morph').Project
+  } catch {
+    throw new Error(
+      'ol-domain-map requires ts-morph, which is an optional peer dependency of ' +
+        '@open-loop/engine. Install it in your project: pnpm add -D ts-morph',
+    )
+  }
+}
 
 // === CONSTANTS ===
 
@@ -107,6 +125,7 @@ export function extractDomain(config, opts = {}) {
   const viewSuffixes = config.viewSuffixes ?? ['State', 'GameState']
   const stopwords = new Set((config.stopwords ?? []).map((s) => s.toLowerCase()))
 
+  const Project = loadProject()
   const project = new Project({
     compilerOptions: { skipLibCheck: true, allowJs: false },
     skipAddingFilesFromTsConfig: true,
@@ -208,7 +227,7 @@ export function extractDomain(config, opts = {}) {
     const hit = nouns.find((n) => containsSubsequence(fieldTokens, n.tokens))
     if (!hit) continue
     if (defStem(owner, defSuffixes) === hit.noun) continue // skip self-reference
-    const key = `${owner}.${field} ${hit.noun}`
+    const key = `${owner}.${field}\x00${hit.noun}`
     if (edgeSet.has(key)) continue
     edgeSet.add(key)
     edges.push({ from: `${owner}.${field}`, to: hit.noun })

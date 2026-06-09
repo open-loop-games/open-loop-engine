@@ -8,7 +8,7 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 
 ### What's in it
 
-- **Four-layer architecture** — `primitives` → `core` → `systems` → consumer modules, strict one-way deps. The `primitives` layer has zero dependencies and is Vue-free; `core` adds reactivity; `systems` adds registration surfaces over core; consumers compose on top.
+- **Five-layer architecture** — `primitives` → `core` → `systems` → consumer modules, with `harness` alongside as an optional balance-sim layer; strict one-way deps. The `primitives` layer has zero dependencies and is Vue-free; `core` adds reactivity; `systems` adds registration surfaces over core; consumers compose on top. Game modules never import `harness` — balance tooling does.
 
 - **Reactive resources** — `createResource()` produces Vue-reactive game quantities backed by `break_eternity.js` `Decimal` arithmetic. Helpers cover the common path: `addResource`, `subtractResource` (with insufficient-funds check), `hasResource`, `resetResource`, `displayResource`. Persistent resources expose `best` (high-water mark) and `cumulative` (lifetime gain) refs.
 
@@ -21,15 +21,15 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 
 - **Persistence and save** — Auto-derived save schemas from persistent-ref `DefaultValue`s via `zod`. Compression via `lz-string`. Load-time validation catches "field renamed mid-dev-cycle" save corruption without hand-written schemas. `SaveManager` orchestrates encode / decode / migrate / peek.
 
-- **Game loop** — `createGameLoop()` ticks registered handlers with `dt` in seconds. Offline catch-up via `offline.ts`. Throttling, profiling, and stasis-mode for headless determinism.
+- **Game loop** — `createTickDriver()` ticks registered handlers with `dt` in seconds. Offline catch-up via `offline.ts`. Throttling, profiling, and stasis-mode for headless determinism.
 
-- **Category systems** — Typed batch-registration surfaces for the validated incremental-game patterns: skills, producers, purchasables, achievements, challenges, dialog, relationships, zones. Each category exposes `register` / `getDef` / `getInstance` / `patch` (for mods) and self-enrols into a global content registry that consumer tooling can walk without install-time coupling.
+- **Category systems** — Typed batch-registration surfaces for the validated incremental-game patterns: skills, producers, purchasables, achievements, challenges, dialog, subjects, zones. Each category exposes `register` / `getDef` / `getInstance` / `patch` (for mods) and self-enrols into a global content registry that consumer tooling can walk without install-time coupling.
 
 - **Loop / sequencer / time** — `createLoop`, `createSequencer` (with fill strategies), `createTimeSystem`, `createReset`, `createRetentionPolicy`. Reusable composition primitives for time-stepped and progression-based games.
 
 - **Spatial primitives** — `core/spatial/graph` and `core/spatial/grid` for games that need adjacency without committing to a UI.
 
-- **Headless harness** — `runHeadless`, `runMatrix`, `runMatrixUntil`, `runSensitivity`, `runBatch`, `runPool`. Plus walker / picker / probe / solver primitives for balance simulation. Same engine logic runs headless or in a browser.
+- **Headless harness** — `runHeadless`, `runMatrix`, `runMatrixUntil`, `runSensitivity`, `runBatch`, `createRunPool`. Plus walker / picker / probe / solver primitives for balance simulation. Same engine logic runs headless or in a browser.
 
 - **Module system** — `createEngine({ gameId })` returns a host that consumers extend via `engine.use({ id, install(ctx) { ... } })`. Install context exposes `onTick`, `onSave`, `onLoad`, `onReset`, plus dependency injection over engine registries.
 
@@ -48,9 +48,9 @@ Pre-1.0. Expect breaking changes between minor versions until 1.0. The version b
 
 ### Requirements
 
-- Node ≥ 18, ESM-only (no CommonJS export).
-- Bundler-mode TypeScript resolution (Vite, Webpack, ESBuild). `moduleResolution: "nodenext"` is not supported in 0.1.0 — see the README install notes.
-- Peer dependencies: `vue ^3.4`, `break_eternity.js ^2.1`, `eternal_notations ^1.1`.
+- Node ≥ 18, ESM-only (no CommonJS export). Published JS and types carry explicit `.js` extensions, so plain node ESM works — no bundler required at runtime.
+- Bundler-mode TypeScript resolution (Vite, Webpack, ESBuild). `moduleResolution: "nodenext"` currently fails on `break_eternity.js`'s typings (upstream CJS-interop issue) — see the README install notes.
+- Peer dependencies: `vue ^3.4`, `break_eternity.js ^2.1`, `eternal_notations ^1.1`. Optional: `ts-morph` (only needed to run the bundled `ol-domain-map` generator).
 
 ### License
 

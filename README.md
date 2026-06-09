@@ -16,7 +16,7 @@ pnpm add @open-loop/engine vue break_eternity.js eternal_notations
 
 `vue`, `break_eternity.js`, and `eternal_notations` are peer dependencies — the engine doesn't bundle them so consumers control the versions.
 
-> Requires `moduleResolution: "bundler"` (or `"node16"` with explicit `.js` extensions in your imports). The published types use extensionless cross-file references, which Vite/webpack/esbuild resolve fine but classic node resolution does not.
+> The published JS and type declarations carry explicit `.js` extensions, so the runtime works under plain node ESM — headless sims need no bundler. For TypeScript, use `moduleResolution: "bundler"`; `"nodenext"` currently fails on `break_eternity.js`'s own typings (upstream CJS-interop issue), not on the engine.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ const engine = createEngine({ gameId: 'my-idle-game' });
 engine.use({
   id: 'core',
   install({ onTick }) {
-    const gold = createResource({ id: 'gold' });
+    const gold = createResource(new Decimal(0), { id: 'gold' });
     onTick((dt) => {
       gold.value = Decimal.add(gold.value, dt); // +1 gold/sec
     });
@@ -60,7 +60,8 @@ The engine ships its own docs in the repo (not on a separate site yet):
 
 - **`docs/consumer-guide.md`** — how to think about composing the engine. Levels of abstraction (resource helpers → category systems → raw primitives → declarative data), persistence, modifier chains.
 - **`docs/api/INDEX.md`** — mechanical per-symbol index across every layer. The answer to "does the engine already do X?"
-- **`docs/migration-notes.md`** — engine-internal migration traps when porting from older shapes.
+
+Migration guidance for breaking changes lives in the commit body of each `feat!:`/`fix!:` commit and is lifted verbatim into this repo's `CHANGELOG.md` — there is no separate migration doc.
 
 The `INDEX.md` is generated from TSDoc; signatures and behavior live in source, reachable from the index.
 
