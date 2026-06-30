@@ -103,10 +103,26 @@ describe('advanceToNextEvent', () => {
     // Walker sees gold=0, rate=5, cost=20 → 4s until affordable.
     expect(snap.all.length).toBeGreaterThan(0);
 
-    const result = advanceToNextEvent(engine, snap);
+    const result = advanceToNextEvent(engine, snap, 1);
     expect('fired' in result).toBe(true);
     if ('fired' in result) {
       expect(result.advanced).toBeCloseTo(4, 5);
+      expect(result.fired.length).toBeGreaterThan(0);
+      expect(result.fired[0]!.kind).toBe('becomes-affordable');
+    }
+  });
+
+  it('floors the advance at tickDelta when the head distance is smaller', () => {
+    const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
+    const engine = buildPurchasableEngine('adv-floor');
+    const snap = createTransitionSnapshot(engine, accessor);
+    // Walker sees a 4s head distance; floor at a tickDelta well past it.
+    const result = advanceToNextEvent(engine, snap, 10);
+    expect('fired' in result).toBe(true);
+    if ('fired' in result) {
+      expect(result.advanced).toBe(10);
+      // `fired` still reports the transitions tied at the raw head distance,
+      // not whatever the walker would see at the floored advance.
       expect(result.fired.length).toBeGreaterThan(0);
       expect(result.fired[0]!.kind).toBe('becomes-affordable');
     }
@@ -117,7 +133,7 @@ describe('advanceToNextEvent', () => {
     const snap = createTransitionSnapshot(engine, mockAccessor());
     expect(snap.all).toHaveLength(0);
 
-    const result = advanceToNextEvent(engine, snap);
+    const result = advanceToNextEvent(engine, snap, 1);
     expect(result).toEqual({ advanced: 0, reason: 'no-finite-transition' });
   });
 
@@ -130,7 +146,7 @@ describe('advanceToNextEvent', () => {
     expect(snap.all.length).toBeGreaterThan(0);
     expect(snap.all[0]!.distance.seconds).toBeNull();
 
-    const result = advanceToNextEvent(engine, snap);
+    const result = advanceToNextEvent(engine, snap, 1);
     expect(result).toEqual({ advanced: 0, reason: 'no-finite-transition' });
   });
 
@@ -141,7 +157,7 @@ describe('advanceToNextEvent', () => {
     // Every emission on the opaque challenge is opaque-predicate.
     expect(snap.all.some((t) => t.distance.reason === 'opaque-predicate')).toBe(true);
 
-    const result = advanceToNextEvent(engine, snap);
+    const result = advanceToNextEvent(engine, snap, 1);
     expect(result).toEqual({ advanced: 0, reason: 'opaque-present' });
   });
 });

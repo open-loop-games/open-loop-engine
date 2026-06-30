@@ -11,9 +11,11 @@
  * 1. {@link createIncrementalSnapshot} each iteration — finite-distance head is
  *    the next walker-visible event.
  * 2. {@link advanceToNextEvent} drives `engine.tickDriver.simulateTick(dt)` with
- *    `dt = smallest finite distance`. The engine must be built with
- *    `maxDeltaTime` raised to cover the largest expected advance — otherwise
- *    `simulateTick` clamps and the loop degrades toward fixed-tick.
+ *    `dt = smallest finite distance`, floored at `tickDelta` so dense
+ *    auto-purchase cadence can't collapse the advance into a per-step
+ *    snapshot-rebuild cliff. The engine must be built with `maxDeltaTime`
+ *    raised to cover the largest expected advance — otherwise `simulateTick`
+ *    clamps and the loop degrades toward fixed-tick.
  * 3. Refuse handling splits by reason:
  *    - `'opaque-present'` — fall back to `simulateTick(tickDelta)`. Opaque
  *      transitions could flip after a tick, so we tick and re-resolve.
@@ -68,11 +70,22 @@ export type AdvanceToNextEventResult =
  *   `distance.seconds`. Pure stasis, empty snapshot, or all distances
  *   uncomputable / no-rate.
  *
+ * The realized advance is floored at `tickDelta`: dense auto-purchase cadence
+ * can collapse the head distance to a few milliseconds, and stepping by that
+ * raw distance pays a full incremental-snapshot rebuild (plus checkpoint
+ * export under `bisectTolSec`) per micro-step — the cliff `studio/open-loop-engine#1`
+ * was filed for. Flooring makes event mode asymptotically never worse than
+ * tick mode; `fired` still reports only the transitions tied at the raw head
+ * distance; the caller's existing bisection (triggered whenever
+ * `advanced > bisectTolSec`) covers the case where the floor overshoots the
+ * walker-reported fire time.
+ *
  * @internal
  */
 export function advanceToNextEvent(
   engine: Engine,
   snapshot: TransitionSnapshot,
+  tickDelta: number,
 ): AdvanceToNextEventResult {
   for (const t of snapshot.all) {
     if (t.distance.reason === 'opaque-predicate') {
@@ -85,10 +98,11 @@ export function advanceToNextEvent(
     return { advanced: 0, reason: 'no-finite-transition' };
   }
 
-  const dt = head.distance.seconds;
+  const rawDt = head.distance.seconds;
+  const dt = Math.max(rawDt, tickDelta);
   const fired: Transition[] = [];
   for (const t of snapshot.all) {
-    if (t.distance.seconds === dt) fired.push(t);
+    if (t.distance.seconds === rawDt) fired.push(t);
     else break;
   }
 
@@ -162,7 +176,7 @@ export function runEventModeLoop(
         ? { blob: engine.saveManager.exportSave(), rng: getRNGState() }
         : null;
     const advanceStart = profileStart();
-    const result = advanceToNextEvent(engine, snapshot);
+    const result = advanceToNextEvent(engine, snapshot, tickDelta);
     profileEnd('runUntil.event.advance', advanceStart);
 
     if ('fired' in result && result.advanced > 0) {
