@@ -273,7 +273,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `headless` — synchronous tick loop for deterministic simulation and tests → harness.md#headless-runner
 - `perturbation` — address→override mechanism for the balance workbench → harness.md#perturbation-applier
 - `picker` — Walk engine state to enumerate addressable choices for solvers / UIs. → harness.md#picker
-- `probe` — Seed-sweep runners. `runProbe` collects per-beat termination-time distributions (with optional `targetWindow` →… → harness.md#probes
+- `probe` — Seed-sweep runners. `runProbe` collects per-beat termination-time distributions (with optional `tuningWindow` →… → harness.md#probes
 - `run-pool` — core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state → harness.md#runpool
 - `runners` — reduces raw per-run results into per-metric stats, optional histograms, and (for until-runs) termination-time… → harness.md#cell-aggregation-kernel
 - `solve` — Tune a parameter to satisfy a predicate (bisection, etc.). → harness.md#solvers

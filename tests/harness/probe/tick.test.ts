@@ -71,16 +71,16 @@ describe('runProbe', () => {
     expect(results[1]!.terminationTime!.p50).toBeCloseTo(3, 5);
   });
 
-  it('populates inWindow when the beat carries a targetWindow', () => {
+  it('populates inTuningWindow when the beat carries a tuningWindow', () => {
     const inside: BeatProbe = {
       id: 'inside',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
-      targetWindow: [4, 6],
+      tuningWindow: [4, 6],
     };
     const outside: BeatProbe = {
       id: 'outside',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
-      targetWindow: [10, 20],
+      tuningWindow: [10, 20],
     };
     const noWindow: BeatProbe = {
       id: 'no-window',
@@ -95,11 +95,11 @@ describe('runProbe', () => {
       tickDelta: 1,
     });
 
-    expect(results[0]!.inWindow).toBe(true);
-    expect(results[0]!.targetWindow).toEqual([4, 6]);
-    expect(results[1]!.inWindow).toBe(false);
-    expect(results[1]!.targetWindow).toEqual([10, 20]);
-    expect(results[2]!.inWindow).toBeUndefined();
-    expect(results[2]!.targetWindow).toBeUndefined();
+    expect(results[0]!.inTuningWindow).toBe(true);
+    expect(results[0]!.tuningWindow).toEqual([4, 6]);
+    expect(results[1]!.inTuningWindow).toBe(false);
+    expect(results[1]!.tuningWindow).toEqual([10, 20]);
+    expect(results[2]!.inTuningWindow).toBeUndefined();
+    expect(results[2]!.tuningWindow).toBeUndefined();
   });
 });

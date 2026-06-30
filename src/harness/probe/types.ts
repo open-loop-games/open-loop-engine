@@ -13,20 +13,23 @@ import type { MetricStats, RunContext, RunMode } from '../types';
 
 /**
  * One beat's predicate + identity. Archetype-agnostic — no game-specific
- * spec window, just the predicate to evaluate and an optional target window
- * for `inWindow` classification on the result.
+ * spec window, just the predicate to evaluate and an optional tuning window
+ * for `inTuningWindow` classification on the result.
  */
 export interface BeatProbe {
   id: string;
   /** Predicate evaluating engine state, fired when the beat lands. */
   predicate: (engine: Engine) => boolean;
   /**
-   * Optional target window in sim-seconds, `[lower, upper]`. When set,
-   * {@link BeatResult.inWindow} is `true` iff `terminationTime.p50` falls
-   * inside the window. Pure interpretation layer on top of the termination
-   * distribution; absent when consumers don't have a target shape.
+   * Optional hand-authored tuning window in sim-seconds, `[lower, upper]`,
+   * for design-time balance iteration — a hypothesis a balance script tunes
+   * toward, not a claim about recorded behavior. When set,
+   * {@link BeatResult.inTuningWindow} is `true` iff `terminationTime.p50`
+   * falls inside the window. Pure interpretation layer on top of the
+   * termination distribution; absent when consumers aren't tuning against
+   * a window.
    */
-  targetWindow?: [number, number];
+  tuningWindow?: [number, number];
 }
 
 /**
@@ -44,16 +47,16 @@ export interface BeatResult {
   /** Counts of how each seed terminated. Sums to `seeds.length`. */
   counts: { predicate: number; maxSimTime: number; unreachable: number };
   /**
-   * Echoed from {@link BeatProbe.targetWindow} when set, so renderers can
+   * Echoed from {@link BeatProbe.tuningWindow} when set, so renderers can
    * display the window without holding the originating `BeatProbe[]`.
    */
-  targetWindow?: [number, number];
+  tuningWindow?: [number, number];
   /**
-   * Present iff {@link BeatProbe.targetWindow} is set. `true` iff
+   * Present iff {@link BeatProbe.tuningWindow} is set. `true` iff
    * `terminationTime.p50` falls inside the window. Allows windowed-arc
-   * usage as a first-class probe field without a wrapper.
+   * tuning usage as a first-class probe field without a wrapper.
    */
-  inWindow?: boolean;
+  inTuningWindow?: boolean;
 }
 
 /**

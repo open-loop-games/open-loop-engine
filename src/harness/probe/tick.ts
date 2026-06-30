@@ -6,8 +6,8 @@
  * fires (or `maxSimTime` is reached, or stasis is observed in non-tick
  * modes), aggregated into per-beat termination-time distributions.
  *
- * When {@link BeatProbe.targetWindow} is set, the per-beat result carries
- * `inWindow = terminationTime.p50 ∈ targetWindow`. Pure interpretation —
+ * When {@link BeatProbe.tuningWindow} is set, the per-beat result carries
+ * `inTuningWindow = terminationTime.p50 ∈ tuningWindow`. Pure interpretation —
  * the underlying distribution is unchanged.
  *
  * One call to `runMatrixUntil` per beat (rather than one big matrix)
@@ -37,7 +37,7 @@ import type { BeatResult, ProbeConfig } from './types';
  *   optional tick granularity, optional `mode` + `buildAccessor`.
  * @returns one {@link BeatResult} per beat, with termination-time stats
  *   over predicate-fired seeds, counts split by termination reason, and
- *   `inWindow` when the beat carried a `targetWindow`.
+ *   `inTuningWindow` when the beat carried a `tuningWindow`.
  * @example
  * ```ts
  * const results = runProbe({
@@ -48,7 +48,7 @@ import type { BeatResult, ProbeConfig } from './types';
  *   tickDelta: 1,
  * });
  * for (const r of results) {
- *   console.log(r.beatId, r.terminationTime?.p50, r.inWindow, r.counts);
+ *   console.log(r.beatId, r.terminationTime?.p50, r.inTuningWindow, r.counts);
  * }
  * ```
  */
@@ -103,10 +103,10 @@ export function runProbe(config: ProbeConfig): BeatResult[] {
         unreachable: counts.unreachable,
       },
     };
-    if (beat.targetWindow) {
+    if (beat.tuningWindow) {
       const p50 = aggregate.terminationTime?.p50 ?? Infinity;
-      beatResult.targetWindow = beat.targetWindow;
-      beatResult.inWindow = p50 >= beat.targetWindow[0] && p50 <= beat.targetWindow[1];
+      beatResult.tuningWindow = beat.tuningWindow;
+      beatResult.inTuningWindow = p50 >= beat.tuningWindow[0] && p50 <= beat.tuningWindow[1];
     }
     out.push(beatResult);
   }
