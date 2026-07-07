@@ -36,15 +36,21 @@ top-level facade composing every layer
 Vue's reactivity API surfaced through the engine
 
 - `const computed: typeof computed$1` — _(no summary)_ `src/reactivity-reexports.ts`
+- `interface ComputedRef<T = any> extends BaseComputedRef<T>` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/reactivity-reexports.ts`
+- `class EffectScope` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function isRef<T>(r: Ref<T> | unknown): r is Ref<T>` — Checks if a value is a ref object. `src/reactivity-reexports.ts`
 - `function reactive<T extends object>(target: T): Reactive<T>` — Returns a reactive proxy of the object. `src/reactivity-reexports.ts`
 - `function ref<T>(value: T): [T] extends [Ref] ? IfAny<T, Ref<T>, T> : Ref<UnwrapRef<T>, UnwrapRef<T> | T>` — Takes an inner value and returns a reactive and mutable ref object, which has a single property `.value` that points to the inner value. `src/reactivity-reexports.ts`
+- `interface Ref<T = any, S = T>` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function shallowRef<T>(value: T): Ref extends T ? T extends Ref ? IfAny<T, ShallowRef<T>, T> : ShallowRef<T> : ShallowRef<T>` — Shallow version of ref. `src/reactivity-reexports.ts`
+- `type ShallowRef<T = any, S = T> = Ref<T, S> & { [ShallowRefMarker]?: true; }` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T` — Returns the inner value if the argument is a ref, otherwise return the argument itself. `src/reactivity-reexports.ts`
 - `function watch<T, Immediate extends Readonly<boolean> = false>(source: WatchSource<T>, cb: WatchCallback<T, MaybeUndefined<T, Immediate>>, options?: WatchOptions<Immediate>): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
 - `function watchEffect(effect: WatchEffect, options?: WatchEffectOptions): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
+- `type WatchStopHandle = () => void` — _(no summary)_ `src/reactivity-reexports.ts`
+- `interface WritableComputedRef<T, S = T> extends BaseComputedRef<T, S>` — _(no summary)_ `src/reactivity-reexports.ts`
 
 ## Events
 

@@ -12,6 +12,13 @@
  * the rest (e.g. `customRef`, `toRefs`); the activeEffect gotcha still
  * applies, so keep those uses out of code that subscribes to engine refs.
  *
+ * Types are re-exported alongside the values for the same reason in the
+ * type domain: `Ref` and friends are branded with unique symbols, so a
+ * consumer annotating engine-facing state with types resolved from its own
+ * `vue` copy fails to unify whenever that copy's declarations differ from
+ * the engine's. Importing both value and type from the engine guarantees
+ * one declaration source.
+ *
  * @cluster reactivity
  */
 export {
@@ -25,4 +32,12 @@ export {
   isRef,
   unref,
   effectScope,
+} from 'vue';
+export type {
+  Ref,
+  ShallowRef,
+  ComputedRef,
+  WritableComputedRef,
+  WatchStopHandle,
+  EffectScope,
 } from 'vue';
