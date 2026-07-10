@@ -10,8 +10,8 @@
  *   trackers
  * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic helpers
  * - {@link displayResource} — formatted string using the resource's precision settings
- * - {@link unwrapResource} — dereference a Resource | Ref | DecimalSource to its current Decimal
- * - {@link resetResource} — set a persistent resource back to its default and clear trackers
+ * - {@link unwrapResource} — dereference a `Resource | Ref<Resource>` to the underlying Resource
+ * - {@link resetResource} — set a resource's value back to its persisted default (or 0)
  *
  * Resources created inside an engine's `install()` / `connect()` phase are
  * automatically added to that engine's {@link ResourceRegistry} via the
@@ -53,7 +53,7 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
    * methods like `getResource`/`getRate`.
    */
   id: string;
-  /** Human-readable name shown in UI and used by {@link findResource} lookups */
+  /** Human-readable name shown in UI and used for resource-registry lookups by name */
   displayName: string;
   /** Number of decimal places to show when formatting (0 = whole numbers only) */
   precision: number;
@@ -277,7 +277,7 @@ export function createResource<T>(
  * @example
  * ```ts
  * const gold = createResource(1234.567, { displayName: "gold", precision: 2 })
- * displayResource(gold) // "1,234.57"
+ * displayResource(gold) // "1.235 k" — notation takes over above 1000; precision no longer digits-after-decimal
  * displayResource(gold, 999) // "999.00"
  * ```
  */

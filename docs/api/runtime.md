@@ -17,18 +17,18 @@ Start with these public symbols before scanning the full inventory below.
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:385`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:295`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:215`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:107`
-- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:81`
-- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:171`
-- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/engine.ts:57`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:193`
-- `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/engine.ts:59`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:389`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:299`
+- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:219`
+- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:111`
+- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:85`
+- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:175`
+- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/engine.ts:61`
+- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:197`
+- `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/engine.ts:63`
 - `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/engine.ts:55`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:92`
-- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:87`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:96`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:91`
 - `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/engine.ts:53`
 
 ## Reactivity re-exports

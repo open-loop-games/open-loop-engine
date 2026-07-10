@@ -53,7 +53,11 @@ import type { SaveManager, SaveLoadResult, SavePeek, StorageAdapter } from './co
 export type TickHandler = (dt: number) => void;
 /** Callback invoked when the engine flushes a save, before storage is written. */
 export type SaveHandler = () => void;
-/** Callback invoked after a save is loaded, receiving the raw decoded payload. */
+/**
+ * Callback invoked after a save is loaded, receiving the `SaveLoadResult`
+ * status object (success flag plus timestamp or failure reason) — not the
+ * decoded save payload.
+ */
 export type LoadHandler = (data: unknown) => void;
 /** Callback invoked when the engine resets, before persistent refs are restored. */
 export type ResetHandler = () => void;
