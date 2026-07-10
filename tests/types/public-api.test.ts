@@ -88,12 +88,16 @@ describe('createResource overloads', () => {
   });
 
   it('existing-ref overload returns a plain Resource (non-persistent)', () => {
-    const source: Ref<Decimal> = ref(new Decimal(0)) as Ref<Decimal>;
+    // Exact equality pins both facts at once: it IS a Resource, and it is NOT
+    // persistent — an exact match rejects the extra Persistent brand keys the
+    // default-value overload adds. If this overload ever gained the Persistent
+    // brand, wrapped computeds would be double-saved and this pin fails.
+    // T is pinned as `number` (as with the persistent overload above): the
+    // contract is T-independent, and Resource<Decimal> blows up vitest's
+    // structural diff over Decimal's ~130 members — a matcher artifact.
+    const source: Ref<number> = ref(0);
     const r = createResource(source, { displayName: 'derived' });
-    expectTypeOf(r).toMatchTypeOf<Resource<Decimal>>();
-    // Crucially, the existing-ref overload must NOT add the Persistent brand —
-    // otherwise wrapped computeds would be double-saved.
-    expectTypeOf<typeof r>().not.toMatchTypeOf<Persistent<Decimal>>();
+    expectTypeOf(r).toEqualTypeOf<Resource<number>>();
   });
 
   it('resource exposes id, displayName, and precision', () => {

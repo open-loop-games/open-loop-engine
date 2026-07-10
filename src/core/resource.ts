@@ -104,6 +104,33 @@ export interface ResourceOptions {
 }
 
 /**
+ * Wrap an existing ref as a resource (non-persistent).
+ *
+ * Use this overload for derived or computed values that should look like a
+ * resource (display name, formatting) but don't need their own persistence —
+ * e.g., a "net income" display backed by a computed ref.
+ *
+ * Declared before the default-value overload so an existing `Ref<T>` argument
+ * binds here: the default-value overload's `T & StateConstraint<T>` parameter
+ * is structural enough to also swallow a ref (inferring `T = Ref<T>`), so with
+ * the reverse order a ref would resolve to a bogus `Resource<Ref<T>> &
+ * Persistent<...>`. Overload resolution is first-match, and a non-ref value
+ * never matches `Ref<T>`, so this ordering is safe for both call shapes.
+ *
+ * @param existingRef - An existing Vue ref to wrap with resource metadata
+ * @param options - Display name, precision, and formatting controls
+ * @returns A resource view over the existing ref (not persisted)
+ *
+ * @example
+ * ```ts
+ * const netIncome = computed(() => Decimal.sub(income.value, expenses.value));
+ * const netIncomeResource = createResource(netIncome, { displayName: 'net income', precision: 1 });
+ * displayResource(netIncomeResource); // formatted string
+ * ```
+ */
+export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>;
+
+/**
  * Create a persistent resource — the standard way to define a game currency.
  *
  * The returned value is both a Vue ref (reactive, watchable) and a persistent
@@ -132,26 +159,6 @@ export function createResource<T>(
   defaultValue: T & StateConstraint<T>,
   options?: ResourceOptions,
 ): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T> };
-
-/**
- * Wrap an existing ref as a resource (non-persistent).
- *
- * Use this overload for derived or computed values that should look like a
- * resource (display name, formatting) but don't need their own persistence —
- * e.g., a "net income" display backed by a computed ref.
- *
- * @param existingRef - An existing Vue ref to wrap with resource metadata
- * @param options - Display name, precision, and formatting controls
- * @returns A resource view over the existing ref (not persisted)
- *
- * @example
- * ```ts
- * const netIncome = computed(() => Decimal.sub(income.value, expenses.value));
- * const netIncomeResource = createResource(netIncome, { displayName: 'net income', precision: 1 });
- * displayResource(netIncomeResource); // formatted string
- * ```
- */
-export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>;
 
 export function createResource<T>(
   defaultValue: (T & StateConstraint<T>) | Ref<T>,

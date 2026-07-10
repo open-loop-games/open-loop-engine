@@ -47,10 +47,10 @@ The package exposes layered subpaths so consumers can import from the smallest s
 
 - `@open-loop/engine` — full surface (primitives + core + systems + harness + `createEngine`)
 - `@open-loop/engine/primitives` — zero-dep foundation (Decimal, RNG, types)
-- `@open-loop/engine/core` — reactive primitives (resource, modifier, formula, save, loop, ...)
+- `@open-loop/engine/core` — reactive primitives (resource, modifier, formula, save, loop, headless runner, run pool, ...)
 - `@open-loop/engine/systems` — registration surfaces (skills, producers, purchasables, ...)
-- `@open-loop/engine/harness` — headless sim runner (matrix sweeps, perturbation, probes)
-- `@open-loop/engine/types` — types only
+- `@open-loop/engine/harness` — balance-sim tooling over a built engine (matrix sweeps, sensitivity, perturbation, probes, solver)
+- `@open-loop/engine/types` — evaluation-kernel interface types only (`IResource`, `ICondition`, `Analyzer`, …), not the factory return types
 
 Default to the root import; reach for subpath imports when bundle size matters.
 

@@ -29,7 +29,7 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 
 - **Spatial primitives** — `core/spatial/graph` and `core/spatial/grid` for games that need adjacency without committing to a UI.
 
-- **Headless harness** — `runHeadless`, `runMatrix`, `runMatrixUntil`, `runSensitivity`, `runBatch`, `createRunPool`. Plus walker / picker / probe / solver primitives for balance simulation. Same engine logic runs headless or in a browser.
+- **Headless simulation** — `runHeadless` and `createRunPool` (in `core`) drive an engine to completion without a browser; the `harness` layer builds on them with `runMatrix`, `runMatrixUntil`, `runSensitivity`, `runBatch`, plus walker / picker / probe / solver primitives for balance sweeps. Same engine logic runs headless or in a browser.
 
 - **Module system** — `createEngine({ gameId })` returns a host that consumers extend via `engine.use({ id, install(ctx) { ... } })`. Install context exposes `onTick`, `onSave`, `onLoad`, `onReset`, plus dependency injection over engine registries.
 
@@ -39,8 +39,8 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 - `@open-loop/engine/primitives` — Decimal, RNG, types only. Zero Vue dependency.
 - `@open-loop/engine/core` — reactive primitives without category systems.
 - `@open-loop/engine/systems` — category surfaces alone.
-- `@open-loop/engine/harness` — headless sim runners + probes.
-- `@open-loop/engine/types` — types-only barrel.
+- `@open-loop/engine/harness` — balance-sim tooling over a built engine (matrix sweeps, sensitivity, perturbation, probes, solver). `runHeadless` / `createRunPool` live in `core`, not here.
+- `@open-loop/engine/types` — evaluation-kernel interface types only (`IResource`, `ICondition`, `IEffect`, `Analyzer`, …); not the factory return types (`Engine`, `Resource`, …).
 
 ### Stability
 

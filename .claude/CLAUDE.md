@@ -25,7 +25,7 @@ pnpm test             # Vitest run
 pnpm test:watch       # Vitest watch mode
 pnpm typecheck        # tsc --noEmit
 pnpm build            # tsc + tsc-alias (rewrites @/ paths in dist/) + build:api
-pnpm build:api        # regenerate docs/api/ from source — run before committing public-API changes
+pnpm build:api        # regenerate docs/api/ from source
 ```
 
 ## Commits
@@ -38,7 +38,9 @@ Conventional commit prefixes — `release-it` picks the bump from accumulated co
 - `feat!:` / `fix!:` or `BREAKING CHANGE:` in body — breaking API change (MINOR pre-1.0, MAJOR after)
 - `chore:` / `docs:` / `test:` — no version bump
 
-Releases are manual and batched: `pnpm exec release-it` at a cut-point bumps version, regenerates `CHANGELOG.md`, commits, tags. `.release-it.json` keeps it local (`push: false`, `npm.publish: false`); `pnpm publish --access public` is a separate step.
+Releases are manual and batched: `pnpm exec release-it` at a cut-point bumps version, regenerates `CHANGELOG.md`, commits, tags. `.release-it.json` keeps it local (`push: false`, `npm.publish: false`); `pnpm publish` is a separate step (`publishConfig.access` is `public`, so no `--access` flag needed).
+
+**First cut (0.1.0):** `package.json` already sits at `0.1.0` with no tags, so a plain `release-it` would bump *past* it and prepend a generated section above the hand-curated `0.1.0` entry. Cut the first release with `pnpm exec release-it --no-increment` to tag `0.1.0` as-is and keep the curated CHANGELOG. Subsequent releases run plain `release-it`.
 
 Scope is optional but encouraged: `feat(systems):`, `fix(core):`, etc.
 
