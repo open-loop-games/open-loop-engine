@@ -4,7 +4,7 @@
  * A Purchasable represents anything the player buys: one-shot upgrades,
  * leveled generators, capped perks. The `limit` option determines shape:
  *
- * - `limit: 1` — one-shot upgrade (boolean `bought` convenience, no amount display)
+ * - `limit: 1` — one-shot upgrade (boolean `active` convenience, no amount display)
  * - `limit: N` — capped leveled purchase (amount tracks levels, maxes at N)
  * - `limit: Infinity` — uncapped repeatable (buy forever, default)
  *
@@ -310,7 +310,7 @@ function buildLimitRequirement(
   };
 }
 
-/** Reactive bought/maxed/canPurchase/amountToPurchase computeds. */
+/** Reactive active/maxed/canPurchase/amountToPurchase computeds. */
 function buildPurchasableComputeds(
   amount: Persistent<DecimalSource>,
   processedLimit: MaybeRef<DecimalSource>,
@@ -480,11 +480,11 @@ function buildScalingEffect(
  * {@link createScalingPurchasable} (the L3 Formula-aware escape).
  *
  * State is always amount-based (`Persistent<DecimalSource>`). One-shot behavior
- * emerges from `limit: 1` — the `bought` computed provides boolean convenience.
+ * emerges from `limit: 1` — the `active` computed provides boolean convenience.
  *
  * @internal
  * @param options - Configuration for the purchasable
- * @returns A {@link Purchasable} with `purchase()`, `amount`, `bought`, `effect`, and event hooks
+ * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
  *
  * @example Leveled repeatable
  * ```ts

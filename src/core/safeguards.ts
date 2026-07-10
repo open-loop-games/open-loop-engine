@@ -30,7 +30,7 @@ export function isDevMode(): boolean {
 /**
  * Diagnostic counters captured by the runtime safeguards — how often the
  * emit-depth cap and sequencer advance cap have tripped, plus the last
- * offender of each. Read via {@link getSafeguardDiagnostics}.
+ * offender of each. Read via {@link getDiagnostics}.
  */
 export interface SafeguardDiagnostics {
   /** Number of times an emit depth limit was hit */

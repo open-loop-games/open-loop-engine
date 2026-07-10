@@ -33,33 +33,33 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 
 ## Profiler
 
-- `function enableProfiling(): () => void` — Subscribe to the profiler. `src/core/profiler.ts:43`
-- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a borglike-style console table. `src/core/profiler.ts:224`
-- `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:191`
-- `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:57`
-- `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:65`
-- `function profileEnd(name: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:89`
-- `interface ProfileEntry` — A single row in a ProfileReport. `src/core/profiler.ts:145`
-- `interface ProfileReport` — Structured profiling report produced by getProfileReport. `src/core/profiler.ts:171`
-- `function profileStart(): number` — Start a manual timer. `src/core/profiler.ts:81`
-- `function resetProfile(): void` — Clear all accumulated timings. `src/core/profiler.ts:245`
+- `function enableProfiling(): () => void` — Subscribe to the profiler. `src/core/profiler.ts:39`
+- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a borglike-style console table. `src/core/profiler.ts:220`
+- `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:187`
+- `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:53`
+- `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:61`
+- `function profileEnd(name: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:85`
+- `interface ProfileEntry` — A single row in a ProfileReport. `src/core/profiler.ts:141`
+- `interface ProfileReport` — Structured profiling report produced by getProfileReport. `src/core/profiler.ts:167`
+- `function profileStart(): number` — Start a manual timer. `src/core/profiler.ts:77`
+- `function resetProfile(): void` — Clear all accumulated timings. `src/core/profiler.ts:241`
 
 ## Engine-internal registries
 
 three per-engine enumerable collections that external introspection tools (balance workbenches, sim pickers, devtools) read to walk "every X this engine knows about":
 
-- `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:50`
-- `const ChainRegistryKey` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:62`
-- `function createChainRegistry(): ChainRegistry` — Create a fresh, empty chain registry. `src/core/registries.ts:70`
-- `function createEffectSystemRegistry(): EffectSystemRegistry` — Create a fresh, empty effect-system registry. `src/core/registries.ts:146`
-- `function createResourceRegistry(): ResourceRegistry` — Create a fresh, empty resource registry. `src/core/registries.ts:237`
-- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef` that the picker needs. `src/core/registries.ts:120`
-- `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:129`
-- `const EffectSystemRegistryKey` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:138`
-- `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:106`
-- `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:197`
-- `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:179`
-- `const ResourceRegistryKey` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:229`
+- `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:51`
+- `const ChainRegistryKey` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:59`
+- `function createChainRegistry(): ChainRegistry` — Create a fresh, empty chain registry. `src/core/registries.ts:65`
+- `function createEffectSystemRegistry(): EffectSystemRegistry` — Create a fresh, empty effect-system registry. `src/core/registries.ts:135`
+- `function createResourceRegistry(): ResourceRegistry` — Create a fresh, empty resource registry. `src/core/registries.ts:222`
+- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef` that the picker needs. `src/core/registries.ts:115`
+- `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:124`
+- `const EffectSystemRegistryKey` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:127`
+- `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:101`
+- `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:186`
+- `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:168`
+- `const ResourceRegistryKey` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:214`
 
 ## Engine safeguards
 

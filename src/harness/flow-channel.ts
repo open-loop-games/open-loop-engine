@@ -8,7 +8,7 @@
  * (`open-loop-research/patterns/cross-pattern-properties/automation.md`)
  * and match Flow Theory's original engagement bands (Csikszentmihalyi 1990):
  *
- * - **arousal** `[5, 30)` — learning phase, building engagement
+ * - **arousal** `[0, 30)` — learning phase, building engagement
  * - **flow** `[30, 120)` — optimal engagement zone (target)
  * - **flow-upper** `[120, 300)` — extended flow, beginning to slow
  * - **boredom** `[300, 900)` — disengagement risk
@@ -66,7 +66,9 @@ export function classifyFlowChannel(beatTimeSeconds: number): FlowChannel {
  */
 export function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]> {
   return {
-    arousal: [5, 30],
+    // Lower bound 0, not 5: classifyFlowChannel maps every duration < 30
+    // (including [0, 5) and, defensively, negatives) to arousal.
+    arousal: [0, 30],
     flow: [30, 120],
     'flow-upper': [120, 300],
     boredom: [300, 900],

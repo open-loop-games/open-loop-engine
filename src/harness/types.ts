@@ -371,7 +371,11 @@ export interface SensitivityResult {
 export interface UntilContext {
   /** Number of `engine.tickDriver.simulateTick(tickDelta)` calls completed so far. */
   tick: number;
-  /** Simulated seconds elapsed so far (`tick * tickDelta`). */
+  /**
+   * Simulated seconds elapsed so far. Equals `tick * tickDelta` in tick mode;
+   * in event mode advances are variable-length (plus fast-ticks), so it tracks
+   * actual advanced sim-time and the `tick * tickDelta` identity does not hold.
+   */
   simTime: number;
 }
 
@@ -454,7 +458,11 @@ export interface RunUntilConfig {
 export interface RunUntilResult {
   /** Number of ticks actually stepped (0 when the predicate was true at tick 0). */
   totalTicks: number;
-  /** `totalTicks * tickDelta`. The run's sim-time at termination. */
+  /**
+   * The run's sim-time at termination. Equals `totalTicks * tickDelta` in tick
+   * mode; in event mode (variable-length advances + fast-ticks) it is the
+   * accumulated advanced sim-time, not that product.
+   */
   elapsedSimulated: number;
   /**
    * How the run ended.

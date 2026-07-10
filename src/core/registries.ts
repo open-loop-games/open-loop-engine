@@ -36,6 +36,7 @@
  */
 
 import type { DecimalSource } from '@/primitives/decimal';
+import type { InjectionKey } from '@/primitives/types';
 import type { ModifierChain } from './modifier';
 import type { Resource } from './resource';
 import { createAmbientScope, createNamedRegistry, type NamedRegistry } from './named-registry';
@@ -54,14 +55,8 @@ export type ChainRegistry = NamedRegistry<ModifierChain>;
  * provides the registry under this key before any module installs, so
  * modules can look it up via `engine.inject(ChainRegistryKey)` or
  * `engine.tryInject(ChainRegistryKey)`.
- *
- * Structurally compatible with `InjectionKey<ChainRegistry>` from the top-
- * level engine barrel — declared here to avoid a circular import back into
- * `src/index.ts`.
  */
-export const ChainRegistryKey = Symbol('engine:chain-registry') as symbol & {
-  __type?: ChainRegistry;
-};
+export const ChainRegistryKey: InjectionKey<ChainRegistry> = Symbol('engine:chain-registry');
 
 /**
  * Create a fresh, empty chain registry. Called once per engine instance in
@@ -128,16 +123,10 @@ export interface EffectDefLike {
  */
 export type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>;
 
-/**
- * Injection key for the per-engine {@link EffectSystemRegistry}.
- *
- * Structurally compatible with `InjectionKey<EffectSystemRegistry>` from the
- * top-level engine barrel — declared here to avoid a circular import back
- * into `src/index.ts`.
- */
-export const EffectSystemRegistryKey = Symbol('engine:effect-system-registry') as symbol & {
-  __type?: EffectSystemRegistry;
-};
+/** Injection key for the per-engine {@link EffectSystemRegistry}. */
+export const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry> = Symbol(
+  'engine:effect-system-registry',
+);
 
 /**
  * Create a fresh, empty effect-system registry. Called once per engine
@@ -221,14 +210,10 @@ export interface ResourceRegistry {
 
 /**
  * Injection key for the per-engine {@link ResourceRegistry}.
- *
- * Structurally compatible with `InjectionKey<ResourceRegistry>` from the
- * top-level engine barrel — declared here to avoid a circular import back
- * into `src/index.ts`.
  */
-export const ResourceRegistryKey = Symbol('engine:resource-registry') as symbol & {
-  __type?: ResourceRegistry;
-};
+export const ResourceRegistryKey: InjectionKey<ResourceRegistry> = Symbol(
+  'engine:resource-registry',
+);
 
 /**
  * Create a fresh, empty resource registry. Called once per engine instance

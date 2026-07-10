@@ -8,13 +8,9 @@
  * sub-tick time through {@link profile} or {@link profileStart}/
  * {@link profileEnd}.
  *
- * Unlike the borglike profiler this is modelled on, per-label per-tick
- * self-times are retained in a ring buffer so {@link getProfileReport}
- * yields p50/p95/p99 per label — matching borglike's "profile max times,
- * not just averages" learning against cf-auto-steady's multi-thousand
- * tick runs.
- *
- * @internal
+ * Per-label per-tick self-times are retained per tick so {@link getProfileReport}
+ * yields p50/p95/p99 per label — profiling max times, not just averages,
+ * which is what surfaces tail spikes over multi-thousand-tick runs.
  */
 
 interface Timing {

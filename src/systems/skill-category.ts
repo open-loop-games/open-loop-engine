@@ -19,8 +19,8 @@
  * const skills = createSkillCategory<TrainingDef>({
  *   id: 'skills',
  *   mapSkill: (def) => ({
- *     xpToLevel: (xp) => Decimal.floor(Decimal.sqrt(Decimal.div(xp, def.xpScale))),
- *     levelToMultiplier: (level) => Decimal.pow(1.05, level),
+ *     xpToLevel: (xp) => Formula.variable(xp).div(def.xpScale).sqrt().floor(),
+ *     levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
  *   }),
  * });
  *
@@ -156,12 +156,12 @@ export interface SkillCategory<Def extends { id: string }, State = void> extends
  *   id: 'skills',
  *   mapSkill: (def) => def.mode === 'accumulator'
  *     ? {
- *         xpToLevel: (xp) => Decimal.floor(Decimal.sqrt(xp)),
- *         retentionFormula: (level) => Decimal.mul(level, 0.01),
+ *         xpToLevel: (xp) => Formula.variable(xp).sqrt().floor(),
+ *         retentionFormula: (level) => Formula.variable(level).mul(0.01),
  *       }
  *     : {
- *         xpToLevel: (xp) => Decimal.floor(Decimal.sqrt(xp)),
- *         levelToMultiplier: (level) => Decimal.pow(1.05, level),
+ *         xpToLevel: (xp) => Formula.variable(xp).sqrt().floor(),
+ *         levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
  *       },
  * });
  *

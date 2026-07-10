@@ -194,7 +194,8 @@ export type SaveLoadFailureReason =
  * Events emitted by a SaveManager. Subscribe via `mgr.on(event, handler)`.
  *
  * `slotId` is the slot the operation targeted — the active slot at the time of
- * the call. `importSave` writes into the active slot, so it carries the same id.
+ * the call. `importSave` applies to the live state under the active slot (it
+ * does not itself write storage until the next `save()`), so it carries that id.
  */
 export interface SaveEvents {
   /** A save was successfully loaded or imported. */
