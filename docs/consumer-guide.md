@@ -442,6 +442,7 @@ Recurring shapes consumers assemble from engine primitives — worked patterns f
 - **Persona-roster composition** — a keyed vector of personality params over sequencer-strategies selection.
 - **Priority-weighted fill** — interleave multiple content categories under one priority order via a `passBonus` map.
 - **Character interaction** — dialog (contract-first runtime) and subjects (typed multi-field relationship state), and where they connect.
+- **Spatial grids** — `createSpatialGrid` board state, runtime placement/removal, the grid-replacement event gotcha, and the adjacency→stat-bonus seam (pure evaluator over an occupancy view).
 
 ## Domain-language map
 

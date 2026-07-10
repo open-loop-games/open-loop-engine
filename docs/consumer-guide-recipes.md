@@ -263,3 +263,91 @@ Cross-cutting concerns the field kinds don't carry — time decay, propagation (
 Both surfaces share the engine's predicate / effect machinery. A dialog node gates on subject state through the typed `StateGate` path: `{ kind: 'state', key: 'subject.npc-trust.mentor-rask.trust', operator: 'gte', value: 2 }` — the path is `{categoryId}.{subjectId}.{fieldName}` for scalar/tier/flag/enum fields, with an extra `.{dim}` segment for vector dimensions. A choice writes back through `E.state('subject.npc-trust.mentor-rask.trust', 3)` — the predicate side is Gate (typed AST); the effect side is the `E` builder (consumer-facing). Reserved path conventions are documented in `src/primitives/types.ts`.
 
 Bespoke subject-aware atoms (a `SubjectGate` kind / `E.subject`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics.
+
+## Spatial grids: board state, placement, and adjacency
+
+`createSpatialGrid` (see `api/spatial.md` for the full method inventory) is a bounded 2D board of typed cells. The load-bearing idea for a game built on it: **the grid is a derived index over authoritative entity state, not the state itself.** Occupancy is reconstructed from your entity list (a roster, a `persistent<Instance[]>`), so a save serializes the entities, not the board — and a tier/board-size change just rebuilds the grid and re-places.
+
+### Owning the grid
+
+Cells carry whatever per-cell metadata you need; the value is a plain object, either mutated by reference or replaced through `set()` (which emits `cellChanged`). Provide the grid (or a thin API over it) under an `InjectionKey` so other modules reach it without importing the module.
+
+```ts
+interface Cell { type: 'open' | 'blocked'; occupantId: string | null }
+
+const grid = createSpatialGrid<Cell>({
+  width, height,
+  initializer: () => ({ type: 'open', occupantId: null }),
+  // allowDiagonals: true  // only changes the default for bfs()/flood()
+});
+
+grid.at(x, y);                 // throws OOB; tryAt() returns undefined instead
+grid.set(x, y, { ...grid.at(x, y), occupantId: id });  // emits cellChanged
+grid.inBounds(x, y);
+grid.neighbors(x, y);          // 4-connected · neighborsDiag() 8 · inRange(x,y,r) Chebyshev
+grid.bfs({ x, y }, (cell) => cell.type !== 'blocked');   // PassabilityFn → parent-link map
+```
+
+The `passable` / `explored` / `visible` bitmaps and their `*Count` accessors are for FOV/terrain; write them through `beginFovUpdate()` (or `restore()`), not by hand, or the maintained counts drift.
+
+### Placement and occupancy (runtime create/destroy)
+
+Player-placed entities that come and go at runtime (towers, seated pieces) are the case the modifier-chain model does *not* fit: a chain created per entity auto-registers into `ChainRegistry`, which has **no unregister path** — sell the entity and its chain leaks. So don't model per-entity stats as per-entity chains. The production shape is a plain instance list plus a per-tick handler:
+
+```ts
+const placed = persistent<Instance[]>([], { name: 'placed' });
+
+function place(defId: string, x: number, y: number): boolean {
+  const cell = grid.at(x, y);
+  if (cell.type !== 'open' || cell.occupantId != null) return false;
+  if (!spend(costOf(defId))) return false;               // debit, bail without mutating on refusal
+  const id = `e-${nextId.value++}`;
+  grid.set(x, y, { ...cell, occupantId: id });
+  placed.value = [...placed.value, { id, defId, x, y, cooldown: 0 }];
+  return true;
+}
+
+function remove(id: string): void {
+  const e = placed.value.find((p) => p.id === id);
+  if (!e) return;
+  grid.set(e.x, e.y, { ...grid.at(e.x, e.y), occupantId: null });
+  placed.value = placed.value.filter((p) => p.id !== id);
+}
+```
+
+Per-entity stats that need to stay perturbable by the balance harness read through `tunable()` keyed by `type/<defId>/<stat>` — not a chain (see § the override registry in the main guide). Occupancy itself is rebuilt in `connect()` / `onLoad` from `placed`, so only `placed` is persisted; if you *do* want to persist the board directly, wrap `grid.serialize()` in one `persistent()` ref (the snapshot is JSON-native).
+
+### Grid change events — and the replacement gotcha
+
+`grid.on('cellChanged', fn)` fires on every `set()`. But if the grid can be **replaced** (board growth, a challenge that swaps in a masked shape), a direct subscription orphans on the old instance. Own a wrapper that re-subscribes inside your build path and let consumers subscribe to *that*:
+
+```ts
+const handlers: Array<() => void> = [];
+function buildGrid() { grid = createSpatialGrid({ /* … */ }); grid.on('cellChanged', () => handlers.forEach((h) => h())); }
+export function onGridChanged(h: () => void) { handlers.push(h); }
+```
+
+SpatialGrid cells are **not** per-cell Vue-reactive — reactivity comes from the event, not from reading a cell. Derive reactive board state by subscribing to `cellChanged`/`onGridChanged` and writing into a `shallowRef` (next section).
+
+### Adjacency → stat bonus
+
+The board-position-to-stat-bonus seam (packing bonuses, tower synergies, "N adjacent of type X") is best a **pure function over an occupancy view**, not code that reads the live grid inline. That buys two things: it's harness-testable with no module state, and the same function powers a placement *preview* when run against an overlay view.
+
+```ts
+interface OccupancyView { width: number; height: number; occupantAt(x: number, y: number): string | null; typeOf(id: string): Def }
+
+// Pure: (view) → bonuses keyed by entity id. No module state, no reactivity.
+function evaluate(view: OccupancyView): Map<string, Bonus> { /* walk cells, read neighbors, sum */ }
+
+// Live wrapper: recompute into a shallowRef on any board change.
+const synergy = shallowRef<Map<string, Bonus>>(new Map());
+onGridChanged(() => { synergy.value = evaluate(liveView()); });   // + watch() any non-spatial inputs
+export const getBonus = (id: string) => synergy.value.get(id) ?? NONE;
+
+// Preview: same evaluator, overlay the hypothetical placement.
+function preview(id: string, x: number, y: number) {
+  return evaluate({ ...liveView(), occupantAt: (cx, cy) => (cx === x && cy === y ? id : liveView().occupantAt(cx, cy)) });
+}
+```
+
+Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship (`neighbors`/`neighborsDiag`/`inRange` cover 4/8-connected and Chebyshev radius) — full row, full column, knight-move — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator.
