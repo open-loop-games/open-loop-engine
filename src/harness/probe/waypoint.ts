@@ -48,6 +48,12 @@ export interface WaypointProbeConfig<T> {
   /** Seeds to run per waypoint. Defaults to `[0]` for deterministic single-engine probes. */
   seeds?: number[];
   /**
+   * Sim-seconds advanced per `simulateTick` iteration, forwarded to
+   * `runUntil`. Defaults to `runUntil`'s own `0.05`; coarsen for
+   * long-horizon waypoints (minutes–hours of sim-time).
+   */
+  tickDelta?: number;
+  /**
    * Sim-seconds added to each waypoint's `snapshotAtSec` to form the
    * `runUntil` `maxSimTime` ceiling. Defaults to `60`.
    */
@@ -84,6 +90,7 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
         engine,
         until: (ctx) => ctx.simTime >= waypoint.snapshotAtSec,
         maxSimTime: waypoint.snapshotAtSec + pad,
+        tickDelta: config.tickDelta,
         seed,
       });
       out.push({

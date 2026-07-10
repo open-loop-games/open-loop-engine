@@ -66,7 +66,7 @@ Seed-sweep runners. `runProbe` collects per-beat termination-time distributions 
 - `interface BeatResult` — Per-beat termination-time distribution from a `seeds`-wide sweep. `src/harness/probe/types.ts:43`
 - `interface ProbeConfig` — Configuration for runProbe. `src/harness/probe/types.ts:69`
 - `function runProbe(config: ProbeConfig): BeatResult[]` — For each beat, drive `seeds.length` fresh engines until the beat predicate fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is observed), aggregated into per-beat termination-time distributions. `src/harness/probe/tick.ts:55`
-- `function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance via `runUntil` until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:76`
+- `function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance via `runUntil` until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:82`
 - `interface Waypoint` — One named time-anchored snapshot target. `src/harness/probe/waypoint.ts:22`
 - `interface WaypointProbeConfig<T>` — Configuration for runWaypointProbe. `src/harness/probe/waypoint.ts:42`
 - `interface WaypointSnapshot<T>` — Per-waypoint × per-seed inspector output. `src/harness/probe/waypoint.ts:29`
