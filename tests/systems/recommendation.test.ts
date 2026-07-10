@@ -380,6 +380,31 @@ describe('createRecommendationSystem', () => {
     expect(applyEvents).toHaveLength(1);
   });
 
+  it('does not mutate the already-emitted recommend payload when auto-applying', () => {
+    const { loop, loopLog, bestOf } = createTestStack('auto-clone');
+    const recommendEvents: Recommendation[] = [];
+
+    const recs = createRecommendationSystem({
+      id: 'rec-auto-clone',
+      loop,
+      loopLog,
+      bestOf,
+      getCurrentSnapshot: () => ({}),
+      applySnapshot: () => {},
+      defs: [makeStrategy({ id: 'a' })],
+    });
+
+    recs.autoApply.value = true;
+    recs.on('recommend', (rec) => recommendEvents.push(rec));
+    recs.evaluate();
+
+    // The object handed to 'recommend' listeners must stay applied=false even
+    // though auto-apply flipped applied=true immediately afterward (auto mode
+    // used to mutate the shared object in place; manual apply() clones).
+    expect(recommendEvents).toHaveLength(1);
+    expect(recommendEvents[0]!.applied).toBe(false);
+  });
+
   // ==========================================================================
   // Manual apply
   // ==========================================================================

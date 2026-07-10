@@ -439,9 +439,13 @@ export function createRecommendationSystem(
 
     if (autoApply.value) {
       applySnapshot(rec.snapshot);
-      rec.applied = true;
-      storedRecommendation.value = serialize(rec);
-      handle.emit('apply', rec);
+      // Clone rather than mutate: `rec` was already handed to 'recommend'
+      // listeners, and the manual apply() path clones too. Mutating here would
+      // flip `applied` under a retained 'recommend' payload only in auto mode.
+      const appliedRec = { ...rec, applied: true };
+      storedRecommendation.value = serialize(appliedRec);
+      handle.emit('apply', appliedRec);
+      return appliedRec;
     }
 
     return rec;

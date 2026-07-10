@@ -255,7 +255,10 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
               automationTiers.unlock(tier.id);
             }
           },
-          { immediate: true },
+          // flush:'sync' so a tier unlocks the same synchronous tick its
+          // requirement flips — a sim harness driving stepOnce() in a tight loop
+          // would otherwise see unlocks lag or bunch (mirrors achievement.ts).
+          { immediate: true, flush: 'sync' },
         ),
       );
     }

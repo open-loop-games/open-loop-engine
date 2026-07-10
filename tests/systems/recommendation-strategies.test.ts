@@ -53,8 +53,8 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
       opts?.captureStrategy !== false ? () => ({ queue: ['spell-a', 'spell-b'] }) : undefined,
   });
 
-  /** Run a loop cycle: set gold, tick, end */
-  function runLoop(goldAmount: number, elapsed: number) {
+  /** Run a loop cycle: set gold, tick, end. String gold allows values past the double range. */
+  function runLoop(goldAmount: number | string, elapsed: number) {
     loop.run();
     addResource(gold, bn(goldAmount));
     tick.tick(elapsed);
@@ -149,8 +149,25 @@ describe('createBestReplayDef', () => {
     expect(strategy.canApply(ctx)).toBe(true);
 
     const score = strategy.score(ctx);
-    // perSecond = 200/10 = 20
-    expect(score).toBe(20);
+    // perSecond = 200/10 = 20; scored as a bounded log10-magnitude so unbounded
+    // game quantities can't overflow toNumber() to Infinity.
+    expect(score).toBeCloseTo(Math.log10(20), 10);
+  });
+
+  it('keeps scores finite and ordered above the double-overflow threshold', () => {
+    // Two configs whose values exceed ~1e308 must still rank distinctly rather
+    // than both scoring Infinity and collapsing arbitration to registration order.
+    const low = createPopulatedStack('br-huge-low');
+    low.runLoop('1e400', 10);
+    const scoreLow = createBestReplayDef('gold').score(low.buildContext());
+
+    const high = createPopulatedStack('br-huge-high');
+    high.runLoop('1e500', 10);
+    const scoreHigh = createBestReplayDef('gold').score(high.buildContext());
+
+    expect(Number.isFinite(scoreLow)).toBe(true);
+    expect(Number.isFinite(scoreHigh)).toBe(true);
+    expect(scoreHigh).toBeGreaterThan(scoreLow);
   });
 
   // ==========================================================================
@@ -265,7 +282,8 @@ describe('createGoalDef', () => {
       prefer: 'maximize',
     });
     const ctx = buildContext();
-    expect(strategy.score(ctx)).toBe(200);
+    // Bounded log10-magnitude of the entry value (200), not the raw value.
+    expect(strategy.score(ctx)).toBeCloseTo(Math.log10(200), 10);
   });
 
   it('minimize score is negative elapsed', () => {

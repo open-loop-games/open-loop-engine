@@ -94,7 +94,7 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
-  /** Release any session-held resources. Currently a no-op — present for interface uniformity with other stateful systems. */
+  /** Release session-held resources — stops the state-sync watcher. Call when discarding a per-conversation session. */
   dispose(): void;
 }
 
@@ -166,7 +166,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // (inverted gate — we want to act *during* load, not avoid acting then).
   // snapshot() writes to stateRef outside any load, so the guard returns
   // immediately on those firings.
-  watch(
+  const stopStateWatch = watch(
     stateRef,
     (newState) => {
       if (loadingSave.value) runtime.importState(newState);
@@ -231,7 +231,12 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     finish,
     isActive: () => runtime.isActive(),
     on: events.on,
-    dispose() {},
+    dispose() {
+      // Stop the sync watch on stateRef; without this, a discarded session
+      // leaks a live watcher that re-imports save state into a stale runtime on
+      // every subsequent load (the per-conversation lazy-instantiation path).
+      stopStateWatch();
+    },
   };
 }
 

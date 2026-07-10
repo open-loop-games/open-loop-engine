@@ -12,6 +12,20 @@ describe('processOfflineTime', () => {
     expect(totalDt).toBeCloseTo(3, 0);
   });
 
+  it('does not silently drop time when chunkSize exceeds maxDeltaTime', () => {
+    // Variable-mode simulateTick clamps each chunk to maxDeltaTime; a chunkSize
+    // above it used to advance only maxDeltaTime per call while the loop
+    // subtracted the full chunk, dropping the rest yet reporting it processed.
+    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
+    const fn = vi.fn();
+    tickDriver.onTick(fn);
+    const result = processOfflineTime(tickDriver, 30, { chunkSize: 10 });
+    const totalDt = fn.mock.calls.reduce((sum: number, call: [number]) => sum + call[0], 0);
+    expect(result).toBe(30);
+    // Actual advanced time must match the reported window (was ~3 before the clamp).
+    expect(totalDt).toBeCloseTo(30, 5);
+  });
+
   it('returns capped seconds processed', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
     const result = processOfflineTime(tickDriver, 500, { maxOfflineSeconds: 100 });

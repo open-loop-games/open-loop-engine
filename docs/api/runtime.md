@@ -65,7 +65,7 @@ Typed per-instance event emitter primitive
 
 worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
 
-- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:212`
+- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:214`
 - `interface PhaseHooks` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:111`
 - `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: receives the elapsed dt in seconds. `src/core/tick-driver.ts:118`
 - `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:126`

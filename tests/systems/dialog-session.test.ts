@@ -76,7 +76,23 @@ const greetingGraph: DialogGraph = {
   ],
 };
 
+const cycleGraph: DialogGraph = {
+  id: 'loop-graph',
+  entry: 'a',
+  nodes: [
+    { id: 'a', text: 'A', next: 'b' },
+    { id: 'b', text: 'B', next: 'a' },
+  ],
+};
+
 describe('createDialogSession', () => {
+  it('throws on an authored next-only cycle instead of hanging settle()', () => {
+    withEngine(buildAccessor(), () => {
+      const session = createDialogSession({ id: 'main', graphs: [cycleGraph] });
+      expect(() => session.start('loop-graph')).toThrow(/cycle/);
+    });
+  });
+
   it('starts a graph and presents the entry node', () => {
     withEngine(buildAccessor(), () => {
       const session = createDialogSession({

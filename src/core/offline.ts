@@ -27,12 +27,17 @@ export function processOfflineTime(
   options?: OfflineProgressOptions,
 ): number {
   const maxOffline = options?.maxOfflineSeconds ?? 259200;
-  const chunkSize = options?.chunkSize ?? 1;
-  if (!Number.isFinite(chunkSize) || chunkSize <= 0) {
+  const requestedChunk = options?.chunkSize ?? 1;
+  if (!Number.isFinite(requestedChunk) || requestedChunk <= 0) {
     throw new Error(
-      `processOfflineTime: chunkSize must be a finite positive number, got ${chunkSize}`,
+      `processOfflineTime: chunkSize must be a finite positive number, got ${requestedChunk}`,
     );
   }
+  // simulateTick clamps each chunk to the driver's maxDeltaTime in variable
+  // mode, so a chunkSize above it would advance only maxDeltaTime per call while
+  // the loop subtracted the full chunk — silently dropping the difference yet
+  // still reporting the whole window processed. Clamp so every chunk is faithful.
+  const chunkSize = Math.min(requestedChunk, tickDriver.maxDeltaTime);
   const capped = Math.min(Math.max(elapsedSeconds, 0), maxOffline);
 
   let remaining = capped;

@@ -39,8 +39,8 @@ score-and-pick over a candidate list
 inter-loop arbitration across registered defs
 
 - `interface BestReplayDefOptions` — Options for createBestReplayDef. `src/systems/recommendation-strategies.ts:30`
-- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:85`
-- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:170`
+- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:99`
+- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:184`
 - `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each loop restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:356`
 - `interface GoalDefOptions` — Options for createGoalDef. `src/systems/recommendation-strategies.ts:41`
 - `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:118`

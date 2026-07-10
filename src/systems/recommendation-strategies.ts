@@ -55,6 +55,20 @@ export interface GoalDefOptions {
   threshold?: DecimalSource;
 }
 
+// === HELPERS ===
+
+/**
+ * Bounded, order-preserving arbitration score for an unbounded game quantity.
+ * `Decimal.toNumber()` overflows to `Infinity` above ~1e308 — and
+ * `Decimal.isFinite()` stays true there — so raw `.toNumber()` scores collapse
+ * every large config to `Infinity`, degenerating arbitration to registration
+ * order across the exact range this engine exists to support. `log10` of the
+ * magnitude stays finite and monotonic, preserving the ranking.
+ */
+function magnitudeScore(x: Decimal): number {
+  return x.max(1).log10().toNumber();
+}
+
 // === FACTORIES ===
 
 // --- Best replay ---
@@ -109,8 +123,8 @@ export function createBestReplayDef(
       const entry = getValidEntry(ctx)!;
       // Use perSecond when finite for natural efficiency-based arbitration
       // across multiple BestReplay strategies for different metrics
-      if (entry.perSecond.isFinite()) return entry.perSecond.toNumber();
-      return entry.value.toNumber();
+      if (entry.perSecond.isFinite()) return magnitudeScore(entry.perSecond);
+      return magnitudeScore(entry.value);
     },
 
     recommend(ctx: RecommendationContext) {
@@ -190,7 +204,7 @@ export function createGoalDef(options: GoalDefOptions): RecommendationDef {
         // Lower elapsed = better; negate so higher score = better
         return -entry.elapsed;
       }
-      return entry.value.toNumber();
+      return magnitudeScore(entry.value);
     },
 
     recommend(ctx: RecommendationContext) {

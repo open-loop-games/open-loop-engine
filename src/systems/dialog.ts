@@ -236,7 +236,16 @@ export function createNativeDialogRuntime(
    * ending at the current node (don't enter the gated node).
    */
   function settle(): void {
+    // Guard against an authored next-only cycle (a → b → a): without it the
+    // fall-through walk spins forever, hanging the game and inflating visitCounts.
+    const seen = new Set<string>();
     while (state.activeGraphId && state.activeNodeId) {
+      if (seen.has(state.activeNodeId)) {
+        throw new Error(
+          `Dialog graph "${state.activeGraphId}" has a next-only cycle through node "${state.activeNodeId}"`,
+        );
+      }
+      seen.add(state.activeNodeId);
       const node = lookupNode(state.activeGraphId, state.activeNodeId);
       const hasChoices = (node.choices?.length ?? 0) > 0;
       if (hasChoices || !node.next) return;

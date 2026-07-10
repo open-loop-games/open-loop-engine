@@ -168,6 +168,8 @@ export interface TickDriver {
   onDeltaOverflow: ((droppedSeconds: number) => void) | undefined;
   /** EWMA of recent tick deltas (seconds). Read-only diagnostic. */
   readonly deltaMean: number;
+  /** Per-tick dt cap (seconds). `simulateTick` clamps to this in variable mode. */
+  readonly maxDeltaTime: number;
 }
 
 /** EWMA smoothing factor. Higher = more smoothing, slower response. Matches Synergism. */
@@ -342,6 +344,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     onTick,
     tickRaw,
     simulateTick,
+    maxDeltaTime,
     start,
     stop,
     stepOnce() {
