@@ -334,4 +334,52 @@ describe('createSubjectCategory', () => {
       engine.stop();
     });
   });
+
+  describe('per-subject override initials', () => {
+    it('clamps an authored initial into range at seed, before any set()', () => {
+      const cat = createSubjectCategory({
+        id: 'pets',
+        fields: { bond: { kind: 'scalar', initial: 999, min: 0, max: 100 } },
+      });
+      cat.register({ id: 'fluffy' });
+      // Seed must already be clamped — not sitting at 999 until the first set().
+      expect(cat.get('fluffy')!.fields.bond.get()).toBe(100);
+    });
+
+    it('clamps an out-of-range tier initial so getTier() is defined', () => {
+      const cat = createSubjectCategory({
+        id: 'guilds',
+        fields: { rank: { kind: 'tier', tiers: ['novice', 'apprentice', 'master'], initial: 9 } },
+      });
+      cat.register({ id: 'mages' });
+      expect(cat.get('mages')!.fields.rank.getIndex()).toBe(2);
+      expect(cat.get('mages')!.fields.rank.getTier()).toBe('master');
+    });
+
+    it('honors an explicit null enum override against a non-null schema default', () => {
+      const cat = createSubjectCategory({
+        id: 'heroes',
+        fields: { path: { kind: 'enum', values: ['light', 'dark'], initial: 'light' } },
+      });
+      cat.register({ id: 'neo', fields: { path: { initial: null } } });
+      // `?? ` used to swallow the null and fall back to the schema's 'light'.
+      expect(cat.get('neo')!.fields.path.get()).toBeNull();
+    });
+
+    it('reports a subject at its own override initial as default (unlock=false)', () => {
+      const cat = createSubjectCategory({
+        id: 'npcs',
+        fields: { bond: { kind: 'scalar', initial: 0, min: 0, max: 100 } },
+      });
+      cat.register([{ id: 'plain' }, { id: 'special', fields: { bond: { initial: 50 } } }]);
+      // Neither field has been touched: both sit at their seeded initial, so
+      // both are "default". Comparing against the schema default alone wrongly
+      // flagged the overridden subject as non-default from creation.
+      expect(cat.getEntry('plain')!.signals!.unlock.value).toBe(false);
+      expect(cat.getEntry('special')!.signals!.unlock.value).toBe(false);
+      // A real change still registers.
+      cat.get('special')!.fields.bond.set(60);
+      expect(cat.getEntry('special')!.signals!.unlock.value).toBe(true);
+    });
+  });
 });

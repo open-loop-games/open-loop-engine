@@ -270,12 +270,13 @@ function buildScalarField(
   const max = schema.max ?? Infinity;
   const initial = override?.initial ?? schema.initial ?? 0;
 
-  const ref = persistent<number>(initial, { name: fieldName });
-  const events = createEmitHandle<ScalarFieldEvents>();
-
   function clamp(v: number): number {
     return Math.min(max, Math.max(min, v));
   }
+  // Clamp the authored initial too — set() clamps, but a raw seed would let a
+  // field sit outside its declared [min, max] until the first set().
+  const ref = persistent<number>(clamp(initial), { name: fieldName });
+  const events = createEmitHandle<ScalarFieldEvents>();
   function get(): number {
     return ref.value;
   }
@@ -305,13 +306,6 @@ function buildVectorField<Dims extends string>(
     throw new Error(`Subject vector field "${fieldName}" must declare at least one dimension`);
   }
 
-  const refs = new Map<Dims, Persistent<number>>();
-  for (const dim of schema.dimensions) {
-    const cfg = schema.dimensionConfig?.[dim];
-    const initial = override?.initialPerDim?.[dim] ?? cfg?.initial ?? 0;
-    refs.set(dim, persistent<number>(initial, { name: `${fieldName}/${dim}` }));
-  }
-
   const events = createEmitHandle<VectorFieldEvents<Dims>>();
 
   function clampForDim(dim: Dims, v: number): number {
@@ -319,6 +313,14 @@ function buildVectorField<Dims extends string>(
     const min = cfg?.min ?? -Infinity;
     const max = cfg?.max ?? Infinity;
     return Math.min(max, Math.max(min, v));
+  }
+
+  const refs = new Map<Dims, Persistent<number>>();
+  for (const dim of schema.dimensions) {
+    const cfg = schema.dimensionConfig?.[dim];
+    // Clamp the authored initial to the dim's range (set() clamps; a raw seed would not).
+    const initial = clampForDim(dim, override?.initialPerDim?.[dim] ?? cfg?.initial ?? 0);
+    refs.set(dim, persistent<number>(initial, { name: `${fieldName}/${dim}` }));
   }
   function get(dim: Dims): number {
     return refs.get(dim)?.value ?? schema.dimensionConfig?.[dim]?.initial ?? 0;
@@ -351,12 +353,13 @@ function buildTierField(
   const maxIndex = schema.tiers.length - 1;
   const gates = override?.gates ?? schema.gates;
 
-  const ref = persistent<number>(initial, { name: fieldName });
-  const events = createEmitHandle<TierFieldEvents>();
-
   function clampIndex(i: number): number {
     return Math.max(0, Math.min(maxIndex, Math.floor(i)));
   }
+  // Clamp the authored initial index into [0, maxIndex] (setIndex clamps; a raw
+  // seed would let an out-of-range initial produce an undefined getTier()).
+  const ref = persistent<number>(clampIndex(initial), { name: fieldName });
+  const events = createEmitHandle<TierFieldEvents>();
   function getIndex(): number {
     return ref.value;
   }
@@ -423,7 +426,12 @@ function buildEnumField<V extends string>(
   schema: EnumFieldDef<V>,
   override: PerSubjectOverride<EnumFieldDef<V>> | undefined,
 ): EnumFieldInstance<V> {
-  const initial = (override?.initial ?? schema.initial ?? null) as V | null;
+  // `?? ` would swallow an explicit `initial: null` override (PerSubjectOverride
+  // types it as `V | null`), so a subject can't start 'unset' against a non-null
+  // schema default. Treat only `undefined` as "not overridden".
+  const initial = (
+    override?.initial !== undefined ? override.initial : (schema.initial ?? null)
+  ) as V | null;
   if (initial !== null && !schema.values.includes(initial)) {
     throw new Error(
       `Subject enum field "${fieldName}" initial "${initial}" not in declared values [${schema.values.join(', ')}]`,
@@ -569,7 +577,7 @@ export function createSubjectCategory<S extends FieldSchema>(
       }
       return { id: def.id, fields };
     },
-    buildSignals: (_def, instance) => buildSubjectSignals(instance, schema),
+    buildSignals: (def, instance) => buildSubjectSignals(instance, schema, def),
   });
 
   const category: SubjectCategory<S> = {
@@ -612,28 +620,49 @@ export function createSubjectCategory<S extends FieldSchema>(
 function buildSubjectSignals<S extends FieldSchema>(
   instance: SubjectInstance<S>,
   schema: S,
+  subjectDef: SubjectDef<S>,
 ): CategoryEntrySignals {
   const fieldNames = Object.keys(schema) as (keyof S & string)[];
 
+  // "Default" is the value the field was seeded with — the per-subject override
+  // if present, else the schema default. Comparing against the schema default
+  // alone reports every overridden field as non-default from creation.
   function isNonDefault(fieldName: keyof S & string): boolean {
     const field = instance.fields[fieldName];
     const def = schema[fieldName];
+    const override = subjectDef.fields?.[fieldName];
     switch (field.kind) {
       case 'scalar':
-        return (field as ScalarFieldInstance).get() !== ((def as ScalarFieldDef).initial ?? 0);
+        return (
+          (field as ScalarFieldInstance).get() !==
+          ((override as { initial?: number })?.initial ?? (def as ScalarFieldDef).initial ?? 0)
+        );
       case 'vector': {
         const vdef = def as VectorFieldDef;
         const vfield = field as VectorFieldInstance;
+        const vover = override as { initialPerDim?: Record<string, number> } | undefined;
         return vdef.dimensions.some(
-          (dim) => vfield.get(dim) !== (vdef.dimensionConfig?.[dim]?.initial ?? 0),
+          (dim) =>
+            vfield.get(dim) !==
+            (vover?.initialPerDim?.[dim] ?? vdef.dimensionConfig?.[dim]?.initial ?? 0),
         );
       }
       case 'tier':
-        return (field as TierFieldInstance).getIndex() !== ((def as TierFieldDef).initial ?? 0);
+        return (
+          (field as TierFieldInstance).getIndex() !==
+          ((override as { initial?: number })?.initial ?? (def as TierFieldDef).initial ?? 0)
+        );
       case 'flag':
-        return (field as FlagFieldInstance).get() !== ((def as FlagFieldDef).initial ?? false);
-      case 'enum':
-        return (field as EnumFieldInstance).get() !== ((def as EnumFieldDef).initial ?? null);
+        return (
+          (field as FlagFieldInstance).get() !==
+          ((override as { initial?: boolean })?.initial ?? (def as FlagFieldDef).initial ?? false)
+        );
+      case 'enum': {
+        const eover = override as { initial?: string | null } | undefined;
+        const effective =
+          eover?.initial !== undefined ? eover.initial : ((def as EnumFieldDef).initial ?? null);
+        return (field as EnumFieldInstance).get() !== effective;
+      }
     }
   }
 
