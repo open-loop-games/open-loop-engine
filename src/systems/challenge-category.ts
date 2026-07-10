@@ -53,7 +53,6 @@ import { getCurrentResourceRegistry } from '@/core/registries';
 import { getCurrentEngineCategories } from './engine-categories';
 import { evaluateGate, type Gate, type GateRuntime } from './gate';
 import type { Grant } from '@/core/modifier';
-import type { DecimalSource } from '@/primitives/decimal';
 
 // === TYPES ===
 
@@ -124,9 +123,6 @@ export interface ChallengeDef<
    * challenge is won, use {@link rewards} instead.
    */
   completionEffects?: IEffect[];
-
-  /** Scaling reward based on total completions */
-  rewardFormula?: (completions: number) => DecimalSource;
 
   /**
    * Declarative modifier bindings active while the challenge is entered.

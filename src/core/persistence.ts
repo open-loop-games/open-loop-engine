@@ -522,7 +522,7 @@ export function setPersistentName(ref: Persistent, name: string): void {
   if (existing === name) return;
   // Collision check: walk live refs in the context. Deriving on demand avoids
   // drift between a cached name set and the live refs Set when callers clear
-  // the context (validatePersistentRefs, test teardown, etc.).
+  // the context (test teardown, etc.).
   for (const other of persistentRefs[contextId]) {
     if (other === ref || other[Deleted]) continue;
     if (other[PersistentName] === name) {
@@ -798,30 +798,7 @@ export function clearPersistentNamespace(namespace?: string): void {
   }
 }
 
-// === VALIDATION + COLLECTORS ===
-
-/**
- * Validate that all persistent refs in a context were properly registered.
- * Call this after setting up a context to catch orphaned persistent refs.
- */
-export function validatePersistentRefs(contextId: string, registeredRefs: Set<Persistent>): void {
-  const contextRefs = persistentRefs[contextId];
-  if (!contextRefs) return;
-
-  for (const persistent of contextRefs) {
-    if (persistent[Deleted]) continue;
-    if (!registeredRefs.has(persistent)) {
-      console.error(
-        `Created persistent ref in "${contextId}" without registering it!`,
-        'Make sure to include all persistent refs in the returned object.',
-        '\nCreated at:\n' + persistent[StackTrace],
-      );
-    }
-  }
-
-  // Clear the tracking set after validation
-  contextRefs.clear();
-}
+// === DEFINITION STATE MAPS ===
 
 /**
  * Create a Map of persistent state objects for an array of definitions.
@@ -869,50 +846,6 @@ export function createDefinitionStates<D, K, S>(
   }
   endPersistentContext();
   return map;
-}
-
-/**
- * Recursively collect all persistent refs from an object tree.
- * Handles nested objects and arrays.
- */
-export function collectPersistentRefs(
-  obj: Record<string, unknown>,
-  path: string[] = [],
-): Map<string, Persistent> {
-  const refs = new Map<string, Persistent>();
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (value == null || typeof value !== 'object') continue;
-
-    // Skip objects marked to skip persistence
-    if (SkipPersistence in value && value[SkipPersistence] === true) continue;
-
-    if (isPersistent(value)) {
-      if (value[Deleted]) continue;
-
-      const savePath = [...path, key];
-      value[SaveDataPath] = savePath;
-      // Auto-name from walk path when the ref has no explicit name yet.
-      // collectPersistentRefs is a consumer-side helper — this lets those
-      // consumers get name-stable keys without touching every `persistent()`.
-      if (value[PersistentName] === undefined && refContextId.has(value)) {
-        try {
-          setPersistentName(value, savePath.slice(1).join('.') || key);
-        } catch {
-          // Collision — ref already named elsewhere in this context; leave it.
-        }
-      }
-      refs.set(savePath.join('.'), value);
-    } else if (!isRef(value) && !(value instanceof Decimal)) {
-      // Recurse into plain objects
-      const nested = collectPersistentRefs(value as Record<string, unknown>, [...path, key]);
-      for (const [nestedPath, nestedRef] of nested) {
-        refs.set(nestedPath, nestedRef);
-      }
-    }
-  }
-
-  return refs;
 }
 
 // === SERIALIZATION ===
