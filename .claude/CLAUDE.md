@@ -30,8 +30,6 @@ pnpm build:api        # regenerate docs/api/ from source
 
 ## Commits
 
-Run `pnpm build:api` and stage `docs/api/` before committing any `src/` change — the pre-commit hook blocks on stale docs (line shifts alone trigger it).
-
 Conventional commit prefixes — `release-it` picks the bump from accumulated commits at cut-point. Pre-1.0 (`preMajor: true`), `feat!:` / `BREAKING CHANGE:` bump MINOR, not MAJOR — breaking changes are expected in 0.x.
 
 - `feat:` — new public API (MINOR bump)
