@@ -53,6 +53,26 @@ describe('createAchievementCategory', () => {
     expect(category.getAchievement('unknown')).toBeUndefined();
   });
 
+  it('two categories sharing a def id do not collide (category id namespaces the save)', () => {
+    // Each achievement's earned/earnedAt must be scoped under {categoryId}/{defId}
+    // like every other category. A flat achievement:{defId} context drops the
+    // category id, so a second category reusing a def id collides at register().
+    const catA = createAchievementCategory<TestDef>({
+      id: 'cat-a',
+      mapAchievement: (def) => ({ display: { title: def.name } }),
+    });
+    const catB = createAchievementCategory<TestDef>({
+      id: 'cat-b',
+      mapAchievement: (def) => ({ display: { title: def.name } }),
+    });
+
+    catA.register({ id: 'first', name: 'First Steps', threshold: 10 });
+    expect(() => catB.register({ id: 'first', name: 'First Steps', threshold: 10 })).not.toThrow();
+
+    catA.getAchievement('first')!.earned.value = true;
+    expect(catB.getAchievement('first')!.earned.value).toBe(false);
+  });
+
   it('achievements start unearned', () => {
     const category = createAchievementCategory<TestDef>({
       id: 'test2',

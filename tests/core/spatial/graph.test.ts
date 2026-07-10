@@ -318,6 +318,21 @@ describe('createSpatialGraph — serialize / restore', () => {
     expect(restored.isConnected('a', 'b')).toBe(true);
   });
 
+  it('auto-id after restore does not collide with restored auto ids', () => {
+    // First session hands out auto ids "1", "2".
+    const graph = createSpatialGraph<Pkg, Wire>();
+    graph.addNode(pkg('a'));
+    graph.addNode(pkg('b'));
+    const snap = graph.serialize();
+
+    // Second session restores into a fresh graph whose id counter starts at 0.
+    // Adding a node must skip the already-restored "1"/"2" instead of clashing.
+    const restored = createSpatialGraph<Pkg, Wire>();
+    restored.restore(snap);
+    expect(() => restored.addNode(pkg('c'))).not.toThrow();
+    expect(restored.nodes.size).toBe(3);
+  });
+
   it('round-trips nested child graphs', () => {
     const graph = createSpatialGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });

@@ -68,6 +68,27 @@ describe('activation', () => {
     expect(system.getActive().map((d) => d.id)).toEqual(['belt']);
   });
 
+  it('applies bindings synchronously under a sim (no flush boundary)', () => {
+    // A headless sim drives stepOnce() in a tight loop with no microtask
+    // boundary between steps. The active-predicate watch must fire on a 'sync'
+    // flush so a mid-run activation binds its modifiers immediately — otherwise
+    // the effect is silently a step (or more) late in the sim.
+    const system = createSystem();
+    const chain = createModifierChain('maxHealth');
+    const active = ref(false);
+
+    system.register({
+      id: 'belt',
+      active,
+      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
+    });
+
+    active.value = true;
+    // No await nextTick() — the binding must already be present.
+    expect(chain.modifiers.length).toBe(1);
+    expect(system.isActive('belt').value).toBe(true);
+  });
+
   it('removes bindings on true → false edge', async () => {
     const system = createSystem();
     const chain = createModifierChain('maxHealth');

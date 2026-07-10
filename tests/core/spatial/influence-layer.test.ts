@@ -428,6 +428,32 @@ describe('composeInfluenceLayers', () => {
     expect(peak!.value).toBeCloseTo(4);
   });
 
+  it('composed peak returns null when the center is outside the grid', () => {
+    // Interchangeable with a single-layer reader, whose peak() returns null for
+    // an out-of-bounds center. The composed reader must too, not a fabricated 0.
+    const grid = numericGrid(3, 3);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    layer.update();
+    const composed = composeInfluenceLayers([layer.read()], (vs) => vs[0]);
+    expect(layer.read().peak(100, 100, 1)).toBeNull();
+    expect(composed.peak(100, 100, 1)).toBeNull();
+  });
+
+  it('composed peak stays in bounds at an edge and matches the single-layer reader', () => {
+    // On an all-zero layer at a corner, a naive box walk picks the first cell
+    // visited — an out-of-bounds coordinate. The composed peak must return an
+    // in-bounds cell, identical to the single-layer reader it stands in for.
+    const grid = numericGrid(3, 3);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    layer.update();
+    const composed = composeInfluenceLayers([layer.read()], (vs) => vs[0]);
+    const comp = composed.peak(0, 0, 1);
+    expect(comp).not.toBeNull();
+    expect(comp!.x).toBeGreaterThanOrEqual(0);
+    expect(comp!.y).toBeGreaterThanOrEqual(0);
+    expect(comp).toEqual(layer.read().peak(0, 0, 1));
+  });
+
   it("cells() iterates the first reader's cells with combine applied", () => {
     const gridA = numericGrid(2, 2);
     const gridB = numericGrid(2, 2);

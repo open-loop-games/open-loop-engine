@@ -214,6 +214,11 @@ export function createPersistentEffectSystem(
         isApplied: false,
       };
 
+      // flush: 'sync' so a predicate that flips mid-run binds/unbinds its
+      // modifiers on the same synchronous step. Headless sims drive stepOnce()
+      // in a tight loop with no microtask boundary, so a default (pre) flush
+      // would leave the effect a step or more late. Mirrors achievement.ts /
+      // automation.ts / resource-bag link watchers.
       entry.stopWatch = watch(
         activeRef,
         (next) => {
@@ -227,7 +232,7 @@ export function createPersistentEffectSystem(
             handle.emit('deactivated', d);
           }
         },
-        { immediate: true },
+        { immediate: true, flush: 'sync' },
       );
 
       entries.set(d.id, entry);

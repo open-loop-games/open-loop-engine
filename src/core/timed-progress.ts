@@ -97,7 +97,12 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
       progress: ref<DecimalSource>(0) as Ref<DecimalSource>,
     };
   }
-  const contextId = getCurrentContext() ?? id;
+  // Compose the ambient context with this tracker's id rather than letting the
+  // ambient win — N parallel trackers built inside one module's install() share
+  // an ambient context, and collapsing them onto it collides their 'progress'
+  // refs. Mirrors category-base's `${parent}/${local}` nesting.
+  const parent = getCurrentContext();
+  const contextId = parent ? `${parent}/${id}` : id;
   return withPersistentContext(
     contextId,
     (): TimedProgressState => ({

@@ -333,8 +333,16 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
       let syncing = false;
 
-      // Initial sync: resource → bag
+      // Initial sync: resource → bag. This runs before either watcher installs,
+      // so if the bag clamps the value to capacity we must reconcile the
+      // resource here too — nothing else will, and the two would diverge with
+      // the resource reading over-cap forever (mirrors the steady-state
+      // resource → bag clamp-back below).
       setAmount(typeId, resource.value);
+      const afterInitial = getAmount(typeId);
+      if (!Decimal.eq(afterInitial, resource.value)) {
+        resource.value = afterInitial;
+      }
 
       // Watch bag → resource. `flush: 'sync'` fires on every ref mutation
       // instead of coalescing via microtask. Required under the fixed-step

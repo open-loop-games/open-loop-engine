@@ -358,6 +358,20 @@ describe('ResourceBag', () => {
       expect(bag.get('gold').eq(50)).toBe(true);
     });
 
+    it('initial sync clamps the resource back when it already exceeds capacity', () => {
+      // Linking a resource whose value is over the bag's cap must reconcile
+      // both sides immediately — the initial sync runs before the watchers
+      // install, so nothing else will. Otherwise the bag holds 100 while the
+      // resource still reads 150 and cost/cap checks disagree indefinitely.
+      beginPersistentContext('test-link-init-clamp');
+      const gold = createResource(bn(150), { displayName: 'Gold' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacity: 100 });
+      bag.link('gold', gold);
+      expect(bag.get('gold').eq(100)).toBe(true);
+      expect(new Decimal(gold.value).eq(100)).toBe(true);
+    });
+
     it('bag change propagates to resource', async () => {
       beginPersistentContext('test-link-bag-to-res');
       const gold = createResource(bn(10), { displayName: 'Gold' });

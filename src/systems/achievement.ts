@@ -24,7 +24,7 @@
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { computed, type Ref, unref, watch } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
-import { persistent, withPersistentContext } from '@/core/persistence';
+import { persistent, withPersistentContext, getCurrentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
 
@@ -166,7 +166,15 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
     showPopup = true,
   } = options;
 
-  const { earned, earnedAt } = withPersistentContext(`achievement:${id}`, () => ({
+  // Compose the ambient context with this achievement's id so save keys carry
+  // the parent scope (the category's `${categoryId}/${def.id}`, matching every
+  // sibling) while staying unique. A flat `achievement:${id}` dropped the scope
+  // (two categories reusing a def id collided); collapsing onto the bare parent
+  // instead collides when several achievements share one context. Mirrors
+  // category-base / timed-progress `${parent}/${local}` nesting.
+  const parent = getCurrentContext();
+  const contextId = parent ? `${parent}/achievement:${id}` : `achievement:${id}`;
+  const { earned, earnedAt } = withPersistentContext(contextId, () => ({
     earned: persistent<boolean>(false, { name: 'earned' }),
     earnedAt: persistent<number | null>(null, { name: 'earnedAt' }),
   }));

@@ -234,6 +234,21 @@ function makeGraph<N, E>(
     return node;
   }
 
+  // Resolve an id for a new node/edge. An explicit id passes through (the caller
+  // still rejects collisions). An auto id skips values already taken, because
+  // restore() reloads ids the generator will hand out again — the default
+  // counter starts fresh at 0 while the map already holds "1".."N", so the next
+  // draw would clash. Bounded to surface a broken (non-advancing) consumer
+  // idGenerator instead of spinning forever.
+  function resolveId(explicit: string | undefined, taken: (id: string) => boolean): string {
+    if (explicit !== undefined) return explicit;
+    for (let attempts = 0; attempts < 1_000_000; attempts++) {
+      const candidate = idGenerator();
+      if (!taken(candidate)) return candidate;
+    }
+    throw new Error('SpatialGraph: idGenerator failed to produce a free id after 1e6 attempts');
+  }
+
   function indexEdge(edge: GraphEdge<E>): void {
     let fromSet = adjacency.get(edge.fromId);
     if (!fromSet) {
@@ -279,7 +294,7 @@ function makeGraph<N, E>(
     edges,
 
     addNode(data, opts) {
-      const id = opts?.id ?? idGenerator();
+      const id = resolveId(opts?.id, (candidate) => nodes.has(candidate));
       if (nodes.has(id)) {
         throw new Error(`SpatialGraph.addNode: node id '${id}' already exists`);
       }
@@ -315,7 +330,7 @@ function makeGraph<N, E>(
     addEdge(fromId, toId, data, opts) {
       requireNode(fromId);
       requireNode(toId);
-      const id = opts?.id ?? idGenerator();
+      const id = resolveId(opts?.id, (candidate) => edges.has(candidate));
       if (edges.has(id)) {
         throw new Error(`SpatialGraph.addEdge: edge id '${id}' already exists`);
       }

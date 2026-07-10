@@ -152,6 +152,13 @@ export interface InfluenceLayerReader {
    */
   peak(x: number, y: number, radius: number): { x: number; y: number; value: number } | null;
   /**
+   * Whether `(x, y)` falls within the reader's domain. Composed readers defer
+   * to their first underlying reader (all are assumed to share a grid, as
+   * `cells()` also relies on). Lets `peak()` honour its in-bounds/null contract
+   * without every consumer re-deriving grid dimensions.
+   */
+  inBounds(x: number, y: number): boolean;
+  /**
    * Iterate the underlying grid's cells as `[x, y, value]` triples in
    * row-major order. Composed readers iterate the first underlying
    * reader's cell set, applying the combine function per cell.
@@ -368,6 +375,9 @@ export function createInfluenceLayer(
         if (bestX < 0) return null;
         return { x: bestX, y: bestY, value: bestValue };
       },
+      inBounds(x, y) {
+        return grid.inBounds(x, y);
+      },
       *cells() {
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
@@ -473,6 +483,10 @@ export function composeInfluenceLayers(
       return total;
     },
     peak(x, y, radius) {
+      // Match the single-layer contract: null for an out-of-bounds center, and
+      // only in-bounds cells considered — otherwise an out-of-bounds coordinate
+      // (whose combined value is a fabricated 0) can win and be returned.
+      if (!readers[0].inBounds(x, y)) return null;
       const r = Math.max(0, Math.floor(radius));
       let bestX = -Infinity;
       let bestY = -Infinity;
@@ -480,10 +494,13 @@ export function composeInfluenceLayers(
       let any = false;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
-          const v = combinedAt(x + dx, y + dy);
+          const cx = x + dx;
+          const cy = y + dy;
+          if (!readers[0].inBounds(cx, cy)) continue;
+          const v = combinedAt(cx, cy);
           if (!any || v > bestValue) {
-            bestX = x + dx;
-            bestY = y + dy;
+            bestX = cx;
+            bestY = cy;
             bestValue = v;
             any = true;
           }
@@ -491,6 +508,9 @@ export function composeInfluenceLayers(
       }
       if (!any) return null;
       return { x: bestX, y: bestY, value: bestValue };
+    },
+    inBounds(x, y) {
+      return readers[0].inBounds(x, y);
     },
     *cells() {
       for (const [x, y] of readers[0].cells()) {

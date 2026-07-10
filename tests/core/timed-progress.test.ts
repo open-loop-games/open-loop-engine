@@ -52,6 +52,31 @@ describe('createTimedProgress — construction', () => {
     expect(tp.id).toMatch(/^timedProgress_\d+$/);
     tp.dispose();
   });
+
+  it('N parallel trackers under one ambient context do not collide', () => {
+    // The factory's headline use is N parallel trackers built inside a module's
+    // install(), which pushes an ambient persistent context. Each tracker's
+    // distinct id must produce a distinct persistent context; collapsing them
+    // all onto the ambient id makes the second tracker's 'progress' ref collide.
+    const bus = makeTickBus();
+    beginPersistentContext('module-install');
+    const attack = createTimedProgress({
+      id: 'attack',
+      duration: 10,
+      registerTick: bus.registerTick,
+    });
+    const defend = createTimedProgress({
+      id: 'defend',
+      duration: 10,
+      registerTick: bus.registerTick,
+    });
+    endPersistentContext();
+
+    expect(attack.id).toBe('attack');
+    expect(defend.id).toBe('defend');
+    attack.progress.value = 5;
+    expect(Decimal.eq(defend.progress.value, 0)).toBe(true);
+  });
 });
 
 describe('createTimedProgress — tick advancement', () => {
