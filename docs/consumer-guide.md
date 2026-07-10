@@ -16,7 +16,7 @@ The engine ships utility functions that handle the Decimal arithmetic, bounds ch
 
 | Function | What it does | Replaces |
 |---|---|---|
-| `addResource` | Add to a resource, optionally through a modifier chain | `resource.value = Decimal.add(resource.value, amount)` |
+| `addResource` | Add to a resource, optionally tagging the gain with a modifier chain for trace attribution | `resource.value = Decimal.add(resource.value, amount)` |
 | `subtractResource` | Subtract with insufficient-funds check; returns `false` if short | `if (Decimal.gte(r.value, cost)) { r.value = Decimal.sub(...) }` |
 | `hasResource` | Check if a resource meets a threshold | `Decimal.gte(resource.value, amount)` |
 | `displayResource` | Format a resource for display | `format(resource.value)` |
@@ -24,7 +24,7 @@ The engine ships utility functions that handle the Decimal arithmetic, bounds ch
 | `resource.best` | Persistent high-water mark on persistent resources | Manual `if (gt(current, best)) best = current` |
 | `resource.cumulative` | Persistent lifetime gain on persistent resources | Manual accumulator in onTick |
 
-These aren't sugar — they're the correct API. `subtractResource` returns a boolean so "check and spend" is one call, not two. `addResource` accepts an optional modifier chain so yield multipliers apply at the call site.
+These aren't sugar — they're the correct API. `subtractResource` returns a boolean so "check and spend" is one call, not two. `addResource` accepts an optional modifier chain that tags the gain for trace attribution (it does *not* apply the chain as a yield multiplier — pre-multiply the amount if you need that).
 
 ### Level 2: Category systems (the default for content)
 
@@ -33,14 +33,17 @@ Categories are the engine's standard shape for registering content: each factory
 ```ts
 const skills = createSkillCategory<MySkillDef>({
   id: 'skills',
-  mapSkill: (def) => ({ xpToLevel: (xp) => Formula.variable(xp).div(def.xpDivisor).floor() }),
+  mapSkill: (def) => ({
+    xpToLevel: (xp) => Formula.variable(xp).div(def.xpDivisor).floor(),
+    levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
+  }),
 });
 skills.register([{ id: 'woodcutting', xpDivisor: 10 }, { id: 'mining', xpDivisor: 12 }]);
 ```
 
 The `map*` function is where your game's definition shape meets the engine's options shape. For simple cases this is mostly pass-through; for complex cases (skills with custom curves, actions with type-specific behavior) the mapper does real work.
 
-What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll` / `getInstance` / `patch`), and per-def lifecycle. Mods extend definitions via `registry.patch()` without touching the original module.
+What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll` / `patch`), and per-def lifecycle. Mods extend definitions via `registry.patch()` without touching the original module.
 
 **Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without install-time coupling. No publishing step; reading is opt-in. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
 
@@ -155,7 +158,7 @@ This is the normal path for one-off constructs, not a failure. The engine's syst
 
 **Sequencer vs advisor.** If the system has to remember what is currently scheduled, it's a sequencer. If it only needs to choose or recommend from candidates each time it's asked, it's an advisor / selection policy.
 
-**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` on `Loop.restart`, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
+**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` between loops, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
 
 Two adjacent primitives sit in the wider advisor family but don't fit the immediate-choice shape above. `createGoalPicker` maintains a **weighted active-goal pool** (between-tick goal arbitration with persistent state, not a one-shot pick). `createRuleAdvisor` aggregates **observation history** into ranked suggestions surfaced to the player (derived from what happened, not selected from candidates). Both live in `api/advisors.md`; read its Canonical entrypoints block for the one-liner role of each.
 
@@ -168,7 +171,7 @@ Two adjacent primitives sit in the wider advisor family but don't fit the immedi
 | Player action that charges a cost | `createPurchasableCategory` with `createCostRequirement` | per-instance `active` / `amount` |
 | Predicate flips, no cost | `createPurchasableCategory` with `createGateRequirement` (`+ setupSweepAutoPurchase`) | per-instance `active` |
 | Observed milestone, auto-earns when true | `createAchievementCategory` | per-instance `earned` |
-| Named region grouping content | `createZoneCategory` | which entries are *addressable* |
+| Named region grouping content | `createZoneSystem` | which entries are *addressable* |
 | Ordered ladder of feature availability | `createAutomationTiers` | which features are exposed |
 | Entity rank / relationship state | `createSubjectCategory` tier field | per-subject tier value |
 
@@ -390,7 +393,7 @@ def.gainChain.bind({
 });
 ```
 
-The `chain.bind` vs `createPersistentEffectSystem` choice here is the same ladder from the top of this section. idle-loops-ng's `affected-by.ts` uses `PersistentEffectSystem.register` only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
+The `chain.bind` vs `createPersistentEffectSystem` choice here is the same ladder from the top of this section. idle-loops-ng uses `PersistentEffectSystem.register` in places only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
 
 ## Tunable knobs
 
@@ -442,7 +445,7 @@ Recurring shapes consumers assemble from engine primitives — worked patterns f
 
 ## Domain-language map
 
-Past a certain vocabulary size, re-reading your `data/` types to recall "what's an action vs a job, what references what" costs more than maintaining a small generated map. The engine ships `ol-domain-map` (a bin) for exactly this: point a per-game `domain-map.config.mjs` at your domain files and it emits a committed `domain-map.md` — vocabulary (enums + string-literal/discriminated unions, where membership is an is-a relation), the def inventory, and a field-name reference graph (the untyped-ID edges like `requiredExplorations` that type-graph tools miss). Source of truth is code STRUCTURE, not tsdoc — it regenerates from your types every run, so it can't drift. The config carries the dialect knobs (`scope` globs, `defSuffixes`, optional `nouns`/`stopwords`) plus a small hand-authored `curated` block for the cross-symbol concepts no single type owns. Wire `"domain-map": "ol-domain-map src/domain-map.config.mjs"` and commit both files; edit the config, never the `.md`. Run it from your pre-commit hook so a stale map can never be committed — the same regenerate-then-check discipline the engine uses for its own API docs. See the seven `domain-map.config.mjs` in `open-loop-starter/src/archetypes/*` for worked examples across dialects (`Def` vs `Spec` suffixes). Note `ts-morph` must resolve for the bin — workspace consumers get it through the engine's own `node_modules`; a registry install needs it added consumer-side.
+Past a certain vocabulary size, re-reading your `data/` types to recall "what's an action vs a job, what references what" costs more than maintaining a small generated map. The engine ships `ol-domain-map` (a bin) for exactly this: point a per-game `domain-map.config.mjs` at your domain files and it emits a committed `domain-map.md` — vocabulary (enums + string-literal/discriminated unions, where membership is an is-a relation), the def inventory, and a field-name reference graph (the untyped-ID edges like `requiredExplorations` that type-graph tools miss). Source of truth is code STRUCTURE, not tsdoc — it regenerates from your types every run, so it can't drift. The config carries the dialect knobs (`scope` globs, `defSuffixes`, optional `nouns`/`stopwords`) plus a small hand-authored `curated` block for the cross-symbol concepts no single type owns. Wire `"domain-map": "ol-domain-map src/domain-map.config.mjs"` and commit both files; edit the config, never the `.md`. Run it from your pre-commit hook so a stale map can never be committed — the same regenerate-then-check discipline the engine uses for its own API docs. See the per-archetype `domain-map.config.mjs` in `open-loop-starter/src/showcase/archetypes/*` for worked examples across dialects (`Def` vs `Spec` suffixes). Note `ts-morph` must resolve for the bin — workspace consumers get it through the engine's own `node_modules`; a registry install needs it added consumer-side.
 
 ## When the engine should grow
 
