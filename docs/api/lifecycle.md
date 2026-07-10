@@ -25,7 +25,7 @@ auto-saved refs with context-scoped registration
 
 - `function createDefinitionStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of persistent state objects for an array of definitions. `src/core/persistence.ts:825`
 - `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:584`
-- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:945`
+- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:999`
 - `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:680`
 - `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:906`
 - `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:713`

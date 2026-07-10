@@ -162,6 +162,50 @@ describe('Persistence', () => {
       expect((score.value as Decimal).gte('1e99')).toBe(true);
       expect((score.value as Decimal).add(1).gte('1e100')).toBe(true);
     });
+
+    it('revives a Decimal nested inside an object-valued ref (open-loop-engine#7)', () => {
+      // break_eternity's Decimal.toJSON emits a string, so a Decimal stored one
+      // level down (`{ hp }`) survives serialization only as a string. Revival
+      // must reach it, or consumers storing a small struct in one ref get
+      // strings back and break on the first Decimal method call.
+      beginPersistentContext('test-nested-decimal');
+      const stats = persistent({ hp: new Decimal(10), mana: new Decimal(5) }, { name: 'stats' });
+      endPersistentContext();
+
+      stats.value = { hp: new Decimal(99), mana: new Decimal('1e42') };
+
+      const refs = getAllPersistentRefs();
+      const parsed = JSON.parse(JSON.stringify(serializePersistents(refs)));
+
+      stats.value = { hp: new Decimal(0), mana: new Decimal(0) };
+      deserializePersistents(refs, parsed);
+
+      expect(stats.value.hp).toBeInstanceOf(Decimal);
+      expect(stats.value.mana).toBeInstanceOf(Decimal);
+      expect(stats.value.hp.eq(99)).toBe(true);
+      expect(stats.value.mana.eq('1e42')).toBe(true);
+    });
+
+    it('revives Decimals nested inside an array-valued ref', () => {
+      // Array elements revive against default[i] (falling back to default[0]),
+      // so a homogeneous Decimal array round-trips even when it grows past the
+      // default's length.
+      beginPersistentContext('test-nested-decimal-array');
+      const bag = persistent<Decimal[]>([new Decimal(0)], { name: 'bag' });
+      endPersistentContext();
+
+      bag.value = [new Decimal(1), new Decimal(2), new Decimal('1e9')];
+
+      const refs = getAllPersistentRefs();
+      const parsed = JSON.parse(JSON.stringify(serializePersistents(refs)));
+
+      bag.value = [new Decimal(0)];
+      deserializePersistents(refs, parsed);
+
+      expect(bag.value).toHaveLength(3);
+      for (const el of bag.value) expect(el).toBeInstanceOf(Decimal);
+      expect(bag.value[2].eq('1e9')).toBe(true);
+    });
   });
 
   describe('namespace stripping preserves `::` in context ids', () => {

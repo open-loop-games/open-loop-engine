@@ -939,6 +939,60 @@ export function getAllPersistentRefs(namespace?: string): Map<string, Persistent
   return result;
 }
 
+/** Non-finite numbers serialize::string; this maps them back on load. */
+const NON_FINITE_NUMBERS: Record<string, number> = { Infinity, '-Infinity': -Infinity, NaN };
+
+/**
+ * Rehydrate a loaded save leaf/tree against a persistent ref's default,
+ * reviving the Decimals the serializer flattened to strings.
+ *
+ * break_eternity's `Decimal.toJSON` emits a string, so a `Decimal` nested
+ * inside an object- or array-valued ref survives JSON serialization only as a
+ * string — top-level revival alone would hand it back as `"99"` and break the
+ * first `.add`/`.gte` call. The default value carries the declared shape and
+ * drives revival: wherever the default holds a `Decimal`, the matching loaded
+ * leaf is reconstructed via `new Decimal(...)`; wherever it holds a `number`,
+ * non-finite strings (`"Infinity"`, `"NaN"`) are recovered. Plain objects and
+ * arrays recurse; arrays use `default[i]` (falling back to `default[0]`) as the
+ * per-element type witness so homogeneous Decimal arrays revive.
+ *
+ * Fields present in the loaded value but absent from the default pass through
+ * unrevived — the default supplies no type witness for them. A dynamically
+ * keyed Decimal map (default `{}`, keys added at runtime) therefore isn't
+ * revived; store those as separate refs or via an explicit schema.
+ */
+function reviveValue(loaded: unknown, defaultNode: unknown): unknown {
+  if (defaultNode instanceof Decimal) {
+    return typeof loaded === 'string' ? new Decimal(loaded) : loaded;
+  }
+  if (typeof defaultNode === 'number') {
+    if (typeof loaded === 'string' && loaded in NON_FINITE_NUMBERS) {
+      return NON_FINITE_NUMBERS[loaded];
+    }
+    return loaded;
+  }
+  if (Array.isArray(defaultNode) && Array.isArray(loaded)) {
+    if (defaultNode.length === 0) return loaded;
+    return loaded.map((el, i) => reviveValue(el, defaultNode[i] ?? defaultNode[0]));
+  }
+  if (isRevivableObject(defaultNode) && isRevivableObject(loaded)) {
+    const dn = defaultNode as Record<string, unknown>;
+    const ld = loaded as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(ld)) {
+      out[k] = k in dn ? reviveValue(ld[k], dn[k]) : ld[k];
+    }
+    return out;
+  }
+  return loaded;
+}
+
+/** Plain, non-array object safe to recurse into (excludes arrays, Decimal,
+ * Map/Set/Date/RegExp, and persistent refs via {@link isPlainContainer}). */
+function isRevivableObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v) && isPlainContainer(v);
+}
+
 /**
  * Load save data into persistent refs
  */
@@ -950,25 +1004,13 @@ export function deserializePersistents(
 
   try {
     for (const [path, persistentRef] of refs) {
-      let current = getNested(save, path);
+      const current = getNested(save, path);
 
       if (current !== undefined) {
-        if (typeof current === 'string') {
-          const defaultValue = persistentRef[DefaultValue];
-          if (defaultValue instanceof Decimal) {
-            // serializePersistents writes Decimals as `value.toString()`;
-            // rehydrate so consumer code calling instance methods
-            // (`ref.value.gte(...)`, `.add(...)`, etc.) keeps working post-load.
-            current = new Decimal(current);
-          } else if (typeof defaultValue === 'number') {
-            // Recover non-finite numbers encoded as strings during serialization
-            const numMap: Record<string, number> = { Infinity, '-Infinity': -Infinity, NaN };
-            if (current in numMap) {
-              current = numMap[current];
-            }
-          }
-        }
-        persistentRef[PersistentState].value = current as State;
+        // Rehydrate Decimals the serializer flattened to strings — top level and
+        // nested alike, guided by the ref's declared default shape.
+        const revived = reviveValue(current, persistentRef[DefaultValue]);
+        persistentRef[PersistentState].value = revived as State;
       } else {
         // Reset to default if not in save
         resetPersistent(persistentRef);
