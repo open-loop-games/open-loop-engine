@@ -1404,8 +1404,14 @@ export function calculateCost(
     }
   }
 
-  for (let i = toNumber(newValue); i < toNumber(targetValue); i++) {
-    cost = Decimal.add(cost, formula.evaluate(i));
+  // Sum the direct-computation tail by a bounded integer counter, evaluating at
+  // Decimal offsets from newValue. Iterating a float `i` over the value range
+  // itself stalls forever once a level reaches 2^53 — float ULP exceeds 1 there,
+  // so `i++` is a no-op and the loop never advances. The tail is always small
+  // (its span is min(directSum, amountToBuy)), so count the terms, not the values.
+  const directCount = toNumber(Decimal.sub(targetValue, newValue));
+  for (let i = 0; i < directCount; i++) {
+    cost = Decimal.add(cost, formula.evaluate(Decimal.add(newValue, i)));
   }
   return cost;
 }

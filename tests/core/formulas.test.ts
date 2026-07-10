@@ -1342,6 +1342,15 @@ describe('Buy Max', () => {
       const formula = Formula.variable(purchases).abs();
       expect(() => calculateCost(formula, 10, true, 10)).not.toLogError();
     });
+    test('directSum tail terminates when the current level exceeds 2^53', () => {
+      // Iterating the tail by a float counter over the value range hangs here:
+      // past 2^53 the float ULP exceeds 1, so `i++` is a no-op and the loop
+      // spins forever. The cost must still resolve to a finite value.
+      const purchases = ref(new Decimal(2).pow(53));
+      const variable = Formula.variable(purchases);
+      const cost = calculateCost(variable, 20, true, 10);
+      expect(Decimal.isFinite(cost)).toBe(true);
+    });
   });
 
   describe('discrete-sum semantics: max-affordable matches Σf(A+i) ≤ R', () => {
