@@ -50,20 +50,22 @@ export interface SpatialGridEvents<T> {
  * and accepted by `restore()`. Wrap in a single `persistent()` ref to
  * persist across saves; per-cell `persistent()` is explicitly rejected.
  *
- * Bitmap fields are `Uint8Array` to match the live grid's shape — no
- * shim when building a snapshot from in-memory data, and `restore()`
- * can use `.set()` in bulk rather than an element loop. `serialize()`
- * returns fresh typed-array copies, so mutating the live grid after a
- * serialize never corrupts the snapshot.
+ * Bitmap fields are plain `number[]`, not `Uint8Array`: the snapshot is a
+ * serialization boundary and must survive JSON (a `Uint8Array` stringifies to
+ * `{"0":1,...}` and reloads as a lengthless object, which `restore()` rejects).
+ * The live grid keeps `Uint8Array` for tick-rate performance; `serialize()`
+ * copies out to `number[]` and `restore()` bulk-loads via `.set()`, which
+ * accepts a plain array. Snapshot arrays are fresh copies, so mutating the live
+ * grid after a serialize never corrupts the snapshot.
  */
 export interface SpatialGridSnapshot<T> {
   width: number;
   height: number;
   /** Row-major dense cell array, length === width * height. */
   cells: T[];
-  passable: Uint8Array;
-  explored: Uint8Array;
-  visible: Uint8Array;
+  passable: number[];
+  explored: number[];
+  visible: number[];
 }
 
 /**
@@ -467,9 +469,9 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         width,
         height,
         cells: cells.slice(),
-        passable: new Uint8Array(passable),
-        explored: new Uint8Array(explored),
-        visible: new Uint8Array(visible),
+        passable: Array.from(passable),
+        explored: Array.from(explored),
+        visible: Array.from(visible),
       };
     },
 

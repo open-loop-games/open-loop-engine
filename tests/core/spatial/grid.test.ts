@@ -556,46 +556,49 @@ describe('createSpatialGrid — serialize / restore', () => {
       width: 3,
       height: 3,
       cells: Array.from({ length: 9 }, floor),
-      passable: new Uint8Array(9),
-      explored: new Uint8Array(9),
-      visible: new Uint8Array(9),
+      passable: new Array(9).fill(0),
+      explored: new Array(9).fill(0),
+      visible: new Array(9).fill(0),
     };
     expect(() => grid.restore(bad)).toThrow();
   });
 
-  it('serialize() returns typed-array copies independent of the live grid', () => {
+  it('serialize() returns plain-array copies independent of the live grid', () => {
     const grid = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
     grid.passable[0] = 1;
     const snapshot = grid.serialize();
-    expect(snapshot.passable).toBeInstanceOf(Uint8Array);
-    expect(snapshot.explored).toBeInstanceOf(Uint8Array);
-    expect(snapshot.visible).toBeInstanceOf(Uint8Array);
+    // Bitmaps are plain number[] so the snapshot survives JSON persistence.
+    expect(Array.isArray(snapshot.passable)).toBe(true);
+    expect(Array.isArray(snapshot.explored)).toBe(true);
+    expect(Array.isArray(snapshot.visible)).toBe(true);
     // Mutating the live bitmap must not leak into an already-captured snapshot.
     grid.passable[1] = 1;
     expect(snapshot.passable[0]).toBe(1);
     expect(snapshot.passable[1]).toBe(0);
-    // And the snapshot's buffer must not alias the live one.
-    expect(snapshot.passable.buffer).not.toBe(grid.passable.buffer);
   });
 
-  it('integrates with the consumer pattern: snapshot wrapped in a single persistent() ref', () => {
+  it('round-trips through a JSON save/load, wrapped in a single persistent() ref', () => {
     beginPersistentContext('spatial-grid-snapshot-test');
     try {
       const initial: SpatialGridSnapshot<Tile> = {
         width: 2,
         height: 2,
         cells: [floor(), floor(), floor(), floor()],
-        passable: new Uint8Array([1, 0, 0, 1]),
-        explored: new Uint8Array([0, 0, 0, 0]),
-        visible: new Uint8Array([0, 0, 0, 0]),
+        passable: [1, 0, 0, 1],
+        explored: [0, 0, 0, 0],
+        visible: [0, 0, 0, 0],
       };
       const snapshotRef = persistent<SpatialGridSnapshot<Tile>>(initial);
       const grid = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
       grid.restore(snapshotRef.value);
       grid.set(1, 1, { kind: 'wall' });
-      snapshotRef.value = grid.serialize();
-      expect(snapshotRef.value.cells[3].kind).toBe('wall');
-      expect(Array.from(grid.passable)).toEqual([1, 0, 0, 1]);
+      // Simulate the real save boundary: the persisted snapshot goes through JSON.
+      const reloaded = JSON.parse(JSON.stringify(grid.serialize())) as SpatialGridSnapshot<Tile>;
+      const restored = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
+      restored.restore(reloaded);
+      expect(reloaded.cells[3].kind).toBe('wall');
+      expect(Array.from(restored.passable)).toEqual([1, 0, 0, 1]);
+      expect(restored.at(1, 1).kind).toBe('wall');
     } finally {
       endPersistentContext();
     }
