@@ -14,6 +14,8 @@ export {
   createResourcePeakTracker,
   createLoopFinalizeTracker,
   defaultAnalyzerPack,
+  createSeriesTracker,
+  seriesAnalyzerPack,
 } from './analyzers';
 export {
   createPickerSnapshot,

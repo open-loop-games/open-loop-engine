@@ -19,7 +19,9 @@ Reusable in-run trackers (resource peaks, loop finalize, default pack).
 
 - `function createLoopFinalizeTracker(): Analyzer` — Create an Analyzer that counts finalized loops and snapshots the most recent loop's deltas into the summary. `src/harness/analyzers/loop-finalize.ts:28`
 - `function createResourcePeakTracker(resource: Resource): Analyzer` — Create an Analyzer that samples a single resource every tick and emits `{ peak, final, avg }` at the end of the run. `src/harness/analyzers/resource-peak.ts:68`
+- `function createSeriesTracker(resource: Resource): Analyzer` — Create an Analyzer that records a single resource's value at every tick and emits it as `series:{displayName}.t{i}` (zero-based tick index). `src/harness/analyzers/series.ts:47`
 - `function defaultAnalyzerPack(engine: Engine): Analyzer[]` — Build a fresh analyzer pack for the given engine. `src/harness/analyzers/default-pack.ts:43`
+- `function seriesAnalyzerPack(engine: Engine): Analyzer[]` — Build one createSeriesTracker per entry in the engine's resource registry — the trajectory-capturing counterpart to defaultAnalyzerPack. `src/harness/analyzers/series.ts:85`
 
 ## Flow-channel classification
 
