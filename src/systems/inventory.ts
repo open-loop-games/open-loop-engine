@@ -5,13 +5,13 @@
  * vocabulary (add/remove/canFit/isFull) instead of raw bag operations.
  */
 
-import { computed, reactive, unref, type ComputedRef } from 'vue';
+import { computed, type ComputedRef } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
 import { createResource, type Resource } from '@/core/resource';
 import { withPersistentContext } from '@/core/persistence';
-import type { Modifier } from '@/core/modifier';
+import { createModifierChain, type Modifier } from '@/core/modifier';
 
 // === TYPES ===
 
@@ -62,8 +62,8 @@ export interface Inventory {
   // --- Capacity ---
   /** Current evaluated per-item cap (reactive) */
   capacity: ComputedRef<Decimal>;
-  /** Push a modifier onto the per-item capacity chain */
-  addCapacityModifier(mod: Modifier): void;
+  /** Add a modifier to the per-item capacity chain; returns a remover. */
+  addCapacityModifier(mod: Modifier): () => void;
   /** How much more of this item can fit */
   remainingSpace(itemId: string): Decimal;
   /** Is the inventory full for a specific item, or overall if no itemId */
@@ -115,17 +115,15 @@ export function createInventory(options: InventoryOptions): Inventory {
   } = options;
 
   // --- Capacity modifier chain ---
-  const modifiers: Modifier[] = reactive([]);
+  // A named `{id}/capacity` chain rather than a hand-rolled reactive array:
+  // it auto-registers under ChainRegistry (so balance-sim / devtools can
+  // attribute each capacity contribution), composes reactively, and hands
+  // back a removal function on add. Matches Producer/Skill chain wiring.
+  const capacityChain = createModifierChain(`${id}/capacity`);
 
-  const capacity: ComputedRef<Decimal> = computed(() => {
-    let value: DecimalSource = baseCapacity;
-    for (const mod of modifiers) {
-      if (unref(mod.enabled) !== false) {
-        value = mod.apply(value);
-      }
-    }
-    return new Decimal(value);
-  });
+  const capacity: ComputedRef<Decimal> = computed(() =>
+    Decimal.fromValue(capacityChain.apply(baseCapacity)),
+  );
 
   // --- Underlying bag with reactive per-item cap ---
   const bag = createResourceBag({
@@ -211,8 +209,8 @@ export function createInventory(options: InventoryOptions): Inventory {
     capacity,
     resources: linkedResources,
 
-    addCapacityModifier(mod: Modifier): void {
-      modifiers.push(mod);
+    addCapacityModifier(mod: Modifier): () => void {
+      return capacityChain.add(mod);
     },
 
     remainingSpace(itemId: string): Decimal {

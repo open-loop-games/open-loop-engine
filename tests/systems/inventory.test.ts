@@ -239,6 +239,16 @@ describe('Inventory', () => {
       // (10 + 10) × 2 = 40
       expect(inv.capacity.value.eq(40)).toBe(true);
     });
+
+    it('addCapacityModifier returns a remover that restores capacity', () => {
+      const inv = createInventory({ id: 'inv', baseCapacity: 10 });
+      const remove = inv.addCapacityModifier(
+        createAdditiveModifier({ addend: 5, description: '+5' }) as Modifier,
+      );
+      expect(inv.capacity.value.eq(15)).toBe(true);
+      remove();
+      expect(inv.capacity.value.eq(10)).toBe(true);
+    });
   });
 
   describe('persistence', () => {
