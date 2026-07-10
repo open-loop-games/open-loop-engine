@@ -1060,7 +1060,7 @@ describe('Sequencer — hold state invariants', () => {
     expect(q.currentItem).not.toBeNull();
   });
 
-  it('save/load rehydration clears in-memory hold', () => {
+  it('save/load rehydration drops the stale hold and re-drives', () => {
     const ctxId = `hold-hydrate-${Math.random().toString(36).slice(2, 8)}`;
     const tm = createTickManager();
     beginPersistentContext(ctxId);
@@ -1073,10 +1073,11 @@ describe('Sequencer — hold state invariants', () => {
 
     q.enqueue(qi('wait'));
     expect(q.holding).toBe(true);
-    expect(tm.subscriberCount()).toBe(1);
+    expect(tm.subscriberCount()).toBe(1); // stale hold's retry tick
 
     // Simulate external rehydration (save load) — feed a different rawItems
-    // payload through the save-restore path. The watch should drop the hold.
+    // payload through the save-restore path. The watch drops the stale hold
+    // (and its retry tick) and arms a one-shot re-drive.
     deserializePersistents(getAllPersistentRefs(), {
       [ctxId]: {
         current: '',
@@ -1086,7 +1087,13 @@ describe('Sequencer — hold state invariants', () => {
     });
 
     expect(q.holding).toBe(false);
-    expect(tm.subscriberCount()).toBe(0);
+    expect(q.items.value.map((i) => i.id)).toEqual(['replaced']);
+
+    // Post-load tick re-drives rather than stalling: canRun is still 'notNow',
+    // so the reloaded item re-enters hold instead of being silently stranded.
+    tm.fireTick();
+    expect(q.holding).toBe(true);
+    expect(q.currentItem).toBeNull();
     expect(q.items.value.map((i) => i.id)).toEqual(['replaced']);
   });
 });
@@ -1604,5 +1611,153 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
     const serialized = JSON.parse(currentRef!.value as string) as { id: string; m: Meta };
     expect(serialized.id).toBe('a');
     expect(serialized.m).toEqual({ ticks: 9 });
+  });
+});
+
+// ============================================================================
+// save/load re-drive — a save taken mid-hold must not reload into a stall
+// ============================================================================
+
+describe('Sequencer — save/load re-drive', () => {
+  it('resumes after a save taken mid-hold reloads into a fresh sequencer', () => {
+    const tm = createTickManager();
+    const ctxId = `hold-reload-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: () => 'now',
+    });
+    endPersistentContext();
+
+    // Simulate loading a save captured while the sequencer was holding on a
+    // 'notNow' item: current empty, the held item still queued, not paused.
+    // Hold state is runtime-only, so it is absent from the save.
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: {
+        current: '',
+        rawItems: JSON.stringify(['wait-me']),
+        paused: false,
+      },
+    });
+
+    // Nothing dispatches synchronously on load — the re-drive is deferred to
+    // the next tick so paused/cursor finish rehydrating first.
+    expect(q.currentItem).toBeNull();
+
+    // The blocking condition has since cleared; the post-load tick re-drives.
+    tm.fireTick();
+    expect(q.currentItem?.id).toBe('wait-me');
+    expect(q.holding).toBe(false);
+    // The one-shot re-drive tick unregistered itself — no live watcher leaks.
+    expect(tm.subscriberCount()).toBe(0);
+  });
+
+  it('re-enters hold on load when the item is still notNow', () => {
+    const tm = createTickManager();
+    const ctxId = `hold-reload-stillblocked-${Math.random().toString(36).slice(2, 8)}`;
+    let gate: StartResult = 'notNow';
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: () => gate,
+    });
+    endPersistentContext();
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { current: '', rawItems: JSON.stringify(['wait-me']), paused: false },
+    });
+
+    tm.fireTick();
+    // Still blocked → the sequencer re-enters the hold path rather than stalling.
+    expect(q.holding).toBe(true);
+    expect(q.currentItem).toBeNull();
+
+    // Condition clears → the retry tick dispatches.
+    gate = 'now';
+    tm.fireTick();
+    expect(q.currentItem?.id).toBe('wait-me');
+    expect(q.holding).toBe(false);
+  });
+
+  it('resumes list-mode hold from the saved cursor after reload', () => {
+    const tm = createTickManager();
+    const ctxId = `list-hold-reload-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: () => 'now',
+    });
+    endPersistentContext();
+
+    // List-mode save mid-hold: 'a' already completed, holding on 'b' at cursor 1.
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: {
+        current: '',
+        rawItems: JSON.stringify(['a', 'b', 'c']),
+        paused: false,
+        rawCursor: 1,
+      },
+    });
+
+    expect(q.currentItem).toBeNull();
+    tm.fireTick();
+    // Re-drives from the loaded cursor (1), dispatching 'b' — proving the
+    // deferral let rawCursor rehydrate before the re-drive read it. A
+    // synchronous re-drive in the rawItems watch would have seen cursor 0
+    // and wrongly dispatched 'a'.
+    expect(q.currentItem?.id).toBe('b');
+    expect(q.cursor).toBe(1);
+  });
+
+  it('does not auto-start on load when startOnEnqueue is false (planning mode)', () => {
+    const tm = createTickManager();
+    const ctxId = `plan-reload-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      startOnEnqueue: false,
+      registerTick: tm.registerTick,
+      canRun: () => 'now',
+    });
+    endPersistentContext();
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { current: '', rawItems: JSON.stringify(['planned']), paused: false },
+    });
+
+    tm.fireTick();
+    // Explicit-control sequencer stays put until the consumer calls start().
+    expect(q.currentItem).toBeNull();
+    expect(q.items.value.map((i) => i.id)).toEqual(['planned']);
+
+    q.start();
+    expect(q.currentItem?.id).toBe('planned');
+  });
+
+  it('stays paused on load and does not dispatch until resumed', () => {
+    const tm = createTickManager();
+    const ctxId = `paused-reload-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: () => 'now',
+    });
+    endPersistentContext();
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { current: '', rawItems: JSON.stringify(['wait-me']), paused: true },
+    });
+
+    tm.fireTick();
+    // paused rehydrated true — the deferred re-drive must respect it.
+    expect(q.currentItem).toBeNull();
+
+    q.resume();
+    expect(q.currentItem?.id).toBe('wait-me');
   });
 });

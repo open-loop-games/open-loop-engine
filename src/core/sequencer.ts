@@ -459,6 +459,22 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       _head = 0;
       bumpLive();
       _lastWritten = newRaw;
+
+      // Hold state is runtime-only (see § HOLD STATE), so a save taken while
+      // holding on a 'notNow' item reloads with current='' and the held item
+      // still queued — a silent permanent stall unless we re-drive. Re-dispatch
+      // on the next tick via a one-shot registerTick: deferred so `paused` and
+      // `rawCursor` (which deserialize *after* rawItems) are read at their
+      // loaded values rather than mid-load, and self-unregistering so it leaves
+      // no live watcher behind. Gated on startOnEnqueue so explicit-control
+      // sequencers stay put until the consumer calls start(); the hold path
+      // requires registerTick, so its absence means no hold stall can exist.
+      if (startOnEnqueue && registerTick && current.value === '' && _liveItems.length > 0) {
+        const unsubRedrive = registerTick(() => {
+          unsubRedrive();
+          if (current.value === '' && !paused.value && !_holding) dequeueNext();
+        });
+      }
     },
     { flush: 'sync' },
   );
@@ -484,7 +500,9 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   let _advanceCapHit = false;
 
   // === HOLD STATE ===
-  // In-memory only; save/load re-enters the hold path via dequeueNext.
+  // Runtime-only, not persisted. A save taken mid-hold reloads with the held
+  // item still queued and current=''; the rawItems rehydration watch above
+  // re-drives it on the next post-load tick.
 
   let _holding = false;
   let _unsubRetryTick: (() => void) | null = null;
