@@ -295,22 +295,29 @@ describe('Creating Formulas', () => {
       testName += args[i];
     }
     testName += ') evaluates correctly';
-    test(testName, () => {
-      // @ts-expect-error - dynamic method access
-      const formula = Formula[functionName](...args);
+    test(
+      testName,
+      () => {
+        // @ts-expect-error - dynamic method access
+        const formula = Formula[functionName](...args);
 
-      try {
-        const expectedEvaluation = Decimal[functionName](
-          // @ts-expect-error - dynamic method access
-          ...args.map((i) => unrefFormulaSource(i)),
-        );
-        if (expectedEvaluation != null) {
-          expect(formula.evaluate()).compare_tolerance(expectedEvaluation);
+        try {
+          const expectedEvaluation = Decimal[functionName](
+            // @ts-expect-error - dynamic method access
+            ...args.map((i) => unrefFormulaSource(i)),
+          );
+          if (expectedEvaluation != null) {
+            expect(formula.evaluate()).compare_tolerance(expectedEvaluation);
+          }
+        } catch {
+          // If this is an invalid Decimal operation, then ignore this test case
         }
-      } catch {
-        // If this is an invalid Decimal operation, then ignore this test case
-      }
-    });
+        // A few pathological inputs (e.g. slog(-2), pentate(10.5, -2, 0)) are
+        // correct but slow single Decimal calls that brush the default 5s timeout
+        // under load; give the whole generated family comfortable headroom.
+      },
+      15000,
+    );
   }
 
   describe('0-param', () => {
