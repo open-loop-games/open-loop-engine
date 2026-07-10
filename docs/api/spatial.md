@@ -41,18 +41,18 @@ Keyed node/edge container with nested child-graph composition — the substrate 
 
 Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active.
 
-- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:178`
-- `interface ScopeStack<N, E>` — Navigation cursor over a recursive graph-of-graphs. `src/core/spatial/scope-stack.ts:95`
-- `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:88`
-- `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:64`
-- `interface ScopeStackSnapshot` — Plain-object snapshot of the stack's navigation state. `src/core/spatial/scope-stack.ts:82`
-- `type ScopeState = 'pristine' | 'unstable' | 'stable' | string` — Caller-owned scope-state label. `src/core/spatial/scope-stack.ts:61`
+- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:176`
+- `interface ScopeStack<N, E>` — Navigation cursor over a recursive graph-of-graphs. `src/core/spatial/scope-stack.ts:93`
+- `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:86`
+- `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:62`
+- `interface ScopeStackSnapshot` — Plain-object snapshot of the stack's navigation state. `src/core/spatial/scope-stack.ts:80`
+- `type ScopeState = 'pristine' | 'unstable' | 'stable' | string` — Caller-owned scope-state label. `src/core/spatial/scope-stack.ts:59`
 
 ## Influence layer
 
 Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric grid into an influence map.
 
-- `function composeInfluenceLayers(readers: readonly InfluenceLayerReader[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerReader` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:457`
+- `function composeInfluenceLayers(readers: readonly InfluenceLayerReader[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerReader` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:456`
 - `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Wrap a `SpatialGrid<number>` with an influence-map lifecycle. `src/core/spatial/influence-layer.ts:268`
 - `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:230`
 - `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff curve applied per cell during accumulation. `src/core/spatial/influence-layer.ts:94`

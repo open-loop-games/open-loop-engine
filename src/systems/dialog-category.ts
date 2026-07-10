@@ -125,5 +125,3 @@ export function createDialogCategory<Def extends { id: string }>(
     [Resettable]: base[Resettable],
   };
 }
-
-// === PUBLIC UTILITIES ===

@@ -272,8 +272,7 @@ export interface EngineConfig {
    * identical to pre-namespacing saves.
    *
    * Primary use case: forkable "scratch" engine instances for sim/balance
-   * workbenches, takeover compare, A/B predictive displays. See
-   * `docs/superpowers/specs/2026-04-10-flow-graph-reframe.md`.
+   * workbenches, takeover compare, A/B predictive displays.
    */
   persistenceNamespace?: string;
   /**

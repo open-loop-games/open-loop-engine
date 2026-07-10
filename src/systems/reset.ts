@@ -214,7 +214,7 @@ function resolveScope(modules: ResetScope[]): Set<Persistent> {
  *   resetModules: [prestigeReset, 'prestige'],
  * })
  *
- * // Legacy manual mode still works:
+ * // Manual mode:
  * const manualReset = createReset({
  *   thingsToReset: [points, upgrades],
  * })

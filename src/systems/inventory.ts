@@ -235,5 +235,3 @@ export function createInventory(options: InventoryOptions): Inventory {
 
   return inventory;
 }
-
-// === TYPE GUARDS ===

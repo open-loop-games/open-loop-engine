@@ -1,5 +1,5 @@
 /**
- * Content walker leaf C2 — enumerate pending purchasable transitions.
+ * Content walker — enumerate pending purchasable transitions.
  *
  * Purchasables are the canonical "becomes affordable" transition: the cost
  * requirement names a resource, the accessor reports its current amount and

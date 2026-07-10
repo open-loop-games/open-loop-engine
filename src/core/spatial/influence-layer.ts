@@ -440,8 +440,7 @@ export function createInfluenceLayer(
  * staleness is impossible.
  *
  * `cells()` iterates the *first* reader's cell set, applying `combine` per
- * cell. Composed layers are expected to share a grid in §B5-style use,
- * making this safe.
+ * cell. Composed layers are expected to share a grid, making this safe.
  *
  * @example
  * ```ts

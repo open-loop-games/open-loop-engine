@@ -443,5 +443,3 @@ export function createBestOf(options: BestOfOptions): BestOf {
     },
   };
 }
-
-// === TYPE GUARDS ===

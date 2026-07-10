@@ -77,14 +77,14 @@ Seed-sweep runners. `runProbe` collects per-beat termination-time distributions 
 
 core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state
 
-- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:201`
-- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:45`
-- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:51`
-- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:148`
-- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:96`
-- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:124`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:85`
-- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:38`
+- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:199`
+- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:43`
+- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:49`
+- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:146`
+- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:94`
+- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:122`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:83`
+- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:36`
 
 ## Cell-aggregation kernel
 

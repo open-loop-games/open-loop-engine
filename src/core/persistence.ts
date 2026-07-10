@@ -502,7 +502,7 @@ export function persistent<T>(
  * Assign a stable save-data name to a persistent ref inside its context.
  *
  * Collisions within the same context throw — silent overwrite is exactly the
- * class of bug this refactor exists to prevent. Reassigning the same ref to
+ * class of bug this guards against. Reassigning the same ref to
  * the same name is a no-op. Reassigning a ref from one name to another frees
  * the old name.
  *

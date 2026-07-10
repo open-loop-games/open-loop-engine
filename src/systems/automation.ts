@@ -266,5 +266,3 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   return automationTiers;
 }
-
-// === TYPE GUARDS ===

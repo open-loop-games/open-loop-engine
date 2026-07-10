@@ -145,7 +145,7 @@ export interface SpatialGraph<N, E> {
    * Breadth-first reachability from `startId`. Returns a parent-link map:
    * key is a reachable node id, value is the predecessor node on the BFS
    * path. The start node maps to itself. `allowEdge`, if provided, filters
-   * which edges may be traversed — HOITU skips 'sibling' edges this way.
+   * which edges may be traversed — e.g. skipping 'sibling' edges.
    */
   bfs(startId: string, allowEdge?: (edge: GraphEdge<E>) => boolean): Map<string, GraphNode<N>>;
 

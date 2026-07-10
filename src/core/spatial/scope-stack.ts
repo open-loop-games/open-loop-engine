@@ -19,8 +19,8 @@
  * Event coupling:
  * - The stack does NOT subscribe to graph events for recalculate propagation
  *   — callers drive `recalculateAt` explicitly from their own event bus.
- *   This keeps the primitive a passive state holder and avoids the circular
- *   import worry flagged by HOITU's port sketch.
+ *   This keeps the primitive a passive state holder and avoids a circular
+ *   import between the stack and the graph event bus.
  * - The stack DOES subscribe to each ancestor graph's `nodeRemoved` for
  *   dangling-path detection: when a node in the active path is removed from
  *   its parent graph, the stack auto-exits all affected levels bottom-up and
@@ -54,9 +54,7 @@ import type { Unsubscribe } from './types';
 
 /**
  * Caller-owned scope-state label. The three defaults are conventional; any
- * string is valid so consumers can widen the vocabulary without engine
- * churn (HOITU uses `'pristine' | 'unstable' | 'stable'`; Planar Pioneers
- * may prefer its own set).
+ * string is valid so consumers can widen the vocabulary without engine churn.
  */
 export type ScopeState = 'pristine' | 'unstable' | 'stable' | string;
 

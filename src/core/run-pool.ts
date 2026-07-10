@@ -21,8 +21,6 @@
  * instances stay dead across save/load regardless of when they're
  * recreated, fixing the lazy-context gap an earlier per-instance layout
  * had with dynamically-spawned runs (borglike clones, Cavernous loops).
- *
- * Design study: `reports/studies/multi-run-orchestration/`.
  */
 
 import { computed, ref, shallowRef, watch, type Ref } from 'vue';

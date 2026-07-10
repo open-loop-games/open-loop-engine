@@ -407,5 +407,3 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     on: handle.on,
   };
 }
-
-// === PUBLIC UTILITIES ===

@@ -245,5 +245,3 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
 
   return category;
 }
-
-// === TYPE GUARDS ===

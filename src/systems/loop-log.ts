@@ -228,5 +228,3 @@ export function createLoopLog(options: LoopLogOptions): LoopLog {
     },
   };
 }
-
-// === TYPE GUARDS ===

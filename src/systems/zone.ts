@@ -201,5 +201,3 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
 
   return zoneSystem;
 }
-
-// === TYPE GUARDS ===

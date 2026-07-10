@@ -1,5 +1,5 @@
 /**
- * Content walker leaf C3 — enumerate pending producer transitions.
+ * Content walker — enumerate pending producer transitions.
  *
  * Emits one {@link Transition} per producer whose repeatable is not yet
  * maxed, answering "when will the player be able to afford the next copy

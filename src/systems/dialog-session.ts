@@ -239,5 +239,3 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     },
   };
 }
-
-// === PUBLIC UTILITIES ===

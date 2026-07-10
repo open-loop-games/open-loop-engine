@@ -1,5 +1,5 @@
 /**
- * Content walker leaf C1 — enumerate pending challenge transitions.
+ * Content walker — enumerate pending challenge transitions.
  *
  * Challenges are the best case for precise distances: `ChallengeDef` carries
  * `visible`, `canStart`, and `goal` as `boolean | Gate | (() => boolean)`.

@@ -464,5 +464,3 @@ export function createTemporaryEffectSystem(
 
   return system;
 }
-
-// === TYPE GUARDS ===

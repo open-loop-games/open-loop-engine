@@ -320,5 +320,3 @@ export function createSlot(options: SlotOptions): Slot {
     on: handle.on,
   };
 }
-
-// === TYPE GUARDS ===

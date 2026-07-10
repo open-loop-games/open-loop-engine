@@ -254,5 +254,3 @@ export function createPolynomialFormula(
     return new Decimal(Decimal.div(x, scale)).pow(exponent).floor();
   };
 }
-
-// === TYPE GUARDS ===

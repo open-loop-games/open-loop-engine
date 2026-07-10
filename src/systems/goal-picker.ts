@@ -312,5 +312,3 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
     setWeights,
   };
 }
-
-// === PUBLIC UTILITIES ===

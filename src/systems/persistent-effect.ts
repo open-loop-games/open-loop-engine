@@ -294,5 +294,3 @@ export function createPersistentEffectSystem(
 
   return system;
 }
-
-// === TYPE GUARDS ===

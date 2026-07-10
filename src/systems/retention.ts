@@ -2,8 +2,7 @@
  * Retention policy for declarative carryover across resets
  *
  * Snapshot/restore pattern: saves retained values before reset,
- * restores them after. Zero changes to core — composes with
- * existing Reset/Loop hooks.
+ * restores them after. Composes with the existing Reset/Loop hooks.
  *
  * Covers the universal retention categories:
  * - keep: refs that survive reset unchanged

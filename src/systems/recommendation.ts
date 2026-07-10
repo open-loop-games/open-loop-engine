@@ -268,7 +268,7 @@ export interface RecommendationSystem {
 
 let recSystemCounter = 0;
 
-// === INTERNAL HELPERS ===
+// === PRIVATE BUILDERS ===
 
 function serialize(rec: Recommendation): SerializedRecommendation {
   const serializedMetrics: Record<string, { current: string; projected: string; delta: string }> =
@@ -498,5 +498,3 @@ export function createRecommendationSystem(
     },
   };
 }
-
-// === TYPE GUARDS ===

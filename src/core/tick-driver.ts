@@ -34,10 +34,9 @@
  * Deterministic replay: fixed mode + seeded RNG + `stepOnce()` produces bit-identical
  * sequences across tab-performance profiles. Variable mode cannot.
  *
- * Origin: Fixed-step RAF accumulator replaced after surveying 25+ incremental games.
  * Variable dt with setInterval is the genre standard. EWMA lag compensation adapted
- * from Synergism (200 TPS, filterStrength=20). Fixed mode reintroduced as opt-in for
- * the source-faithful-port case surfaced by incloneution's tick-drift diagnostic.
+ * from Synergism (200 TPS, filterStrength=20). Fixed mode is an opt-in for the
+ * source-faithful-port case (incloneution's tick-drift diagnostic).
  */
 
 import { persistent, withPersistentContext } from './persistence';

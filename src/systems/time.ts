@@ -77,5 +77,3 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
     },
   };
 }
-
-// === TYPE GUARDS ===

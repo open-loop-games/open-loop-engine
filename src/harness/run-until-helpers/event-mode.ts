@@ -73,8 +73,8 @@ export type AdvanceToNextEventResult =
  * The realized advance is floored at `tickDelta`: dense auto-purchase cadence
  * can collapse the head distance to a few milliseconds, and stepping by that
  * raw distance pays a full incremental-snapshot rebuild (plus checkpoint
- * export under `bisectTolSec`) per micro-step — the cliff `studio/open-loop-engine#1`
- * was filed for. Flooring makes event mode asymptotically never worse than
+ * export under `bisectTolSec`) per micro-step — the performance cliff this
+ * floor exists to avoid. Flooring makes event mode asymptotically never worse than
  * tick mode; `fired` still reports only the transitions tied at the raw head
  * distance; the caller's existing bisection (triggered whenever
  * `advanced > bisectTolSec`) covers the case where the floor overshoots the

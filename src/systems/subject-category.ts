@@ -122,6 +122,10 @@ export interface VectorFieldInstance<Dims extends string = string> extends Emitt
 }
 
 interface TierFieldEvents {
+  /**
+   * Fires on any tier-index change via `setIndex` — including regressions
+   * (`to < from`), despite the name. Read `from`/`to` to distinguish direction.
+   */
   advance: (info: { from: number; to: number }) => void;
 }
 

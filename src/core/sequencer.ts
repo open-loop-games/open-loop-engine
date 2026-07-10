@@ -34,7 +34,7 @@ export interface SequencerItem<M = void> {
 /**
  * Tri-state precondition result from a {@link SequencerOptions.canRun} check.
  *
- * - `'now'` — dispatch the item (identical to boolean `true`)
+ * - `'now'` — dispatch the item
  * - `'never'` — permanently unrunnable, skip and advance
  * - `'notNow'` — temporarily blocked, **hold** the slot and retry next tick
  *
@@ -128,15 +128,14 @@ export interface SequencerOptions<M = void> {
    * Tick registration for the `'notNow'` retry path. When a canRun call
    * returns `'notNow'`, the sequencer installs a retry callback via this
    * function and re-evaluates canRun each tick until the item transitions
-   * to `'now'` or `'never'`. Without this, `'notNow'` falls back to `'never'`
-   * (same as today's boolean-false behavior).
+   * to `'now'` or `'never'`. Without this, `'notNow'` falls back to `'never'`.
    *
    * Matches `EngineContext.onTick` — pass `ctx.onTick` directly.
    */
   registerTick?: RegisterTick;
   /**
    * Whether enqueue() auto-starts execution when the sequencer is empty and not paused.
-   * Default: `true` (existing behavior — first enqueued item starts immediately).
+   * Default: `true` — the first enqueued item starts immediately.
    *
    * Set to `false` for "planning mode" where items are queued without execution.
    * Use {@link Sequencer.start start()} to begin execution explicitly.
@@ -280,8 +279,7 @@ export interface Sequencer<M = void> {
    */
   // TODO(ergonomics): accept optional `toIndex: number` for arbitrary-position
   // cursor jumps (e.g. Cavernous II's `<` repeat-from-marker). Deferred until
-  // an in-repo consumer surfaces. Study: reports/studies/multi-run-orchestration/
-  // multi-run-orchestration-primitive-surface.md § Part 2.
+  // an in-repo consumer surfaces.
   resetCursor(): void;
 
   // --- Safeguards ---

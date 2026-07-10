@@ -249,5 +249,3 @@ export function createLoop(options: LoopOptions): Loop {
 
   return loop;
 }
-
-// === TYPE GUARDS ===
