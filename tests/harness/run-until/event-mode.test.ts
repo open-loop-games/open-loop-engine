@@ -14,7 +14,7 @@ import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { runProbe } from '@/harness';
+import { runProbe, runUntil } from '@/harness';
 import type { BeatProbe } from '@/harness';
 
 beforeEach(() => {
@@ -408,6 +408,64 @@ describe("runProbe({mode: 'event'})", () => {
     expect(results[0]!.counts).toEqual({ predicate: 1, maxSimTime: 0, unreachable: 0 });
     // Without bisect, the probe records post-advance simTime = 100s.
     expect(results[0]!.terminationTime!.avg).toBeCloseTo(100, 1);
+  });
+
+  it('bisects a simTime-reading predicate to run-absolute fire time on a later advance', () => {
+    // Regression: bisectFireTime evaluated the predicate with checkpoint-
+    // relative `mid` as simTime, so a simTime-reading predicate — the exact
+    // idiom in runUntil's @example — never saw its time clause flip inside the
+    // bisect loop, and the search fell to the advance boundary. The divergence
+    // is only visible past the first advance, where the checkpoint's absolute
+    // simTime is nonzero (baseSimTime + mid ≠ mid).
+    resetAllPersistentContexts();
+    const module: EngineModule = {
+      id: 'simtime-bisect',
+      install(ctx) {
+        const gold = createResource(0, { displayName: 'gold' });
+        const upgrades = createPurchasableCategory<UpgradeDef>({
+          id: 'upgrades',
+          mapPurchasable: (def) => ({
+            display: { description: def.id },
+            requirements: [createCostRequirement({ resource: gold, cost: def.cost })],
+            limit: 1,
+          }),
+        });
+        upgrades.register([{ id: 'big', cost: 100 }]);
+        ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
+      },
+    };
+    const engine = createEngine({
+      gameId: 'simtime-bisect',
+      storageAdapter: createMemoryStorage(),
+      maxDeltaTime: 1000,
+    });
+    engine.use(module);
+    engine.start();
+
+    // Stateless accessor (gold=0, rate=1, cost=100) → the walker emits a 100s
+    // `becomes-affordable` transition every rebuild, so the run advances 100s
+    // per iteration: 0 → 100 → 200 → (crosses 250 inside the 200→300 advance).
+    // The checkpoint simTime there is 200, so the relative-vs-absolute bug
+    // records the advance boundary (300s) instead of the true crossing (250s).
+    const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 1 } });
+    const threshold = 250;
+    const tol = 0.5;
+
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: ({ simTime }) => simTime >= threshold,
+      maxSimTime: 1000,
+      tickDelta: 1,
+      bisectTolSec: tol,
+    });
+
+    expect(result.terminated).toBe('predicate');
+    // With the fix, bisect resolves the true crossing at 250s (± tol). With the
+    // bug it recorded the advance boundary at 300s.
+    expect(result.elapsedSimulated).toBeGreaterThanOrEqual(threshold - tol);
+    expect(result.elapsedSimulated).toBeLessThanOrEqual(threshold + tol);
   });
 
   it('terminates as maxSimTime when predicate never fires and events keep coming', () => {

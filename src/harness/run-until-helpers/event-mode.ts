@@ -195,6 +195,8 @@ export function runEventModeLoop(
           checkpoint,
           result.advanced,
           bisectTolSec!,
+          simTime,
+          steps,
         );
         simTime += fireDt;
         terminated = 'predicate';
@@ -215,6 +217,7 @@ export function runEventModeLoop(
           accessor,
           predicate,
           simTime,
+          steps,
           maxSimTime,
           tickDelta,
           result.fired,
@@ -240,6 +243,7 @@ export function runEventModeLoop(
           accessor,
           predicate,
           simTime,
+          steps,
           maxSimTime,
           tickDelta,
           stasisProbeInterval,
@@ -337,6 +341,7 @@ function fastTickDuringStasis(
   accessor: GameStateAccessor,
   predicate: UntilPredicate,
   startSimTime: number,
+  startSteps: number,
   maxSimTime: number,
   tickDelta: number,
   stasisProbeInterval: number,
@@ -352,7 +357,9 @@ function fastTickDuringStasis(
     simTime += dt;
     ticks++;
 
-    if (predicate({ tick: ticks, simTime })) {
+    // `startSteps + ticks` keeps ctx.tick run-absolute — consistent with the
+    // main loop's `steps`, not a per-entry local counter restarting at 1.
+    if (predicate({ tick: startSteps + ticks, simTime })) {
       return { simTime, ticks, exit: 'predicate' };
     }
     if (ticks % stasisProbeInterval === 0) {
@@ -371,6 +378,7 @@ function fastTickDuringTie(
   accessor: GameStateAccessor,
   predicate: UntilPredicate,
   startSimTime: number,
+  startSteps: number,
   maxSimTime: number,
   tickDelta: number,
   initialFired: readonly Transition[],
@@ -388,7 +396,9 @@ function fastTickDuringTie(
     simTime += dt;
     ticks++;
 
-    if (predicate({ tick: ticks, simTime })) {
+    // `startSteps + ticks` keeps ctx.tick run-absolute — consistent with the
+    // main loop's `steps`, not a per-entry local counter restarting at 1.
+    if (predicate({ tick: startSteps + ticks, simTime })) {
       return { simTime, ticks, exit: 'predicate' };
     }
     if (ticks % stasisProbeInterval === 0) {
@@ -443,6 +453,8 @@ function bisectFireTime(
   checkpoint: { blob: string; rng: RNGState },
   advanceDt: number,
   tolSec: number,
+  baseSimTime: number,
+  baseSteps: number,
 ): number {
   let low = 0;
   let high = advanceDt;
@@ -451,7 +463,11 @@ function bisectFireTime(
     engine.saveManager!.importSave(checkpoint.blob);
     setRNGState(checkpoint.rng);
     engine.tickDriver.simulateTick(mid);
-    if (predicate({ tick: 0, simTime: mid })) high = mid;
+    // `mid` is relative to the checkpoint (the advance's start); the predicate
+    // reads run-absolute `simTime`, so feed it `baseSimTime + mid`. Passing the
+    // raw `mid` here silently defeats bisection for any simTime-reading
+    // predicate — the exact idiom in runUntil's @example.
+    if (predicate({ tick: baseSteps, simTime: baseSimTime + mid })) high = mid;
     else low = mid;
   }
   // Leave the engine at the smallest dt for which the predicate is true so
