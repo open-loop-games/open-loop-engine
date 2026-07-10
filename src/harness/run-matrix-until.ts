@@ -70,18 +70,27 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
     const engine = cell.buildEngine({ seed });
     const analyzers = cell.analyzers;
     const accessor = cell.buildAccessor?.(engine);
-    const result = runUntil({
-      engine,
-      until: config.until,
-      maxSimTime: config.maxSimTime,
-      tickDelta: cell.tickDelta,
-      setup: analyzers ? () => analyzers(engine, { seed }) : undefined,
-      seed,
-      mode,
-      accessor,
-      bisectTolSec: config.bisectTolSec,
-      stasisProbeInterval: config.stasisProbeInterval,
-    });
+    let result: RunUntilResult;
+    try {
+      result = runUntil({
+        engine,
+        until: config.until,
+        maxSimTime: config.maxSimTime,
+        tickDelta: cell.tickDelta,
+        setup: analyzers ? () => analyzers(engine, { seed }) : undefined,
+        seed,
+        mode,
+        accessor,
+        bisectTolSec: config.bisectTolSec,
+        stasisProbeInterval: config.stasisProbeInterval,
+      });
+    } finally {
+      // buildEngine returns a *started* engine (contract); with the default
+      // TickDriver that is a live setInterval. Stop each run's engine or the
+      // sweep leaks one ticking engine per (cell × seed) that keeps the Node
+      // process alive. `stop?.` tolerates lightweight test fakes.
+      engine.stop?.();
+    }
     perCellRuns[item.cellIdx]!.push(result);
     config.onRunComplete?.(item, result);
 

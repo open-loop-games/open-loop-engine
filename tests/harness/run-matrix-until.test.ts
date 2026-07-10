@@ -55,6 +55,33 @@ function createTickRecorder(state: TestState): Analyzer {
 }
 
 describe('runMatrixUntil', () => {
+  it('stops every engine it builds, so no started engine leaks past the sweep', () => {
+    const stops: string[] = [];
+    let built = 0;
+    const cell: UntilCell = {
+      name: 'leaky',
+      buildEngine: ({ seed }) => {
+        const state: TestState = { tick: 0, lastDt: 0 };
+        const id = `run-${seed}-${built++}`;
+        const engine = {
+          tickDriver: { simulateTick: () => (state.tick += 1) },
+          stop: () => stops.push(id),
+        };
+        return engine as unknown as Engine;
+      },
+      tickDelta: 0.1,
+    };
+    runMatrixUntil({
+      cells: [cell],
+      seeds: [1, 2, 3],
+      until: ({ tick }) => tick >= 3,
+      maxSimTime: 10,
+    });
+    // One stop() per (cell × seed) run — none left ticking.
+    expect(stops).toHaveLength(3);
+    expect(built).toBe(3);
+  });
+
   it('runs cells × seeds, fresh engine per run, predicate-terminated', () => {
     const sink = new Map<number, TestState>();
     const cellA = makeCell('a', sink, 0.1);
