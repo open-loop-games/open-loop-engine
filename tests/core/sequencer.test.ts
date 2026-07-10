@@ -525,7 +525,9 @@ describe('Sequencer — canRun tri-state', () => {
     // Item remains in the waiting list — peek, don't pop
     expect(q.items.value.map((i) => i.id)).toEqual(['wait-me']);
     expect(events).toEqual(['hold:wait-me']);
-    expect(tm.subscriberCount()).toBe(1);
+    // Two ticks: the always-on advance-cap reset (registered at construction
+    // whenever registerTick is supplied) plus the hold's retry tick.
+    expect(tm.subscriberCount()).toBe(2);
   });
 
   it('"notNow" without registerTick degrades to "never"', () => {
@@ -1073,7 +1075,8 @@ describe('Sequencer — hold state invariants', () => {
 
     q.enqueue(qi('wait'));
     expect(q.holding).toBe(true);
-    expect(tm.subscriberCount()).toBe(1); // stale hold's retry tick
+    // Always-on advance-cap reset tick + the stale hold's retry tick.
+    expect(tm.subscriberCount()).toBe(2);
 
     // Simulate external rehydration (save load) — feed a different rawItems
     // payload through the save-restore path. The watch drops the stale hold
@@ -1650,7 +1653,9 @@ describe('Sequencer — save/load re-drive', () => {
     expect(q.currentItem?.id).toBe('wait-me');
     expect(q.holding).toBe(false);
     // The one-shot re-drive tick unregistered itself — no live watcher leaks.
-    expect(tm.subscriberCount()).toBe(0);
+    // The always-on advance-cap reset tick remains (it lives for the
+    // sequencer's lifetime whenever registerTick is supplied).
+    expect(tm.subscriberCount()).toBe(1);
   });
 
   it('re-enters hold on load when the item is still notNow', () => {

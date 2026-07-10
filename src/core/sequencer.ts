@@ -99,8 +99,12 @@ export interface SequencerOptions<M = void> {
   /**
    * Maximum number of complete→dequeueNext advances allowed per tick.
    * Prevents runaway loops when items complete instantly.
-   * Call `resetAdvanceCount()` at the start of each tick.
-   * Default: {@link DEFAULT_MAX_ADVANCES_PER_TICK} (1000).
+   *
+   * When {@link registerTick} is supplied the counter resets automatically at
+   * each tick boundary. A sequencer driven manually without `registerTick` must
+   * call {@link resetAdvanceCount} at the start of each tick, or the cap latches
+   * into a lifetime budget and dequeueNext stalls once cumulative advances pass
+   * it. Default: {@link DEFAULT_MAX_ADVANCES_PER_TICK} (1000).
    */
   maxAdvancesPerTick?: number;
   /**
@@ -282,8 +286,10 @@ export interface Sequencer<M = void> {
 
   // --- Safeguards ---
   /**
-   * Reset the per-tick advance counter. Call at the start of each game tick
-   * so the sequencer can advance again after hitting its cap.
+   * Reset the per-tick advance counter so the sequencer can advance again after
+   * hitting its cap. Called automatically each tick when {@link registerTick} is
+   * supplied; call it manually at the start of each game tick when driving the
+   * sequencer without `registerTick`.
    */
   resetAdvanceCount(): void;
 
@@ -1006,6 +1012,18 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       return handle.on(event, handler);
     },
   };
+
+  // The advance cap guards against instant-complete runaway *within a single
+  // tick*. When the consumer supplies registerTick, own the per-tick reset so
+  // the cap can't silently latch into a lifetime budget: without it the counter
+  // accumulates across every tick and dequeueNext returns null forever once
+  // cumulative advances pass the cap. Registered once, fired at the tick
+  // boundary (never mid-dispatch-cascade), so within-tick runaway still trips.
+  // Sequencers driven without registerTick keep the manual resetAdvanceCount()
+  // obligation.
+  if (registerTick) {
+    registerTick(() => sequencer.resetAdvanceCount());
+  }
 
   return sequencer;
 }

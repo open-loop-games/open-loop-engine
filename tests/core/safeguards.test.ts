@@ -164,6 +164,43 @@ describe('sequencer advance cap', () => {
     expect(diagAfter.advanceCapTrips).toBe(before.advanceCapTrips);
   });
 
+  it('resets the cap each tick when driven via registerTick (B3)', () => {
+    // A sequencer wired the recommended way — driven through registerTick —
+    // must not let the per-tick cap silently latch into a lifetime budget.
+    // Without an owned per-tick reset, cumulative advances across ticks exceed
+    // the cap and dequeueNext returns null forever, permanently stalling the
+    // queue (the B3 blocker). One item completes per tick here; cumulative
+    // completes (15) far exceed the cap (3), so a lifetime counter would trip.
+    const cbs = new Set<() => void>();
+    const registerTick = (cb: () => void) => {
+      cbs.add(cb);
+      return () => cbs.delete(cb);
+    };
+    const fireTick = () => {
+      for (const cb of [...cbs]) cb();
+    };
+
+    beginPersistentContext('b3');
+    const q = createSequencer<void>({ id: 'b3', maxAdvancesPerTick: 3, registerTick });
+    endPersistentContext();
+
+    const started: string[] = [];
+    q.on('start', (item) => started.push(item.id));
+
+    for (let i = 0; i < 20; i++) q.enqueue(qi(`item-${i}`));
+
+    for (let t = 0; t < 15; t++) {
+      fireTick(); // start-of-tick reset zeroes the per-tick counter
+      q.complete(); // completes current, advances to next
+    }
+
+    // The queue kept advancing every tick — never latched to null.
+    expect(getDiagnostics().advanceCapTrips).toBe(0);
+    expect(q.currentItem).not.toBeNull();
+    // 1 auto-start on first enqueue + 15 per-tick advances.
+    expect(started.length).toBe(16);
+  });
+
   it('does not interfere with normal sequencer operation within cap', () => {
     const q = makeQueue({ maxAdvancesPerTick: 100 });
     const completed: string[] = [];
