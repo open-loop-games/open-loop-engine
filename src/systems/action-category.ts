@@ -251,17 +251,6 @@ function buildInitialMetadata<Payload>(
   };
 }
 
-function defaultProgressFor(
-  hint: number | Record<string, number> | undefined,
-): number | Record<string, number> {
-  if (hint === undefined) return 0;
-  if (typeof hint === 'number') return 0;
-  // Multi-bar hint: zero out the same keys so accumulators have stable shape.
-  const seed: Record<string, number> = {};
-  for (const key of Object.keys(hint)) seed[key] = 0;
-  return seed;
-}
-
 // === FACTORIES ===
 
 /**
@@ -562,7 +551,9 @@ export function createActionCategory<Def extends { id: string }, State = void, P
         );
       }
       const payload = (opts?.payload ?? (undefined as unknown)) as Payload;
-      const meta = buildInitialMetadata(defId, payload, defaultProgressFor(undefined));
+      // Multi-bar accumulators seed their per-key shape lazily via
+      // tickItemProgress's runtime coercion; a scalar 0 is the right seed here.
+      const meta = buildInitialMetadata(defId, payload, 0);
       const item: SequencerItem<ActionItemMetadata<Payload>> = { id: defId, metadata: meta };
       return sequencer.enqueue(item, opts?.at !== undefined ? { at: opts.at } : undefined);
     },

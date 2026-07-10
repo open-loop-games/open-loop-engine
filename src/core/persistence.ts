@@ -829,22 +829,24 @@ export function createDefinitionStates<D, K, S>(
   keyAccessor: (def: D) => K = (def) => (def as { id: K }).id,
 ): Map<K, S> {
   const map = new Map<K, S>();
-  beginPersistentContext(contextId);
-  for (const def of definitions) {
-    const state = stateFactory(def);
-    const defKey = keyAccessor(def);
-    // Auto-name every persistent field as `${defId}.${fieldName}` so save
-    // keys stay stable across field reorders and new-field additions.
-    if (state !== null && typeof state === 'object') {
-      for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
-        if (isPersistent(value) && value[PersistentName] === undefined) {
-          setPersistentName(value, `${String(defKey)}.${fieldName}`);
+  // withPersistentContext, not a bare begin/end pair: a throwing stateFactory
+  // must not leave the context stack pushed and mis-scope every later ref.
+  withPersistentContext(contextId, () => {
+    for (const def of definitions) {
+      const state = stateFactory(def);
+      const defKey = keyAccessor(def);
+      // Auto-name every persistent field as `${defId}.${fieldName}` so save
+      // keys stay stable across field reorders and new-field additions.
+      if (state !== null && typeof state === 'object') {
+        for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
+          if (isPersistent(value) && value[PersistentName] === undefined) {
+            setPersistentName(value, `${String(defKey)}.${fieldName}`);
+          }
         }
       }
+      map.set(defKey, state);
     }
-    map.set(defKey, state);
-  }
-  endPersistentContext();
+  });
   return map;
 }
 

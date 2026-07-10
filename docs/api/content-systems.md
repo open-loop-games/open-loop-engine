@@ -47,8 +47,8 @@ batch-registered ordered-execution queue with per-execution state machine
 - `type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 'failed'` — Per-execution lifecycle state. `src/systems/action-category.ts:53`
 - `interface ActionMapping<Def extends { id: string; }, State, Payload>` — Return type of the `mapAction` callback. `src/systems/action-category.ts:95`
 - `interface ActionTickContext<Def extends { id: string; }, State, Payload>` — Context passed to a mapping's `tick` closure. `src/systems/action-category.ts:74`
-- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:304`
-- `function progressToDecimal(progress: number | Record<string, number>, key?: string): DecimalSource` — Coerce a plain progress value to Decimal for downstream rate-math composition. `src/systems/action-category.ts:688`
+- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:293`
+- `function progressToDecimal(progress: number | Record<string, number>, key?: string): DecimalSource` — Coerce a plain progress value to Decimal for downstream rate-math composition. `src/systems/action-category.ts:679`
 
 ## Automation tiers
 

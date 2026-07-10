@@ -15,12 +15,12 @@ Start with these public symbols before scanning the full inventory below.
 
 weighted-goal selection over a candidate pool
 
-- `function createGoalPicker<TCandidate, TContext, TWeights>(options: GoalPickerOptions<TCandidate, TContext, TWeights>): GoalPicker<TCandidate, TContext, TWeights>` — Creates a weighted-goal picker over a candidate pool. `src/systems/goal-picker.ts:207`
-- `type GoalCompletionFn<TCandidate, TContext> = (candidateId: TCandidate, context: TContext) => boolean` — Completion predicate. `src/systems/goal-picker.ts:51`
-- `interface GoalPicker<TCandidate, TContext, TWeights>` — A goal picker instance, returned by createGoalPicker. `src/systems/goal-picker.ts:136`
-- `interface GoalPickerOptions<TCandidate, TContext, TWeights>` — Configuration for createGoalPicker. `src/systems/goal-picker.ts:67`
-- `interface GoalPickResult<TCandidate>` — Result of one GoalPicker.pick cycle — a diff over active selections. `src/systems/goal-picker.ts:57`
-- `type GoalScorerFn<TCandidate, TContext, TWeights> = (candidateId: TCandidate, weights: TWeights, context: TContext) => number` — Score function. `src/systems/goal-picker.ts:41`
+- `function createGoalPicker<TCandidate, TContext, TWeights>(options: GoalPickerOptions<TCandidate, TContext, TWeights>): GoalPicker<TCandidate, TContext, TWeights>` — Creates a weighted-goal picker over a candidate pool. `src/systems/goal-picker.ts:206`
+- `type GoalCompletionFn<TCandidate, TContext> = (candidateId: TCandidate, context: TContext) => boolean` — Completion predicate. `src/systems/goal-picker.ts:50`
+- `interface GoalPicker<TCandidate, TContext, TWeights>` — A goal picker instance, returned by createGoalPicker. `src/systems/goal-picker.ts:135`
+- `interface GoalPickerOptions<TCandidate, TContext, TWeights>` — Configuration for createGoalPicker. `src/systems/goal-picker.ts:66`
+- `interface GoalPickResult<TCandidate>` — Result of one GoalPicker.pick cycle — a diff over active selections. `src/systems/goal-picker.ts:56`
+- `type GoalScorerFn<TCandidate, TContext, TWeights> = (candidateId: TCandidate, weights: TWeights, context: TContext) => number` — Score function. `src/systems/goal-picker.ts:40`
 
 ## Selection policies
 

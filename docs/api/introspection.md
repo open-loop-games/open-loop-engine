@@ -16,9 +16,9 @@ Start with these public symbols before scanning the full inventory below.
 
 the typed cross-category accumulator the engine self-publishes for external introspection tools (sim pickers, devtools, balance workbenches, harness walkers)
 
-- `const CategoriesKey: InjectionKey<EngineCategories>` — Discovery key for external introspection tools (sim, devtools). `src/systems/engine-categories.ts:109`
-- `interface EngineCategories` — Discovery map for external introspection tools (sim, devtools, balance workbenches). `src/systems/engine-categories.ts:64`
-- `function findCategoryEntrySignals(categories: EngineCategories, categoryId: string, entityId: string): CategoryEntrySignals | undefined` — Resolve `(categoryId, entityId)` to the entry's introspection signals across every typed slot in EngineCategories. `src/systems/engine-categories.ts:178`
+- `const CategoriesKey: InjectionKey<EngineCategories>` — Discovery key for external introspection tools (sim, devtools). `src/systems/engine-categories.ts:107`
+- `interface EngineCategories` — Discovery map for external introspection tools (sim, devtools, balance workbenches). `src/systems/engine-categories.ts:62`
+- `function findCategoryEntrySignals(categories: EngineCategories, categoryId: string, entityId: string): CategoryEntrySignals | undefined` — Resolve `(categoryId, entityId)` to the entry's introspection signals across every typed slot in EngineCategories. `src/systems/engine-categories.ts:176`
 
 ## Override Registry
 

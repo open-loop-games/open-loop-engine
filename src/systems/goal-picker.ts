@@ -26,7 +26,6 @@
  * @see {@link createSlot} — the composition target for persistence
  */
 
-import { unref } from 'vue';
 import type { Slot } from './slot';
 
 // === TYPES ===
@@ -261,7 +260,7 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
       }
     }
 
-    const capacity = Math.max(0, unref(getCapacity()));
+    const capacity = Math.max(0, getCapacity());
     const activeCount = readActive().length;
     const openSlots = Math.max(0, capacity - activeCount);
 

@@ -13,11 +13,9 @@
  *
  * Mechanism: {@link createEngine} creates a per-engine accumulator,
  * pre-provides it under {@link CategoriesKey}, and makes it the ambient
- * target during `install()` and `connect()`. Each of the five category
- * factories (`createProducerCategory`, `createPurchasableCategory`,
- * `createAchievementCategory`, `createChallengeCategory`,
- * `createSkillCategory`) appends itself to the appropriate slot at
- * construction time. Categories constructed outside an engine (tests,
+ * target during `install()` and `connect()`. Each category factory appends
+ * itself to the appropriate slot at construction time. Categories
+ * constructed outside an engine (tests,
  * throwaway scripts) silently skip registration — the primitive still
  * works, just isn't discoverable via `tryInject`.
  *
@@ -40,8 +38,8 @@ import type { CategoryEntrySignals } from './category-base';
 /**
  * Discovery map for external introspection tools (sim, devtools, balance
  * workbenches). The engine self-publishes this object under
- * {@link CategoriesKey}: each of the five category factories appends to
- * the corresponding slot at construction time, so a consumer can read the
+ * {@link CategoriesKey}: each category factory appends to the corresponding
+ * slot at construction time, so a consumer can read the
  * full inventory via `engine.tryInject(CategoriesKey)` without any
  * archetype-side publication step.
  *
