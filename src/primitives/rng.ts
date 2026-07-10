@@ -11,22 +11,29 @@ interface AleaState {
   c: number;
 }
 
-function mash(data: string): number {
+// Alea's mash is a stateful accumulator: `n` MUST persist across calls so the
+// three `mash(' ')` seed lines below diverge. A stateless mash (resetting `n`
+// per call) collapses s0 == s1 == s2 at init and makes draws 2 and 3 of every
+// seeded stream bit-identical — see the non-degeneracy regression test.
+function createMash(): (data: string) => number {
   let n = 0xefc8249d;
-  for (let i = 0; i < data.length; i++) {
-    n += data.charCodeAt(i);
-    let h = 0.02519603282416938 * n;
-    n = h >>> 0;
-    h -= n;
-    h *= n;
-    n = h >>> 0;
-    h -= n;
-    n += h * 0x100000000;
-  }
-  return (n >>> 0) * 2.3283064365386963e-10;
+  return (data: string): number => {
+    for (let i = 0; i < data.length; i++) {
+      n += data.charCodeAt(i);
+      let h = 0.02519603282416938 * n;
+      n = h >>> 0;
+      h -= n;
+      h *= n;
+      n = h >>> 0;
+      h -= n;
+      n += h * 0x100000000;
+    }
+    return (n >>> 0) * 2.3283064365386963e-10;
+  };
 }
 
 function initAleaState(seed: number): AleaState {
+  const mash = createMash();
   let s0 = mash(' ');
   let s1 = mash(' ');
   let s2 = mash(' ');
