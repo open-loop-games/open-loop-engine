@@ -7,8 +7,10 @@
  * @internal
  */
 
-import type { DecimalSource, Engine, Modifier } from '@/index';
-import { ChainRegistryKey } from '@/index';
+import type { DecimalSource } from '@/primitives/decimal';
+import type { Engine } from '@/engine';
+import type { Modifier } from '@/core/modifier';
+import { ChainRegistryKey } from '@/core/registries';
 import { forEachChainRegistryEntry } from '../walk';
 import type { ModifierPickerEntry } from './types';
 

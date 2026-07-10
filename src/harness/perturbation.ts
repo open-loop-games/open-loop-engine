@@ -39,8 +39,11 @@
  * baselines.
  */
 
-import type { Engine, Modifier, ModifierChain, DecimalSource } from '@/index';
-import { ChainRegistryKey, Decimal, EffectSystemRegistryKey, TuningRegistriesKey } from '@/index';
+import type { Engine } from '@/engine';
+import type { Modifier, ModifierChain } from '@/core/modifier';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
+import { TuningRegistriesKey } from '@/core/override-registry';
 import type { PickerEntry } from './picker';
 
 /** Scalar transform applied on top of an existing modifier or tunable value. */

@@ -43,8 +43,8 @@ synchronous tick loop for deterministic simulation and tests
 
 address→override mechanism for the balance workbench
 
-- `function applyPerturbation(engine: Engine, entry: PickerEntry, perturbation: Perturbation): () => void` — Apply `perturbation` to the surface identified by `entry` and return an idempotent cleanup that reverses the mutation. `src/harness/perturbation.ts:86`
-- `type Perturbation` — Scalar transform applied on top of an existing modifier or tunable value. `src/harness/perturbation.ts:47`
+- `function applyPerturbation(engine: Engine, entry: PickerEntry, perturbation: Perturbation): () => void` — Apply `perturbation` to the surface identified by `entry` and return an idempotent cleanup that reverses the mutation. `src/harness/perturbation.ts:89`
+- `type Perturbation` — Scalar transform applied on top of an existing modifier or tunable value. `src/harness/perturbation.ts:50`
 
 ## Picker
 
@@ -161,10 +161,10 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 
 Enumerate purchasables, producers, and challenges with their next-transition timing.
 
-- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:164`
+- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:165`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:90`
-- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:67`
-- `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:56`
+- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:68`
+- `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:57`
 - `interface Transition` — A pending state change surfaced by the content walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:52`
 - `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which content-walker leaf produced a given Transition. `src/harness/walker/types.ts:24`

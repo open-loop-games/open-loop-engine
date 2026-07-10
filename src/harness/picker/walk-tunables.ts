@@ -20,8 +20,8 @@
  * @internal
  */
 
-import type { Engine } from '@/index';
-import { TuningRegistriesKey } from '@/index';
+import type { Engine } from '@/engine';
+import { TuningRegistriesKey } from '@/core/override-registry';
 import type { TunablePickerEntry } from './types';
 
 /** @internal */

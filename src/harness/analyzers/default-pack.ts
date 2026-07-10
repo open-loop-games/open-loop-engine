@@ -17,7 +17,7 @@
  */
 
 import type { Analyzer } from '@/primitives/types';
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import { ResourceRegistryKey } from '@/core/registries';
 import { LoopLogKey } from '@/systems/loop-log';
 import { createLoopFinalizeTracker } from './loop-finalize';

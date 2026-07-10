@@ -4,7 +4,7 @@
  * single public entry point for the picker subsystem.
  */
 
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import type { ModifierPickerEntry, PickerEntry, PickerSnapshot, TunablePickerEntry } from './types';
 import { walkChainRegistry } from './walk-chain-registry';
 import { walkContent } from './walk-content';

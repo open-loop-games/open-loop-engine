@@ -24,7 +24,7 @@
  * entirely. The walker does not make that call.
  */
 
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { Transition, TransitionSource } from './types';
 import { walkChallengeTransitions } from './walk-challenge-transitions';

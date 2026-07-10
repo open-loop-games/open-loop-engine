@@ -154,6 +154,6 @@ export type {
   SaveHandler,
   LoadHandler,
   ResetHandler,
-} from '../index';
+} from '../engine';
 export { Decimal } from '../primitives/decimal';
 export type { ResettableObject } from '../systems/resettable';

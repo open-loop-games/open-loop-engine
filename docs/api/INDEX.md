@@ -235,7 +235,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 ### Runtime
 
-- `engine` — top-level facade composing every layer → runtime.md#engine-entrypoint
+- `engine` — the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_,… → runtime.md#engine-assembly
 - `reactivity` — Vue's reactivity API surfaced through the engine → runtime.md#reactivity-re-exports
 - `events` — Typed per-instance event emitter primitive → runtime.md#events
 - `tick-driver` — worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard)… → runtime.md#tickdriver

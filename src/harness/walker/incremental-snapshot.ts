@@ -34,7 +34,8 @@
  *   rebuild collapse; reads across rebuilds do not.
  */
 
-import { CategoriesKey, type Engine, type EngineCategories } from '@/index';
+import { CategoriesKey, type EngineCategories } from '@/systems/engine-categories';
+import type { Engine } from '@/engine';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps } from '@/core/transitions';
 import type { Transition, TransitionSource } from './types';

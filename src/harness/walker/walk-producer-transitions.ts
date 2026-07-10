@@ -46,8 +46,8 @@ import type { Requirement } from '@/core/requirements';
 import { isCostRequirement } from '@/core/requirements';
 import type { GameStateAccessor } from '@/primitives/types';
 import { timeUntilResource, type TransitionDeps } from '@/core/transitions';
-import { CategoriesKey } from '@/index';
-import type { Engine } from '@/index';
+import { CategoriesKey } from '@/systems/engine-categories';
+import type { Engine } from '@/engine';
 import { forEachCategoryEntity } from '../walk';
 import type { Transition } from './types';
 

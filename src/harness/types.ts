@@ -8,7 +8,7 @@
 
 import type { Analyzer, GameStateAccessor } from '@/primitives/types';
 import type { HeadlessResult } from '@/core/headless';
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 
 /**
  * Run-loop mode shared by {@link runUntil} and {@link runMatrixUntil}.

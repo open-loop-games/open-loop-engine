@@ -21,7 +21,7 @@
  * `kind === 'modifier'` pattern-match on `address.source` afterward.
  */
 
-import type { Modifier, ModifierChain } from '@/index';
+import type { Modifier, ModifierChain } from '@/core/modifier';
 
 /**
  * Which discovery walker produced a given {@link PickerEntry}. Also used by

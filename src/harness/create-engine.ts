@@ -5,8 +5,8 @@
  * per-run scratch engines.
  */
 
-import { createEngine } from '@/index';
-import type { Engine, EngineConfig, EngineModule } from '@/index';
+import { createEngine } from '@/engine';
+import type { Engine, EngineConfig, EngineModule } from '@/engine';
 import type { TimerProvider } from '@/core/tick-driver';
 import { createMemoryStorage } from '@/core/save-manager';
 

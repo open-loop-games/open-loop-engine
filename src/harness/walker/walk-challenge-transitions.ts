@@ -31,8 +31,8 @@ import {
   type TransitionDeps,
 } from '@/core/transitions';
 import { gateToCondition, isGate, type Gate } from '@/systems/gate';
-import { CategoriesKey } from '@/index';
-import type { Engine } from '@/index';
+import { CategoriesKey } from '@/systems/engine-categories';
+import type { Engine } from '@/engine';
 import { forEachCategoryEntity } from '../walk';
 import type { Transition } from './types';
 

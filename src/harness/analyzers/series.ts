@@ -23,7 +23,7 @@
  */
 
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import type { Resource } from '@/core/resource';
 import { ResourceRegistryKey } from '@/core/registries';
 import { Decimal } from '@/primitives/decimal';

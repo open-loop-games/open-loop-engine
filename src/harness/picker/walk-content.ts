@@ -6,8 +6,9 @@
  * @internal
  */
 
-import type { Engine, ModifierBinding } from '@/index';
-import { EffectSystemRegistryKey } from '@/index';
+import type { Engine } from '@/engine';
+import type { ModifierBinding } from '@/systems/modifier-binding';
+import { EffectSystemRegistryKey } from '@/core/registries';
 import { forEachEffectDef } from '../walk';
 import type { ModifierPickerEntry } from './types';
 

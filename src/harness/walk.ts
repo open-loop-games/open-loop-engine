@@ -18,11 +18,10 @@ import type {
   ChainRegistry,
   EffectDefLike,
   EffectSystemRegistry,
-  EngineCategories,
   EnumerableEffectSystem,
-  Modifier,
-  ModifierChain,
-} from '@/index';
+} from '@/core/registries';
+import type { Modifier, ModifierChain } from '@/core/modifier';
+import type { EngineCategories } from '@/systems/engine-categories';
 
 // ============================================================================
 // Category traversal

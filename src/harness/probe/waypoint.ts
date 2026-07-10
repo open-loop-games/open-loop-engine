@@ -15,7 +15,7 @@
  */
 
 import { runUntil } from '../run-until';
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import type { RunContext } from '../types';
 
 /** One named time-anchored snapshot target. */

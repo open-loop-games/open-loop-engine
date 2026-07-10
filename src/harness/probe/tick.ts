@@ -16,7 +16,7 @@
  */
 
 import { runMatrixUntil } from '../run-matrix-until';
-import type { Engine } from '@/index';
+import type { Engine } from '@/engine';
 import type { UntilCell, UntilPredicate } from '../types';
 import type { BeatResult, ProbeConfig } from './types';
 

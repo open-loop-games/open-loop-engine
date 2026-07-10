@@ -15,7 +15,7 @@
  */
 
 import type { Analyzer } from '@/primitives/types';
-import type { Engine, EngineConfig, EngineModule } from '@/index';
+import type { Engine, EngineConfig, EngineModule } from '@/engine';
 import { LoopLogKey } from '@/systems/loop-log';
 import { createEngineFromSave } from './create-engine';
 import type { Cell, RunContext } from './types';
