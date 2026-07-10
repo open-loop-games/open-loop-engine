@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createEngine, persistent, type Engine, type EngineModule } from '@/index';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import { createSensitivityCell, runSensitivity, type RunContext } from '@/harness';
@@ -167,5 +167,28 @@ describe('createSensitivityCell', () => {
     });
 
     expect(result.variants[0]!.deltas['gold-peak.peak']!.absolute).toBe(0);
+  });
+
+  // Regression for the final-run engine leak: scratch engines are driven
+  // tick-by-tick by the harness, so `engine.start()` must not arm a real
+  // wall-clock timer. Otherwise the last run's engine — never re-entered by
+  // setup and unreachable by the engine-agnostic runner — keeps a live
+  // setInterval ticking the imported save after the sweep returns.
+  it('scratch engines arm no wall-clock timer, so the sweep leaks none', () => {
+    const blob = makeLiveSave(100); // built before the spy — its live engine uses a real timer
+    const baseline = makeCell('baseline', blob);
+    const variant = makeCell('variant', blob);
+
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    try {
+      runSensitivity({
+        baseline,
+        variants: [{ name: 'variant', patch: () => variant }],
+        seeds: [1, 2, 3],
+      });
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+    } finally {
+      setIntervalSpy.mockRestore();
+    }
   });
 });
