@@ -5,6 +5,8 @@ import {
   beginPersistentContext,
   endPersistentContext,
   resetAllPersistentContexts,
+  deserializePersistents,
+  getAllPersistentRefs,
 } from '@/core/persistence';
 
 beforeEach(() => {
@@ -346,6 +348,48 @@ describe('callbacks', () => {
     slot.restore(['b', 'c']);
     expect(onSelect).not.toHaveBeenCalled();
     expect(onDeselect).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// resync — re-establish onSelect side effects after a save loads
+// ============================================================================
+
+describe('resync', () => {
+  it('re-invokes onSelect for the rehydrated selection after a save loads', () => {
+    const onSelect = vi.fn();
+    resetAllPersistentContexts();
+    const slot = createSlot({ id: 'hz', mode: 'single', onSelect });
+
+    // Load a save the way the engine does: the persistent selection rehydrates
+    // directly through the save-restore path, bypassing select() — so onSelect
+    // never fires and side effects wired through it (enabled modifiers) are lost.
+    deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
+    expect(slot.selected.value).toEqual(['cabin']);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    slot.resync();
+    expect(onSelect).toHaveBeenCalledWith('cabin');
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires no selected events on resync', () => {
+    const onSelected = vi.fn();
+    resetAllPersistentContexts();
+    const slot = createSlot({ id: 'ev', mode: 'multi', maxSelections: 5, onSelect: vi.fn() });
+    slot.on('selected', onSelected);
+
+    deserializePersistents(getAllPersistentRefs(), { 'slot:ev': { selected: ['a', 'b'] } });
+    slot.resync();
+    expect(onSelected).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when no onSelect is configured', () => {
+    resetAllPersistentContexts();
+    const slot = createSlot({ id: 'noop', mode: 'single' });
+    deserializePersistents(getAllPersistentRefs(), { 'slot:noop': { selected: ['x'] } });
+    expect(() => slot.resync()).not.toThrow();
+    expect(slot.selected.value).toEqual(['x']);
   });
 });
 

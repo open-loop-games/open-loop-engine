@@ -28,6 +28,9 @@
  *   onDeselect: (id) => housingModifiers.get(id)!.disable(),
  * });
  * housing.select('cabin'); // auto-deselects previous
+ * // onSelect side effects are runtime-only: the persistent selection reloads
+ * // without firing the hooks, so re-establish them after a save loads.
+ * ctx.onLoad(() => housing.resync());
  *
  * // Multi-select: support spell slots with growing capacity
  * const supportSlots = createSlot({
@@ -72,7 +75,12 @@ export interface SlotOptions {
   pool?: Computable<string[]>;
   /** Additional constraint beyond pool membership and capacity */
   canSelect?: (itemId: string) => boolean;
-  /** Called after an item is successfully selected. Use for modifier wiring, VFX, etc. */
+  /**
+   * Called after an item is successfully selected. Use for modifier wiring,
+   * VFX, etc. These side effects are runtime-only — a loaded save rehydrates
+   * the selection without firing this hook, so wire {@link Slot.resync} on load
+   * (or derive the effect reactively from {@link Slot.selected}).
+   */
   onSelect?: (itemId: string) => void;
   /** Called after an item is successfully deselected. Use for modifier teardown. */
   onDeselect?: (itemId: string) => void;
@@ -134,6 +142,18 @@ export interface Slot {
   snapshot(): string[];
   /** Bulk-replace selections from a save. Silently skips invalid IDs and truncates to capacity. No events fired. */
   restore(ids: string[]): void;
+  /**
+   * Re-invoke `onSelect` for every currently-selected item. Call after loading
+   * a game save (e.g. from `ctx.onLoad`): the persistent selection rehydrates
+   * directly without firing the hooks, so side effects wired through `onSelect`
+   * — enabled modifiers, VFX — would otherwise be silently lost. Fires no
+   * `selected` events (state restoration, not a user action), mirroring
+   * {@link ChallengeCategory.restore}.
+   *
+   * Not needed when the side effect is derived reactively from {@link selected}
+   * (a `watch`/`computed` re-runs on rehydration on its own).
+   */
+  resync(): void;
 
   on: Emittable<SlotEvents>['on'];
 }
@@ -276,6 +296,11 @@ export function createSlot(options: SlotOptions): Slot {
     _selected.value = valid.slice(0, max);
   }
 
+  function resync(): void {
+    if (!options.onSelect) return;
+    for (const itemId of _selected.value) options.onSelect(itemId);
+  }
+
   return {
     id,
     mode,
@@ -291,6 +316,7 @@ export function createSlot(options: SlotOptions): Slot {
     toggle,
     snapshot,
     restore,
+    resync,
     on: handle.on,
   };
 }

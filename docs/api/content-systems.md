@@ -175,10 +175,10 @@ Skill helper for dual-tier loop incremental skills
 
 constrained persistent selection from a pool
 
-- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:162`
-- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:97`
-- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:82`
-- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:53`
+- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:182`
+- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:105`
+- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:90`
+- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:56`
 
 ## Zone
 
