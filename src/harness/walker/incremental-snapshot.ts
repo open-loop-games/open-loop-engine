@@ -46,6 +46,7 @@ import { emitChallengeTransitionsForEntity } from './walk-challenge-transitions'
 import { emitPurchasableTransitionsForEntity } from './walk-purchasable-transitions';
 import { emitProducerTransitionsForEntity } from './walk-producer-transitions';
 import { profile } from '@/core/profiler';
+import { forEachCategoryEntity } from '../walk';
 
 /**
  * Minimal reference to the source entity behind a cached transition.
@@ -111,24 +112,6 @@ const CATEGORY_KEY_TO_SOURCE: Partial<Record<keyof EngineCategories, TransitionS
   purchasables: 'purchasable',
   producers: 'producer',
 };
-
-/** Duck-typed shape of a category slice entry. Matches `walk.ts`. */
-interface WalkableCategoryLike {
-  readonly registry: { readonly name: string };
-  getAll(): ReadonlyArray<{ readonly def: { readonly id: string } }>;
-}
-
-function isWalkableCategory(value: unknown): value is WalkableCategoryLike {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Partial<WalkableCategoryLike>;
-  const registry = v.registry as { name?: unknown } | undefined;
-  return (
-    typeof registry === 'object' &&
-    registry !== null &&
-    typeof registry.name === 'string' &&
-    typeof v.getAll === 'function'
-  );
-}
 
 type PerEntityEmit = (
   categoryId: string,
@@ -300,27 +283,17 @@ export function createIncrementalSnapshot(
     byUnlock.clear();
     byState.clear();
 
-    if (categories) {
-      for (const key of Object.keys(categories) as Array<keyof EngineCategories>) {
-        const source = CATEGORY_KEY_TO_SOURCE[key];
-        if (!source) continue;
-        const slice = categories[key];
-        if (!Array.isArray(slice)) continue;
-        for (const maybeCategory of slice) {
-          if (!isWalkableCategory(maybeCategory)) continue;
-          const categoryId = maybeCategory.registry.name;
-          for (const entity of maybeCategory.getAll()) {
-            const entityRef: IncrementalSnapshotEntityRef = {
-              source,
-              categoryKey: key,
-              categoryId,
-              entityId: entity.def.id,
-            };
-            emitForEntityRef(entityRef, entity, memo);
-          }
-        }
-      }
-    }
+    forEachCategoryEntity(categories, ({ categoryKey, categoryId, entityId, entity }) => {
+      const source = CATEGORY_KEY_TO_SOURCE[categoryKey];
+      if (!source) return;
+      const entityRef: IncrementalSnapshotEntityRef = {
+        source,
+        categoryKey,
+        categoryId,
+        entityId,
+      };
+      emitForEntityRef(entityRef, entity, memo);
+    });
 
     clearDirty();
     return snapshotFromEntries();
