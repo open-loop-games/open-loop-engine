@@ -301,6 +301,13 @@ describe('Scenario 4 — save round-trip', () => {
       expect(snapshot.activeNodeId).toBe('mundane');
       expect(snapshot.visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
 
+      // Read accessor mirrors the persisted counts, with 0 for never-visited
+      // nodes and unknown graphs (the visit-gating read path).
+      expect(r1.getVisitCount('rask-greeting', 'open')).toBe(1);
+      expect(r1.getVisitCount('rask-greeting', 'mundane')).toBe(1);
+      expect(r1.getVisitCount('rask-greeting', 'restricted')).toBe(0);
+      expect(r1.getVisitCount('no-such-graph', 'open')).toBe(0);
+
       // Fresh runtime + import — exactly what save/load does.
       const r2 = createNativeDialogRuntime({
         graphs: [raskGreeting],
@@ -312,6 +319,9 @@ describe('Scenario 4 — save round-trip', () => {
       expect(r2.isActive()).toBe(true);
       expect(r2.present()?.nodeId).toBe('mundane');
       expect(r2.exportState().visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
+      // Read path survives save/load on the fresh runtime.
+      expect(r2.getVisitCount('rask-greeting', 'open')).toBe(1);
+      expect(r2.getVisitCount('rask-greeting', 'mundane')).toBe(1);
     });
   });
 

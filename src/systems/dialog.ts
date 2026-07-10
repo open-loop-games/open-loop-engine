@@ -117,6 +117,13 @@ export interface DialogRuntime {
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
+  /**
+   * How many times a node has been entered, across the full persisted history
+   * (survives save/load). Returns 0 for a never-visited node. Read path for the
+   * visit counts `recordVisit` maintains — lets a Gate or authored branch gate
+   * on "first time here" / "seen N times" without consumer-side bookkeeping.
+   */
+  getVisitCount(graphId: string, nodeId: string): number;
   /** Return persistable state for save inclusion. */
   exportState(): DialogRuntimeState;
   /** Restore from previously exported state. Replaces current state wholesale. */
@@ -215,6 +222,10 @@ export function createNativeDialogRuntime(
   function recordVisit(graphId: string, nodeId: string): void {
     const visits = state.visitCounts[graphId] ?? (state.visitCounts[graphId] = {});
     visits[nodeId] = (visits[nodeId] ?? 0) + 1;
+  }
+
+  function getVisitCount(graphId: string, nodeId: string): number {
+    return state.visitCounts[graphId]?.[nodeId] ?? 0;
   }
 
   function activate(graphId: string, nodeId: string): void {
@@ -356,6 +367,7 @@ export function createNativeDialogRuntime(
     choose,
     finish,
     isActive,
+    getVisitCount,
     exportState,
     importState,
     on: events.on,
