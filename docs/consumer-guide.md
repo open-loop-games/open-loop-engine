@@ -185,7 +185,7 @@ The trick is when data needs to express predicates over live game state. An achi
 
 `Gate` is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
 
-Gate kinds split into two flavors. **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) are declarative against the accessor with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor.
+Gate kinds split into two flavors. **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) are declarative against the accessor with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
 
 **When NOT to reach for Gate.** When you have direct typed refs in scope, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is about *content definitions* (where the closure can't live anyway) — typed callsites inside engine module code stay typed.
 
@@ -200,6 +200,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     requirement: { kind: 'cumulative-gte', resource: 'eggs', value: 10 } },
   { id: 'coop-built', description: 'Hens settle in.',
     requirement: { kind: 'count-gte', category: 'producers', entity: 'coop', value: 1 } },
+  { id: 'flock-master', description: 'A big coop and a full larder.',
+    requirement: { kind: 'all', of: [
+      { kind: 'count-gte', category: 'producers', entity: 'coop', value: 5 },
+      { kind: 'cumulative-gte', resource: 'eggs', value: 1000 },
+    ] } },
 ];
 ```
 
