@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Decimal, bn, format, formatWhole, formatTime, renormIfLayer0 } from '@/primitives/decimal';
+import {
+  Decimal,
+  bn,
+  format,
+  formatWhole,
+  formatTime,
+  integerRoot,
+  renormIfLayer0,
+} from '@/primitives/decimal';
 import { notationManager } from '@/primitives/notation-manager';
 import { Presets } from '@/primitives/notations';
 
@@ -51,6 +59,66 @@ describe('Decimal static fast-path chain contract', () => {
   it('slow path (Decimal+Decimal) stays chainable', () => {
     const big = bn('1e400');
     expect(Decimal.add(big, big).gt('1e400')).toBe(true);
+  });
+});
+
+describe('integerRoot', () => {
+  it('recovers perfect cubes that a raw floor drops', () => {
+    // Decimal.root(x, 3) = pow(x, 1/3) lands a hair under exact cubes, so
+    // Decimal.floor(Decimal.root(8, 3)) is 1. integerRoot corrects it.
+    expect(Decimal.floor(Decimal.root(8, 3)).eq(1)).toBe(true); // the bug, pinned
+    for (const [x, k] of [
+      [8, 2],
+      [27, 3],
+      [64, 4],
+      [125, 5],
+      [216, 6],
+      [343, 7],
+      [1000, 10],
+      [15625, 25],
+    ] as const) {
+      expect(integerRoot(x, 3).eq(k), `∛${x} = ${k}`).toBe(true);
+    }
+  });
+
+  it('floors non-perfect radicands to the largest integer whose cube fits', () => {
+    expect(integerRoot(8.5, 3).eq(2)).toBe(true);
+    expect(integerRoot(26.999, 3).eq(2)).toBe(true);
+    expect(integerRoot(28, 3).eq(3)).toBe(true);
+    expect(integerRoot(7.999, 3).eq(1)).toBe(true);
+  });
+
+  it('recovers perfect cubes across magnitudes, where a fixed additive nudge is scale-blind', () => {
+    for (const k of [100, 1000, 1e4, 1e5, 1e6]) {
+      const cube = Decimal.pow(k, 3); // exact k³
+      expect(integerRoot(cube, 3).eq(k), `∛(${k}³) = ${k}`).toBe(true);
+    }
+  });
+
+  it('snaps within a relative tolerance band, not an absolute one', () => {
+    const cube = Decimal.pow(1e6, 3); // 1e18; band = 1e18 · 1e-9 = 1e9
+    expect(integerRoot(cube, 3).eq(1e6)).toBe(true);
+    // a hair below the perfect power (well inside the band) snaps up to it —
+    // near the boundary the log/exp float error already dominates
+    expect(integerRoot(cube.sub(1), 3).eq(1e6)).toBe(true);
+    // clearly below the band floors down
+    expect(integerRoot(cube.mul(0.9), 3).lt(1e6)).toBe(true);
+  });
+
+  it('supports the integer square root (degree 2)', () => {
+    expect(integerRoot(144, 2).eq(12)).toBe(true);
+    expect(integerRoot(145, 2).eq(12)).toBe(true);
+    expect(integerRoot(143, 2).eq(11)).toBe(true);
+  });
+
+  it('returns 0 for zero and negatives', () => {
+    expect(integerRoot(0, 3).eq(0)).toBe(true);
+    expect(integerRoot(-8, 3).eq(0)).toBe(true);
+  });
+
+  it('accepts string and Decimal sources and returns a chainable Decimal', () => {
+    expect(integerRoot('1000', 3).eq(10)).toBe(true);
+    expect(integerRoot(bn(216), 3).add(1).eq(7)).toBe(true);
   });
 });
 

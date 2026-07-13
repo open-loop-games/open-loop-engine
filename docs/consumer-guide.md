@@ -326,6 +326,22 @@ const prestige = createConversion({
 // At the call site: if (prestige.canConvert.value) prestige.convert();
 ```
 
+### Sublinear per-source payouts
+
+A common prestige-currency shape (Industry Idle's Merge fragments, and games that copy it) pays out a **power-law transform of run output, summed per source** — each run-long accumulator diminishes independently:
+
+```ts
+import { integerRoot, Decimal } from '@open-loop/engine';
+
+// sources = [{ total: ∫production dt, scale: 280 }, { total: ∫pressure dt, scale: 350 }]
+const payout = sources.reduce(
+  (acc, s) => acc.add(integerRoot(Decimal.div(s.total, s.scale), 3)),
+  new Decimal(0),
+);
+```
+
+Two things carry the shape. **Sum per source, don't pool** — `⌊∛(a/sₐ)⌋ + ⌊∛(b/s_b)⌋`, not `⌊∛((a+b)/s)⌋`. Pooling before the root lets one dominant source mask the others, collapsing the "every source must be cultivated" pressure that makes the mechanic interesting; the per-source floor is what makes each source's returns bite on its own curve. **Floor with `integerRoot`, not `Decimal.floor(Decimal.root(...))`** — break_eternity routes `root`/`pow` through log/exp, so a raw floored root under-counts at perfect powers (∛8 → 1); `integerRoot(x, n)` snaps to the true integer with a scale-robust relative tolerance (see its tsdoc). The `scale` per source sets its exchange rate and can be a reactive tunable; the `3` is the power (cube-root ≈ p⅓ diminishing returns — raise the degree for harsher falloff). Wire the accumulators, wallet, and quorum consumer-side — those diverge per game; the payout formula above is the shared part.
+
 ## Modifier chains and effects
 
 The word "effect" wears two hats in this section. `IEffect` / the `E` builder / `GameStateMutator` are the **state-mutation AST** — declarative writes evaluated against the ambient runtime. `createPersistentEffectSystem` / `createTemporaryEffectSystem` are **binding-lifecycle managers** — they hold live modifier registrations and activate/deactivate them as predicates flip. "Persistent" in the system name refers to the binding's durability across reloads, not to save serialization — the bindings themselves re-hydrate from install code on every load (see § Bindings re-hydrate from install). The modifier chain is the surface that bindings (from either source) push onto.

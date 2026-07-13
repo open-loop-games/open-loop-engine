@@ -1,4 +1,13 @@
-export { Decimal, bn, toNumber, format, formatWhole, formatTime, formatSmall } from './decimal';
+export {
+  Decimal,
+  bn,
+  toNumber,
+  integerRoot,
+  format,
+  formatWhole,
+  formatTime,
+  formatSmall,
+} from './decimal';
 export type { DecimalSource } from './decimal';
 export { notationManager } from './notation-manager';
 export { NotationManager } from './notation-manager';

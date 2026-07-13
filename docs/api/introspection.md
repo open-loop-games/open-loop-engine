@@ -49,17 +49,17 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 three per-engine enumerable collections that external introspection tools (balance workbenches, sim pickers, devtools) read to walk "every X this engine knows about":
 
 - `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:51`
-- `const ChainRegistryKey` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:59`
+- `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:59`
 - `function createChainRegistry(): ChainRegistry` — Create a fresh, empty chain registry. `src/core/registries.ts:65`
 - `function createEffectSystemRegistry(): EffectSystemRegistry` — Create a fresh, empty effect-system registry. `src/core/registries.ts:135`
 - `function createResourceRegistry(): ResourceRegistry` — Create a fresh, empty resource registry. `src/core/registries.ts:222`
 - `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef` that the picker needs. `src/core/registries.ts:115`
 - `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:124`
-- `const EffectSystemRegistryKey` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:127`
+- `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:127`
 - `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:101`
 - `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:186`
 - `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:168`
-- `const ResourceRegistryKey` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:214`
+- `const ResourceRegistryKey: InjectionKey<ResourceRegistry>` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:214`
 
 ## Engine safeguards
 

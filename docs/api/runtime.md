@@ -23,7 +23,7 @@ the module-system façade that composes core + systems into a runnable game: _cr
 - `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:111`
 - `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:85`
 - `interface EngineModule` — A registerable unit of game content. `src/engine.ts:175`
-- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the raw decoded payload. `src/engine.ts:61`
+- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the `SaveLoadResult` status object (success flag plus timestamp or failure reason) — not the decoded save payload. `src/engine.ts:61`
 - `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:197`
 - `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/engine.ts:63`
 - `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/engine.ts:55`

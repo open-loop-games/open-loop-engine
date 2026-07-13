@@ -180,6 +180,54 @@ export function toNumber(x: DecimalSource): number {
   return typeof x === 'number' ? x : new OrigDecimal(x).toNumber();
 }
 
+/**
+ * Relative tolerance for {@link integerRoot}'s perfect-power snapping. A value
+ * within this fraction of a perfect `degree`-th power counts as that power.
+ * 1e-9 sits far above break_eternity's log/exp error floor (~1e-15 relative)
+ * and far below any game-meaningful distinction near an integer boundary.
+ */
+const INTEGER_ROOT_REL_TOL = 1e-9;
+
+/**
+ * The floored integer `degree`-th root of `x` — the largest integer `m` with
+ * `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `integerRoot(x, 2)` is the integer
+ * square root; `integerRoot(x, 3)` the integer cube root.
+ *
+ * Use this instead of `Decimal.floor(Decimal.root(x, n))`. break_eternity
+ * computes both `root` and `pow` through log/exp, so each carries float error
+ * in both directions (`root(8, 3)` = 1.999…, `pow(3, 3)` = 27.000…4). A plain
+ * floor of the root under-counts at perfect powers (∛8 → 1), and a plain
+ * `mⁿ ≤ x` comparison mis-floors for the same reason. This walks off the raw
+ * root to the true integer using a magnitude-relative tolerance, so it is
+ * correct at every scale rather than by luck of a fixed additive nudge.
+ *
+ * Snapping is relative: a value within {@link INTEGER_ROOT_REL_TOL} of a
+ * perfect power rounds to that power (near an integer boundary the float error
+ * already dominates, so this is the stable answer). `x ≤ 0` returns 0.
+ *
+ * Canonical use is sublinear per-source prestige payouts — `Σ integerRoot(
+ * total / scale, 3)` — where pooling before the root would let one dominant
+ * source mask the others (see consumer-guide § Sublinear per-source payouts).
+ *
+ * @param x - the radicand; sources accepted, coerced once
+ * @param degree - the root degree (a positive integer: 2, 3, …)
+ * @returns the largest integer `m` with `m^degree ≤ x`, as a Decimal
+ *
+ * @example
+ * integerRoot(2240, 3);  // ⌊∛2240⌋ = 13
+ * integerRoot(8, 3);     // 2, not 1 — the perfect-cube case a raw floor drops
+ */
+export function integerRoot(x: DecimalSource, degree: number): Decimal {
+  const value = x instanceof OrigDecimal ? x : new OrigDecimal(x);
+  if (value.lte(0)) return new OrigDecimal(0);
+  let m = value.root(degree).floor();
+  if (m.lt(0)) m = new OrigDecimal(0);
+  const tol = value.mul(INTEGER_ROOT_REL_TOL);
+  while (m.gt(0) && m.pow(degree).sub(value).gt(tol)) m = m.sub(1);
+  while (m.add(1).pow(degree).sub(value).lte(tol)) m = m.add(1);
+  return m;
+}
+
 const ZERO = new OrigDecimal(0);
 const NEAR_ONE = new OrigDecimal(0.98);
 const THOUSANDTH = new OrigDecimal(0.001);

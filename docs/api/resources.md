@@ -19,10 +19,11 @@ Big number utilities using break_eternity.js Provides Decimal type and formattin
 - `function bn(x: DecimalSource): Decimal` — Create a Decimal from a number, string, or Decimal. `src/primitives/decimal.ts:169`
 - `type Decimal = OrigDecimal` — Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. `src/primitives/decimal.ts:32`
 - `type DecimalSource = OrigDecimal | number | string` — Anything toDecimal accepts — a live `Decimal`, a `number`, or a numeric string. `src/primitives/decimal.ts:30`
-- `function format(num: DecimalSource, precision?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:259`
-- `function formatSmall(num: DecimalSource, precision?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:388`
-- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:338`
-- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:310`
+- `function format(num: DecimalSource, precision?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:307`
+- `function formatSmall(num: DecimalSource, precision?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:436`
+- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:386`
+- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:358`
+- `function integerRoot(x: DecimalSource, degree: number): Decimal` — The floored integer `degree`-th root of `x` — the largest integer `m` with `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `src/primitives/decimal.ts:220`
 - `function toNumber(x: DecimalSource): number` — Coerce a DecimalSource to a native number. `src/primitives/decimal.ts:179`
 
 ## Notation
