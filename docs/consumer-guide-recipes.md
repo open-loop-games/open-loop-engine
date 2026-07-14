@@ -351,3 +351,37 @@ function preview(id: string, x: number, y: number) {
 ```
 
 Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship (`neighbors`/`neighborsDiag`/`inRange` cover 4/8-connected and Chebyshev radius) — full row, full column, knight-move — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator.
+
+## Shared pure state-function across live tick and harness
+
+The balance harness only tells the truth if it measures the shipping game — the moment it re-implements a pacing rule or a policy decision, the two drift and every number it produces describes code that isn't running in the game. The fix is a discipline, not a primitive: the decision or step logic lives in ONE pure function over game state, exported from the game-logic module, and BOTH the live `onTick` path and the harness/sim path import and call it. Cadence and rate-limiting stay with each caller; the pure fn is stateless of *when* it runs.
+
+Two flavors, one shape.
+
+**Decision / selection** — `(state, params) => choice`. The live automation ticker runs it each pulse; the balance sim queries the same fn. Its params double as the sweep axis *and* the player-facing tuning surface.
+
+```ts
+// game module — exported pure, no side effects
+export function shouldCollapse(exp: Expedition, p: CollapsePolicyParams): boolean { /* … */ }
+
+// live: inside ctx.onTick, gated by the automation tier
+if (effectiveOrder.value >= 3 && shouldCollapse(exp, collapsePolicy.value)) exp.collapse();
+
+// harness: the sim's runUntil predicate calls the SAME fn
+runUntil(() => shouldCollapse(exp, { tapOutSeconds }));
+```
+
+**Integration step** — `(s, dt) => s'`. A pure reflecting/accumulating step the live variable-dt tick integrates and the harness replays at a fixed sim step, so online and offline integrate identically.
+
+```ts
+export function advanceCenter(s: CenterState, delta: number, lo: number, hi: number): CenterState { /* … */ }
+
+// live:    engine.onTick((dt) => { const n = advanceCenter(state, v * dt, lo, hi); /* … */ });
+// harness: buildCenterPath integrates advanceCenter at 1 s steps to precompute the path.
+```
+
+The parameterization seam is "policy params as an argument; game state read however the module already reads it" — pure-of-args (fork's `advanceCenter`), an accessor object (frontier's `exp`), or direct sibling-module reads (multiverse-hr's `rotation.ts` reading `getBurnout`). Argument purity is not the invariant; the live-vs-harness *symmetry* is.
+
+Why no engine helper: nothing to extract — each policy/step is domain (target-picking, drift integration, seat rotation), and the shared part is already a one-liner (export the fn, call from both sides). The engine's only job is to make the harness side cheap: `runUntil`, memory storage, `AutomationTiers.unlock`, `pushScope` — the balance-harness kernel that assembles the second caller.
+
+This is the general form of studio CLAUDE.md § "Automation is game code, not a harness bot": that convention states the *automation-policy* case (AutomationTiers-gated, the harness drives the shipping tick); the integration-step flavor — an always-on economy step with no tier gate — is the same discipline applied outside automation. Consumers (each with a live `onTick` caller and a `balance/` sim caller): frontier `src/game/modules/auto-target.ts` (decision — `pickNextTarget` / `shouldCollapse`), multiverse-hr `src/modules/rotation.ts` (selection — `worstEligibleSeat` / `freshestBenchedReplacement`), fork `src/game/economy/drift.ts` (step — `advanceCenter`).
