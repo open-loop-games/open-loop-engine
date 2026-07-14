@@ -3,9 +3,9 @@ dist
 temp
 .mcp.json
 
-# Studio-internal docs — primitive-gap tracking and design notes that
-# reference sibling repos. Not part of the public engine surface.
-docs/candidate-primitives.md
+# Studio-internal design notes that reference sibling repos. Not part of the
+# public engine surface. (candidate-primitives.md is now tracked — it's the
+# shared primitive-gap drop-spot, sibling to candidate-recipes / candidate-patterns.)
 docs/notes/
 
 # Claude: commit .claude/CLAUDE.md and rules/, keep the rest private
