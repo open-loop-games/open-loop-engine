@@ -104,6 +104,22 @@ export interface TickDriverConfig {
    * for background-tab immunity. Defaults to native setInterval/clearInterval.
    */
   timerProvider?: TimerProvider;
+  /**
+   * Persistent-context id for the fixed-mode accumulator. When set, the
+   * accumulator registers under this exact id (combined with any ambient
+   * {@link withPersistenceNamespace}) — a *stable* key that survives a
+   * save/reload deterministically and joins the engine's namespaced save. The
+   * engine passes `'tick-driver'` here, wrapped in its `persistenceNamespace`,
+   * so the accumulator lands in the right namespace bucket and is evicted by
+   * `dispose()`.
+   *
+   * When unset (default), the id falls back to a process-global
+   * `tick-driver_${counter}` — collision-free for multiple standalone drivers
+   * in one runtime, but order-dependent and therefore unsuitable for
+   * cross-session determinism. A single engine owns exactly one driver, so the
+   * stable id is the engine's to supply.
+   */
+  persistentContextId?: string;
 }
 
 /** Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. */
@@ -226,7 +242,10 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   // sub-tick (≤ `stepSize`) remainder desynced from resources after a mid-run
   // snapshot restore, breaking deterministic-replay and bisection flows.
   // Unused in variable mode; value stays 0 so the context key costs nothing.
-  const driverContextId = `tick-driver_${++tickDriverCounter}`;
+  // A caller-supplied id (the engine's namespaced `'tick-driver'`) is a stable
+  // key for cross-session determinism; the counter fallback is collision-free
+  // but order-dependent — see `persistentContextId`.
+  const driverContextId = config.persistentContextId ?? `tick-driver_${++tickDriverCounter}`;
   const accumulator = withPersistentContext(driverContextId, () =>
     persistent<number>(0, { name: 'accumulator' }),
   );

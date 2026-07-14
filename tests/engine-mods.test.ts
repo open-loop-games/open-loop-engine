@@ -231,6 +231,10 @@ describe('engine mod support', () => {
     engine.start();
     engine.save();
     engine.stop();
+    // Dispose before the second same-namespace instance installs: the stable
+    // tick-driver accumulator context would otherwise collide. Save storage is
+    // untouched, so engine2's peek still reads this save.
+    engine.dispose();
 
     // New engine instance — peek before start
     const engine2 = createEngine({

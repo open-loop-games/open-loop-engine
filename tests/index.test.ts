@@ -870,7 +870,14 @@ describe('ChainRegistryKey — auto-registered modifier chain discovery', () => 
       },
     });
 
-    const engineA = createEngine({ gameId: 'test', persistence: false });
+    // Concurrent engines in one runtime must carry distinct persistence
+    // namespaces — the contract for coexisting instances (shared stable
+    // context ids like the tick-driver accumulator collide otherwise).
+    const engineA = createEngine({
+      gameId: 'test',
+      persistence: false,
+      persistenceNamespace: 'a',
+    });
     engineA.use(makeProducer('only-in-a'));
     engineA.use({
       id: 'probe',
@@ -884,7 +891,11 @@ describe('ChainRegistryKey — auto-registered modifier chain discovery', () => 
     });
     engineA.start();
 
-    const engineB = createEngine({ gameId: 'test', persistence: false });
+    const engineB = createEngine({
+      gameId: 'test',
+      persistence: false,
+      persistenceNamespace: 'b',
+    });
     engineB.use(makeProducer('only-in-b'));
     engineB.use({
       id: 'probe',
@@ -1002,6 +1013,9 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
       });
       e.start();
       e.stop();
+      // Dispose so the next engine can reinstall the same stable context ids
+      // (the tick-driver accumulator) under the default namespace.
+      e.dispose();
       return seen;
     }
 

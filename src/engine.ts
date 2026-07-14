@@ -399,16 +399,24 @@ export function createEngine(config: EngineConfig): Engine {
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };
 
-  const tickDriver = createTickDriver({
-    tickRate: config.tickRate,
-    maxDeltaTime: config.maxDeltaTime,
-    speedMultiplier: config.speedMultiplier,
-    tickMode: config.tickMode,
-    stepSize: config.stepSize,
-    maxStepsPerTick: config.maxStepsPerTick,
-    onStepsOverflow: config.onStepsOverflow,
-    timerProvider: config.timerProvider,
-  });
+  // Created inside the engine's namespace under a stable context id so the
+  // fixed-mode accumulator joins this engine's namespaced save, restores
+  // deterministically across sessions, and is evicted by `dispose()`'s
+  // `clearPersistentNamespace`. Outside the namespace it would strand in the
+  // default bucket — excluded from its own save (open-loop-engine#9).
+  const tickDriver = withPersistenceNamespace(config.persistenceNamespace, () =>
+    createTickDriver({
+      tickRate: config.tickRate,
+      maxDeltaTime: config.maxDeltaTime,
+      speedMultiplier: config.speedMultiplier,
+      tickMode: config.tickMode,
+      stepSize: config.stepSize,
+      maxStepsPerTick: config.maxStepsPerTick,
+      onStepsOverflow: config.onStepsOverflow,
+      timerProvider: config.timerProvider,
+      persistentContextId: 'tick-driver',
+    }),
+  );
   const saveManager =
     config.persistence !== false
       ? createSaveManager({

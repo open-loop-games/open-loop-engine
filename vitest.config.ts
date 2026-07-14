@@ -4,6 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   test: {
     globals: true,
+    setupFiles: ['./tests/setup.ts'],
     // `.claude/` holds agent-owned workspace artifacts (nested worktrees,
     // scratch dirs). Vitest's default include (`**/*.test.ts`) would otherwise
     // pick up tests from an older worktree snapshot and run them against
