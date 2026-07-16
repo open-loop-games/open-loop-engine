@@ -3,13 +3,13 @@
 Open Loop Engine — headless incremental game substrate. Foundational layer in the studio dep graph (consumed via starter); see `/work/studio/CLAUDE.md` § Studio components. Ongoing intake from consumers via `docs/candidate-primitives.md` (see studio CLAUDE.md § Back-flows) — not a one-time extraction. Note: `docs/candidate-primitives.md` and `docs/notes/` are gitignored studio-side resources; they live on disk locally and aren't part of the public Codeberg mirror.
 
 **Stack:** TypeScript + Vue 3 (reactivity only) + break_eternity.js (`Decimal` for all game quantities — no plain `number`) + nanoevents + Vitest.
-**Peers:** `vue ^3.4`, `break_eternity.js ^2.1`, `eternal_notations ^1.1.1` — consumers own the versions (not bundled).
-**Entrypoints:** `open-loop-engine` (full surface), `/primitives`, `/core`, `/systems`, `/harness`, `/types` (types-only).
+**Peers:** not bundled — consumers own the versions. `peerDependencies` in `package.json` is the list.
+**Entrypoints:** `@open-loop/engine` (full surface), `/primitives`, `/core`, `/systems`, `/harness`, `/types` (types-only). The package is `@open-loop/engine`; `open-loop-engine` is the repo.
 **Functional core:** Pure evaluation (conditions, effects, formulas) separated from reactive state (resources, persistent refs). Headless runner proves it — same engine logic runs with or without a browser.
 
 ## Start here — API surface
 
-Before assuming the engine lacks a primitive, or hand-rolling a pattern that should already exist: **route through `docs/api/INDEX.md`, then read the routed tier's `## Canonical entrypoints` block.** INDEX.md is routing — Task table (verb), Concept index (noun), Cluster directory (subsystem), Tier map — pointing into eleven tier files that hold the actual symbols (`resources`, `mechanics`, `composition`, `content-systems`, `content-narrative`, `lifecycle`, `runtime`, `introspection`, `advisors`, `spatial`, `harness`). The tier file's `Canonical entrypoints` block is the load-bearing read; per-symbol entries underneath give `name:line` into source.
+Before assuming the engine lacks a primitive, or hand-rolling a pattern that should already exist: **route through `docs/api/INDEX.md`, then read the routed tier's `## Canonical entrypoints` block.** INDEX.md is routing — Task table (verb), Concept index (noun), Cluster directory (subsystem), Tier map — pointing into the per-tier files that hold the actual symbols. Its Tier map is the tier list; both it and the tier files are generated, so read them rather than a copy kept here. The tier file's `Canonical entrypoints` block is the load-bearing read; per-symbol entries underneath give `name:line` into source.
 
 Symbol-grepping for names you arrived with confirms expectation and misses adjacent surface — and the resulting hand-rolls pollute `candidate-primitives.md` with false signal. Route from the task, don't grep from the vocabulary.
 
@@ -90,7 +90,9 @@ src/
 ├── core/          # Vue reactivity enters. Generic composable primitives — no game-pattern opinions.
 ├── systems/       # Registration surfaces over core — one per validated incremental pattern.
 ├── harness/       # Headless-sim substrate: runners, probes, walker, picker, perturbation, solver. Game code never imports it; balance tooling does.
-└── index.ts       # createEngine(), module system, barrel exports.
+├── engine.ts      # Engine assembly — the module-system façade composing core + systems. `createEngine()` lives here.
+├── reactivity-reexports.ts  # Vue reactivity surfaced through the engine. Consumers import these, not `vue` — a separately-resolved `vue` won't subscribe to engine refs, and updates silently miss.
+└── index.ts       # Barrel — the public surface.
 ```
 
 ### Layer Rules
