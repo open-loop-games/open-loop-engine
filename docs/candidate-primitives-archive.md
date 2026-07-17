@@ -52,6 +52,19 @@ Shipped 2026-04-26 as `src/core/spatial/influence-layer.ts` under OL-715 in comm
 
 **First consumer attempt deferred.** Borglike `bot/danger.ts` port attempted 2026-05-21 under OL-1051; reverted on F3 bench data showing 7–8× slowdown of `computeDangerGrid` vs the existing hand-roll (warrior 11.4 → 80.7µs/call, mage 11.0 → 94.5µs/call on seed 1000 50k-turn deep profile). Three drivers identified, captured as candidates in the live file: `SpatialGrid<T>.fill(mapper)` batched evaporate, allocation-free `inRange` iteration, and `cellChanged`-suppressing internal write path. All three need to land together before OL-1051 retry — closing one leaves the consumer still blocked. Borglike hand-roll + `Int16Array` storage remains canonical for `bot/danger.ts` in the meantime.
 
+All three drivers landed 2026-07-16 in commit `959c9a8` — see the SpatialGrid hot-path entry below. OL-1051 retry is unblocked, with expectations reset there.
+
+### SpatialGrid hot-path cluster — `fill(mapper)` / `forEachInRange` / `setSilent` + InfluenceLayer `updated` event
+
+Shipped 2026-07-16 in commit `959c9a8`, folding the `SpatialGrid<T>.fill(mapper)` entry and its sibling hot-path perf cluster entry (allocation-free `inRange` + cellChanged suppression) — all three drivers of the OL-1051 borglike danger-field revert landed together as additive API:
+
+- `SpatialGrid.fill(mapper)` — one-pass full-grid mutation, single new coarse `bulkChanged` event. The candidate's "suppress entirely" lean was overturned at implementation: every real `cellChanged` subscriber ecosystem-wide (multiverse-hr occupancy, frontier/fork `useSpatialGrid` / `useInfluenceLayer` / `DomGrid`) ignores the payload and bumps a version ref, so a single argless event fully substitutes — but a general grid method still needs *some* signal for general wrappers.
+- `SpatialGrid.forEachInRange(x, y, r, fn)` — callback form won over `inRangeIndices`: a generator variant still boxes a `{value, done}` result per yield, so only the callback is genuinely allocation-free. Hands `(x, y, index)` to the callback for direct `cells` access; `inRange` retained for non-hot callers.
+- `SpatialGrid.setSilent(x, y, v)` — bounds-checked emit-free write (named against `setUnchecked` to avoid implying bounds-skipping). The write-path asymmetry (`accumulate` read `grid.cells[idx]` directly but wrote through emitting `set()`) was the bug.
+- `InfluenceLayer.on('updated')` — layer-level event fired once per `update()`/`reset()` after all writes land; the layer's first subscribable surface. Internal writes went silent (breaking for `grid.on('cellChanged')` subscribers of layer-driven grids; migration in the commit body). Frontier + fork composables migrated same-day.
+
+Bench expectation for the OL-1051 retry, recorded from the graduation dive: post-fix estimate ~20–30µs/call vs the 11µs hand-roll — a structural ~2–3× residual remains because the hand-roll fresh-allocates a zero-paged `Int16Array` and writes only monster neighborhoods (plus a result cache), while the engine clears a `number[]` in place and has no cache. The port target is *near* the hand-roll's band, not beating it.
+
 ### `Sequencer.repeat()` — advance-vs-repeat primitive
 
 Shipped 2026-05-27 under OL-1067 in commit `1fced1c` as an additive imperative method on `Sequencer<M>` plus a new `'repeat'` event on `SequencerEvents`. Consumers call `seq.repeat()` in place of `seq.complete()` when the current item should re-dispatch rather than advance. Queue mode splices the captured item back into `_liveItems` at `_head` (no `'enqueue'` event re-fire); list mode skips the `rawCursor++` that `complete()` would do. Both modes re-enter `dequeueNext`, so `canRun` re-evaluation, `maxAdvancesPerTick`, and the `'notNow'`/`hold` path all compose for free.
