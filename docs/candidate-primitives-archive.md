@@ -12,6 +12,14 @@ The live file stays the current queue.
 
 Entries move here when the candidate ships in the engine. Each records the commit that landed it, so this file is the history of "what used to be parked here" alongside the current queue.
 
+### RNG-injectable pick helpers — trailing `rng?` param on the derived draw family
+
+Shipped 2026-07-17 as a trailing `rng: () => number = random` parameter on all five derived helpers in `src/primitives/rng.ts` — `randomInt`, `randomItem`, `shuffle`, `weightedPick`, `chance`. The global-stream form is the default; passing a `createSeededRNG` closure gives an independent deterministic stream that never advances (or is advanced by) the module-global Alea state. Fully backward compatible — no overload signatures, no `*With` sibling family.
+
+Parked at N=1 (beat-forge `draw-rng.ts` `intIn`/`weightedPickWith`/`shuffleWith`), graduated when a review sweep found the count already at N≥4: maldacena [`src/modules/effects.ts:79`](../../maldacena/src/modules/effects.ts) `pickOutcome` (loop-seeded weighted pick, header names the gap verbatim), frontier [`src/game/map/generate.ts:96`](../../frontier/src/game/map/generate.ts) `pickType` (map-seed weighted pick), spatial-machinations `src/sim/executor.ts` (threads `rng` through `rollDice`/`chooseWeightedOutput`/`resourceAllows`). maldacena and frontier are byte-identical to engine semantics; spatial-machinations differs only at measure-zero boundaries (`<=` vs `<`).
+
+Shape decisions: trailing-optional param over the parked entry's first-arg overload (data stays the natural first argument); weights stay plain `number` (`WeightedItem<T>` — every consumer uses number weights; the Decimal concern was moot). The harness needs no injection internally (it reseeds/snapshots the global stream via `getRNGState`/`setRNGState`) — the seam is purely consumer-facing. Consumer migration and `TODO(expansion)` marker retirement ride each repo's next drift audit; no coordinated sweep.
+
 ### `createTimeBank` / `createBankedAcceleration` / `burstDischarge` — banked-time family
 
 Shipped 2026-07-17 as `src/systems/time-bank.ts`, folding two live entries (`createBonusTimeBank`, pre-designed from the offline-progress survey, and "Banked-time accumulator over TickDriver.speedMultiplier", maldacena N=1) after an N=3 dive whose corpus sweep grew the count to ~10 instances. The dive record, kept here because the shape of the evidence drove the API split:
@@ -162,4 +170,14 @@ A future devtools time-rewind or deterministic-replay infra needing a *fourth* p
 
 ## Rejected
 
-None recorded yet. When an entry is deleted from the live queue for the [`candidate-primitives.md`](./candidate-primitives.md) § When a candidate is wrong reasons, move its husk here with the reason — don't delete silently, or the shape gets re-dropped.
+When an entry is deleted from the live queue for the [`candidate-primitives.md`](./candidate-primitives.md) § When a candidate is wrong reasons, its husk moves here with the reason — don't delete silently, or the shape gets re-dropped.
+
+### Bidirectional bounded gauge — asymmetric charge/drain, curve-mapped to a multiplier
+
+Rejected 2026-07-17: too simple when reduced. The candidate was a per-entity `[0, 1]` scalar charging while a predicate holds and draining otherwise, clamped both ends, read through a curve into an effectiveness multiplier (`createBoundedGauge({ min, max, charge, drain })`).
+
+A review dive confirmed the sole full instance is multiverse-hr burnout ([`src/modules/burnout.ts`](../../multiverse-hr/src/modules/burnout.ts) — continuous `rate·dt` on both sides, dynamic recovery floor, `1 − level^p` curve read) and that every family relative diverges on a load-bearing update-law axis. The discriminating question is **whether each side is a continuous rate the primitive integrates or a discrete event the consumer calls in**: idle-loops-ng soulstone-chance (event-multiplicative `×0.98` drain, direct probability read), cycler wall (discrete leak damage, breach-at-0, raw-HP read), civ-clicker morale (`reference-code/civ-clicker/scripts/civclicker.js:1371` — event-driven both ways, direct multiplier read). Only burnout has an engine-ownable tick; the honest generalization across the family reduces to `Math.min(max, Math.max(min, x + r·dt))` — a clamped-number utility that fails the delete-test ("not already covered" bar: deleting the hand-rolls invents no API). The interesting parts of burnout (rate-factor products, ratcheting floor, curve choice) are exactly the parts that don't generalize.
+
+The absence of a research-side pattern name (nearest is the softcap *read* curve, `design-playbook/bending.mdx` — not the state machine) corroborates: the genre converges on "bounded scalar → production multiplier" reads, not on a shared update law. A future drop needs a second instance matching burnout's *full* shape — continuous bidirectional integration plus curve read — and would be a fresh entry, not a revival of this one.
+
+The adjacent shape the dive surfaced — a **capped resource**, scalar bounded `[0, max]` with a load-bearing cap (wall, heaviest-objects bandwidth, incloneution health, borglike hp/mp) — was verified in the same pass and also fails the bar, on "not already covered": `createResourceBag` already exposes reactive capacity + clamp-on-add + `remainingCapacityForType`, so a single capped scalar is a 1-slot bag or a two-line `Math.min` / `computed(() => chain.apply(base))` composition (incloneution's chain-derived `effectiveMaxHealth` is the worked example). Only one of the four sites even sits on `createResource`, so "createResource lacks a cap" isn't the friction at the other three. Don't re-drop a capped-resource entry; the composition is the answer.
