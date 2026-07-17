@@ -71,15 +71,6 @@ Sibling to `InfeasibilityOracle`: where the Oracle answers "can predicate fire w
 - **Receipts:** [`open-loop-starter/src/showcase/archetypes/looper/balance/solver.ts`](../../open-loop-starter/src/showcase/archetypes/looper/balance/solver.ts) — `TODO(expansion)` at the `astar` / `beam` hand-roll site.
 - **Convergence signal:** second consumer hand-rolls the same `{problem, expand(node), goalReached(state), hashState(state)}` shape. At graduation, decide placement (`harness/plan/` parallel to `harness/solve/`) and rollout-contract shape (engine-coupled vs state-only).
 
-### `createBonusTimeBank({ source, capacity, redemption })`
-
-Time-conservation offline strategy — the fourth family in the offline-progress survey (extrapolation, tick-sim, cap-and-trickle, banking). Absence beyond a minimum-floor accumulates into a reservoir; reservoir is spent during active sessions at `bonusSpeed > 1`. Idle becomes future fast-forward inside an active session, not currency on return. KTL canonical; Shark Game Overtime is a hybrid.
-
-- **Consumers:** none engine-side yet. open-loop-starter intends consumer-side adoption.
-- **Receipts:** none. Current `processOfflineTime` covers extrapolation and tick-sim families only.
-- **Research ref:** [`incremental-math` offline-progress § Bonus-time banking](../../incremental-math/src/pages/modern/offline-progress.mdx).
-- **Convergence signal:** second consumer wants the same shape. At graduation, decide: redemption rate parameterization, bank capacity policy (hard vs soft cap), absolute-seconds vs normalized-bonus-units storage.
-
 ### `createSymmetricModuleSet({ sides, build })`
 
 Sugar for archetypes with N parallel module instances over shared data — Tug's mirrored player/AI sides, Auto-battler PvP, "two adversarial agents over the same content" shapes. Each `build(side)` returns an `EngineModule[]` for one side; the helper namespaces persistent contexts as `<archetypeId>/<scope>/<side>/<module>`.
@@ -244,16 +235,6 @@ Extend list-mode `resetCursor` with optional `toIndex: number` for arbitrary-pos
 - **Receipts:** [`src/core/sequencer.ts:283`](../src/core/sequencer.ts).
 - **Research ref:** `open-loop-research/reports/studies/multi-run-orchestration/multi-run-orchestration-primitive-surface.md` § Part 2.
 - **Convergence signal:** first in-repo consumer surfaces a replay-from-marker need (Looper revisit, idle-loops-ng Lloyd variant, similar).
-
-### Banked-time accumulator over TickDriver.speedMultiplier
-
-Composes engine `createTimeSystem` (play-time tracking) + `TickDriverKey` (the actual tick-scaler surface) + `processOfflineTime` (offline catch-up replay). Earns from offline excess via a logarithmic curve (`rate × log2(hoursExcess + 1)`), capped at a maximum reservoir. Spending toggles `engine.tickDriver.speedMultiplier` to a configured value (e.g. 10×) and decrements the reservoir per-tick at 1:1 with `dt` (already speed-scaled). Auto-stops at depletion; restores `speedMultiplier` to 1.
-
-The two-engine-speedMultiplier shape (TimeSystem's internal counter vs TickDriver's actual tick scaler) is a known papercut for consumers — banked-time is the first first-party documented use of `TickDriverKey.speedMultiplier` outside the engine's own surfaces. If a second consumer wants the same earn-and-spend acceleration pattern, the boilerplate-reduction candidate is a `createBankedAcceleration({ source, capacity, redemption, gate, tickDriver })` factory along the lines of `createBonusTimeBank` already on this file.
-
-- **Consumers:** maldacena Banked Time module (N=1).
-- **Receipts:** [`/work/studio/maldacena/src/modules/time.ts`](../../maldacena/src/modules/time.ts) `timeModule` + `addBankedFromOffline` / `startSpending` / `stopSpending`.
-- **Convergence signal:** convergence between this entry and the pre-designed `createBonusTimeBank` candidate already filed. The earn-side (log curve over offline-excess) matches Bonus Time's redemption-rate shape; the spend-side (gating on game-active + auto-stop at depletion) is the new sub-shape that may need to bake into the factory or stay consumer-side.
 
 ### Per-action repetition softcap on a Producer rateChain
 

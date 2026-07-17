@@ -12,6 +12,20 @@ The live file stays the current queue.
 
 Entries move here when the candidate ships in the engine. Each records the commit that landed it, so this file is the history of "what used to be parked here" alongside the current queue.
 
+### `createTimeBank` / `createBankedAcceleration` / `burstDischarge` — banked-time family
+
+Shipped 2026-07-17 as `src/systems/time-bank.ts`, folding two live entries (`createBonusTimeBank`, pre-designed from the offline-progress survey, and "Banked-time accumulator over TickDriver.speedMultiplier", maldacena N=1) after an N=3 dive whose corpus sweep grew the count to ~10 instances. The dive record, kept here because the shape of the evidence drove the API split:
+
+**First-party instances (3):** maldacena `modules/time.ts` (log2-over-excess earn, full-dt drain, game-active gate, hard cap); idle-loops-ng `modules/bonus-time.ts` (borrow-against-future earn with debt ledger, excess-only drain); open-loop-starter's deleted `createTimeBankModule` (added `928a440`, killed in the `ecd6bc1` greenfield purge, not on merits — KTL-canonical 1:1 earn + excess drain + rate ladder, and the only adopter ever of `TickDriver.onDeltaOverflow`, the seam designed for exactly this).
+
+**Corpus instances:** idle-loops originals ×3 (`offlineRatio` earn efficiency, excess drain), Cavernous I+II (literally "Banked Time"; uncapped, excess-only, refunds unused), Shark Game (dual-channel minute-hand + Overtime bank, excess drain, prestige carry-over), Kittens Game Redshift (temporal flux; hard cap, deliberately lossy full-time drain), Evolve accelerated time (2/3 earn efficiency, fixed 2×, auto-on), AD Enslaved stored time (burst instant-skip discharge, 0.7 real-time earn efficiency, 1% auto-release fraction), bitburner stored cycles (per-subsystem fast-tick, no global speed knob).
+
+**Why three surfaces instead of one factory:** the spend modes genuinely diverge — live multiplier (~8 instances), burst skip (AD), per-subsystem drain (bitburner) — but all share the reservoir underneath. `createTimeBank` is the spend-agnostic core (deposit with `earnEfficiency` + hard `cap`, withdraw); `createBankedAcceleration` wraps the dominant live-multiplier loop (`drainMode: 'excess' | 'full'` defaulting to excess — the 8-instance KTL conservation shape, with `'full'` kept because Kittens' lossy drain and maldacena prove it's a deliberate design, not a bug; `gate`, `bankLiveOverflow` onto `onDeltaOverflow`); `burstDischarge` replays a withdrawn fraction through `processOfflineTime` at an optional efficiency penalty. bitburner's per-subsystem shape needs no factory — a subsystem owns a `createTimeBank` and `withdraw()`s at its own cadence.
+
+**Stays consumer-side:** earn policy (which time counts, curves, borrow ledgers), rate-ladder UI, cap-raising mechanics, prestige carry-over, currency-spends of stored time (AD unlocks/hints), Shark-style dual-channel payout. Soft-cap trickle overflow was considered and dropped — every capped corpus instance hard-clamps.
+
+**Naming:** `createOfflineTimeBank` was considered and rejected — "offline" over-narrows the earn source (borrow, live overflow, paused ticks all feed banks in the corpus) and collides conceptually with `processOfflineTime`, a different family. "Time bank" is corpus-native (Cavernous) and starter-precedented.
+
 ### Event-mode advance floor — micro-advance cliff in `runUntil({mode: 'event'})`
 
 Shipped under `studio/open-loop-engine#1`. `advanceToNextEvent` (`src/harness/run-until-helpers/event-mode.ts`) now floors the realized advance at `tickDelta`: `dt = Math.max(rawHeadDistance, tickDelta)`. Dense auto-purchase cadence that used to collapse the head distance to milliseconds — paying a full incremental-snapshot rebuild (plus checkpoint export under `bisectTolSec`) per micro-step — now takes one tickDelta-sized step instead, making event mode asymptotically never worse than tick mode.
