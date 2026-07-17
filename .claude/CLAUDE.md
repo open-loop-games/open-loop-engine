@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Open Loop Engine — headless incremental game substrate. Foundational layer in the studio dep graph (consumed via starter); see `/work/studio/CLAUDE.md` § Studio components. Ongoing intake from consumers via `docs/candidate-primitives.md` (see studio CLAUDE.md § Back-flows) — not a one-time extraction. Note: `docs/candidate-primitives.md` and `docs/notes/` are gitignored studio-side resources; they live on disk locally and aren't part of the public Codeberg mirror.
+Open Loop Engine — headless incremental game substrate. Foundational layer in the studio dep graph (consumed via starter); see `/work/studio/CLAUDE.md` § Studio components. Ongoing intake from consumers via `docs/candidate-primitives.md` (see studio CLAUDE.md § Back-flows) — not a one-time extraction. Note: `docs/candidate-primitives.md` is tracked (the shared primitive-gap drop-spot, sibling to starter `candidate-recipes.md` / research `candidate-patterns.md`); `docs/notes/` is a gitignored studio-side resource that lives on disk locally only.
 
 **Stack:** TypeScript + Vue 3 (reactivity only) + break_eternity.js (`Decimal` for all game quantities — no plain `number`) + nanoevents + Vitest.
 **Peers:** not bundled — consumers own the versions. `peerDependencies` in `package.json` is the list.

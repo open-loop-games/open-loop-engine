@@ -34,7 +34,8 @@ Entries are terse by design — 4–10 lines. If a candidate needs more, it has 
 `registerTimedInput(engine, (simTime, dt) => ...)` for time-parameterized external state — bot click tapers, script-driven players, "integrate this rate profile over time" shapes. Producer's `expectedClicksAt(simTimeSec)` is the canonical N=1: a pure `(simTime) => cumulativeCount` function the bot differences per tick.
 
 - **Consumers:** Producer balance bot (OL-630).
-- **Receipts:** [`open-loop-starter/src/showcase/archetypes/producer/balance/bot.ts:64`](../../open-loop-starter/src/showcase/archetypes/producer/balance/bot.ts) — `TODO(expansion)`.
+- **Receipts:** [`open-loop-starter/src/showcase/archetypes/producer/balance/bot.ts:34`](../../open-loop-starter/src/showcase/archetypes/producer/balance/bot.ts) — `expectedClicksAt` (the in-code `TODO(expansion)` marker was lost in a bot refactor; restore starter-side).
+- **Naming (graduation constraint):** don't ship under the `Timed*` stem — it collides with `createTimedProgress`, a documented reach-by-name confusion (INDEX.md § Reserved names). Name the invariant (exogenous input schedule), not the mechanism.
 - **Convergence signal:** second archetype's balance bot hand-rolls the same `(simTime) => cumulativeCount` shape, or an event-driven probe needs to reason about rate-change breakpoints symbolically. Today's `ctx.onTick` composition is mechanical-only; a probe needing symbolic input-rate events re-opens the trigger.
 - **Probe-side evidence (2026-06-09, beat-forge#1 Q4):** `runUntil` `'stasis-aware-tick'` returns `unreachable` at t=0 on a *reachable* producer-arc beat — the click taper is walker-invisible, so `isStasis` misclassifies the bootstrap phase. Event mode's stasis fast-tick fallback handles the same engine correctly (fire 730s vs tick-mode 728s). Until this graduates, the mode's contract is effectively "sound only when all progression is walker-visible"; beat-forge's tuner defaults to `'event'` and documents the exclusion in [`beat-forge/src/balance/tuner.ts`](../../beat-forge/src/balance/tuner.ts).
 
@@ -125,7 +126,7 @@ Not a new primitive — a graduation-readiness candidate for an existing one. In
 Headless-run `Analyzer` for the Ambient/cozy "no fail state" invariant: per-tick negative-delta detector on a player-visible resource, masked on ticks where any wired purchase source incremented (so legitimate auto-buy spending isn't conflated with structural pressure). Composes onto the existing `Analyzer` interface; reports via `AnalyzerResult.issues`.
 
 - **Consumers:** Ambient archetype (OL-701) — `runNoPressureAudit` hand-rolls the masked check today.
-- **Receipts:** [`open-loop-starter/src/showcase/archetypes/ambient/balance/probes.ts`](../../open-loop-starter/src/showcase/archetypes/ambient/balance/probes.ts) — `TODO(expansion)`.
+- **Receipts:** [`open-loop-starter/src/showcase/archetypes/ambient/balance/invariant-probe.ts:124`](../../open-loop-starter/src/showcase/archetypes/ambient/balance/invariant-probe.ts) — `TODO(expansion)`.
 - **Convergence signal:** second consumer wants the same shape. At graduation, decide whether the purchase-source contract is `() => Decimal` (poll counts, current shape) or per-event subscription via `Purchasable.onPurchase` (more accurate when purchase amounts are tiny relative to the resource).
 
 ### `diffTrajectories<TWaypoint>({ predicted, simulated, keys, tolerance })`
@@ -143,8 +144,8 @@ diffTrajectories<TWaypoint>(
 ): TrajectoryDiff[];
 ```
 
-- **Consumers (N=1):** Producer `balance/verify.ts` — `DiffRow` + `diff()` over `ArcWaypoint[]`. Single-key relative-percent tolerance today.
-- **Receipts:** [`open-loop-starter/src/showcase/archetypes/producer/balance/verify.ts`](../../open-loop-starter/src/showcase/archetypes/producer/balance/verify.ts) — `TODO(expansion)`.
+- **Consumers (N=1):** Producer `balance/verify-probe.ts` — `DiffRow` + `diff()` over `ArcWaypoint[]`. Single-key relative-percent tolerance today.
+- **Receipts:** [`open-loop-starter/src/showcase/archetypes/producer/balance/verify-probe.ts:155`](../../open-loop-starter/src/showcase/archetypes/producer/balance/verify-probe.ts) — `TODO(expansion)`.
 - **Convergence signal:** second archetype's balance harness hand-rolls the same waypoint-tolerance diff. At graduation, decide tolerance shape: per-key absolute, relative-percent uniform, or discriminated mode per key.
 
 ### `createThresholdAutobuyer({ mode: 'amount' | 'time' | 'roi' })`
@@ -208,15 +209,23 @@ Shape: typed `schema` for payload validation; `storage: 'fixed-slots' | 'free-fo
 Optional `stages` array on `PurchasableOptions` + `stage` ref on instance for purchasables that transform between N phases — buying advances to the next stage rather than incrementing a count.
 
 - **Consumers:** none first-party. Corpus N=2: Kittens Game `stages[]`, AD `charged` overlays.
-- **Receipts:** [`src/systems/purchasable.ts:80`](../src/systems/purchasable.ts).
+- **Receipts:** [`src/systems/purchasable.ts:69`](../src/systems/purchasable.ts).
 - **Convergence signal:** first consumer hand-rolls phase-transforming purchasable behavior. At graduation, decide whether `stages` is partial-options merged onto the base or full per-stage option objects.
+
+### Gate acceptance on def-level predicate fields — Zone / Skill / Purchasable widening
+
+Three systems carry the same pre-designed widening, each deferred on consumer demand: `ZoneDef.unlockGate?: Gate` (declarative auto-unlock instead of imperative `zones.unlock(id)`), `SkillOptionsBase.unlockGate?`/`prerequisites?` (declarative skill unlocks instead of consumer-side gating closures), and `PurchasableOptions.visibility` widened to `Computable<boolean> | Gate`. `Gate` already exists; the win is flip-distance introspection (`timeUntilGateFlip`) and serializability on fields that today accept only opaque closures. `ChallengeDef.{visible, canStart}` and `AchievementOptions.requirement` already accept `Gate` — the widening aligns the laggard systems with that precedent.
+
+- **Consumers:** none yet — pre-designed deferrals, indexed from their co-located markers.
+- **Receipts:** [`src/systems/zone.ts:97`](../src/systems/zone.ts), [`src/systems/skill.ts:78`](../src/systems/skill.ts), [`src/systems/purchasable.ts:106`](../src/systems/purchasable.ts) — `TODO(expansion)` at each site.
+- **Convergence signal:** first consumer wants declarative unlock/visibility on any of the three (mod configs, sim walkers, devtools flip-distance). The three widenings likely land together — same accepted-forms shape as `ChallengeDef`'s existing `Gate | boolean` fields.
 
 ### `DialogRuntimeState.adapter` — adapter-private persisted payload
 
 Optional `adapter?` field on `DialogRuntimeState` for external runtime adapters (Ink JSON dump, Yarn VM state) to round-trip private state through save/load. StateConstraint-compatible (serializable). Today's workaround is declaration-merging on the type from the adapter's package.
 
 - **Consumers:** none yet — internal `createNativeDialogRuntime` doesn't need it. First external adapter port (Ink/Yarn/Ren'Py) is the trigger.
-- **Receipts:** [`src/systems/dialog.ts:91`](../src/systems/dialog.ts).
+- **Receipts:** [`src/systems/dialog.ts:88`](../src/systems/dialog.ts).
 - **Convergence signal:** first external adapter port. Promotion lifts the declaration-merging contract into a first-class field.
 
 ### Multi-cost walker-leaf transition emission
@@ -232,7 +241,7 @@ Walker leaves pick the first cost requirement when emitting becomes-affordable t
 Batch cell mutation: `fill(mapper: (x, y, current: T) => T)` overwrites every cell in one pass with a single bulk event instead of N per-cell `set` calls and N `cellChanged` emits. Documented event-storm risk on large grids (256×256 = 65k events/frame).
 
 - **Consumers:** `createInfluenceLayer` evaporate/reset — N=1 hand-roll. N=2 blocked: borglike danger-field port attempted 2026-05-21 against the InfluenceLayer surface; reverted on bench data — see sibling entry below.
-- **Receipts:** [`src/core/spatial/influence-layer.ts:268`](../src/core/spatial/influence-layer.ts) (engine-side TODO marker). Borglike in-vivo bench: post-port `computeDangerGrid` went 11.4µs → 80.7µs/call warrior, 11.0µs → 94.5µs/call mage (7–8× slowdown), with the per-cell `set` evaporate one of the three drivers per the OL-1051 closeout.
+- **Receipts:** [`src/core/spatial/influence-layer.ts:301`](../src/core/spatial/influence-layer.ts) (engine-side `TODO(ergonomics)` marker). Borglike in-vivo bench: post-port `computeDangerGrid` went 11.4µs → 80.7µs/call warrior, 11.0µs → 94.5µs/call mage (7–8× slowdown), with the per-cell `set` evaporate one of the three drivers per the OL-1051 closeout.
 - **Convergence signal:** in-vivo perf blocker now satisfied — borglike port reverted because the per-cell evaporate is one of the three drivers of the 7–8× slowdown. Decide at implementation whether emit shape is a single `bulkChanged` event or suppressed entirely (lean: suppressed entirely for `fill`; consumers can subscribe via the layer-level event if they care about composite state).
 
 ### InfluenceLayer hot-path perf cluster — allocation-free `inRange` + cellChanged suppression on internal writes
@@ -246,7 +255,7 @@ Sibling to `SpatialGrid<T>.fill(mapper)` above; both stem from the same in-vivo 
 The three drivers compound. Removing all three closes most of the engine-vs-hand-roll gap in the OL-1051 bench (estimated post-fix ~20-30µs/call vs current 80-95µs/call vs hand-roll 11µs/call — still 2-3× the hand-roll because the hand-roll's tight Int16Array index loop is structurally hard to beat, but back inside the consumer's ±10% perf band).
 
 - **Consumers:** `createInfluenceLayer.accumulate` — N=1 internal driver today. Borglike danger-field port (N=2) attempted 2026-05-21 and reverted on bench data; see OL-1051 closeout for the full per-driver breakdown.
-- **Receipts:** [`src/core/spatial/influence-layer.ts:300`](../src/core/spatial/influence-layer.ts) (accumulate loop — inRange iteration + grid.set per cell). [`src/core/spatial/grid.ts:330`](../src/core/spatial/grid.ts) (cellChanged emit on set). Borglike F0 vs F3 bench captured in OL-1051 comments: warrior 11.4 → 80.7µs/call (+608%), mage 11.0 → 94.5µs/call (+758%), total tick warrior 1696.8 → 2753.2ms (+62%), mage 2148.2 → 4338.9ms (+102%) on seed 1000 50k-turn deep profile.
+- **Receipts:** [`src/core/spatial/influence-layer.ts:325`](../src/core/spatial/influence-layer.ts) (accumulate loop — inRange iteration + grid.set per cell). [`src/core/spatial/grid.ts:330`](../src/core/spatial/grid.ts) (cellChanged emit on set). Borglike F0 vs F3 bench captured in OL-1051 comments: warrior 11.4 → 80.7µs/call (+608%), mage 11.0 → 94.5µs/call (+758%), total tick warrior 1696.8 → 2753.2ms (+62%), mage 2148.2 → 4338.9ms (+102%) on seed 1000 50k-turn deep profile.
 - **Convergence signal:** the fill entry above. These two sub-gaps should land together with `fill(mapper)` because all three serve the same use case (any consumer driving a SpatialGrid at tick frequency with bulk writes), and resolving them separately leaves OL-1051 still blocked after each one ships. Branch decision point at implementation: keep the API shape narrow (`fill` + `inRangeIndices` / `forEachInRange` + a documented internal-write convention via `grid.cells[i] = v` direct write tolerated for engine-internal use) or formalize a "hot-path consumer" mode toggle on the grid itself. Lean: narrow API additions; engine-internal direct-write is already what `accumulate` does for reads (`grid.cells[idx]`), the asymmetric write path is the bug.
 
 ### `Sequencer.resetCursor(toIndex)`
@@ -254,7 +263,7 @@ The three drivers compound. Removing all three closes most of the engine-vs-hand
 Extend list-mode `resetCursor` with optional `toIndex: number` for arbitrary-position cursor jumps — Cavernous II `<` repeat-from-marker semantics. Today's signature hardcodes index 0. Cursor-control family member alongside the graduated `repeat()` (advance by 0), `complete()` (advance by 1), and the no-arg `resetCursor()` (reset to 0); absolute-jump rounds out the set. A fourth member would trigger consolidation discussion under a unified `advance(n)` / `jumpTo(n)` surface.
 
 - **Consumers:** none first-party. Corpus reference: Cavernous II loop replay-from-marker.
-- **Receipts:** [`src/core/sequencer.ts:233`](../src/core/sequencer.ts).
+- **Receipts:** [`src/core/sequencer.ts:283`](../src/core/sequencer.ts).
 - **Research ref:** `open-loop-research/reports/studies/multi-run-orchestration/multi-run-orchestration-primitive-surface.md` § Part 2.
 - **Convergence signal:** first in-repo consumer surfaces a replay-from-marker need (Looper revisit, idle-loops-ng Lloyd variant, similar).
 

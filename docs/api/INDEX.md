@@ -51,10 +51,14 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 
 A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
-- **Loop** — loop-incremental gameplay run (Idle Loops, Cavernous, Loopy Loops). `createLoop`. → content-systems.md#loop
+- **Loop** — loop-incremental gameplay run (Idle Loops, Cavernous, Loopy Loops). `createLoop`. → content-systems.md#loop. `end()` is an atomic end→reset→restart and `elapsed`/`running` are not persistent — a run that ends and dwells awaiting a player restart does not fit; that lifecycle stays consumer-side.
 - **LoopLog** — per-loop metric delta recorder; observes a `Loop`'s lifecycle. `createLoopLog`. → content-systems.md#looplog
+- **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category
 - **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.
 - **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine's `TickDriver` (tick scheduler).
+- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side.
+- **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress
+- **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system's internal play-time counter. Only the TickDriver one accelerates the game.
 
 ## Task → tier
 
