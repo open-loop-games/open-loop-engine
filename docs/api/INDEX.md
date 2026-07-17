@@ -58,7 +58,8 @@ A few symbols share a stem and are easy to confuse. Each links to its anchor:
 - **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine's `TickDriver` (tick scheduler).
 - **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side.
 - **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress
-- **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system's internal play-time counter. Only the TickDriver one accelerates the game.
+- **TimeSystem vs TimeBank** — `createTimeSystem` is the play-clock (how long has the player played); `createTimeBank` is a spendable reservoir of banked seconds (offline banking, bonus time). → runtime.md#time-tracking, lifecycle.md#time-bank
+- **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system's internal play-time counter. Only the TickDriver one accelerates the game. `createBankedAcceleration` drives the TickDriver one.
 
 ## Task → tier
 
@@ -236,6 +237,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 - `resettable` — opt-in interface for objects that can yield their resettable contents to _resetObject_ in the reset system → lifecycle.md#resettable-protocol
 - `retention` — Retention policy for declarative carryover across resets → lifecycle.md#retention
 - `save` — persistent game state with multi-slot support → lifecycle.md#save-manager
+- `time-bank` — banked-time reservoir with acceleration and burst spend surfaces → lifecycle.md#time-bank
 
 ### Runtime
 

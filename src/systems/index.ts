@@ -146,6 +146,11 @@ export * from './inventory';
 // Time tracking, speed multipliers, and calendar/day systems.
 export * from './time';
 
+// === TIME BANK ===
+// Banked-time reservoir (the fourth offline-progress family): deposit/withdraw
+// core plus the live-acceleration and burst-discharge spend surfaces.
+export * from './time-bank';
+
 // === CHALLENGES ===
 // Optional difficulty modifiers with enter/exit lifecycle and completion tracking.
 // ChallengeCategory: batch-register Challenges from content definitions.

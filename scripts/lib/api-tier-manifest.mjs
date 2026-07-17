@@ -116,8 +116,9 @@ export const TIER_MANIFEST = [
       '`createRetentionPolicy`, `keep`, and `retain` — carry values across prestige resets.',
       '`createSaveManager` — multi-slot save/load, migration, validation, import, and export.',
       '`processOfflineTime` — replay elapsed time through the game loop in bounded chunks.',
+      '`createTimeBank` with `createBankedAcceleration` / `burstDischarge` — bank time into a reservoir and spend it as a live speed boost or an instant fast-forward (the banking offline-progress family).',
     ],
-    clusters: ['offline', 'persistence', 'reset', 'resettable', 'retention', 'save'],
+    clusters: ['offline', 'persistence', 'reset', 'resettable', 'retention', 'save', 'time-bank'],
   },
   {
     tier: 'runtime',

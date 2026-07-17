@@ -11,6 +11,7 @@ Start with these public symbols before scanning the full inventory below.
 - `createRetentionPolicy`, `keep`, and `retain` — carry values across prestige resets.
 - `createSaveManager` — multi-slot save/load, migration, validation, import, and export.
 - `processOfflineTime` — replay elapsed time through the game loop in bounded chunks.
+- `createTimeBank` with `createBankedAcceleration` / `burstDischarge` — bank time into a reservoir and spend it as a live speed boost or an instant fast-forward (the banking offline-progress family).
 
 ## Offline
 
@@ -105,3 +106,16 @@ persistent game state with multi-slot support
 - `interface ValidateSaveDataOptions` — Options for validateSaveData. `src/core/save-validation.ts:161`
 - `interface ValidateSaveDataResult` — Result of validateSaveData. `src/core/save-validation.ts:168`
 - `interface ValidationIssue` — A single field-level validation failure, suitable for `save:validation-error`. `src/core/save-validation.ts:72`
+
+## Time bank
+
+banked-time reservoir with acceleration and burst spend surfaces
+
+- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:170`
+- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:135`
+- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:334`
+- `interface BurstDischargeOptions` — Options for burstDischarge. `src/systems/time-bank.ts:294`
+- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:212`
+- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:103`
+- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:71`
+- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:48`
