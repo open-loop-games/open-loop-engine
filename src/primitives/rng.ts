@@ -142,22 +142,32 @@ export function random(): number {
   return nextAlea(globalAlea);
 }
 
-/** Draw an integer in `[min, max]` inclusive from the module-global RNG. */
-export function randomInt(min: number, max: number): number {
-  return Math.floor(random() * (max - min + 1)) + min;
+/**
+ * Draw an integer in `[min, max]` inclusive.
+ * @param rng draw source; defaults to the module-global stream. Pass a
+ * {@link createSeededRNG} closure for an independent deterministic stream.
+ */
+export function randomInt(min: number, max: number, rng: () => number = random): number {
+  return Math.floor(rng() * (max - min + 1)) + min;
 }
 
-/** Pick one element uniformly at random from `array`, or `undefined` if empty. */
-export function randomItem<T>(array: readonly T[]): T | undefined {
+/**
+ * Pick one element uniformly at random from `array`, or `undefined` if empty.
+ * @param rng draw source; defaults to the module-global stream.
+ */
+export function randomItem<T>(array: readonly T[], rng: () => number = random): T | undefined {
   if (array.length === 0) return undefined;
-  return array[randomInt(0, array.length - 1)];
+  return array[randomInt(0, array.length - 1, rng)];
 }
 
-/** Return a new array with `array`'s elements in random order (Fisher–Yates). */
-export function shuffle<T>(array: readonly T[]): T[] {
+/**
+ * Return a new array with `array`'s elements in random order (Fisher–Yates).
+ * @param rng draw source; defaults to the module-global stream.
+ */
+export function shuffle<T>(array: readonly T[], rng: () => number = random): T[] {
   const result = [...array];
   for (let i = result.length - 1; i > 0; i--) {
-    const j = randomInt(0, i);
+    const j = randomInt(0, i, rng);
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
@@ -166,12 +176,17 @@ export function shuffle<T>(array: readonly T[]): T[] {
 /**
  * Pick one item from a weighted list. Returns `undefined` when the list is
  * empty or every weight is non-positive.
+ * @param rng draw source; defaults to the module-global stream. Pass a
+ * {@link createSeededRNG} closure for an independent deterministic stream.
  */
-export function weightedPick<T>(items: readonly WeightedItem<T>[]): T | undefined {
+export function weightedPick<T>(
+  items: readonly WeightedItem<T>[],
+  rng: () => number = random,
+): T | undefined {
   if (items.length === 0) return undefined;
   const totalWeight = items.reduce((sum, i) => sum + i.weight, 0);
   if (totalWeight <= 0) return undefined;
-  let roll = random() * totalWeight;
+  let roll = rng() * totalWeight;
   for (const { item, weight } of items) {
     roll -= weight;
     if (roll < 0) return item;
@@ -179,7 +194,10 @@ export function weightedPick<T>(items: readonly WeightedItem<T>[]): T | undefine
   return items[items.length - 1].item;
 }
 
-/** Return `true` with the given probability (clamped 0..1 by RNG output). */
-export function chance(probability: number): boolean {
-  return random() < probability;
+/**
+ * Return `true` with the given probability (clamped 0..1 by RNG output).
+ * @param rng draw source; defaults to the module-global stream.
+ */
+export function chance(probability: number, rng: () => number = random): boolean {
+  return rng() < probability;
 }

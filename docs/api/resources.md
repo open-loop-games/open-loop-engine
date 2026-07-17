@@ -40,18 +40,18 @@ re-exports eternal_notations as the engine's notation layer
 
 seedable pseudo-random number generator and weighted-item picker
 
-- `function chance(probability: number): boolean` — Return `true` with the given probability (clamped 0..1 by RNG output). `src/primitives/rng.ts:183`
+- `function chance(probability: number, rng?: () => number): boolean` — Return `true` with the given probability (clamped 0..1 by RNG output). `src/primitives/rng.ts:201`
 - `function createSeededRNG(seed: number): () => number` — Returns an independent seeded RNG closure. `src/primitives/rng.ts:131`
 - `function getRNGState(): RNGState` — Capture the module-global RNG state. `src/primitives/rng.ts:103`
 - `function getSeed(): number` — Return the seed last passed to seedRNG (0 before any call). `src/primitives/rng.ts:136`
 - `function random(): number` — Draw the next value in [0, 1) from the module-global RNG. `src/primitives/rng.ts:141`
-- `function randomInt(min: number, max: number): number` — Draw an integer in `[min, max]` inclusive from the module-global RNG. `src/primitives/rng.ts:146`
-- `function randomItem<T>(array: readonly T[]): T | undefined` — Pick one element uniformly at random from `array`, or `undefined` if empty. `src/primitives/rng.ts:151`
+- `function randomInt(min: number, max: number, rng?: () => number): number` — Draw an integer in `[min, max]` inclusive. `src/primitives/rng.ts:150`
+- `function randomItem<T>(array: readonly T[], rng?: () => number): T | undefined` — Pick one element uniformly at random from `array`, or `undefined` if empty. `src/primitives/rng.ts:158`
 - `interface RNGState` — Opaque snapshot of the module-global RNG's internal state. `src/primitives/rng.ts:89`
 - `function seedRNG(seed: number): void` — Reseed the module-global RNG. `src/primitives/rng.ts:79`
 - `function setRNGState(state: RNGState): void` — Restore the module-global RNG to a previously captured state. `src/primitives/rng.ts:118`
-- `function shuffle<T>(array: readonly T[]): T[]` — Return a new array with `array`'s elements in random order (Fisher–Yates). `src/primitives/rng.ts:157`
-- `function weightedPick<T>(items: readonly WeightedItem<T>[]): T | undefined` — Pick one item from a weighted list. `src/primitives/rng.ts:170`
+- `function shuffle<T>(array: readonly T[], rng?: () => number): T[]` — Return a new array with `array`'s elements in random order (Fisher–Yates). `src/primitives/rng.ts:167`
+- `function weightedPick<T>(items: readonly WeightedItem<T>[], rng?: () => number): T | undefined` — Pick one item from a weighted list. `src/primitives/rng.ts:182`
 
 ## Resource
 

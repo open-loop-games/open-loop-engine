@@ -8,6 +8,7 @@ import {
   shuffle,
   weightedPick,
   chance,
+  createSeededRNG,
 } from '@/primitives/rng';
 
 describe('Seeded RNG', () => {
@@ -86,5 +87,45 @@ describe('Seeded RNG', () => {
       expect(chance(1)).toBe(true);
       expect(chance(0)).toBe(false);
     }
+  });
+});
+
+describe('Injected RNG stream', () => {
+  it('weightedPick() draws from the injected stream deterministically', () => {
+    const items = [
+      { item: 'a', weight: 1 },
+      { item: 'b', weight: 1 },
+      { item: 'c', weight: 1 },
+    ];
+    const picksOf = (seed: number) => {
+      const rng = createSeededRNG(seed);
+      return Array.from({ length: 20 }, () => weightedPick(items, rng));
+    };
+    expect(picksOf(7)).toEqual(picksOf(7));
+    expect(picksOf(7)).not.toEqual(picksOf(8));
+  });
+  it('injected draws never advance the module-global stream', () => {
+    seedRNG(42);
+    const expected = [random(), random(), random()];
+    seedRNG(42);
+    const rng = createSeededRNG(7);
+    randomInt(1, 6, rng);
+    randomItem(['a', 'b', 'c'], rng);
+    shuffle([1, 2, 3, 4], rng);
+    weightedPick([{ item: 'x', weight: 1 }], rng);
+    chance(0.5, rng);
+    expect([random(), random(), random()]).toEqual(expected);
+  });
+  it('all helpers accept an injected stream and stay in contract', () => {
+    const rng = createSeededRNG(3);
+    for (let i = 0; i < 50; i++) {
+      const v = randomInt(1, 6, rng);
+      expect(v).toBeGreaterThanOrEqual(1);
+      expect(v).toBeLessThanOrEqual(6);
+    }
+    expect(['a', 'b', 'c']).toContain(randomItem(['a', 'b', 'c'], rng));
+    expect(shuffle([1, 2, 3, 4, 5], rng).sort()).toEqual([1, 2, 3, 4, 5]);
+    expect(chance(1, rng)).toBe(true);
+    expect(chance(0, rng)).toBe(false);
   });
 });
