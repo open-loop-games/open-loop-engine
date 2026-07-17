@@ -41,6 +41,8 @@ export interface SpatialGridOptions<T> {
 /** Events emitted by a {@link SpatialGrid}. Subscribe via `grid.on()`. */
 export interface SpatialGridEvents<T> {
   cellChanged: (x: number, y: number, prev: T, next: T) => void;
+  /** One coarse signal per bulk mutation (`fill()`). No per-cell payload. */
+  bulkChanged: () => void;
   fovUpdated: (deltaIn: GridCoord[], deltaOut: GridCoord[]) => void;
   maskChanged: (mask: 'passable' | 'explored' | 'visible') => void;
 }
@@ -131,6 +133,21 @@ export interface SpatialGrid<T> {
    * contract for `T`. Throws if out of bounds.
    */
   set(x: number, y: number, value: T): void;
+  /**
+   * Writes a value to (x, y) without emitting `cellChanged`. For tick-rate
+   * internal writers (influence-map accumulation and kin) where a per-cell
+   * event per write is pure overhead; pair with a coarser signal the
+   * consumer owns (a layer-level event, or `fill()`'s `bulkChanged`).
+   * Bounds-checked like `set()`. Throws if out of bounds.
+   */
+  setSilent(x: number, y: number, value: T): void;
+  /**
+   * Overwrites every cell in one row-major pass: each cell becomes
+   * `mapper(x, y, current)`. Emits a single `bulkChanged` event instead of
+   * one `cellChanged` per cell — the batch counterpart to `set()` for
+   * full-grid mutations (zero-fill, decay passes, map generation).
+   */
+  fill(mapper: (x: number, y: number, current: T) => T): void;
   inBounds(x: number, y: number): boolean;
 
   /** 4-connected neighbors of (x, y) within bounds. */
@@ -139,6 +156,18 @@ export interface SpatialGrid<T> {
   neighborsDiag(x: number, y: number): Iterable<GridCoord>;
   /** All cells within Chebyshev `radius` of (x, y), within bounds. */
   inRange(x: number, y: number, radius: number): Iterable<GridCoord>;
+  /**
+   * Callback form of `inRange` for hot paths: visits the same cells without
+   * allocating a coordinate object (or generator result) per cell, and hands
+   * the callback the flat `y * width + x` index for direct `cells` access.
+   * Prefer `inRange` outside tick-rate loops — `for…of` reads better.
+   */
+  forEachInRange(
+    x: number,
+    y: number,
+    radius: number,
+    fn: (x: number, y: number, index: number) => void,
+  ): void;
 
   /**
    * Row-major flat cell array. Length = width * height, indexed by `y * width + x`.
@@ -330,6 +359,22 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       handle.emit('cellChanged', x, y, prev, value);
     },
 
+    setSilent(x, y, value) {
+      checkBounds(x, y);
+      cells[idx(x, y)] = value;
+    },
+
+    fill(mapper) {
+      for (let y = 0; y < height; y++) {
+        const row = y * width;
+        for (let x = 0; x < width; x++) {
+          const i = row + x;
+          cells[i] = mapper(x, y, cells[i]);
+        }
+      }
+      handle.emit('bulkChanged');
+    },
+
     inBounds,
 
     neighbors(x, y) {
@@ -345,6 +390,21 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     inRange(x, y, radius) {
       checkBounds(x, y);
       return inRangeIter(x, y, radius);
+    },
+
+    forEachInRange(cx, cy, radius, fn) {
+      checkBounds(cx, cy);
+      const r = Math.max(0, Math.floor(radius));
+      const x0 = Math.max(0, cx - r);
+      const y0 = Math.max(0, cy - r);
+      const x1 = Math.min(width - 1, cx + r);
+      const y1 = Math.min(height - 1, cy + r);
+      for (let y = y0; y <= y1; y++) {
+        const row = y * width;
+        for (let x = x0; x <= x1; x++) {
+          fn(x, y, row + x);
+        }
+      }
     },
 
     bfs(start, isPassable) {

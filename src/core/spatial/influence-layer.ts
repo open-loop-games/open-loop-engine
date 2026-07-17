@@ -29,16 +29,18 @@
  * Full reset is the default — cheapest and fully reactive to source
  * movement, matching the most common field shape.
  *
- * Bulk-write fallback: until `SpatialGrid<T>.fill(mapper)` lands, `reset()`
- * and the evaporation pass write per-cell via `grid.set()` and emit one
- * `cellChanged` per cell. Documented event-storm risk on large grids;
- * switches to the batched form internally once `grid.fill` is available.
+ * Events: the layer writes through the grid's silent/bulk paths — no
+ * per-cell `cellChanged` storm at tick rate. Reactive wrappers subscribe
+ * to the layer's own `updated` event, fired once per `update()`/`reset()`
+ * after all cell writes land.
  *
  * Diagnostics: throws on illegal ops (duplicate source id, NaN strength,
  * out-of-bounds source coords) so misuse surfaces synchronously.
  */
 
+import { createEmitHandle } from '../events';
 import type { SpatialGrid } from './grid';
+import type { Unsubscribe } from './types';
 
 /**
  * A point source contributing influence to the layer.
@@ -166,13 +168,24 @@ export interface InfluenceLayerReader {
   cells(): Iterable<[number, number, number]>;
 }
 
+/** Events emitted by an {@link InfluenceLayer}. Subscribe via `layer.on()`. */
+export interface InfluenceLayerEvents {
+  /**
+   * Fired once per `update()` / `reset()`, after all cell writes land.
+   * The layer's writes bypass per-cell `cellChanged` (tick-rate event-storm
+   * cost), so this is the signal reactive wrappers subscribe to.
+   */
+  updated: () => void;
+}
+
 /** Lifecycle handle for an influence layer. */
 export interface InfluenceLayer {
   /**
    * The underlying numeric grid the layer reads and writes through.
-   * Exposed so reactive wrappers (e.g. `useInfluenceLayer`) can subscribe
-   * to `cellChanged` events and so tight-loop consumers can read raw
-   * cells without per-call bounds checks.
+   * Exposed so tight-loop consumers can read raw cells without per-call
+   * bounds checks. The layer's own writes are silent at the grid level —
+   * reactive wrappers subscribe to the layer's `updated` event, not
+   * `grid.on('cellChanged')`.
    */
   readonly grid: SpatialGrid<number>;
 
@@ -203,9 +216,12 @@ export interface InfluenceLayer {
   update(): void;
   /**
    * Set every cell to zero without running accumulation. Useful on map
-   * load or round reset. Per-cell writes until `grid.fill` lands.
+   * load or round reset.
    */
   reset(): void;
+
+  /** Subscribe to a layer event. Returns an unsubscribe function. */
+  on<K extends keyof InfluenceLayerEvents>(event: K, handler: InfluenceLayerEvents[K]): Unsubscribe;
 }
 
 // === BUILT-IN FALLOFF FUNCTIONS ===
@@ -278,6 +294,7 @@ export function createInfluenceLayer(
   }
 
   const sources = new Map<string, InfluenceSource>();
+  const handle = createEmitHandle<InfluenceLayerEvents>();
   const { width, height } = grid;
 
   function checkSource(source: InfluenceSource): void {
@@ -298,28 +315,17 @@ export function createInfluenceLayer(
     }
   }
 
-  // TODO(ergonomics): switch evaporation/reset to a single grid.fill(mapper)
-  // once SpatialGrid<T>.fill exists — currently emits one cellChanged per
-  // cell, the documented event-storm risk on large grids (256×256 = 65k
-  // events/frame). API shape does not change when the switch happens.
+  const retention = decay ?? 0;
+  const zeroFill = (): number => 0;
+  const decayFill = (_x: number, _y: number, v: number): number => v * retention;
 
   function evaporate(): void {
-    if (!decay) {
-      // decay === 0 or undefined → full reset
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          grid.set(x, y, 0);
-        }
-      }
+    if (retention === 0) {
+      grid.fill(zeroFill);
       return;
     }
-    if (decay === 1) return;
-    const d = decay;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        grid.set(x, y, grid.cells[y * width + x] * d);
-      }
-    }
+    if (retention === 1) return;
+    grid.fill(decayFill);
   }
 
   function accumulate(): number {
@@ -327,20 +333,19 @@ export function createInfluenceLayer(
     for (const source of sources.values()) {
       const r = source.radius ?? defaultRadius;
       if (r <= 0 || source.strength === 0) continue;
-      // grid.inRange iterates a Chebyshev square; the falloff function
+      // forEachInRange walks a Chebyshev square; the falloff function
       // chooses how to collapse (dx, dy) into a scalar distance for its
       // metric. For source positions clamped via checkSource at
       // registration time the iteration is in-bounds.
-      for (const cell of grid.inRange(source.x, source.y, r)) {
-        const idx = cell.y * width + cell.x;
-        if (respectPassability && grid.passable[idx] === 0) continue;
-        const dx = cell.x - source.x;
-        const dy = cell.y - source.y;
+      grid.forEachInRange(source.x, source.y, r, (cx, cy, idx) => {
+        if (respectPassability && grid.passable[idx] === 0) return;
+        const dx = cx - source.x;
+        const dy = cy - source.y;
         const contribution = source.strength * falloff(dx, dy, r);
         samples++;
-        if (contribution === 0) continue;
-        grid.set(cell.x, cell.y, grid.cells[idx] + contribution);
-      }
+        if (contribution === 0) return;
+        grid.setSilent(cx, cy, grid.cells[idx] + contribution);
+      });
     }
     return samples;
   }
@@ -417,14 +422,16 @@ export function createInfluenceLayer(
       evaporate();
       const samples = accumulate();
       profileHook?.(samples);
+      handle.emit('updated');
     },
 
     reset() {
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          grid.set(x, y, 0);
-        }
-      }
+      grid.fill(zeroFill);
+      handle.emit('updated');
+    },
+
+    on(event, handler) {
+      return handle.on(event, handler);
     },
   };
 }

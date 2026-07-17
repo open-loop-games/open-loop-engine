@@ -70,6 +70,47 @@ describe('createSpatialGrid — construction & access', () => {
   });
 });
 
+describe('createSpatialGrid — fill', () => {
+  it('overwrites every cell via the mapper, passing coordinates and current value', () => {
+    const grid = createSpatialGrid<number>({ width: 3, height: 2, initializer: () => 1 });
+    grid.fill((x, y, current) => current + x + y * 10);
+    expect(grid.at(0, 0)).toBe(1);
+    expect(grid.at(2, 0)).toBe(3);
+    expect(grid.at(0, 1)).toBe(11);
+    expect(grid.at(2, 1)).toBe(13);
+  });
+
+  it('emits one bulkChanged and zero cellChanged per call', () => {
+    const grid = createSpatialGrid<number>({ width: 4, height: 4, initializer: () => 0 });
+    let bulk = 0;
+    let perCell = 0;
+    grid.on('bulkChanged', () => bulk++);
+    grid.on('cellChanged', () => perCell++);
+    grid.fill(() => 7);
+    grid.fill((_x, _y, v) => v * 2);
+    expect(bulk).toBe(2);
+    expect(perCell).toBe(0);
+    expect(grid.at(3, 3)).toBe(14);
+  });
+});
+
+describe('createSpatialGrid — setSilent', () => {
+  it('writes the cell without emitting cellChanged', () => {
+    const grid = createSpatialGrid<number>({ width: 2, height: 1, initializer: () => 0 });
+    let fired = 0;
+    grid.on('cellChanged', () => fired++);
+    grid.setSilent(1, 0, 42);
+    expect(grid.at(1, 0)).toBe(42);
+    expect(fired).toBe(0);
+  });
+
+  it('throws out of bounds, matching set()', () => {
+    const grid = createSpatialGrid<number>({ width: 2, height: 1, initializer: () => 0 });
+    expect(() => grid.setSilent(2, 0, 1)).toThrow(RangeError);
+    expect(() => grid.setSilent(0, -1, 1)).toThrow(RangeError);
+  });
+});
+
 describe('createSpatialGrid — adjacency & range', () => {
   const grid = createSpatialGrid<Tile>({ width: 3, height: 3, initializer: floor });
 
@@ -108,6 +149,19 @@ describe('createSpatialGrid — adjacency & range', () => {
     );
     expect([...grid.inRange(1, 1, 5)]).toHaveLength(9);
     expect([...grid.inRange(1, 1, 0)]).toEqual([{ x: 1, y: 1 }]);
+  });
+
+  it('forEachInRange(): visits the same cells as inRange, passing the flat index', () => {
+    const viaIterator = sortCoords([...grid.inRange(0, 1, 1)]);
+    const viaCallback: GridCoord[] = [];
+    grid.forEachInRange(0, 1, 1, (x, y, index) => {
+      expect(index).toBe(y * grid.width + x);
+      viaCallback.push({ x, y });
+    });
+    expect(sortCoords(viaCallback)).toEqual(viaIterator);
+    let count = 0;
+    grid.forEachInRange(1, 1, 5, () => count++);
+    expect(count).toBe(9);
   });
 });
 

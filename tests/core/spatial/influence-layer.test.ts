@@ -309,6 +309,47 @@ describe('InfluenceLayer — reset', () => {
   });
 });
 
+describe('InfluenceLayer — events', () => {
+  it('emits one updated per update() and per reset(); unsubscribe detaches', () => {
+    const grid = numericGrid(4, 4);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 2, falloff: linearFalloff });
+    layer.addSource({ id: 'a', x: 1, y: 1, strength: 5 });
+    let updates = 0;
+    const off = layer.on('updated', () => updates++);
+    layer.update();
+    layer.update();
+    layer.reset();
+    expect(updates).toBe(3);
+    off();
+    layer.update();
+    expect(updates).toBe(3);
+  });
+
+  it('update() emits no per-cell cellChanged — subscribers use the layer event', () => {
+    const grid = numericGrid(8, 8);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 3, falloff: linearFalloff });
+    layer.addSource({ id: 'a', x: 4, y: 4, strength: 10 });
+    let perCell = 0;
+    grid.on('cellChanged', () => perCell++);
+    layer.update();
+    layer.reset();
+    expect(perCell).toBe(0);
+    expect(grid.at(4, 4)).toBe(0);
+  });
+
+  it('handler reads post-accumulation values, not the evaporated intermediate', () => {
+    const grid = numericGrid(4, 4);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 2, falloff: linearFalloff });
+    layer.addSource({ id: 'a', x: 1, y: 1, strength: 5 });
+    let seen = -1;
+    layer.on('updated', () => {
+      seen = layer.read().at(1, 1);
+    });
+    layer.update();
+    expect(seen).toBeCloseTo(5);
+  });
+});
+
 describe('InfluenceLayerReader — sum / peak / cells / at', () => {
   it('at() returns 0 out of bounds', () => {
     const grid = numericGrid(3, 3);
