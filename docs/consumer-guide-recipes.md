@@ -1,6 +1,6 @@
 # Composition recipes
 
-Recurring shapes consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol — single-consumer hand-rolls; an engine helper would over-fit. When a second consumer reaches for the same wrapper, the pattern graduates via `docs/candidate-primitives.md`.
+Recurring shapes consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol — single-consumer hand-rolls; an engine helper would over-fit. A second consumer independently reaching for the same wrapper is the signal that it has outgrown this file.
 
 This is the companion cookbook to [consumer-guide.md](./consumer-guide.md) — a condensed starter-components reference. Read the guide for *how to think* about composing the engine; reach here for the full worked patterns when you're building one. The guide's narrative spine stays a continuous read; these bulkier examples live here so they don't bloat it.
 
@@ -107,7 +107,7 @@ mapAction: (def) => ({
 }),
 ```
 
-This is a recipe, not engine API. The chain shape is currently single-lineage (omsi-loops). When a non-omsi consumer surfaces the same chain independently, that's the N=2 signal to graduate it onto ActionCategory — drop a breadcrumb in `docs/candidate-primitives.md`.
+This is a recipe, not engine API. The chain shape is currently single-lineage (omsi-loops). A non-omsi consumer surfacing the same chain independently is the signal to graduate it onto ActionCategory.
 
 ## Persona-roster composition
 
@@ -146,7 +146,7 @@ sequencer.fillStrategy = createConditionalStrategy(() => [
 
 **Harness integration.** The `src/harness/` picker/runner/sweep substrate already covers persona-population sweeps: `runMatrix` over a personality param axis, or `createPickerSnapshot` to enumerate what the sequencer has loaded. Procedural personas (objective variation in search-based agents) live here — vary the objective the search optimizes rather than the policy params; see `open-loop-research/practical/composition-cookbook/procedural-personas.md`.
 
-Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. A cautionary case (a `createPersonalityRoster` wrapper shipped and then rolled back pre-release) established that the wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit (see breadcrumb in `docs/candidate-primitives.md`). Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
+Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. A cautionary case (a `createPersonalityRoster` wrapper shipped and then rolled back pre-release) established that the wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit. Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
 
 ## Priority-weighted fill across multiple content categories
 

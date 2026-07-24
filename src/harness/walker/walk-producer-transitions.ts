@@ -37,8 +37,8 @@
  *
  * Multi-cost repeatables use the first cost requirement's resource —
  * matches the `walk-purchasable-transitions` convention. `count-threshold`
- * and `rate-chain-crosses-threshold` lookaheads remain parked under
- * `createTransitionPlanner` in `docs/candidate-primitives.md`.
+ * and `rate-chain-crosses-threshold` lookaheads are deliberately absent:
+ * they want a planner above this layer, not more cases inside it.
  */
 
 import type { Producer } from '@/systems/producer-category';

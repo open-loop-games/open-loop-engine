@@ -14,9 +14,8 @@
  * the probe ecosystem, not a generic consumer-facing API.
  *
  * Broader consumer adoption (devtools panels, UI unlock hints, tutorial
- * reachability, mod-QA) is the `InfeasibilityOracle` graduation target
- * tracked in `docs/candidate-primitives.md`. The walker is the substrate;
- * the candidate is the budget-bounded reachability layer above it.
+ * reachability, mod-QA) wants a budget-bounded reachability layer above
+ * this one — deliberately not built here. The walker is the substrate.
  *
  * Null-distance handling is intentionally left to the consumer: `null`
  * distances surface as-is at the tail of `all`. A stasis analyzer treats null
