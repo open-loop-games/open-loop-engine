@@ -1,8 +1,8 @@
 /**
  * Skill helper for dual-tier loop incremental skills
  *
- * Engine primitive for the Skill Systems pattern
- * (`open-loop-research/patterns/tier-3-moderate/skill-systems.md`).
+ * Engine primitive for the Skill Systems pattern — validated at moderate
+ * prevalence across the incremental-games corpus.
  *
  * Two modes for the two universal patterns:
  * - **Level-driven:** modifier = levelToMultiplier(level). For tiers where the

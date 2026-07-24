@@ -4,9 +4,9 @@
  * in harness because the bands encode player-engagement theory, which the
  * mechanics-tier kernel deliberately avoids.
  *
- * The thresholds come from the incremental-games research corpus
- * (`open-loop-research/patterns/cross-pattern-properties/automation.md`)
- * and match Flow Theory's original engagement bands (Csikszentmihalyi 1990):
+ * The thresholds come from automation-pacing analysis across the
+ * incremental-games corpus, and match Flow Theory's original engagement
+ * bands (Csikszentmihalyi 1990):
  *
  * - **arousal** `[0, 30)` — learning phase, building engagement
  * - **flow** `[30, 120)` — optimal engagement zone (target)

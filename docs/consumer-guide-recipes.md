@@ -144,9 +144,9 @@ sequencer.fillStrategy = createConditionalStrategy(() => [
 
 **Difficulty-tier discipline.** When sub-shapes encode difficulty (beginner/normal/hard), enforce a monotonic-difficulty constraint in the param bundle: each param that the player perceives as "harder" should be strictly ordered across tiers. Mixing monotonically-increasing and monotonically-decreasing params produces a roster where no tier is cleanly "harder" — exploitability profiles work differently (encode known weaknesses explicitly, not via difficulty ordering).
 
-**Harness integration.** The `src/harness/` picker/runner/sweep substrate already covers persona-population sweeps: `runMatrix` over a personality param axis, or `createPickerSnapshot` to enumerate what the sequencer has loaded. Procedural personas (objective variation in search-based agents) live here — vary the objective the search optimizes rather than the policy params; see `open-loop-research/practical/composition-cookbook/procedural-personas.md`.
+**Harness integration.** The `src/harness/` picker/runner/sweep substrate already covers persona-population sweeps: `runMatrix` over a personality param axis, or `createPickerSnapshot` to enumerate what the sequencer has loaded. Procedural personas (objective variation in search-based agents) live here — vary the objective the search optimizes rather than the policy params.
 
-Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. A cautionary case (a `createPersonalityRoster` wrapper shipped and then rolled back pre-release) established that the wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit. Research: `open-loop-research/practical/composition-cookbook/parameterized-personality.md`.
+Why no engine helper today: the selection-policy axis (round-robin vs. priority vs. conditional vs. composite) and the param-bundle shape vary widely across game types. The primitives above are the stable substrate. A cautionary case (a `createPersonalityRoster` wrapper shipped and then rolled back pre-release) established that the wrapper would over-name a composition that already reads naturally without it. First consumer hand-roll is the signal to revisit.
 
 ## Priority-weighted fill across multiple content categories
 
@@ -201,7 +201,7 @@ The shape is convergent today but the pass-bonus map is the consumer-side knob: 
 
 ## Character interaction surface
 
-Composition recipe for games with named characters that the player returns to — companions, mentors, merchants, faction contacts. The engine provides a dialog runtime and a relationship-state category; both are Tier-4 surfaces (specialized in incremental, near-default in narrative-adjacent codebases). Pattern definitions live in `open-loop-research/patterns/tier-4-specialized/character-interaction-systems.md` and `open-loop-research/patterns/tier-4-specialized/relationship-systems.md`.
+Composition recipe for games with named characters that the player returns to — companions, mentors, merchants, faction contacts. The engine provides a dialog runtime and a relationship-state category; both are Tier-4 surfaces (specialized in incremental, near-default in narrative-adjacent codebases) implementing the Character Interaction and Relationship Systems patterns.
 
 ### Dialog: contract first, runtime second
 

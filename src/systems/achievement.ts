@@ -17,8 +17,8 @@
  * Batch-registration over a content registry lives in
  * `./achievement-category` ({@link createAchievementCategory}).
  *
- * Pattern reference:
- * `open-loop-research/patterns/tier-1-foundation/achievement-systems.md`.
+ * Implements the Achievement Systems pattern — foundation-tier, near-universal
+ * across the incremental-games corpus.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
