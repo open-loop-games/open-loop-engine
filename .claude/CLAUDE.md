@@ -63,8 +63,8 @@ Migration:
 
 Why removed: Action was a god-function whose lifecycle/serialization/cursor
 concerns couldn't be untangled without reinventing Sequencer internally.
-Killed in OL-385 after the starter stress test showed three games each
-working around a different part of it. Don't reintroduce a generic Action —
+Killed after the starter stress test showed three games each working
+around a different part of it. Don't reintroduce a generic Action —
 the composition is the primitive.
 ```
 
