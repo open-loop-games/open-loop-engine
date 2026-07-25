@@ -7,6 +7,9 @@ temp
 # public engine surface.
 docs/notes/
 
+# Bytecode from scripts/formula-oracle.py's dev-only oracle runs
+__pycache__/
+
 # Claude: commit .claude/CLAUDE.md and rules/, keep the rest private
 .claude/*
 !.claude/CLAUDE.md
