@@ -89,6 +89,17 @@ export interface ProducerMapping {
    * responsibility — engine does nothing here.
    */
   extraCount?: Computable<DecimalSource>;
+  /**
+   * Let the resource fall below zero when the composed rate is net-negative.
+   *
+   * A rate chain carrying consumption modifiers can resolve negative, in which
+   * case the tick drains instead of producing. By default the drain stops at
+   * zero, taking whatever remains — unlike {@link subtractResource}, which
+   * refuses a shortfall outright, since a continuous rate has no atomic
+   * purchase to reject. Set `true` when the deficit is itself a game signal
+   * (starvation detectors reading a negative balance).
+   */
+  allowNegative?: boolean;
 }
 
 /**
@@ -135,6 +146,8 @@ export interface Producer {
   readonly computedRate: ComputedRef<DecimalSource>;
   /** The resource this producer generates */
   readonly resource: Resource;
+  /** Whether a net-negative rate may drain the resource below zero */
+  readonly allowNegative: boolean;
   /** Trigger mode */
   readonly trigger: 'continuous' | 'manual';
   /** The Purchasable, if purchase config was provided */
@@ -311,6 +324,7 @@ function buildProducer<Def extends { id: string }, State>(
     rateChain,
     computedRate,
     resource: mapping.resource,
+    allowNegative: mapping.allowNegative ?? false,
     trigger: mapping.trigger,
     repeatable,
     activate,
@@ -324,12 +338,24 @@ function buildProducer<Def extends { id: string }, State>(
 /**
  * Per-tick body for a continuous producer entry. Skips manual producers so
  * mixed-trigger categories don't double-credit on `activate()`.
+ *
+ * A rate chain carrying consumption modifiers can compose net-negative, so the
+ * integration is signed: the same `rate × count × dt` that credits a positive
+ * rate debits a negative one. The drain floors at zero unless the producer opts
+ * into `allowNegative` — it takes what remains rather than refusing the whole
+ * shortfall, since a continuous rate has no atomic purchase to reject.
  */
 function tickContinuousProducer(entry: { instance: Producer }, dt: number): void {
   const producer = entry.instance;
   if (producer.trigger !== 'continuous') return;
   const amount = Decimal.mul(Decimal.mul(producer.computedRate.value, producer.count.value), dt);
-  if (Decimal.gt(amount, 0)) addResource(producer.resource, amount);
+  if (Decimal.gt(amount, 0)) {
+    addResource(producer.resource, amount);
+    return;
+  }
+  if (Decimal.gte(amount, 0)) return;
+  const next = Decimal.add(producer.resource.value, amount);
+  producer.resource.value = producer.allowNegative || Decimal.gte(next, 0) ? next : Decimal.dZero;
 }
 
 // === FACTORIES ===

@@ -943,3 +943,97 @@ describe('Producer.purchaseBeatSeconds', () => {
     expect(producer.purchaseBeatSeconds.value).toBe(5);
   });
 });
+
+describe('Producer signed-rate integration', () => {
+  it('a net-negative composed rate drains the resource', () => {
+    const { registerTick, tick } = createTickManager();
+    const catnip = createTestResource('catnip', 100);
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'net-negative',
+      mapProducer: (def) => ({
+        resource: catnip,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+      }),
+      registerTick,
+    });
+
+    category.register({
+      id: 'field',
+      name: 'Field',
+      baseRate: 5,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+
+    const producer = category.getProducer('field')!;
+
+    // Consumption bound onto the same rate chain outweighs production:
+    // 5 produced - 8 consumed = -3/sec net.
+    producer.rateChain.add(createAdditiveModifier({ addend: -8, description: 'Upkeep' }));
+    expect(new Decimal(producer.computedRate.value).eq(-3)).toBe(true);
+
+    tick(1);
+
+    expect(new Decimal(catnip.value).eq(97)).toBe(true);
+  });
+
+  it('a drain floors at zero by default, taking what remains', () => {
+    const { registerTick, tick } = createTickManager();
+    const catnip = createTestResource('catnip', 2);
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'drain-clamped',
+      mapProducer: (def) => ({
+        resource: catnip,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+      }),
+      registerTick,
+    });
+
+    category.register({
+      id: 'field',
+      name: 'Field',
+      baseRate: -5,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+
+    // Demand is 5, balance is 2 — the shortfall drains the remainder rather
+    // than refusing outright the way subtractResource would.
+    tick(1);
+
+    expect(new Decimal(catnip.value).eq(0)).toBe(true);
+  });
+
+  it('allowNegative lets the deficit accumulate below zero', () => {
+    const { registerTick, tick } = createTickManager();
+    const catnip = createTestResource('catnip', 2);
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'drain-signed',
+      mapProducer: (def) => ({
+        resource: catnip,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+        allowNegative: true,
+      }),
+      registerTick,
+    });
+
+    category.register({
+      id: 'field',
+      name: 'Field',
+      baseRate: -5,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+
+    tick(1);
+
+    // -3 is readable by a starvation detector; the clamped variant loses it.
+    expect(new Decimal(catnip.value).eq(-3)).toBe(true);
+  });
+});
