@@ -18,11 +18,12 @@
  *    agrees to 1e-9 can sit a long way off in input space.
  */
 
-import { F } from '@/core/formulas/formulas';
-import type { GenericFormula } from '@/core/formulas/types';
+import Formula, { F, calculateCost } from '@/core/formulas/formulas';
+import type { GenericFormula, InvertibleFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { describe, expect, test, vi } from 'vitest';
+import { ref } from 'vue';
 import oracle from './fixtures/formula-oracle.json';
 
 // === DOMAIN SAMPLES ===
@@ -384,6 +385,220 @@ describe('oracle: invert lands on the true pre-image', () => {
   }
 });
 
+describe('piecewise: step and if', () => {
+  // `Formula.step` is the engine's existing piecewise-splice structure — the
+  // composition the research vocabulary names as the genre's lead pattern, and
+  // the shape a first-passage search has to do regime detection through. Its
+  // laws were never swept.
+
+  const MODIFIERS: Record<string, (v: never) => GenericFormula> = {
+    // Continuous at the breakpoint: m(0) = 0, so the spliced function has no jump.
+    sqrt: (v) => (v as unknown as GenericFormula).sqrt(),
+    'mul 0.5': (v) => (v as unknown as GenericFormula).mul(0.5),
+    'pow 0.75': (v) => (v as unknown as GenericFormula).pow(0.75),
+  };
+
+  test('below the breakpoint the value passes through unchanged', () => {
+    for (const modifier of Object.values(MODIFIERS)) {
+      const formula = F.step(F.variable(0), 100, modifier);
+      for (const x of ['0', '1', '50', '99.9']) {
+        expect(String(formula.evaluate(x)), `step passthrough at ${x}`).toBe(
+          String(new Decimal(x)),
+        );
+      }
+    }
+  });
+
+  test('round-trip holds for continuous modifiers, on both sides of the breakpoint', () => {
+    for (const [name, modifier] of Object.entries(MODIFIERS)) {
+      const formula = F.step(F.variable(0), 100, modifier);
+      for (const x of ['50', '100', '110', '200', '1e6']) {
+        const { value, errors } = withoutEngineErrors(() => {
+          const y = formula.evaluate(x);
+          return { y, back: formula.invert(y) };
+        });
+        expect(errors, `${name} logged at x=${x}`).toEqual([]);
+        const err = relativeError(value.back, x);
+        expect(
+          Decimal.lte(err, DEFAULT_TOL),
+          `step(${name}) x=${x} → ${String(value.y)} → ${String(value.back)} (error ${err.toString()})`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('a discontinuous modifier leaves targets with no pre-image', () => {
+    // With m(0) ≠ 0 the splice jumps at the breakpoint: `add 5` maps 100 → 105,
+    // so nothing evaluates into (100, 105). `invert` still answers there, and the
+    // answer does not evaluate back.
+    //
+    // This is the *same* defect class as interior rounding — a target outside the
+    // function's image — which is the useful part: whatever the invert contract
+    // becomes, one signal covers both. Asserting the hole rather than the wrong
+    // number, so this fails when the contract gains a way to say "inexact"
+    // instead of silently calcifying today's answer.
+    const formula = F.step(F.variable(0), 100, (v) => (v as unknown as GenericFormula).add(5));
+    expect(String(formula.evaluate('100'))).toBe('105');
+
+    const inGap = '102';
+    const preimage = formula.invert(inGap);
+    expect(
+      Decimal.neq(formula.evaluate(preimage), inGap),
+      `target ${inGap} sits in the image gap, yet invert returned ${String(preimage)} which evaluates back to ${String(formula.evaluate(preimage))}`,
+    ).toBe(true);
+  });
+
+  test('if/conditional round-trips through whichever branch is live', () => {
+    const condition = ref(true);
+    const formula = F.if(
+      F.variable(0),
+      condition,
+      (v) => (v as unknown as GenericFormula).mul(2),
+      (v) => (v as unknown as GenericFormula).mul(10),
+    );
+    for (const live of [true, false]) {
+      condition.value = live;
+      for (const x of ['0', '2.5', '100', '1e6']) {
+        const { value, errors } = withoutEngineErrors(() => {
+          const y = formula.evaluate(x);
+          return { y, back: formula.invert(y) };
+        });
+        expect(errors, `if(${String(live)}) logged at x=${x}`).toEqual([]);
+        expect(
+          Decimal.lte(relativeError(value.back, x), DEFAULT_TOL),
+          `if(${String(live)}) x=${x} → ${String(value.y)} → ${String(value.back)}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+describe('cumulative cost: integral vs discrete sum', () => {
+  // The two are different operations, and `calculateCost` selects between them
+  // by `directSum` — which is exactly the ambiguity the umbrella's integral
+  // uncertainty is about. Pinning both halves so any renaming or splitting has
+  // to preserve the arithmetic.
+
+  /** Σ f(start + i) for i in [0, n) — the definition of a discrete bulk cost. */
+  function discreteSum(formula: GenericFormula, start: DecimalSource, n: number): Decimal {
+    let total = new Decimal(0);
+    for (let i = 0; i < n; i++) {
+      total = total.add(formula.evaluate(Decimal.add(start, i)));
+    }
+    return total;
+  }
+
+  const CURVES: Record<string, () => GenericFormula> = {
+    'exponential 10·1.15ⁿ': () => Formula.exponential(0, 10, 1.15),
+    'linear 5n+10': () => Formula.linear(0, 10, 5),
+    'polynomial 10n²': () => Formula.polynomial(0, 10, 2),
+  };
+
+  for (const [name, build] of Object.entries(CURVES)) {
+    test(`${name} — directSum ≥ amount reproduces Σ f(i) exactly`, () => {
+      const formula = build() as InvertibleFormula;
+      for (const n of [1, 2, 5, 8]) {
+        const cost = calculateCost(formula, n, true, n);
+        const truth = discreteSum(formula, 0, n);
+        expect(
+          Decimal.lte(relativeError(cost, truth), 1e-12),
+          `${name} n=${n}: calculateCost=${String(cost)}, Σ=${truth.toString()}`,
+        ).toBe(true);
+      }
+    });
+  }
+
+  test('the integral path is a different number, and knowingly so', () => {
+    // Not a defect — a continuous antiderivative genuinely disagrees with a
+    // discrete sum for a convex curve. Pinned because a consumer indexing by
+    // level needs the sum, and reaching for the integral silently gets this gap.
+    const formula = Formula.exponential(0, 10, 1.15) as InvertibleFormula;
+    const n = 8;
+    const integral = calculateCost(formula, n, true, 0);
+    const summed = discreteSum(formula, 0, n);
+    expect(Decimal.neq(integral, summed)).toBe(true);
+    // Same order of magnitude — the two differ by a boundary term, not wildly.
+    const ratio = new Decimal(integral).div(summed).toNumber();
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(1.5);
+  });
+});
+
+describe('tetration family', () => {
+  // No external reference reaches here, and these ops are where an inverse is
+  // most likely to be wrong: each takes auxiliary arguments (height, base,
+  // payload) that the inverse has to honour, and upstream dropped several of
+  // them behind `eslint-disable no-unused-vars` rather than reporting.
+  // `lambertw` earns its own sweep by being load-bearing in four integral
+  // inversions (`operations.ts` log/log2/log10/ln).
+
+  test('lambertw — w·eʷ recovers the argument', () => {
+    for (const x of ['0.5', '2', '10', '1e10', '1e100', '1e300']) {
+      expectRoundTrip(F.lambertw(F.variable(x)), x, 1e-12);
+    }
+  });
+
+  test('ssqrt — inverts xˣ', () => {
+    for (const x of ['1.5', '2', '3', '10']) {
+      expectRoundTrip(F.ssqrt(F.variable(x)), x, DEFAULT_TOL);
+    }
+  });
+
+  test('tetrate at height 2 — ssqrt is the exact inverse', () => {
+    for (const base of ['1.5', '2', '3', '10']) {
+      expectRoundTrip(F.tetrate(F.variable(base), 2), base, DEFAULT_TOL);
+    }
+  });
+
+  test('tetrate above height 2 — reports instead of answering', () => {
+    // `ssqrt` inverts `b^b` alone. Applying it at height 3 returned a
+    // plausible-looking wrong number (2.745 for `tetrate(2, 3) = 16`), which is
+    // the failure mode this umbrella exists to remove: a silent wrong answer is
+    // worse than a refusal.
+    for (const height of [3, 4]) {
+      const formula = F.tetrate(F.variable('2'), height);
+      const { errors } = withoutEngineErrors(() => formula.invert(formula.evaluate()));
+      expect(errors.join(' '), `tetrate height ${height}`).toMatch(/could not invert tetrate/i);
+    }
+  });
+
+  test('slog — inverse is base ↑↑ y, carrying the base', () => {
+    for (const base of ['2', '10']) {
+      for (const x of ['1e10', '1e100']) {
+        expectRoundTrip(F.slog(F.variable(x), base), x, 1e-9);
+      }
+    }
+  });
+
+  test('layeradd — inverse carries the base', () => {
+    for (const base of ['2', '10']) {
+      for (const diff of ['1', '2']) {
+        for (const x of ['1e10', '1e100']) {
+          expectRoundTrip(F.layeradd(F.variable(x), diff, base), x, 1e-9);
+        }
+      }
+    }
+  });
+
+  test('iteratedexp at height 1 — degenerates to base^payload and inverts', () => {
+    for (const payload of ['1', '2']) {
+      for (const x of ['1.5', '2', '3']) {
+        expectRoundTrip(F.iteratedexp(F.variable(x), 1, payload), x, 1e-9);
+      }
+    }
+  });
+
+  test('iteratedexp above height 1 — reports instead of answering', () => {
+    for (const height of [2, 3]) {
+      const formula = F.iteratedexp(F.variable('2'), height);
+      const { errors } = withoutEngineErrors(() => formula.invert(formula.evaluate()));
+      expect(errors.join(' '), `iteratedexp height ${height}`).toMatch(
+        /could not invert iteratedexp/i,
+      );
+    }
+  });
+});
+
 describe('magnitude regimes: laws hold where no oracle can reach', () => {
   /**
    * Sample points by break_eternity regime. Layer 0 is an ordinary float; layer
@@ -498,6 +713,27 @@ describe('oracle: F(b) − F(a) equals the definite integral', () => {
         tol,
         logTol: 1e-12,
         label: `∫${op} over [${from}, ${to}]${tolReason ? ` (${tolReason})` : ''}`,
+      });
+    });
+  }
+
+  // Binary ops integrate through a different path per orientation — `integrateX`
+  // dispatches on which side holds the variable, and `integrateAdd`/`integrateSub`
+  // additionally branch between a closed-form quadratic and bisection. A single
+  // orientation would leave half of that untested.
+  for (const { op, side, k, from, to, value } of oracle.binaryIntegrals) {
+    test(`${op}(${side === 'lhs' ? `var, ${k}` : `${k}, var`}) over [${from}, ${to}]`, () => {
+      const build = BINARY[op].op;
+      const formula = side === 'lhs' ? build(F.variable(0), k) : build(k, F.variable(0));
+      const { value: got, errors } = withoutEngineErrors(() =>
+        Decimal.sub(formula.evaluateIntegral(to), formula.evaluateIntegral(from)),
+      );
+      expect(errors, `engine logged integrating ${op}(${side})`).toEqual([]);
+      const { tol = 1e-12, tolReason } = INTEGRAL_TOL[`${op}.${side}`] ?? {};
+      expectValueClose(got, value, {
+        tol,
+        logTol: 1e-12,
+        label: `∫${op}(${side}, k=${k})${tolReason ? ` (${tolReason})` : ''}`,
       });
     });
   }

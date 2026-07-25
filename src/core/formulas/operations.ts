@@ -370,10 +370,31 @@ export const invertDiv = makeBinaryInvert(
   (value, other) => Decimal.div(other, value),
 );
 
-export const integrateDiv = makeBinaryIntegrate(
-  (x, other) => Formula.div(x, other),
-  (x, other) => Formula.div(other, x),
-);
+// `x / k` is linear in the antiderivative, so the substitution shortcut applies
+// and `F(x)/k` is correct. `k / x` is not: its antiderivative is `k·ln(x)`.
+// Upstream ran both orientations through the shortcut, so the rhs branch
+// returned `k/(x²/2)` — the integrand reshaped, not an antiderivative at all
+// (∫2.5/x over [1,10] came out as -4.95 against a true 2.5·ln(10) = 5.756).
+export function integrateDiv(stack: SubstitutionStack, lhs: FormulaSource, rhs: FormulaSource) {
+  if (hasVariable(lhs)) {
+    if (!lhs.isIntegrable()) {
+      console.error('Could not integrate due to variable not being integrable');
+      return Formula.constant(0);
+    }
+    return Formula.div(lhs.getIntegralFormula(stack), rhs);
+  }
+  if (hasVariable(rhs)) {
+    // ∫k/g(x) dx is `k·ln(g(x))` only when g is the bare variable — otherwise
+    // the chain rule contributes a factor the substitution stack can't supply.
+    if (!isPlainVariable(rhs)) {
+      console.error('Could not integrate k/f(x): closed form needs a bare variable denominator');
+      return Formula.constant(0);
+    }
+    return Formula.mul(lhs, Formula.ln(rhs));
+  }
+  console.error('Could not integrate due to no input being a variable');
+  return Formula.constant(0);
+}
 
 export const applySubstitutionDiv = makeBinarySubstitution((value, other) =>
   Formula.mul(value, other),
@@ -586,10 +607,19 @@ export function tetrate(
 export function invertTetrate(
   value: DecimalSource,
   base: FormulaSource,
-  _height: FormulaSource,
-  _payload: FormulaSource,
+  height: FormulaSource,
+  payload: FormulaSource,
 ) {
   if (hasVariable(base)) {
+    // `ssqrt` inverts `b ↑↑ 2` (that is, `b^b`) and nothing else. Upstream
+    // applied it at every height and payload — silently returning `2.745` for
+    // `tetrate(2, 3) = 16` instead of `2`. There is no closed-form inverse in
+    // the base for general height, so report rather than answer; a numeric
+    // fallback can widen this once core has a shared root-finder.
+    if (!Decimal.eq(unrefFormulaSource(height), 2) || !Decimal.eq(unrefFormulaSource(payload), 1)) {
+      console.error('Could not invert tetrate: no closed form except height 2 with payload 1');
+      return 0;
+    }
     return base.invert(Decimal.ssqrt(value));
   }
   console.error('Could not invert due to no input being a variable');
@@ -609,16 +639,22 @@ export function invertIteratedExp(
   value: DecimalSource,
   lhs: FormulaSource,
   height: FormulaSource,
-  _payload: FormulaSource,
+  payload: FormulaSource,
 ) {
   if (hasVariable(lhs)) {
-    return lhs.invert(
-      Decimal.iteratedlog(
-        value,
-        Math.E,
-        Decimal.minabs(1e308, unrefFormulaSource(height)).toNumber(),
-      ),
-    );
+    // The variable sits in the *base* position, so the inverse has to solve for
+    // the base. Upstream applied `iteratedlog(value, e, height)`, which solves
+    // for the payload and hardcodes base e — the wrong argument, and right only
+    // where the base happens to be e.
+    //
+    // At height 1 the op degenerates to `base ^ payload`, whose inverse in the
+    // base is `root(value, payload)`. Above that there is no closed form —
+    // report rather than answer, as with `invertTetrate`.
+    if (!Decimal.eq(unrefFormulaSource(height), 1)) {
+      console.error('Could not invert iteratedexp: no closed form in the base above height 1');
+      return 0;
+    }
+    return lhs.invert(Decimal.root(value, unrefFormulaSource(payload)));
   }
   console.error('Could not invert due to no input being a variable');
   return 0;
@@ -640,8 +676,11 @@ export function slog(value: DecimalSource, lhs: DecimalSource = 10) {
 
 export function invertSlog(value: DecimalSource, lhs: FormulaSource, rhs: FormulaSource) {
   if (hasVariable(lhs)) {
+    // Inverting `slog_base(x) = y` gives `x = base ↑↑ y`, so the base is
+    // `tetrate`'s first argument and the target its second. Upstream passed
+    // them the other way round, computing `y ↑↑ base`.
     return lhs.invert(
-      Decimal.tetrate(value, Decimal.minabs(1e308, unrefFormulaSource(rhs)).toNumber()),
+      Decimal.tetrate(unrefFormulaSource(rhs), Decimal.minabs(1e308, value).toNumber()),
     );
   }
   console.error('Could not invert due to no input being a variable');
@@ -657,11 +696,18 @@ export function invertLayeradd(
   value: DecimalSource,
   lhs: FormulaSource,
   diff: FormulaSource,
-  _base: FormulaSource,
+  base: FormulaSource,
 ) {
   if (hasVariable(lhs)) {
+    // The base has to travel with the inverse: `layeradd` counts layers in
+    // base-b logarithms, so undoing it in base 10 (upstream dropped the
+    // argument) recovers a different number for any other base.
     return lhs.invert(
-      Decimal.layeradd(value, Decimal.minabs(1e308, unrefFormulaSource(diff)).negate().toNumber()),
+      Decimal.layeradd(
+        value,
+        Decimal.minabs(1e308, unrefFormulaSource(diff)).negate().toNumber(),
+        unrefFormulaSource(base),
+      ),
     );
   }
   console.error('Could not invert due to no input being a variable');
