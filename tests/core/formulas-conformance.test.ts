@@ -726,6 +726,151 @@ describe('invert contract: tryInvert grades the answer', () => {
   });
 });
 
+describe('first passage: the smallest input that reaches the target', () => {
+  // The third arm of the same story. `invert` answers the algebraic pre-image,
+  // `tryInvert` grades whether that answer is reachable, and `firstPassage`
+  // answers the question a time axis actually asked. The laws below pin where
+  // the first two diverge from the third — and, first, that they don't diverge
+  // where the target is genuinely in the image.
+
+  test('agrees with invert on a continuous invertible chain', () => {
+    // The load-bearing non-divergence law. If these came apart, `firstPassage`
+    // would be a second, subtly different algebra rather than the same answer
+    // reached by another route.
+    const formula = F.variable(0).pow(2).mul(10).add(100);
+    for (const target of ['110', '350', '1e6', '1e30']) {
+      const { value, errors } = withoutEngineErrors(() => formula.firstPassage(target));
+      expect(errors, `target ${target}`).toEqual([]);
+      expect(value.reason, `target ${target}`).toBe('crossed');
+      expect(
+        Decimal.lte(relativeError(value.value!, formula.invert(target)), DEFAULT_TOL),
+        `target ${target}: passage ${String(value.value)}, invert ${String(formula.invert(target))}`,
+      ).toBe(true);
+    }
+  });
+
+  test('reproduces a shipped stepped-burn schedule that invert misses', () => {
+    // multiverse-hr's operating-burn spine (`src/balance/drain-projection.ts`):
+    // burn = B₀·g^(⌊t/T_g⌋+½), and the run ends when it overtakes P_max. The
+    // shipped hand-roll computes the crossing as T_g·⌈log_g H − ½⌉; written as
+    // an ordinary chain the `.floor()` is *interior*, so the algebra lands on
+    // the step's centre rather than its boundary — off by T_g·frac(log_g H),
+    // up to a full T_g. The law states the hand-roll's formula, not its numbers.
+    const [g, tg, b0] = [2, 15, 6];
+    const burn = F.variable(0).div(tg).floor().add(0.5).pow_base(g).mul(b0);
+
+    for (const h of [4, 8, 16, 32, 100]) {
+      const shipped = tg * Math.ceil(Math.log(h) / Math.log(g) - 0.5);
+      const { value, errors } = withoutEngineErrors(() => burn.firstPassage(b0 * h));
+      expect(errors, `H=${h}`).toEqual([]);
+      expect(value.reason, `H=${h}`).toBe('crossed');
+      expect(String(value.value), `H=${h}`).toBe(String(shipped));
+      // …and the algebra really does miss it, so the law fails if the
+      // divergence this method exists for ever quietly closes.
+      expect(burn.tryInvert(b0 * h).reason, `H=${h}`).toBe('outside-image');
+    }
+  });
+
+  test('answers the next breakpoint where an interior floor has no pre-image', () => {
+    // The documented Skill curve. At an integer level the two agree, because
+    // that is exactly what rounding passthrough answers exactly for. At 3.5 the
+    // level axis has no such value: nothing evaluates to 3.5, so the smallest
+    // XP that *reaches* it is the start of level 4, while `invert` hands back a
+    // number from inside the gap.
+    const xpToLevel = F.variable(0).div(50).sqrt().floor();
+
+    expect(String(xpToLevel.firstPassage(3).value)).toBe('450');
+    expect(xpToLevel.tryInvert(3).reason).toBe('exact');
+
+    const fractional = xpToLevel.firstPassage(3.5);
+    expect(fractional.reason).toBe('crossed');
+    expect(xpToLevel.tryInvert(3.5).reason).toBe('outside-image');
+    // Stated as the property, not the number: the answer is the smallest
+    // *representable* input whose evaluation reaches 3.5. That sits one ulp
+    // under the exact 800, because `sqrt(15.999999999999998)` rounds to 4 in
+    // break_eternity's arithmetic — a fact about the representation, not slack
+    // in the search, and the law would hide a real regression if it demanded
+    // the prettier number.
+    expect(String(xpToLevel.evaluate(fractional.value!))).toBe('4');
+    expect(Decimal.lte(relativeError(fractional.value!, 800), 1e-15)).toBe(true);
+  });
+
+  test('answers the far side of a step splice’s jump discontinuity', () => {
+    // Where the modifier does not vanish at the breakpoint the splice jumps, so
+    // targets inside the gap have no pre-image at all — the defect class leaf 1
+    // collapsed into `outside-image`. A first passage has a real answer here:
+    // the breakpoint itself, where the curve lands on the far side of the jump.
+    const spliced = F.step(F.variable(0), 10, (f) => f.add(5));
+    expect(String(spliced.evaluate(9.9))).toBe('9.9');
+    expect(String(spliced.evaluate(10))).toBe('15');
+
+    const passage = spliced.firstPassage(12);
+    expect(passage.reason).toBe('crossed');
+    expect(String(passage.value)).toBe('10');
+  });
+
+  test('reports rather than answers when a clamp saturates below the target', () => {
+    // `min`/`max`/`clamp` invert by passthrough, so the algebra answers for a
+    // target the curve can never produce. The search cannot bracket it and says
+    // so; below the cap it answers normally.
+    const capped = F.variable(0).mul(2).clamp(0, 50);
+    expect(capped.firstPassage('80')).toEqual({ value: null, reason: 'no-crossing' });
+    expect(String(capped.firstPassage(50).value)).toBe('25');
+  });
+
+  test('answers for chains that have no inverse at all', () => {
+    // The capability that falls out of searching the forward function: nothing
+    // here binds an inverse, and `isInvertible()` correctly says so. This is the
+    // forward-only evaluator class (outermost `ceil`/`floor`/`min`/`max`) that
+    // the algebra could never serve.
+    const absolute = F.variable(0).abs().mul(3);
+    expect(absolute.isInvertible()).toBe(false);
+
+    const { value, errors } = withoutEngineErrors(() => absolute.firstPassage(30));
+    expect(errors).toEqual([]);
+    expect(value.reason).toBe('crossed');
+    expect(String(value.value)).toBe('10');
+  });
+
+  test('distinguishes a target already met at the domain floor from a crossing', () => {
+    // A legitimate answer, not a failure — "when do I reach X" is answered by
+    // "you already have" — but a caller driving a countdown wants to say that
+    // rather than render a zero it can't tell from a computed crossing.
+    const formula = F.variable(0).add(100);
+    expect(formula.firstPassage(50)).toEqual({ value: new Decimal(0), reason: 'already-reached' });
+    expect(formula.firstPassage(150).reason).toBe('crossed');
+  });
+
+  test('refuses a descending curve instead of reporting its floor', () => {
+    // The precondition failure that would otherwise be silent *and* plausible:
+    // for a falling curve `f(lower) ≥ target` is true at the floor, so an
+    // unguarded search reports 0 — a confident wrong answer to "when does this
+    // drop below X". Bisection cannot detect the violation, so the floor case
+    // probes forward before claiming it.
+    const draining = F.variable(0).neg().add(100);
+    expect(draining.firstPassage(50)).toEqual({ value: null, reason: 'not-monotone' });
+  });
+
+  test('refuses a domain floor the curve is not real-valued at', () => {
+    // break_eternity's `gte` answers `true` against NaN, so an unguarded
+    // comparison at the floor turns an undefined point into "already reached".
+    // `recip` at 0 is the reachable case: 1/0 is NaN, not Infinity.
+    const reciprocal = F.variable(1).recip().mul(1000);
+    expect(String(reciprocal.evaluate(0))).toBe('NaN');
+    expect(reciprocal.firstPassage(10)).toEqual({ value: null, reason: 'not-monotone' });
+  });
+
+  test('crosses at layer 1, where the answer is the exponent', () => {
+    // A spine consumer computing a crossing time up here gets an answer floored
+    // by the representation rather than the search: past layer 0 the value is a
+    // logarithm in a float64, worth ~16 − log₁₀(log₁₀ x) significant digits.
+    const tower = F.variable(0).pow_base(10);
+    const passage = tower.firstPassage('1e250');
+    expect(passage.reason).toBe('crossed');
+    expect(Decimal.lte(relativeError(passage.value!, 250), DEFAULT_TOL)).toBe(true);
+  });
+});
+
 describe('cumulative cost: integral vs discrete sum', () => {
   // The two are different operations, and `calculateCost` selects between them
   // by `directSum` — which is exactly the ambiguity the umbrella's integral

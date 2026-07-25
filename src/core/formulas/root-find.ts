@@ -60,8 +60,11 @@ const DEFAULT_ITERATIONS = 120;
  * `max(lo, 1)` folds the whole `[0, 1]` region into one geometric step, which
  * keeps the geometric mean strictly inside the bracket even when `lo` is 0 or
  * negative.
+ *
+ * @internal — also used by the first-passage probe, which wants an interior
+ * sample in the same coordinate the search itself would have picked.
  */
-function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
+export function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
   const geometricFloor = Decimal.max(lo, 1);
   if (Decimal.gt(hi, 1) && Decimal.gte(Decimal.div(hi, geometricFloor), 2)) {
     return new Decimal(Decimal.sqrt(Decimal.mul(geometricFloor, hi)));
@@ -80,9 +83,11 @@ function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
  * @param f - The function to cross. Monotone non-decreasing on `[lower, ∞)`.
  * @param target - The value to reach.
  * @param options - Bracket and iteration tuning. See {@link FindCrossingOptions}.
- * @returns The crossing point, `lower` when `target` is already reached there, or
- *   `null` when the target could not be bracketed — the one case where the
- *   returned number would be meaningless, so it isn't returned.
+ * @returns The crossing point — always an `x` with `f(x) ≥ target`, so a stepped
+ *   curve answers on the far side of the step rather than the last input before
+ *   it. `lower` when `target` is already reached there, or `null` when the target
+ *   could not be bracketed — the one case where the returned number would be
+ *   meaningless, so it isn't returned.
  *
  * @example
  * ```ts
@@ -128,13 +133,19 @@ export function findCrossing(
   }
   if (!bracketed) return null;
 
+  // Loop invariant: `f(lo) < target ≤ f(hi)`. Both bounds are returnable
+  // numbers, and `hi` is the side that satisfies the contract — so the answer is
+  // always `hi`, never the collapse midpoint. On a continuous curve the two
+  // differ by an ulp and the distinction is cosmetic; on a *stepped* one it is
+  // the whole answer, because `lo` is the last input before the step and
+  // reports a value the caller was asking to get past.
   for (let i = 0; i < iterations; i++) {
     const mid = bracketMidpoint(lo, hi);
     // Bracket collapse — `mid` is no longer strictly inside, so further halving
     // cannot move the answer and the loop would spin.
-    if (Decimal.eq(mid, lo) || Decimal.eq(mid, hi)) return mid;
+    if (Decimal.eq(mid, lo) || Decimal.eq(mid, hi)) return hi;
     if (Decimal.lt(f(mid), target)) lo = mid;
     else hi = mid;
   }
-  return bracketMidpoint(lo, hi);
+  return hi;
 }

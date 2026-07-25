@@ -36,6 +36,8 @@ import {
   type GridCoord,
   type Inversion,
   type InversionFailureReason,
+  type FirstPassageOptions,
+  type Passage,
 } from '@/index';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
@@ -599,5 +601,32 @@ describe('Formula inversion contract', () => {
     // enforces that rather than leaving a plausible 0 to be consumed.
     expectTypeOf<Failed['value']>().toBeNull();
     expectTypeOf<Failed['reason']>().toEqualTypeOf<InversionFailureReason>();
+  });
+});
+
+describe('Formula first-passage contract', () => {
+  it('answers with a Decimal, and only on the arms that have one', async () => {
+    const { F } = await import('@/core/formulas/formulas');
+    const formula = F.variable(0).div(50).sqrt().floor();
+
+    expectTypeOf(formula.firstPassage('3')).toEqualTypeOf<Passage>();
+    expectTypeOf(formula.firstPassage)
+      .parameter(1)
+      .toEqualTypeOf<FirstPassageOptions | undefined>();
+
+    type Answered = Extract<Passage, { value: Decimal }>;
+    type Unanswered = Extract<Passage, { value: null }>;
+
+    // A found crossing and a target already met at the floor are both answers,
+    // and both carry the input they answer with.
+    expectTypeOf<Answered['reason']>().toEqualTypeOf<'crossed' | 'already-reached'>();
+    expectTypeOf<Unanswered['value']>().toBeNull();
+    expectTypeOf<Unanswered['reason']>().toEqualTypeOf<'no-crossing' | 'not-monotone'>();
+  });
+
+  it('exposes the domain, not the search', () => {
+    // `lower`/`upper` are the caller's axis. Expansion and iteration counts are
+    // the finder's business and stay off the public surface.
+    expectTypeOf<keyof FirstPassageOptions>().toEqualTypeOf<'lower' | 'upper'>();
   });
 });

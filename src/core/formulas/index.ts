@@ -19,4 +19,5 @@ export type {
 } from './types';
 export type { Inversion, InversionFailureReason } from './inversion';
 export { inversionTolerance } from './inversion';
+export type { FirstPassageOptions, Passage } from './passage';
 export * from './formulas';

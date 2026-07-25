@@ -32,6 +32,7 @@ import {
   reportInversionFailure,
   type Inversion,
 } from './inversion';
+import { findFirstPassage, type FirstPassageOptions, type Passage } from './passage';
 import type {
   EvaluateFunction,
   FormulaOptions,
@@ -549,6 +550,43 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    */
   tryInvert(value: DecimalSource, tolerance?: number): Inversion {
     return this.gradeInversion(value, (target) => this.invert(target), tolerance);
+  }
+
+  /**
+   * Smallest input at which this formula *reaches* `target` — the question a
+   * time axis asks, as opposed to the algebraic pre-image {@link invert} answers.
+   *
+   * Searches the forward function rather than running the op table backward, so
+   * it stays correct through the rounding and splicing that make an algebraic
+   * inverse unsound: an interior `.floor()`, a `step` whose modifier jumps at the
+   * breakpoint, a saturated `clamp`. For the same reason it needs no inverse at
+   * all — a chain reporting `isInvertible() === false` still answers here.
+   *
+   * Reach for {@link invert} / {@link tryInvert} when you want the input that
+   * *maps to* the target (the XP at which a level begins); reach for this when
+   * you want the input at which the target is *first met* (when the burn
+   * overtakes production, when a wave breaches the wall).
+   *
+   * The curve must be non-decreasing over the search domain. Where it isn't, the
+   * two cases that would otherwise return a plausible number report
+   * `not-monotone` instead.
+   *
+   * @param target - The value to reach.
+   * @param options - Domain bounds. See {@link FirstPassageOptions}.
+   * @returns A {@link Passage}: `crossed`, `already-reached` at the domain floor,
+   *   or a reason with no value.
+   *
+   * @example
+   * ```ts
+   * // Burn steps ×g every Tg seconds — an interior floor, so the algebra
+   * // lands mid-step while the player crosses at the boundary.
+   * const burn = F.variable(0).div(15).floor().add(0.5).pow_base(2).mul(b0);
+   * burn.invert(pMax);          // 37.5 — inside a step nothing evaluates into
+   * burn.firstPassage(pMax);    // { value: 45, reason: 'crossed' }
+   * ```
+   */
+  firstPassage(target: DecimalSource, options?: FirstPassageOptions): Passage {
+    return findFirstPassage((x) => this.evaluate(x), target, options);
   }
 
   /**
