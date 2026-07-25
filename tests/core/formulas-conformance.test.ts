@@ -20,6 +20,7 @@
 
 import Formula, { F, calculateCost } from '@/core/formulas/formulas';
 import { inversionTolerance } from '@/core/formulas/inversion';
+import { findCrossing } from '@/core/formulas/root-find';
 import type { GenericFormula, InvertibleFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
@@ -479,6 +480,65 @@ describe('piecewise: step and if', () => {
   });
 });
 
+describe('root finding: findCrossing', () => {
+  // The numeric fallback three inverses now share. Swept directly as well as
+  // through them, because its two interesting properties — the search coordinate
+  // and the refusal to early-out on value tolerance — are invisible from the
+  // callers that consume it.
+
+  test('lands on the root of a polynomial with no closed form', () => {
+    // x³/3 + 2x, the shape `integrateAdd` hits for a cubic integral. Verified
+    // against the forward function rather than a precomputed root, so the law
+    // states the property instead of a number.
+    const f = (x: Decimal) => Decimal.add(Decimal.div(Decimal.pow(x, 3), 3), Decimal.mul(2, x));
+    for (const target of ['1', '100', '1e6', '1e30']) {
+      const x = findCrossing(f, target);
+      expect(x, `target ${target}`).not.toBeNull();
+      expect(
+        Decimal.lte(relativeError(f(x!), target), DEFAULT_TOL),
+        `target ${target}: f(${String(x)}) = ${String(f(x!))}`,
+      ).toBe(true);
+    }
+  });
+
+  test('the search coordinate follows the bracket, so wide brackets still converge', () => {
+    // The property that makes one shared finder viable. `10^x` crossing 1e250
+    // has its answer at 250 while the bracket opens to ~1e250: bisecting that
+    // arithmetically needs thousands of halvings to walk down, and the default
+    // 60 would stop nowhere near. Geometric halving gets there in tens.
+    const x = findCrossing((v) => Decimal.pow10(v), '1e250', { upper: '1e250' });
+    expect(x).not.toBeNull();
+    expect(Decimal.lte(relativeError(x!, 250), DEFAULT_TOL), `got ${String(x)}`).toBe(true);
+  });
+
+  test('a target already reached at the domain floor answers with the floor', () => {
+    // Not a failure: the first x in the declared domain that reaches the target
+    // *is* `lower`. Reporting here would make every "already affordable" query
+    // an error.
+    const x = findCrossing((v) => Decimal.mul(v, 2), '-5', { lower: 0 });
+    expect(x).not.toBeNull();
+    expect(String(x)).toBe('0');
+  });
+
+  test('an unbracketable target returns null rather than the bound it never crossed', () => {
+    // A bounded function: `tanh`-like saturation at 10. Nothing reaches 20, and
+    // the old per-caller loops would have returned their final `hi` regardless.
+    const x = findCrossing((v) => Decimal.min(v, 10), '20');
+    expect(x).toBeNull();
+  });
+
+  test('convergence is by bracket collapse, not by value tolerance', () => {
+    // The rationale inherited from the hand-rolled loops: at tetration scale a
+    // relative-value early-out can fire while x is still far from the root,
+    // because dv/dx is enormous. `2 ↑↑ x`-shaped steepness — a tiny x error is a
+    // vast value error, so the only safe statement is about x.
+    const f = (v: Decimal) => Decimal.pow10(Decimal.pow10(v));
+    const x = findCrossing(f, f(new Decimal('2.5')));
+    expect(x).not.toBeNull();
+    expect(Decimal.lte(relativeError(x!, '2.5'), 1e-14), `got ${String(x)}`).toBe(true);
+  });
+});
+
 describe('invert contract: tryInvert grades the answer', () => {
   // `invert` returns the algebra's pre-image whether or not it is reachable.
   // `tryInvert` grades it by mapping the candidate forward, which is the only
@@ -611,17 +671,21 @@ describe('invert contract: tryInvert grades the answer', () => {
     expect(String(result.value)).toBe('12');
   });
 
-  test('no-closed-form — distinguished from having no inverse at all', () => {
-    // Worth a separate arm because the root-finder foundation can widen these to
-    // `exact` later without a consumer that branched on them being wrong today.
-    for (const [label, formula] of [
-      ['tetrate height 3', F.tetrate(F.variable('2'), 3)],
-      ['tetrate height 4', F.tetrate(F.variable('2'), 4)],
-      ['iteratedexp height 2', F.iteratedexp(F.variable('2'), 2)],
+  test('no-solution — distinguished from having no inverse at all', () => {
+    // The arm earns its separation by being *target*-dependent where
+    // `not-invertible` is structural. Each of these binds an inverse and reports
+    // `isInvertible() === true`; the target is what has no pre-image. The
+    // tetration heights that used to sit here are now solved numerically, which
+    // is the point of keeping the two arms apart — widening one didn't have to
+    // touch consumers of the other.
+    for (const [label, formula, target] of [
+      ['tetrate height 0 (base cannot influence the result)', F.tetrate(F.variable('2'), 0), '16'],
+      ['iteratedexp height 0', F.iteratedexp(F.variable('2'), 0), '16'],
     ] as const) {
-      const { value, errors } = withoutEngineErrors(() => formula.tryInvert(formula.evaluate()));
+      expect(formula.isInvertible(), `${label} should look invertible`).toBe(true);
+      const { value, errors } = withoutEngineErrors(() => formula.tryInvert(target));
       expect(errors, `${label} logged instead of reporting structurally`).toEqual([]);
-      expect(value.reason, label).toBe('no-closed-form');
+      expect(value.reason, label).toBe('no-solution');
       expect(value.value, label).toBeNull();
     }
   });
@@ -739,16 +803,41 @@ describe('tetration family', () => {
     }
   });
 
-  test('tetrate above height 2 — reports instead of answering', () => {
+  test('tetrate above height 2 — solved numerically in the base', () => {
     // `ssqrt` inverts `b^b` alone. Applying it at height 3 returned a
-    // plausible-looking wrong number (2.745 for `tetrate(2, 3) = 16`), which is
-    // the failure mode this umbrella exists to remove: a silent wrong answer is
-    // worse than a refusal.
-    for (const height of [3, 4]) {
-      const formula = F.tetrate(F.variable('2'), height);
-      const { errors } = withoutEngineErrors(() => formula.invert(formula.evaluate()));
-      expect(errors.join(' '), `tetrate height ${height}`).toMatch(/could not invert tetrate/i);
+    // plausible-looking wrong number (2.745 for `tetrate(2, 3) = 16`); the
+    // interim contract reported instead. Now `findCrossing` solves for the base,
+    // which is a well-conditioned search even where the value is at layer 2 —
+    // the answer lives in a bracket a few units wide no matter how tall the
+    // tower. `b ↑↑ 5` at base 3 is `ee3638334640023.79`, and the base still
+    // comes back exactly.
+    for (const height of [3, 4, 5]) {
+      for (const base of ['1.5', '2', '3']) {
+        expectRoundTrip(F.tetrate(F.variable(base), height), base, DEFAULT_TOL);
+      }
     }
+  });
+
+  test('tetrate at height 2 with a payload — also solved numerically', () => {
+    // `ssqrt` only covers payload 1, which is why the closed form is guarded to
+    // it. Any other payload takes the search.
+    for (const payload of ['2', '5']) {
+      for (const base of ['1.5', '2', '3']) {
+        expectRoundTrip(F.tetrate(F.variable(base), 2, payload), base, DEFAULT_TOL);
+      }
+    }
+  });
+
+  test('tetrate where the base cannot reach the target — still reports', () => {
+    // Height 0 is `payload` regardless of base, so no base solves for 16. The
+    // search reports rather than returning a bound it never crossed — which is
+    // what keeps the `no-solution` arm honest now that the closed-form gaps are
+    // filled.
+    const formula = F.tetrate(F.variable('2'), 0);
+    const { value, errors } = withoutEngineErrors(() => formula.tryInvert('16'));
+    expect(errors).toEqual([]);
+    expect(value.reason).toBe('no-solution');
+    expect(value.value).toBeNull();
   });
 
   test('slog — inverse is base ↑↑ y, carrying the base', () => {
@@ -777,13 +866,11 @@ describe('tetration family', () => {
     }
   });
 
-  test('iteratedexp above height 1 — reports instead of answering', () => {
+  test('iteratedexp above height 1 — solved numerically in the base', () => {
     for (const height of [2, 3]) {
-      const formula = F.iteratedexp(F.variable('2'), height);
-      const { errors } = withoutEngineErrors(() => formula.invert(formula.evaluate()));
-      expect(errors.join(' '), `iteratedexp height ${height}`).toMatch(
-        /could not invert iteratedexp/i,
-      );
+      for (const base of ['1.5', '2', '3']) {
+        expectRoundTrip(F.iteratedexp(F.variable(base), height), base, DEFAULT_TOL);
+      }
     }
   });
 });

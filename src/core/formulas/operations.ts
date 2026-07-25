@@ -13,6 +13,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
+import { findCrossing } from './root-find';
 import type {
   FormulaSource,
   GenericFormula,
@@ -209,26 +210,19 @@ function buildIntegrateAdd(
         return 0;
       }
       const F = F_input as InvertibleFormula;
-      // Coarse bracket from F⁻¹(target) (the answer if c=0). Expansion via
-      // geometric ×2 — 32 doublings cover 2^32, far beyond any sane target.
-      let hi = Decimal.fromValue(F.invert(target));
-      let lo = Decimal.fromValue(0);
-      for (let i = 0; i < 32; i++) {
-        const v = Decimal.add(F.evaluate(hi), Decimal.mul(c, hi));
-        if (Decimal.gte(v, target)) break;
-        hi = Decimal.add(Decimal.mul(hi, 2), 1);
+      // F⁻¹(target) is the answer when c = 0, so it makes a tight starting
+      // bracket for the general case.
+      const x = findCrossing((v) => Decimal.add(F.evaluate(v), Decimal.mul(c, v)), target, {
+        upper: F.invert(target),
+      });
+      if (x == null) {
+        reportInversionFailure(
+          'no-solution',
+          'Could not invert integrateAdd: target is out of the search range',
+        );
+        return 0;
       }
-      // Binary search — fixed 30 iterations. No eq_tolerance early-out: at
-      // tetration scale, a relative-tolerance early-out can fire when `mid` is
-      // still far from truth in level-space (large dv/dx amplifies value diff
-      // for small mid diff, making the value "close" while mid is not).
-      for (let i = 0; i < 30; i++) {
-        const mid = Decimal.div(Decimal.add(lo, hi), 2);
-        const v = Decimal.add(F.evaluate(mid), Decimal.mul(c, mid));
-        if (Decimal.lt(v, target)) lo = mid;
-        else hi = mid;
-      }
-      return Decimal.div(Decimal.add(lo, hi), 2);
+      return x;
     },
   });
 }
@@ -312,24 +306,25 @@ function buildIntegrateSub(
         return 0;
       }
       const F = F_input as InvertibleFormula;
-      const compute = (x: DecimalSource): DecimalSource => {
-        const cx = Decimal.mul(c, x);
-        return variableOnLhs ? Decimal.sub(F.evaluate(x), cx) : Decimal.sub(cx, F.evaluate(x));
-      };
-      let hi = Decimal.fromValue(F.invert(variableOnLhs ? target : Decimal.neg(target)));
-      let lo = Decimal.fromValue(0);
-      for (let i = 0; i < 32; i++) {
-        if (Decimal.gte(compute(hi), target)) break;
-        hi = Decimal.add(Decimal.mul(hi, 2), 1);
+      // `c·x - F(x)` rises then falls, so it is only monotone up to its turning
+      // point. `findCrossing` cannot detect the violation, and this branch keeps
+      // the pre-existing behaviour of taking the first crossing it finds.
+      const x = findCrossing(
+        (v) => {
+          const cx = Decimal.mul(c, v);
+          return variableOnLhs ? Decimal.sub(F.evaluate(v), cx) : Decimal.sub(cx, F.evaluate(v));
+        },
+        target,
+        { upper: F.invert(variableOnLhs ? target : Decimal.neg(target)) },
+      );
+      if (x == null) {
+        reportInversionFailure(
+          'no-solution',
+          'Could not invert integrateSub: target is out of the search range',
+        );
+        return 0;
       }
-      // No eq_tolerance early-out — see integrateAdd's bisection rationale.
-      for (let i = 0; i < 30; i++) {
-        const mid = Decimal.div(Decimal.add(lo, hi), 2);
-        const v = compute(mid);
-        if (Decimal.lt(v, target)) lo = mid;
-        else hi = mid;
-      }
-      return Decimal.div(Decimal.add(lo, hi), 2);
+      return x;
     },
   });
 }
@@ -618,19 +613,27 @@ export function invertTetrate(
   payload: FormulaSource,
 ) {
   if (hasVariable(base)) {
+    const heightValue = unrefFormulaSource(height);
+    const payloadValue = unrefFormulaSource(payload);
     // `ssqrt` inverts `b ↑↑ 2` (that is, `b^b`) and nothing else. Upstream
     // applied it at every height and payload — silently returning `2.745` for
-    // `tetrate(2, 3) = 16` instead of `2`. There is no closed-form inverse in
-    // the base for general height, so report rather than answer; a numeric
-    // fallback can widen this once core has a shared root-finder.
-    if (!Decimal.eq(unrefFormulaSource(height), 2) || !Decimal.eq(unrefFormulaSource(payload), 1)) {
+    // `tetrate(2, 3) = 16` instead of `2`.
+    if (Decimal.eq(heightValue, 2) && Decimal.eq(payloadValue, 1)) {
+      return base.invert(Decimal.ssqrt(value));
+    }
+    // No closed form elsewhere, so solve for the base numerically. `b ↑↑ h` is
+    // monotone increasing in `b` only above 1 — below it the tower converges
+    // instead of growing — so the search starts there and reports when the
+    // target can't be bracketed above it.
+    const solved = findCrossing((b) => tetrate(b, heightValue, payloadValue), value, { lower: 1 });
+    if (solved == null) {
       reportInversionFailure(
-        'no-closed-form',
-        'Could not invert tetrate: no closed form except height 2 with payload 1',
+        'no-solution',
+        'Could not invert tetrate: no base above 1 reaches the target',
       );
       return 0;
     }
-    return base.invert(Decimal.ssqrt(value));
+    return base.invert(solved);
   }
   reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
@@ -658,16 +661,25 @@ export function invertIteratedExp(
     // where the base happens to be e.
     //
     // At height 1 the op degenerates to `base ^ payload`, whose inverse in the
-    // base is `root(value, payload)`. Above that there is no closed form —
-    // report rather than answer, as with `invertTetrate`.
-    if (!Decimal.eq(unrefFormulaSource(height), 1)) {
+    // base is `root(value, payload)`. Above that there is no closed form, so it
+    // takes the same numeric fallback as `invertTetrate` — monotone in the base
+    // only above 1, for the same reason.
+    const heightValue = unrefFormulaSource(height);
+    const payloadValue = unrefFormulaSource(payload);
+    if (Decimal.eq(heightValue, 1)) {
+      return lhs.invert(Decimal.root(value, payloadValue));
+    }
+    const solved = findCrossing((b) => iteratedexp(b, heightValue, payloadValue), value, {
+      lower: 1,
+    });
+    if (solved == null) {
       reportInversionFailure(
-        'no-closed-form',
-        'Could not invert iteratedexp: no closed form in the base above height 1',
+        'no-solution',
+        'Could not invert iteratedexp: no base above 1 reaches the target',
       );
       return 0;
     }
-    return lhs.invert(Decimal.root(value, unrefFormulaSource(payload)));
+    return lhs.invert(solved);
   }
   reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;

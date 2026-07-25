@@ -7,8 +7,9 @@
  * three ways it isn't:
  *
  * - the chain has no inverse at all — `sign`, `abs`, a multi-variable chain;
- * - the op has an inverse but no closed form at these parameters — `tetrate`
- *   above height 2, `iteratedexp` above height 1;
+ * - no pre-image was found for this target, by closed form or by search — a
+ *   `tetrate` height at which the base can't influence the result, an integral
+ *   inverse whose target sits outside the searchable range;
  * - the target lies **outside the function's image**, so the pre-image the
  *   algebra hands back doesn't map forward onto it. An interior `.floor()`
  *   asked for a fractional level, a `step`/`if` splice whose modifier jumps at
@@ -36,10 +37,19 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
  * table, where the specific cause is known, and surfaced on {@link Inversion}.
  */
 export type InversionFailureReason =
-  /** No inverse exists for this chain — a non-invertible op, or no single variable to solve for. */
+  /**
+   * No inverse exists for this chain — a non-invertible op, or no single
+   * variable to solve for. Structural, so `isInvertible()` predicts it without
+   * needing a target.
+   */
   | 'not-invertible'
-  /** An inverse exists mathematically but not in closed form at these parameters. */
-  | 'no-closed-form';
+  /**
+   * The chain has an inverse path, but no pre-image was found for *this* target
+   * — no closed form applies and the numeric search couldn't bracket it either.
+   * Target-dependent, so `isInvertible()` can be optimistic here: `tetrate` at
+   * height 0 binds an inverse and is still constant in its base.
+   */
+  | 'no-solution';
 
 /**
  * Diagnosed result of {@link Formula.tryInvert} / {@link Formula.tryInvertIntegral}.
@@ -50,7 +60,7 @@ export type InversionFailureReason =
  *   wanting "smallest input that reaches the target" want a first-passage
  *   search, not this; callers wanting the breakpoint below the target (progress
  *   bars over a `.floor()`ed curve) can use `value` as-is.
- * - `not-invertible` / `no-closed-form` — no answer at all.
+ * - `not-invertible` / `no-solution` — no answer at all.
  */
 export type Inversion =
   | { value: DecimalSource; reason: 'exact' }

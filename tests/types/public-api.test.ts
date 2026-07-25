@@ -595,7 +595,7 @@ describe('Formula inversion contract', () => {
     // The value the target *does* reach lives only on this arm, so measuring the
     // gap can't be done without first admitting there is one.
     expectTypeOf<OutsideImage['evaluatesTo']>().toEqualTypeOf<DecimalSource>();
-    // `not-invertible` / `no-closed-form` carry no value, and the compiler
+    // `not-invertible` / `no-solution` carry no value, and the compiler
     // enforces that rather than leaving a plausible 0 to be consumed.
     expectTypeOf<Failed['value']>().toBeNull();
     expectTypeOf<Failed['reason']>().toEqualTypeOf<InversionFailureReason>();
