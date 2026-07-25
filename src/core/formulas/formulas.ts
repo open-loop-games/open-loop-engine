@@ -242,18 +242,21 @@ const unaryOps: Record<string, OpDescriptor> = {
   factorial: { evaluate: Decimal.factorial },
   gamma: { evaluate: Decimal.gamma },
   lngamma: { evaluate: Decimal.lngamma },
-  sin: { evaluate: Decimal.sin, invert: ops.invertAsin, integrate: ops.integrateSin },
-  cos: { evaluate: Decimal.cos, invert: ops.invertAcos, integrate: ops.integrateCos },
-  tan: { evaluate: Decimal.tan, invert: ops.invertAtan, integrate: ops.integrateTan },
-  asin: { evaluate: Decimal.asin, invert: ops.invertSin, integrate: ops.integrateAsin },
-  acos: { evaluate: Decimal.acos, invert: ops.invertCos, integrate: ops.integrateAcos },
-  atan: { evaluate: Decimal.atan, invert: ops.invertTan, integrate: ops.integrateAtan },
-  sinh: { evaluate: Decimal.sinh, invert: ops.invertAsinh, integrate: ops.integrateSinh },
-  cosh: { evaluate: Decimal.cosh, invert: ops.invertAcosh, integrate: ops.integrateCosh },
-  tanh: { evaluate: Decimal.tanh, invert: ops.invertAtanh, integrate: ops.integrateTanh },
-  asinh: { evaluate: Decimal.asinh, invert: ops.invertSinh, integrate: ops.integrateAsinh },
-  acosh: { evaluate: Decimal.acosh, invert: ops.invertCosh, integrate: ops.integrateAcosh },
-  atanh: { evaluate: Decimal.atanh, invert: ops.invertTanh, integrate: ops.integrateAtanh },
+  // `invertX` means "the inverse of X" — so each op binds its like-named
+  // invert. Upstream crossed the whole block (`sin` bound `invertAsin`, whose
+  // body is `Decimal.sin`), which applied the op twice instead of undoing it.
+  sin: { evaluate: Decimal.sin, invert: ops.invertSin, integrate: ops.integrateSin },
+  cos: { evaluate: Decimal.cos, invert: ops.invertCos, integrate: ops.integrateCos },
+  tan: { evaluate: Decimal.tan, invert: ops.invertTan, integrate: ops.integrateTan },
+  asin: { evaluate: Decimal.asin, invert: ops.invertAsin, integrate: ops.integrateAsin },
+  acos: { evaluate: Decimal.acos, invert: ops.invertAcos, integrate: ops.integrateAcos },
+  atan: { evaluate: Decimal.atan, invert: ops.invertAtan, integrate: ops.integrateAtan },
+  sinh: { evaluate: Decimal.sinh, invert: ops.invertSinh, integrate: ops.integrateSinh },
+  cosh: { evaluate: Decimal.cosh, invert: ops.invertCosh, integrate: ops.integrateCosh },
+  tanh: { evaluate: Decimal.tanh, invert: ops.invertTanh, integrate: ops.integrateTanh },
+  asinh: { evaluate: Decimal.asinh, invert: ops.invertAsinh, integrate: ops.integrateAsinh },
+  acosh: { evaluate: Decimal.acosh, invert: ops.invertAcosh, integrate: ops.integrateAcosh },
+  atanh: { evaluate: Decimal.atanh, invert: ops.invertAtanh, integrate: ops.integrateAtanh },
 };
 
 const binaryOps: Record<string, OpDescriptor> = {

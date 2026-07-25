@@ -527,13 +527,18 @@ export const integratePow = makeBinaryIntegrate(
   (x, other) => Formula.pow(other, x).div(Formula.ln(other)),
 );
 
-export const invertPow10 = makeUnaryInvert((v) => Decimal.root(v, 10));
+// The inverse of `10ˣ` is `log₁₀`, not the 10th root — `root(v, 10)` inverts
+// `x¹⁰`. Upstream had the latter, and no test round-tripped a unary op.
+export const invertPow10 = makeUnaryInvert(Decimal.log10);
 
 export const integratePow10 = makeUnaryIntegrate((x) => Formula.pow10(x).div(Formula.ln(10)));
 
 export const invertPowBase = makeBinaryInvert(
   (value, other) => Decimal.ln(value).div(Decimal.ln(other)),
-  (value, other) => Decimal.root(other, value),
+  // Solving `otherᵇ = value` for the base b gives `value^(1/other)`, i.e.
+  // `root(value, other)`. Upstream passed these the other way round, which
+  // computes `other^(1/value)` — only equal when value === other.
+  (value, other) => Decimal.root(value, other),
 );
 
 export const integratePowBase = makeBinaryIntegrate(
