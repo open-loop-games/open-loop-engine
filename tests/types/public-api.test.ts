@@ -17,6 +17,7 @@
 import { describe, it, expectTypeOf } from 'vitest';
 import { ref, type ComputedRef, type Ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
+import type { DecimalSource } from '@/primitives/decimal';
 
 import {
   createActionCategory,
@@ -33,6 +34,8 @@ import {
   type SpatialGridSnapshot,
   type Suggestion,
   type GridCoord,
+  type Inversion,
+  type InversionFailureReason,
 } from '@/index';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
@@ -566,5 +569,35 @@ describe('runSensitivity', () => {
       baseline: { aggregate: { metrics: Record<string, unknown> } };
       variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
     }>();
+  });
+});
+
+describe('Formula inversion contract', () => {
+  it('separates the unchecked pre-image from the graded one', async () => {
+    const { F } = await import('@/core/formulas/formulas');
+    const formula = F.variable(0).div(50).sqrt().floor();
+
+    // The raw path stays a bare DecimalSource — the op table composes with it
+    // recursively, so widening it here would ripple through every op invert.
+    expectTypeOf(formula.invert('3')).toEqualTypeOf<DecimalSource>();
+    expectTypeOf(formula.tryInvert('3')).toEqualTypeOf<Inversion>();
+    expectTypeOf(formula.tryInvertIntegral('3')).toEqualTypeOf<Inversion>();
+    expectTypeOf(formula.tryInvert).parameter(1).toEqualTypeOf<number | undefined>();
+  });
+
+  it('discriminates on reason, so a failure arm cannot be read as a value', () => {
+    type Exact = Extract<Inversion, { reason: 'exact' }>;
+    type OutsideImage = Extract<Inversion, { reason: 'outside-image' }>;
+    type Failed = Extract<Inversion, { value: null }>;
+
+    expectTypeOf<Exact['value']>().toEqualTypeOf<DecimalSource>();
+    expectTypeOf<OutsideImage['value']>().toEqualTypeOf<DecimalSource>();
+    // The value the target *does* reach lives only on this arm, so measuring the
+    // gap can't be done without first admitting there is one.
+    expectTypeOf<OutsideImage['evaluatesTo']>().toEqualTypeOf<DecimalSource>();
+    // `not-invertible` / `no-closed-form` carry no value, and the compiler
+    // enforces that rather than leaving a plausible 0 to be consumed.
+    expectTypeOf<Failed['value']>().toBeNull();
+    expectTypeOf<Failed['reason']>().toEqualTypeOf<InversionFailureReason>();
   });
 });

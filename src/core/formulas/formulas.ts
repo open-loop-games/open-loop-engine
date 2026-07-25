@@ -25,6 +25,13 @@ import { processGetter, type Computable } from '../computed';
 import { profile, profileStart, profileEnd } from '../profiler';
 import { computed, ref, unref, type MaybeRef } from 'vue';
 import * as ops from './operations';
+import {
+  captureInversionFailures,
+  inversionTolerance,
+  landsOnTarget,
+  reportInversionFailure,
+  type Inversion,
+} from './inversion';
 import type {
   EvaluateFunction,
   FormulaOptions,
@@ -418,6 +425,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   // === TYPE PREDICATES ===
 
+  /**
+   * Whether this *chain* has an inverse — every op in it binds one, and there
+   * is exactly one variable to solve for.
+   *
+   * Chain capability only. It deliberately says nothing about whether inverting
+   * a *particular target* is sound, because that isn't a property of the chain:
+   * a curve ending in `.floor()` inverts exactly for integer targets and has no
+   * pre-image at all for 3.5. For that question use {@link tryInvert}, which
+   * grades the answer against the target it was given.
+   */
   isInvertible(): this is InvertibleFormula {
     return this.hasVariable() && (this.internalInvert != null || this.internalEvaluate == null);
   }
@@ -479,14 +496,86 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     return (this.hasVariable() ? variable : null) ?? unrefFormulaSource(inputs[0]);
   }
 
+  /**
+   * Algebraic pre-image: the input this formula maps to `value`.
+   *
+   * Unchecked by design — this is the shape the op table composes with
+   * recursively, and it returns the algebra's answer whether or not that answer
+   * is reachable. When the target may lie outside the formula's image (anything
+   * with an interior `.floor()`, a `step`/`if` splice, or a `min`/`max`/`clamp`)
+   * use {@link tryInvert}, which grades the answer.
+   *
+   * Reports and returns `0` when no inverse exists at all.
+   */
   invert(value: DecimalSource): DecimalSource {
     if (this.internalInvert && this.hasVariable()) {
       return this.internalInvert.call(this, value, ...this.inputs);
-    } else if (this.inputs.length === 1 && this.hasVariable()) {
+    } else if (this.inputs.length === 1 && this.internalEvaluate == null && this.hasVariable()) {
+      // A bare variable is its own inverse. The guard has to include
+      // `internalEvaluate == null` or it also catches the unary ops that bind no
+      // invert (`sign`, `abs`, `factorial`, …) and answers `value` for them —
+      // formulas whose own `isInvertible()` correctly reports false. Matches the
+      // condition `getIntegralFormula` already uses for the same case.
       return value;
     }
-    console.error('Cannot invert non-invertible formula');
+    reportInversionFailure('not-invertible', 'Cannot invert non-invertible formula');
     return 0;
+  }
+
+  /**
+   * Invert `value` and say whether the answer is usable — the checked
+   * counterpart to {@link invert}.
+   *
+   * Runs the algebra, then evaluates the candidate forward: an inverse is only
+   * meaningful if it maps back onto the target. That one check covers every way
+   * an inversion goes quietly wrong — a fractional target through an interior
+   * `.floor()`, a target inside a `step` splice's jump discontinuity, a
+   * saturated `clamp` — because they are all the same failure, a target outside
+   * the function's image.
+   *
+   * @param value - The output to solve for.
+   * @param tolerance - Relative tolerance for the image check. Defaults to
+   *   {@link inversionTolerance} at `value`'s magnitude, which relaxes past
+   *   layer 0 because the representation cannot do better there.
+   * @returns An {@link Inversion}: `exact`, `outside-image` (with the value it
+   *   does reach), or a failure reason with no value.
+   *
+   * @example
+   * ```ts
+   * const xpToLevel = Formula.variable(xp).div(50).sqrt().floor();
+   * xpToLevel.tryInvert(3);    // { value: 450, reason: 'exact' }
+   * xpToLevel.tryInvert(3.5);  // { value: 450, reason: 'outside-image', evaluatesTo: 3 }
+   * ```
+   */
+  tryInvert(value: DecimalSource, tolerance?: number): Inversion {
+    return this.gradeInversion(value, (target) => this.invert(target), tolerance);
+  }
+
+  /**
+   * Invert this formula's integral and say whether the answer is usable — the
+   * checked counterpart to {@link invertIntegral}, graded the same way
+   * {@link tryInvert} grades a forward inversion.
+   */
+  tryInvertIntegral(value: DecimalSource, tolerance?: number): Inversion {
+    return this.gradeInversion(value, (target) => this.invertIntegral(target), tolerance, true);
+  }
+
+  /**
+   * Shared body of {@link tryInvert} / {@link tryInvertIntegral}: capture any
+   * reported failure, then grade the candidate by mapping it forward.
+   */
+  private gradeInversion(
+    value: DecimalSource,
+    run: (target: DecimalSource) => DecimalSource,
+    tolerance?: number,
+    viaIntegral = false,
+  ): Inversion {
+    const { value: candidate, failure } = captureInversionFailures(() => run(value));
+    if (failure !== null) return { value: null, reason: failure };
+    const forward = viaIntegral ? this.evaluateIntegral(candidate) : this.evaluate(candidate);
+    const tol = tolerance ?? inversionTolerance(value);
+    if (landsOnTarget(forward, value, tol)) return { value: candidate, reason: 'exact' };
+    return { value: candidate, reason: 'outside-image', evaluatesTo: forward };
   }
 
   evaluateIntegral(variable?: DecimalSource): DecimalSource {
@@ -499,7 +588,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   invertIntegral(value: DecimalSource): DecimalSource {
     if (!this.isIntegrable() || !this.getIntegralFormula().isInvertible()) {
-      console.error('Cannot invert integral of formula without invertible integral');
+      reportInversionFailure(
+        'not-invertible',
+        'Cannot invert integral of formula without invertible integral',
+      );
       return 0;
     }
     return (this.getIntegralFormula() as InvertibleFormula).invert(value);
@@ -766,7 +858,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
         }
         return lhs.invert(value);
       }
-      console.error('Could not invert due to no input being a variable');
+      reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
       return 0;
     }
     return new Formula({
@@ -824,18 +916,24 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
           if (formula.isInvertible()) {
             return lhs.invert(formula.invert(value));
           }
-          console.error('Could not invert due to no input being a variable');
+          reportInversionFailure(
+            'not-invertible',
+            'Could not invert due to no input being a variable',
+          );
           return 0;
         } else if (elseFormula) {
           if (elseFormula.isInvertible()) {
             return lhs.invert(elseFormula.invert(value));
           }
-          console.error('Could not invert due to no input being a variable');
+          reportInversionFailure(
+            'not-invertible',
+            'Could not invert due to no input being a variable',
+          );
           return 0;
         }
         return lhs.invert(value);
       }
-      console.error('Could not invert due to no input being a variable');
+      reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
       return 0;
     }
     return new Formula({

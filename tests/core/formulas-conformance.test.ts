@@ -19,6 +19,7 @@
  */
 
 import Formula, { F, calculateCost } from '@/core/formulas/formulas';
+import { inversionTolerance } from '@/core/formulas/inversion';
 import type { GenericFormula, InvertibleFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
@@ -44,6 +45,12 @@ const DOMAIN = {
   unitPositive: ['0', '0.25', '0.5', '0.75', '0.9'],
   /** x ≥ 1 — `acosh`. */
   atLeastOne: ['1', '1.5', '2.5', '10', '137.5', '1e3', '1e7'],
+  /**
+   * x > 1 — a logarithm's *base*. Base 1 is undefined (`ln(k)/ln(1)` divides by
+   * zero), and the round-trip law survives it only by coincidence: `evaluate`
+   * gives Infinity and `invert(Infinity)` happens to come back to 1.
+   */
+  aboveOne: ['1.5', '2.5', '10', '137.5', '1e3', '1e7'],
   /** (-π/2, π/2) — the principal branch where `asin`/`atan` invert `sin`/`tan`. */
   principal: ['-1.5', '-1', '-0.5', '-0.25', '0', '0.25', '0.5', '1', '1.5'],
   /** [0, π] — the principal branch where `acos` inverts `cos`. */
@@ -169,7 +176,7 @@ const BINARY: Record<
     // log_base(x): x > 0, base > 1.
     lhs: { domain: 'positive', consts: ['2', '2.718281828459045', '10'] },
     // log_x(k): x is the base — positive and away from 1.
-    rhs: { domain: 'atLeastOne', consts: ['100', '1e6'] },
+    rhs: { domain: 'aboveOne', consts: ['100', '1e6'] },
   },
   pow: {
     op: (a, b) => F.pow(a, b),
@@ -433,10 +440,9 @@ describe('piecewise: step and if', () => {
     // answer does not evaluate back.
     //
     // This is the *same* defect class as interior rounding — a target outside the
-    // function's image — which is the useful part: whatever the invert contract
-    // becomes, one signal covers both. Asserting the hole rather than the wrong
-    // number, so this fails when the contract gains a way to say "inexact"
-    // instead of silently calcifying today's answer.
+    // function's image — which is the useful part: one signal covers both. That
+    // signal is now `tryInvert`; this law pins the raw `invert` path it grades,
+    // which stays unchecked because the op table composes with it recursively.
     const formula = F.step(F.variable(0), 100, (v) => (v as unknown as GenericFormula).add(5));
     expect(String(formula.evaluate('100'))).toBe('105');
 
@@ -470,6 +476,189 @@ describe('piecewise: step and if', () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe('invert contract: tryInvert grades the answer', () => {
+  // `invert` returns the algebra's pre-image whether or not it is reachable.
+  // `tryInvert` grades it by mapping the candidate forward, which is the only
+  // way to answer a question that depends on *(chain, target)* rather than on
+  // the chain alone. These laws pin each arm of the contract to the defect that
+  // motivated it.
+
+  /**
+   * Image-check tolerance where it differs from the round-trip's. The round-trip
+   * grades in *input* space against `max(|x|, 1)`; the image check grades in
+   * *output* space against the target. For `sinh` at x=-10 the two differ by
+   * exactly that factor of 10: break_eternity's naive `asinh` cancels, leaving
+   * 1.34e-7 of absolute input error, and `cosh(10)/sinh(10) ≈ 1` transfers it
+   * ~1:1 into output-space relative error.
+   */
+  const IMAGE_TOL: Record<string, number> = { sinh: 2e-7 };
+
+  test('every op that round-trips is graded exact', () => {
+    // The strongest form of the contract: the image check must not reject
+    // anything the round-trip law already accepts.
+    for (const [name, { op, domain, tol = DEFAULT_TOL }] of Object.entries(UNARY)) {
+      for (const x of DOMAIN[domain]) {
+        const formula = op(F.variable(x));
+        const { value, errors } = withoutEngineErrors(() =>
+          formula.tryInvert(formula.evaluate(), IMAGE_TOL[name] ?? tol),
+        );
+        expect(errors, `${name} logged at x=${x}`).toEqual([]);
+        expect(value.reason, `${name} at x=${x} (value ${String(value.value)})`).toBe('exact');
+      }
+    }
+  });
+
+  test('every binary op that round-trips is graded exact, both orientations', () => {
+    for (const [name, { op, lhs, rhs, tol = DEFAULT_TOL }] of Object.entries(BINARY)) {
+      for (const [label, side, build] of [
+        ['var,k', lhs, (x: string, k: string) => op(F.variable(x), k)],
+        ['k,var', rhs, (x: string, k: string) => op(k, F.variable(x))],
+      ] as const) {
+        if (!side) continue;
+        for (const k of side.consts) {
+          for (const x of DOMAIN[side.domain]) {
+            const formula = build(x, k);
+            const { value, errors } = withoutEngineErrors(() =>
+              formula.tryInvert(formula.evaluate(), tol),
+            );
+            expect(errors, `${name}(${label}) logged at x=${x}, k=${k}`).toEqual([]);
+            expect(value.reason, `${name}(${label}) at x=${x}, k=${k}`).toBe('exact');
+          }
+        }
+      }
+    }
+  });
+
+  describe('outside-image — the target has no pre-image', () => {
+    test('interior rounding: a fractional level through the documented Skill curve', () => {
+      // `xpToLevel: variable(xp).div(scale).sqrt().floor()` is the pattern
+      // `skill.ts` documents. Passthrough inversion is *correct* for integer
+      // targets — that is what the progress-bar callers ask for — and silently
+      // wrong for anything between breakpoints. Same chain, both outcomes,
+      // which is why no chain-only boolean can answer.
+      const xpToLevel = F.variable(0).div(50).sqrt().floor();
+
+      for (const [level, xp] of [
+        ['1', '50'],
+        ['2', '200'],
+        ['3', '450'],
+        ['10', '5000'],
+      ]) {
+        const result = xpToLevel.tryInvert(level);
+        expect(result.reason, `level ${level}`).toBe('exact');
+        expect(String(result.value), `level ${level}`).toBe(String(new Decimal(xp)));
+      }
+
+      const fractional = xpToLevel.tryInvert('3.5');
+      expect(fractional.reason).toBe('outside-image');
+      // The algebraic pre-image is still returned — a progress bar wants it.
+      expect(Decimal.lte(relativeError(fractional.value!, '612.5'), DEFAULT_TOL)).toBe(true);
+      expect(fractional.reason === 'outside-image' && String(fractional.evaluatesTo)).toBe('3');
+    });
+
+    test('a step splice with a discontinuous modifier', () => {
+      // The gap `add 5` opens at the breakpoint. Nothing evaluates into
+      // (100, 105), and the contract now says so rather than answering.
+      const formula = F.step(F.variable(0), 100, (v) => (v as unknown as GenericFormula).add(5));
+      const { value, errors } = withoutEngineErrors(() => formula.tryInvert('102'));
+      expect(errors).toEqual([]);
+      expect(value.reason).toBe('outside-image');
+    });
+
+    test('a saturated min / max / clamp', () => {
+      // The clamp family inverts by passthrough, so a target past the bound
+      // gets an answer that saturates back to the bound.
+      const cases: [string, GenericFormula, string][] = [
+        ['min', F.min(F.variable(0), 200), '500'],
+        ['max', F.max(F.variable(0), 200), '100'],
+        ['clamp', F.clamp(F.variable(0), 0, 200), '500'],
+        ['clampMax', F.clampMax(F.variable(0), 200), '500'],
+      ];
+      for (const [name, formula, target] of cases) {
+        const { value, errors } = withoutEngineErrors(() => formula.tryInvert(target));
+        expect(errors, `${name} logged`).toEqual([]);
+        expect(value.reason, `${name} at target ${target}`).toBe('outside-image');
+      }
+    });
+  });
+
+  test('not-invertible — the unary ops that bind no inverse', () => {
+    // These correctly report `isInvertible() === false`, and `invert` used to
+    // answer for them anyway: its bare-variable fallback keyed on arity alone,
+    // so any one-input op with no inverse fell through it and got `value` back
+    // unchanged. Carried from the 2026-05-26 audit, where it was recorded
+    // against `sign`/`abs` only — the real set is all seven.
+    for (const name of ['sign', 'abs', 'pLog10', 'absLog10', 'factorial', 'gamma', 'lngamma']) {
+      const formula = (F as unknown as Record<string, (v: GenericFormula) => GenericFormula>)[name](
+        F.variable('5'),
+      );
+      expect(formula.isInvertible(), `${name} claims invertibility`).toBe(false);
+      const { value, errors } = withoutEngineErrors(() => formula.tryInvert('5'));
+      expect(errors, `${name} logged instead of reporting structurally`).toEqual([]);
+      expect(value.reason, name).toBe('not-invertible');
+      expect(value.value, name).toBeNull();
+    }
+  });
+
+  test('a bare variable still inverts as the identity', () => {
+    // The fallback the fix above narrowed. Tightening it to `internalEvaluate ==
+    // null` must not cost the legitimate case.
+    const result = F.variable('7').tryInvert('12');
+    expect(result.reason).toBe('exact');
+    expect(String(result.value)).toBe('12');
+  });
+
+  test('no-closed-form — distinguished from having no inverse at all', () => {
+    // Worth a separate arm because the root-finder foundation can widen these to
+    // `exact` later without a consumer that branched on them being wrong today.
+    for (const [label, formula] of [
+      ['tetrate height 3', F.tetrate(F.variable('2'), 3)],
+      ['tetrate height 4', F.tetrate(F.variable('2'), 4)],
+      ['iteratedexp height 2', F.iteratedexp(F.variable('2'), 2)],
+    ] as const) {
+      const { value, errors } = withoutEngineErrors(() => formula.tryInvert(formula.evaluate()));
+      expect(errors, `${label} logged instead of reporting structurally`).toEqual([]);
+      expect(value.reason, label).toBe('no-closed-form');
+      expect(value.value, label).toBeNull();
+    }
+  });
+
+  test('the magnitude-derived tolerance is load-bearing, not decorative', () => {
+    // Past layer 0 a value is stored as its logarithm in a float64, so the
+    // exponent carries ulp error and the image check cannot demand 1e-10. If it
+    // did, a spine consumer computing a crossing at layer 1 would be told its
+    // arithmetic is outside the image when it is as exact as the representation
+    // allows.
+    const formula = F.variable(0).pow10();
+    for (const x of ['1e6', '1e9']) {
+      const target = formula.evaluate(x);
+      expect(formula.tryInvert(target).reason, `pow10 at x=${x}`).toBe('exact');
+      expect(inversionTolerance(target), `tolerance at x=${x}`).toBeGreaterThan(1e-10);
+    }
+    // Layer 0 keeps the strict floor, and so does the low end of layer 1 — the
+    // exponent's ulp only overtakes 1e-10 above ~1e10^4.9.
+    expect(inversionTolerance('1e100')).toBe(1e-10);
+    expect(inversionTolerance(formula.evaluate('1e3'))).toBe(1e-10);
+  });
+
+  test('tryInvertIntegral grades the integral the same way', () => {
+    const formula = F.variable(0).pow_base(1.15).mul(100);
+    const cumulative = formula.evaluateIntegral(50);
+    const result = formula.tryInvertIntegral(cumulative);
+    expect(result.reason).toBe('exact');
+    expect(Decimal.lte(relativeError(result.value!, 50), DEFAULT_TOL)).toBe(true);
+
+    // Non-integrable chain: no answer, and the reason is structural. `factorial`
+    // binds no integral — `sin` does, so it is not the example it looks like.
+    const { value, errors } = withoutEngineErrors(() =>
+      F.variable(0).factorial().tryInvertIntegral('1'),
+    );
+    expect(errors).toEqual([]);
+    expect(value.reason).toBe('not-invertible');
+    expect(value.value).toBeNull();
   });
 });
 

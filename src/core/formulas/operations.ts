@@ -12,6 +12,7 @@
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
+import { reportInversionFailure } from './inversion';
 import type {
   FormulaSource,
   GenericFormula,
@@ -27,7 +28,7 @@ const ln10 = Decimal.ln(10);
 function makeUnaryInvert(transform: (value: DecimalSource) => DecimalSource) {
   return (value: DecimalSource, lhs: FormulaSource) => {
     if (hasVariable(lhs)) return lhs.invert(transform(value));
-    console.error('Could not invert due to no input being a variable');
+    reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
     return 0;
   };
 }
@@ -42,7 +43,7 @@ function makeBinaryInvert(
     } else if (hasVariable(rhs) && rhsTransform) {
       return rhs.invert(rhsTransform(value, unrefFormulaSource(lhs)));
     }
-    console.error('Could not invert due to no input being a variable');
+    reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
     return 0;
   };
 }
@@ -105,7 +106,7 @@ export function passthrough<T extends GenericFormula | DecimalSource>(value: T):
 export function invertPassthrough(value: DecimalSource, ...inputs: FormulaSource[]) {
   const variable = inputs.find((input) => hasVariable(input)) as InvertibleFormula | undefined;
   if (variable == null) {
-    console.error('Could not invert due to no input being a variable');
+    reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
     return 0;
   }
   return variable.invert(value);
@@ -201,7 +202,10 @@ function buildIntegrateAdd(
 
       // Generic shape (cubic and higher): solve F(x) + c·x = target by bisection.
       if (!hasVariable(F_input) || !(F_input as InvertibleFormula).isInvertible()) {
-        console.error('Could not invert integrateAdd: integral lhs is not invertible');
+        reportInversionFailure(
+          'not-invertible',
+          'Could not invert integrateAdd: integral lhs is not invertible',
+        );
         return 0;
       }
       const F = F_input as InvertibleFormula;
@@ -301,7 +305,10 @@ function buildIntegrateSub(
       }
 
       if (!hasVariable(F_input) || !(F_input as InvertibleFormula).isInvertible()) {
-        console.error('Could not invert integrateSub: integral lhs is not invertible');
+        reportInversionFailure(
+          'not-invertible',
+          'Could not invert integrateSub: integral lhs is not invertible',
+        );
         return 0;
       }
       const F = F_input as InvertibleFormula;
@@ -418,7 +425,7 @@ function internalInvertIntegralLog10(value: DecimalSource, lhs: FormulaSource) {
     const numerator = ln10.times(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -452,7 +459,7 @@ function internalInvertIntegralLog(value: DecimalSource, lhs: FormulaSource, rhs
     const numerator = Decimal.ln(unrefFormulaSource(rhs)).times(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -483,7 +490,7 @@ function internalInvertIntegralLog2(value: DecimalSource, lhs: FormulaSource) {
     const numerator = Decimal.ln(2).times(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -513,7 +520,7 @@ function internalInvertIntegralLn(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
     return lhs.invert(Decimal.div(value, new Decimal(Decimal.div(value, Math.E)).lambertw()));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -617,12 +624,15 @@ export function invertTetrate(
     // the base for general height, so report rather than answer; a numeric
     // fallback can widen this once core has a shared root-finder.
     if (!Decimal.eq(unrefFormulaSource(height), 2) || !Decimal.eq(unrefFormulaSource(payload), 1)) {
-      console.error('Could not invert tetrate: no closed form except height 2 with payload 1');
+      reportInversionFailure(
+        'no-closed-form',
+        'Could not invert tetrate: no closed form except height 2 with payload 1',
+      );
       return 0;
     }
     return base.invert(Decimal.ssqrt(value));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -651,12 +661,15 @@ export function invertIteratedExp(
     // base is `root(value, payload)`. Above that there is no closed form —
     // report rather than answer, as with `invertTetrate`.
     if (!Decimal.eq(unrefFormulaSource(height), 1)) {
-      console.error('Could not invert iteratedexp: no closed form in the base above height 1');
+      reportInversionFailure(
+        'no-closed-form',
+        'Could not invert iteratedexp: no closed form in the base above height 1',
+      );
       return 0;
     }
     return lhs.invert(Decimal.root(value, unrefFormulaSource(payload)));
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -683,7 +696,7 @@ export function invertSlog(value: DecimalSource, lhs: FormulaSource, rhs: Formul
       Decimal.tetrate(unrefFormulaSource(rhs), Decimal.minabs(1e308, value).toNumber()),
     );
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 
@@ -710,7 +723,7 @@ export function invertLayeradd(
       ),
     );
   }
-  console.error('Could not invert due to no input being a variable');
+  reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
   return 0;
 }
 

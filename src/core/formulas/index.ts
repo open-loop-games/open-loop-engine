@@ -17,4 +17,6 @@ export type {
   TupleGuard,
   GuardedFormulasToDecimals,
 } from './types';
+export type { Inversion, InversionFailureReason } from './inversion';
+export { inversionTolerance } from './inversion';
 export * from './formulas';

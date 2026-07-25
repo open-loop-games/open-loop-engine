@@ -429,38 +429,57 @@ export function createSkill(options: SkillOptions): Skill {
 // === PUBLIC UTILITIES ===
 
 /**
+ * XP the current level starts and ends at, or `null` when `xpCurve` has no
+ * inverse to ask.
+ *
+ * A `.floor()`ed curve is fine here, and precisely because these callers only
+ * ever ask for integer levels: an interior rounding op inverts to the exact
+ * breakpoint below the target, which for an integer target *is* the pre-image.
+ * A fractional target would come back `outside-image` instead — see
+ * `Formula.tryInvert`, which is what makes the distinction visible rather than
+ * leaving it to a passthrough that answers either way.
+ */
+function getLevelXPBounds(
+  skill: Skill,
+  currentLevel: Decimal,
+): { from: Decimal; to: Decimal } | null {
+  const from = skill.xpCurve.tryInvert(currentLevel);
+  const to = skill.xpCurve.tryInvert(currentLevel.add(1));
+  if (from.value == null || to.value == null) return null;
+  return { from: new Decimal(from.value), to: new Decimal(to.value) };
+}
+
+/**
  * Progress fraction (0–1) within the current level, for progress bar display.
  *
  * Computes `(currentXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)`.
- * Requires an invertible `xpToLevel` curve (`.floor()` is fine — the Formula
- * system inverts through it via passthrough).
+ * Requires an invertible `xpToLevel` curve; returns 1 (a full bar) when the
+ * curve can't be inverted or the level spans no XP.
  */
 export function getSkillProgress(skill: Skill): number {
   const currentLevel = new Decimal(skill.level.value);
   const currentXp = new Decimal(skill.xp.value);
-  const xpForCurrent = new Decimal(skill.xpCurve.invert(currentLevel));
-  const xpForNext = new Decimal(skill.xpCurve.invert(currentLevel.add(1)));
-  const span = new Decimal(Decimal.sub(xpForNext, xpForCurrent));
+  const bounds = getLevelXPBounds(skill, currentLevel);
+  if (bounds == null) return 1;
+  const span = new Decimal(Decimal.sub(bounds.to, bounds.from));
   if (Decimal.lte(span, 0)) return 1;
-  return new Decimal(Decimal.div(Decimal.sub(currentXp, xpForCurrent), span))
-    .clamp(0, 1)
-    .toNumber();
+  return new Decimal(Decimal.div(Decimal.sub(currentXp, bounds.from), span)).clamp(0, 1).toNumber();
 }
 
 /**
  * XP window for "N / M" display — how much XP into the current level and
  * how much the current level spans.
  *
- * Requires an invertible `xpToLevel` curve (`.floor()` is fine — the Formula
- * system inverts through it via passthrough).
+ * Requires an invertible `xpToLevel` curve; reports a zero window when the
+ * curve can't be inverted, rather than a window measured from a failed inverse.
  */
 export function getSkillXPWindow(skill: Skill): { current: Decimal; needed: Decimal } {
   const currentLevel = new Decimal(skill.level.value);
   const currentXp = new Decimal(skill.xp.value);
-  const xpForCurrent = new Decimal(skill.xpCurve.invert(currentLevel));
-  const xpForNext = new Decimal(skill.xpCurve.invert(currentLevel.add(1)));
+  const bounds = getLevelXPBounds(skill, currentLevel);
+  if (bounds == null) return { current: new Decimal(0), needed: new Decimal(0) };
   return {
-    current: new Decimal(Decimal.sub(currentXp, xpForCurrent)),
-    needed: new Decimal(Decimal.sub(xpForNext, xpForCurrent)),
+    current: new Decimal(Decimal.sub(currentXp, bounds.from)),
+    needed: new Decimal(Decimal.sub(bounds.to, bounds.from)),
   };
 }
