@@ -3,12 +3,13 @@ export {
   bn,
   toNumber,
   integerRoot,
+  tryIntegerRoot,
   format,
   formatWhole,
   formatTime,
   formatSmall,
 } from './decimal';
-export type { DecimalSource } from './decimal';
+export type { DecimalSource, IntegerRoot } from './decimal';
 export { notationManager } from './notation-manager';
 export { NotationManager } from './notation-manager';
 export { Notation, Presets, HTMLPresets } from './notations';

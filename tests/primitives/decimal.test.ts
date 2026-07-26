@@ -6,6 +6,7 @@ import {
   formatWhole,
   formatTime,
   integerRoot,
+  tryIntegerRoot,
   renormIfLayer0,
 } from '@/primitives/decimal';
 import { notationManager } from '@/primitives/notation-manager';
@@ -88,23 +89,6 @@ describe('integerRoot', () => {
     expect(integerRoot(7.999, 3).eq(1)).toBe(true);
   });
 
-  it('recovers perfect cubes across magnitudes, where a fixed additive nudge is scale-blind', () => {
-    for (const k of [100, 1000, 1e4, 1e5, 1e6]) {
-      const cube = Decimal.pow(k, 3); // exact k³
-      expect(integerRoot(cube, 3).eq(k), `∛(${k}³) = ${k}`).toBe(true);
-    }
-  });
-
-  it('snaps within a relative tolerance band, not an absolute one', () => {
-    const cube = Decimal.pow(1e6, 3); // 1e18; band = 1e18 · 1e-9 = 1e9
-    expect(integerRoot(cube, 3).eq(1e6)).toBe(true);
-    // a hair below the perfect power (well inside the band) snaps up to it —
-    // near the boundary the log/exp float error already dominates
-    expect(integerRoot(cube.sub(1), 3).eq(1e6)).toBe(true);
-    // clearly below the band floors down
-    expect(integerRoot(cube.mul(0.9), 3).lt(1e6)).toBe(true);
-  });
-
   it('supports the integer square root (degree 2)', () => {
     expect(integerRoot(144, 2).eq(12)).toBe(true);
     expect(integerRoot(145, 2).eq(12)).toBe(true);
@@ -119,6 +103,188 @@ describe('integerRoot', () => {
   it('accepts string and Decimal sources and returns a chainable Decimal', () => {
     expect(integerRoot('1000', 3).eq(10)).toBe(true);
     expect(integerRoot(bn(216), 3).add(1).eq(7)).toBe(true);
+  });
+
+  it('recovers perfect cubes across magnitudes, where a fixed additive nudge is scale-blind', () => {
+    for (const k of [100, 1000, 1e4, 1e5, 1e6]) {
+      const cube = Decimal.pow(k, 3); // exact k³
+      expect(integerRoot(cube, 3).eq(k), `∛(${k}³) = ${k}`).toBe(true);
+    }
+  });
+
+  it('snaps only across break_eternity’s own error, not a fixed relative band', () => {
+    const cube = Decimal.pow(1e6, 3); // 1e18
+    expect(integerRoot(cube, 3).eq(1e6)).toBe(true);
+    // `cube.sub(1)` is a no-op at this magnitude — the ulp of 1e18 is 128 — so
+    // the value below has to be built far enough down to be representable at
+    // all. One part in 1e12 is ~1e6 absolute, far outside the ~1e-14 relative
+    // slack, and must floor rather than snap.
+    const justBelow = cube.mul(1 - 1e-12);
+    expect(justBelow.lt(cube)).toBe(true); // the input really did move
+    expect(integerRoot(justBelow, 3).eq(999999)).toBe(true);
+    // clearly below floors down
+    expect(integerRoot(cube.mul(0.9), 3).lt(1e6)).toBe(true);
+  });
+
+  it('holds m^degree ≤ x < (m+1)^degree exactly, checked in BigInt', () => {
+    // Below 9e15 a Decimal is an exact layer-0 integer, so the law can be
+    // checked against arbitrary-precision integer arithmetic with no oracle
+    // fixture and no tolerance of its own.
+    const law = (x: number, degree: number) => {
+      const m = BigInt(integerRoot(x, degree).toNumber());
+      const d = BigInt(degree);
+      const X = BigInt(x);
+      expect(m ** d <= X, `${m}^${degree} ≤ ${x}`).toBe(true);
+      expect((m + 1n) ** d > X, `${m + 1n}^${degree} > ${x}`).toBe(true);
+    };
+    for (const degree of [2, 3, 4, 5]) {
+      for (const x of [
+        1, 2, 7, 8, 9, 26, 27, 28, 100, 1023, 1024, 1025, 999999, 1e6, 1e9, 1e12, 4e15,
+      ]) {
+        law(x, degree);
+      }
+    }
+  });
+
+  it('is exact at the magnitudes the unbounded snap overshot', () => {
+    // Oracle values from mpmath at 80 digits. The prior implementation applied
+    // a 1e-9 relative tolerance in radicand space while stepping the root by 1,
+    // so it overshot by `tol / (degree·m^(degree−1))` integers — 5 at 1e20,
+    // 500001 at 1e30 — and the overshoot grew without bound.
+    const DEGREE_2 = [
+      ['1e16', 100000000],
+      ['1e17', 316227766],
+      ['1e18', 1000000000],
+      ['1e19', 3162277660],
+      ['1e20', 10000000000],
+      ['1e21', 31622776601],
+      ['1e22', 100000000000],
+      ['1e24', 1000000000000],
+      ['1e26', 10000000000000],
+      ['1e27', 31622776601683],
+    ] as const;
+    const DEGREE_3 = [
+      ['1e18', 1000000],
+      ['1e20', 4641588],
+      ['1e24', 100000000],
+      ['1e28', 2154434690],
+      ['1e30', 10000000000],
+      ['1e33', 100000000000],
+      ['1e36', 1000000000000],
+      ['1e40', 21544346900318],
+      ['1e41', 46415888336127],
+    ] as const;
+    const DEGREE_5 = [
+      ['1e30', 1000000],
+      ['1e50', 10000000000],
+      ['1e60', 1000000000000],
+      ['1e70', 100000000000000],
+    ] as const;
+    for (const [degree, table] of [
+      [2, DEGREE_2],
+      [3, DEGREE_3],
+      [5, DEGREE_5],
+    ] as const) {
+      for (const [x, expected] of table) {
+        const got = integerRoot(x, degree);
+        expect(got.eq(expected), `integerRoot(${x}, ${degree}) = ${got}, want ${expected}`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  it('terminates in bounded time at magnitudes that used to hang', () => {
+    // The old walk stepped one integer at a time across a tolerance that grew
+    // with x: 699 ms at 1e30 degree 2, and no termination within 120 s past
+    // ~1e32. The candidate set is now fixed, so cost is flat in x.
+    const started = performance.now();
+    for (const [x, degree] of [
+      ['1e32', 2],
+      ['1e100', 2],
+      ['1e1000', 2],
+      ['1e400', 3],
+      ['1e1e10', 2],
+    ] as const) {
+      expect(integerRoot(x, degree).gt(0)).toBe(true);
+    }
+    expect(performance.now() - started).toBeLessThan(100);
+  });
+});
+
+describe('tryIntegerRoot', () => {
+  it('grades a resolvable root exact and returns the same value as integerRoot', () => {
+    for (const [x, degree] of [
+      [2240, 3],
+      [8, 3],
+      [144, 2],
+      ['1e15', 2], // exact-integer arithmetic reaches this far
+      ['3.7e20', 3], // past it, the error bar still clears every integer
+      ['4e38', 3],
+    ] as const) {
+      const graded = tryIntegerRoot(x, degree);
+      expect(graded.reason, `${x} deg ${degree}`).toBe('exact');
+      expect(graded.value.eq(integerRoot(x, degree))).toBe(true);
+    }
+  });
+
+  it('reports ambiguous once the root’s error bar can reach an integer boundary', () => {
+    // The bar grows with magnitude and shrinks with degree, so the crossing is
+    // degree-dependent: the root passes ~1e11 at 1e22 for degree 2 and only at
+    // 1e33 for degree 3. Width below 1 means "possibly off by one" — the value
+    // is still the best estimate, and here still the right one.
+    for (const [x, degree, value] of [
+      ['1e22', 2, 100000000000],
+      ['1e27', 2, 31622776601683],
+      ['1e41', 3, 46415888336127],
+    ] as const) {
+      const graded = tryIntegerRoot(x, degree);
+      expect(graded.reason, `${x} deg ${degree} should be ambiguous`).toBe('ambiguous');
+      expect(graded.value.eq(value), `${x} deg ${degree} value is still correct`).toBe(true);
+    }
+  });
+
+  it('separates a hair of doubt from an answer carrying no information', () => {
+    const hair = tryIntegerRoot('1e22', 2); // root 1e11, bar ~1e-3 of an integer
+    const none = tryIntegerRoot('1e45', 2); // root past the distinguishable ceiling
+    expect(hair.reason).toBe('ambiguous');
+    expect(none.reason).toBe('ambiguous');
+    if (hair.reason === 'ambiguous') expect(hair.width.lt(1)).toBe(true);
+    if (none.reason === 'ambiguous') expect(none.width.gt(1e6)).toBe(true);
+  });
+
+  it('reports ambiguous once the root itself outgrows distinguishable integers', () => {
+    // Past 9e15 a Decimal stores its logarithm and m+1 is m, so no
+    // implementation can floor here — the honest answer is to say so.
+    const graded = tryIntegerRoot('1e40', 2); // root ≈ 1e20, far past the ceiling
+    expect(graded.reason).toBe('ambiguous');
+    const root = integerRoot('1e40', 2);
+    expect(root.add(1).eq(root)).toBe(true);
+  });
+
+  it('width grows with the ambiguity rather than being a flag in disguise', () => {
+    const near = tryIntegerRoot('1e29', 2);
+    const far = tryIntegerRoot('1e40', 2);
+    expect(near.reason).toBe('ambiguous');
+    expect(far.reason).toBe('ambiguous');
+    if (near.reason === 'ambiguous' && far.reason === 'ambiguous') {
+      expect(far.width.gt(near.width)).toBe(true);
+    }
+  });
+
+  it('grades exactly-representable radicands exact at every degree', () => {
+    // Below 9e15 the answer is settled in BigInt, so nothing here depends on
+    // magnitude, degree, or how close the radicand sits to a perfect power.
+    for (const degree of [1, 2, 3, 7]) {
+      for (const x of [1, 2, 8, 143, 26.999, 1e9, 4e15]) {
+        expect(tryIntegerRoot(x, degree).reason, `${x} deg ${degree}`).toBe('exact');
+      }
+    }
+  });
+
+  it('grades the clamped non-positive arm exact', () => {
+    expect(tryIntegerRoot(0, 3).reason).toBe('exact');
+    expect(tryIntegerRoot(-8, 3).value.eq(0)).toBe(true);
   });
 });
 

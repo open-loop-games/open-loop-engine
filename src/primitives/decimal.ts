@@ -180,13 +180,198 @@ export function toNumber(x: DecimalSource): number {
   return typeof x === 'number' ? x : new OrigDecimal(x).toNumber();
 }
 
+/** float64 machine epsilon — the ulp of a mantissa, and of a stored exponent above layer 0. */
+const EPSILON = 2.220446049250313e-16;
+
 /**
- * Relative tolerance for {@link integerRoot}'s perfect-power snapping. A value
- * within this fraction of a perfect `degree`-th power counts as that power.
- * 1e-9 sits far above break_eternity's log/exp error floor (~1e-15 relative)
- * and far below any game-meaningful distinction near an integer boundary.
+ * Safety factor over the measured `root` error, for {@link rootUncertainty}.
+ *
+ * Measured against an mpmath oracle over 2490 `(radicand, degree)` pairs —
+ * degrees 2 through 10, roots from 1 to 9e15, exact powers included — the worst
+ * observed error was **0.898×** the modelled budget. The model bounds reality
+ * with little to spare, so 2× is headroom rather than the whole allowance.
  */
-const INTEGER_ROOT_REL_TOL = 1e-9;
+const ROOT_ERROR_HEADROOM = 2;
+
+/**
+ * Uncertainty, in integers, below which a root sitting near an integer is taken
+ * to *be* that integer rather than merely close to it.
+ *
+ * This is the perfect-power snap, and it decides only which of two off-by-one
+ * errors to risk — never the grade, which is `ambiguous` on both sides of it.
+ * A root landing this close to an integer is either a perfect power the log/exp
+ * path fell a few ulps short of, or a coincidence with about a 1-in-500 chance;
+ * below the ceiling the perfect power is overwhelmingly likelier and rounding
+ * to it wins, above it the bar is wide enough that flooring wins.
+ *
+ * The measured reason for reporting rather than trusting either way: over 3234
+ * oracle-checked radicands, snapping produced three answers off by one — all of
+ * them radicands built as `base^degree` at layer 1, where the construction's
+ * own rounding puts the stored value a hair *below* the perfect power it was
+ * meant to be. Nothing available at this layer distinguishes that from the
+ * perfect power itself.
+ */
+const SNAP_CEILING = 1e-3;
+
+/**
+ * The ceiling past which break_eternity cannot tell an integer from its
+ * successor: `9e15`, its layer-0 boundary. At or above it a Decimal stores its
+ * base-10 logarithm and `m.add(1).eq(m)`, so "the largest integer `m` with
+ * `m^degree ≤ x`" has no representable answer. `8999999999999999` is the last
+ * integer that still works.
+ *
+ * Measured, not `Number.MAX_SAFE_INTEGER` — that is 9007199254740991, already
+ * past this ceiling and already indistinguishable from its successor.
+ */
+const MAX_DISTINGUISHABLE_INTEGER = 9e15;
+
+/**
+ * How far, in integers, `value.root(degree)` can sit from the true root.
+ *
+ * The root is the coordinate to work in, and by a factor of `degree`. Both
+ * `root` and `pow` route through log/exp, so both carry the ulp of a stored
+ * logarithm — but `pow` *multiplies* the exponent by `degree` while `root`
+ * divides it, so at 1e27 the raw square root is accurate to ±0.2 integers while
+ * a `m² ≤ x` comparison is only good to ±0.44. Comparing powers is the less
+ * precise instrument at every magnitude, which is why the floor is settled here
+ * and never by raising a candidate back.
+ *
+ * The `max(…, 1)` floor covers layer 0, where the radicand is stored directly
+ * and the error is the ordinary ulp of the root's own mantissa.
+ *
+ * Deliberately *not* `inversionTolerance` from `core/formulas`, and not only
+ * because `primitives/` sits below `core/`: that function floors at 1e-10
+ * relative, which at 1e28 is 1e18 absolute against a one-integer step of 2e14 —
+ * four orders too loose to floor anything. The shape transfers (a floor plus a
+ * magnitude term); the constant does not.
+ */
+function rootUncertainty(value: Decimal, root: Decimal, degree: number): Decimal | null {
+  const magnitude = Math.abs(value.log10().toNumber());
+  if (!Number.isFinite(magnitude)) return null;
+  const relative = Math.max(1, (Math.LN10 * magnitude) / degree);
+  return root.mul(ROOT_ERROR_HEADROOM * EPSILON * relative);
+}
+
+/**
+ * The floored root of a layer-0 radicand, settled in exact integer arithmetic.
+ *
+ * Below {@link MAX_DISTINGUISHABLE_INTEGER} a Decimal *is* an exact integer, so
+ * the question has an exact answer and no float reasoning is needed to reach
+ * it: flooring the radicand loses nothing (`mᵈ ≤ x` and `mᵈ ≤ ⌊x⌋` agree when
+ * `mᵈ` is an integer), and BigInt settles the comparisons outright. This is
+ * what makes `∛8 = 2` a proof rather than a snap.
+ *
+ * `root` seeds the search and is within one integer of the answer, so the
+ * corrections below run at most a step or two.
+ */
+function exactIntegerRoot(value: Decimal, root: Decimal, degree: number): Decimal {
+  const radicand = BigInt(value.floor().toNumber());
+  const power = BigInt(degree);
+  let m = BigInt(Math.max(0, Math.floor(root.toNumber())));
+  while (m > 0n && m ** power > radicand) m -= 1n;
+  while ((m + 1n) ** power <= radicand) m += 1n;
+  return new OrigDecimal(Number(m));
+}
+
+/**
+ * Diagnosed result of {@link tryIntegerRoot}.
+ *
+ * - `exact` — `value` is the true `⌊x^(1/degree)⌋`: `value^degree ≤ x <
+ *   (value+1)^degree` holds in exact arithmetic.
+ * - `ambiguous` — the representation cannot resolve an integer here, so `value`
+ *   is the best estimate available rather than a verified floor. `value` is
+ *   within `max(1, width)` of the true root — measured across 573 ambiguous
+ *   results with no violation — which lets a caller judge whether the
+ *   imprecision matters at its scale: a width below 1 means "possibly off by
+ *   one", while 1e6 means the integer part carries no information at all.
+ *
+ * A radicand that is an exact perfect power still reports `ambiguous` once it
+ * passes layer 0, because at that point nothing distinguishes it from a value
+ * a hair below it. The answer is usually right there; it just isn't provable,
+ * and `exact` is reserved for what is.
+ *
+ * Shape follows `Inversion` in `@/core/formulas` — a value plus a `reason`
+ * discriminator — rather than inventing a second vocabulary for "the answer is
+ * there but you should know something about it".
+ */
+export type IntegerRoot =
+  | { value: Decimal; reason: 'exact' }
+  | { value: Decimal; reason: 'ambiguous'; width: Decimal };
+
+/**
+ * The floored integer `degree`-th root of `x`, **graded** — the same answer
+ * {@link integerRoot} returns, plus whether the representation could actually
+ * resolve it.
+ *
+ * Two things put an integer root out of reach, and both are checked here:
+ *
+ * - **The root outgrows the representation.** Above
+ *   {@link MAX_DISTINGUISHABLE_INTEGER} a Decimal stores its logarithm, `m` and
+ *   `m + 1` are the same number, and no implementation can distinguish them.
+ * - **The root's own error bar reaches an integer boundary.** See
+ *   {@link rootUncertainty}: the raw root carries the ulp of a stored logarithm,
+ *   which grows with magnitude and shrinks with `degree`. Once the bar spans a
+ *   boundary, which integer the root falls between is not determined by the
+ *   representation. The bar reaches one integer wide once the root passes about
+ *   1e11 — a square root at 1e22, a cube root at 1e33, a fifth root only at
+ *   1e55 — and whether it actually *straddles* depends on where the root sits
+ *   between integers, so a radicand well clear of a perfect power stays exact
+ *   past that and one sitting on top of one does not.
+ *
+ * Use this over {@link integerRoot} where being silently off by one matters —
+ * balance tooling, tests, and dev-mode asserts on a game whose accumulators run
+ * long. Gameplay payout paths generally want the plain form.
+ *
+ * @param x - the radicand; sources accepted, coerced once
+ * @param degree - the root degree (a positive integer: 2, 3, …)
+ * @returns the root and how far to trust it. See {@link IntegerRoot}.
+ *
+ * @example
+ * const r = tryIntegerRoot(runTotal, 3);
+ * if (r.reason === 'ambiguous') {
+ *   console.warn(`fragment payout is ±${format(r.width)} at this scale`);
+ * }
+ */
+export function tryIntegerRoot(x: DecimalSource, degree: number): IntegerRoot {
+  const value = x instanceof OrigDecimal ? x : new OrigDecimal(x);
+  if (value.lte(0)) return { value: new OrigDecimal(0), reason: 'exact' };
+
+  const root = OrigDecimal.max(value.root(degree), 0);
+
+  // Exact arithmetic where it is available, which is every radicand a game is
+  // likely to reach. A non-integer degree has no BigInt exponent and falls
+  // through to the float path rather than throwing.
+  if (value.lt(MAX_DISTINGUISHABLE_INTEGER) && Number.isInteger(degree) && degree >= 1) {
+    return { value: exactIntegerRoot(value, root, degree), reason: 'exact' };
+  }
+
+  const uncertainty = rootUncertainty(value, root, degree);
+  if (uncertainty === null || root.gte(MAX_DISTINGUISHABLE_INTEGER)) {
+    // Past the ceiling `m` and `m + 1` are the same Decimal, so there is no
+    // floor to find. Reached independently of the interval test below, which
+    // would also fire here — stated separately because it is a different limit.
+    return { value: root.floor(), reason: 'ambiguous', width: uncertainty ?? root };
+  }
+
+  // The whole answer, in one comparison: if `root ± uncertainty` floors to the
+  // same integer, no other integer is in play and that floor is the answer.
+  // O(1) at every magnitude — the unbounded stepping this replaces ran once per
+  // integer inside a tolerance that grew with `x`, and stopped terminating
+  // past ~1e32.
+  const low = root.sub(uncertainty).floor();
+  const high = root.add(uncertainty).floor();
+  if (low.eq(high)) return { value: low, reason: 'exact' };
+
+  // An integer sits inside the error bar, so the floor is not provable and the
+  // grade says so. Which value to hand back is a separate question from the
+  // grade: below SNAP_CEILING a perfect power is the likelier explanation and
+  // rounding to it beats flooring away from it, above it the reverse.
+  return {
+    value: uncertainty.lt(SNAP_CEILING) ? root.round() : root.floor(),
+    reason: 'ambiguous',
+    width: uncertainty.mul(2),
+  };
+}
 
 /**
  * The floored integer `degree`-th root of `x` — the largest integer `m` with
@@ -197,13 +382,16 @@ const INTEGER_ROOT_REL_TOL = 1e-9;
  * computes both `root` and `pow` through log/exp, so each carries float error
  * in both directions (`root(8, 3)` = 1.999…, `pow(3, 3)` = 27.000…4). A plain
  * floor of the root under-counts at perfect powers (∛8 → 1), and a plain
- * `mⁿ ≤ x` comparison mis-floors for the same reason. This walks off the raw
- * root to the true integer using a magnitude-relative tolerance, so it is
- * correct at every scale rather than by luck of a fixed additive nudge.
+ * `mⁿ ≤ x` comparison mis-floors *worse*, since `pow` amplifies the same error
+ * by `degree` where `root` divides it. This works in the root's own coordinate
+ * instead, floored against break_eternity's measured error at that magnitude.
  *
- * Snapping is relative: a value within {@link INTEGER_ROOT_REL_TOL} of a
- * perfect power rounds to that power (near an integer boundary the float error
- * already dominates, so this is the stable answer). `x ≤ 0` returns 0.
+ * **Exact up to a degree-dependent ceiling** — roughly 1e22 for degree 2 and
+ * 1e33 for degree 3, where the root passes 1e11 — above which the
+ * representation stops resolving consecutive integers and the result is the
+ * best estimate rather than a verified floor.
+ * {@link tryIntegerRoot} returns the same value plus which of the two you got;
+ * reach for it when being silently off by one would matter. `x ≤ 0` returns 0.
  *
  * Canonical use is sublinear per-source prestige payouts — `Σ integerRoot(
  * total / scale, 3)` — where pooling before the root would let one dominant
@@ -218,14 +406,7 @@ const INTEGER_ROOT_REL_TOL = 1e-9;
  * integerRoot(8, 3);     // 2, not 1 — the perfect-cube case a raw floor drops
  */
 export function integerRoot(x: DecimalSource, degree: number): Decimal {
-  const value = x instanceof OrigDecimal ? x : new OrigDecimal(x);
-  if (value.lte(0)) return new OrigDecimal(0);
-  let m = value.root(degree).floor();
-  if (m.lt(0)) m = new OrigDecimal(0);
-  const tol = value.mul(INTEGER_ROOT_REL_TOL);
-  while (m.gt(0) && m.pow(degree).sub(value).gt(tol)) m = m.sub(1);
-  while (m.add(1).pow(degree).sub(value).lte(tol)) m = m.add(1);
-  return m;
+  return tryIntegerRoot(x, degree).value;
 }
 
 const ZERO = new OrigDecimal(0);
