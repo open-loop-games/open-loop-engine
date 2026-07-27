@@ -2,19 +2,34 @@
  * Conversion system — atomic multi-resource transformation.
  *
  * Turns N input resources into M output resources atomically: input costs are
- * snapshotted, output formulas evaluate against the snapshot, inputs are paid,
- * outputs are added. Used for crafting recipes, exchanges, market trades, and
- * prestige gain (the prestige variant composes externally with createReset).
+ * snapshotted, outputs evaluate against the snapshot, inputs are paid, outputs
+ * are added. Crafting recipes, market trades, and exchanges are the shape it
+ * is built for — the machinery that earns its keep is multi-input atomicity
+ * and the pre-payment snapshot.
  *
- * Inputs adopt the Requirements surface — each input is a Requirement
- * (typically a CostRequirement). Multi-input gating and payment delegate to
- * `requirementsMet()` / `payRequirements()`. The snapshot is keyed by the
- * user-chosen input keys and only includes CostRequirements; boolean gates
- * and other non-cost Requirements contribute nothing to the snapshot but
- * still gate `canConvert`.
+ * Inputs adopt the Requirements surface — each input is a Requirement.
+ * Multi-input gating and payment delegate to `requirementsMet()` /
+ * `payRequirements()`. The snapshot is keyed by the user-chosen input keys and
+ * only includes CostRequirements; boolean gates and other non-cost
+ * Requirements contribute nothing to the snapshot but still gate `canConvert`.
+ *
+ * That gives two legitimate shapes, and shipping code uses both:
+ *
+ * - **Paying exchange** — inputs are CostRequirements, the snapshot carries
+ *   what was charged, outputs are a function of it. The recipe case.
+ * - **Gated trigger** — inputs are `createBooleanRequirement`s (or costs with
+ *   `requiresPay: false`) that pay nothing, the output amount is precomputed
+ *   elsewhere, and the real "spend" is a `createReset` fired from
+ *   `afterConvert`. The prestige case. Nothing about it is a misuse; a
+ *   Requirement is not obliged to charge, which is why `anyOf` documents the
+ *   pure-gate branch explicitly.
+ *
+ * Prestige does not *need* this factory — `createReset` plus a gain function
+ * is the whole pattern, and several shipping games compose it that way. Reach
+ * for a Conversion when you want the atomic gate + gain + reset bundled behind
+ * one `convert()`, not because prestige is expected to live here.
  *
  * - {@link createConversion} — the factory
- * - Formula helpers: {@link createSqrtFormula}, {@link createLogFormula}, {@link createPolynomialFormula}
  */
 
 import { computed, unref, type ComputedRef, type MaybeRef } from 'vue';
@@ -34,8 +49,16 @@ import {
  * One output of a conversion: which Resource gets the gain, and how much.
  *
  * `amount` is a {@link Computable} for static / reactive values, or a function
- * over the consumed-input snapshot for variable exchanges. Snapshot keys
- * match the keys in the conversion's `inputs` record.
+ * over the consumed-input snapshot for variable exchanges. Snapshot keys match
+ * the keys in the conversion's `inputs` record, and only CostRequirement
+ * inputs appear.
+ *
+ * The two arms overlap by construction — `Computable` already admits a
+ * zero-argument getter, so `() => gain.value` and `({ gold }) => …` are the
+ * same arm as far as the type is concerned, distinguished only by whether the
+ * body wants the snapshot. Both are called before any payment, so a getter
+ * reading a live resource sees pre-conversion state too; the snapshot exists
+ * for the one thing a getter cannot reach, which is *what the inputs charged*.
  */
 export interface ConversionOutput {
   /** The resource that receives the produced amount. */
@@ -98,9 +121,8 @@ export interface Conversion {
  * 7. Fire `afterConvert`.
  * 8. Return `produced`.
  *
- * The snapshot materializes before any state mutation, so output formulas
- * reading consumed amounts are deterministic even when input and output
- * share a resource type.
+ * Steps 2–3 run before step 5, so an output reading the snapshot is
+ * deterministic even when an input and an output share a resource.
  *
  * @example
  * ```ts
@@ -128,6 +150,21 @@ export interface Conversion {
  *   outputs: {
  *     mana: { resource: mana, amount: ({ gold }) => gold.times(50) },
  *   },
+ * });
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Gated trigger: no cost, the reset is the spend.
+ * createConversion({
+ *   inputs: {
+ *     ready: createBooleanRequirement({
+ *       requirement: () => Decimal.gte(runs.value, 50),
+ *       description: 'Reached run 50',
+ *     }),
+ *   },
+ *   outputs: { token: { resource: token, amount: () => gainComputed.value } },
+ *   afterConvert: () => prestigeReset.reset(),
  * });
  * ```
  */
@@ -208,49 +245,4 @@ export function createConversion<
   };
 
   return conversion;
-}
-
-// === FORMULA HELPERS ===
-
-/**
- * Create a square-root formula: `floor(√(x / scale))`.
- *
- * The most common prestige gain curve. With `scale = 100`, 100 base → 1 gain,
- * 400 → 2, 900 → 3.
- */
-export function createSqrtFormula(scale: DecimalSource = 10): (x: DecimalSource) => DecimalSource {
-  return (x: DecimalSource): DecimalSource => {
-    return new Decimal(Decimal.div(x, scale)).sqrt().floor();
-  };
-}
-
-/**
- * Create a logarithmic formula: `floor(log_base(x / scale))`.
- *
- * Slower than sqrt — each additional gain unit requires ~`base`× more base.
- * Returns 0 when `x / scale <= 1`.
- */
-export function createLogFormula(
-  base: DecimalSource = 10,
-  scale: DecimalSource = 1,
-): (x: DecimalSource) => DecimalSource {
-  return (x: DecimalSource): DecimalSource => {
-    const scaled = Decimal.div(x, scale);
-    if (Decimal.lte(scaled, 1)) return Decimal.dZero;
-    return Decimal.log(scaled, base).floor();
-  };
-}
-
-/**
- * Create a polynomial formula: `floor((x / scale) ^ exponent)`.
- *
- * Generalizes sqrt — `exponent = 0.5` matches {@link createSqrtFormula}.
- */
-export function createPolynomialFormula(
-  exponent: DecimalSource = 0.5,
-  scale: DecimalSource = 10,
-): (x: DecimalSource) => DecimalSource {
-  return (x: DecimalSource): DecimalSource => {
-    return new Decimal(Decimal.div(x, scale)).pow(exponent).floor();
-  };
 }

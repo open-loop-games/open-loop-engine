@@ -310,23 +310,32 @@ Drop to a hand-rolled callback only when a migration needs cross-field invariant
 
 ## Conversions
 
-`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs through formulas over a snapshot of consumed amounts. Prestige is the canonical shape (convert to prestige points, then reset), but it equally covers crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`). The input snapshot is taken before any mutation, so same-resource compounding (output produces more of an input type) is well-defined.
+`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs against a snapshot of what those inputs charged. Crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`) are what the machinery is for — multi-input atomicity plus a snapshot taken before any mutation, so same-resource compounding (an output producing more of an input type) is well-defined.
 
-Conversion and reset are composed externally — the factory holds no `Reset` reference. The standard prestige pattern wires them together at the call site by firing the reset from `afterConvert`:
+**Inputs are Requirements, not necessarily costs.** A `createBooleanRequirement`, or a `createCostRequirement` with `requiresPay: false`, gates `canConvert` and charges nothing. That is the second shape shipping games use: a *gated trigger* whose real spend is a reset fired from `afterConvert`.
+
+Conversion and reset are composed externally — the factory holds no `Reset` reference:
 
 ```ts
 const prestige = createConversion({
   inputs: {
-    points: createCostRequirement({ resource: points, cost: () => points.value, pay: () => { points.value = 0 } }),
+    ready: createBooleanRequirement({
+      requirement: () => Decimal.gte(runScore.value, threshold),
+      description: 'Run score reached',
+    }),
   },
   outputs: {
-    prestigePoints: { resource: prestigePoints, amount: ({ points }) => createSqrtFormula(10)(points) },
+    prestigePoints: { resource: prestigePoints, amount: () => prestigeGain.value },
   },
   afterConvert: () => prestigeReset.reset(),
 });
 
 // At the call site: if (prestige.canConvert.value) prestige.convert();
 ```
+
+**Prestige does not require a Conversion.** `createReset` plus a gain function is the entire pattern, and several shipping games compose it that way rather than routing through this factory. Reach for a Conversion when you want gate + gain + reset bundled behind one `convert()` with `canConvert` / `currentGain` for the UI to read; drop to `createReset` when you don't. Neither is the blessed path.
+
+For the gain curve itself, compose the arithmetic you need rather than looking for a prestige-formula helper — the engine ships none. A fixed-exponent floored root is `integerRoot` (below); a curve whose exponent moves at runtime is a `Formula` chain, which also inverts for a "next at" display.
 
 ### Sublinear per-source payouts
 

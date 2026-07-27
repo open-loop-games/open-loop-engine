@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { computed, nextTick } from 'vue';
-import { bn, Decimal } from '@/primitives/decimal';
+import { bn, Decimal, integerRoot } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import {
   beginPersistentContext,
@@ -21,7 +21,7 @@ import {
   createModifierChain,
   createMultiplicativeModifier,
 } from '@/core/modifier';
-import { createConversion, createSqrtFormula } from '@/systems/conversion';
+import { createConversion } from '@/systems/conversion';
 import { createCostRequirement } from '@/core/requirements';
 import { createReset } from '@/systems/reset';
 import { createPurchasable } from '@/systems/purchasable';
@@ -142,7 +142,7 @@ function createPrestigeTreeGame() {
 
   // --- Conversions ---
   // Consume-all + external reset composition: prestige conversions drain
-  // the source layer, produce sqrt-formula gain on the next layer up, then
+  // the source layer, produce a floored-root gain on the next layer up, then
   // the layer reset zeroes the dependent layers via afterConvert.
   const prestigeConversion = createConversion({
     inputs: {
@@ -155,7 +155,10 @@ function createPrestigeTreeGame() {
       }),
     },
     outputs: {
-      prestige: { resource: prestige, amount: ({ points }) => createSqrtFormula(10)(points) },
+      prestige: {
+        resource: prestige,
+        amount: ({ points }) => integerRoot(Decimal.div(points, 10), 2),
+      },
     },
     afterConvert: () => layer1Reset.reset(),
   });
@@ -173,7 +176,7 @@ function createPrestigeTreeGame() {
     outputs: {
       superPrestige: {
         resource: superPrestige,
-        amount: ({ prestige }) => createSqrtFormula(10)(prestige),
+        amount: ({ prestige }) => integerRoot(Decimal.div(prestige, 10), 2),
       },
     },
     afterConvert: () => layer2Reset.reset(),
@@ -192,7 +195,7 @@ function createPrestigeTreeGame() {
     outputs: {
       hyperPrestige: {
         resource: hyperPrestige,
-        amount: ({ superPrestige }) => createSqrtFormula(5)(superPrestige),
+        amount: ({ superPrestige }) => integerRoot(Decimal.div(superPrestige, 5), 2),
       },
     },
     afterConvert: () => layer3Reset.reset(),
@@ -501,7 +504,7 @@ describe('Integration: Prestige Tree layer chain', () => {
         outputs: {
           gain: {
             resource: gain,
-            amount: ({ base }) => Decimal.mul(createSqrtFormula(10)(base), 3),
+            amount: ({ base }) => Decimal.mul(integerRoot(Decimal.div(base, 10), 2), 3),
           },
         },
       });
