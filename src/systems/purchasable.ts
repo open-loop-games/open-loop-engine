@@ -583,7 +583,10 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
         toPurchase = 1;
       }
 
-      if (Decimal.lte(toPurchase, 0)) return Decimal.dZero;
+      // `!gt(0)` rather than `lte(0)`: this guard fronts `payRequirements`, so
+      // admitting an indeterminate count would spend before the count could be
+      // rejected downstream. `lte` admits NaN, `gt` rejects it.
+      if (!Decimal.gt(toPurchase, 0)) return Decimal.dZero;
 
       payRequirements(allRequirements, toPurchase);
       amount.value = Decimal.add(amount.value, toPurchase);

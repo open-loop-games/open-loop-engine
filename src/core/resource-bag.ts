@@ -269,7 +269,10 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       } else {
         // destroy: add up to remaining
         const actualAdd = toDecimal(Decimal.min(toAdd, remaining));
-        if (actualAdd.lte(0)) return Decimal.dZero;
+        // `!gt(0)` rather than `lte(0)`: this guard fronts a write that also
+        // folds into `cachedTotal`, and a NaN there would never wash out.
+        // `lte` admits NaN, `gt` rejects it.
+        if (!actualAdd.gt(0)) return Decimal.dZero;
         writeAmount(typeId, toDecimal(Decimal.add(getAmount(typeId), actualAdd)));
         return actualAdd;
       }
@@ -431,7 +434,7 @@ export function transferBetweenBags(
   const available = from.get(typeId);
   const canTake = toDecimal(Decimal.min(toTransfer, available));
 
-  if (canTake.lte(0)) return Decimal.dZero;
+  if (!canTake.gt(0)) return Decimal.dZero;
 
   const added = to.add(typeId, canTake);
   if (added.gt(0)) {

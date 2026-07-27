@@ -63,6 +63,106 @@ describe('Decimal static fast-path chain contract', () => {
   });
 });
 
+describe('ordering against NaN', () => {
+  // break_eternity derives gte/lte/max/min from a strict comparison in a form
+  // that assumes trichotomy, so each inverts against NaN: `gte` and `lte` answer
+  // `true`, and `max`/`min` swallow a right-hand NaN. A guard asking "have we
+  // already arrived?" then claims the domain floor as its answer. Corrected in
+  // `primitives/decimal.ts` § ORDERING CORRECTIONS; these are the gate.
+  const NAN = bn(NaN);
+  const FIVE = bn(5);
+
+  it('gte/lte are false against NaN in either operand position', () => {
+    for (const [a, b] of [
+      [NAN, FIVE],
+      [FIVE, NAN],
+      [NAN, NAN],
+    ] as const) {
+      expect(Decimal.gte(a, b)).toBe(false);
+      expect(Decimal.lte(a, b)).toBe(false);
+      expect(a.gte(b)).toBe(false);
+      expect(a.lte(b)).toBe(false);
+    }
+  });
+
+  it('gt/lt/eq were already correct and stay so', () => {
+    for (const [a, b] of [
+      [NAN, FIVE],
+      [FIVE, NAN],
+      [NAN, NAN],
+    ] as const) {
+      expect(Decimal.gt(a, b)).toBe(false);
+      expect(Decimal.lt(a, b)).toBe(false);
+      expect(Decimal.eq(a, b)).toBe(false);
+    }
+  });
+
+  it('the number-space fast path and the Decimal slow path agree', () => {
+    // The fast path uses native operators, which are correctly false against
+    // NaN, while the slow path was not — so the same call answered differently
+    // depending only on whether its operands happened to be boxed. This asserts
+    // the two can never drift apart again.
+    expect(Decimal.gte(NaN, 5)).toBe(Decimal.gte(NAN, FIVE));
+    expect(Decimal.lte(NaN, 5)).toBe(Decimal.lte(NAN, FIVE));
+    expect(Decimal.gte(5, NaN)).toBe(Decimal.gte(FIVE, NAN));
+    expect(Decimal.lte(5, NaN)).toBe(Decimal.lte(FIVE, NAN));
+    expect(Decimal.max(NaN, 5).isNan()).toBe(Decimal.max(NAN, FIVE).isNan());
+    expect(Decimal.min(5, NaN).isNan()).toBe(Decimal.min(FIVE, NAN).isNan());
+  });
+
+  it('max/min propagate NaN rather than swallowing it', () => {
+    expect(Decimal.max(NAN, FIVE).isNan()).toBe(true);
+    expect(Decimal.max(FIVE, NAN).isNan()).toBe(true);
+    expect(Decimal.min(NAN, FIVE).isNan()).toBe(true);
+    expect(Decimal.min(FIVE, NAN).isNan()).toBe(true);
+    expect(FIVE.max(NAN).isNan()).toBe(true);
+    expect(FIVE.min(NAN).isNan()).toBe(true);
+  });
+
+  it('the clamp family inherits the correction', () => {
+    // clamp/clampMin/clampMax are defined in terms of max/min upstream.
+    expect(NAN.clamp(0, 10).isNan()).toBe(true);
+    expect(NAN.clampMin(0).isNan()).toBe(true);
+    expect(NAN.clampMax(10).isNan()).toBe(true);
+    expect(FIVE.clampMin(NAN).isNan()).toBe(true);
+    expect(FIVE.clampMax(NAN).isNan()).toBe(true);
+  });
+
+  it('gte/lte must not be rebuilt from cmp — cmp calls NaN equal', () => {
+    // `cmp` is asymmetric: NaN on the right reports 0 ("equal"), so the one-call
+    // form `cmp(v) >= 0` would reintroduce the bug that the two assertions below
+    // exist to prevent. Pins the trap, not just the symptom.
+    expect(FIVE.cmp(NAN)).toBe(0);
+    expect(FIVE.gte(NAN)).toBe(false);
+    expect(FIVE.lte(NAN)).toBe(false);
+  });
+
+  it('ordering on defined values is unchanged, including above layer 0', () => {
+    expect(Decimal.gte(5, 5)).toBe(true);
+    expect(Decimal.lte(5, 5)).toBe(true);
+    expect(Decimal.gte(5, 3)).toBe(true);
+    expect(Decimal.lte(5, 3)).toBe(false);
+    expect(Decimal.max(5, 3).toNumber()).toBe(5);
+    expect(Decimal.min(5, 3).toNumber()).toBe(3);
+    expect(bn(Infinity).gte(FIVE)).toBe(true);
+    expect(bn(-Infinity).lte(FIVE)).toBe(true);
+    const tet = bn(10).tetrate(4);
+    expect(tet.gte(tet)).toBe(true);
+    expect(tet.lte(tet)).toBe(true);
+    expect(tet.gte(bn('1e1000'))).toBe(true);
+  });
+
+  it('an undefined chain no longer reads as "already arrived"', () => {
+    // The route in: `recip(0)` is NaN rather than Infinity, so an ordinary chain
+    // reaches an undefined value without doing anything exotic. Before the
+    // correction, comparing it against a threshold answered `true`.
+    const undefinedValue = bn(0).recip();
+    expect(undefinedValue.isNan()).toBe(true);
+    expect(Decimal.gte(bn(1000), undefinedValue)).toBe(false);
+    expect(Decimal.gte(undefinedValue, bn(1000))).toBe(false);
+  });
+});
+
 describe('integerRoot', () => {
   it('recovers perfect cubes that a raw floor drops', () => {
     // Decimal.root(x, 3) = pow(x, 1/3) lands a hair under exact cubes, so

@@ -1159,6 +1159,18 @@ describe('Buy Max', () => {
       const formula = Formula.abs(variable);
       expect(() => calculateCost(formula, 5, false, 0)).toLogError();
     });
+    test('A cost curve that evaluates to NaN affords nothing', () => {
+      // `maxBulkAmount === 1` short-circuits to `gte(resource, evaluate())`.
+      // break_eternity's `gte` answered `true` against NaN, so an undefined cost
+      // — `recip(0)` is NaN rather than Infinity — read as affordable and handed
+      // out a free level. Corrected in `primitives/decimal.ts`; gated here
+      // because this is the default single-buy path every purchasable takes.
+      const variable = Formula.variable(0);
+      const formula = Formula.recip(variable);
+      expect(new Decimal(formula.evaluate()).isNan()).toBe(true);
+      const maxAffordable = calculateMaxAffordable(formula, resource, false, undefined, 1);
+      expect(maxAffordable.value).compare_tolerance(0);
+    });
     test('Calculates max affordable and cost correctly', () => {
       const variable = Formula.variable(0);
       const formula = Formula.pow(1.05, variable).times(100);

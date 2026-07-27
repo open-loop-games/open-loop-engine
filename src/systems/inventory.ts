@@ -172,7 +172,7 @@ export function createInventory(options: InventoryOptions): Inventory {
         return bag.add(itemId, toAdd);
       } else {
         const actual = Decimal.min(toAdd, room);
-        if (Decimal.lte(actual, 0)) return Decimal.dZero;
+        if (!Decimal.gt(actual, 0)) return Decimal.dZero;
         return bag.add(itemId, actual);
       }
     },
@@ -218,10 +218,13 @@ export function createInventory(options: InventoryOptions): Inventory {
     },
 
     isFull(itemId?: string): boolean {
+      // `!gt(0)` keeps an indeterminate remaining capacity reading as *full*,
+      // which is the direction that refuses the add rather than admitting one
+      // it can't size.
       if (itemId != null) {
-        return remainingForItem(itemId).lte(0);
+        return !remainingForItem(itemId).gt(0);
       }
-      return bag.remainingCapacity().lte(0);
+      return !bag.remainingCapacity().gt(0);
     },
 
     serialize(): Record<string, string> {

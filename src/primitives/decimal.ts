@@ -17,6 +17,11 @@
  *
  * Predicates (eq/gt/gte/lt/lte) stay boolean-returning — no promotion needed,
  * no chain form to preserve.
+ *
+ * Four prototype methods are additionally *corrected* rather than accelerated —
+ * `gte`, `lte`, `max`, `min` — because break_eternity derives each from a strict
+ * comparison in a way that only holds under trichotomy, and NaN breaks it. See
+ * the ORDERING CORRECTIONS section below.
  */
 
 import OrigDecimal from 'break_eternity.js';
@@ -76,6 +81,58 @@ export function toFinalDecimal(x: DecimalSource): Decimal {
   return x instanceof OrigDecimal ? x : new OrigDecimal(x);
 }
 
+// === ORDERING CORRECTIONS ===
+
+// break_eternity derives four ordering methods from a strict comparison, each in
+// a form that silently assumes trichotomy — that exactly one of `<`, `=`, `>`
+// holds. NaN satisfies none of them, so every derivation inverts:
+//
+//   gte(v) { return !this.lt(v); }              NaN >= 5  ->  true
+//   lte(v) { return !this.gt(v); }              NaN <= 5  ->  true
+//   max(v) { return this.lt(v) ? v : this; }    5.max(NaN) -> 5   (NaN swallowed)
+//   min(v) { return this.gt(v) ? v : this; }    5.min(NaN) -> 5
+//
+// The consequence is a guard that reads "have we already arrived?" as `true`
+// against an undefined value, and answers with the domain floor — silent,
+// plausible, and wrong. `recip(0)` is NaN rather than Infinity in this library,
+// so an ordinary chain reaches it without doing anything exotic.
+//
+// `lt`, `gt`, and `eq` need no correction: the first two test `cmp` against an
+// exact value (`=== -1` / `=== 1`) and `eq` compares sign/layer/mag with `===`,
+// so all three are already false against NaN in either operand position.
+//
+// INVARIANT: `gte`/`lte` must be built from `gt`/`lt`/`eq`, never from `cmp`
+// directly. `Decimal(5).cmp(NaN)` is `0` — cmp reports NaN as *equal* when it is
+// the right-hand operand — so the tempting one-call form `cmp(v) >= 0`
+// reintroduces exactly this bug. Do not "simplify" these back to `!lt` / `!gt`.
+//
+// Patched on the prototype, not just the statics: 25 of the engine's 64 ordering
+// callsites use the instance form, and the statics delegate down here anyway.
+// break_eternity's own internals (tetrate/slog/lambertw) route through these too
+// and are covered by the suite.
+OrigDecimal.prototype.gte = function gte(this: Decimal, value: DecimalSource): boolean {
+  return this.gt(value) || this.eq(value);
+};
+
+OrigDecimal.prototype.lte = function lte(this: Decimal, value: DecimalSource): boolean {
+  return this.lt(value) || this.eq(value);
+};
+
+// `max`/`min` propagate NaN in both operand positions, matching `Math.max`/`Math.min`.
+// `clamp`, `clampMin`, and `clampMax` are defined in terms of these upstream, so
+// all five become NaN-correct together.
+OrigDecimal.prototype.max = function max(this: Decimal, value: DecimalSource): Decimal {
+  const decimal = new OrigDecimal(value);
+  if (this.isNan() || decimal.isNan()) return new OrigDecimal(OrigDecimal.dNaN);
+  return this.lt(decimal) ? new OrigDecimal(decimal) : new OrigDecimal(this);
+};
+
+OrigDecimal.prototype.min = function min(this: Decimal, value: DecimalSource): Decimal {
+  const decimal = new OrigDecimal(value);
+  if (this.isNan() || decimal.isNan()) return new OrigDecimal(OrigDecimal.dNaN);
+  return this.gt(decimal) ? new OrigDecimal(decimal) : new OrigDecimal(this);
+};
+
 const origAdd = OrigDecimal.add;
 const origSub = OrigDecimal.sub;
 const origMul = OrigDecimal.mul;
@@ -127,13 +184,24 @@ OrigDecimal.div = function div(a: DecimalSource, b: DecimalSource): Decimal {
   return origDiv(a, b);
 };
 
+// The `a < b ? a : b` form has the same trichotomy assumption the prototype
+// methods did — a NaN operand fails the test and the *other* operand is returned,
+// swallowing it. Testing `a <= b` instead of `a < b` would not help; NaN must be
+// checked for. Native `<` is correctly false against NaN, so `!(a >= b) && !(a < b)`
+// would also work, but the explicit test says what it means.
 OrigDecimal.min = function min(a: DecimalSource, b: DecimalSource): Decimal {
-  if (typeof a === 'number' && typeof b === 'number') return new OrigDecimal(a < b ? a : b);
+  if (typeof a === 'number' && typeof b === 'number') {
+    if (Number.isNaN(a) || Number.isNaN(b)) return new OrigDecimal(OrigDecimal.dNaN);
+    return new OrigDecimal(a < b ? a : b);
+  }
   return origMin(a, b);
 };
 
 OrigDecimal.max = function max(a: DecimalSource, b: DecimalSource): Decimal {
-  if (typeof a === 'number' && typeof b === 'number') return new OrigDecimal(a > b ? a : b);
+  if (typeof a === 'number' && typeof b === 'number') {
+    if (Number.isNaN(a) || Number.isNaN(b)) return new OrigDecimal(OrigDecimal.dNaN);
+    return new OrigDecimal(a > b ? a : b);
+  }
   return origMax(a, b);
 };
 

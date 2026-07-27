@@ -109,6 +109,10 @@ export function timeUntilResource(
   }
   const distance = Decimal.sub(targetDec, current);
   const seconds = toNumber(Decimal.div(distance, rate));
+  // An undefined amount or rate makes the distance indeterminate, not zero.
+  // `computed` promises a real `seconds`, so the indeterminate case takes the
+  // arm that already exists for it.
+  if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
   return { seconds, reason: 'computed' };
 }
 
@@ -193,6 +197,7 @@ function timeUntilResourceFlip(
   const distance = needsUp ? Decimal.sub(targetDec, current) : Decimal.sub(current, targetDec);
   const absRate = needsUp ? rate : Decimal.neg(rate);
   const seconds = toNumber(Decimal.div(distance, absRate));
+  if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
   return { seconds: Math.max(0, seconds), reason: 'computed' };
 }
 

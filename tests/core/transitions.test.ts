@@ -71,6 +71,29 @@ describe('timeUntilResource', () => {
     expect(d.seconds).toBeNull();
     expect(d.reason).toBe('no-rate');
   });
+
+  it('reports uncomputable rather than 0 when the amount is undefined', () => {
+    // An undefined amount used to satisfy the `gte(current, target)` guard and
+    // answer "you already have it". It is now indeterminate, which is what the
+    // `uncomputable` arm is for — `computed` promises a real `seconds`.
+    const d = timeUntilResource(
+      'gold',
+      100,
+      mockAccessor({ resources: { gold: NaN }, rates: { gold: 5 } }),
+    );
+    expect(d.seconds).toBeNull();
+    expect(d.reason).toBe('uncomputable');
+  });
+
+  it('reports uncomputable when the rate is undefined', () => {
+    const d = timeUntilResource(
+      'gold',
+      100,
+      mockAccessor({ resources: { gold: 40 }, rates: { gold: NaN } }),
+    );
+    expect(d.seconds).toBeNull();
+    expect(d.reason).toBe('uncomputable');
+  });
 });
 
 describe('timeUntilAffordable', () => {
