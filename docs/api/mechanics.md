@@ -12,14 +12,6 @@ Start with these public symbols before scanning the full inventory below.
 - `Gate` / `E` — declarative predicates and effects when save/mod/sim data needs serializable shape.
 - `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.
 
-## Closed-form beat-timing math
-
-computes the `T(n) = Cost(n) / Production(n)` snapshot used by balance/devtools to label arbitrary (cost, rate, level) samples without booting a live engine
-
-- `interface BeatTimingParams` — Parameters for calculateBeatTiming. `src/core/beat-timing.ts:20`
-- `function calculateBeatTiming(params: BeatTimingParams): Decimal` — Closed-form beat timing: time (in seconds) to afford the next purchase at level `n`, given a fully-stacked per-unit production rate. `src/core/beat-timing.ts:61`
-- `type CostScalingType = 'exponential' | 'linear' | 'polynomial'` — Cost scaling family for calculateBeatTiming. `src/core/beat-timing.ts:17`
-
 ## Common
 
 shared generic type utilities and dev-mode helpers

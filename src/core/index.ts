@@ -127,9 +127,6 @@ export {
 // === FORMULAS ===
 export * from './formulas';
 
-// === BEAT TIMING ===
-export * from './beat-timing';
-
 // === EFFECTS ===
 // ICondition + C and ConditionalEffect + IEffectInternal are engine-internal
 // IR — imported via `@/core/conditions` / `@/primitives/types` from tests and

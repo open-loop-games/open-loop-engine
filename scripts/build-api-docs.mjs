@@ -372,7 +372,6 @@ function renderIndex(byCluster) {
     '- **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide.md#choosing-among-purchasable-primitives',
     '- **inversion-driven affordability** — `calculateMaxAffordable`, `InvertibleFormula` → mechanics.md#formulas',
     '- **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel',
-    '- **closed-form beat timing** — `calculateBeatTiming`, `T(n) = Cost(n) / Production(n)` snapshot for balance/devtools → mechanics.md#beat-timing',
     '- **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second',

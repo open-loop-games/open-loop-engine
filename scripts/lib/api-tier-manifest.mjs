@@ -39,7 +39,6 @@ export const TIER_MANIFEST = [
       '`createTimedProgress` — tick-driven progress for actions, workers, and staged costs.',
     ],
     clusters: [
-      'beat-timing',
       'common',
       'computed',
       'effects',

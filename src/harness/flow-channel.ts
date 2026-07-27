@@ -15,8 +15,9 @@
  * - **frustration** `[900, 3600)` — high disengagement
  * - **breakdown** `[3600, ∞)` — player abandonment likely
  *
- * Consumed alongside `calculateBeatTiming` (mechanics tier) — the math is
- * pure algebra; this file is the theory layer over it.
+ * Consumed alongside a beat-time quotient — a cost `Formula` in level over
+ * a production rate. The algebra is the mechanics tier's; this file is the
+ * theory layer over it.
  */
 
 /**

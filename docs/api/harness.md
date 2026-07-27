@@ -27,9 +27,9 @@ Reusable in-run trackers (resource peaks, loop finalize, default pack).
 
 maps beat duration to Csikszentmihalyi's Flow Theory engagement bands. Opinionated balance-tooling surface: lives in harness because the bands encode player-engagement theory, which the mechanics-tier kernel deliberately avoids
 
-- `function classifyFlowChannel(beatTimeSeconds: number): FlowChannel` — Classify a beat duration (in seconds) into its flow channel. `src/harness/flow-channel.ts:51`
-- `type FlowChannel = 'arousal' | 'flow' | 'flow-upper' | 'boredom' | 'frustration' | 'breakdown'` — Flow-channel classification based on Csikszentmihalyi's Flow Theory (1990). `src/harness/flow-channel.ts:26`
-- `function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]>` — Get flow-channel threshold boundaries as `[min, max)` pairs in seconds. `src/harness/flow-channel.ts:67`
+- `function classifyFlowChannel(beatTimeSeconds: number): FlowChannel` — Classify a beat duration (in seconds) into its flow channel. `src/harness/flow-channel.ts:52`
+- `type FlowChannel = 'arousal' | 'flow' | 'flow-upper' | 'boredom' | 'frustration' | 'breakdown'` — Flow-channel classification based on Csikszentmihalyi's Flow Theory (1990). `src/harness/flow-channel.ts:27`
+- `function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]>` — Get flow-channel threshold boundaries as `[min, max)` pairs in seconds. `src/harness/flow-channel.ts:68`
 
 ## Headless runner
 
