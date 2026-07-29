@@ -388,9 +388,19 @@ export interface BindOptions {
   /**
    * Override the auto-derived binding id. Normally omitted — the id is
    * derived from the ambient persistent context (`getCurrentFullContext`)
-   * and the modifier's description text, producing `{scope}/{text}`.
+   * and the attribution text, producing `{scope}/{text}`.
    */
   id?: string;
+  /**
+   * Stable attribution text for id derivation (`{scope}/{text}`). When
+   * omitted (and no explicit `id`), bind falls back to invoking the
+   * modifier's `description` getter — which for factory modifiers formats
+   * the *current value*, forcing the value getter's first evaluation at
+   * bind time. A value getter whose first run reads zero reactive deps
+   * (e.g. a lookup that misses because its target registers later) freezes
+   * its computed permanently, so pass this whenever the text is known.
+   */
+  description?: string;
   /** Free-form attribution tags surfaced through {@link ModifierChain.bindings}. */
   tags?: readonly string[];
 }
@@ -485,10 +495,12 @@ export interface ModifierChain extends Modifier {
    * balance-sim, devtools, and modifier inspectors walk
    * {@link bindings} to attribute each chain contribution to its source.
    *
-   * Auto-id format: `{scope}/{modifier.description.text}` where `scope`
-   * comes from the ambient persistent context. Outside any context, emits
-   * a warning and uses just the description text as the id. Duplicate ids
-   * within one chain throw — override via `opts.id` when intentional.
+   * Auto-id format: `{scope}/{text}` where `scope` comes from the ambient
+   * persistent context and `text` is `opts.description` when given, else
+   * the modifier's own description text (invoking its getter — prefer
+   * passing `opts.description`, see {@link BindOptions}). Outside any
+   * context, emits a warning and uses just the text as the id. Duplicate
+   * ids within one chain throw — override via `opts.id` when intentional.
    *
    * @returns A function that removes the binding (modifier + attribution record) from the chain.
    */
@@ -633,11 +645,14 @@ export function createModifierChain(id: string): ModifierChain {
         modifier = { ...rawModifier, enabled: composedEnabled };
       }
 
-      // Resolve id — explicit override wins, otherwise derive from scope + description.
+      // Resolve id — explicit override wins, then explicit attribution text,
+      // then (fallback) the modifier's own description getter. The fallback
+      // *invokes* that getter, which for factory modifiers evaluates the
+      // underlying value — see BindOptions.description for the freeze hazard.
       const scope = getCurrentFullContext();
       let bindingId = opts.id;
       if (bindingId == null) {
-        const descText = resolveDescriptionText(modifier);
+        const descText = opts.description ?? resolveDescriptionText(modifier);
         if (descText == null) {
           throw new Error(
             `chain.bind on "${chain.id}": cannot auto-derive binding id — modifier has ` +

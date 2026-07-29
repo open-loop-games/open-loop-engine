@@ -13,7 +13,7 @@
  * loop integration) and not part of the public surface.
  */
 
-import { computed, unref, type ComputedRef, type MaybeRef } from 'vue';
+import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import type { DecimalSource } from '@/primitives/decimal';
 import {
   withPersistentContext,
@@ -174,6 +174,12 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
 
   const registry = createContentRegistry<Def>(categoryId);
   const entries = new Map<string, CategoryEntry<Def, Instance, State>>();
+  // Registration-reactive read barrier for the plain Map: accessors read this
+  // ref so a computed whose first evaluation misses the map (e.g. a grants
+  // getter reading back through the category before its entry lands) tracks a
+  // dependency and re-evaluates after registration. Without it, a zero-dep
+  // first run freezes the computed at its fallback permanently.
+  const entriesVersion = ref(0);
 
   function registerOne(def: Def): void {
     // withPersistentContext guarantees the context is popped even if a builder
@@ -199,6 +205,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     });
 
     entries.set(def.id, { def, instance, state, signals });
+    entriesVersion.value++;
   }
 
   return {
@@ -220,14 +227,17 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     },
 
     getEntry(id: string): CategoryEntry<Def, Instance, State> | undefined {
+      void entriesVersion.value;
       return entries.get(id);
     },
 
     getAll(): CategoryEntry<Def, Instance, State>[] {
+      void entriesVersion.value;
       return Array.from(entries.values());
     },
 
     get size(): number {
+      void entriesVersion.value;
       return entries.size;
     },
 
@@ -275,7 +285,14 @@ export function setupDeclarativeBindings(
             return computed(() => unref(active) !== false && unref(when) !== false);
           })();
     const modifier = buildGrantModifier(grant);
-    for (const chain of chains) chain.bind({ active: composedActive, modifier });
+    // Pass the grant's stable text so bind derives its attribution id without
+    // invoking the modifier's description getter — that getter formats the
+    // current value, and forcing a value getter's first evaluation here (before
+    // the entry is in the category map) freezes self-referential lookups at
+    // their fallback. Escape-hatch grants without a description still fall back
+    // to the getter inside bind.
+    for (const chain of chains)
+      chain.bind({ active: composedActive, modifier, description: grant.description });
   }
 }
 
