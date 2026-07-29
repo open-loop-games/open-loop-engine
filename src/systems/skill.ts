@@ -176,7 +176,11 @@ export interface LevelDrivenSkill extends SkillBase {
 
 /** Accumulator skill — modifier = 1 + permanentBonus */
 export interface AccumulatorSkill extends SkillBase {
-  /** Permanent bonus — survives forever, not included in any reset scope */
+  /**
+   * Permanent bonus — tagged `lifetime`, so module-scoped resets
+   * (`resetModules`) skip it. To wipe it in a hard reset, pass it through
+   * `thingsToReset` explicitly.
+   */
   readonly permanentBonus: Persistent<DecimalSource>;
   /**
    * The built retention formula, bound to `level`. `accumulateBonus()` adds
@@ -227,7 +231,9 @@ function buildSkillState(
   const ctxId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
   return withPersistentContext(ctxId, () => ({
     xp: persistent<DecimalSource>(0, { name: 'xp' }),
-    permanentBonus: isLevelDriven ? null : persistent<DecimalSource>(0, { name: 'permanentBonus' }),
+    permanentBonus: isLevelDriven
+      ? null
+      : persistent<DecimalSource>(0, { name: 'permanentBonus', lifetime: true }),
   }));
 }
 

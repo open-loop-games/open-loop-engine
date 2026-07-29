@@ -5,6 +5,7 @@ import { createResource, addResource } from '@/core/resource';
 import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
 import { createReset, createResetTimer } from '@/systems/reset';
 import { Resettable } from '@/systems/resettable';
+import { createSkill } from '@/systems/skill';
 import { createSkillCategory } from '@/systems/skill-category';
 import Formula from '@/core/formulas/formulas';
 import { fractional } from '@/systems/retention';
@@ -155,6 +156,27 @@ describe('Reset with resetModules', () => {
     expect(gold.value).toBe(0);
     expect(skillXp.value).toBe(0);
     expect(warriorLevel.value).toBe(1);
+  });
+
+  it('skips accumulator permanentBonus (lifetime) while wiping xp', () => {
+    beginPersistentContext('rm-permbonus');
+    const mastery = createSkill({
+      id: 'mastery',
+      xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
+      retentionFormula: (level) => Formula.variable(level).mul(0.01),
+    });
+    endPersistentContext();
+
+    mastery.xp.value = new Decimal(5000);
+    mastery.accumulateBonus();
+    const bonusBefore = new Decimal(mastery.permanentBonus.value);
+    expect(bonusBefore.gt(0)).toBe(true);
+
+    const reset = createReset({ resetModules: ['rm-permbonus'] });
+    reset.reset();
+
+    expect(new Decimal(mastery.xp.value).eq(0)).toBe(true);
+    expect(new Decimal(mastery.permanentBonus.value).eq(bonusBefore)).toBe(true);
   });
 
   it('clones non-primitive defaults so in-place mutation does not corrupt them', () => {
