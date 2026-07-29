@@ -129,7 +129,11 @@ export interface PhaseHooks {
   onTick?: (dt: number) => void;
 }
 
-/** Tick-handler signature for `tickDriver.onTick`: receives the elapsed dt in seconds. */
+/**
+ * Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real
+ * (speed-scaled, capped) elapsed time in variable mode, always `stepSize` in
+ * fixed mode.
+ */
 export type TickCallback = (dt: number) => void;
 
 /**

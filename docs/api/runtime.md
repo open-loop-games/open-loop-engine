@@ -17,7 +17,7 @@ Start with these public symbols before scanning the full inventory below.
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:389`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:394`
 - `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:299`
 - `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:219`
 - `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:111`
@@ -65,10 +65,10 @@ Typed per-instance event emitter primitive
 
 worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
 
-- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:229`
+- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:233`
 - `interface PhaseHooks` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:126`
-- `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: receives the elapsed dt in seconds. `src/core/tick-driver.ts:133`
-- `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:141`
+- `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real (speed-scaled, capped) elapsed time in variable mode, always `stepSize` in fixed mode. `src/core/tick-driver.ts:137`
+- `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:145`
 - `interface TickDriverConfig` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:62`
 - `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:52`
 

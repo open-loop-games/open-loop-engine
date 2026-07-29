@@ -218,6 +218,8 @@ A custom-predicate Gate kind carrying a closure is deliberately *not* part of th
 
 ## Persistence
 
+`engine.start()` does not load the save. Call `engine.load()` explicitly after `start()` — modules must install first so their persistent refs exist to hydrate. A game bootstrap is `use(...)` → `start()` → `load()`.
+
 ### Persistent context
 
 All engine state that survives save/load must be created inside a persistent context. `withPersistentContext` runs a block inside the context and guarantees the context closes even if the block throws — return whatever refs the caller needs and destructure on the outside:
@@ -241,7 +243,7 @@ const prestigeReset = createReset({
 });
 ```
 
-So adding a resource, upgrade, producer, or category entry inside a module scope automatically joins resets that reference that module — no cross-file coordination. Lifetime refs (`resource.cumulative`, `resource.best`) are skipped by default; pass them through `thingsToReset` only for hard resets meant to wipe lifetime stats.
+So adding a resource, upgrade, producer, or category entry inside a module scope automatically joins resets that reference that module — no cross-file coordination. Lifetime refs (`resource.cumulative`, `resource.best`, accumulator-skill `permanentBonus`) are skipped by default; pass them through `thingsToReset` only for hard resets meant to wipe lifetime stats. Per-run skill state (`skill.xp`) is *not* lifetime — a looper's between-run reset over a skill-category module wipes xp and keeps the permanent bonus, which is the intended loop shape.
 
 Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved scope, evaluated at reset time. Refs in `keep` survive verbatim; refs in `retain` are snapshot before the wipe, run through the supplied transform, and written back after:
 

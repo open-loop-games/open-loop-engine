@@ -186,12 +186,17 @@ function formatSignature(rec) {
  * body. See {@link formatSignature}.
  */
 function renderSymbol(rec) {
+  const loc = rec.line ? `${rec.sourcePath}:${rec.line}` : rec.sourcePath
+  // Overload continuations without their own TSDoc lean on the set's lead
+  // declaration — render signature + source line only, no coverage marker.
+  if (!rec.tsdocSummary && rec.overloadIndex > 0) {
+    return `- \`${formatSignature(rec)}\` \`${loc}\``
+  }
   const summary = rec.tsdocSummary
     ? rec.tsdocSummary.endsWith('.')
       ? rec.tsdocSummary
       : `${rec.tsdocSummary}.`
     : '_(no summary)_'
-  const loc = rec.line ? `${rec.sourcePath}:${rec.line}` : rec.sourcePath
   return `- \`${formatSignature(rec)}\` — ${summary} \`${loc}\``
 }
 
@@ -297,7 +302,7 @@ function renderIndex(byCluster) {
     '- **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category',
     '- **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.',
     '- **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine\'s `TickDriver` (tick scheduler).',
-    '- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side.',
+    '- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side. Per-item repeat counts ("run this item N times") are also consumer-side: expand at enqueue or count in item metadata — `repeat()` re-dispatches the current item once, without advancing.',
     '- **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress',
     '- **TimeSystem vs TimeBank** — `createTimeSystem` is the play-clock (how long has the player played); `createTimeBank` is a spendable reservoir of banked seconds (offline banking, bonus time). → runtime.md#time-tracking, lifecycle.md#time-bank',
     '- **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system\'s internal play-time counter. Only the TickDriver one accelerates the game. `createBankedAcceleration` drives the TickDriver one.',
@@ -306,6 +311,8 @@ function renderIndex(byCluster) {
     '## Task → tier',
     '',
     'Common consumer tasks resolved to their starting tier. Land in the tier file and follow its `##` sections to the cluster.',
+    '',
+    'Deliberately absent: real-time entity combat (positioning, collision, frame-level action resolution). The engine is a headless incremental substrate — combat resolution stays consumer-side; spatial.md covers only adjacency and traversal.',
     '',
     '| Task | Starting tier |',
     '| --- | --- |',
@@ -380,6 +387,7 @@ function renderIndex(byCluster) {
     '- **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop',
     '- **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names',
     '- **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation',
+    '- **spatial agent steering** — steer an agent over a map: influence layers supply per-cell field values, the goal picker scores and ranks candidates built from them → spatial.md#influence-layer, advisors.md#goal-picker',
     '',
     '## Common disambiguators',
     '',
@@ -520,7 +528,8 @@ for (const tier of TIER_MANIFEST) {
 writeFileSync(join(API_DIR, 'INDEX.md'), renderIndex(byCluster))
 
 // Coverage report — `records` is already filtered to public symbols above.
-const missingSummary = records.filter((r) => !r.tsdocSummary)
+// Overload continuations may lean on their lead declaration's doc.
+const missingSummary = records.filter((r) => !r.tsdocSummary && !(r.overloadIndex > 0))
 const missingLine = records.filter((r) => r.line == null)
 
 console.log(

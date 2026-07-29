@@ -298,6 +298,11 @@ export interface EngineConfig {
  */
 export interface Engine {
   use(module: EngineModule): Engine;
+  /**
+   * Install registered modules and begin ticking. Does not load a save —
+   * call `load()` explicitly after `start()` (modules must install first so
+   * their persistent refs exist to hydrate).
+   */
   start(): void;
   stop(): void;
   /**

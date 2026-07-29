@@ -57,6 +57,7 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:85`
 - `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:80`
 - `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true, directSum?: number): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1491`
+- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean, directSum?: number): DecimalSource` `src/core/formulas/formulas.ts:1497`
 - `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, directSum?: Computable<number>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Calculate the maximum number of purchases affordable with the current resource amount. `src/core/formulas/formulas.ts:1293`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:77`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:44`
@@ -118,24 +119,24 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 composable value calculation chains
 
 - `interface AdditiveModifierOptions` — Options for createAdditiveModifier. `src/core/modifier.ts:64`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:749`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:763`
-- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:412`
-- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:374`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:802`
-- `function createAdditiveModifier<T extends AdditiveModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that adds a value to the input. `src/core/modifier.ts:90`
-- `function createExponentialModifier<T extends ExponentialModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that raises the input to a power. `src/core/modifier.ts:222`
-- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:574`
-- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:159`
-- `function createSequentialModifier<T extends Modifier, S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }>(modifiers: T[]): S` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:305`
-- `interface ExponentialModifierOptions` — Options for createExponentialModifier. `src/core/modifier.ts:190`
-- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:440`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:776`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:762`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:776`
+- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:424`
+- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:386`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:815`
+- `function createAdditiveModifier<T extends AdditiveModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that adds a value to the input. `src/core/modifier.ts:94`
+- `function createExponentialModifier<T extends ExponentialModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that raises the input to a power. `src/core/modifier.ts:234`
+- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:587`
+- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:167`
+- `function createSequentialModifier<T extends Modifier, S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }>(modifiers: T[]): S` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:317`
+- `interface ExponentialModifierOptions` — Options for createExponentialModifier. `src/core/modifier.ts:198`
+- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:452`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:789`
 - `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:32`
-- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:481`
-- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:361`
+- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:493`
+- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:373`
 - `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:44`
-- `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:121`
+- `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:125`
 - `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:56`
 
 ## Requirements

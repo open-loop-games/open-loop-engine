@@ -98,7 +98,7 @@ function readFileLines(absPath) {
  * `class` | `abstract-class` | `enum`). `projectRoot` overrides the default
  * repo root for tests / alternative project layouts.
  */
-export function findDeclarationLine(sourcePath, symbolName, kind, projectRoot = ROOT) {
+export function findDeclarationLine(sourcePath, symbolName, kind, projectRoot = ROOT, occurrence = 1) {
   if (!sourcePath) return null
   const abs = join(projectRoot, sourcePath)
   if (!existsSync(abs)) return null
@@ -112,8 +112,11 @@ export function findDeclarationLine(sourcePath, symbolName, kind, projectRoot = 
   const declRe = new RegExp(
     `^\\s*export\\s+(?:async\\s+|declare\\s+|default\\s+)?(?:${kindPattern})\\s+${symbolName}\\b`
   )
+  // `occurrence` selects the nth matching declaration — overload sets share a
+  // name, and source order matches `.d.ts` declaration order.
+  let remaining = occurrence
   for (let i = 0; i < lines.length; i++) {
-    if (declRe.test(lines[i])) return i + 1
+    if (declRe.test(lines[i]) && --remaining === 0) return i + 1
   }
   // Fallback: top-level non-export declaration that gets re-exported via an
   // `export { ... }` clause later in the file.

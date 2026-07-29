@@ -801,7 +801,9 @@ export function clearPersistentNamespace(namespace?: string): void {
 // === DEFINITION STATE MAPS ===
 
 /**
- * Create a Map of persistent state objects for an array of definitions.
+ * Create a Map of per-definition persistent state, where each `stateFactory`
+ * result must be an *object* of persistent refs (property keys become the
+ * stable save names).
  *
  * Wraps `beginPersistentContext`/`endPersistentContext` and iterates
  * definitions, calling `stateFactory` for each to build the state object.
@@ -809,7 +811,10 @@ export function clearPersistentNamespace(namespace?: string): void {
  *
  * @param contextId - Persistence context name (e.g. 'jobs', 'explorations')
  * @param definitions - Array of definition objects to create state for
- * @param stateFactory - Called once per definition, should return an object containing persistent refs
+ * @param stateFactory - Called once per definition. Must return an *object* whose
+ *   properties are the persistent refs — property keys become the stable save
+ *   names. Returning a bare `Persistent` loses stable naming (runtime console
+ *   warning only).
  * @param keyAccessor - Function to extract the map key from a definition (default: `def.id`)
  * @returns Map from key to state object
  *

@@ -122,8 +122,8 @@ function kindFromDeclaration(decl) {
 
 /**
  * Extract the first sentence of the symbol's TSDoc, stripped of `{@link}`
- * syntax and trailing markdown links. Looks at JSDoc on the declaration; for
- * function overloads, the first declaration's comment is canonical.
+ * syntax and trailing markdown links. Looks at JSDoc on the declaration;
+ * overload declarations each carry (or lack) their own comment.
  *
  * Returns the empty string when the symbol has no TSDoc summary — the docs
  * generator (OL-929) treats that as a coverage gap.
@@ -302,19 +302,37 @@ export function parseEntrypoint(rootDts, opts = {}) {
     const layer = layerFromSrcPath(srcPath)
     const header = getHeader(srcPath)
     const cluster = clusterFor(srcPath, header)
-    const line = findDeclarationLine(srcPath, name, kind, projectRoot)
 
-    records.push({
-      name,
-      kind,
-      signature: extractSignature(terminal),
-      tsdocSummary: extractTsdocSummary(terminal),
-      sourcePath: srcPath,
-      line,
-      layer,
-      cluster,
-      tag: hasInternalTag(terminal) ? 'internal' : 'public',
-    })
+    // Overloaded functions emit one record per overload declaration, so every
+    // shape is visible in the tier files. Only in-project same-file
+    // FunctionDeclaration sets qualify — external re-exports (Vue's `ref`,
+    // `watch`, …) and mixed declaration lists collapse to the terminal as
+    // before; their overload detail belongs to the upstream package.
+    const terminalFile = terminal.getSourceFile()
+    const overloadDecls =
+      kind === 'function' &&
+      symbol.declarations?.length > 1 &&
+      isInProject(terminalFile.fileName) &&
+      symbol.declarations.every(
+        (d) => ts.isFunctionDeclaration(d) && d.getSourceFile() === terminalFile
+      )
+        ? symbol.declarations
+        : [terminal]
+
+    for (const [i, decl] of overloadDecls.entries()) {
+      records.push({
+        name,
+        kind,
+        signature: extractSignature(decl),
+        tsdocSummary: extractTsdocSummary(decl),
+        sourcePath: srcPath,
+        line: findDeclarationLine(srcPath, name, kind, projectRoot, i + 1),
+        layer,
+        cluster,
+        tag: hasInternalTag(terminal) ? 'internal' : 'public',
+        ...(overloadDecls.length > 1 ? { overloadIndex: i } : {}),
+      })
+    }
   }
 
   records.sort((a, b) => {
@@ -350,7 +368,9 @@ if (isCLI) {
     if (r.tag === 'internal') internalCount++
     else publicCount++
     if (r.line == null) missingLine++
-    if (!r.tsdocSummary) missingSummary++
+    // Overload continuations may lean on the first declaration's doc — only
+    // the set's lead record counts toward summary coverage.
+    if (!r.tsdocSummary && !(r.overloadIndex > 0)) missingSummary++
   }
 
   console.log(`Parsed ${records.length} symbols from dist/index.d.ts`)

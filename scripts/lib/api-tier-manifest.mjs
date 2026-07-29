@@ -167,7 +167,7 @@ export const TIER_MANIFEST = [
     tier: 'advisors',
     title: 'Advisors',
     scope:
-      'Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.',
+      'Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share. Candidates are abstract — for map-based steering, build them from spatial.md influence-layer readings.',
     entrypoints: [
       '`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.',
       '`createGoalPicker` — pick weighted goals from a candidate pool.',
@@ -180,7 +180,7 @@ export const TIER_MANIFEST = [
     tier: 'spatial',
     title: 'Spatial',
     scope:
-      'Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal.',
+      'Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal. For steering an agent by these fields, rank candidates with advisors.md (goal picker / selection policies).',
     entrypoints: [
       '`createSpatialGrid` — bounded coordinate boards with adjacency, BFS, FOV adapter, and snapshots.',
       '`createSpatialGraph` — arbitrary node/edge topology with nested child graphs.',

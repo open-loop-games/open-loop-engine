@@ -64,7 +64,11 @@ export type OperationModifier<T> = WithRequired<
 export interface AdditiveModifierOptions {
   /** The amount to add. Can be a ref/getter for dynamic values (e.g., scaling with upgrades). */
   addend: Computable<DecimalSource>;
-  /** Label for the UI breakdown (e.g., "Upgrade bonus"). Can be a getter for dynamic text. */
+  /**
+   * Label for the UI breakdown (e.g., "Upgrade bonus"). Can be a getter for
+   * dynamic text. A plain string — the factory wraps it into the
+   * `ModifierDescription` shape that `Modifier.description` exposes.
+   */
   description?: MaybeGetter<string>;
   /** Reactive toggle. When `false`, this modifier is skipped entirely. Default: always enabled. */
   enabled?: Computable<boolean>;
@@ -121,7 +125,11 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions, S = Op
 export interface MultiplicativeModifierOptions {
   /** The factor to multiply by. Can be a ref/getter for dynamic values. */
   multiplier: Computable<DecimalSource>;
-  /** Label for the UI breakdown. Can be a getter for dynamic text. */
+  /**
+   * Label for the UI breakdown. Can be a getter for dynamic text. A plain
+   * string — the factory wraps it into the `ModifierDescription` shape that
+   * `Modifier.description` exposes.
+   */
   description?: MaybeGetter<string>;
   /** Reactive toggle. When `false`, this modifier is skipped. Default: always enabled. */
   enabled?: Computable<boolean>;
@@ -190,7 +198,11 @@ export function createMultiplicativeModifier<
 export interface ExponentialModifierOptions {
   /** The power to raise the input to. Can be a ref/getter for dynamic values. */
   exponent: Computable<DecimalSource>;
-  /** Label for the UI breakdown. Can be a getter for dynamic text. */
+  /**
+   * Label for the UI breakdown. Can be a getter for dynamic text. A plain
+   * string — the factory wraps it into the `ModifierDescription` shape that
+   * `Modifier.description` exposes.
+   */
   description?: MaybeGetter<string>;
   /** Reactive toggle. When `false`, this modifier is skipped. Default: always enabled. */
   enabled?: Computable<boolean>;
@@ -513,6 +525,7 @@ export interface ModifierChain extends Modifier {
    * Attribution records for every modifier added via {@link bind} (modifiers
    * added via raw {@link add} do not appear here). Walk this to surface
    * "where does each contribution come from?" in balance-sim / devtools.
+   * A method (fresh snapshot per call), unlike the `modifiers` property.
    */
   bindings(): readonly BindingRecord[];
   /** Subscribe to chain events */

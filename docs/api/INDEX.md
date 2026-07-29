@@ -42,8 +42,8 @@ Per-tier landing pages in dependency-ascending order — numeric foundation firs
 - `lifecycle.md` — Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.
 - `runtime.md` — The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
 - `introspection.md` — The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.
-- `advisors.md` — Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share.
-- `spatial.md` — Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal.
+- `advisors.md` — Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share. Candidates are abstract — for map-based steering, build them from spatial.md influence-layer readings.
+- `spatial.md` — Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal. For steering an agent by these fields, rank candidates with advisors.md (goal picker / selection policies).
 - `harness.md` — Headless-sim substrate. Matrix and predicate-bounded runners, probes, content walkers, the picker for solver/UI enumeration, solvers (bisection), perturbation, analyzers, run pools, and typed harness contracts. Separable from the rest of the engine — game code never imports harness; balance tooling does.
 
 ## Reserved names
@@ -55,7 +55,7 @@ A few symbols share a stem and are easy to confuse. Each links to its anchor:
 - **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category
 - **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.
 - **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine's `TickDriver` (tick scheduler).
-- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side.
+- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side. Per-item repeat counts ("run this item N times") are also consumer-side: expand at enqueue or count in item metadata — `repeat()` re-dispatches the current item once, without advancing.
 - **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress
 - **TimeSystem vs TimeBank** — `createTimeSystem` is the play-clock (how long has the player played); `createTimeBank` is a spendable reservoir of banked seconds (offline banking, bonus time). → runtime.md#time-tracking, lifecycle.md#time-bank
 - **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system's internal play-time counter. Only the TickDriver one accelerates the game. `createBankedAcceleration` drives the TickDriver one.
@@ -64,6 +64,8 @@ A few symbols share a stem and are easy to confuse. Each links to its anchor:
 ## Task → tier
 
 Common consumer tasks resolved to their starting tier. Land in the tier file and follow its `##` sections to the cluster.
+
+Deliberately absent: real-time entity combat (positioning, collision, frame-level action resolution). The engine is a headless incremental substrate — combat resolution stays consumer-side; spatial.md covers only adjacency and traversal.
 
 | Task | Starting tier |
 | --- | --- |
@@ -138,6 +140,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
 - **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
 - **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation
+- **spatial agent steering** — steer an agent over a map: influence layers supply per-cell field values, the goal picker scores and ranks candidates built from them → spatial.md#influence-layer, advisors.md#goal-picker
 
 ## Common disambiguators
 

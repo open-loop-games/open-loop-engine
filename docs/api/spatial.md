@@ -1,6 +1,6 @@
 # Spatial
 
-Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal.
+Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal. For steering an agent by these fields, rank candidates with advisors.md (goal picker / selection policies).
 
 ## Canonical entrypoints
 
