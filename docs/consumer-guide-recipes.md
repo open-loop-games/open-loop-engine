@@ -278,13 +278,14 @@ interface Cell { type: 'open' | 'blocked'; occupantId: string | null }
 const grid = createSpatialGrid<Cell>({
   width, height,
   initializer: () => ({ type: 'open', occupantId: null }),
-  // allowDiagonals: true  // only changes the default for bfs()/flood()
-});
+  // neighborhood: DIAGONAL_DELTAS,  // or HEX_AXIAL_DELTAS, or your own offsets;
+});                                  // sets the board's adjacency for every traversal verb
 
 grid.at(x, y);                 // throws OOB; tryAt() returns undefined instead
 grid.set(x, y, { ...grid.at(x, y), occupantId: id });  // emits cellChanged
 grid.inBounds(x, y);
-grid.neighbors(x, y);          // 4-connected · neighborsDiag() 8 · inRange(x,y,r) Chebyshev
+grid.neighbors(x, y);          // the board's own adjacency (4-connected by default)
+grid.neighbors(x, y, DIAGONAL_DELTAS);  // ad-hoc, this call only · inRange(x,y,r) Chebyshev
 grid.bfs({ x, y }, (cell) => cell.type !== 'blocked');   // PassabilityFn → parent-link map
 ```
 
@@ -350,7 +351,7 @@ function preview(id: string, x: number, y: number) {
 }
 ```
 
-Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship (`neighbors`/`neighborsDiag`/`inRange` cover 4/8-connected and Chebyshev radius) — full row, full column, knight-move — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator.
+Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship — full row, full column, radial arcs — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator. Anything expressible as a fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood` or an ad-hoc `neighbors(x, y, deltas)` instead, not a hand-roll.
 
 ## Shared pure state-function across live tick and harness
 
