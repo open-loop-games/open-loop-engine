@@ -33,6 +33,7 @@ import {
   type Inversion,
 } from './inversion';
 import { findFirstPassage, type FirstPassageOptions, type Passage } from './passage';
+import { NOT_SUMMABLE, arithmeticSeries, exactSeries, type Series } from './series';
 import type {
   EvaluateFunction,
   FormulaOptions,
@@ -47,6 +48,7 @@ import type {
   InvertibleIntegralFormula,
   SubstitutionFunction,
   SubstitutionStack,
+  SumFunction,
 } from './types';
 
 /** Type guard for Formula instances. Use this over `instanceof Formula` at call sites that don't already import the class. */
@@ -70,6 +72,11 @@ function integrateVariable(this: GenericFormula) {
 
 function integrateVariableInner(this: GenericFormula) {
   return this;
+}
+
+/** The bare variable's own series — `Σ(from + i)` is arithmetic and always exact. */
+function sumVariable(from: DecimalSource, count: DecimalSource): Series {
+  return exactSeries(arithmeticSeries(from, count));
 }
 
 // === DYNAMIC OP TYPES ===
@@ -216,6 +223,13 @@ type OpDescriptor = {
   invert?: (...args: any[]) => any;
   integrate?: (...args: any[]) => any;
   integrateInner?: (...args: any[]) => any;
+  /**
+   * Discrete series rule. Bound only for the ops that carry an exact identity
+   * (linearity) or an exact closed form (geometric, Faulhaber) — an op with no
+   * entry here reports `not-summable` rather than guessing, which is why the
+   * table is short next to `integrate`.
+   */
+  sum?: (...args: any[]) => any;
   applySubstitution?: (...args: any[]) => any;
   aliases?: string[];
 };
@@ -225,6 +239,7 @@ const unaryOps: Record<string, OpDescriptor> = {
     evaluate: Decimal.neg,
     invert: ops.invertNeg,
     integrate: ops.integrateNeg,
+    sum: ops.sumNeg,
     applySubstitution: ops.applySubstitutionNeg,
     aliases: ['negate', 'negated'],
   },
@@ -273,6 +288,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     invert: ops.invertAdd,
     integrate: ops.integrateAdd,
     integrateInner: ops.integrateInnerAdd,
+    sum: ops.sumAdd,
     applySubstitution: ops.passthrough,
     aliases: ['plus'],
   },
@@ -281,6 +297,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     invert: ops.invertSub,
     integrate: ops.integrateSub,
     integrateInner: ops.integrateInnerSub,
+    sum: ops.sumSub,
     applySubstitution: ops.passthrough,
     aliases: ['subtract', 'minus'],
   },
@@ -288,6 +305,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     evaluate: Decimal.mul,
     invert: ops.invertMul,
     integrate: ops.integrateMul,
+    sum: ops.sumMul,
     applySubstitution: ops.applySubstitutionMul,
     aliases: ['multiply', 'times'],
   },
@@ -295,6 +313,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     evaluate: Decimal.div,
     invert: ops.invertDiv,
     integrate: ops.integrateDiv,
+    sum: ops.sumDiv,
     applySubstitution: ops.applySubstitutionDiv,
     aliases: ['divide', 'divideBy', 'dividedBy'],
   },
@@ -304,11 +323,17 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integrateLog,
     aliases: ['logarithm'],
   },
-  pow: { evaluate: Decimal.pow, invert: ops.invertPow, integrate: ops.integratePow },
+  pow: {
+    evaluate: Decimal.pow,
+    invert: ops.invertPow,
+    integrate: ops.integratePow,
+    sum: ops.sumPow,
+  },
   pow_base: {
     evaluate: (value: DecimalSource, base: DecimalSource) => Decimal.pow(base, value),
     invert: ops.invertPowBase,
     integrate: ops.integratePowBase,
+    sum: ops.sumPowBase,
   },
   root: { evaluate: Decimal.root, invert: ops.invertRoot, integrate: ops.integrateRoot },
 };
@@ -340,6 +365,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   protected readonly internalInvert: InvertFunction<T> | undefined;
   protected readonly internalIntegrate: IntegrateFunction<T> | undefined;
   protected readonly internalIntegrateInner: IntegrateFunction<T> | undefined;
+  protected readonly internalSum: SumFunction<T> | undefined;
   protected readonly applySubstitution: SubstitutionFunction<T> | undefined;
   protected readonly description: string | undefined;
   protected readonly internalVariables: number;
@@ -372,6 +398,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     this.internalInvert = readonlyProperties.internalInvert;
     this.internalIntegrate = readonlyProperties.internalIntegrate;
     this.internalIntegrateInner = readonlyProperties.internalIntegrateInner;
+    this.internalSum = readonlyProperties.internalSum;
     this.applySubstitution = readonlyProperties.applySubstitution;
     this.description = options.description;
   }
@@ -383,6 +410,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       innermostVariable: variable,
       internalIntegrate: integrateVariable,
       internalIntegrateInner: integrateVariableInner,
+      internalSum: sumVariable as unknown as SumFunction<T>,
       applySubstitution: ops.passthrough as unknown as SubstitutionFunction<T>,
     };
   }
@@ -398,7 +426,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
 
   private setupFormula(options: GeneralFormulaOptions<T>): FormulaProperties<T> {
-    const { inputs, evaluate, invert, integrate, integrateInner, applySubstitution } = options;
+    const { inputs, evaluate, invert, integrate, integrateInner, sum, applySubstitution } = options;
     const numVariables = inputs.reduce<number>(
       (acc, input) => acc + (input instanceof Formula ? input.internalVariables : 0),
       0,
@@ -418,6 +446,11 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       internalInvert: invertible ? invert : undefined,
       internalIntegrate: integrable ? integrate : undefined,
       internalIntegrateInner: integrateInner,
+      // Bound unconditionally, unlike `integrate`: a sum op returns a graded
+      // {@link Series} rather than a formula, so it reports `not-summable` for
+      // itself. Gating it on the inner's capability would move that report into
+      // a silent `undefined` and lose which op broke the chain.
+      internalSum: sum,
       applySubstitution,
       innermostVariable,
       internalVariables: numVariables,
@@ -616,12 +649,115 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     return { value: candidate, reason: 'outside-image', evaluatesTo: forward };
   }
 
+  /**
+   * Antiderivative of this formula, evaluated at `variable`.
+   *
+   * **This is not `∫₀ˣ`.** It carries an arbitrary constant, so the value at a
+   * single point is only meaningful relative to another one:
+   * `Formula.exponential(0, 10, 1.15).evaluateIntegral(0)` is `71.55`, not 0.
+   * For the area over a span use {@link cumulative}, which differences it; for
+   * a level-indexed cost use {@link sum}, which is a different operation again.
+   */
   evaluateIntegral(variable?: DecimalSource): DecimalSource {
     if (!this.isIntegrable()) {
       console.error('Cannot evaluate integral of formula without integral');
       return 0;
     }
     return this.getIntegralFormula().evaluate(variable);
+  }
+
+  /**
+   * `∫ from→to` — the continuous area under this formula across a span.
+   *
+   * The rate-function lineage's *cumulative*: integrate a rate over time and
+   * this is the total accrued, which is what {@link firstPassage} inverts. The
+   * arbitrary constant {@link evaluateIntegral} carries cancels in the
+   * difference, so unlike that method this answers a well-posed question.
+   *
+   * **Not the cost of buying levels.** A level-indexed cost curve is a series,
+   * and the two differ by a boundary term that is 7.3% on the canonical
+   * `1.15ⁿ` curve — use {@link sum} there.
+   *
+   * @example
+   * ```ts
+   * const rate = Formula.variable(0).pow_base(2).mul(5);  // 5·2ᵗ per second
+   * rate.cumulative(0, 10);  // total produced over the first ten seconds
+   * ```
+   */
+  cumulative(from: DecimalSource, to: DecimalSource): DecimalSource {
+    if (!this.isIntegrable()) {
+      console.error('Cannot take a cumulative of a formula without an integral');
+      return 0;
+    }
+    const antiderivative = this.getIntegralFormula();
+    return Decimal.sub(antiderivative.evaluate(to), antiderivative.evaluate(from));
+  }
+
+  /**
+   * `Σ f(from + i)` for `i` in `[0, count)` — the discrete series.
+   *
+   * What a level-indexed cost actually is: buying `count` levels starting at
+   * level `from` costs this, and it is not {@link cumulative} over the same
+   * span. Exact where a closed form exists (the shipped `exponential` /
+   * `linear` / `polynomial` curves and anything built from them by `+`, `−`,
+   * and constant `×`/`÷`); otherwise `approximate` via Euler–Maclaurin, or
+   * `not-summable` when there is no integral to correct.
+   *
+   * There is deliberately no unchecked twin the way {@link invert} sits under
+   * {@link tryInvert}: `invert` is unchecked because the op table composes with
+   * it recursively, whereas summation composes over graded results, so nothing
+   * needs the bare number and no caller gets one by accident.
+   *
+   * @example
+   * ```ts
+   * const cost = Formula.exponential(level, 10, 1.15);
+   * const price = cost.sum(level.value, 19);   // what 19 more levels cost
+   * if (price.reason !== 'not-summable') charge(price.value);
+   * ```
+   */
+  sum(from: DecimalSource, count: DecimalSource): Series {
+    if (Decimal.lte(count, 0)) return exactSeries(Decimal.dZero);
+    if (!this.hasVariable()) return exactSeries(Decimal.mul(count, this.evaluate()));
+    if (this.internalSum != null) {
+      const series = this.internalSum.call(this, from, count, ...this.inputs);
+      if (series.value != null) return series;
+    }
+    return this.correctedSum(from, count);
+  }
+
+  /**
+   * Euler–Maclaurin fallback for chains with no closed-form series: the
+   * continuous cumulative plus its first two boundary corrections,
+   * `∫ₐᵇ f − [f(b)−f(a)]/2 + [f′(b)−f′(a)]/12`.
+   *
+   * On the exponential curve this cuts the error from 7.3% (raw cumulative) to
+   * ~4e-4, which is why it beats reporting nothing. The reported `error` is the
+   * relative size of the last correction applied — for the smooth monotone
+   * curves this arm exists to serve, the omitted tail is smaller still, so read
+   * it as an accuracy claim rather than a proof.
+   *
+   * Derivatives come from central differences at unit spacing, which is the
+   * grid the sum is defined on anyway.
+   */
+  private correctedSum(from: DecimalSource, count: DecimalSource): Series {
+    if (!this.isIntegrable()) return NOT_SUMMABLE;
+    const to = Decimal.add(from, count);
+    const area = this.cumulative(from, to);
+    const trapezoid = Decimal.div(Decimal.sub(this.evaluate(to), this.evaluate(from)), 2);
+
+    const slopeAt = (x: DecimalSource) =>
+      Decimal.div(
+        Decimal.sub(this.evaluate(Decimal.add(x, 1)), this.evaluate(Decimal.sub(x, 1))),
+        2,
+      );
+    const curvature = Decimal.div(Decimal.sub(slopeAt(to), slopeAt(from)), 12);
+
+    const value = Decimal.add(Decimal.sub(area, trapezoid), curvature);
+    if (!Decimal.isFinite(value)) return NOT_SUMMABLE;
+    const error = Decimal.eq(value, 0)
+      ? Decimal.abs(curvature).toNumber()
+      : Decimal.abs(Decimal.div(curvature, value)).toNumber();
+    return { value, reason: 'approximate', error };
   }
 
   invertIntegral(value: DecimalSource): DecimalSource {
@@ -1279,26 +1415,54 @@ export function findNonInvertible(formula: GenericFormula): GenericFormula | nul
 /**
  * Calculate the maximum number of purchases affordable with the current resource amount.
  *
- * Uses formula inversion (and integration for cumulative costs) to compute the answer
- * efficiently, then refines with direct summation for the last `directSum` levels to
- * handle rounding. This is the main "buy max" calculation for repeatables and conversions.
+ * This is the "buy max" calculation for repeatables and conversions, and it
+ * answers the discrete question — the largest `n` with `Σ f(a+i) ≤ resource`,
+ * which is exactly what `n` sequential single purchases would cost.
+ * {@link calculateCost} prices that same `n` through the same operation, so the
+ * count and the charge can't disagree.
+ *
+ * Continuous inversion still does the work: the integral seeds the answer in one
+ * step and a short exact correction lands it, rather than summing levels one at
+ * a time from zero.
  *
  * @param formula - Cost formula (must be invertible; must be integrable if `cumulativeCost` is true)
  * @param resource - The resource being spent
- * @param cumulativeCost - If true, total cost is the integral (sum of costs 0..N). If false, cost is just `formula(N)`. Default: `true`
- * @param directSum - Number of levels to verify by direct summation for rounding accuracy. Default: `10` (cumulative) or `0` (non-cumulative)
+ * @param cumulativeCost - If true, buying `n` costs `Σ f(a+i)`. If false, it costs `f(a+n)` alone. Default: `true`
  * @param maxBulkAmount - Cap on the returned amount. Default: `Infinity`
  * @returns Reactive computed with the max affordable amount
  */
+/**
+ * Relative slack when comparing a closed-form price against a balance.
+ *
+ * Matches the tolerance `createCostRequirement` applies to flat costs. Tight
+ * enough not to grant a level a player is meaningfully short of (a 49.99
+ * balance never affords a 50 cost), wide enough to absorb the ulp a closed form
+ * carries where summing the same levels one at a time would land exactly.
+ */
+const AFFORDABILITY_TOLERANCE = 1e-12;
+
+/**
+ * Whether `price` can be met out of `balance`.
+ *
+ * Non-finite prices are unaffordable rather than free. A cost curve that
+ * evaluates to NaN must afford nothing, and `Decimal`'s ordering comparisons
+ * answer false against NaN in *both* directions, so a bare `gt` would read
+ * "not more than the balance" and hand out levels without limit.
+ *
+ * @internal
+ */
+function payable(price: DecimalSource, balance: DecimalSource): boolean {
+  if (!Decimal.isFinite(price)) return false;
+  return Decimal.lte_tolerance(price, balance, AFFORDABILITY_TOLERANCE);
+}
+
 export function calculateMaxAffordable(
   formula: GenericFormula,
   resource: Resource,
   cumulativeCost: Computable<boolean> = true,
-  directSum?: Computable<number>,
   maxBulkAmount: Computable<DecimalSource> = Decimal.dInf,
 ) {
   const computedCumulativeCost = processGetter(cumulativeCost);
-  const computedDirectSum = processGetter(directSum);
   const computedmaxBulkAmount = processGetter(maxBulkAmount);
 
   // Threshold guard: cache the affordability band [floorCost, ceilCost) so ticks
@@ -1345,13 +1509,6 @@ export function calculateMaxAffordable(
       }
 
       const cumulativeCost = unref(computedCumulativeCost);
-      // Default directSum=10 for cumulative cost: integral inversion under-reports
-      // discrete affordability by up to 1 level for monotone-convex curves
-      // (boundary gap log_s((s-1)/ln(s)) ≈ 0.5 for exponential), and the tail
-      // refinement closes that gap. ds=10 covers known boundary cases for
-      // exponential / linear / polynomial. Non-cumulative path stays ds=0 since
-      // single-level cost has no integral-vs-discrete ambiguity.
-      const directSum = unref(computedDirectSum) ?? (cumulativeCost ? 10 : 0);
 
       // Compute input signature once — also registers reactive deps on any
       // ref-based inputs so the outer computed invalidates when they change.
@@ -1359,117 +1516,98 @@ export function calculateMaxAffordable(
 
       // --- Threshold guard fast path ---
       const currentVariable = unref(formula.innermostVariable) ?? 0;
+      // Band membership is tested with the same predicate the answer was
+      // decided by (`payable` below), so the cached answer and a recomputation
+      // cannot disagree at the boundary — a plain `gte`/`lt` pair here would
+      // reject an ulp-wide sliver the recomputation accepts, and return
+      // stale-by-one for resource values sitting in it.
       if (
         guard !== null &&
         guard.inputSig === inputSig &&
         Decimal.eq(currentVariable, guard.variable) &&
-        Decimal.gte(resource.value, guard.floorCost) &&
-        Decimal.lt(resource.value, guard.ceilCost)
+        payable(guard.floorCost, resource.value) &&
+        !payable(guard.ceilCost, resource.value)
       ) {
         return guard.affordable;
       }
 
       // --- Full recomputation ---
-      let affordable: DecimalSource = 0;
-      const integralRan = Decimal.gt(maxBulkAmount, directSum);
-      // Capture integral at current variable for guard band computation.
-      // evaluateIntegral() is already called in the main path — reuse it.
-      let integralAtCurrent: DecimalSource = 0;
-      if (integralRan) {
-        if (!formula.isInvertible()) {
-          console.error(
-            'Cannot calculate max affordable of non-invertible formula with more maxBulkAmount than directSum',
-          );
-          return 0;
-        }
-        if (cumulativeCost) {
-          if (!formula.isIntegralInvertible()) {
-            console.error(
-              'Cannot calculate max affordable of formula with non-invertible integral',
-            );
-            return 0;
-          }
-          affordable = profile('formula.affordable.integral', () => {
-            integralAtCurrent = formula.evaluateIntegral();
-            return Decimal.floor(
-              formula.invertIntegral(Decimal.add(resource.value, integralAtCurrent)),
-            ).sub(currentVariable);
-          });
-        } else {
-          // invert(R) returns the absolute variable level at which evaluate
-          // equals R; for non-cumulative cost (a single payment of
-          // evaluate(targetLevel) covers reaching that level), the buyable
-          // count is invert(R) − currentVariable. Mirrors the cumulative
-          // branch's `.sub(currentVariable)` above. Clamped to 0 because
-          // invert can drop below currentVariable when even the current
-          // level's cost exceeds R.
-          affordable = Decimal.max(
-            Decimal.floor(formula.invert(resource.value)).sub(currentVariable),
-            0,
-          );
-        }
-      }
-      affordable = Decimal.clampMax(affordable, maxBulkAmount);
-      if (directSum > 0) {
-        // directSum > 0 only when the caller explicitly requested it.
-        // When the integral path ran, the estimate is trusted (TMT/Profectus
-        // pattern: closed-form inversion is authoritative for invertible
-        // formulas). The refinement loop only fires for non-invertible
-        // formulas where maxBulkAmount <= directSum skipped the integral.
-        const preSumAffordable = affordable;
-        const refinementCeiling = integralRan ? Decimal.add(preSumAffordable, 1) : maxBulkAmount;
-        affordable = Decimal.max(Decimal.sub(affordable, directSum), 0);
-        let summedCost = profile('formula.affordable.seed', () => {
-          if (cumulativeCost) {
-            return calculateCost(formula as InvertibleFormula, affordable, true, 0);
-          } else {
-            return formula.evaluate(Decimal.add(currentVariable, affordable));
-          }
-        });
-        const loopStart = profileStart();
-        while (
-          Decimal.lt(affordable, maxBulkAmount) &&
-          Decimal.lt(affordable, Number.MAX_SAFE_INTEGER) &&
-          Decimal.gte(refinementCeiling, affordable)
-        ) {
-          const nextCost = formula.evaluate(Decimal.add(affordable, currentVariable));
-          if (Decimal.lte(Decimal.add(summedCost, nextCost), resource.value)) {
-            affordable = Decimal.add(affordable, 1);
-            summedCost = Decimal.add(summedCost, nextCost);
-          } else {
-            break;
-          }
-        }
-        profileEnd('formula.affordable.refine', loopStart);
+      if (!formula.isInvertible()) {
+        console.error('Cannot calculate max affordable of non-invertible formula');
+        return 0;
       }
 
-      // --- Update threshold guard ---
-      // Build the cost band [floorCost, ceilCost) reusing integralAtCurrent
-      // from the main path. floorCost is integral-based (one evaluateIntegral);
-      // ceilCost is the discrete next-level cost (one evaluate) so the band's
-      // upper bound matches the post-directSum discrete `affordable` instead of
-      // the looser integral ceiling — without this, resource values in the
-      // integral-vs-discrete gap hit the cache and return a stale-by-1 answer.
-      if (integralRan && cumulativeCost) {
-        const targetLevel = Decimal.add(currentVariable, affordable);
-        const integralAtFloor = formula.evaluateIntegral(targetLevel);
-        const floorCost = Decimal.sub(integralAtFloor, integralAtCurrent);
-        const capped = Decimal.gte(Decimal.add(affordable, 1), maxBulkAmount);
-        const ceilCost = capped
-          ? Decimal.dInf
-          : Decimal.add(floorCost, formula.evaluate(targetLevel));
-        guard = { variable: currentVariable, affordable, floorCost, ceilCost, inputSig };
-      } else if (integralRan && !cumulativeCost) {
-        // Non-cumulative: cost is just formula(level), not a sum
-        const targetLevel = Decimal.add(currentVariable, affordable);
-        const floorCost = formula.evaluate(targetLevel);
-        const ceilCost = Decimal.gte(Decimal.add(affordable, 1), maxBulkAmount)
-          ? Decimal.dInf
-          : formula.evaluate(Decimal.add(targetLevel, 1));
-        guard = { variable: currentVariable, affordable, floorCost, ceilCost, inputSig };
+      /** Total charged for buying `n` levels — the same operation the purchase pays. */
+      const priceOf = (n: DecimalSource): DecimalSource =>
+        cumulativeCost
+          ? (formula.sum(currentVariable, n).value ?? Decimal.dInf)
+          : formula.evaluate(Decimal.add(currentVariable, n));
+
+      let affordable: DecimalSource;
+      if (cumulativeCost) {
+        if (!formula.isIntegralInvertible()) {
+          console.error('Cannot calculate max affordable of formula with non-invertible integral');
+          return 0;
+        }
+        affordable = profile('formula.affordable.integral', () =>
+          Decimal.floor(
+            formula.invertIntegral(Decimal.add(resource.value, formula.evaluateIntegral())),
+          ).sub(currentVariable),
+        );
       } else {
-        guard = null;
+        // invert(R) returns the absolute variable level at which evaluate
+        // equals R; for non-cumulative cost (a single payment of
+        // evaluate(targetLevel) covers reaching that level), the buyable
+        // count is invert(R) − currentVariable. Clamped to 0 because invert
+        // can drop below currentVariable when even the current level's cost
+        // exceeds R.
+        affordable = Decimal.floor(formula.invert(resource.value)).sub(currentVariable);
       }
+      affordable = Decimal.clamp(affordable, 0, maxBulkAmount);
+
+      /** Whether buying `n` levels is payable out of the current balance. */
+      const canAfford = (n: DecimalSource): boolean => payable(priceOf(n), resource.value);
+
+      // The seed solves the *continuous* equation, so it lands within about a
+      // level of the discrete answer — half of one for every geometric curve,
+      // since the two differ by the fixed factor ln(s)/(s−1). Correcting it
+      // against the exact price walks a couple of steps at most; the bound is a
+      // backstop for curves whose two coordinates drift further apart, not a
+      // search.
+      const CORRECTION_LIMIT = 64;
+      const correctionStart = profileStart();
+      if (!Decimal.isFinite(priceOf(affordable))) {
+        // A curve that prices nothing at the seed prices nothing anywhere the
+        // walk could reach, and walking would only spend the correction budget
+        // to arrive at the same place.
+        affordable = Decimal.dZero;
+      } else {
+        for (let i = 0; i < CORRECTION_LIMIT && Decimal.gt(affordable, 0); i++) {
+          if (canAfford(affordable)) break;
+          affordable = Decimal.sub(affordable, 1);
+        }
+        for (let i = 0; i < CORRECTION_LIMIT && Decimal.lt(affordable, maxBulkAmount); i++) {
+          const next = Decimal.add(affordable, 1);
+          if (!canAfford(next)) break;
+          affordable = next;
+        }
+      }
+      profileEnd('formula.affordable.refine', correctionStart);
+
+      // --- Update threshold guard ---
+      // The band is [price(n), price(n+1)) in the same operation the answer was
+      // computed in. Both bounds discrete now that pricing is: the earlier
+      // integral-floor / discrete-ceil mix existed only to paper over the two
+      // coordinates disagreeing, and a resource landing in that gap read a
+      // stale-by-one answer out of the cache.
+      const capped = Decimal.gte(Decimal.add(affordable, 1), maxBulkAmount);
+      guard = {
+        variable: currentVariable,
+        affordable,
+        floorCost: priceOf(affordable),
+        ceilCost: capped ? Decimal.dInf : priceOf(Decimal.add(affordable, 1)),
+        inputSig,
+      };
 
       return affordable;
     }),
@@ -1479,78 +1617,61 @@ export function calculateMaxAffordable(
 /**
  * Calculate the total cost of purchasing a specific number of levels.
  *
- * Combines integration (for the bulk) with direct summation (for the tail)
- * to balance performance and accuracy. Companion to {@link calculateMaxAffordable}.
+ * Under `cumulativeCost` this is the **series** `Σ f(a+i)` — what buying the
+ * levels one at a time charges — not the continuous area under the cost curve.
+ * The two differ by a boundary term worth 7.3% on the canonical `1.15ⁿ` curve
+ * and 44% at `2ⁿ`, and charging the second for the first is what this
+ * function used to do. Companion to {@link calculateMaxAffordable}, which
+ * counts levels through the same operation so the count and the charge agree.
  *
  * @param formula - Cost formula (must be invertible; must be integrable if cumulative)
  * @param amountToBuy - Number of levels to price
- * @param cumulativeCost - If true, sum all individual costs. If false, just `formula(current + amountToBuy)`. Default: `true`
- * @param directSum - Levels to sum directly for rounding accuracy
+ * @param cumulativeCost - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
  * @returns The total cost as a DecimalSource
  */
 export function calculateCost(
   formula: InvertibleFormula,
   amountToBuy: DecimalSource,
   cumulativeCost?: true,
-  directSum?: number,
 ): DecimalSource;
 export function calculateCost(
   formula: InvertibleIntegralFormula,
   amountToBuy: DecimalSource,
   cumulativeCost: boolean,
-  directSum?: number,
 ): DecimalSource;
 export function calculateCost(
   formula: InvertibleFormula,
   amountToBuy: DecimalSource,
   cumulativeCost = true,
-  directSum?: number,
 ) {
-  if (Decimal.eq(amountToBuy, 1)) {
-    return formula.evaluate();
-  }
-
   const origValue = unref(formula.innermostVariable) ?? 0;
-  let newValue = Decimal.add(amountToBuy, origValue);
-  const targetValue = newValue;
-  directSum ??= 0;
-  newValue = Decimal.max(Decimal.sub(newValue, directSum), origValue);
-  let cost: DecimalSource = 0;
+  if (Decimal.lte(amountToBuy, 0)) return Decimal.dZero;
+  if (!cumulativeCost) return formula.evaluate(Decimal.add(origValue, amountToBuy));
 
-  if (Decimal.gt(amountToBuy, directSum)) {
-    if (!formula.isInvertible()) {
-      console.error('Cannot calculate cost with indirect sum of non-invertible formula');
-      return 0;
-    }
-    if (cumulativeCost) {
-      if (!formula.isIntegrable()) {
-        console.error('Cannot calculate cost with cumulative cost of non-integrable formula');
-        return 0;
-      }
-      cost = Decimal.sub(formula.evaluateIntegral(newValue), formula.evaluateIntegral());
-      if (Decimal.gt(targetValue, 1e308)) {
-        return Decimal.add(
-          cost,
-          Decimal.mul(Decimal.sub(targetValue, newValue), formula.evaluate(newValue)),
-        );
-      }
-    } else {
-      cost = formula.evaluate(newValue);
-      newValue = Decimal.add(newValue, 1);
-      if (Decimal.gt(targetValue, 1e308)) {
-        return Decimal.mul(Decimal.add(Decimal.sub(targetValue, newValue), 1), cost);
-      }
-    }
+  const series = formula.sum(origValue, amountToBuy);
+  if (series.value != null) return series.value;
+
+  // Nothing closed-form and nothing to correct — the chain has no integral
+  // either. A short span is still exactly summable term by term, which is what
+  // the caller wanted; a long one has no honest answer to give.
+  if (Decimal.gt(amountToBuy, DIRECT_SUM_LIMIT)) {
+    console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
+    return 0;
   }
-
-  // Sum the direct-computation tail by a bounded integer counter, evaluating at
-  // Decimal offsets from newValue. Iterating a float `i` over the value range
-  // itself stalls forever once a level reaches 2^53 — float ULP exceeds 1 there,
-  // so `i++` is a no-op and the loop never advances. The tail is always small
-  // (its span is min(directSum, amountToBuy)), so count the terms, not the values.
-  const directCount = toNumber(Decimal.sub(targetValue, newValue));
-  for (let i = 0; i < directCount; i++) {
-    cost = Decimal.add(cost, formula.evaluate(Decimal.add(newValue, i)));
+  // Count the terms, not the values: iterating a float over the *level* range
+  // stalls forever past 2^53, where the float ULP exceeds 1 and `i++` stops
+  // advancing. The span is bounded above, so the counter is safe.
+  let cost: DecimalSource = Decimal.dZero;
+  const terms = toNumber(amountToBuy);
+  for (let i = 0; i < terms; i++) {
+    cost = Decimal.add(cost, formula.evaluate(Decimal.add(origValue, i)));
   }
   return cost;
 }
+
+/**
+ * Longest span {@link calculateCost} will sum term by term when a formula has
+ * neither a closed-form series nor an integral to correct. Past it the honest
+ * answer is a report, not a loop long enough to stall a tick.
+ */
+const DIRECT_SUM_LIMIT = 1000;

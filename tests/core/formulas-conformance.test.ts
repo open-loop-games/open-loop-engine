@@ -893,10 +893,10 @@ describe('cumulative cost: integral vs discrete sum', () => {
   };
 
   for (const [name, build] of Object.entries(CURVES)) {
-    test(`${name} — directSum ≥ amount reproduces Σ f(i) exactly`, () => {
+    test(`${name} — calculateCost reproduces Σ f(i) exactly`, () => {
       const formula = build() as InvertibleFormula;
       for (const n of [1, 2, 5, 8]) {
-        const cost = calculateCost(formula, n, true, n);
+        const cost = calculateCost(formula, n, true);
         const truth = discreteSum(formula, 0, n);
         expect(
           Decimal.lte(relativeError(cost, truth), 1e-12),
@@ -906,19 +906,22 @@ describe('cumulative cost: integral vs discrete sum', () => {
     });
   }
 
-  test('the integral path is a different number, and knowingly so', () => {
+  test('the continuous cumulative is a different number, and now a different call', () => {
     // Not a defect — a continuous antiderivative genuinely disagrees with a
-    // discrete sum for a convex curve. Pinned because a consumer indexing by
-    // level needs the sum, and reaching for the integral silently gets this gap.
+    // discrete sum for a convex curve. What was a defect is the two sharing one
+    // name, so that a consumer indexing by level reached for `calculateCost`
+    // and silently got this gap charged to it. Both remain reachable; they are
+    // no longer reachable by accident.
     const formula = Formula.exponential(0, 10, 1.15) as InvertibleFormula;
     const n = 8;
-    const integral = calculateCost(formula, n, true, 0);
     const summed = discreteSum(formula, 0, n);
-    expect(Decimal.neq(integral, summed)).toBe(true);
-    // Same order of magnitude — the two differ by a boundary term, not wildly.
-    const ratio = new Decimal(integral).div(summed).toNumber();
-    expect(ratio).toBeGreaterThan(0.5);
-    expect(ratio).toBeLessThan(1.5);
+    expect(Decimal.lte(relativeError(calculateCost(formula, n, true), summed), 1e-12)).toBe(true);
+
+    const area = formula.cumulative(0, n);
+    expect(Decimal.neq(area, summed)).toBe(true);
+    // The gap is the geometric boundary term (s−1)/ln s, exactly — 7.33% here.
+    const ratio = new Decimal(area).div(summed).toNumber();
+    expect(ratio).toBeCloseTo(0.15 / Math.log(1.15), 10);
   });
 });
 

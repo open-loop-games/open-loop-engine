@@ -159,13 +159,7 @@ export function createCostRequirement<T extends CostRequirementOptions>(
 
   // Precomputed formula affordability — reactive via calculateMaxAffordable's own computed.
   const formulaMaxAffordable = isFormula(processedCost)
-    ? calculateMaxAffordable(
-        processedCost,
-        resource,
-        processedCumulativeCost,
-        undefined,
-        processedMaxBulk,
-      )
+    ? calculateMaxAffordable(processedCost, resource, processedCumulativeCost, processedMaxBulk)
     : null;
 
   function getCost(amount: DecimalSource = 1): DecimalSource {

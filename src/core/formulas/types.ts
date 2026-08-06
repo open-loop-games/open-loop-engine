@@ -15,6 +15,7 @@
 import type { DecimalSource } from '@/primitives/decimal';
 import type { MaybeRef } from 'vue';
 import type Formula from './formulas';
+import type { Series } from './series';
 
 /** Any Formula instance, regardless of capability. The base type for formula parameters. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +61,20 @@ export type IntegrateFunction<T extends FormulaSource[]> = (
   ...inputs: T
 ) => GenericFormula;
 
+/**
+ * Summation function signature — used in {@link GeneralFormulaOptions}.
+ *
+ * Unlike {@link IntegrateFunction} this returns a value rather than a formula:
+ * summation composes only through the linear identities, so there is no series
+ * *formula* to hand back up the chain, only a graded number.
+ */
+export type SumFunction<T extends FormulaSource[]> = (
+  this: Formula<T>,
+  from: DecimalSource,
+  count: DecimalSource,
+  ...inputs: T
+) => Series;
+
 /** Substitution function signature (for nested integration) — used in {@link GeneralFormulaOptions} */
 export type SubstitutionFunction<T extends FormulaSource[]> = (
   this: Formula<T>,
@@ -86,6 +101,7 @@ export type GeneralFormulaOptions<T extends [FormulaSource] | FormulaSource[]> =
   invert?: InvertFunction<T>;
   integrate?: IntegrateFunction<T>;
   integrateInner?: IntegrateFunction<T>;
+  sum?: SumFunction<T>;
   applySubstitution?: SubstitutionFunction<T>;
   description?: string;
 };
@@ -104,6 +120,7 @@ export type FormulaProperties<T extends [FormulaSource] | FormulaSource[]> = {
   internalInvert?: InvertFunction<T>;
   internalIntegrate?: IntegrateFunction<T>;
   internalIntegrateInner?: IntegrateFunction<T>;
+  internalSum?: SumFunction<T>;
   applySubstitution?: SubstitutionFunction<T>;
   innermostVariable?: MaybeRef<DecimalSource>;
   description?: string;

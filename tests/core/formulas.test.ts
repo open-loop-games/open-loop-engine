@@ -1153,11 +1153,15 @@ describe('Buy Max', () => {
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(() => maxAffordable.value).toLogError();
     });
-    test('Errors on calculating cost of non-invertible formula', () => {
+    test('Prices a non-invertible formula by evaluating it, without erroring', () => {
+      // Non-cumulative cost is a single evaluation at the target level, so
+      // invertibility never enters into it. The old signature routed this
+      // through an inversion guard and reported instead of answering.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.abs(variable);
-      expect(() => calculateCost(formula, 5, false, 0)).toLogError();
+      expect(() => calculateCost(formula, 5, false)).not.toLogError();
+      expect(calculateCost(formula, 5, false)).compare_tolerance(6);
     });
     test('A cost curve that evaluates to NaN affords nothing', () => {
       // `maxBulkAmount === 1` short-circuits to `gte(resource, evaluate())`.
@@ -1168,7 +1172,7 @@ describe('Buy Max', () => {
       const variable = Formula.variable(0);
       const formula = Formula.recip(variable);
       expect(new Decimal(formula.evaluate()).isNan()).toBe(true);
-      const maxAffordable = calculateMaxAffordable(formula, resource, false, undefined, 1);
+      const maxAffordable = calculateMaxAffordable(formula, resource, false, 1);
       expect(maxAffordable.value).compare_tolerance(0);
     });
     test('Calculates max affordable and cost correctly', () => {
@@ -1180,17 +1184,14 @@ describe('Buy Max', () => {
         Decimal.pow(1.05, 141).times(100),
       );
     });
-    test('Calculates max affordable and cost correctly with direct sum', () => {
+    test('Caps the count at maxBulkAmount and prices the capped target', () => {
       const variable = Formula.variable(0);
       const formula = Formula.pow(1.05, variable).times(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false, 4);
-      expect(maxAffordable.value).compare_tolerance(141 - 4);
-
-      const actualCost = new Array(4)
-        .fill(null)
-        .reduce((acc, _, i) => acc.add(formula.evaluate(133 + i)), new Decimal(0));
-      const calculatedCost = calculateCost(formula, maxAffordable.value, false, 4);
-      expect(calculatedCost).compare_tolerance(actualCost);
+      expect(maxAffordable.value).compare_tolerance(4);
+      expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
+        formula.evaluate(4),
+      );
     });
     test('Returns purchase count, not absolute level, when currentVariable > 0', () => {
       // invert(100000) for 100·1.05^x is floor(log_1.05(1000)) = 141. With
@@ -1226,17 +1227,26 @@ describe('Buy Max', () => {
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       expect(() => maxAffordable.value).toLogError();
     });
-    test('Errors on calculating cost of non-invertible formula', () => {
+    test('Sums a formula with no closed-form series term by term', () => {
+      // `abs` binds neither a series rule nor an integral, so there is nothing
+      // to apply and nothing to correct — but a short span is still exactly
+      // summable, and answering beats reporting. |1|+|2|+…+|5| = 15.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.abs(variable);
-      expect(() => calculateCost(formula, 5, true, 0)).toLogError();
+      expect(() => calculateCost(formula, 5, true)).not.toLogError();
+      expect(calculateCost(formula, 5, true)).compare_tolerance(15);
     });
-    test('Estimates max affordable and cost correctly with 0 purchases', () => {
+    test('Reports rather than stalling when an unsummable span is unbounded', () => {
+      const purchases = ref(1);
+      const formula = Formula.abs(Formula.variable(purchases));
+      expect(() => calculateCost(formula, 1e6, true)).toLogError();
+    });
+    test('Max affordable and cost agree exactly with 0 purchases', () => {
       const purchases = ref(0);
       const variable = Formula.variable(purchases);
       const formula = Formula.pow(1.05, variable).times(100);
-      const maxAffordable = calculateMaxAffordable(formula, resource, true, 0);
+      const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
       while (true) {
@@ -1253,18 +1263,16 @@ describe('Buy Max', () => {
       const actualCost = new Array(actualAffordable)
         .fill(null)
         .reduce((acc, _, i) => acc.add(formula.evaluate(i)), new Decimal(0));
-      const calculatedCost = calculateCost(formula, maxAffordable.value);
-      // Check if the calculated cost is within 10% of the actual cost,
-      // because this is an approximation
-      expect(Decimal.sub(actualCost, calculatedCost).abs().div(actualCost).toNumber()).toBeLessThan(
-        0.1,
-      );
+      // Was "within 10%, because this is an approximation" — it no longer is.
+      // The cost is the same series the affordability count was decided by, so
+      // the two agree to the closed form's own precision.
+      expect(calculateCost(formula, maxAffordable.value)).compare_tolerance(actualCost);
     });
-    test('Estimates max affordable and cost with 1 purchase', () => {
+    test('Max affordable and cost agree exactly with 1 purchase', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.pow(1.05, variable).times(100);
-      const maxAffordable = calculateMaxAffordable(formula, resource, true, 0);
+      const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
       while (true) {
@@ -1281,14 +1289,9 @@ describe('Buy Max', () => {
       const actualCost = new Array(actualAffordable)
         .fill(null)
         .reduce((acc, _, i) => acc.add(formula.evaluate(i + 1)), new Decimal(0));
-      const calculatedCost = calculateCost(formula, maxAffordable.value);
-      // Check if the calculated cost is within 10% of the actual cost,
-      // because this is an approximation
-      expect(Decimal.sub(actualCost, calculatedCost).abs().div(actualCost).toNumber()).toBeLessThan(
-        0.1,
-      );
+      expect(calculateCost(formula, maxAffordable.value)).compare_tolerance(actualCost);
     });
-    test('Integral-only estimate is within 10% for cumulative cost', () => {
+    test('The default path prices the levels it counted, exactly', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.pow(1.05, variable).times(100);
@@ -1309,16 +1312,13 @@ describe('Buy Max', () => {
       const actualCost = new Array(actualAffordable)
         .fill(null)
         .reduce((acc, _, i) => acc.add(formula.evaluate(i + 1)), new Decimal(0));
-      const calculatedCost = calculateCost(formula, maxAffordable.value);
-      expect(Decimal.sub(actualCost, calculatedCost).abs().div(actualCost).toNumber()).toBeLessThan(
-        0.1,
-      );
+      expect(calculateCost(formula, maxAffordable.value)).compare_tolerance(actualCost);
     });
-    test('Explicit directSum refines estimate for few purchases', () => {
+    test('Stays exact partway up the curve, not just from level zero', () => {
       const purchases = ref(90);
       const variable = Formula.variable(purchases);
       const formula = Formula.pow(1.05, variable).times(100);
-      const maxAffordable = calculateMaxAffordable(formula, resource, true, 10);
+      const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
       while (true) {
@@ -1335,8 +1335,7 @@ describe('Buy Max', () => {
       const actualCost = new Array(actualAffordable)
         .fill(null)
         .reduce((acc, _, i) => acc.add(formula.evaluate(i + purchases.value)), new Decimal(0));
-      const calculatedCost = calculateCost(formula, maxAffordable.value, true, 10);
-      expect(calculatedCost).compare_tolerance(actualCost);
+      expect(calculateCost(formula, maxAffordable.value, true)).compare_tolerance(actualCost);
     });
     test('Handles over e308 purchases', () => {
       resource.value = '1ee308';
@@ -1349,10 +1348,10 @@ describe('Buy Max', () => {
       expect(Decimal.isFinite(calculatedCost)).toBe(true);
       resource.value = 100000;
     });
-    test('Non-integrable formula with explicit directSum does not error', () => {
+    test('Non-integrable formula over a short span does not error', () => {
       const purchases = ref(0);
       const formula = Formula.variable(purchases).abs();
-      expect(() => calculateCost(formula, 10, true, 10)).not.toLogError();
+      expect(() => calculateCost(formula, 10, true)).not.toLogError();
     });
     test('directSum tail terminates when the current level exceeds 2^53', () => {
       // Iterating the tail by a float counter over the value range hangs here:

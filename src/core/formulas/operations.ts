@@ -14,6 +14,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
 import { findCrossing } from './root-find';
+import { NOT_SUMMABLE, exactSeries, geometricSeries, powerSeries, type Series } from './series';
 import type {
   FormulaSource,
   GenericFormula,
@@ -63,6 +64,20 @@ function makeUnaryIntegrate(formulaOp: (x: GenericFormula) => GenericFormula) {
   };
 }
 
+/**
+ * Build an integrate op from per-orientation antiderivative constructors.
+ *
+ * **Precondition — the op must be linear in the antiderivative.** These
+ * constructors receive `∫f`, not `f`, and the substitution stack composes them
+ * as though `op(∫f) = ∫op(f)`. That identity holds for the linear ops (`neg`,
+ * `add`/`sub` by a constant, `mul`/`div` by a constant) and for nothing else.
+ * Wiring a non-linear op through here yields the integrand reshaped rather than
+ * an antiderivative, and the result is plausible enough to pass a smoke test:
+ * `k/x` routed this way returned `k/(x²/2)`, making `∫2.5/x` over [1,10] come
+ * out as −4.95 against a true 5.756. `integrateDiv` is hand-written and guarded
+ * to a bare-variable denominator because of it. An op that isn't linear here
+ * needs its own hand-written integrate, as the log family and `root` have.
+ */
 function makeBinaryIntegrate(
   lhsOp: (x: GenericFormula, other: FormulaSource, variable: GenericFormula) => GenericFormula,
   rhsOp?: (x: GenericFormula, other: FormulaSource, variable: GenericFormula) => GenericFormula,
@@ -111,6 +126,145 @@ export function invertPassthrough(value: DecimalSource, ...inputs: FormulaSource
     return 0;
   }
   return variable.invert(value);
+}
+
+// === SUMMATION ===
+
+/**
+ * `Σ` over a formula source. A raw `DecimalSource` (or a variable-free formula,
+ * which {@link Formula.sum} handles) is constant across the span, so its series
+ * is just `count` copies of it.
+ *
+ * @internal
+ */
+export function sumSource(
+  source: FormulaSource,
+  from: DecimalSource,
+  count: DecimalSource,
+): Series {
+  if (source instanceof Formula) return source.sum(from, count);
+  return exactSeries(Decimal.mul(count, unrefFormulaSource(source)));
+}
+
+/**
+ * Combine two series under an exact linear identity — `Σ(f ± g) = Σf ± Σg`.
+ *
+ * The weakest arm wins: `not-summable` anywhere makes the whole thing
+ * unanswerable, and an approximate part makes the result approximate with the
+ * errors added, since the identity carries both through unchanged.
+ *
+ * @internal
+ */
+function combineSeries(
+  a: Series,
+  b: Series,
+  combine: (x: DecimalSource, y: DecimalSource) => DecimalSource,
+): Series {
+  if (a.value == null || b.value == null) return NOT_SUMMABLE;
+  const value = combine(a.value, b.value);
+  const error =
+    (a.reason === 'approximate' ? a.error : 0) + (b.reason === 'approximate' ? b.error : 0);
+  return error > 0 ? { value, reason: 'approximate', error } : exactSeries(value);
+}
+
+/** Apply an exact scalar map to a series, preserving its grade. @internal */
+function mapSeries(series: Series, transform: (x: DecimalSource) => DecimalSource): Series {
+  if (series.value == null) return series;
+  const value = transform(series.value);
+  return series.reason === 'approximate'
+    ? { value, reason: 'approximate', error: series.error }
+    : exactSeries(value);
+}
+
+/**
+ * Split a binary node into its variable-bearing side and its constant side, or
+ * `null` when that isn't the shape — the constant side is what the linearity
+ * identities factor out, so an op that can't find one has no rule to apply.
+ *
+ * @internal
+ */
+function splitByVariable(
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): { variable: FormulaSource; constant: DecimalSource; variableOnLeft: boolean } | null {
+  if (hasAnyVariable(lhs) && !hasAnyVariable(rhs)) {
+    return { variable: lhs, constant: unrefFormulaSource(rhs), variableOnLeft: true };
+  }
+  if (hasAnyVariable(rhs) && !hasAnyVariable(lhs)) {
+    return { variable: rhs, constant: unrefFormulaSource(lhs), variableOnLeft: false };
+  }
+  return null;
+}
+
+export function sumNeg(from: DecimalSource, count: DecimalSource, lhs: FormulaSource): Series {
+  return mapSeries(sumSource(lhs, from, count), Decimal.neg);
+}
+
+export function sumAdd(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  return combineSeries(sumSource(lhs, from, count), sumSource(rhs, from, count), Decimal.add);
+}
+
+export function sumSub(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  return combineSeries(sumSource(lhs, from, count), sumSource(rhs, from, count), Decimal.sub);
+}
+
+export function sumMul(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  const split = splitByVariable(lhs, rhs);
+  if (split == null) return NOT_SUMMABLE;
+  return mapSeries(sumSource(split.variable, from, count), (x) => Decimal.mul(x, split.constant));
+}
+
+export function sumDiv(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  // `Σ k/f(i)` is not linear in `Σ f` — only the variable-numerator orientation
+  // factors out. Same asymmetry `integrateDiv` guards, for the same reason.
+  const split = splitByVariable(lhs, rhs);
+  if (split == null || !split.variableOnLeft) return NOT_SUMMABLE;
+  return mapSeries(sumSource(split.variable, from, count), (x) => Decimal.div(x, split.constant));
+}
+
+export function sumPowBase(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  // Geometric only when the exponent is the bare variable. `base^g(x)` is
+  // geometric for affine `g` too, but proving that means pattern-matching the
+  // chain, and an unproven claim here is exactly the silent wrongness the
+  // conformance work removed from this file.
+  if (!isPlainVariable(lhs) || hasAnyVariable(rhs)) return NOT_SUMMABLE;
+  return exactSeries(geometricSeries(unrefFormulaSource(rhs), from, count));
+}
+
+export function sumPow(
+  from: DecimalSource,
+  count: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+): Series {
+  if (!isPlainVariable(lhs) || hasAnyVariable(rhs)) return NOT_SUMMABLE;
+  const value = powerSeries(unrefFormulaSource(rhs), from, count);
+  return value == null ? NOT_SUMMABLE : exactSeries(value);
 }
 
 // === NEGATION ===

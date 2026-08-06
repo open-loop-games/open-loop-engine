@@ -38,7 +38,9 @@ import {
   type InversionFailureReason,
   type FirstPassageOptions,
   type Passage,
+  type Series,
 } from '@/index';
+import type { Computable } from '@/core/computed';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
@@ -601,6 +603,55 @@ describe('Formula inversion contract', () => {
     // enforces that rather than leaving a plausible 0 to be consumed.
     expectTypeOf<Failed['value']>().toBeNull();
     expectTypeOf<Failed['reason']>().toEqualTypeOf<InversionFailureReason>();
+  });
+});
+
+describe('Formula series contract', () => {
+  it('keeps the three integral-adjacent operations apart at the type level', async () => {
+    const { F } = await import('@/core/formulas/formulas');
+    const formula = F.exponential(0, 10, 1.15);
+
+    // The antiderivative stays a bare value — it is the raw thing, arbitrary
+    // constant included, and callers who want a well-posed answer take one of
+    // the other two.
+    expectTypeOf(formula.evaluateIntegral('3')).toEqualTypeOf<DecimalSource>();
+    // The continuous span is always answerable once a formula is integrable, so
+    // it needs no grading.
+    expectTypeOf(formula.cumulative(0, 10)).toEqualTypeOf<DecimalSource>();
+    // The discrete one is graded, because exactness depends on the chain.
+    expectTypeOf(formula.sum(0, 10)).toEqualTypeOf<Series>();
+  });
+
+  it('discriminates on reason, so an unsummable chain cannot be read as a value', () => {
+    type Exact = Extract<Series, { reason: 'exact' }>;
+    type Approximate = Extract<Series, { reason: 'approximate' }>;
+    type Unsummable = Extract<Series, { value: null }>;
+
+    expectTypeOf<Exact['value']>().toEqualTypeOf<DecimalSource>();
+    expectTypeOf<Approximate['value']>().toEqualTypeOf<DecimalSource>();
+    // The error estimate lives only on the approximate arm, so a caller can't
+    // read an accuracy claim off an exact answer or ignore one on an estimate.
+    expectTypeOf<Approximate['error']>().toEqualTypeOf<number>();
+    expectTypeOf<Unsummable['value']>().toBeNull();
+  });
+
+  it('prices and counts through the same two-boolean surface, with no operation knob', async () => {
+    const { calculateCost, calculateMaxAffordable } = await import('@/core/formulas/formulas');
+    // `directSum` used to sit here selecting *which operation* the caller got —
+    // integral below the threshold, series above it. Its absence is the fix.
+    const { F } = await import('@/core/formulas/formulas');
+    const cost = F.exponential(0, 10, 1.15);
+
+    expectTypeOf(calculateCost).toBeCallableWith(cost, 5, true);
+    // @ts-expect-error — the fourth argument was `directSum`, and it is gone.
+    calculateCost(cost, 5, true, 10);
+
+    expectTypeOf(calculateMaxAffordable)
+      .parameter(3)
+      .toEqualTypeOf<Computable<DecimalSource> | undefined>();
+    // @ts-expect-error — `maxBulkAmount` moved into the slot `directSum` held,
+    // so the old five-argument call no longer type-checks.
+    calculateMaxAffordable(cost, createResource(ref(0)), true, undefined, 10);
   });
 });
 
