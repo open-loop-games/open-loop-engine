@@ -1388,6 +1388,19 @@ function payable(price: DecimalSource, balance: DecimalSource): boolean {
   return Decimal.lte_tolerance(price, balance, AFFORDABILITY_TOLERANCE);
 }
 
+/**
+ * Count how many levels a resource can currently afford on a cost curve.
+ *
+ * Counts through the same series {@link calculateCost} charges, so the count
+ * and the charge agree — a bulk buy is priced at exactly what the same
+ * purchases cost one at a time.
+ *
+ * @param formula - Cost formula (must be invertible; must be integrable if cumulative)
+ * @param resource - The resource paying for the levels
+ * @param cumulativeCost - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
+ * @param maxBulkAmount - Ceiling on the returned count, for "buy max" caps. Default: unbounded
+ * @returns Reactive count of affordable levels, recomputed as the resource and the formula's inputs change
+ */
 export function calculateMaxAffordable(
   formula: GenericFormula,
   resource: Resource,
@@ -1549,12 +1562,11 @@ export function calculateMaxAffordable(
 /**
  * Calculate the total cost of purchasing a specific number of levels.
  *
- * Under `cumulativeCost` this is the **series** `Σ f(a+i)` — what buying the
- * levels one at a time charges — not the continuous area under the cost curve.
- * The two differ by a boundary term worth 7.3% on the canonical `1.15ⁿ` curve
- * and 44% at `2ⁿ`, and charging the second for the first is what this
- * function used to do. Companion to {@link calculateMaxAffordable}, which
- * counts levels through the same operation so the count and the charge agree.
+ * Under `cumulativeCost` this is the **series** {@link Formula.sum} — what
+ * buying the levels one at a time charges — not the continuous area
+ * {@link Formula.cumulative} under the same curve. Companion to
+ * {@link calculateMaxAffordable}, which counts levels through the same
+ * operation so the count and the charge agree.
  *
  * @param formula - Cost formula (must be invertible; must be integrable if cumulative)
  * @param amountToBuy - Number of levels to price

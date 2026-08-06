@@ -1,10 +1,8 @@
 # Composition
 
-Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.
+Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` are the meta-shape every batch-registration category extends; `Sequencer` is the shared ordered-dispatch primitive.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `createCategoryBase` — build a custom batch-registration category when built-ins do not fit.
 - `createContentRegistry` — hold patchable content definitions for mods and registration.
@@ -15,7 +13,7 @@ Start with these public symbols before scanning the full inventory below.
 shared skeleton for batch-registration categories
 
 - `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:118`
-- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` — Options for createCategoryBase. `src/systems/category-base.ts:84`
+- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:84`
 - `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:76`
 - `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:59`
 - `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:170`

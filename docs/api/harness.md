@@ -1,10 +1,8 @@
 # Harness
 
-Headless-sim substrate. Matrix and predicate-bounded runners, probes, content walkers, the picker for solver/UI enumeration, solvers (bisection), perturbation, analyzers, run pools, and typed harness contracts. Separable from the rest of the engine — game code never imports harness; balance tooling does.
+Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers, run pools. Separable — game code never imports harness; balance tooling does.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `runHeadless` / `runUntil` — deterministic fixed-tick and predicate-bounded simulations.
 - `replayLive` / `createTickCounter` — replay live-play dt cadence (speed-scaled) deterministically; count sub-ticks for fixed-mode speed-invariance assertions.
@@ -55,7 +53,7 @@ Walk engine state to enumerate addressable choices for solvers / UIs.
 - `interface ModifierPickerEntry` — A perturbable modifier surface discovered by the picker. `src/harness/picker/types.ts:103`
 - `type PickerAddress = ModifierPickerAddress | TunablePickerAddress` — Address of any PickerEntry. `src/harness/picker/types.ts:95`
 - `type PickerEntry = ModifierPickerEntry | TunablePickerEntry` — Normalized picker output. `src/harness/picker/types.ts:143`
-- `interface PickerSnapshot` — Result of createPickerSnapshot. `src/harness/picker/types.ts:154`
+- `interface PickerSnapshot` `src/harness/picker/types.ts:154`
 - `type PickerSource = 'content' | 'chain-registry' | 'tunable'` — Which discovery walker produced a given PickerEntry. `src/harness/picker/types.ts:34`
 - `interface TunablePickerAddress` — Address of a `TunablePickerEntry`. `src/harness/picker/types.ts:81`
 - `interface TunablePickerEntry` — A designer-flagged tunable value discovered by the picker. `src/harness/picker/types.ts:126`
@@ -96,7 +94,7 @@ reduces raw per-run results into per-metric stats, optional histograms, and (for
 - `function createWorkPlan<C>(config: { cells: C[]; seeds: number[]; }): WorkItem<C>[]` — Build the flat `(cellIdx, seedIdx, seed, cell)` array that runMatrix and runMatrixUntil iterate. `src/harness/work-plan.ts:38`
 - `function diffAggregates(cell: CellAggregate, baseline: CellAggregate): Record<string, MetricDelta>` — Per-metric delta between a variant cell aggregate and the baseline. `src/harness/aggregate.ts:233`
 - `function replayLive(driver: TickDriver, options: ReplayLiveOptions): Promise<number>` — Replay `seconds` of live play at `speed` through `driver`, reproducing `intervalTick`'s dt math deterministically. `src/harness/replay.ts:57`
-- `interface ReplayLiveOptions` — Options for replayLive. `src/harness/replay.ts:30`
+- `interface ReplayLiveOptions` `src/harness/replay.ts:30`
 - `function runBatch(config: BatchConfig): MatrixResult` — Run every config × seed pair via runMatrix. `src/harness/run-batch.ts:34`
 - `function runMatrix(config: MatrixConfig): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
 - `function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:53`

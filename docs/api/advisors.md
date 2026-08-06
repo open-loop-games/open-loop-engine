@@ -1,10 +1,8 @@
 # Advisors
 
-Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share. Candidates are abstract — for map-based steering, build them from spatial.md influence-layer readings.
+Decision-support systems that observe the engine and rank actions: rule advisor, goal picker, recommendation system, and the selection policies they share. Candidates are abstract — build map-based ones from spatial.md influence readings.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.
 - `createGoalPicker` — pick weighted goals from a candidate pool.
@@ -38,11 +36,11 @@ score-and-pick over a candidate list
 
 inter-loop arbitration across registered defs
 
-- `interface BestReplayDefOptions` — Options for createBestReplayDef. `src/systems/recommendation-strategies.ts:30`
+- `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:30`
 - `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:99`
 - `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:184`
 - `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each loop restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:356`
-- `interface GoalDefOptions` — Options for createGoalDef. `src/systems/recommendation-strategies.ts:41`
+- `interface GoalDefOptions` `src/systems/recommendation-strategies.ts:41`
 - `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:118`
 - `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:52`
 - `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:97`

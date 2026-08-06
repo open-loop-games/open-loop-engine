@@ -1,10 +1,8 @@
 # Runtime
 
-The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.
+How an engine assembles and ticks. `createEngine` and the module/event/save wiring, TickDriver (variable-dt and fixed-step), typed event emitter, throttle, play-clock, transition-distance math, the ambient accessor context.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.
 - `EngineModule` / `EngineContext` — install/connect game content and share engine services.
@@ -33,24 +31,9 @@ the module-system façade that composes core + systems into a runnable game: _cr
 
 ## Reactivity re-exports
 
-Vue's reactivity API surfaced through the engine
+Vue's reactivity API surfaced through the engine — import these from `@open-loop/engine`, not from `vue`: a separately-resolved `vue` won't subscribe to engine refs and updates silently miss. Signatures and semantics are Vue's own; read them in Vue's docs.
 
-- `const computed: typeof computed$1` — _(no summary)_ `src/reactivity-reexports.ts`
-- `interface ComputedRef<T = any> extends BaseComputedRef<T>` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): ReactiveEffectRunner<T>` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function effectScope(detached?: boolean): EffectScope` — Creates an effect scope object which can capture the reactive effects (i.e. `src/reactivity-reexports.ts`
-- `class EffectScope` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function isRef<T>(r: Ref<T> | unknown): r is Ref<T>` — Checks if a value is a ref object. `src/reactivity-reexports.ts`
-- `function reactive<T extends object>(target: T): Reactive<T>` — Returns a reactive proxy of the object. `src/reactivity-reexports.ts`
-- `function ref<T>(value: T): [T] extends [Ref] ? IfAny<T, Ref<T>, T> : Ref<UnwrapRef<T>, UnwrapRef<T> | T>` — Takes an inner value and returns a reactive and mutable ref object, which has a single property `.value` that points to the inner value. `src/reactivity-reexports.ts`
-- `interface Ref<T = any, S = T>` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function shallowRef<T>(value: T): Ref extends T ? T extends Ref ? IfAny<T, ShallowRef<T>, T> : ShallowRef<T> : ShallowRef<T>` — Shallow version of ref. `src/reactivity-reexports.ts`
-- `type ShallowRef<T = any, S = T> = Ref<T, S> & { [ShallowRefMarker]?: true; }` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T` — Returns the inner value if the argument is a ref, otherwise return the argument itself. `src/reactivity-reexports.ts`
-- `function watch<T, Immediate extends Readonly<boolean> = false>(source: WatchSource<T>, cb: WatchCallback<T, MaybeUndefined<T, Immediate>>, options?: WatchOptions<Immediate>): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
-- `function watchEffect(effect: WatchEffect, options?: WatchEffectOptions): WatchHandle` — _(no summary)_ `src/reactivity-reexports.ts`
-- `type WatchStopHandle = () => void` — _(no summary)_ `src/reactivity-reexports.ts`
-- `interface WritableComputedRef<T, S = T> extends BaseComputedRef<T, S>` — _(no summary)_ `src/reactivity-reexports.ts`
+`computed` · `ComputedRef` · `effect` · `effectScope` · `EffectScope` · `isRef` · `reactive` · `ref` · `Ref` · `shallowRef` · `ShallowRef` · `unref` · `watch` · `watchEffect` · `WatchStopHandle` · `WritableComputedRef`
 
 ## Events
 
@@ -58,7 +41,7 @@ Typed per-instance event emitter primitive
 
 - `function createEmitHandle<E>(options?: EmitHandleOptions): EmitHandle<E>` — Create a typed event handle for use inside a factory closure. `src/core/events.ts:57`
 - `interface EmitHandle<E>` — Internal event interface held inside factory closures — subscribe and emit. `src/core/events.ts:25`
-- `interface EmitHandleOptions` — Options for createEmitHandle. `src/core/events.ts:36`
+- `interface EmitHandleOptions` `src/core/events.ts:36`
 - `interface Emittable<E>` — Public event interface exposed on system instances — subscribe only, emit is internal. `src/core/events.ts:19`
 
 ## TickDriver
@@ -84,7 +67,7 @@ lightweight tick-callback rate limiter
 
 - `function createThrottle(options: ThrottleOptions): Throttle` — Create a throttle gate for rate-limiting tick callbacks. `src/core/throttle.ts:66`
 - `interface Throttle` — A gate that rate-limits execution within a tick callback. `src/core/throttle.ts:35`
-- `interface ThrottleOptions` — Options for createThrottle. `src/core/throttle.ts:24`
+- `interface ThrottleOptions` `src/core/throttle.ts:24`
 
 ## Time tracking
 

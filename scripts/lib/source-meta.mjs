@@ -28,9 +28,16 @@ export const CLUSTER_OVERRIDES = {
 /**
  * Override the auto-derived title/blurb for a cluster id. Use when no anchor
  * file's header is suitable (e.g. the cluster spans a subdir whose `index.ts`
- * has no header). Both fields optional.
+ * has no header). All fields optional. `prologue` adds a paragraph under the
+ * blurb; `compact: true` lists the cluster's symbols by name only, for
+ * clusters whose signatures and docs are owned by a dependency.
  */
 export const CLUSTER_TITLES = {
+  reactivity: {
+    blurb:
+      "Vue's reactivity API surfaced through the engine — import these from `@open-loop/engine`, not from `vue`: a separately-resolved `vue` won't subscribe to engine refs and updates silently miss. Signatures and semantics are Vue's own; read them in Vue's docs.",
+    compact: true,
+  },
   'spatial-grid': {
     title: 'Grid',
     blurb: 'Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.',

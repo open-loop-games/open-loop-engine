@@ -1,10 +1,8 @@
 # Resources
 
-Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, randomness, and notations sit underneath `createResource`, which produces the reactive game values everything else reads. Conversion and resource bags layer on top. Start here when modelling a new countable quantity.
+Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, and randomness underneath `createResource`; conversion and resource bags on top. Start here for any new countable quantity.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `createResource` — define a named game quantity with persistence and display metadata.
 - `addResource` / `subtractResource` / `hasResource` / `displayResource` — mutate, check, and present resources through the standard helpers.
@@ -73,7 +71,7 @@ the fundamental currency of incremental games
 - `interface ResourceBagOptions` — Options for configuring a resource bag at creation time. `src/core/resource-bag.ts:50`
 - `interface ResourceOptions` — Configuration for createResource. `src/core/resource.ts:90`
 - `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:347`
-- `interface SubtractResourceOptions` — Options for subtractResource. `src/core/resource.ts:328`
+- `interface SubtractResourceOptions` `src/core/resource.ts:328`
 - `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's available stock and the destination's remaining capacity. `src/core/resource-bag.ts:427`
 - `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:299`
 
@@ -82,6 +80,6 @@ the fundamental currency of incremental games
 atomic multi-resource transformation
 
 - `interface Conversion` — A conversion instance returned by createConversion. `src/systems/conversion.ts:92`
-- `interface ConversionOptions<I extends Record<string, Requirement> = Record<string, Requirement>, O extends Record<string, ConversionOutput> = Record<string, ConversionOutput>>` — Options for createConversion. `src/systems/conversion.ts:71`
+- `interface ConversionOptions<I extends Record<string, Requirement> = Record<string, Requirement>, O extends Record<string, ConversionOutput> = Record<string, ConversionOutput>>` `src/systems/conversion.ts:71`
 - `interface ConversionOutput` — One output of a conversion: which Resource gets the gain, and how much. `src/systems/conversion.ts:63`
 - `function createConversion<I extends Record<string, Requirement>, O extends Record<string, ConversionOutput>>(options: ConversionOptions<I, O>): Conversion` — Create a conversion that atomically transforms input resources into output resources. `src/systems/conversion.ts:171`

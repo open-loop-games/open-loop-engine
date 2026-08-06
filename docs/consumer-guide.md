@@ -160,11 +160,9 @@ This is the normal path for one-off constructs, not a failure. The engine's syst
 
 Two adjacent primitives sit in the wider advisor family but don't fit the immediate-choice shape above. `createGoalPicker` maintains a **weighted active-goal pool** (between-tick goal arbitration with persistent state, not a one-shot pick). `createRuleAdvisor` aggregates **observation history** into ranked suggestions surfaced to the player (derived from what happened, not selected from candidates). Both live in `api/advisors.md`; read its Canonical entrypoints block for the one-liner role of each.
 
-**`invert` vs `tryInvert`.** `formula.invert(target)` is the algebraic pre-image, and it answers whether or not that answer is reachable — it's what the op table composes with internally, and it's the right call when you know the target lies in the formula's image (an integer level through a `.floor()`ed XP curve, a cost on a continuous curve). `formula.tryInvert(target)` evaluates the candidate forward and grades it, returning `{ value, reason }`: `exact`, `outside-image` (the target falls in a gap — a fractional level through an interior `.floor()`, a `step` splice whose modifier jumps at the breakpoint, a saturated `min`/`max`), or `not-invertible` / `no-solution` with no value at all. Reach for `tryInvert` whenever the target comes from player input, a solver, or a time axis rather than from a level counter. `isInvertible()` answers only for the *chain*; soundness is a property of *(chain, target)*, so no boolean can settle it — the same curve is exact for level 3 and has no pre-image for 3.5.
+**Formula operations that answer near-identical questions.** Two clusters sit close enough to pick wrong without getting an error for it. *Which input?* — `invert` is the algebraic pre-image (unchecked, because the op table composes with it recursively), `tryInvert` grades that same answer and names the cases where the target falls in a gap the curve never evaluates into, and `firstPassage` answers what a time axis usually meant: the smallest input at which the curve *reaches* a target, needing no inverse at all. *Which total?* — `evaluateIntegral` is the bare antiderivative, `cumulative(a, b)` the continuous area across a span, `sum(a, n)` the discrete series.
 
-**…and `firstPassage`, which is what a time axis usually wanted.** `formula.firstPassage(target)` is the smallest input at which the curve *reaches* the target — "when does the burn overtake production", not "what input maps to this output". It searches the forward function instead of running the algebra backward, so it stays correct through exactly the cases `tryInvert` can only report on: it answers the far side of a `step` splice's jump, the next breakpoint above an interior `.floor()`, and `no-crossing` when a `min` saturates below the target. It needs no inverse at all, so a forward-only chain (outermost `ceil`/`floor`/`min`/`max`) is answerable too. The rule of thumb: if `tryInvert` hands you `outside-image` and you wanted the input that *gets you there*, that's `firstPassage`. Two constraints — it searches upward over a non-decreasing curve (a falling curve reports `not-monotone`; negate the chain, or use `timeUntilConditionFlip` when the quantity is a live resource), and above layer 0 the answer carries roughly `16 − log₁₀(log₁₀ x)` significant digits, because the representation stores a logarithm in a float64.
-
-**Area under a curve vs cost of the levels under it.** Three `Formula` operations look like "the integral" and are not interchangeable. `evaluateIntegral(x)` is the raw **antiderivative**, arbitrary constant and all — `Formula.exponential(0, 10, 1.15).evaluateIntegral(0)` is 71.55, not 0 — so a single reading of it means nothing on its own. `cumulative(a, b)` is the **continuous area** across a span; it's the rate-function lineage's cumulative and what `firstPassage` inverts, so reach for it when integrating a *rate over time*. `sum(a, n)` is the **discrete series** `Σ f(a+i)`, which is what a level-indexed cost curve actually is: buying `n` levels charges the sum, never the area. The gap is a boundary term, not a rounding error — 7.3% on a `1.15ⁿ` curve, 44% on a `2ⁿ` — and it runs in the player's disfavour. `calculateCost` and `calculateMaxAffordable` both use the series, so "buy max" charges exactly what the same purchases cost bought singly. `sum` returns `{ value, reason }` like `tryInvert`: `exact` for anything built from the shipped curves by `+`, `−`, and constant `×`/`÷`; `approximate` with an `error` estimate where only a continuous correction is available; `not-summable` when there's nothing to correct either.
+The compressor for both clusters: ask whether your axis is **levels** or **time**. A cost curve is indexed by level, so it wants `sum` — and `calculateCost` / `calculateMaxAffordable` both use it, so a bulk buy prices at exactly what those purchases cost bought singly. A rate integrated over elapsed seconds is `cumulative`, which is what `firstPassage` inverts. The two totals differ by a boundary term, not a rounding error, so the wrong one is wrong at any tolerance. Each method's tsdoc carries the distinction from the inside — the failure reasons, the size of the gap, the monotonicity and precision constraints — and cross-links its siblings; read them at the callsite rather than here.
 
 **Introspection vs harness.** "Discover what's live in this engine right now" → introspection. "Run a simulation against this engine state" → harness. A dev panel usually starts with introspection; a balance experiment starts with harness.
 
@@ -339,23 +337,7 @@ const prestige = createConversion({
 
 **Prestige does not require a Conversion.** `createReset` plus a gain function is the entire pattern, and several shipping games compose it that way rather than routing through this factory. Reach for a Conversion when you want gate + gain + reset bundled behind one `convert()` with `canConvert` / `currentGain` for the UI to read; drop to `createReset` when you don't. Neither is the blessed path.
 
-For the gain curve itself, compose the arithmetic you need rather than looking for a prestige-formula helper — the engine ships none. A fixed-exponent floored root is `integerRoot` (below); a curve whose exponent moves at runtime is a `Formula` chain, which also inverts for a "next at" display.
-
-### Sublinear per-source payouts
-
-A common prestige-currency shape (Industry Idle's Merge fragments, and games that copy it) pays out a **power-law transform of run output, summed per source** — each run-long accumulator diminishes independently:
-
-```ts
-import { integerRoot, Decimal } from '@open-loop/engine';
-
-// sources = [{ total: ∫production dt, scale: 280 }, { total: ∫pressure dt, scale: 350 }]
-const payout = sources.reduce(
-  (acc, s) => acc.add(integerRoot(Decimal.div(s.total, s.scale), 3)),
-  new Decimal(0),
-);
-```
-
-Two things carry the shape. **Sum per source, don't pool** — `⌊∛(a/sₐ)⌋ + ⌊∛(b/s_b)⌋`, not `⌊∛((a+b)/s)⌋`. Pooling before the root lets one dominant source mask the others, collapsing the "every source must be cultivated" pressure that makes the mechanic interesting; the per-source floor is what makes each source's returns bite on its own curve. **Floor with `integerRoot`, not `Decimal.floor(Decimal.root(...))`** — break_eternity routes `root`/`pow` through log/exp, so a raw floored root under-counts at perfect powers (∛8 → 1); `integerRoot(x, n)` settles the floor in exact integer arithmetic below 9e15 and against the root's measured error bar above it. Past that bar the floor stops being provable — for a cube root that is around 1e33, well past where a run accumulator lands, but a game whose totals reach it can ask `tryIntegerRoot(x, n)` instead: same value, plus whether it is the verified floor or an estimate and how many integers wide the doubt is. The `scale` per source sets its exchange rate and can be a reactive tunable; the `3` is the power (cube-root ≈ p⅓ diminishing returns — raise the degree for harsher falloff). Wire the accumulators, wallet, and quorum consumer-side — those diverge per game; the payout formula above is the shared part.
+For the gain curve itself, compose the arithmetic you need rather than looking for a prestige-formula helper — the engine ships none. A fixed-exponent floored root is `integerRoot`; a curve whose exponent moves at runtime is a `Formula` chain, which also inverts for a "next at" display. For the per-source sublinear payout shape built on the former, see [consumer-guide-recipes.md §Sublinear per-source prestige payouts](./consumer-guide-recipes.md#sublinear-per-source-prestige-payouts).
 
 ## Modifier chains and effects
 
@@ -398,38 +380,7 @@ For conditional modifiers (active only when a condition is met), there are three
 
 When a challenge or prestige layer replaces one multiplier with another while active (AD's IC3 tickspeed rewire is the canonical example), use `replacementBinding` to generate the cancel + replacement pair as one call. It expands to two separately-described chain entries so attribution stays intact — do not use `OverrideRegistry` for this, which bypasses the chain and defeats introspection.
 
-### Cross-action bonuses
-
-When one content definition's bonus scales by another definition's state — action A's yield multiplied while B has been unlocked, skill A's XP rate boosted by skill B's level, upgrade A granting a bonus gated on C being owned — it's a conditional modifier on A's gain chain whose `active` predicate or `multiplier` value reads from B. No new primitive needed.
-
-**Binary gate (owned / unlocked / ≥1 of a resource).** The simplest shape — a multiplicative bonus that flips on when the source is present. Bind directly onto the target's gain chain:
-
-```ts
-for (const ref of def.affectedBy ?? []) {
-  def.gainChain.bind({
-    active: () => hasResource(ref.action, 1),
-    modifier: createMultiplicativeModifier({
-      multiplier: ref.multiplier,
-      description: `${ref.action} bonus`,
-    }),
-  });
-}
-```
-
-Auto-attributed via the ambient persistent context; `chain.bindings` surfaces each contribution to balance-sim with no extra wiring.
-
-**Level-scaled bonus (source's level/xp multiplies the target).** Reactivity lives inside the modifier value, not the `active` predicate — the binding is always live, and the multiplier evaluates to `1` when the source is at zero, producing a no-op contribution:
-
-```ts
-def.gainChain.bind({
-  modifier: createMultiplicativeModifier({
-    multiplier: computed(() => Decimal.add(1, Decimal.mul(sourceLevel.value, perLevelBonus))),
-    description: `${ref.action} mastery bonus`,
-  }),
-});
-```
-
-The `chain.bind` vs `createPersistentEffectSystem` choice here is the same ladder from the top of this section. idle-loops-ng uses `PersistentEffectSystem.register` in places only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
+The most common shape this ladder gets used for — one definition's yield scaled by another definition's state — is worked in [consumer-guide-recipes.md §Cross-action bonuses](./consumer-guide-recipes.md#cross-action-bonuses).
 
 ## Tunable knobs
 
@@ -479,6 +430,9 @@ Recurring shapes consumers assemble from engine primitives — worked patterns f
 - **Priority-weighted fill** — interleave multiple content categories under one priority order via a `passBonus` map.
 - **Character interaction** — dialog (contract-first runtime) and subjects (typed multi-field relationship state), and where they connect.
 - **Spatial grids** — `createSpatialGrid` board state, runtime placement/removal, the grid-replacement event gotcha, and the adjacency→stat-bonus seam (pure evaluator over an occupancy view).
+- **Cross-action bonuses** — A's yield scaled by B's state, as a binary-gate or level-scaled binding on A's gain chain.
+- **Sublinear per-source prestige payouts** — power-law transform of run output, summed per source rather than pooled.
+- **Shared pure state-function** — one pure fn over game state called by both the live tick and the balance harness, so the two can't drift.
 
 ## Domain-language map
 

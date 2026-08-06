@@ -1,10 +1,8 @@
 # Mechanics
 
-The composable evaluation kernel. Modifier chains, requirements, formulas, computed bindings, conditions, effects, gates, and trace. Pure-function evaluation (no Vue dependency in the core) plus reactive wrappers — the substrate the content systems compose against.
+The composable evaluation kernel — modifier chains, requirements, formulas, computed bindings, effects, gates, trace. Pure evaluation plus reactive wrappers; the substrate content systems compose against.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `createModifierChain` plus `chain.bind` — shared bonus surfaces and attributed conditional modifiers.
 - `createCostRequirement` / `createBooleanRequirement` — spend-bearing and predicate-only requirements.
@@ -41,14 +39,14 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:54`
 - `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:77`
 - `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:91`
-- `interface PersistentEffectSystemOptions` — Options for createPersistentEffectSystem. `src/systems/persistent-effect.ts:85`
+- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:85`
 - `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:100`
-- `interface ReplacementBindingOptions` — Options for replacementBinding. `src/systems/modifier-binding.ts:39`
+- `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:39`
 - `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:56`
 - `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:106`
 - `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:90`
 - `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:124`
-- `interface TemporaryEffectSystemOptions` — Options for createTemporaryEffectSystem. `src/systems/temporary-effect.ts:116`
+- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:116`
 
 ## Formulas
 
@@ -57,9 +55,9 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:74`
 - `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:92`
 - `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:87`
-- `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1564`
-- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean): DecimalSource` `src/core/formulas/formulas.ts:1569`
-- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — _(no summary)_ `src/core/formulas/formulas.ts:1391`
+- `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1576`
+- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean): DecimalSource` `src/core/formulas/formulas.ts:1581`
+- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve. `src/core/formulas/formulas.ts:1404`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:92`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:45`
 - `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1294`
@@ -114,7 +112,7 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:57`
 - `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:278`
 - `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:143`
-- `interface GateRequirementOptions` — Options for createGateRequirement. `src/systems/gate.ts:245`
+- `interface GateRequirementOptions` `src/systems/gate.ts:245`
 - `interface GateRuntime` — The three engine handles evaluateGate and timeUntilGateFlip need at runtime. `src/systems/gate.ts:89`
 - `function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRuntime` — Resolve the three ambient handles into a GateRuntime bundle. `src/systems/gate.ts:109`
 - `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:188`
@@ -123,7 +121,7 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 
 composable value calculation chains
 
-- `interface AdditiveModifierOptions` — Options for createAdditiveModifier. `src/core/modifier.ts:64`
+- `interface AdditiveModifierOptions` `src/core/modifier.ts:64`
 - `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:762`
 - `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:776`
 - `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:424`
@@ -134,14 +132,14 @@ composable value calculation chains
 - `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:587`
 - `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions, S = OperationModifier<T>>(options: T): S` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:167`
 - `function createSequentialModifier<T extends Modifier, S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }>(modifiers: T[]): S` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:317`
-- `interface ExponentialModifierOptions` — Options for createExponentialModifier. `src/core/modifier.ts:198`
+- `interface ExponentialModifierOptions` `src/core/modifier.ts:198`
 - `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:452`
 - `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:789`
 - `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:32`
 - `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:493`
 - `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:373`
 - `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:44`
-- `interface MultiplicativeModifierOptions` — Options for createMultiplicativeModifier. `src/core/modifier.ts:125`
+- `interface MultiplicativeModifierOptions` `src/core/modifier.ts:125`
 - `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:56`
 
 ## Requirements
@@ -150,9 +148,9 @@ Requirements system for gating purchases, unlocks, and actions
 
 - `function allOf(...children: Requirement[]): Requirement` — Compose requirements with AND semantics. `src/core/requirements.ts:365`
 - `function anyOf(...children: Requirement[]): Requirement` — Compose requirements with OR semantics. `src/core/requirements.ts:314`
-- `interface BooleanRequirementOptions` — Options for creating a boolean requirement. `src/core/requirements.ts:240`
+- `interface BooleanRequirementOptions` `src/core/requirements.ts:240`
 - `interface CostRequirement extends Requirement` — A requirement that costs a resource to satisfy. `src/core/requirements.ts:112`
-- `interface CostRequirementOptions` — Options for creating a cost requirement. `src/core/requirements.ts:76`
+- `interface CostRequirementOptions` `src/core/requirements.ts:76`
 - `function createBooleanRequirement<T extends BooleanRequirementOptions>(options: T): Requirement` — Create a simple true/false requirement. `src/core/requirements.ts:261`
 - `function createCostRequirement<T extends CostRequirementOptions>(options: T): CostRequirement` — Create a requirement based on spending a resource. `src/core/requirements.ts:151`
 - `function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void` — Create a pay function that resets to default. `src/core/requirements.ts:489`
@@ -176,7 +174,7 @@ stateless tickable progress accumulator
 - `function resourceConsumedAt(progress: DecimalSource, duration: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units should be consumed at a given progress level. `src/core/timed-progress.ts:268`
 - `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; duration: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:372`
 - `interface TimedProgress` — A stateless ticking progress accumulator created by createTimedProgress. `src/core/timed-progress.ts:66`
-- `interface TimedProgressOptions` — Options for createTimedProgress. `src/core/timed-progress.ts:33`
+- `interface TimedProgressOptions` `src/core/timed-progress.ts:33`
 
 ## Trace
 

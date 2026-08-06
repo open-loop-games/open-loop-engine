@@ -1,10 +1,8 @@
 # Narrative
 
-Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.
+Character-interaction systems: Dialog (authored conversation graphs, native runtime, swappable adapter contract) and Subject (named entities with typed multi-field state). Specialized in incremental games, near-default in narrative-adjacent ones.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `createDialogCategory` — batch-register authored conversation graphs.
 - `createDialogSession` — persistent UI/runtime envelope for driving dialog.
@@ -20,7 +18,7 @@ authored conversation graphs and the engine-native runtime that walks them. The 
 - `function createNativeDialogRuntime(options: NativeDialogRuntimeOptions): NativeDialogRuntime` — Construct a native dialog runtime backed by the supplied graphs + accessor + mutator. `src/systems/dialog.ts:188`
 - `interface DialogCategory<Def extends { id: string; }> extends ResettableObject` — A dialog category — batch-registered NPC/scene dialog content. `src/systems/dialog-category.ts:43`
 - `interface DialogCategoryEntry<Def extends { id: string; }>` — A registered entry: definition + dialog graphs (no per-instance state). `src/systems/dialog-category.ts:37`
-- `interface DialogCategoryOptions<Def extends { id: string; }>` — Options for createDialogCategory. `src/systems/dialog-category.ts:25`
+- `interface DialogCategoryOptions<Def extends { id: string; }>` `src/systems/dialog-category.ts:25`
 - `interface DialogChoice` — A single response option attached to a DialogNode. `src/systems/dialog.ts:49`
 - `interface DialogGraph` — A complete authored conversation: nodes plus an entry pointer. `src/systems/dialog.ts:64`
 - `interface DialogNode` — A single line/branch in a dialog graph. `src/systems/dialog.ts:31`
@@ -52,7 +50,7 @@ addressable subjects with typed multi-field state
 - `interface ScalarFieldInstance extends Emittable<ScalarFieldEvents>` — Live scalar accessor built from a ScalarFieldDef. `src/systems/subject-category.ts:99`
 - `interface SubjectCategory<S extends FieldSchema> extends ResettableObject` — Container that registers subjects against a shared schema and builds the matching typed instance for each. `src/systems/subject-category.ts:245`
 - `interface SubjectCategoryEntry<S extends FieldSchema>` — One entry inside a SubjectCategory — authored def + live instance. `src/systems/subject-category.ts:225`
-- `interface SubjectCategoryOptions<S extends FieldSchema>` — Options for createSubjectCategory. `src/systems/subject-category.ts:232`
+- `interface SubjectCategoryOptions<S extends FieldSchema>` `src/systems/subject-category.ts:232`
 - `interface SubjectDef<S extends FieldSchema>` — Authoring shape for one subject in a SubjectCategory. `src/systems/subject-category.ts:212`
 - `interface SubjectInstance<S extends FieldSchema>` — Live subject — typed field accessors keyed by schema field name. `src/systems/subject-category.ts:219`
 - `interface TierFieldDef` — Ordered tier ladder with per-transition advancement gates. `src/systems/subject-category.ts:62`

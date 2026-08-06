@@ -353,6 +353,55 @@ function preview(id: string, x: number, y: number) {
 
 Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship — full row, full column, radial arcs — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator. Anything expressible as a fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood` or an ad-hoc `neighbors(x, y, deltas)` instead, not a hand-roll.
 
+## Cross-action bonuses
+
+When one content definition's bonus scales by another definition's state — action A's yield multiplied while B has been unlocked, skill A's XP rate boosted by skill B's level, upgrade A granting a bonus gated on C being owned — it's a conditional modifier on A's gain chain whose `active` predicate or `multiplier` value reads from B. No new primitive needed.
+
+**Binary gate (owned / unlocked / ≥1 of a resource).** The simplest shape — a multiplicative bonus that flips on when the source is present. Bind directly onto the target's gain chain:
+
+```ts
+for (const ref of def.affectedBy ?? []) {
+  def.gainChain.bind({
+    active: () => hasResource(ref.action, 1),
+    modifier: createMultiplicativeModifier({
+      multiplier: ref.multiplier,
+      description: `${ref.action} bonus`,
+    }),
+  });
+}
+```
+
+Auto-attributed via the ambient persistent context; `chain.bindings` surfaces each contribution to balance-sim with no extra wiring.
+
+**Level-scaled bonus (source's level/xp multiplies the target).** Reactivity lives inside the modifier value, not the `active` predicate — the binding is always live, and the multiplier evaluates to `1` when the source is at zero, producing a no-op contribution:
+
+```ts
+def.gainChain.bind({
+  modifier: createMultiplicativeModifier({
+    multiplier: computed(() => Decimal.add(1, Decimal.mul(sourceLevel.value, perLevelBonus))),
+    description: `${ref.action} mastery bonus`,
+  }),
+});
+```
+
+Which of `chain.bind` / declarative `grants` / `createPersistentEffectSystem` to reach for is the ladder in [consumer-guide.md §Modifier chains and effects](./consumer-guide.md#modifier-chains-and-effects); this recipe is what the binding looks like once you've picked. idle-loops-ng uses `PersistentEffectSystem.register` in places only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
+
+## Sublinear per-source prestige payouts
+
+A common prestige-currency shape (Industry Idle's Merge fragments, and games that copy it) pays out a **power-law transform of run output, summed per source** — each run-long accumulator diminishes independently:
+
+```ts
+import { integerRoot, Decimal } from '@open-loop/engine';
+
+// sources = [{ total: ∫production dt, scale: 280 }, { total: ∫pressure dt, scale: 350 }]
+const payout = sources.reduce(
+  (acc, s) => acc.add(integerRoot(Decimal.div(s.total, s.scale), 3)),
+  new Decimal(0),
+);
+```
+
+Two things carry the shape. **Sum per source, don't pool** — `⌊∛(a/sₐ)⌋ + ⌊∛(b/s_b)⌋`, not `⌊∛((a+b)/s)⌋`. Pooling before the root lets one dominant source mask the others, collapsing the "every source must be cultivated" pressure that makes the mechanic interesting; the per-source floor is what makes each source's returns bite on its own curve. **Floor with `integerRoot`, not `Decimal.floor(Decimal.root(...))`** — break_eternity routes `root`/`pow` through log/exp, so a raw floored root under-counts at perfect powers (∛8 → 1); read `integerRoot`'s tsdoc for where the floor stops being provable and what `tryIntegerRoot` reports instead. The `scale` per source sets its exchange rate and can be a reactive tunable; the `3` is the power (cube-root ≈ p⅓ diminishing returns — raise the degree for harsher falloff). Wire the accumulators, wallet, and quorum consumer-side — those diverge per game; the payout formula above is the shared part.
+
 ## Shared pure state-function across live tick and harness
 
 The balance harness only tells the truth if it measures the shipping game — the moment it re-implements a pacing rule or a policy decision, the two drift and every number it produces describes code that isn't running in the game. The fix is a discipline, not a primitive: the decision or step logic lives in ONE pure function over game state, exported from the game-logic module, and BOTH the live `onTick` path and the harness/sim path import and call it. Cadence and rate-limiting stay with each caller; the pure fn is stateless of *when* it runs.

@@ -16,7 +16,7 @@ export const TIER_MANIFEST = [
     tier: 'resources',
     title: 'Resources',
     scope:
-      'Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, randomness, and notations sit underneath `createResource`, which produces the reactive game values everything else reads. Conversion and resource bags layer on top. Start here when modelling a new countable quantity.',
+      'Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, and randomness underneath `createResource`; conversion and resource bags on top. Start here for any new countable quantity.',
     entrypoints: [
       '`createResource` — define a named game quantity with persistence and display metadata.',
       '`addResource` / `subtractResource` / `hasResource` / `displayResource` — mutate, check, and present resources through the standard helpers.',
@@ -30,7 +30,7 @@ export const TIER_MANIFEST = [
     tier: 'mechanics',
     title: 'Mechanics',
     scope:
-      'The composable evaluation kernel. Modifier chains, requirements, formulas, computed bindings, conditions, effects, gates, and trace. Pure-function evaluation (no Vue dependency in the core) plus reactive wrappers — the substrate the content systems compose against.',
+      'The composable evaluation kernel — modifier chains, requirements, formulas, computed bindings, effects, gates, trace. Pure evaluation plus reactive wrappers; the substrate content systems compose against.',
     entrypoints: [
       '`createModifierChain` plus `chain.bind` — shared bonus surfaces and attributed conditional modifiers.',
       '`createCostRequirement` / `createBooleanRequirement` — spend-bearing and predicate-only requirements.',
@@ -54,7 +54,7 @@ export const TIER_MANIFEST = [
     tier: 'composition',
     title: 'Composition',
     scope:
-      'Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` form the meta-shape every batch-registration category extends; `Sequencer` (with fill strategies) is the reusable composition primitive used by both engine and content layers. Start here when building a new category factory or composing a custom registration surface.',
+      'Substrate the content systems compose against. `CategoryBase` + `ContentRegistry` are the meta-shape every batch-registration category extends; `Sequencer` is the shared ordered-dispatch primitive.',
     entrypoints: [
       '`createCategoryBase` — build a custom batch-registration category when built-ins do not fit.',
       '`createContentRegistry` — hold patchable content definitions for mods and registration.',
@@ -66,7 +66,7 @@ export const TIER_MANIFEST = [
     tier: 'content-systems',
     title: 'Content Systems',
     scope:
-      'Currency-flow and long-arc structure systems — the validated incremental-game primitives. Purchasable / Producer / Achievement / Inventory / BestOf for economy; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog for progression. Each is a typed registration surface over the mechanics kernel; category factories batch-register many definitions.',
+      'The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog carry long-arc structure.',
     entrypoints: [
       '`createProducerCategory` — buildings/generators whose ownership creates continuous resource flow.',
       '`createPurchasableCategory` — upgrades, gates, capped repeatables, perks, and bought effects in batch.',
@@ -95,7 +95,7 @@ export const TIER_MANIFEST = [
     tier: 'content-narrative',
     title: 'Narrative',
     scope:
-      'Tier-4 character-interaction systems — specialized in incremental games, near-default in narrative-adjacent codebases. Dialog (authored conversation graphs + native runtime + swappable adapter contract) and Subject (addressable named entities with typed multi-field state). Both compose engine substrate (conditions, effects, gates) into save-friendly drivers.',
+      'Character-interaction systems: Dialog (authored conversation graphs, native runtime, swappable adapter contract) and Subject (named entities with typed multi-field state). Specialized in incremental games, near-default in narrative-adjacent ones.',
     entrypoints: [
       '`createDialogCategory` — batch-register authored conversation graphs.',
       '`createDialogSession` — persistent UI/runtime envelope for driving dialog.',
@@ -108,7 +108,7 @@ export const TIER_MANIFEST = [
     tier: 'lifecycle',
     title: 'Lifecycle',
     scope:
-      'Save/load, reset cascades, persistent refs, offline catch-up, retention policies. Anything that crosses session boundaries or prestige resets. `withPersistentContext` is the namespacing primitive every save-touching factory uses; `createSaveManager` is the multi-slot envelope; `createReset` carries retention rules between prestige tiers.',
+      'Anything that crosses a session boundary or a prestige reset — `withPersistentContext` namespacing, `createSaveManager` slots and migration, `createReset` with retention policies, offline catch-up.',
     entrypoints: [
       '`withPersistentContext` / `persistent` — create save-owned refs under stable namespaces.',
       '`createReset` with `resetModules` — reset module/category scopes without manually listing every ref.',
@@ -123,7 +123,7 @@ export const TIER_MANIFEST = [
     tier: 'runtime',
     title: 'Runtime',
     scope:
-      'The runtime substrate every engine carries. `createEngine` and the module/event/save wiring; the TickDriver (variable-dt and fixed-step modes); typed per-instance event emitter; throttle, time tracking, transition-distance math; the ambient game-state-accessor context. Start here to understand how an engine assembles and ticks.',
+      'How an engine assembles and ticks. `createEngine` and the module/event/save wiring, TickDriver (variable-dt and fixed-step), typed event emitter, throttle, play-clock, transition-distance math, the ambient accessor context.',
     entrypoints: [
       '`createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.',
       '`EngineModule` / `EngineContext` — install/connect game content and share engine services.',
@@ -147,7 +147,7 @@ export const TIER_MANIFEST = [
     tier: 'introspection',
     title: 'Introspection',
     scope:
-      'The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.',
+      'The cross-cutting "walk every X" surface external tools read — devtools, mods, balance workbenches. `EngineCategories`, per-engine registries, `tunable()` plus the override/tuning registries, profiler and safeguards. All reachable through injection keys.',
     entrypoints: [
       '`EngineCategories` / `CategoriesKey` — discover auto-registered content categories.',
       '`createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.',
@@ -167,7 +167,7 @@ export const TIER_MANIFEST = [
     tier: 'advisors',
     title: 'Advisors',
     scope:
-      'Decision-support systems that observe the engine and rank or recommend actions. The rule advisor (aggregate history into ranked suggestions), goal picker (which goal to pursue next), recommendation system (curated next-actions for the player), and the selection policies they share. Candidates are abstract — for map-based steering, build them from spatial.md influence-layer readings.',
+      'Decision-support systems that observe the engine and rank actions: rule advisor, goal picker, recommendation system, and the selection policies they share. Candidates are abstract — build map-based ones from spatial.md influence readings.',
     entrypoints: [
       '`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.',
       '`createGoalPicker` — pick weighted goals from a candidate pool.',
@@ -180,7 +180,7 @@ export const TIER_MANIFEST = [
     tier: 'spatial',
     title: 'Spatial',
     scope:
-      'Coordinate-based primitives. Grid, graph, scope stack, influence layer. Used by board-state and adjacency-driven games — hex maps, dungeon layouts, factory grids. Headless: no rendering, just adjacency and traversal. For steering an agent by these fields, rank candidates with advisors.md (goal picker / selection policies).',
+      'Coordinate primitives for adjacency-driven games — grid, graph, scope stack, influence layer. Headless: adjacency and traversal, no rendering. Rank the fields through advisors.md to steer an agent.',
     entrypoints: [
       '`createSpatialGrid` — bounded coordinate boards with adjacency, BFS, FOV adapter, and snapshots.',
       '`createSpatialGraph` — arbitrary node/edge topology with nested child graphs.',
@@ -193,7 +193,7 @@ export const TIER_MANIFEST = [
     tier: 'harness',
     title: 'Harness',
     scope:
-      'Headless-sim substrate. Matrix and predicate-bounded runners, probes, content walkers, the picker for solver/UI enumeration, solvers (bisection), perturbation, analyzers, run pools, and typed harness contracts. Separable from the rest of the engine — game code never imports harness; balance tooling does.',
+      'Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers, run pools. Separable — game code never imports harness; balance tooling does.',
     entrypoints: [
       '`runHeadless` / `runUntil` — deterministic fixed-tick and predicate-bounded simulations.',
       '`replayLive` / `createTickCounter` — replay live-play dt cadence (speed-scaled) deterministically; count sub-ticks for fixed-mode speed-invariance assertions.',

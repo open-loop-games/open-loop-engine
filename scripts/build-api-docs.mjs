@@ -15,6 +15,7 @@
  *
  * Quality gates:
  *   - Exits non-zero if any cluster is unassigned in the manifest
+ *   - Exits non-zero if an INDEX tier anchor names no emitted section
  *   - Warns on public symbols without a TSDoc summary (feeds OL-928 audit)
  *
  * Run: `node scripts/build-api-docs.mjs`
@@ -79,10 +80,10 @@ function preferFileWithHeader(files) {
 }
 
 /**
- * Read cluster title + blurb + prologue from CLUSTER_TITLES (highest priority)
- * or the anchor file's header. Falls back to titleCase(clusterId) when neither
- * source has a usable title. `prologue` is CLUSTER_TITLES-only — source headers
- * don't carry it.
+ * Read cluster title + blurb + prologue + compact flag from CLUSTER_TITLES
+ * (highest priority) or the anchor file's header. Falls back to
+ * titleCase(clusterId) when neither source has a usable title. `prologue` and
+ * `compact` are CLUSTER_TITLES-only — source headers don't carry them.
  */
 function clusterMeta(clusterId, files) {
   const anchor = pickAnchorFile(clusterId, files)
@@ -93,7 +94,7 @@ function clusterMeta(clusterId, files) {
   let blurb = override.blurb || header.blurb || null
   if (blurb && blurb.toLowerCase() === title.toLowerCase()) blurb = null
   const prologue = override.prologue || null
-  return { title, blurb, prologue, anchor }
+  return { title, blurb, prologue, compact: override.compact === true, anchor }
 }
 
 /** Stable anchor slug for cross-file links. */
@@ -179,6 +180,25 @@ function formatSignature(rec) {
 }
 
 /**
+ * True when a summary only restates the symbol's own name — "Options for
+ * createLoop." on `CreateLoopOptions`, "Result of validateSaveData." on
+ * `ValidateSaveDataResult`. The bullet renders bare instead: the absence of
+ * prose is itself the signal that the shape is the factory's options bag.
+ * Harmless in IDE hover, pure noise in a scannable directory.
+ */
+function isTautologicalSummary(name, summary) {
+  const m = summary.match(/^(?:Options for|Result of)\s+(.+?)\.?$/i)
+  if (!m) return false
+  const norm = (s) =>
+    s
+      .toLowerCase()
+      .replace(/\b(?:a|an|the)\b/g, '')
+      .replace(/[^a-z]/g, '')
+      .replace(/^creat(?:ing|e)/, '')
+  return norm(m[1]) === norm(name.replace(/(?:Options|Result)$/, ''))
+}
+
+/**
  * Render one symbol bullet. Format:
  *   `{signature}` — {tsdocSummary}. `src/path:line`
  *
@@ -187,17 +207,26 @@ function formatSignature(rec) {
  */
 function renderSymbol(rec) {
   const loc = rec.line ? `${rec.sourcePath}:${rec.line}` : rec.sourcePath
+  const bare = `- \`${formatSignature(rec)}\` \`${loc}\``
   // Overload continuations without their own TSDoc lean on the set's lead
   // declaration — render signature + source line only, no coverage marker.
-  if (!rec.tsdocSummary && rec.overloadIndex > 0) {
-    return `- \`${formatSignature(rec)}\` \`${loc}\``
-  }
+  if (!rec.tsdocSummary && rec.overloadIndex > 0) return bare
+  if (rec.tsdocSummary && isTautologicalSummary(rec.name, rec.tsdocSummary)) return bare
   const summary = rec.tsdocSummary
     ? rec.tsdocSummary.endsWith('.')
       ? rec.tsdocSummary
       : `${rec.tsdocSummary}.`
     : '_(no summary)_'
   return `- \`${formatSignature(rec)}\` — ${summary} \`${loc}\``
+}
+
+/**
+ * Render a cluster whose symbols are re-exported from a dependency (Vue's
+ * reactivity API). Their signatures and docs belong to the upstream project —
+ * reprinting them costs kilobytes and reads as engine surface. Names only.
+ */
+function renderCompactCluster(recs) {
+  return recs.map((r) => `\`${r.name}\``).join(' · ')
 }
 
 /** Group records by cluster id; preserve parser's stable sort within each. */
@@ -216,7 +245,6 @@ function renderTierFile(tier, byCluster) {
 
   if (tier.entrypoints?.length) {
     lines.push('## Canonical entrypoints', '')
-    lines.push('Start with these public symbols before scanning the full inventory below.', '')
     for (const entry of tier.entrypoints) {
       lines.push(`- ${entry}`)
     }
@@ -230,12 +258,13 @@ function renderTierFile(tier, byCluster) {
       continue
     }
     const files = [...new Set(recs.map((r) => r.sourcePath))].sort()
-    const { title, blurb, prologue } = clusterMeta(clusterId, files)
+    const { title, blurb, prologue, compact } = clusterMeta(clusterId, files)
     lines.push(`## ${title}`)
     if (blurb) lines.push('', blurb)
     if (prologue) lines.push('', prologue)
     lines.push('')
-    for (const rec of recs) lines.push(renderSymbol(rec))
+    if (compact) lines.push(renderCompactCluster(recs))
+    else for (const rec of recs) lines.push(renderSymbol(rec))
     lines.push('')
   }
 
@@ -251,48 +280,23 @@ function renderIndex(byCluster) {
   const lines = [
     '# API Index',
     '',
-    'The mechanical per-symbol surface for the engine. Read in full before assuming a primitive is missing — symbols group by adjacency, not by the vocabulary you arrived with, and partial reads miss real primitives whose names don\'t match the problem you brought in.',
+    'Router into the engine\'s per-symbol surface. Symbols group by adjacency, not by the vocabulary you arrived with, so route from your task rather than grepping for the name you brought in — that is what keeps a reading failure from being reported as a missing primitive.',
     '',
-    'Three ways to land:',
+    'Land by **verb** (§ Task → tier), by **noun-shape** (§ Concept index), or by **subsystem** (§ Tier map). Check § Reserved names before grepping a shared stem, and § Predicate forms before choosing a gating type. Prose companion — *how* to compose, not *what* exists — is `../consumer-guide.md`; entries link there rather than restating it.',
     '',
-    '- **Task table** — arriving with a verb ("offline catch-up", "register a new category"). Resolves "which tier file?" without a Read.',
-    '- **Concept index** — arriving with a noun-shape an agent might use ("perturbation seam", "tunable knob"). Entries resolve to tier `#section` anchors, plus `consumer-guide.md` for the prose.',
-    '- **Cluster directory** — arriving with a rough subsystem in mind. Every public-symbol cluster grouped under its tier.',
+    'Generated by `node scripts/build-api-docs.mjs`; hand edits are meaningless. Per-symbol detail lives in the tier files, cluster ids come from `@cluster` source tags, and tier assignment is one line in `scripts/lib/api-tier-manifest.mjs`.',
     '',
-    'Two quick-reference disambiguators (consult before grep-by-stem or choosing a predicate type):',
+    '## Choose a level',
     '',
-    '- **Reserved names** — symbols that share a stem (`Loop` family, etc.).',
-    '- **Predicate forms** — choosing between `Gate` / `Requirement` / `Computable<boolean>`.',
-    '',
-    'Companion docs (do not duplicate — link):',
-    '',
-    '- `../consumer-guide.md` — *how* to compose the engine; levels of abstraction; what shape a module should take. Concept-index entries link here for prose.',
-    '',
-    'This file is generated by `node scripts/build-api-docs.mjs`. Editing it by hand is meaningless — re-run the generator to regenerate.',
-    '',
-    '## Choose a level first',
-    '',
-    'Most game modules should start at the highest-level surface that fits, then drop down only when that surface is fighting the shape of the game. Full prose: ../consumer-guide.md#the-expression-spectrum.',
+    'Start at the highest-level surface that fits, and drop down only when it fights the shape of the game. Full prose: ../consumer-guide.md#the-expression-spectrum.',
     '',
     '| Level | Reach for | Start at |',
     '| --- | --- | --- |',
-    '| **L1: Resource helpers** | Direct currency mutation, display, checks, and resource lifetime trackers | resources.md#resource |',
-    '| **L2: Category systems** | Repeatable authored content: producers, purchasables, achievements, skills, challenges, dialog, subjects | content-systems.md, content-narrative.md |',
-    '| **L3: Raw primitives** | One-off systems or custom registration shapes where category mapping is too constraining | content-systems.md, composition.md, mechanics.md, lifecycle.md |',
-    '| **L4: Declarative data** | JSON/mod/save/sim-friendly gates and effects | mechanics.md#gate, mechanics.md#effects |',
+    '| **L1: Resource helpers** | `addResource` / `hasResource` / `displayResource`, `Resource.best` / `.cumulative` — direct currency mutation, display, lifetime trackers | resources.md#resource |',
+    '| **L2: Category systems** | `createProducerCategory`, `createPurchasableCategory`, `createSkillCategory`, `createDialogCategory`, … — repeatable authored content, and the default for it | content-systems.md, content-narrative.md |',
+    '| **L3: Raw primitives** | `createScalingPurchasable`, `createLoop`, `createModifierChain`, `createCategoryBase` — one-off systems, or registration shapes category mapping constrains | composition.md, mechanics.md, lifecycle.md |',
+    '| **L4: Declarative data** | `Gate`, `E` / `IEffect` — JSON/mod/save/sim-friendly gates and effects | mechanics.md#gate, mechanics.md#effects |',
     '',
-    '## Tier map',
-    '',
-    'Per-tier landing pages in dependency-ascending order — numeric foundation first, headless harness last. This is *not* the L1→L4 consumer-journey ordering from `../consumer-guide.md` § The expression spectrum (helpers → categories → raw → declarative); see the by-abstraction-level lens below for that cut.',
-    '',
-  ]
-
-  for (const tier of TIER_MANIFEST) {
-    lines.push(`- \`${tier.tier}.md\` — ${tier.scope}`)
-  }
-  lines.push('')
-
-  lines.push(
     '## Reserved names',
     '',
     'A few symbols share a stem and are easy to confuse. Each links to its anchor:',
@@ -302,12 +306,12 @@ function renderIndex(byCluster) {
     '- **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category',
     '- **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.',
     '- **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine\'s `TickDriver` (tick scheduler).',
-    '- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch — not a timed phase cadence over a generated schedule (wave cycles): those have no items to dispatch and stay consumer-side. Per-item repeat counts ("run this item N times") are also consumer-side: expand at enqueue or count in item metadata — `repeat()` re-dispatches the current item once, without advancing.',
+    '- **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch, not a timed phase cadence over a generated schedule (wave cycles have no items to dispatch, and stay consumer-side). Per-item repeat counts are consumer-side too — expand at enqueue or count in metadata; `repeat()` re-dispatches the current item once, without advancing.',
     '- **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress',
     '- **TimeSystem vs TimeBank** — `createTimeSystem` is the play-clock (how long has the player played); `createTimeBank` is a spendable reservoir of banked seconds (offline banking, bonus time). → runtime.md#time-tracking, lifecycle.md#time-bank',
     '- **`speedMultiplier` ×2** — `TickDriver.speedMultiplier` (runtime.md#tickdriver) scales actual tick dt; `TimeSystem.speedMultiplier` (runtime.md#time-tracking) scales only that system\'s internal play-time counter. Only the TickDriver one accelerates the game. `createBankedAcceleration` drives the TickDriver one.',
-    '- **"total over a span" ×3** — `Formula` carries three operations that all look like "the integral", and picking the wrong one is silently wrong rather than an error. `evaluateIntegral(x)` is the **antiderivative**, arbitrary constant included — `evaluateIntegral(0)` is 71.55 on a `10·1.15ˣ` curve, not 0 — and is only meaningful relative to another point. `cumulative(a, b)` is the **continuous area** over a span, the rate-function lineage\'s cumulative and the thing `firstPassage` inverts: reach for it when integrating a *rate over time*. `sum(a, n)` is the **discrete series** `Σ f(a+i)`: reach for it when indexing by *level*, which is what a cost curve is. The last two differ by a boundary term worth 7.3% on a `1.15ⁿ` curve and 44% on a `2ⁿ`, so they are not interchangeable at any tolerance. `calculateCost` and `calculateMaxAffordable` both use the series, so a bulk buy is priced at exactly what the same purchases cost one at a time. → mechanics.md#formulas',
-    '- **"when do I reach X" ×3** — one question, three coordinate systems, so they share no name deliberately. `Formula.firstPassage` answers on a *curve* — an abstract axis, pure algebra, no engine state, returns the input (→ mechanics.md#formulas). `timeUntilResource` / `timeUntilAffordable` / `timeUntilConditionFlip` answer against *live accessor state and rates* and return seconds (→ runtime.md#transition-distance-primitives). `calculateMaxAffordable` answers in *levels* against a cost curve plus the resource paying for it (→ mechanics.md#formulas). Pick by what you have in hand, not by the wording of the question. `firstPassage` is the rate-function lineage\'s name (rate → cumulative → first passage) and stays formula-local.',
+    '- **"total over a span" ×3** — `evaluateIntegral` (antiderivative, arbitrary constant included), `cumulative(a, b)` (continuous area — a *rate over time*), and `sum(a, n)` (discrete series `Σ f(a+i)` — indexed by *level*, which is what a cost curve is). Picking wrong is silently wrong rather than an error, and the last two differ by a boundary term worth 7.3% on a `1.15ⁿ` curve. → mechanics.md#formulas; why, in full, at ../consumer-guide.md#common-disambiguators.',
+    '- **"when do I reach X" ×3** — one question, three coordinate systems, so they deliberately share no name. `Formula.firstPassage` answers on a *curve*: pure algebra, no engine state, returns the input (→ mechanics.md#formulas). `timeUntilResource` / `timeUntilAffordable` / `timeUntilConditionFlip` answer against *live state and rates*, in seconds (→ runtime.md#transition-distance-primitives). `calculateMaxAffordable` answers in *levels*, against a cost curve plus the resource paying for it (→ mechanics.md#formulas). Pick by what you have in hand, not by the wording of the question.',
     '',
     '## Task → tier',
     '',
@@ -339,7 +343,7 @@ function renderIndex(byCluster) {
     '| save migration / version bump | lifecycle.md#save-manager |',
     '| offline catch-up after long absence | lifecycle.md#offline |',
     '| prestige / reset with retention policy | lifecycle.md#reset |',
-    '| register an engine module | runtime.md#engine-entrypoint |',
+    '| register an engine module | runtime.md#engine-assembly |',
     '| subscribe to engine or category events | runtime.md#events |',
     '| time-until-X transition timing | runtime.md#transition-distance-primitives |',
     '| expose a tunable knob to a slider / mod config | introspection.md#override-registry |',
@@ -355,16 +359,16 @@ function renderIndex(byCluster) {
     '',
     '## Concept index',
     '',
-    'Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors and `consumer-guide.md` prose. Concepts are higher-level than symbols — the table answers "where do I read about X?" when X is a shape, not a name. Tier anchors give symbol-level detail; consumer-guide anchors give the prose explaining how to think about it.',
+    'Cross-cutting shapes rather than symbol names — "where do I read about X?" when X has no single name. Tier anchors give symbol-level detail; consumer-guide anchors give the prose.',
     '',
     '- **perturbation seam** — address→override mechanism for the balance workbench → harness.md#perturbation-applier',
     '- **persistent context scoping** — `withPersistentContext`, save-key namespacing → lifecycle.md#persistence, ../consumer-guide.md#persistent-context',
     '- **category auto-registration** — categories self-publish into `EngineCategories` for introspection → introspection.md#engine-categories, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **modifier attribution** — `BindingRecord`, trace entries, `withChain` scope → mechanics.md#modifier, mechanics.md#trace',
     '- **modifier chain composition** — named chains, `bind`, declarative `grants`/`restricts`/`rewards` → mechanics.md#modifier, ../consumer-guide.md#modifier-chains-and-effects',
-    '- **cross-action bonus** — A\'s yield scaled by B\'s state via binary-gate or level-scaled modifier → ../consumer-guide.md#cross-action-bonuses, mechanics.md#modifier',
+    '- **cross-action bonus** — A\'s yield scaled by B\'s state via binary-gate or level-scaled modifier → ../consumer-guide-recipes.md#cross-action-bonuses, mechanics.md#modifier',
     '- **predicate-bounded sim** — `runUntil` / `runMatrixUntil`, terminate on shared predicate → harness.md#cell-aggregation-kernel',
-    '- **live-play replay** — `replayLive`, deterministic speed-scaled `intervalTick` cadence; `createTickCounter` for fixed-mode speed-invariance → harness.md#runners',
+    '- **live-play replay** — `replayLive`, deterministic speed-scaled `intervalTick` cadence; `createTickCounter` for fixed-mode speed-invariance → harness.md#headless-runner',
     '- **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel',
     '- **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives',
     '- **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection',
@@ -372,7 +376,7 @@ function renderIndex(byCluster) {
     '- **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide-recipes.md#persona-roster-composition, composition.md#sequencer',
     '- **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resetting-persistent-refs-in-bulk',
     '- **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resetting-persistent-refs-in-bulk',
-    '- **save lifecycle hooks** — `SaveHandler` / `LoadHandler` / `save:loaded` events → lifecycle.md#save-manager, runtime.md#engine-entrypoint',
+    '- **save lifecycle hooks** — `SaveHandler` / `LoadHandler` / `save:loaded` events → lifecycle.md#save-manager, runtime.md#engine-assembly',
     '- **offline catch-up** — `processOfflineTime`, chunked simulation of elapsed seconds → lifecycle.md#offline; strategy families (extrapolation / tick-sim / cap-and-trickle / banking) and the mechanism-vs-policy split → ../consumer-guide.md#common-disambiguators',
     '- **tunable knob** — `tunable()` + `TuningRegistry`, scoped-stack override of balance constants → introspection.md#override-registry, ../consumer-guide.md#tunable-knobs',
     '- **declarative gate predicate** — `Gate` AST, evaluable + flip-distance + condition projection → mechanics.md#gate, ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch',
@@ -380,7 +384,7 @@ function renderIndex(byCluster) {
     '- **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects',
     '- **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide.md#choosing-among-purchasable-primitives',
     '- **inversion-driven affordability** — `calculateMaxAffordable`, `InvertibleFormula` → mechanics.md#formulas',
-    '- **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel',
+    '- **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel-classification',
     '- **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second',
@@ -403,7 +407,7 @@ function renderIndex(byCluster) {
     '| Observed milestone that auto-earns | `createAchievement` / `createAchievementCategory` → content-systems.md#achievement |',
     '| Generic multi-resource container | `createResourceBag` → resources.md#resource |',
     '| Game-facing item inventory with capacities | `createInventory` → content-systems.md#inventory |',
-    '| Engine tick scheduler | `createTickDriver` → runtime.md#tick-driver |',
+    '| Engine tick scheduler | `createTickDriver` → runtime.md#tickdriver |',
     '| Loop-incremental gameplay run | `createLoop` → content-systems.md#loop |',
     '| Many opaque concurrent runs | `createRunPool` → harness.md#runpool |',
     '| Ordered schedule or persona dispatch | `createSequencer` and fill strategies → composition.md#sequencer |',
@@ -430,56 +434,32 @@ function renderIndex(byCluster) {
     '',
     'Prose: ../consumer-guide.md#level-4-declarative-gates-and-effects-the-data-driven-escape-hatch.',
     '',
-    '## Cluster directory',
+    '## Tier map',
     '',
-    'Every public-symbol cluster across the engine, grouped under its tier. Cluster ids come from `@cluster` source tags or stem fallback; section title and blurb come from the cluster\'s anchor file header.',
+    'The landing pages, in dependency-ascending order (numeric foundation first, headless harness last) with the clusters each holds — *not* the L1→L4 order of § Choose a level. Follow a cluster anchor for its symbols and its blurb.',
     '',
-  )
+  ]
 
   for (const tier of TIER_MANIFEST) {
-    lines.push(`### ${tier.title}`, '')
+    lines.push(`### ${tier.title} — \`${tier.tier}.md\``, '', tier.scope, '')
     for (const clusterId of tier.clusters) {
       const recs = byCluster.get(clusterId) || []
       const files = [...new Set(recs.map((r) => r.sourcePath))].sort()
-      const { title, blurb } = clusterMeta(clusterId, files)
-      const anchor = `${tier.tier}.md#${slugify(title)}`
-      const trimmed = blurb && blurb.length > 120
-        ? blurb.slice(0, 117).replace(/\s+\S*$/, '') + '…'
-        : blurb
-      const blurbPart = trimmed ? ` — ${trimmed}` : ''
-      lines.push(`- \`${clusterId}\`${blurbPart} → ${anchor}`)
+      const { title } = clusterMeta(clusterId, files)
+      lines.push(`- \`${clusterId}\` → ${tier.tier}.md#${slugify(title)}`)
     }
     lines.push('')
   }
 
   lines.push(
-    '## Lenses',
+    '## Source layers',
     '',
-    'The default lens is **by-question** — the task table at the top of this file. Two alternative cuts when that framing doesn\'t fit:',
-    '',
-    '### By abstraction level',
-    '',
-    'The expression spectrum from `consumer-guide.md`: pick the most specific level that fits, drop down only when the level above is fighting you. Full prose: ../consumer-guide.md#the-expression-spectrum.',
-    '',
-    '- **L1: Resource helpers** — `addResource`, `subtractResource`, `hasResource`, `displayResource`, `Resource.best`, `Resource.cumulative` → resources.md#resource',
-    '- **L2: Category systems** — `createSkillCategory`, `createPurchasableCategory`, `createProducerCategory`, `createAchievementCategory`, `createDialogCategory`, `createSubjectCategory`, … the default for game content → content-systems.md, content-narrative.md',
-    '- **L3: Raw primitives** — `createScalingPurchasable`, `createLoop`, `createModifierChain`, `createCategoryBase` → content-systems.md, composition.md, mechanics.md, lifecycle.md',
-    '- **L4: Declarative data** — `E` builder, `IEffect`, `Gate`. The data-driven escape hatch for save replay, mod configs, balance tools → mechanics.md#effects, mechanics.md#gate',
-    '',
-    '### By layer',
-    '',
-    'Engine source layers `primitives → core → systems → harness` with one-way imports. Tier ≠ layer — most tier files mix layers:',
+    'A second cut, orthogonal to the tiers above: source layers `primitives → core → systems → harness`, one-way imports. Tier ≠ layer — most tier files mix them, and `parse-dts.mjs` derives each symbol\'s layer from its `src/` path.',
     '',
     '- **primitives/** — zero-Vue foundational types and helpers (`Decimal`, `RNG`, `IEffect` types, `Analyzer` shape).',
     '- **core/** — generic reactive primitives (modifiers, effects, persistence, save manager, game loop, transitions).',
     '- **systems/** — typed registration surfaces (every category factory; reset / retention; dialog runtime; advisors; gate).',
     '- **harness/** — headless-sim substrate (runners, probes, walkers, picker, perturbation, solvers, run pool).',
-    '',
-    'Open `dist/index.d.ts` after a build for the canonical layer split — `parse-dts.mjs` derives each symbol\'s layer from its source file.',
-    '',
-    '## Internals',
-    '',
-    'Per-symbol detail lives in the eleven tier files. Cluster ids come from `@cluster` tags in source-file headers — see CLAUDE.md "TSDoc Standards" for the convention. To move a cluster between tiers, edit `scripts/lib/api-tier-manifest.mjs`; no source-file edits required.',
     ''
   )
 
@@ -522,18 +502,45 @@ if (unassigned.length) {
   process.exit(1)
 }
 
-// Render tier files.
+// Render tier files, collecting the `##` anchors each one emits.
+const emittedAnchors = new Map()
 for (const tier of TIER_MANIFEST) {
   const content = renderTierFile(tier, byCluster)
   writeFileSync(join(API_DIR, `${tier.tier}.md`), content)
+  emittedAnchors.set(
+    `${tier.tier}.md`,
+    new Set([...content.matchAll(/^#{2,3} (.+)$/gm)].map((m) => slugify(m[1])))
+  )
 }
 
 // Render INDEX.md.
-writeFileSync(join(API_DIR, 'INDEX.md'), renderIndex(byCluster))
+const indexContent = renderIndex(byCluster)
+writeFileSync(join(API_DIR, 'INDEX.md'), indexContent)
+
+// Validate INDEX's hand-written tier anchors against what the tier files just
+// emitted. Section titles come from source file headers, so a header reword
+// silently rots every INDEX link naming the old title — this turns that class
+// of drift into a build failure. Only tier anchors are checked; links into
+// consumer-guide.md point at a file this generator doesn't own.
+const brokenAnchors = [...indexContent.matchAll(/([\w-]+\.md)#([\w-]+)/g)]
+  .filter(([, file, anchor]) => emittedAnchors.has(file) && !emittedAnchors.get(file).has(anchor))
+  .map(([ref]) => ref)
+if (brokenAnchors.length) {
+  const unique = [...new Set(brokenAnchors)].sort()
+  console.error(
+    `INDEX.md references ${unique.length} tier anchor(s) that no section emits:\n  ${unique.join('\n  ')}\n` +
+      `Fix the link in scripts/build-api-docs.mjs, or restore the section title in the source file header.`
+  )
+  process.exit(1)
+}
 
 // Coverage report — `records` is already filtered to public symbols above.
-// Overload continuations may lean on their lead declaration's doc.
-const missingSummary = records.filter((r) => !r.tsdocSummary && !(r.overloadIndex > 0))
+// Overload continuations may lean on their lead declaration's doc; compact
+// clusters re-export a dependency's symbols and never render a summary at all.
+const missingSummary = records.filter(
+  (r) =>
+    !r.tsdocSummary && !(r.overloadIndex > 0) && CLUSTER_TITLES[r.cluster]?.compact !== true
+)
 const missingLine = records.filter((r) => r.line == null)
 
 console.log(

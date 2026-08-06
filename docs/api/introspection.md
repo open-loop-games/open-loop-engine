@@ -1,10 +1,8 @@
 # Introspection
 
-The cross-cutting "walk every X" surface external tools read — balance workbenches, sim pickers, devtools panels, mods. `EngineCategories` plus the per-engine registries (chain / resource / effect-system), the `OverrideRegistry` + `TuningRegistry` + `tunable()` pattern that exposes designer-flagged knobs, and the Profiler + Safeguards instrumentation. All discoverable via injection keys with no install-time coupling.
+The cross-cutting "walk every X" surface external tools read — devtools, mods, balance workbenches. `EngineCategories`, per-engine registries, `tunable()` plus the override/tuning registries, profiler and safeguards. All reachable through injection keys.
 
 ## Canonical entrypoints
-
-Start with these public symbols before scanning the full inventory below.
 
 - `EngineCategories` / `CategoriesKey` — discover auto-registered content categories.
 - `createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.
