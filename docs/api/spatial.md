@@ -13,18 +13,22 @@ Start with these public symbols before scanning the full inventory below.
 
 ## Grid
 
-Bounded 2D grid with adjacency, FOV adapter, and snapshot persistence. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
+Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:299`
-- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:84`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:359`
+- `const DIAGONAL_DELTAS: readonly GridDelta[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:68`
+- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:137`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
-- `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:25`
-- `interface SpatialGrid<T>` — Bounded 2D grid with adjacency, BFS and weighted distance fields, an FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:95`
-- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:47`
-- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:32`
-- `interface SpatialGridSnapshot<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:68`
-- `type TraversalCostFn<T> = (cell: T, x: number, y: number) => number` — Caller-supplied cost to *enter* a cell, for weighted traversal queries (`distanceField`). `src/core/spatial/types.ts:37`
-- `type Unsubscribe = () => void` — Function returned by event subscriptions; call to detach the handler. `src/core/spatial/types.ts:18`
+- `interface GridDelta` — A 2D integer offset from a cell to one of its neighbors. `src/core/spatial/types.ts:23`
+- `const HEX_AXIAL_DELTAS: readonly GridDelta[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which makes axial deltas equal grid deltas. `src/core/spatial/grid.ts:90`
+- `const ORTHOGONAL_DELTAS: readonly GridDelta[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:60`
+- `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:36`
+- `interface SpatialGrid<T>` — Bounded 2D grid with configurable adjacency, BFS and weighted distance fields, an FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:148`
+- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:100`
+- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:37`
+- `interface SpatialGridSnapshot<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:121`
+- `type TraversalCostFn<T> = (cell: T, x: number, y: number) => number` — Caller-supplied cost to *enter* a cell, for weighted traversal queries (`distanceField`). `src/core/spatial/types.ts:50`
+- `type Unsubscribe = () => void` — Function returned by event subscriptions; call to detach the handler. `src/core/spatial/types.ts:29`
 
 ## Graph
 

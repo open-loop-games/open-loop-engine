@@ -33,7 +33,7 @@ export const CLUSTER_OVERRIDES = {
 export const CLUSTER_TITLES = {
   'spatial-grid': {
     title: 'Grid',
-    blurb: 'Bounded 2D grid with adjacency, FOV adapter, and snapshot persistence. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.',
+    blurb: 'Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.',
   },
   'spatial-graph': {
     title: 'Graph',

@@ -289,6 +289,7 @@ export {
 // === SPATIAL PRIMITIVES ===
 export type {
   GridCoord,
+  GridDelta,
   PassabilityFn,
   TraversalCostFn,
   Unsubscribe,
@@ -315,6 +316,7 @@ export type {
   InfluenceLayer,
 } from './spatial';
 export { createSpatialGrid, createSpatialGraph, createScopeStack } from './spatial';
+export { ORTHOGONAL_DELTAS, DIAGONAL_DELTAS, HEX_AXIAL_DELTAS } from './spatial';
 export {
   createInfluenceLayer,
   composeInfluenceLayers,

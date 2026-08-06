@@ -410,6 +410,7 @@ function renderIndex(byCluster) {
     '| Discover live engine surfaces | introspection registries → introspection.md |',
     '| Execute headless simulations | harness runners → harness.md |',
     '| Bounded coordinate board | `createSpatialGrid` → spatial.md#grid |',
+    '| Hex board, or any non-square adjacency | still `createSpatialGrid` — pass `neighborhood` (`HEX_AXIAL_DELTAS`, `DIAGONAL_DELTAS`, or your own offsets); traversal follows it → spatial.md#grid |',
     '| Arbitrary node topology / nested spaces | `createSpatialGraph` → spatial.md#graph |',
     '',
     '## Predicate forms',

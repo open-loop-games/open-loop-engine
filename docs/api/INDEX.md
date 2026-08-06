@@ -163,6 +163,7 @@ Short answers only; consumer-level reasoning lives in ../consumer-guide.md#commo
 | Discover live engine surfaces | introspection registries → introspection.md |
 | Execute headless simulations | harness runners → harness.md |
 | Bounded coordinate board | `createSpatialGrid` → spatial.md#grid |
+| Hex board, or any non-square adjacency | still `createSpatialGrid` — pass `neighborhood` (`HEX_AXIAL_DELTAS`, `DIAGONAL_DELTAS`, or your own offsets); traversal follows it → spatial.md#grid |
 | Arbitrary node topology / nested spaces | `createSpatialGraph` → spatial.md#graph |
 
 ## Predicate forms
@@ -270,7 +271,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 ### Spatial
 
-- `spatial-grid` — Bounded 2D grid with adjacency, FOV adapter, and snapshot persistence. Two traversal queries split by use: `bfs()`… → spatial.md#grid
+- `spatial-grid` — Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the… → spatial.md#grid
 - `spatial-graph` — Keyed node/edge container with nested child-graph composition — the substrate `ScopeStack` walks. → spatial.md#graph
 - `spatial-scope-stack` — Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active. → spatial.md#scope-stack
 - `spatial-influence-layer` — Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric… → spatial.md#influence-layer

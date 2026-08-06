@@ -8,6 +8,11 @@
  * an FOV commit adapter that lets external libraries (rot.js shadowcasting)
  * write visibility back without the engine importing them.
  *
+ * Rectangular *storage*, not rectangular *topology*: the `neighborhood`
+ * option is the board's adjacency as a set of offsets, so 4-connected,
+ * 8-connected, and hex-at-an-axial-offset are the same container with a
+ * different delta set — and every traversal verb follows it.
+ *
  * Two traversal queries, split by what the caller does with the answer:
  * `bfs()` for reachability and path reconstruction (parent links, hop order),
  * `distanceField()` for routing and gradient descent (least-cost distance per
@@ -26,7 +31,7 @@
 
 import { createEmitHandle } from '../events';
 import { randomItem } from '@/primitives/rng';
-import type { GridCoord, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
+import type { GridCoord, GridDelta, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
 
 /** Options accepted by {@link createSpatialGrid}. */
 export interface SpatialGridOptions<T> {
@@ -35,13 +40,61 @@ export interface SpatialGridOptions<T> {
   /** Cell value factory. Called once per cell at construction. */
   readonly initializer: (x: number, y: number) => T;
   /**
-   * Whether traversal queries (BFS, flood) treat 8-connected neighbors as
-   * adjacent. `neighbors()` and `neighborsDiag()` are always available
-   * regardless; this only affects the default for traversal helpers.
-   * Defaults to false (4-connected).
+   * The board's adjacency, as the set of offsets from a cell to its
+   * neighbors. Drives `neighbors()` and every traversal query (`bfs`,
+   * `flood`, `distanceField`) — so a board's topology is stated once, at
+   * construction, and the traversal verbs follow.
+   *
+   * Defaults to {@link ORTHOGONAL_DELTAS} (4-connected). Ships
+   * {@link DIAGONAL_DELTAS} (8-connected) and {@link HEX_AXIAL_DELTAS}
+   * (6-connected hex under axial-offset storage); any other adjacency —
+   * knight moves, directed one-way lattices — is an array literal.
+   *
+   * Iteration order follows this array, and traversal tie-breaks follow
+   * iteration order, so the order is part of the board's contract.
    */
-  readonly allowDiagonals?: boolean;
+  readonly neighborhood?: readonly GridDelta[];
 }
+
+/** 4-connected orthogonal adjacency: E, W, N, S. The `neighborhood` default. */
+export const ORTHOGONAL_DELTAS: readonly GridDelta[] = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: -1 },
+  { dx: 0, dy: 1 },
+];
+
+/** 8-connected adjacency: the four orthogonals plus the four diagonals. */
+export const DIAGONAL_DELTAS: readonly GridDelta[] = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: -1 },
+  { dx: 0, dy: 1 },
+  { dx: 1, dy: -1 },
+  { dx: 1, dy: 1 },
+  { dx: -1, dy: -1 },
+  { dx: -1, dy: 1 },
+];
+
+/**
+ * 6-connected hex adjacency, clockwise from east, for a hex board stored at
+ * an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which
+ * makes axial deltas equal grid deltas. That storage convention is what lets
+ * a hex board keep the whole rectangular-grid surface (events, snapshots,
+ * `createInfluenceLayer`) instead of dropping to `createSpatialGraph`.
+ *
+ * The engine knows nothing else about hexes: no axial or cube coordinate
+ * type, no hex distance, no pixel layout. Those stay consumer-side, where the
+ * storage offset and the rendering convention already live.
+ */
+export const HEX_AXIAL_DELTAS: readonly GridDelta[] = [
+  { dx: 1, dy: 0 },
+  { dx: 1, dy: -1 },
+  { dx: 0, dy: -1 },
+  { dx: -1, dy: 0 },
+  { dx: -1, dy: 1 },
+  { dx: 0, dy: 1 },
+];
 
 /** Events emitted by a {@link SpatialGrid}. Subscribe via `grid.on()`. */
 export interface SpatialGridEvents<T> {
@@ -89,8 +142,8 @@ export interface FovUpdateHandle {
 }
 
 /**
- * Bounded 2D grid with adjacency, BFS and weighted distance fields, an FOV
- * adapter, and snapshot persistence.
+ * Bounded 2D grid with configurable adjacency, BFS and weighted distance
+ * fields, an FOV adapter, and snapshot persistence.
  */
 export interface SpatialGrid<T> {
   readonly width: number;
@@ -158,10 +211,16 @@ export interface SpatialGrid<T> {
   fill(mapper: (x: number, y: number, current: T) => T): void;
   inBounds(x: number, y: number): boolean;
 
-  /** 4-connected neighbors of (x, y) within bounds. */
-  neighbors(x: number, y: number): Iterable<GridCoord>;
-  /** 8-connected neighbors of (x, y) within bounds. */
-  neighborsDiag(x: number, y: number): Iterable<GridCoord>;
+  /**
+   * In-bounds neighbors of (x, y) under the grid's configured
+   * `neighborhood`, in that array's order.
+   *
+   * @param deltas - Ad-hoc adjacency for this call only, overriding the
+   *   grid's own. For the query that wants a different topology than the
+   *   board — an 8-connected scan on a 4-connected board, say — without
+   *   changing what traversal does.
+   */
+  neighbors(x: number, y: number, deltas?: readonly GridDelta[]): Iterable<GridCoord>;
   /** All cells within Chebyshev `radius` of (x, y), within bounds. */
   inRange(x: number, y: number, radius: number): Iterable<GridCoord>;
   /**
@@ -198,8 +257,8 @@ export interface SpatialGrid<T> {
   readonly visible: Uint8Array;
 
   /**
-   * Breadth-first reachability from `start`. Uses 4- or 8-connected
-   * neighbors per the grid's `allowDiagonals` option. Returns a parent-
+   * Breadth-first reachability from `start`, over the grid's configured
+   * `neighborhood`. Returns a parent-
    * link map: key is `"x,y"` of a reachable cell, value is the predecessor
    * coordinate on the BFS path. The start cell maps to itself.
    */
@@ -217,8 +276,9 @@ export interface SpatialGrid<T> {
    * parent links — agents descend the field, and deriving the step direction
    * consumer-side keeps routing and rendering from drifting on tie-breaks.
    *
-   * Uses 4- or 8-connected neighbors per the grid's `allowDiagonals` option,
-   * matching `bfs()` and `flood()`. Sources out of bounds, or whose own
+   * Expands the grid's configured `neighborhood`, matching `bfs()` and
+   * `flood()` — so a hex board routes over hex adjacency without this query
+   * knowing what a hex is. Sources out of bounds, or whose own
    * `cost` is `Infinity`, are dropped rather than seeded — a source standing
    * on impassable terrain is not a zero-distance origin.
    *
@@ -297,7 +357,7 @@ export interface SpatialGrid<T> {
  * ```
  */
 export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T> {
-  const { width, height, initializer, allowDiagonals = false } = options;
+  const { width, height, initializer, neighborhood = ORTHOGONAL_DELTAS } = options;
 
   if (width <= 0 || height <= 0 || !Number.isInteger(width) || !Number.isInteger(height)) {
     throw new Error(
@@ -344,21 +404,11 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     }
   }
 
-  function* neighbors4(x: number, y: number): Generator<GridCoord> {
-    if (x > 0) yield { x: x - 1, y };
-    if (x < width - 1) yield { x: x + 1, y };
-    if (y > 0) yield { x, y: y - 1 };
-    if (y < height - 1) yield { x, y: y + 1 };
-  }
-
-  function* neighbors8(x: number, y: number): Generator<GridCoord> {
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = x + dx;
-        const ny = y + dy;
-        if (inBounds(nx, ny)) yield { x: nx, y: ny };
-      }
+  function* neighborsOf(x: number, y: number, deltas: readonly GridDelta[]): Generator<GridCoord> {
+    for (let i = 0; i < deltas.length; i++) {
+      const nx = x + deltas[i].dx;
+      const ny = y + deltas[i].dy;
+      if (inBounds(nx, ny)) yield { x: nx, y: ny };
     }
   }
 
@@ -375,7 +425,8 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     }
   }
 
-  const bfsNeighbors = allowDiagonals ? neighbors8 : neighbors4;
+  const bfsNeighbors = (x: number, y: number): Generator<GridCoord> =>
+    neighborsOf(x, y, neighborhood);
   const posKey = (x: number, y: number): string => `${x},${y}`;
 
   // Binary min-heap over parallel key/payload arrays, retained across
@@ -478,14 +529,9 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
     inBounds,
 
-    neighbors(x, y) {
+    neighbors(x, y, deltas = neighborhood) {
       checkBounds(x, y);
-      return neighbors4(x, y);
-    },
-
-    neighborsDiag(x, y) {
-      checkBounds(x, y);
-      return neighbors8(x, y);
+      return neighborsOf(x, y, deltas);
     },
 
     inRange(x, y, radius) {
@@ -561,9 +607,15 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         if (d > dist[u]) continue;
         const ux = u % width;
         const uy = (u - ux) / width;
-        for (const n of bfsNeighbors(ux, uy)) {
-          const ni = idx(n.x, n.y);
-          const step = cost(cells[ni], n.x, n.y);
+        // Delta walk inlined rather than routed through `neighbors()`: this is
+        // the one traversal whose inner loop runs per relaxation, and the
+        // generator would box a coordinate object per neighbor per pop.
+        for (let k = 0; k < neighborhood.length; k++) {
+          const nx = ux + neighborhood[k].dx;
+          const ny = uy + neighborhood[k].dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const ni = ny * width + nx;
+          const step = cost(cells[ni], nx, ny);
           if (!Number.isFinite(step)) continue;
           const nd = d + step;
           if (nd < dist[ni]) {
