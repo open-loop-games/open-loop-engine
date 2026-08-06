@@ -935,6 +935,14 @@ export const integrateAtan = makeUnaryIntegrate((x) =>
 
 // === HYPERBOLIC ===
 
+// Accuracy ceiling inherited from the dependency, not from this table: upstream
+// `asinh`/`atanh` are the naive closed forms — `ln(x + √(x²+1))` and
+// `ln((1+x)/(1−x))/2` — which cancel catastrophically in the saturated tail. At
+// x = -10, `x + √(x²+1)` is 4.5e-5, so ~9 digits are gone: `asinh` returns
+// -10.000000133701262 where `Math.asinh` and mpmath give exactly -10. The error
+// is sign-asymmetric (the positive half holds machine epsilon) and grows as
+// ε·2x². Inverting `sinh`/`tanh` inherits it; a consumer needing the tail to
+// full precision has to bind a stable inverse rather than tightening a law.
 export const invertSinh = makeUnaryInvert(Decimal.asinh);
 export const integrateSinh = makeUnaryIntegrate((x) => Formula.cosh(x));
 

@@ -106,6 +106,15 @@ export function toFinalDecimal(x: DecimalSource): Decimal {
 // the right-hand operand — so the tempting one-call form `cmp(v) >= 0`
 // reintroduces exactly this bug. Do not "simplify" these back to `!lt` / `!gt`.
 //
+// A NaN guard is not a domain check, so don't mistake one for the other. Two
+// thirds of the op table reports a domain error as NaN (`recip(0)`, `ln(0)`,
+// `sqrt(-1)`, `asin(2)`, `∞−∞`, …), but a second class answers with a plausible
+// finite number instead: `pow(0, -1)` is `0`, `0 × Infinity` is `Infinity`,
+// `factorial(-1)` is `Infinity`, `slog(-1)` is -1.8643…. Nothing downstream can
+// detect those, which is why the standing remedy is to work in a coordinate
+// where the value is defined rather than to evaluate into a domain edge and
+// inspect the result afterward.
+//
 // Patched on the prototype, not just the statics: 25 of the engine's 64 ordering
 // callsites use the instance form, and the statics delegate down here anyway.
 // break_eternity's own internals (tetrate/slog/lambertw) route through these too
