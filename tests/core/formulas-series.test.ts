@@ -14,6 +14,7 @@ import { Formula } from '@/core/formulas';
 import { arithmeticSeries, geometricSeries, powerSeries } from '@/core/formulas/series';
 import type { GenericFormula } from '@/core/formulas';
 import { createResource } from '@/core/resource';
+import { createCostRequirement, maxRequirementsMet, payRequirements } from '@/core/requirements';
 import { createScalingPurchasable } from '@/systems/purchasable';
 
 /** Σ f(from + i) for i in [0, count) — the definition. */
@@ -275,6 +276,66 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       expect(Decimal.gt(wallet.value, 0)).toBe(true);
     }
   });
+});
+
+describe('a single-payment purchase charges the level it counted to', () => {
+  // The sibling of the law above, one flag over. `cumulativeCost: false` prices
+  // a bulk buy as one payment at the target level rather than a sum, so "bulk
+  // charges what singles charge" does NOT hold here and is the wrong law. What
+  // must hold is the invariant studio/open-loop-engine#22 was actually about:
+  // the count and the charge resolve through the same operation. Both sides go
+  // through `evaluate(current + n)` — `calculateCost`'s non-cumulative branch
+  // and `calculateMaxAffordable`'s `priceOf` — and nothing pinned that.
+
+  for (const startLevel of [0, 7]) {
+    for (const costScaling of [1.05, 1.15, 1.5, 2, 3]) {
+      test(`level=${startLevel} s=${costScaling}`, () => {
+        const funds = 1e3;
+        const level = ref<DecimalSource>(startLevel);
+        const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const req = createCostRequirement({
+          resource: wallet,
+          cost: Formula.exponential(level, 10, costScaling),
+          cumulativeCost: false,
+          maxBulkAmount: Decimal.dInf,
+        });
+
+        const n = maxRequirementsMet(req);
+        const price = req.getCost(n);
+
+        // The charge is a single evaluation at the target level, not a sum —
+        // the defining semantic of the flag. Buying nothing charges nothing:
+        // at level 7 a 2× or 3× curve already prices the next level above the
+        // whole balance, which is a real state and not a degenerate skip.
+        const expected = Decimal.gt(n, 0)
+          ? Decimal.mul(10, Decimal.pow(costScaling, Decimal.add(startLevel, n)))
+          : Decimal.dZero;
+        expect(
+          Decimal.lte(relativeError(price, expected), EXACT),
+          `charged ${String(price)} for ${String(n)} levels from ${startLevel}, expected ${String(expected)}`,
+        ).toBe(true);
+
+        // The count is honest in both directions: what it counted is payable,
+        // and one more is not. An overcharge lives in the first assertion — it
+        // is exactly what a continuous price against a discrete count breaks.
+        expect(
+          Decimal.lte_tolerance(price, funds, EXACT),
+          `charged ${String(price)} out of ${funds}`,
+        ).toBe(true);
+        expect(
+          Decimal.gt(req.getCost(Decimal.add(n, 1)), funds),
+          `one more level cost ${String(req.getCost(Decimal.add(n, 1)))}, still under ${funds}`,
+        ).toBe(true);
+
+        // `pay`'s clamp to zero must not be what keeps the wallet solvent.
+        payRequirements(req, n);
+        expect(
+          Decimal.lte(relativeError(wallet.value, Decimal.sub(funds, price)), EXACT),
+          `left ${String(wallet.value)}, expected ${String(Decimal.sub(funds, price))}`,
+        ).toBe(true);
+      });
+    }
+  }
 });
 
 describe('degenerate spans', () => {
