@@ -635,7 +635,6 @@ describe('invert contract: tryInvert grades the answer', () => {
         ['min', F.min(F.variable(0), 200), '500'],
         ['max', F.max(F.variable(0), 200), '100'],
         ['clamp', F.clamp(F.variable(0), 0, 200), '500'],
-        ['clampMax', F.clampMax(F.variable(0), 200), '500'],
       ];
       for (const [name, formula, target] of cases) {
         const { value, errors } = withoutEngineErrors(() => formula.tryInvert(target));

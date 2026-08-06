@@ -148,7 +148,7 @@ export interface Conversion {
  *     }),
  *   },
  *   outputs: {
- *     mana: { resource: mana, amount: ({ gold }) => gold.times(50) },
+ *     mana: { resource: mana, amount: ({ gold }) => gold.mul(50) },
  *   },
  * });
  * ```

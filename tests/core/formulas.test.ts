@@ -158,32 +158,14 @@ describe('Formula Equality Checking', () => {
       expect(Formula.constant(1).equals(Formula.variable(1))).toBe(false));
   });
 
-  describe('Formula aliases', () => {
-    function testAliases<T extends FormulaFunctions>(
-      aliases: T[],
-      args: Parameters<(typeof Formula)[T]>,
-    ) {
-      describe(aliases[0], () => {
-        let formula: GenericFormula;
-        beforeAll(() => {
-          // @ts-expect-error - dynamic method access
-          formula = Formula[aliases[0]](...args);
-        });
-
-        aliases.slice(1).forEach((alias) => {
-          // @ts-expect-error - dynamic method access
-          test(alias, () => expect(Formula[alias](...args).equals(formula)).toBe(true));
-        });
-      });
+  // One name per operation: `Decimal`'s aliases (`times`, `plus`, `dividedBy`,
+  // …) are not re-exported onto `Formula`, so there is no alias-equality block
+  // here. `Decimal.mul` etc. still answer to them — that surface is upstream's.
+  test('an op answers to its canonical name only', () => {
+    for (const alias of ['negate', 'negated', 'sgn', 'reciprocal', 'plus', 'times', 'dividedBy']) {
+      expect(alias in Formula, alias).toBe(false);
+      expect(alias in Formula.prototype, alias).toBe(false);
     }
-    testAliases(['neg', 'negate', 'negated'], [1]);
-    testAliases(['recip', 'reciprocal', 'reciprocate'], [1]);
-    testAliases(['sign', 'sgn'], [1]);
-    testAliases(['add', 'plus'], [1, 1]);
-    testAliases(['sub', 'subtract', 'minus'], [1, 1]);
-    testAliases(['mul', 'multiply', 'times'], [1, 1]);
-    testAliases(['div', 'divide'], [1, 1]);
-    testAliases(['log', 'logarithm'], [1, 1]);
   });
 
   describe('Instance vs Static methods', () => {
@@ -337,8 +319,6 @@ describe('Creating Formulas', () => {
         'min',
         'maxabs',
         'minabs',
-        'clampMin',
-        'clampMax',
       ] as const
     ).forEach((names) =>
       describe(names, () => {
@@ -492,16 +472,12 @@ describe('Inverting', () => {
       expect(Formula.minabs(variable, constant).invert(10)).compare_tolerance(10));
     test('maxabs', () =>
       expect(Formula.maxabs(variable, constant).invert(10)).compare_tolerance(10));
-    test('clampMax', () =>
-      expect(Formula.clampMax(variable, constant).invert(10)).compare_tolerance(10));
-    test('clampMin', () =>
-      expect(Formula.clampMin(variable, constant).invert(10)).compare_tolerance(10));
     test('clamp', () =>
       expect(Formula.clamp(variable, constant, constant).invert(10)).compare_tolerance(10));
   });
 
   test('Inverting nested formulas', () => {
-    const formula = Formula.add(variable, constant).times(constant).floor();
+    const formula = Formula.add(variable, constant).mul(constant).floor();
     expect(formula.invert(100)).compare_tolerance(0);
   });
 
@@ -600,7 +576,7 @@ describe('Integrating', () => {
   describe.todo('Integrable formulas integrate correctly');
 
   test('Integrating nested formulas', () => {
-    const formula = Formula.add(variable, constant).times(constant).pow(2).times(30).add(10);
+    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
     const actualCost = new Array(10)
       .fill(null)
       .reduce((acc, _, i) => acc.add(formula.evaluate(i)), new Decimal(0));
@@ -618,7 +594,7 @@ describe('Integrating', () => {
   });
 
   test('Integrating nested formulas with overridden variable', () => {
-    const formula = Formula.add(variable, constant).times(constant).pow(2).times(30).add(10);
+    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
     const actualCost = new Array(20)
       .fill(null)
       .reduce((acc, _, i) => acc.add(formula.evaluate(i)), new Decimal(0));
@@ -636,7 +612,7 @@ describe('Integrating', () => {
   });
 
   test('Integrating nested complex formulas', () => {
-    const formula = Formula.pow(1.05, variable).times(100).pow(0.5);
+    const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.evaluateIntegral()).toLogError();
   });
 
@@ -724,7 +700,7 @@ describe('Inverting integrals', () => {
   });
 
   test('variable.invertIntegral() calculates correctly', () =>
-    expect(variable.invertIntegral(20)).compare_tolerance(Decimal.sqrt(20).times(Decimal.sqrt(2))));
+    expect(variable.invertIntegral(20)).compare_tolerance(Decimal.sqrt(20).mul(Decimal.sqrt(2))));
 
   describe('Invertible Integral functions marked as such', () => {
     function checkFormula(formula: InvertibleIntegralFormula) {
@@ -798,12 +774,12 @@ describe('Inverting integrals', () => {
   describe.todo('Invertible Integral formulas invert correctly');
 
   test('Inverting integral of nested formulas', () => {
-    const formula = Formula.add(variable, constant).times(constant).pow(2).times(30);
+    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30);
     expect(formula.invertIntegral(formula.evaluateIntegral())).compare_tolerance(10);
   });
 
   test('Inverting integral of nested complex formulas', () => {
-    const formula = Formula.pow(1.05, variable).times(100).pow(0.5);
+    const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.invertIntegral(100)).toLogError();
   });
 });
@@ -976,7 +952,7 @@ describe('Conditionals', () => {
           constant,
           false,
           (value) => Formula.sqrt(value),
-          (value) => value.times(2),
+          (value) => value.mul(2),
         ).evaluate(),
       ).compare_tolerance(20));
     test('Inverts correctly with variable in input', () =>
@@ -985,7 +961,7 @@ describe('Conditionals', () => {
           variable,
           false,
           (value) => Formula.sqrt(value),
-          (value) => value.times(2),
+          (value) => value.mul(2),
         ).invert(20),
       ).compare_tolerance(10));
   });
@@ -1177,16 +1153,16 @@ describe('Buy Max', () => {
     });
     test('Calculates max affordable and cost correctly', () => {
       const variable = Formula.variable(0);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(141);
       expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
-        Decimal.pow(1.05, 141).times(100),
+        Decimal.pow(1.05, 141).mul(100),
       );
     });
     test('Caps the count at maxBulkAmount and prices the capped target', () => {
       const variable = Formula.variable(0);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false, 4);
       expect(maxAffordable.value).compare_tolerance(4);
       expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
@@ -1199,13 +1175,13 @@ describe('Buy Max', () => {
       // correct count of additional purchases is 141 - 10 = 131.
       const purchases = ref(10);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(131);
 
       // Round-trip: paying for 131 levels (non-cumulative) costs evaluate(141).
       expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
-        Decimal.pow(1.05, 141).times(100),
+        Decimal.pow(1.05, 141).mul(100),
       );
     });
     test('Clamps to 0 when currentVariable already exceeds invert(resource)', () => {
@@ -1214,7 +1190,7 @@ describe('Buy Max', () => {
       // clamp, the result would be negative and poison downstream callers.
       const purchases = ref(200);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(0);
     });
@@ -1245,7 +1221,7 @@ describe('Buy Max', () => {
     test('Max affordable and cost agree exactly with 0 purchases', () => {
       const purchases = ref(0);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1271,7 +1247,7 @@ describe('Buy Max', () => {
     test('Max affordable and cost agree exactly with 1 purchase', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1294,7 +1270,7 @@ describe('Buy Max', () => {
     test('The default path prices the levels it counted, exactly', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1317,7 +1293,7 @@ describe('Buy Max', () => {
     test('Stays exact partway up the curve, not just from level zero', () => {
       const purchases = ref(90);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).times(100);
+      const formula = Formula.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;

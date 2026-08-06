@@ -295,7 +295,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
       baseCost: 100,
       costScaling: 10,
       limit: 3,
-      effect: (amount) => Formula.variable(amount).times(1).add(1),
+      effect: (amount) => Formula.variable(amount).mul(1).add(1),
     });
 
     const bought = p.purchaseMax();

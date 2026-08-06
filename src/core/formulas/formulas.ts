@@ -93,24 +93,20 @@ export type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula;
 
 /**
  * Type of the static methods `registerOps` adds to {@link F}. Each property is
- * either a {@link UnaryFormulaOp} or a {@link BinaryFormulaOp}; the aliases
- * (`add`/`plus`, `mul`/`multiply`/`times`, …) point at the same operation.
+ * either a {@link UnaryFormulaOp} or a {@link BinaryFormulaOp}, one name per
+ * operation — `Decimal`'s alias sprawl (`times`, `plus`, `dividedBy`, …) stops
+ * at the `Formula` boundary.
  */
 export interface FormulaStaticOps {
   // Unary
   neg: UnaryFormulaOp;
-  negate: UnaryFormulaOp;
-  negated: UnaryFormulaOp;
   sign: UnaryFormulaOp;
-  sgn: UnaryFormulaOp;
   round: UnaryFormulaOp;
   floor: UnaryFormulaOp;
   ceil: UnaryFormulaOp;
   trunc: UnaryFormulaOp;
   abs: UnaryFormulaOp;
   recip: UnaryFormulaOp;
-  reciprocal: UnaryFormulaOp;
-  reciprocate: UnaryFormulaOp;
   pLog10: UnaryFormulaOp;
   absLog10: UnaryFormulaOp;
   log10: UnaryFormulaOp;
@@ -135,19 +131,10 @@ export interface FormulaStaticOps {
   atanh: UnaryFormulaOp;
   // Binary
   add: BinaryFormulaOp;
-  plus: BinaryFormulaOp;
   sub: BinaryFormulaOp;
-  subtract: BinaryFormulaOp;
-  minus: BinaryFormulaOp;
   mul: BinaryFormulaOp;
-  multiply: BinaryFormulaOp;
-  times: BinaryFormulaOp;
   div: BinaryFormulaOp;
-  divide: BinaryFormulaOp;
-  divideBy: BinaryFormulaOp;
-  dividedBy: BinaryFormulaOp;
   log: BinaryFormulaOp;
-  logarithm: BinaryFormulaOp;
   pow: BinaryFormulaOp;
   pow_base: BinaryFormulaOp;
   root: BinaryFormulaOp;
@@ -162,18 +149,13 @@ export interface FormulaStaticOps {
 export interface FormulaInstanceOps {
   // Unary
   neg: UnaryFormulaInstanceOp;
-  negate: UnaryFormulaInstanceOp;
-  negated: UnaryFormulaInstanceOp;
   sign: UnaryFormulaInstanceOp;
-  sgn: UnaryFormulaInstanceOp;
   round: UnaryFormulaInstanceOp;
   floor: UnaryFormulaInstanceOp;
   ceil: UnaryFormulaInstanceOp;
   trunc: UnaryFormulaInstanceOp;
   abs: UnaryFormulaInstanceOp;
   recip: UnaryFormulaInstanceOp;
-  reciprocal: UnaryFormulaInstanceOp;
-  reciprocate: UnaryFormulaInstanceOp;
   pLog10: UnaryFormulaInstanceOp;
   absLog10: UnaryFormulaInstanceOp;
   log10: UnaryFormulaInstanceOp;
@@ -198,19 +180,10 @@ export interface FormulaInstanceOps {
   atanh: UnaryFormulaInstanceOp;
   // Binary
   add: BinaryFormulaInstanceOp;
-  plus: BinaryFormulaInstanceOp;
   sub: BinaryFormulaInstanceOp;
-  subtract: BinaryFormulaInstanceOp;
-  minus: BinaryFormulaInstanceOp;
   mul: BinaryFormulaInstanceOp;
-  multiply: BinaryFormulaInstanceOp;
-  times: BinaryFormulaInstanceOp;
   div: BinaryFormulaInstanceOp;
-  divide: BinaryFormulaInstanceOp;
-  divideBy: BinaryFormulaInstanceOp;
-  dividedBy: BinaryFormulaInstanceOp;
   log: BinaryFormulaInstanceOp;
-  logarithm: BinaryFormulaInstanceOp;
   pow: BinaryFormulaInstanceOp;
   pow_base: BinaryFormulaInstanceOp;
   root: BinaryFormulaInstanceOp;
@@ -231,7 +204,6 @@ type OpDescriptor = {
    */
   sum?: (...args: any[]) => any;
   applySubstitution?: (...args: any[]) => any;
-  aliases?: string[];
 };
 
 const unaryOps: Record<string, OpDescriptor> = {
@@ -241,9 +213,8 @@ const unaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integrateNeg,
     sum: ops.sumNeg,
     applySubstitution: ops.applySubstitutionNeg,
-    aliases: ['negate', 'negated'],
   },
-  sign: { evaluate: Decimal.sign, aliases: ['sgn'] },
+  sign: { evaluate: Decimal.sign },
   round: { evaluate: Decimal.round, invert: ops.invertPassthrough },
   floor: { evaluate: Decimal.floor, invert: ops.invertPassthrough },
   ceil: { evaluate: Decimal.ceil, invert: ops.invertPassthrough },
@@ -253,7 +224,6 @@ const unaryOps: Record<string, OpDescriptor> = {
     evaluate: Decimal.recip,
     invert: ops.invertRecip,
     integrate: ops.integrateRecip,
-    aliases: ['reciprocal', 'reciprocate'],
   },
   pLog10: { evaluate: Decimal.pLog10 },
   absLog10: { evaluate: Decimal.absLog10 },
@@ -290,7 +260,6 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrateInner: ops.integrateInnerAdd,
     sum: ops.sumAdd,
     applySubstitution: ops.passthrough,
-    aliases: ['plus'],
   },
   sub: {
     evaluate: Decimal.sub,
@@ -299,7 +268,6 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrateInner: ops.integrateInnerSub,
     sum: ops.sumSub,
     applySubstitution: ops.passthrough,
-    aliases: ['subtract', 'minus'],
   },
   mul: {
     evaluate: Decimal.mul,
@@ -307,7 +275,6 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integrateMul,
     sum: ops.sumMul,
     applySubstitution: ops.applySubstitutionMul,
-    aliases: ['multiply', 'times'],
   },
   div: {
     evaluate: Decimal.div,
@@ -315,13 +282,11 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integrateDiv,
     sum: ops.sumDiv,
     applySubstitution: ops.applySubstitutionDiv,
-    aliases: ['divide', 'divideBy', 'dividedBy'],
   },
   log: {
     evaluate: Decimal.log,
     invert: ops.invertLog,
     integrate: ops.integrateLog,
-    aliases: ['logarithm'],
   },
   pow: {
     evaluate: Decimal.pow,
@@ -1287,8 +1252,6 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   public static min = ops.createPassthroughBinaryFormula(Decimal.min);
   public static minabs = ops.createPassthroughBinaryFormula(Decimal.minabs);
   public static maxabs = ops.createPassthroughBinaryFormula(Decimal.maxabs);
-  public static clampMin = ops.createPassthroughBinaryFormula(Decimal.clampMin);
-  public static clampMax = ops.createPassthroughBinaryFormula(Decimal.clampMax);
 
   public max(value: FormulaSource) {
     return Formula.max(this, value);
@@ -1301,12 +1264,6 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
   public minabs(value: FormulaSource) {
     return Formula.minabs(this, value);
-  }
-  public clampMin(value: FormulaSource) {
-    return Formula.clampMin(this, value);
-  }
-  public clampMax(value: FormulaSource) {
-    return Formula.clampMax(this, value);
   }
 
   public static clamp(value: FormulaSource, min: FormulaSource, max: FormulaSource) {
@@ -1356,14 +1313,11 @@ export const F = Formula as typeof Formula & FormulaStaticOps;
 
 function registerOps(table: Record<string, OpDescriptor>, arity: 'unary' | 'binary') {
   for (const [name, desc] of Object.entries(table)) {
-    const { aliases, ...formulaProps } = desc;
-
     if (arity === 'unary') {
-      (Formula as any)[name] = (value: FormulaSource) =>
-        new Formula({ inputs: [value], ...formulaProps });
+      (Formula as any)[name] = (value: FormulaSource) => new Formula({ inputs: [value], ...desc });
     } else {
       (Formula as any)[name] = (value: FormulaSource, other: FormulaSource) =>
-        new Formula({ inputs: [value, other], ...formulaProps });
+        new Formula({ inputs: [value, other], ...desc });
     }
 
     // Instance method delegates to static
@@ -1376,12 +1330,6 @@ function registerOps(table: Record<string, OpDescriptor>, arity: 'unary' | 'bina
       proto[name] = function (this: Formula, ...args: FormulaSource[]) {
         return (Formula as any)[name](this, ...args);
       };
-    }
-
-    // Aliases
-    for (const alias of aliases ?? []) {
-      (Formula as any)[alias] = (Formula as any)[name];
-      proto[alias] = proto[name];
     }
   }
 }

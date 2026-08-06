@@ -513,8 +513,8 @@ export const invertMul = makeBinaryInvert(
 );
 
 export const integrateMul = makeBinaryIntegrate(
-  (x, other) => Formula.times(x, other),
-  (x, other) => Formula.times(x, other),
+  (x, other) => Formula.mul(x, other),
+  (x, other) => Formula.mul(x, other),
 );
 
 export const applySubstitutionMul = makeBinarySubstitution((value, other) =>
@@ -566,12 +566,12 @@ export const integrateRecip = makeUnaryIntegrate((x) => Formula.ln(x));
 export const invertLog10 = makeUnaryInvert(Decimal.pow10);
 
 function internalIntegrateLog10(lhs: DecimalSource) {
-  return Decimal.ln(lhs).sub(1).times(lhs).div(ln10);
+  return Decimal.ln(lhs).sub(1).mul(lhs).div(ln10);
 }
 
 function internalInvertIntegralLog10(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
-    const numerator = ln10.times(value);
+    const numerator = ln10.mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
   reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
@@ -600,12 +600,12 @@ export const invertLog = makeBinaryInvert(
 );
 
 function internalIntegrateLog(lhs: DecimalSource, rhs: DecimalSource) {
-  return Decimal.ln(lhs).sub(1).times(lhs).div(Decimal.ln(rhs));
+  return Decimal.ln(lhs).sub(1).mul(lhs).div(Decimal.ln(rhs));
 }
 
 function internalInvertIntegralLog(value: DecimalSource, lhs: FormulaSource, rhs: FormulaSource) {
   if (hasVariable(lhs)) {
-    const numerator = Decimal.ln(unrefFormulaSource(rhs)).times(value);
+    const numerator = Decimal.ln(unrefFormulaSource(rhs)).mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
   reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
@@ -631,12 +631,12 @@ export function integrateLog(stack: SubstitutionStack, lhs: FormulaSource, rhs: 
 export const invertLog2 = makeUnaryInvert((v) => Decimal.pow(2, v));
 
 function internalIntegrateLog2(lhs: DecimalSource) {
-  return Decimal.ln(lhs).sub(1).times(lhs).div(Decimal.ln(2));
+  return Decimal.ln(lhs).sub(1).mul(lhs).div(Decimal.ln(2));
 }
 
 function internalInvertIntegralLog2(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
-    const numerator = Decimal.ln(2).times(value);
+    const numerator = Decimal.ln(2).mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
   }
   reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
@@ -662,7 +662,7 @@ export function integrateLog2(stack: SubstitutionStack, lhs: FormulaSource) {
 export const invertLn = makeUnaryInvert(Decimal.exp);
 
 function internalIntegrateLn(lhs: DecimalSource) {
-  return Decimal.ln(lhs).sub(1).times(lhs);
+  return Decimal.ln(lhs).sub(1).mul(lhs);
 }
 
 function internalInvertIntegralLn(value: DecimalSource, lhs: FormulaSource) {
@@ -738,7 +738,7 @@ export function integrateRoot(stack: SubstitutionStack, lhs: FormulaSource, rhs:
       return Formula.constant(0);
     }
     const x = lhs.getIntegralFormula(stack);
-    return Formula.pow(x, Formula.recip(rhs).add(1)).times(rhs).div(Formula.add(rhs, 1));
+    return Formula.pow(x, Formula.recip(rhs).add(1)).mul(rhs).div(Formula.add(rhs, 1));
   }
   console.error('Could not integrate due to no input being a variable');
   return Formula.constant(0);
@@ -884,7 +884,7 @@ export function invertLayeradd(
     return lhs.invert(
       Decimal.layeradd(
         value,
-        Decimal.minabs(1e308, unrefFormulaSource(diff)).negate().toNumber(),
+        Decimal.minabs(1e308, unrefFormulaSource(diff)).neg().toNumber(),
         unrefFormulaSource(base),
       ),
     );
@@ -893,7 +893,7 @@ export function invertLayeradd(
   return 0;
 }
 
-export const invertLambertw = makeUnaryInvert((v) => Decimal.pow(Math.E, v).times(v));
+export const invertLambertw = makeUnaryInvert((v) => Decimal.pow(Math.E, v).mul(v));
 export const invertSsqrt = makeUnaryInvert((v) => Decimal.tetrate(v, 2));
 
 export function pentate(value: DecimalSource, height: DecimalSource, payload: DecimalSource) {
@@ -915,21 +915,21 @@ export const integrateTan = makeUnaryIntegrate((x) => Formula.cos(x).ln().neg())
 export const invertAsin = makeUnaryInvert(Decimal.sin);
 export const integrateAsin = makeUnaryIntegrate((x) =>
   Formula.asin(x)
-    .times(x)
+    .mul(x)
     .add(Formula.sqrt(Formula.sub(1, Formula.pow(x, 2)))),
 );
 
 export const invertAcos = makeUnaryInvert(Decimal.cos);
 export const integrateAcos = makeUnaryIntegrate((x) =>
   Formula.acos(x)
-    .times(x)
+    .mul(x)
     .sub(Formula.sqrt(Formula.sub(1, Formula.pow(x, 2)))),
 );
 
 export const invertAtan = makeUnaryInvert(Decimal.tan);
 export const integrateAtan = makeUnaryIntegrate((x) =>
   Formula.atan(x)
-    .times(x)
+    .mul(x)
     .sub(Formula.ln(Formula.pow(x, 2).add(1)).div(2)),
 );
 
@@ -946,20 +946,20 @@ export const integrateTanh = makeUnaryIntegrate((x) => Formula.cosh(x).ln());
 
 export const invertAsinh = makeUnaryInvert(Decimal.sinh);
 export const integrateAsinh = makeUnaryIntegrate((x) =>
-  Formula.asinh(x).times(x).sub(Formula.pow(x, 2).add(1).sqrt()),
+  Formula.asinh(x).mul(x).sub(Formula.pow(x, 2).add(1).sqrt()),
 );
 
 export const invertAcosh = makeUnaryInvert(Decimal.cosh);
 export const integrateAcosh = makeUnaryIntegrate((x) =>
   Formula.acosh(x)
-    .times(x)
-    .sub(Formula.add(x, 1).sqrt().times(Formula.sub(x, 1).sqrt())),
+    .mul(x)
+    .sub(Formula.add(x, 1).sqrt().mul(Formula.sub(x, 1).sqrt())),
 );
 
 export const invertAtanh = makeUnaryInvert(Decimal.tanh);
 export const integrateAtanh = makeUnaryIntegrate((x) =>
   Formula.atanh(x)
-    .times(x)
+    .mul(x)
     .add(Formula.sub(1, Formula.pow(x, 2)).ln().div(2)),
 );
 

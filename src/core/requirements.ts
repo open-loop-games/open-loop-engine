@@ -143,7 +143,7 @@ export interface CostRequirement extends Requirement {
  * // With scaling formula for bulk purchases
  * const scalingCost = createCostRequirement({
  *   resource: points,
- *   cost: Formula.variable(0).pow_base(2).times(10), // 10 * 2^level
+ *   cost: Formula.variable(0).pow_base(2).mul(10), // 10 * 2^level
  *   maxBulkAmount: 10
  * })
  * ```
