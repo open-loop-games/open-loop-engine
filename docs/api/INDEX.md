@@ -100,6 +100,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | schedule jobs / persona rotation / ordered dispatch | composition.md#sequencer |
 | recommendation between loops | advisors.md#recommendation |
 | spatial adjacency / grid bonuses | spatial.md#grid, spatial.md#graph |
+| routing / pathfinding / travel cost over a map | `SpatialGrid.distanceField` (weighted, multi-source, descend the field) or `SpatialGrid.bfs` (reachability + parent links) → spatial.md#grid |
 | balance parameter sweep (multi-variant) | harness.md#cell-aggregation-kernel |
 | tune a single balance value to meet a target | harness.md#solvers |
 | perturb a modifier to test sensitivity | harness.md#perturbation-applier |
@@ -141,6 +142,7 @@ Cross-cutting concepts in agent vocabulary, resolved to tier `#section` anchors 
 - **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
 - **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation
 - **spatial agent steering** — steer an agent over a map: influence layers supply per-cell field values, the goal picker scores and ranks candidates built from them → spatial.md#influence-layer, advisors.md#goal-picker
+- **distance field / flow field** — least-cost distance from a source set to every cell, agents move by descending it. `SpatialGrid.distanceField`; the step direction is derived consumer-side so routing and rendering share one tie-break → spatial.md#grid
 
 ## Common disambiguators
 
@@ -268,7 +270,7 @@ Every public-symbol cluster across the engine, grouped under its tier. Cluster i
 
 ### Spatial
 
-- `spatial-grid` — Bounded 2D grid with adjacency, BFS, FOV adapter, and snapshot persistence. Shared coordinate types (`GridCoord`,… → spatial.md#grid
+- `spatial-grid` — Bounded 2D grid with adjacency, FOV adapter, and snapshot persistence. Two traversal queries split by use: `bfs()`… → spatial.md#grid
 - `spatial-graph` — Keyed node/edge container with nested child-graph composition — the substrate `ScopeStack` walks. → spatial.md#graph
 - `spatial-scope-stack` — Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active. → spatial.md#scope-stack
 - `spatial-influence-layer` — Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric… → spatial.md#influence-layer

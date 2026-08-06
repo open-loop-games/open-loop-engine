@@ -223,6 +223,124 @@ describe('createSpatialGrid — bfs', () => {
   });
 });
 
+describe('createSpatialGrid — distanceField', () => {
+  const openCost: (cell: Tile) => number = (c) => (c.kind === 'floor' ? 1 : Infinity);
+
+  it('returns hop distance from a single source, Infinity where unreachable', () => {
+    // Full vertical wall at x=1 — the x=2 column is cut off.
+    const grid = createSpatialGrid<Tile>({
+      width: 3,
+      height: 3,
+      initializer: (x) => ({ kind: x === 1 ? 'wall' : 'floor' }),
+    });
+    const dist = grid.distanceField([{ x: 0, y: 0 }], openCost);
+    expect(dist[0]).toBe(0); // (0,0)
+    expect(dist[3]).toBe(1); // (0,1)
+    expect(dist[6]).toBe(2); // (0,2)
+    expect(dist[1]).toBe(Infinity); // (1,0) wall
+    expect(dist[2]).toBe(Infinity); // (2,0) severed
+  });
+
+  it('accumulates per-cell entry cost, preferring a longer cheap route', () => {
+    // 5x2. Row 0 is a toll road (cost 5/cell), row 1 is cheap (0.1/cell).
+    // Reaching (4,0) via row 1 and stepping up costs 5*0.1 + 5 = 5.5,
+    // beating the straight 4*5 = 20 along row 0.
+    const grid = createSpatialGrid<Tile>({
+      width: 5,
+      height: 2,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    const dist = grid.distanceField([{ x: 0, y: 0 }], (_c, _x, y) => (y === 0 ? 5 : 0.1));
+    expect(dist[5]).toBeCloseTo(0.1, 12); // (0,1)
+    expect(dist[9]).toBeCloseTo(0.5, 12); // (4,1) — five cheap steps
+    expect(dist[4]).toBeCloseTo(5.5, 12); // (4,0) — cheap route then one toll
+    // Every cell is reached: a non-dyadic weight must not strand a region.
+    expect([...dist].every(Number.isFinite)).toBe(true);
+  });
+
+  it('seeds every source at zero and returns the distance to the nearest one', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 5,
+      height: 1,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    const dist = grid.distanceField(
+      [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+      ],
+      openCost,
+    );
+    expect([...dist]).toEqual([0, 1, 2, 1, 0]);
+  });
+
+  it('drops sources that are out of bounds or standing on impassable terrain', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 3,
+      height: 1,
+      initializer: (x) => ({ kind: x === 2 ? 'wall' : 'floor' }),
+    });
+    const dist = grid.distanceField(
+      [
+        { x: -1, y: 0 }, // out of bounds
+        { x: 2, y: 0 }, // impassable — not a zero-distance origin
+        { x: 0, y: 0 },
+      ],
+      openCost,
+    );
+    expect([...dist]).toEqual([0, 1, Infinity]);
+  });
+
+  it('returns an all-Infinity field for an empty source set', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 2,
+      height: 2,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    expect([...grid.distanceField([], openCost)]).toEqual([Infinity, Infinity, Infinity, Infinity]);
+  });
+
+  it('uses 8-connected neighbors when allowDiagonals is true', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 3,
+      height: 3,
+      allowDiagonals: true,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    const dist = grid.distanceField([{ x: 0, y: 0 }], openCost);
+    expect(dist[8]).toBe(2); // (2,2) — Chebyshev, not Manhattan
+  });
+
+  it('fills a caller-supplied buffer in place and allocates nothing per recompute', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 3,
+      height: 3,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    const buffer = new Float64Array(9);
+    const first = grid.distanceField([{ x: 0, y: 0 }], openCost, buffer);
+    expect(first).toBe(buffer);
+    expect(buffer[8]).toBe(4);
+
+    // Reused across recomputes, with stale values from the prior run cleared.
+    const second = grid.distanceField([{ x: 2, y: 2 }], openCost, buffer);
+    expect(second).toBe(buffer);
+    expect(buffer[0]).toBe(4);
+    expect(buffer[8]).toBe(0);
+  });
+
+  it('rejects an `into` buffer whose length does not match the grid', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 3,
+      height: 3,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    expect(() => grid.distanceField([{ x: 0, y: 0 }], openCost, new Float64Array(8))).toThrow(
+      RangeError,
+    );
+  });
+});
+
 describe('createSpatialGrid — flood & findOpen', () => {
   it('flood yields every reachable matching cell, including start', () => {
     const grid = createSpatialGrid<Tile>({

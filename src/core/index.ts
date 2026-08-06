@@ -290,6 +290,7 @@ export {
 export type {
   GridCoord,
   PassabilityFn,
+  TraversalCostFn,
   Unsubscribe,
   SpatialGrid,
   SpatialGridOptions,

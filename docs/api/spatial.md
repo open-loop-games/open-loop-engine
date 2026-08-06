@@ -13,16 +13,17 @@ Start with these public symbols before scanning the full inventory below.
 
 ## Grid
 
-Bounded 2D grid with adjacency, BFS, FOV adapter, and snapshot persistence. Shared coordinate types (`GridCoord`, `PassabilityFn`, `Unsubscribe`) sit here.
+Bounded 2D grid with adjacency, FOV adapter, and snapshot persistence. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:241`
-- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:79`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:299`
+- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:84`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
 - `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:25`
-- `interface SpatialGrid<T>` — Bounded 2D grid with adjacency, BFS, FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:87`
-- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:42`
-- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:27`
-- `interface SpatialGridSnapshot<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:63`
+- `interface SpatialGrid<T>` — Bounded 2D grid with adjacency, BFS and weighted distance fields, an FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:95`
+- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:47`
+- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:32`
+- `interface SpatialGridSnapshot<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:68`
+- `type TraversalCostFn<T> = (cell: T, x: number, y: number) => number` — Caller-supplied cost to *enter* a cell, for weighted traversal queries (`distanceField`). `src/core/spatial/types.ts:37`
 - `type Unsubscribe = () => void` — Function returned by event subscriptions; call to detach the handler. `src/core/spatial/types.ts:18`
 
 ## Graph

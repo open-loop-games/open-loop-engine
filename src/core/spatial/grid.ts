@@ -4,9 +4,14 @@
  * @cluster spatial-grid
  *
  * Plain-data, Vue-free. Dense `T[]` cell storage plus three `Uint8Array`
- * bitmaps (passable / explored / visible). Adjacency, range, BFS, and an
- * FOV commit adapter that lets external libraries (rot.js shadowcasting)
+ * bitmaps (passable / explored / visible). Adjacency, range, traversal, and
+ * an FOV commit adapter that lets external libraries (rot.js shadowcasting)
  * write visibility back without the engine importing them.
+ *
+ * Two traversal queries, split by what the caller does with the answer:
+ * `bfs()` for reachability and path reconstruction (parent links, hop order),
+ * `distanceField()` for routing and gradient descent (least-cost distance per
+ * cell, weighted, multi-source).
  *
  * Persistence is structure-level: `serialize()` returns a snapshot,
  * `restore(snapshot)` rebuilds. The consumer wraps the snapshot in a
@@ -21,7 +26,7 @@
 
 import { createEmitHandle } from '../events';
 import { randomItem } from '@/primitives/rng';
-import type { GridCoord, PassabilityFn, Unsubscribe } from './types';
+import type { GridCoord, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
 
 /** Options accepted by {@link createSpatialGrid}. */
 export interface SpatialGridOptions<T> {
@@ -83,7 +88,10 @@ export interface FovUpdateHandle {
   commit(): void;
 }
 
-/** Bounded 2D grid with adjacency, BFS, FOV adapter, and snapshot persistence. */
+/**
+ * Bounded 2D grid with adjacency, BFS and weighted distance fields, an FOV
+ * adapter, and snapshot persistence.
+ */
 export interface SpatialGrid<T> {
   readonly width: number;
   readonly height: number;
@@ -196,6 +204,56 @@ export interface SpatialGrid<T> {
    * coordinate on the BFS path. The start cell maps to itself.
    */
   bfs(start: GridCoord, isPassable: PassabilityFn<T>): Map<string, GridCoord>;
+
+  /**
+   * Least-cost distance from a set of sources to every cell, as a dense
+   * `Float64Array` indexed `y * width + x` — the same layout as the
+   * `passable` / `explored` / `visible` bitmaps. Unreachable cells hold
+   * `Infinity`; every source reachable at all holds `0`.
+   *
+   * This is the query for routing and gradient-descent movement, where
+   * `bfs()` is the query for reachability and path reconstruction. `bfs()`
+   * returns parent links and no distances; this returns distances and no
+   * parent links — agents descend the field, and deriving the step direction
+   * consumer-side keeps routing and rendering from drifting on tie-breaks.
+   *
+   * Uses 4- or 8-connected neighbors per the grid's `allowDiagonals` option,
+   * matching `bfs()` and `flood()`. Sources out of bounds, or whose own
+   * `cost` is `Infinity`, are dropped rather than seeded — a source standing
+   * on impassable terrain is not a zero-distance origin.
+   *
+   * Storage is `Float64Array` so accumulated cost stays exact to the width
+   * the caller's `cost` returns; quantize on the way out if you need a
+   * narrower field. Note this is a precision choice, not what makes the
+   * traversal sound — soundness comes from the queue carrying the *stored*
+   * distance rather than the computed one, so the staleness check compares
+   * like with like. Narrowing the store without that would round a distance
+   * below its queue key and drop nodes unexpanded, leaving whole regions at
+   * `Infinity`; integer costs hide it, any non-dyadic cost trips it.
+   *
+   * @param sources - Seed cells, all at distance 0. A single-source query is
+   *   a one-element set.
+   * @param cost - Cost to enter each cell; `Infinity` means impassable. Must
+   *   not call `distanceField` on this grid — the query reuses a per-grid
+   *   scratch queue.
+   * @param into - Optional destination array of length `width * height`,
+   *   filled in place and returned. For tick-rate callers that keep a
+   *   retained field buffer instead of allocating one per recompute.
+   *
+   * @example
+   * ```ts
+   * // Distance to the nearest of several supply depots, with roads cheap.
+   * const supply = grid.distanceField(depots, (cell) =>
+   *   cell.kind === 'wall' ? Infinity : cell.road ? 0.5 : 1,
+   * );
+   * const here = supply[y * grid.width + x];
+   * ```
+   */
+  distanceField(
+    sources: Iterable<GridCoord>,
+    cost: TraversalCostFn<T>,
+    into?: Float64Array,
+  ): Float64Array;
 
   /**
    * Returns a randomly-selected cell satisfying the predicate, or undefined
@@ -320,6 +378,49 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   const bfsNeighbors = allowDiagonals ? neighbors8 : neighbors4;
   const posKey = (x: number, y: number): string => `${x},${y}`;
 
+  // Binary min-heap over parallel key/payload arrays, retained across
+  // `distanceField` calls — a fresh heap per recompute churns GC at tick rate,
+  // which is the whole reason `into` exists on the same query. Reuse is what
+  // makes the query non-reentrant; the TSDoc states that contract.
+  const heapKey: number[] = [];
+  const heapIdx: number[] = [];
+
+  function heapPush(key: number, payload: number): void {
+    heapKey.push(key);
+    heapIdx.push(payload);
+    let c = heapKey.length - 1;
+    while (c > 0) {
+      const p = (c - 1) >> 1;
+      if (heapKey[p] <= heapKey[c]) break;
+      [heapKey[p], heapKey[c]] = [heapKey[c], heapKey[p]];
+      [heapIdx[p], heapIdx[c]] = [heapIdx[c], heapIdx[p]];
+      c = p;
+    }
+  }
+
+  function heapPop(): number {
+    const top = heapIdx[0];
+    const lastKey = heapKey.pop()!;
+    const lastIdx = heapIdx.pop()!;
+    if (heapKey.length > 0) {
+      heapKey[0] = lastKey;
+      heapIdx[0] = lastIdx;
+      let p = 0;
+      for (;;) {
+        const l = 2 * p + 1;
+        const r = l + 1;
+        let m = p;
+        if (l < heapKey.length && heapKey[l] < heapKey[m]) m = l;
+        if (r < heapKey.length && heapKey[r] < heapKey[m]) m = r;
+        if (m === p) break;
+        [heapKey[p], heapKey[m]] = [heapKey[m], heapKey[p]];
+        [heapIdx[p], heapIdx[m]] = [heapIdx[m], heapIdx[p]];
+        p = m;
+      }
+    }
+    return top;
+  }
+
   const grid: SpatialGrid<T> = {
     width,
     height,
@@ -425,6 +526,55 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         }
       }
       return result;
+    },
+
+    distanceField(sources, cost, into) {
+      let dist: Float64Array;
+      if (into) {
+        if (into.length !== size) {
+          throw new RangeError(
+            `SpatialGrid.distanceField: 'into' must have length ${size} (got ${into.length})`,
+          );
+        }
+        dist = into;
+      } else {
+        dist = new Float64Array(size);
+      }
+      dist.fill(Infinity);
+      heapKey.length = 0;
+      heapIdx.length = 0;
+
+      for (const s of sources) {
+        if (!inBounds(s.x, s.y)) continue;
+        const i = idx(s.x, s.y);
+        if (!Number.isFinite(cost(cells[i], s.x, s.y))) continue;
+        if (dist[i] === 0) continue;
+        dist[i] = 0;
+        heapPush(0, i);
+      }
+
+      while (heapKey.length > 0) {
+        const d = heapKey[0];
+        const u = heapPop();
+        // Lazy deletion: a cell already relaxed to something better has a
+        // stale entry still sitting in the heap.
+        if (d > dist[u]) continue;
+        const ux = u % width;
+        const uy = (u - ux) / width;
+        for (const n of bfsNeighbors(ux, uy)) {
+          const ni = idx(n.x, n.y);
+          const step = cost(cells[ni], n.x, n.y);
+          if (!Number.isFinite(step)) continue;
+          const nd = d + step;
+          if (nd < dist[ni]) {
+            dist[ni] = nd;
+            // Push what was *stored*, not what was computed, so the pop-time
+            // staleness check compares like with like.
+            heapPush(dist[ni], ni);
+          }
+        }
+      }
+      return dist;
     },
 
     findOpen(predicate) {
