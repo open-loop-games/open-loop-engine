@@ -63,7 +63,7 @@ const unlocks = createPurchasableCategory<UnlockDef>({
     limit: 1,
   }),
 });
-setupSweepAutoPurchase(unlocks.getAll().map((e) => e.instance), true, ctx.onTick);
+setupSweepAutoPurchase(unlocks.getAll().map((e) => e.instance), { enabled: true }, ctx.onTick);
 // Elsewhere: unlocks.getPurchasable('coop-built')?.active.value
 ```
 

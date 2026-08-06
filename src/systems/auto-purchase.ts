@@ -4,9 +4,10 @@
  * Two trigger shapes share this file because they bridge the same conceptual
  * surface (automation auto-buy) to different selection mechanics:
  *
- * - {@link setupSweepAutoPurchase} — every tick, `purchaseMax()` on every
- *   affordable purchasable. Light helper for one-shot upgrades and capped
- *   levels where there's no contention between candidates.
+ * - {@link setupSweepAutoPurchase} — on each (optionally throttled) beat, buy
+ *   every affordable purchasable, clamped by an optional reserve floor. Light
+ *   helper for one-shot upgrades and capped levels where there's no contention
+ *   between candidates.
  * - {@link setupPolicyAutoPurchase} — pick-one-then-buy under a
  *   {@link SelectionPolicy}, throttled by an interval and gated by an
  *   optional reserve floor. The producer-chain shape: costs grow into each
@@ -27,6 +28,7 @@ import { persistent } from '@/core/persistence';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
 import type { Resource } from '@/core/resource';
 import type { RegisterTick } from '@/core/sequencer';
+import { isCostRequirement, type Requirement } from '@/core/requirements';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
 import type { Purchasable } from './purchasable';
 import type { Producer, ProducerCategory } from './producer-category';
@@ -39,6 +41,16 @@ import type { Producer, ProducerCategory } from './producer-category';
 // a distinct key so `importSave` can round-trip them.
 let policyAutoPurchaseAccumulatorCounter = 0;
 
+// Same, for the sweep helper's throttle accumulator. Sweep only allocates one
+// when `interval` is supplied, so the two counters advance independently.
+let sweepAutoPurchaseAccumulatorCounter = 0;
+
+// Iteration bound on the reserve clamp's binary search. Exact for ceilings up
+// to 2^64; past that the search returns its current lower bound — an
+// under-buy, never a floor breach — and the residual is picked up by the next
+// beat, so the clamp converges rather than stalling.
+const MAX_RESERVE_CLAMP_STEPS = 64;
+
 // Default policy: cheapest by `repeatable.getCost(1)`. Module-level singleton
 // so identity is stable across `processGetter` calls when `options.policy`
 // is omitted; the helper-side filter guarantees every candidate has a
@@ -47,23 +59,137 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
   p.repeatable!.getCost(1),
 );
 
+// === SHARED BUILDERS ===
+
+/**
+ * Largest `n` in `[1, ceiling]` whose total cost fits in `available`, or `0`
+ * when even a single unit doesn't.
+ *
+ * Total cost is non-decreasing in `n`, so "fits" is a monotone predicate and a
+ * binary search finds its boundary. Both helpers reach this through a reserve:
+ * each passes an `available` already reduced by the floor, so the result is the
+ * most that can be bought without breaching it.
+ *
+ * A `ceiling` of 1 needs no search, and a non-finite one means this cost can't
+ * bind (free or unbounded) — both return `ceiling` unchanged.
+ *
+ * @internal
+ */
+function largestAffordable(
+  getCost: (amount: DecimalSource) => DecimalSource,
+  available: Decimal,
+  ceiling: DecimalSource,
+): DecimalSource {
+  if (Decimal.lt(available, getCost(1))) return Decimal.dZero;
+  if (Decimal.lte(ceiling, 1) || !Decimal.isFinite(ceiling)) return ceiling;
+
+  let lo: DecimalSource = 1;
+  let hi: DecimalSource = ceiling;
+  for (let step = 0; step < MAX_RESERVE_CLAMP_STEPS && Decimal.lt(lo, hi); step++) {
+    const mid = Decimal.add(lo, hi).add(1).div(2).floor();
+    if (Decimal.lte(getCost(mid), available)) lo = mid;
+    else hi = Decimal.sub(mid, 1);
+  }
+  return lo;
+}
+
 // === SWEEP AUTO-PURCHASE ===
 
 /**
- * Register a tick handler that sweeps a purchasable list each frame, calling
- * `purchaseMax()` on every candidate whose `canPurchase` is true.
+ * Options for {@link setupSweepAutoPurchase}.
  *
- * For one-shot purchasables (`limit: 1`), `purchaseMax()` reduces to a single
- * `purchase()`. For leveled / uncapped purchasables, it spends as much as the
- * resource allows in a single call.
+ * Knob names mirror {@link SetupPolicyAutoPurchaseOptions} where the two
+ * overlap, but the internals differ where the trigger shapes differ — see
+ * {@link SetupSweepAutoPurchaseOptions.interval}.
+ */
+export interface SetupSweepAutoPurchaseOptions {
+  /** Reactive toggle for the whole sweep */
+  enabled: Computable<boolean>;
+  /**
+   * Throttle interval in seconds between sweeps. `0` (default) sweeps every
+   * tick. Fractional values are allowed.
+   *
+   * Unlike {@link SetupPolicyAutoPurchaseOptions.interval}, elapsed beats are
+   * *not* replayed. A sweep buys everything affordable, so one sweep after a
+   * long `dt` lands in the same state as a thousand sweeps would — the
+   * accumulator keeps its phase modulo `interval` and the sweep fires once.
+   * That's why there's no drain loop and no iteration cap here.
+   *
+   * Supplying this field registers a persistent accumulator, so the call must
+   * sit inside a persistent context. Omit it and the helper registers no
+   * state at all.
+   */
+  interval?: Computable<number>;
+  /**
+   * Spending-discipline floor — the sweep will not drive a cost-resource
+   * below this value. Default: `0` (no reserve).
+   *
+   * Applied *per cost-resource*: each candidate's cost requirements are
+   * grouped by the resource they spend, and the same floor is held against
+   * each. Single-currency lists (the common case) see exactly the "leave N in
+   * the bank" semantic {@link SetupPolicyAutoPurchaseOptions.reserve}
+   * describes.
+   *
+   * Re-read once per candidate, not once per beat, so a floor expressed as a
+   * fraction of the live bank (`() => 0.2 * bank.value`) holds *cumulatively*
+   * as earlier candidates in the sweep spend.
+   *
+   * The floor clamps rather than skips: a candidate that can afford three
+   * levels under the floor but not ten buys three. This is the one place the
+   * sweep is stricter than its policy sibling, which filters on the cost of a
+   * single unit.
+   *
+   * Only top-level cost requirements are seen. Costs nested inside `anyOf` /
+   * `allOf` are opaque to the floor — the same limitation `Purchasable.getCost`
+   * has.
+   */
+  reserve?: Computable<DecimalSource>;
+}
+
+/**
+ * Largest purchase amount for `p` that leaves every cost-resource it spends at
+ * or above `reserve`. Returns `0` when even a single level would breach the
+ * floor.
+ *
+ * Each requirement is measured against its own resource — `Purchasable.getCost`
+ * sums across requirements regardless of currency, which is meaningless for a
+ * per-resource floor — and the tightest one wins.
+ */
+function reserveClampedAmount(p: Purchasable, reserve: Decimal): DecimalSource {
+  const reqs: Requirement[] = Array.isArray(p.requirements) ? p.requirements : [p.requirements];
+  let ceiling = p.amountToPurchase.value;
+
+  for (const req of reqs) {
+    if (!isCostRequirement(req)) continue;
+    if (!unref(req.requiresPay)) continue;
+
+    const affordable = largestAffordable(
+      (n) => req.getCost(n),
+      Decimal.sub(req.resource.value, reserve),
+      ceiling,
+    );
+    if (Decimal.lte(affordable, 0)) return Decimal.dZero;
+    ceiling = Decimal.min(ceiling, affordable);
+  }
+
+  return ceiling;
+}
+
+/**
+ * Register a tick handler that sweeps a purchasable list, buying every
+ * candidate whose `canPurchase` is true.
+ *
+ * For one-shot purchasables (`limit: 1`) each buy is a single `purchase()`.
+ * For leveled / uncapped purchasables the sweep spends as much as the resource
+ * allows, less any {@link SetupSweepAutoPurchaseOptions.reserve} floor.
  *
  * Use this for upgrades and leveled perks where there's no contention between
  * candidates. For producer chains where costs grow into each other, see
  * {@link setupPolicyAutoPurchase} instead.
  *
  * @param purchasables - Purchasable list to auto-buy from
- * @param enabled - Reactive toggle for the auto-purchase behavior
- * @param registerTick - Function to register a per-tick callback (e.g., `ctx.onTick`)
+ * @param options - Toggle, throttle, and reserve knobs
+ * @param registerTick - Tick registration (typically `ctx.onTick`)
  * @returns Cleanup function that unregisters the tick handler
  *
  * @example
@@ -71,26 +197,90 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
  * // Reveal unlocks the moment their requirement is met
  * setupSweepAutoPurchase(
  *   unlocks.getAll().map((entry) => entry.purchasable),
- *   () => true,
+ *   { enabled: true },
+ *   ctx.onTick,
+ * );
+ *
+ * // Buy upgrades once a second, holding 20% of the live bank back for the
+ * // producer auto-buyer to accumulate against
+ * setupSweepAutoPurchase(
+ *   upgrades.getAll().map((entry) => entry.purchasable),
+ *   {
+ *     enabled: () => autoBuyUnlocked.value,
+ *     interval: 1,
+ *     reserve: () => Decimal.mul(reserveFraction.value, bank.value),
+ *   },
  *   ctx.onTick,
  * );
  * ```
  */
 export function setupSweepAutoPurchase(
   purchasables: Purchasable[],
-  enabled: Computable<boolean>,
-  registerTick: (callback: (dt: number) => void) => () => void,
+  options: SetupSweepAutoPurchaseOptions,
+  registerTick: RegisterTick,
 ): () => void {
-  const processedEnabled = processGetter(enabled);
+  const processedEnabled = processGetter(options.enabled);
+  const hasReserve = options.reserve !== undefined;
+  const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
 
-  return registerTick(() => {
-    if (!unref(processedEnabled)) return;
-
+  const runSweep = (): void => {
     for (const p of purchasables) {
-      if (p.canPurchase.value) {
+      if (!p.canPurchase.value) continue;
+
+      if (!hasReserve) {
         p.purchaseMax();
+        continue;
       }
+
+      // Re-read per candidate: a bank-fraction floor moves as earlier
+      // candidates spend, and the discipline only holds cumulatively if each
+      // candidate sees the post-spend bank.
+      const reserve = Decimal.fromValue(unref(processedReserve));
+      if (reserve.lte(0)) {
+        p.purchaseMax();
+        continue;
+      }
+
+      const amount = reserveClampedAmount(p, reserve);
+      if (Decimal.gt(amount, 0)) p.purchase(amount);
     }
+  };
+
+  if (options.interval === undefined) {
+    return registerTick(() => {
+      if (!unref(processedEnabled)) return;
+      runSweep();
+    });
+  }
+
+  const processedInterval = processGetter(options.interval);
+
+  // Persistent for the same reason the policy helper's accumulator is: a
+  // mid-run `importSave` would otherwise leave the throttle phase out of sync
+  // with the resources and purchase counts it was just restored alongside.
+  const accumulator = persistent<number>(0, {
+    name: `sweepAutoPurchaseAccumulator_${++sweepAutoPurchaseAccumulatorCounter}`,
+  });
+
+  return registerTick((dt: number) => {
+    if (!unref(processedEnabled)) {
+      accumulator.value = 0;
+      return;
+    }
+
+    accumulator.value += dt;
+    const interval = Math.max(0, Number(unref(processedInterval)) || 0);
+    if (interval <= 0) {
+      accumulator.value = 0;
+      runSweep();
+      return;
+    }
+
+    if (accumulator.value < interval) return;
+    // Keep beat phase without replaying elapsed beats — one sweep subsumes
+    // any number of them.
+    accumulator.value %= interval;
+    runSweep();
   });
 }
 
@@ -131,6 +321,14 @@ export interface SetupPolicyAutoPurchaseOptions {
    * resource below this value — `canPurchase` is tightened to require
    * `resource.value − reserve ≥ cost`. Orthogonal to policy, applied
    * uniformly across every candidate. Default: `0` (no reserve).
+   *
+   * The floor also clamps {@link bulkAmount}: candidate selection screens on
+   * the cost of a single unit, so the winning bulk buy is cut down to whatever
+   * the floor admits rather than spending through it.
+   *
+   * Read once per tick, not once per drained slot — a floor expressed as a
+   * fraction of the bank stays at its start-of-tick value for the whole drain,
+   * which over-reserves slightly rather than under-reserving.
    *
    * Mirrors the "leave N in the bank" pattern shared by Frozen Cookies
    * (Spontaneous Edifice / harvest bank), Cookie Monster (`PP` formula's
@@ -175,7 +373,8 @@ export interface SetupPolicyAutoPurchaseOptions {
  * 2. If `enabled` is false, reset the accumulator and return.
  * 3. Filter producers by `canPurchase.value && repeatable !== undefined`
  *    and, when `reserve > 0`, `resource.value − reserve ≥ getCost(1)`.
- * 4. Pass the filtered list to `policy.pick()` and purchase the winner.
+ * 4. Pass the filtered list to `policy.pick()` and purchase the winner,
+ *    clamping `bulkAmount` to what the reserve admits.
  * 5. Subtract `interval` from the accumulator (so beat timing stays stable)
  *    and re-scan if more drained slots remain.
  *
@@ -333,7 +532,23 @@ export function setupPolicyAutoPurchase(
 
       if (best && best.repeatable) {
         const buyTarget = best.repeatable;
-        profile('autobuy.purchase', () => buyTarget.purchase(unref(processedBulk)));
+        const bulk = unref(processedBulk);
+
+        // The candidate filter above only proved that a *single* unit fits
+        // under the floor. Buying `bulk` on that evidence spends straight
+        // through the reserve whenever `bulkAmount > 1`, so clamp to what the
+        // floor actually admits.
+        const amount = useReserve
+          ? largestAffordable(
+              (n) => buyTarget.getCost(n),
+              Decimal.sub(best.resource.value, reserve),
+              bulk,
+            )
+          : bulk;
+
+        if (Decimal.gt(amount, 0)) {
+          profile('autobuy.purchase', () => buyTarget.purchase(amount));
+        }
       }
 
       if (interval <= 0) {

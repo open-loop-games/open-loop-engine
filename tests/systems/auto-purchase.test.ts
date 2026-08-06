@@ -12,7 +12,7 @@ import {
 } from '@/core/policy';
 import { createProducerCategory, type Producer } from '@/systems/producer-category';
 import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-purchase';
-import { createPurchasable } from '@/systems/purchasable';
+import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createCostRequirement } from '@/core/requirements';
 
 // ============================================================================
@@ -90,7 +90,7 @@ describe('setupSweepAutoPurchase', () => {
       limit: 1,
     });
 
-    setupSweepAutoPurchase([cheap, dear], true, registerTick);
+    setupSweepAutoPurchase([cheap, dear], { enabled: true }, registerTick);
 
     tick(0.1);
     expect(cheap.active.value).toBe(true);
@@ -108,7 +108,7 @@ describe('setupSweepAutoPurchase', () => {
       limit: 1,
     });
 
-    setupSweepAutoPurchase([upgrade], enabled, registerTick);
+    setupSweepAutoPurchase([upgrade], { enabled }, registerTick);
 
     tick(0.1);
     expect(upgrade.active.value).toBe(false);
@@ -116,6 +116,146 @@ describe('setupSweepAutoPurchase', () => {
     enabled.value = true;
     tick(0.1);
     expect(upgrade.active.value).toBe(true);
+  });
+
+  it('holds the reserve floor, clamping the buy instead of skipping it', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+
+    // Cumulative cost of n levels: 100, ~433, ~1010. A 1000 bank reaches 3
+    // outright; under a 400 floor only 600 is spendable, which reaches 2.
+    // The clamp must buy those 2, not skip the candidate.
+    const levels = createScalingPurchasable({
+      id: 'levels',
+      description: 'Leveled upgrade',
+      resource: cookies,
+      baseCost: 100,
+      costScaling: 2,
+    });
+
+    setupSweepAutoPurchase([levels], { enabled: true, reserve: 400 }, registerTick);
+
+    tick(0.1);
+    expect(Decimal.eq(levels.amount.value, 2)).toBe(true);
+    expect(Decimal.gte(cookies.value, 400)).toBe(true);
+    // ...and 2 is the *most* it could take: one more level would breach.
+    expect(Decimal.lt(Decimal.sub(cookies.value, levels.getCost(1)), 400)).toBe(true);
+  });
+
+  it('skips a candidate whose first level alone would breach the floor', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+
+    const cheap = createPurchasable({
+      id: 'cheap',
+      requirements: createCostRequirement({ resource: cookies, cost: 50 }),
+      limit: 1,
+    });
+    const dear = createPurchasable({
+      id: 'dear',
+      requirements: createCostRequirement({ resource: cookies, cost: 500 }),
+      limit: 1,
+    });
+
+    setupSweepAutoPurchase([cheap, dear], { enabled: true, reserve: 600 }, registerTick);
+
+    tick(0.1);
+    expect(cheap.active.value).toBe(true);
+    expect(dear.active.value).toBe(false);
+    expect(Decimal.eq(cookies.value, 950)).toBe(true);
+  });
+
+  it('re-reads a bank-fraction reserve per candidate so the floor holds cumulatively', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+
+    // Five 200-cost one-shots against a floor of half the *live* bank.
+    // Re-read per candidate the floor shrinks as the bank drains, admitting
+    // buys while `bank ≥ 400`: 1000→800→600→400→200, refusing the fifth.
+    // Read once per beat it would freeze at 500 and refuse from the third on,
+    // leaving the bank at 600 — so the two shapes are distinguishable here.
+    const items = [1, 2, 3, 4, 5].map((n) =>
+      createPurchasable({
+        id: `item-${n}`,
+        requirements: createCostRequirement({ resource: cookies, cost: 200 }),
+        limit: 1,
+      }),
+    );
+
+    setupSweepAutoPurchase(
+      items,
+      { enabled: true, reserve: () => Decimal.mul(0.5, cookies.value) },
+      registerTick,
+    );
+
+    tick(0.1);
+    expect(items.map((i) => i.active.value)).toEqual([true, true, true, true, false]);
+    expect(Decimal.eq(cookies.value, 200)).toBe(true);
+  });
+
+  it('applies the floor per cost-resource on a multi-currency candidate', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const chips = createTestResource('chips', 100);
+    const { registerTick, tick } = createTickManager();
+
+    // Affordable in cookies under the floor, but chips has only 100 against a
+    // 90 floor and a 50 cost — the second currency binds.
+    const combo = createPurchasable({
+      id: 'combo',
+      requirements: [
+        createCostRequirement({ resource: cookies, cost: 100 }),
+        createCostRequirement({ resource: chips, cost: 50 }),
+      ],
+      limit: 1,
+    });
+
+    setupSweepAutoPurchase([combo], { enabled: true, reserve: 90 }, registerTick);
+
+    tick(0.1);
+    expect(combo.active.value).toBe(false);
+    expect(Decimal.eq(chips.value, 100)).toBe(true);
+  });
+
+  it('throttles on interval and does not replay elapsed beats', () => {
+    const ctx = beginPersistentContext('sweep-interval');
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+
+    const levels = createPurchasable({
+      id: 'levels',
+      requirements: createCostRequirement({ resource: cookies, cost: 100 }),
+      limit: 3,
+      bulkPurchase: false,
+    });
+
+    setupSweepAutoPurchase([levels], { enabled: true, interval: 2 }, registerTick);
+    endPersistentContext(ctx);
+
+    tick(1);
+    expect(Decimal.eq(levels.amount.value, 0)).toBe(true);
+
+    tick(1);
+    expect(Decimal.eq(levels.amount.value, 1)).toBe(true);
+
+    // 10s of catch-up is still one sweep, not five — a sweep is idempotent
+    // per beat, so the elapsed beats collapse.
+    tick(10);
+    expect(Decimal.eq(levels.amount.value, 2)).toBe(true);
+  });
+
+  it('registers no persistent state when interval is omitted', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick } = createTickManager();
+
+    const upgrade = createPurchasable({
+      id: 'upgrade',
+      requirements: createCostRequirement({ resource: cookies, cost: 10 }),
+      limit: 1,
+    });
+
+    // No ambient persistent context — the throttle-free path must not reach
+    // for one.
+    expect(() => setupSweepAutoPurchase([upgrade], { enabled: true }, registerTick)).not.toThrow();
   });
 });
 
@@ -443,6 +583,39 @@ describe('setupPolicyAutoPurchase', () => {
     expect(new Decimal(category.getProducer('cursor')!.repeatable!.amount.value).toNumber()).toBe(
       2,
     );
+  });
+
+  it('clamps bulkAmount to the reserve floor instead of buying through it', () => {
+    const cookies = createTestResource('cookies', 100);
+    const { category, registerTick, tick } = makeCategory(cookies);
+
+    category.register({
+      id: 'cursor',
+      name: 'Cursor',
+      baseRate: 1,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+
+    // Reserve 70 leaves a 30 budget. `bulkAmount: 10` would cost far more than
+    // that, so the floor has to clamp the buy — the candidate filter only
+    // proves a *single* unit fits under the floor.
+    setupPolicyAutoPurchase(
+      category,
+      {
+        enabled: true,
+        interval: 1,
+        policy: cheapestPolicy(),
+        bulkAmount: 10,
+        reserve: 70,
+      },
+      registerTick,
+    );
+
+    tick(5);
+    expect(Decimal.gte(cookies.value, 70)).toBe(true);
+    // ...and it bought as much as the floor allowed, rather than nothing.
+    expect(Decimal.gt(category.getProducer('cursor')!.repeatable!.amount.value, 0)).toBe(true);
   });
 
   it('hybrid-payback re-scores per drained slot so the winner can flip mid-drain', () => {
