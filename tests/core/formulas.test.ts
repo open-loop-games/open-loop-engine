@@ -317,8 +317,6 @@ describe('Creating Formulas', () => {
         ...nonInvertibleOneParamFunctionNames,
         'max',
         'min',
-        'maxabs',
-        'minabs',
       ] as const
     ).forEach((names) =>
       describe(names, () => {
@@ -330,7 +328,7 @@ describe('Creating Formulas', () => {
     );
   });
   describe('2-param', () => {
-    ([...nonInvertibleTwoParamFunctionNames, 'clamp'] as const).forEach((names) =>
+    (nonInvertibleTwoParamFunctionNames as readonly FormulaFunctions[]).forEach((names) =>
       describe(names, () => {
         checkFormula(names, [0, 0, 0] as const);
         testValues.forEach((i) =>
@@ -465,15 +463,12 @@ describe('Inverting', () => {
     );
   });
 
+  // `min`/`max` stay permissive by design: `invert` is the algebra's answer,
+  // and a saturated bound is graded by `tryInvert` / `firstPassage` rather than
+  // being pushed into `invert`, which the op table composes with recursively.
   describe('Inverting pass-throughs', () => {
     test('max', () => expect(Formula.max(variable, constant).invert(10)).compare_tolerance(10));
     test('min', () => expect(Formula.min(variable, constant).invert(10)).compare_tolerance(10));
-    test('minabs', () =>
-      expect(Formula.minabs(variable, constant).invert(10)).compare_tolerance(10));
-    test('maxabs', () =>
-      expect(Formula.maxabs(variable, constant).invert(10)).compare_tolerance(10));
-    test('clamp', () =>
-      expect(Formula.clamp(variable, constant, constant).invert(10)).compare_tolerance(10));
   });
 
   test('Inverting nested formulas', () => {

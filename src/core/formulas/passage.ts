@@ -5,7 +5,7 @@
  * this answers the one a time axis actually asks ("when do I get there"). They
  * coincide on continuous invertible curves and diverge exactly where the target
  * isn't in the function's image — an interior `.floor()`, a `step` splice that
- * jumps at its breakpoint, a saturated `clamp`. There the algebra returns a
+ * jumps at its breakpoint, a saturated `min`/`max`. There the algebra returns a
  * plausible number from inside a gap nothing evaluates into, and the search
  * returns the boundary a player actually crosses.
  *

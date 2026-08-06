@@ -459,7 +459,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     // cost formula (Formula.exponential → mul → pow_base → variable), that's
     // 2 array allocations every call × every purchasable × every tick. The
     // 1/2/3-input fast paths cover every op in the table; the default branch
-    // handles the rare >3-input ops (tetrate/iteratedexp/pentate/clamp).
+    // handles the rare >3-input ops (tetrate/iteratedexp/pentate).
     const fn = this.internalEvaluate as
       | ((...args: DecimalSource[]) => DecimalSource | null | undefined)
       | undefined;
@@ -501,7 +501,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * Unchecked by design — this is the shape the op table composes with
    * recursively, and it returns the algebra's answer whether or not that answer
    * is reachable. When the target may lie outside the formula's image (anything
-   * with an interior `.floor()`, a `step`/`if` splice, or a `min`/`max`/`clamp`)
+   * with an interior `.floor()`, a `step`/`if` splice, or a saturating `min`/`max`)
    * use {@link tryInvert}, which grades the answer.
    *
    * Reports and returns `0` when no inverse exists at all.
@@ -529,7 +529,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * meaningful if it maps back onto the target. That one check covers every way
    * an inversion goes quietly wrong — a fractional target through an interior
    * `.floor()`, a target inside a `step` splice's jump discontinuity, a
-   * saturated `clamp` — because they are all the same failure, a target outside
+   * saturated `min`/`max` — because they are all the same failure, a target outside
    * the function's image.
    *
    * @param value - The output to solve for.
@@ -557,7 +557,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * Searches the forward function rather than running the op table backward, so
    * it stays correct through the rounding and splicing that make an algebraic
    * inverse unsound: an interior `.floor()`, a `step` whose modifier jumps at the
-   * breakpoint, a saturated `clamp`. For the same reason it needs no inverse at
+   * breakpoint, a saturated `min`/`max`. For the same reason it needs no inverse at
    * all — a chain reporting `isInvertible() === false` still answers here.
    *
    * Reach for {@link invert} / {@link tryInvert} when you want the input that
@@ -1248,34 +1248,18 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   // === PASSTHROUGH BINARY OPS ===
 
+  // Saturating floor/ceiling on a curve — `x.max(lo).min(hi)` is the clamp.
+  // Both invert by passthrough, which answers for a target the curve can never
+  // produce; `tryInvert` grades that as `outside-image` and `firstPassage`
+  // reports `no-crossing`, so the permissiveness is visible rather than silent.
   public static max = ops.createPassthroughBinaryFormula(Decimal.max);
   public static min = ops.createPassthroughBinaryFormula(Decimal.min);
-  public static minabs = ops.createPassthroughBinaryFormula(Decimal.minabs);
-  public static maxabs = ops.createPassthroughBinaryFormula(Decimal.maxabs);
 
   public max(value: FormulaSource) {
     return Formula.max(this, value);
   }
   public min(value: FormulaSource) {
     return Formula.min(this, value);
-  }
-  public maxabs(value: FormulaSource) {
-    return Formula.maxabs(this, value);
-  }
-  public minabs(value: FormulaSource) {
-    return Formula.minabs(this, value);
-  }
-
-  public static clamp(value: FormulaSource, min: FormulaSource, max: FormulaSource) {
-    return new Formula({
-      inputs: [value, min, max],
-      evaluate: Decimal.clamp,
-      invert: ops.invertPassthrough,
-    });
-  }
-
-  public clamp(min: FormulaSource, max: FormulaSource) {
-    return Formula.clamp(this, min, max);
   }
 }
 

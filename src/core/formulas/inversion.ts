@@ -13,7 +13,7 @@
  * - the target lies **outside the function's image**, so the pre-image the
  *   algebra hands back doesn't map forward onto it. An interior `.floor()`
  *   asked for a fractional level, a `step`/`if` splice whose modifier jumps at
- *   the breakpoint, a saturated `min`/`max`/`clamp` — one failure, not three.
+ *   the breakpoint, a saturated `min`/`max` — one failure, not three.
  *
  * The third is the one that drove this contract. It is a property of *(chain,
  * target)*, not of the chain, which is why no chain-only boolean —

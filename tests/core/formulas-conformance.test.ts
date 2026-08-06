@@ -628,13 +628,13 @@ describe('invert contract: tryInvert grades the answer', () => {
       expect(value.reason).toBe('outside-image');
     });
 
-    test('a saturated min / max / clamp', () => {
-      // The clamp family inverts by passthrough, so a target past the bound
-      // gets an answer that saturates back to the bound.
+    test('a saturated min / max', () => {
+      // Both invert by passthrough, so a target past the bound gets an answer
+      // that saturates back to the bound. Composed, they are the clamp.
       const cases: [string, GenericFormula, string][] = [
         ['min', F.min(F.variable(0), 200), '500'],
         ['max', F.max(F.variable(0), 200), '100'],
-        ['clamp', F.clamp(F.variable(0), 0, 200), '500'],
+        ['clamp', F.variable(0).max(0).min(200), '500'],
       ];
       for (const [name, formula, target] of cases) {
         const { value, errors } = withoutEngineErrors(() => formula.tryInvert(target));
@@ -808,11 +808,11 @@ describe('first passage: the smallest input that reaches the target', () => {
     expect(String(passage.value)).toBe('10');
   });
 
-  test('reports rather than answers when a clamp saturates below the target', () => {
-    // `min`/`max`/`clamp` invert by passthrough, so the algebra answers for a
-    // target the curve can never produce. The search cannot bracket it and says
-    // so; below the cap it answers normally.
-    const capped = F.variable(0).mul(2).clamp(0, 50);
+  test('reports rather than answers when a bound saturates below the target', () => {
+    // `min`/`max` invert by passthrough, so the algebra answers for a target
+    // the curve can never produce. The search cannot bracket it and says so;
+    // below the cap it answers normally.
+    const capped = F.variable(0).mul(2).max(0).min(50);
     expect(capped.firstPassage('80')).toEqual({ value: null, reason: 'no-crossing' });
     expect(String(capped.firstPassage(50).value)).toBe('25');
   });
