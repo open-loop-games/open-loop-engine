@@ -56,14 +56,15 @@ Default to the root import; reach for subpath imports when bundle size matters.
 
 ## Documentation
 
-The engine ships its own docs in the repo (not on a separate site yet):
+The engine carries its own docs — in the repo and in the installed package, under `node_modules/@open-loop/engine/`. There's no separate doc site yet, and the copy you install describes the version you installed.
 
+- **`docs/api/INDEX.md`** — router into the per-symbol surface. Task table, concept index, tier map. The answer to "does the engine already do X?"
 - **`docs/consumer-guide.md`** — how to think about composing the engine. Levels of abstraction (resource helpers → category systems → raw primitives → declarative data), persistence, modifier chains.
-- **`docs/api/INDEX.md`** — mechanical per-symbol index across every layer. The answer to "does the engine already do X?"
+- **`docs/consumer-guide-recipes.md`** — the worked-pattern cookbook the guide routes into: worker pools, persona rosters, spatial boards, dialog and subjects.
+
+`docs/api/` is generated from TSDoc, and each entry ends in a `src/…:line` pointer. `src/` ships for exactly that reason, so those pointers resolve in an installed copy — it's reference material, not an import surface, since `exports` admits only the subpaths listed above.
 
 Migration guidance for breaking changes lives in the commit body of each `feat!:`/`fix!:` commit and is lifted verbatim into this repo's `CHANGELOG.md` — there is no separate migration doc.
-
-The `INDEX.md` is generated from TSDoc; signatures and behavior live in source, reachable from the index.
 
 ## Stability and feedback
 

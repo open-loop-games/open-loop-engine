@@ -46,6 +46,10 @@
   },
   "files": [
     "dist",
+    "src",
+    "docs/*.md",
+    "docs/api",
+    ".claude/CLAUDE.md",
     "scripts/build-domain-map.mjs",
     "scripts/lib/domain-extract.mjs",
     "scripts/lib/domain-render.mjs"

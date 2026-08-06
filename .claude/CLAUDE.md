@@ -41,6 +41,10 @@ Releases are manual and batched: `pnpm exec release-it` at a cut-point bumps ver
 
 **First cut (0.1.0):** `package.json` already sits at `0.1.0` with no tags, so a plain `release-it` would bump *past* it and prepend a generated section above the hand-curated `0.1.0` entry. Cut the first release with `pnpm exec release-it --no-increment` to tag `0.1.0` as-is and keep the curated CHANGELOG. Subsequent releases run plain `release-it`.
 
+### Publish surface
+
+`npm pack --dry-run` prints the exact tarball and is the check to run before publishing — `files` is the allowlist that decides it, and a path named there **cannot** be re-excluded by `.gitignore`. Hence the globs: `docs/*.md` + `docs/api` rather than a bare `docs`, which would publish any gitignored working files sitting under it. `src` ships because every `docs/api/` entry ends in a `src/path:line` pointer — the two travel together or those pointers dangle in an installed copy. `exports` still admits only the declared subpaths, so shipped source is reference material, not an import surface. `prepublishOnly` rebuilds, so shipped docs always describe the shipped `dist`.
+
 Scope is optional but encouraged: `feat(systems):`, `fix(core):`, etc.
 
 ### Breaking-change entries
