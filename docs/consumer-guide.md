@@ -2,7 +2,7 @@
 
 How to express a game with `@open-loop/engine`. Read this after forking `open-loop-starter` and before writing your first module.
 
-This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: `CHANGELOG.md` for breaking-change migration blocks.
+This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [consumer-guide-balance.md](./consumer-guide-balance.md) for how numbers get chosen and verified; `CHANGELOG.md` for breaking-change migration blocks.
 
 ## The expression spectrum
 
@@ -384,18 +384,18 @@ The most common shape this ladder gets used for — one definition's yield scale
 
 ## Tunable knobs
 
-Balance constants — base rates, cost growth, multipliers — sit in `data/balance.ts` as plain values most of the time. When something external needs to perturb them (a balance solver bisecting against beat windows, a live dev-panel slider, a mod config, an A/B harness), wrap them in `tunable()` to expose them through a tuning registry any external surface can read.
+Balance constants — base rates, cost growth, multipliers — declare at their reader sites through `tunable()`, which exposes them via a tuning registry any external surface can read: a balance probe sweeping a knob, a live dev-panel slider, a mod config, an A/B harness. Declare them there from the first pass rather than collecting them in a parallel constants file; two homes for one number has no rule for which wins. Where the values come from in the first place is [consumer-guide-balance.md](./consumer-guide-balance.md).
 
 ```ts
-// data/balance.ts
-const tuning = createTuningRegistry('my-archetype');
+// modules/tuning.ts — the registry, shared by every reader site
+export const tuning = createTuningRegistry('my-game');
 
-export const balance = {
-  tier1BaseRate:        tunable(tuning, 'producers/tier1/baseRate', () => 0.5),
-  producerCostGrowth:   tunable(tuning, 'producers/costGrowth',     () => 1.08),
-  achievementMultiplier: tunable(tuning, 'achievements/multiplier', () => 1.02),
-  prestigeEligibleThreshold: 1_000_000, // unwrapped: structural, not a knob
-};
+// modules/producers.ts — declared where it's read
+const baseRate = tunable(tuning, 'producers/tier1/baseRate', () => 0.5);
+const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
+
+// data/producers.ts — structural, not a knob: left unwrapped
+export const prestigeEligibleThreshold = 1_000_000;
 ```
 
 The wrap returns a `ComputedRef` that reads registry-then-default; `pushScope` / `restore` install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.

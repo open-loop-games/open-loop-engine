@@ -1,0 +1,257 @@
+# Balance guide
+
+How numbers get chosen and verified in a game built on `@open-loop/engine`. Read this before touching a balance constant or writing your first probe.
+
+This is the third companion to [consumer-guide.md](./consumer-guide.md). The guide explains **how to compose** the engine; [consumer-guide-recipes.md](./consumer-guide-recipes.md) holds the worked shapes consumers assemble from it; this file holds the discipline for **what the numbers should be** and how you know. It is engineering process over the engine's harness, not game-design theory — the theory lives upstream, per § Cite-out.
+
+It deliberately does not describe any consumer's directory layout. What things are called and where they sit is your repo's business.
+
+## The balance floor
+
+The short version. If you read nothing else here — a first balance pass, a prototype, a spike — this is the part that has to be true.
+
+1. **Write the spine first.** Every balance constant is derived from a closed-form expression, with a one-line derivation comment at the value. Plain arithmetic, no engine. If you cannot predict the shape on paper, that is the finding: the mechanic is probably mis-specified, and no amount of tuning will tell you what the number should have been.
+
+2. **The spine is a prediction, stated so it can be wrong.** It is not a target you defend and not a record of what happened. It says what the math expects, in a form specific enough to be contradicted by a run.
+
+3. **Run the real game and diff prediction against truth.** Construct the engine with the real modules and the game's real automation, play the arc headless, and compare what the spine predicted against what the game did.
+
+4. **When they disagree, decide which one was wrong.** Sometimes the implementation drifted. Sometimes the spine's shape is wrong. Sometimes the *metric* is wrong — the quantity you chose to design against turns out to be structurally unable to express your intent, and no tuning of either side will fix it. All three are findings; only the first is a bug.
+
+5. **The engine is the truth; the spine is the spec.** The math predicts, the engine decides. If a behavior can't be read off an engine run, it doesn't belong in your prediction.
+
+6. **Balance verification is a script that prints, not a test that asserts.** It reports deltas for a human to read. See § Why this isn't a test suite.
+
+7. **Coarsen the tick.** Balance is measured in minutes; the engine's default tick is built for a live loop. See § `tickDelta`.
+
+Everything below is these seven with their reasoning, their failure modes, and the engine surface behind each.
+
+## Spec and truth
+
+Two surfaces and a loop between them.
+
+```
+      the spine  ───── predicts ─────▶  what should happen
+   (closed form,                              │
+    plain math)                             diff
+                                              │
+      the probe  ───── measures ────▶  what actually happens
+   (real engine, real modules,
+    real automation policies)
+```
+
+There is no third surface that pins the result. The diff *is* the check, and it runs when a human runs it.
+
+### The spine — a falsifiable prediction
+
+The spine is the closed-form expression behind every constant, written next to the constant it explains, naming what it couples to and what you would re-tune if the shape came out wrong.
+
+Keep it in plain arithmetic. Not because engine math is forbidden, but because the spine's job is to be *read* — by you in six months, by whoever forks the game, by a reviewer deciding whether the derivation holds. Plain arithmetic is one pass to write and one pass to read. Reach for `Decimal` when magnitudes demand precision the native number type can't carry, and otherwise stay in native arithmetic.
+
+Keep the engine out of it. A prediction that constructs an engine and reads runtime state has stopped predicting and started measuring, which makes agreement between "prediction" and "measurement" vacuous — the two agree because they are the same observation twice. The rule is not "no engine import"; it is **no engine construction and no runtime-state read**. Pure algebra that happens to live in the engine is still algebra.
+
+When the closed form is worth executing — it predicts a run length, sizes a parameter against a target, or projects a horizon a run can't reach in reasonable time — make it a runnable function rather than a comment. That is still the spine, in executable form, not a second source of truth.
+
+**What a derivation comment must contain.** "One-line derivation per value" is only worth having if the line is checkable. A comment that says `// measured` is not a receipt; it is a claim about a measurement that may never have happened, and it reads identically to one that did. A receipt names the source: the expression it came from, or — when a value genuinely was fitted from runs rather than derived — which run produced it, when, and over how many seeds. If a number was chosen by feel, say *that*. An honestly-flagged guess is more useful than a guess wearing derivation language, because the next person knows which numbers to attack first.
+
+### The probe — real engine, real policies
+
+The probe constructs the real engine with the real modules and plays the game headless. Real automation policies, never a re-implementation — the moment a probe re-implements a mechanic to measure it, it measures the re-implementation.
+
+A game that ships player-facing automation writes each policy as a pure function over game state gated by `AutomationTiers`, and the probe force-unlocks the tier — bank a save, toggle the tier state, run — rather than modelling what the policy does. The sim then exercises the code the player runs, and the two cannot drift; the policy's parameters double as the sweep axis and, later, as the player-facing tuning surface. A thin runner works only the manual openers a player would work.
+
+The exception is deliberate: behavior that exists *only* to perturb the game — full-auto session drivers, optimal-play enumeration — is harness tooling, not a mechanic, and stays probe-side. The test is whether the behavior is also a real mechanic. If it is, it's game code; if it only ever runs under a probe, it isn't.
+
+A probe that is worth keeping is worth committing. Wire it into your scripts (`"sim": "vite-node scripts/…"`) rather than leaving it in a scratch directory — a balance script that lives outside the repo has to be rebuilt from memory every time the economy moves, and it takes its accumulated judgment with it when it goes. Fold one-off diagnostic scans into it once they've served their purpose rather than accumulating a directory of them.
+
+A useful probe has three passes:
+
+- **Anchors** — force a few points on the progression ladder, play at each, and diff the spine's prediction against what the engine produced.
+- **Coefficients** — refit any empirically-fitted scalars from those same runs and print them *beside* the values currently in source. Drift here is the signal that something moved under the spine.
+- **Arc walk** — play the designed arc under a fixed policy and report where the beats actually land against what the spine says.
+
+Report distributions, not point values. `mean [min, max]` over a stated seed count is the readable default, and state the seed count — an aggregate over five seeds prints identically to one over two hundred.
+
+### The loop
+
+Spine, build, run, diff, decide, next layer.
+
+Iteration is triggered by a **contradiction**, not by a schedule. You do not plan "layer two" in advance; you run the game, find that the economy stalls or a metric is pinned or a beat lands nowhere near prediction, and that finding tells you what the next pass is. A layer added because the plan said so is a layer nobody has evidence for.
+
+The first headless run is the first integration surface that walks the whole chain — rate chain to resource to predicate to beat — and it is routinely where structural defects surface rather than tuning ones. An economy that never leaves zero, a purchase never reachable, a resource pinned at its cap for the entire arc: these are not balance findings, and no amount of constant-tuning addresses them. Confirm the game *plays* end to end under its own automation before treating any number as a balance question. Module-level unit tests validate contracts; they do not tell you the game runs.
+
+**Done is when the disagreement is boring.** Not when a threshold is met — when the diff is small, stable across runs, and the remaining gap is explained rather than surprising. Consolidating your throwaway diagnostic scripts into the permanent probe is a good marker that you've reached it.
+
+### Why this isn't a test suite
+
+Balance verification prints; it does not assert.
+
+The tempting shape is to take a measured window, add a tolerance band, and pin it in the test runner as a drift tripwire. It reads as rigor, and it decays predictably. Legitimate retunes red the suite, so bounds get widened to restore green; the widened bound no longer asserts anything but still looks like a passing test; and the whole file trains everyone to treat balance failures as noise. A bound written before the design settles is a guess with a green check.
+
+A printed diff has none of that failure mode. It reports the delta rather than a boolean, so a human sees *how far* things moved and in which direction, and the honest response to "the economy legitimately changed" is to read the new numbers rather than to edit a threshold. It also carries no pass/fail semantics into work that is exploratory by nature — a probe that surfaces something unexpected has succeeded, and a runtime that calls that a failure is fighting you.
+
+The cost is real and worth naming: nothing runs automatically, so nothing catches balance drift on a commit you didn't think to check. Accept that, and run the probe when the economy moves. The alternative isn't a tripwire that works; it's a tripwire that was disarmed months ago and still shows green.
+
+**Behavioral tests are a different suite and they stay.** "Does the slot free, does the count go up, is growth monotonic, does the wave complete" belongs in the test runner, driving the assembled engine tick by tick. Those assertions carry no magnitudes, which is exactly why they survive retunes. Keeping balance out of the suite does not mean keeping the game out of it — it means magnitudes and mechanics are different questions, and mixing them produces a suite that reds on every retune and gets ignored.
+
+## Reading a game's balance shape
+
+Before writing a spine, classify what you're writing it for. The unit is the **subsystem**, not the game — a game is a composition of subsystems with their own rate functions, and it is normal for some to close in standard algebra while others don't.
+
+This is a spec-layer tool. Its output is which closed form you write, and it is what tells you when there isn't one.
+
+### The buckets
+
+Walk each subsystem against this vocabulary:
+
+- **Pure closed-form** — the rate function is in the standard algebra (constant, linear, geometric, polynomial, log, logistic). Integrals exist, the formula is readable, inversion closes.
+- **Piecewise closed-form** — regime-spliced. Same algebra per regime, breakpoints at threshold crossings, extra bookkeeping.
+- **Coupled-state deterministic** — multiple resources with deterministic mutual feedback. Linear systems close via matrix exponential; general nonlinear coupling does not.
+- **Strategy-space integration** — adversarial. Payoff depends on a joint choice. Per-fixed-strategy ROI closes; equilibrium is game-theoretic math.
+- **Stochastic load-bearing** — variance carries design intent, not just the mean. The distribution *shape* is the spec (geometric, exponential/gamma, phase-type), and the dimensionless feel knob is usually the coefficient of variation.
+- **Discrete-event coupled** — combinatorial state, transitions are discrete events, subsystems interact through event ordering.
+- **Network-topological** — resources flow through a directed graph and throughput is bounded by topology, not just rates. Min-cut/max-flow for linear capacities.
+- **Optimal stopping** — when-to-reset surfaces, prestige timing. Per-fixed-strategy ROI closes; the optimal threshold is a Bellman problem.
+- **Combinatorial selection** — lattice search across configurations (skill tree, loadout, deck).
+- **Discrete planning / scheduling** — queue formation under finite slots, build order under capacity, routing over a sparse graph. Neither rate algebra nor equilibrium fits; the adjacent math is planning and scheduling.
+
+The last deserves a note, because it is where the framework dodge lives. "This is discrete and combinatorial, so there's no math available" is not the right read — the math is there, under planning, scheduling, and operations research. The candidate algorithms are the usual ones and the choice is made on structure: A\* when state is enumerable and an admissible heuristic is cheap; dynamic programming when the state space decomposes into overlapping subproblems; MCTS when branching defeats enumeration but rollouts are cheap; beam search when "good enough" plans are useful and optimal is intractable.
+
+A subsystem can classify two ways at once — coupled-state deterministic per fixed strategy, optimal stopping across strategies, to take the common pair. Name both, because they imply different tooling.
+
+Finding that some of your subsystems close and some don't is not a failure of the method. It is reading the design correctly.
+
+### The orthogonal axis: runtime
+
+A bucket classifies a subsystem's **spec-layer math**. Whether the *runtime* integrates that spec continuously or through discrete-event simulation is a separate annotation and does not change the bucket.
+
+- **Sim as fallback** — the spec doesn't close, so simulation is what you reach for because the integration isn't doable on paper.
+- **Sim as gameplay** — the spec *closes*, every constituent rate function is standard, but the gameplay loop *is* the integration over discrete events. Tower defense, auto-battlers, real-time combat.
+
+The temptation in the second case — "we have a sim, so we don't need the math" — is exactly inverted. *Because* the sim is the gameplay, the spec it runs has to be specified precisely, or the gameplay drifts and tuning becomes opaque.
+
+### When prediction and truth disagree
+
+The useful first question is not "which constant do I change" but **which layer is wrong**:
+
+- **The implementation drifted.** The spine is right and the game stopped matching it. Cheapest to fix and the most common cause of a *sudden* disagreement.
+- **Retune.** Adjust a constant. The intent is expressible under the current content at a different numeric setting.
+- **Reshape content.** Change cardinality or targets. The intent can't be expressed at *any* constant setting. If the reachable modifier stack is 10⁴× and the design asks for 10⁶×, no tuning of one knob closes that; the content surface has to grow.
+- **Reshape the predicate.** The predicate measures the wrong moment. "Five achievements earned" fires too early when every achievement grants the same multiplier and the perceptible moment is the first *compounding* one.
+- **The spine's shape is wrong.** The closed form was the wrong family for this subsystem. Re-walk the buckets.
+- **The metric is wrong.** The quantity you chose to design against is structurally unable to express your intent — it stays pinned in a narrow range no matter what the player does, so it cannot mark the transition you wanted it to mark. The fix is to design against a different quantity, one the spine actually predicts well. This is the finding that tuning cannot reach, and it only ever surfaces by running the game.
+
+Often the answer coordinates two or three of these. The probe surfaces the choice; a human makes the call.
+
+## Engine as oracle
+
+The unifying rule: **your prediction never re-implements game mechanics.** The math is the spec, the engine is the truth. A predictor that re-derives cost curves in its own arithmetic is pinned to the engine version it was written against and silently diverges; one that asks the engine cannot.
+
+There are two query modes against the same instance:
+
+**Frozen-state queries.** Build the engine, mutate persistent refs into a hypothetical state, and *don't tick*. Read `Producer.getTotalRate(resource)` for aggregate per-resource rate, `Purchasable.amount` / `.active` for purchase state, `Purchasable.calculateMaxAffordable()` and `Producer.calculateMaxAffordable()` for cost inversion, `Formula.calculateCost` / `Formula.calculateMaxAffordable` at the core formula layer, and `ModifierChain` bindings with per-link contributions for attribution. The engine answers "what would cost and rate be at this state" without running gameplay — which is how a walker steps a schedule without simulating it.
+
+**Ticking runs.** Install the game's automation, then `runUntil` a beat predicate fires. The engine plays; the script times the beats.
+
+These are probe-lane tools, not spine tools — both construct an engine. The spine stays pure; the probe is where the engine answers.
+
+**Ceremony that is load-bearing.** `pushScope` + `importSave` + a `scopeDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination.
+
+## Engine surfaces
+
+The harness is the toolkit. Curated entries; the full surface is `docs/api/harness.md`, and `docs/api/INDEX.md` routes per symbol.
+
+| Surface | Use for |
+| --- | --- |
+| `runUntil` | Predicate-bounded single-engine run. The workhorse. Dispatches on `RunMode` (`'tick'`, `'event'`, `'stasis-aware-tick'`). |
+| `runProbe` | Per-beat termination-time distributions from a seed sweep. |
+| `runWaypointProbe` | Snapshot-at-time across an arc per seed × waypoint; band occupation reads off the snapshot series. |
+| `runHeadless` | Fixed-tick-count deterministic run. |
+| `runMatrix` / `runMatrixUntil` | Cartesian runs over a parameter grid, when you want many configurations at once. |
+| `runSensitivity` | One parameter swept across a range with per-variant deltas against baseline. Generic over `Cell` and `UntilCell` via `config.until`. |
+| `bisectTuner` | 1-D bisection against a predicate, when a spec gives you a shape and you want the scalar. |
+| `applyPerturbation` | Apply a perturbation to a `PickerEntry` and get an idempotent cleanup. |
+| `createPickerSnapshot` | Enumerate the engine's addressable choices (content, chain-registry, tunable). |
+| `createSensitivityCell` | Build a matrix cell from a save blob + per-run module factory + analyzer factory. |
+| `diffAggregates` | Per-metric delta between a variant cell and baseline. |
+| `createTransitionSnapshot` / `createIncrementalSnapshot` | Pending content transitions; caching overlay for time-series introspection. |
+| `defaultAnalyzerPack` / `seriesAnalyzerPack` | Loop-finalize and resource-peak analyzers; per-resource trajectory capture. |
+| `classifyFlowChannel` / `getFlowChannelBoundaries` | Classify a beat duration into its flow channel; read the threshold table. |
+
+Most balance work uses the first two and the analyzer packs. The sweep surfaces are there when a design question genuinely is "what does this curve look like across a range" — reach for them then, not as routine process.
+
+### Flow channels
+
+`FlowChannel` classifies a beat duration into six bands — `arousal`, `flow`, `flow-upper`, `boredom`, `frustration`, `breakdown`. The first three are engaged; the rest are not. Collapsing the disengaged three gives a binary read when that's all you want.
+
+The framing that makes this useful is that the objective is **shape of play, not beat-second targets**. "Land beat 3 at minute 17" is a number with nothing behind it. "Spend most of the arc in the engaged bands, with beats firing in order and the arc completing within budget" is an intent the spine can predict and the probe can check.
+
+### `tickDelta`
+
+A two-hour arc at the engine's default tick runs on the order of a hundred thousand ticks per probe. At `tickDelta: 1` it runs a few thousand — one to two orders of magnitude faster, with minute-scale timing unchanged.
+
+Default to `1` for arc probes. Drop lower only when sub-second timing is part of the spec: explicit click cadence, real-time combat resolution, anything resolving faster than a second.
+
+### `stasis-aware-tick`
+
+`runUntil({ mode: 'stasis-aware-tick' })` short-circuits ticking when the game has stopped progressing, turning a probe that would burn to `maxSimTime` into one that terminates early and honestly.
+
+The adoption condition is structural, not a heuristic: **the accessor faithfully captures the engine's income channels if and only if there is no out-of-band rate channel it can't see.**
+
+If every continuous income channel flows through producer categories — or fires as a discrete event the predicate observes directly — it adopts cleanly. If the game has a click affordance, a tick-jitter spawn channel, or any other rate the accessor doesn't read, it misfires: the accessor reads zero, declares stasis, and kills a run that was still bootstrapping. The decision point is the accessor's `getRate(resource)`, and the question is binary.
+
+**The cap-reach sub-axis.** The rule above is necessary but not sufficient. A cap-bounded resource whose value clamps at a ceiling introduces a second wedge: the rate is real but the integrand is bounded. Stasis detection inspects content-walker transitions — purchasable distances, conversion readiness — rather than the accessor's rate, so a purchasable that is visible and uncapped reports as a finite transition even when the resource it consumes is wedged at a zero cap. Stasis returns false and the run terminates as `maxSimTime` rather than as unreachable. Detecting cap-reach termination needs a budget-bounded reachability check layered on top; that is deliberately absent rather than overlooked.
+
+## Where balance constants live
+
+`tunable()` plus a `TuningRegistry` (`createTuningRegistry`) is the canonical answer. Values declare at their **reader sites**, not in a central constants file:
+
+```ts
+// at the reader site — a producer module, an upgrade definition, an achievement threshold
+const effect = tunable(tuningRegistry, 'upgrades/double-gold/effect', () => baseEffect.times(amount));
+```
+
+The chosen number lives in the default closure. The registry exposes it to the picker, so probes and a balance workbench can enumerate and perturb it, and to scoped overrides, so a probe can swap the value transiently and restore on cleanup. A probe sweeps a knob by pushing a tuning scope, never by editing source.
+
+Two rules follow, both load-bearing:
+
+**Route balance constants through `tunable()` from the first pass — no parallel constants file.** A game with both has two homes for one number and no rule for which wins. Keep pure config (content shape, ids, cardinality) in your data layer, and declare every *perturbable* value at its reader site. A deep-partial override path stays useful for non-tunable surfaces — theme tokens, ids, cardinality — but not for balance.
+
+**Every field in your data layer should have a reader.** Authoring the data shape ahead of the modules that consume it reliably produces fields nothing reads, and a dead field is indistinguishable from a live one until someone tunes it and nothing happens. Author only what consumers read.
+
+### `Formula` at the wiring layer
+
+The spine stays plain arithmetic. But when a spine-derived constant is wired into a live purchasable's cost or a skill's XP curve, **express the curve as a `Formula` rather than a hand-rolled closure** — `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costScaling` shorthands that are Formula-backed underneath.
+
+This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is invertibility, and with it the engine's bulk-purchase math: `calculateMaxAffordable` needs an invertible `Formula`, so a non-Formula cost silently restricts you to single purchases and loses the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
+
+The rule of thumb: if a number only ever feeds a prediction, plain arithmetic. If it becomes a cost the player pays repeatedly, `Formula`.
+
+## When a balance pass finds an engine gap
+
+Balance work is where missing engine surface shows up first, because it is where you ask the engine questions nobody asked before.
+
+When you find yourself hand-rolling a query the engine should own, leave a `TODO(expansion)` marker at the hand-roll site — three lines, co-located — and record the finding wherever your project collects them. The distinction that matters: would deleting the hand-roll force you to *invent* new engine API, or only to *re-wire* primitives that already exist?
+
+The engine grows by pulling from those records, deliberately and selectively. It does not reference them back, and no downstream doc amends this one — so don't write a promotion pointer into this guide's sections. Record the finding where your project's convention puts it and let an engine pass read it.
+
+Two things make a record worth acting on later. State the receipt — the actual site, by path and symbol — rather than a count; a bare "this came up twice" is unauditable once the two sites are out of view. And state how you got there: reaching a gap against engine source and being handed it by a doc you read are different evidence that read identically afterward. A hand-roll that turns out to duplicate existing API is still a finding — it says the surface wasn't discoverable, which is a docs fix rather than an engine one.
+
+The prior is "use the engine, fix gaps when they're real." When you do bypass an engine primitive to make something work, document the decision inline where the bypass lives.
+
+## Cite-out
+
+This guide owns process over the engine. Theory and prescription live upstream, in sibling repositories rather than in this package:
+
+| Question | Goes to |
+| --- | --- |
+| What shape does this rate function take, and when does it close? | `open-loop-research/methodology/techniques/closed-form-progression/` |
+| Which named adjacent math takes over when it doesn't close? | `closed-form-progression/bifurcations.md` |
+| Which rate-function shape is my subsystem on? | `incremental-math/src/pages/rate-functions/` |
+| Which composition row does my economy walk? | `closed-form-progression/rate-function-algebra.md` |
+| What number should I pick? | `incremental-math/src/pages/design-playbook/` |
+| What patterns does my game compose, and how common are they? | `open-loop-research/LIBRARY.md` |
+| What engine primitive does X? | `docs/api/INDEX.md`, then the routed tier file |
+| How do I compose the engine at all? | [consumer-guide.md](./consumer-guide.md) |
+| What's the worked shape for this composition? | [consumer-guide-recipes.md](./consumer-guide-recipes.md) |
+| How do I run the process? | this file |
