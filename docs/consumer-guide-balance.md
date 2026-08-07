@@ -70,7 +70,9 @@ A useful probe has three passes:
 - **Coefficients** — refit any empirically-fitted scalars from those same runs and print them *beside* the values currently in source. Drift here is the signal that something moved under the spine.
 - **Arc walk** — play the designed arc under a fixed policy and report where the beats actually land against what the spine says.
 
-Report distributions, not point values. `mean [min, max]` over a stated seed count is the readable default, and state the seed count — an aggregate over five seeds prints identically to one over two hundred.
+Report distributions, not point values. `mean [min, max]` over a stated seed count is the readable default, and state the seed count — an aggregate over five seeds prints identically to one over two hundred. Where variance carries design intent, report the moments (mean, variance, p50, p90), because the distribution *shape* is the spec and a mean alone hides it. Where the policy is deterministic, extra seeds confirm determinism rather than correctness — one run tells you as much as fifty, and fifty tells you nothing extra.
+
+**Probe design parameters, not automation knobs.** A probe targets the design under test: cost curves, ROI on upgrade tiers, hit rates, HP against DPS, spend rates. Knobs that parameterize *how the automation plays* — decision quality, reaction lag, cadence jitter, persona choice — are not the design. The working test: would this number change if the automation were swapped for a different reasonable one? If yes, the probe is measuring the automation. Keep those knobs fixed while the design constants move.
 
 ### The loop
 
