@@ -1,6 +1,6 @@
 export * from './types';
 export { createWorkPlan } from './work-plan';
-export { diffAggregates } from './aggregate';
+export { computeMetricStats, diffAggregates } from './aggregate';
 export { runMatrix } from './run-matrix';
 export { runBatch } from './run-batch';
 export { runSensitivity } from './run-sensitivity';

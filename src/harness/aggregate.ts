@@ -35,8 +35,15 @@ function percentile(sorted: number[], p: number): number {
 /**
  * Descriptive stats (min/max/avg/stddev/median/p5/p50/p95/count) over a
  * non-empty numeric array. Caller guarantees `values.length >= 1`.
+ *
+ * Public because the cell aggregators are not the only shape a seed sweep
+ * takes: a consumer whose per-run readout is a domain object rather than an
+ * analyzer's `Record<string, number>` would otherwise fabricate
+ * `HeadlessResult`s to reach this, or re-implement percentiles beside it —
+ * and a second percentile convention in the tree is exactly what the
+ * floor-index note above exists to prevent.
  */
-function computeStats(values: number[]): MetricStats {
+export function computeMetricStats(values: number[]): MetricStats {
   // Caller ensures values.length >= 1. Single-pass min/max/avg, then a copy
   // for the sort so we don't mutate the caller's buffer.
   let min = values[0]!;
@@ -141,7 +148,7 @@ export function aggregateCell(runs: HeadlessResult[], options?: AggregateOptions
   }
   const metrics: Record<string, MetricStats> = {};
   for (const [key, values] of Object.entries(samples)) {
-    if (values.length > 0) metrics[key] = computeStats(values);
+    if (values.length > 0) metrics[key] = computeMetricStats(values);
   }
 
   const histogramSpecs = options?.histograms;
@@ -199,7 +206,7 @@ export function aggregateUntilCell(
     unreachable: unreachableCount,
   };
   if (predicateTimes.length > 0) {
-    base.terminationTime = computeStats(predicateTimes);
+    base.terminationTime = computeMetricStats(predicateTimes);
     if (options?.terminationTimeHistogram) {
       base.terminationTimeHistogram = bucketize(predicateTimes, options.terminationTimeHistogram);
     }
