@@ -429,7 +429,7 @@ Recurring shapes consumers assemble from engine primitives — worked patterns f
 - **Persona-roster composition** — a keyed vector of personality params over sequencer-strategies selection.
 - **Priority-weighted fill** — interleave multiple content categories under one priority order via a `passBonus` map.
 - **Character interaction** — dialog (contract-first runtime) and subjects (typed multi-field relationship state), and where they connect.
-- **Spatial grids** — `createSpatialGrid` board state, runtime placement/removal, the grid-replacement event gotcha, and the adjacency→stat-bonus seam (pure evaluator over an occupancy view).
+- **Spatial grids** — `createSpatialGrid` board state, runtime placement/removal, the grid-replacement event gotcha, the adjacency→stat-bonus seam (pure evaluator over an occupancy view), and routing: distance fields by default, plus landmark heuristics from `distanceField` when a consumer-side A\* is genuinely the right shape.
 - **Cross-action bonuses** — A's yield scaled by B's state, as a binary-gate or level-scaled binding on A's gain chain.
 - **Sublinear per-source prestige payouts** — power-law transform of run output, summed per source rather than pooled.
 - **Shared pure state-function** — one pure fn over game state called by both the live tick and the balance harness, so the two can't drift.

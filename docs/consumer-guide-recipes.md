@@ -353,6 +353,42 @@ function preview(id: string, x: number, y: number) {
 
 Two disciplines that keep this stable: **recompute on placement events, not per tick** — structural bonuses change only when the board changes, so apply time-varying factors (freshness, decay) at read time rather than baking them into the recomputed result. And for connection shapes the grid doesn't ship — full row, full column, radial arcs — hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coords; it stays pure and testable alongside the evaluator. Anything expressible as a fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood` or an ad-hoc `neighbors(x, y, deltas)` instead, not a hand-roll.
 
+### Routing: fields by default, A\* only for the opposite shape
+
+Many agents converging on a shared goal set is **one** `distanceField` plus a per-agent descent — not one search per agent. The field is the whole board at once, reusable across the tick and across agents, and it's the shape most boards want.
+
+A\* answers the opposite shape: one agent, one start/goal pair, a board big enough that a whole-board field is waste, and a goal that moves often enough that you'd rebuild the field anyway. The engine ships no A\* and no heuristic surface — that search is a consumer-side loop over `neighbors()` and your own cost function. What the engine does ship is the expensive half of a *good* heuristic.
+
+**Landmark (differential) heuristics.** Pick K cells as landmarks and precompute each one's distance field; then `h(a, b) = maxₗ |d(L,a) − d(L,b)|` is an admissible lower bound on `d(a,b)`, and a far tighter one than Manhattan or Euclidean whenever walls or terrain cost make the straight line a lie. One landmark row is exactly one `distanceField` call:
+
+```ts
+const n = grid.width * grid.height;
+const table = new Float64Array(landmarks.length * n);   // K rows, one per landmark
+// subarray() is a view, so the rows are one allocation and `into` fills them in place.
+landmarks.forEach((L, k) => grid.distanceField([L], cost, table.subarray(k * n, (k + 1) * n)));
+
+const h = (a: GridCoord, b: GridCoord) => {
+  const ia = a.y * grid.width + a.x, ib = b.y * grid.width + b.x;
+  let best = 0;
+  for (let k = 0; k < landmarks.length; k++) {
+    const d = Math.abs(table[k * n + ia] - table[k * n + ib]);
+    if (d > best) best = d;
+  }
+  return best;
+};
+```
+
+Build the table with K *sequential* calls — `cost` must not call `distanceField` on the same grid, which reuses a per-grid scratch queue — and rebuild it when terrain changes, not per tick. A landmark table that gets recomputed every frame has spent more than the searches it saves.
+
+**The trap: `cost` is cost-to-*enter*, so travel is asymmetric.** `d(a,b)` and `d(b,a)` differ by `cost(b) − cost(a)`, while the `|Δ|` bound is admissible only against a *symmetric* metric. Under a uniform passable cost the difference vanishes and the code above is correct as written. Under varied terrain it doesn't: symmetrize each row on the way in, then undo the shift on the way out.
+
+```ts
+// filling row k:  row[i] += (costAt(L) - costAt(i)) / 2
+// reading h:      Math.max(0, best + (costAt(b) - costAt(a)) / 2)
+```
+
+Both corrections are endpoint-only, so the optimal path is unchanged and the result stays admissible *and* consistent — safe with a closed set. Skipping them inflates `h` by up to the terrain-cost spread, and an inadmissible heuristic doesn't fail loudly: A\* just quietly returns paths that aren't shortest.
+
 ## Cross-action bonuses
 
 When one content definition's bonus scales by another definition's state — action A's yield multiplied while B has been unlocked, skill A's XP rate boosted by skill B's level, upgrade A granting a bonus gated on C being owned — it's a conditional modifier on A's gain chain whose `active` predicate or `multiplier` value reads from B. No new primitive needed.
