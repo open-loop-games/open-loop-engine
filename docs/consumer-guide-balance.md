@@ -2,7 +2,7 @@
 
 How numbers get chosen and verified in a game built on `@open-loop/engine`. Read this before touching a balance constant or writing your first probe.
 
-This is the third companion to [consumer-guide.md](./consumer-guide.md). The guide explains **how to compose** the engine; [consumer-guide-recipes.md](./consumer-guide-recipes.md) holds the worked shapes consumers assemble from it; this file holds the discipline for **what the numbers should be** and how you know. It is engineering process over the engine's harness, not game-design theory — the theory lives upstream, per § Cite-out.
+This is the third companion to [consumer-guide.md](./consumer-guide.md). The guide explains **how to compose** the engine; [consumer-guide-recipes.md](./consumer-guide-recipes.md) holds the worked shapes consumers assemble from it; this file holds the discipline for **what the numbers should be** and how you know. It has a companion of its own — [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md), for when a policy agent is what plays the game your probe measures. It is engineering process over the engine's harness, not game-design theory — the theory lives upstream, per § Cite-out.
 
 It deliberately does not describe any consumer's directory layout. What things are called and where they sit is your repo's business.
 
@@ -24,7 +24,9 @@ The short version. If you read nothing else here — a first balance pass, a pro
 
 7. **Coarsen the tick.** Balance is measured in minutes; the engine's default tick is built for a live loop. See § `tickDelta`.
 
-Everything below is these seven with their reasoning, their failure modes, and the engine surface behind each.
+8. **If a policy plays the game for you, it is part of the instrument.** Every number a bot-driven probe prints is a joint claim about the design *and* about the agent, and the two are indistinguishable until you calibrate the agent separately. See § When an agent is the instrument.
+
+Everything below is these eight with their reasoning, their failure modes, and the engine surface behind each.
 
 ## Spec and truth
 
@@ -54,6 +56,10 @@ When the closed form is worth executing — it predicts a run length, sizes a pa
 
 **What a derivation comment must contain.** "One-line derivation per value" is only worth having if the line is checkable. A comment that says `// measured` is not a receipt; it is a claim about a measurement that may never have happened, and it reads identically to one that did. A receipt names the source: the expression it came from, or — when a value genuinely was fitted from runs rather than derived — which run produced it, when, and over how many seeds. If a number was chosen by feel, say *that*. An honestly-flagged guess is more useful than a guess wearing derivation language, because the next person knows which numbers to attack first.
 
+**A solved quantity gets one home, and the code that grows reads it.** When the spine *solves* for a rate — the per-purchase gain that holds time-to-kill flat, the ladder that lands beats on schedule — the implementation has to consume that solved value rather than re-author the growth beside it. Two authored copies drift silently, and the failure never presents as arithmetic: the economy runs a permanent deficit that reads as "the game is too hard" and gets tuned for by moving constants that are not the problem. The same rule has a second face — **every term that multiplies a solved curve belongs inside the solve.** A term left out is not a small error, because the solve is what the rest of the model assumes is being delivered; downstream code goes on treating the undelivered quantity as constant and the divergence compounds with nothing reporting it.
+
+**Keep the retired shape where it was retired.** When a run shows the spine was the wrong *family* rather than the wrong constant, write down what the old shape assumed and what contradicted it, at the value that replaced it. Three lines, and it is the cheapest guard there is against re-deriving a refuted shape a year later, when the conclusion is remembered and the refutation isn't.
+
 ### The probe — real engine, real policies
 
 The probe constructs the real engine with the real modules and plays the game headless. Real automation policies, never a re-implementation — the moment a probe re-implements a mechanic to measure it, it measures the re-implementation.
@@ -72,7 +78,7 @@ A useful probe has three passes:
 
 Report distributions, not point values. `mean [min, max]` over a stated seed count is the readable default, and state the seed count — an aggregate over five seeds prints identically to one over two hundred. Where variance carries design intent, report the moments (mean, variance, p50, p90), because the distribution *shape* is the spec and a mean alone hides it. Where the policy is deterministic, extra seeds confirm determinism rather than correctness — one run tells you as much as fifty, and fifty tells you nothing extra.
 
-**Probe design parameters, not automation knobs.** A probe targets the design under test: cost curves, ROI on upgrade tiers, hit rates, HP against DPS, spend rates. Knobs that parameterize *how the automation plays* — decision quality, reaction lag, cadence jitter, persona choice — are not the design. The working test: would this number change if the automation were swapped for a different reasonable one? If yes, the probe is measuring the automation. Keep those knobs fixed while the design constants move.
+**Probe design parameters, not automation knobs.** A probe targets the design under test: cost curves, ROI on upgrade tiers, hit rates, HP against DPS, spend rates. Knobs that parameterize *how the automation plays* — decision quality, reaction lag, cadence jitter, persona choice — are not the design, and neither is a difficulty dial that handicaps one side. The working test: would this number change if the automation were swapped for a different reasonable one? If yes, the probe is measuring the automation. Keep those knobs fixed *within* a comparison — and sweep them across the grid before a conclusion lands, which is a different move made for a different reason (§ When an agent is the instrument).
 
 ### The loop
 
@@ -94,7 +100,42 @@ A printed diff has none of that failure mode. It reports the delta rather than a
 
 The cost is real and worth naming: nothing runs automatically, so nothing catches balance drift on a commit you didn't think to check. Accept that, and run the probe when the economy moves. The alternative isn't a tripwire that works; it's a tripwire that was disarmed months ago and still shows green.
 
+**The assertion that survives a retune is liveness, not value.** Between behavioral suites and printed probes sits a third, narrow tier that is worth having and is easy to miss, because it asserts about the *instrument* rather than about the design. Four forms recur:
+
+- A **calibration scenario** — the agent still does the knowably-right thing in a situation whose answer is known by inspection (§ When an agent is the instrument).
+- A **fixture-liveness** assertion — the deliberately-hard case still fails, the deliberately-survivable one still survives. An improvement that moves the magnitude passes; a change that makes every fixture report success reds, because a fixture that can no longer fail has stopped measuring. These go stale by design: when a real improvement clears one, re-measure and commit the new table rather than lowering the bar.
+- A **derivation guard** — a runnable projection still couples to the constants it derives from, so a balance edit that breaks an assumption it rests on fires here instead of silently producing confident wrong numbers.
+- A **symmetry** assertion — structurally identical things (mirrored sides, interchangeable seats) reach identical state. A substrate asymmetry otherwise surfaces as a *balance* result, gets chased through the numbers, and biases every cell of a sweep at once.
+
+None carries a magnitude, which is why none decays into a widened bound, and all red for one reason: the instrument stopped instrumenting.
+
 **Behavioral tests are a different suite and they stay.** "Does the slot free, does the count go up, is growth monotonic, does the wave complete" belongs in the test runner, driving the assembled engine tick by tick. Those assertions carry no magnitudes, which is exactly why they survive retunes. Keeping balance out of the suite does not mean keeping the game out of it — it means magnitudes and mechanics are different questions, and mixing them produces a suite that reds on every retune and gets ignored.
+
+## When an agent is the instrument
+
+Where a policy plays the game for the probe — an automation tier, an opponent bot, a persona standing in for a player — every number is read *through* that agent, and a defect in it is indistinguishable from a defect in the design. It arrives as a balance finding with plausible magnitudes rather than as "the bot is bad", survives sweeps, and gets a design decision built on top of it. Unit specs on the policy do not catch it, because they assert plumbing and plumbing stays true of an agent deciding exactly wrongly.
+
+That layer has its own file: [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) — calibrating on named situations, joining every optimized quantity to a realized counterpart, proving a scoring term has spread before tuning its weight, what a converging policy structurally cannot measure, personas as a coverage axis, and the three harness checks (one brain, restore parity, pipeline liveness).
+
+## Making a pass cheap
+
+A balance pass is bottlenecked on **grading** — deciding what a set of numbers means — not on running: runs parallelize, judgment doesn't. Most of what makes a pass expensive is spending runs on questions a cheaper instrument, or no instrument, already answers.
+
+**Read before you run.** A source read that settles a question is a finding, and costs nothing a run would not have cost anyway. Read the module's header rather than grepping the symbol you arrived with — a subsystem's prose routinely carries a standing refusal of exactly the change being proposed, above the code the grep opened.
+
+**Name the content that could answer it.** A question is gradeable only where something in your game can express it, and two thresholds differ. A channel with **one carrier** yields an address rather than a finding: one instance cannot distinguish a mechanism from that instance's own shape. A channel with **zero carriers** is not a result at all — a sweep that comes back flat across content that cannot express the thing is a statement about your content, and the honest output is the content ask, not the refutation. Generate the carrier list rather than remembering it; remembered ones are wrong often enough to be worthless. When a line of work stops producing findings, ask what your content can express before asking for a better candidate — adding a carrier is frequently cheaper than another mechanism.
+
+**A printed report is the proof that a refactor was behaviour-preserving.** Re-run the probe against the pre-change tree and diff the numbers. That is a stronger claim than a green suite, which only says nothing asserted broke — and it is the cheapest thing that catches a mechanical change quietly moving play. It is worth keeping the report machine-diffable for exactly this, and worth caching a built baseline per commit if generating one is slow, so the base side is that commit rather than that commit plus whatever was uncommitted when it was built.
+
+**Inertness is cheap; magnitude is not.** Identical-versus-not has no noise floor, so a lever measured unchanged across its range is settled in one run per end. Only a lever that *does* move something needs the wide read. Order the pass accordingly.
+
+**Widen along the axis that actually varies.** A read narrower than the thing that moves it reports the wrong shape in either direction, understating a real effect as readily as manufacturing one. Which axis carries the variance is a property of your game: seeds where the arc is stochastic, distinct trajectories where personas diverge, content variants where the runtime is deterministic and seeds only prove the harness repeats. Where the sim is deterministic, repeating a cell measures nothing and averaging cells measures less. What *does* carry noise is anything measured on a machine doing other things — wall-clock above all, where a number that moved once has not moved.
+
+**Bank states rather than replaying arcs.** Most questions concern one phase of a run, and replaying the arc to reach it is the largest avoidable cost in a pass. Keep named mid-arc saves, stand probes up from them, and share the set with whatever QA or dev-panel picker the game has so it stays honest by being used. Two guards: a banked state travels the restore path and owes restore parity ([consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) § Verify the instrument), and a fixture must leave the decision under test *free* — a bank seeded so richly that the choice is already made, or an opening inflated until the constraint stops binding, measures a game nobody plays.
+
+**Name your verification tiers, and say which one you ran.** Write down the ladder your game has — a seconds-long unit and calibration tier, a minutes-long fixture tier, the full arc, the grid across personas — with what each covers and costs, then pick the shallowest that covers what the change could move. Part of the value is the ordering; most of it is the shared vocabulary, because "fixture tier green, grid pending" is a handoff and "I ran some probes" is not.
+
+**Write the prediction down before the run.** The spine already is the prediction; the discipline is that it lands *before* the instrument runs, with what would refute it, and is not edited afterwards — a prediction adjusted after seeing the numbers has no evidentiary value, and the adjustment is invisible one commit later. When a result refuses the change, that is the finding. Keep a refused change re-derivable with the cell it lost on, so a later basis shift can revive it rather than leaving it retired by a table that no longer exists.
 
 ## Reading a game's balance shape
 
@@ -141,6 +182,8 @@ The useful first question is not "which constant do I change" but **which layer 
 - **Reshape content.** Change cardinality or targets. The intent can't be expressed at *any* constant setting. If the reachable modifier stack is 10⁴× and the design asks for 10⁶×, no tuning of one knob closes that; the content surface has to grow.
 - **Reshape the predicate.** The predicate measures the wrong moment. "Five achievements earned" fires too early when every achievement grants the same multiplier and the perceptible moment is the first *compounding* one.
 - **The spine's shape is wrong.** The closed form was the wrong family for this subsystem. Re-walk the buckets.
+- **The basis moved.** Nothing is wrong with the number except the column it was fitted against — a baseline, a denominator, a policy output the change has since moved. Fix the basis and re-take the denominator *before* grading, or every net in the pass is measured against a hole. And re-derive the value on the column it will ship against: the old window's *interior* is not a safe default, and picking a fresh value inside a stored band inherits the refuted table one level down, where the inheritance is invisible.
+- **The constant is an average of something that varies across the arc.** A run-average of a quantity that drifts with progression is a summary, not a constant. Re-fitting it does not converge, because the fitted value changes run length and run length changes the quantity; the tell is oscillation with roughly unit gain across passes rather than a drift toward a value. Damping the fit is a workaround and should be labelled as one — the repair is to make the quantity a function of the phase variable.
 - **The metric is wrong.** The quantity you chose to design against is structurally unable to express your intent — it stays pinned in a narrow range no matter what the player does, so it cannot mark the transition you wanted it to mark. The fix is to design against a different quantity, one the spine actually predicts well. This is the finding that tuning cannot reach, and it only ever surfaces by running the game.
 
 Often the answer coordinates two or three of these. The probe surfaces the choice; a human makes the call.
@@ -157,7 +200,7 @@ There are two query modes against the same instance:
 
 These are probe-lane tools, not spine tools — both construct an engine. The spine stays pure; the probe is where the engine answers.
 
-**Ceremony that is load-bearing.** `pushScope` + `importSave` + a `scopeDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination.
+**Ceremony that is load-bearing.** `pushScope` + `importSave` + a `scopeDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination — the engine-level instance of restore parity (§ When an agent is the instrument), which is the same failure wherever a state is stood up rather than played into.
 
 ## Engine surfaces
 
@@ -253,7 +296,9 @@ This guide owns process over the engine. Theory and prescription live upstream, 
 | Which composition row does my economy walk? | `closed-form-progression/rate-function-algebra.md` |
 | What number should I pick? | `incremental-math/src/pages/design-playbook/` |
 | What patterns does my game compose, and how common are they? | `open-loop-research/LIBRARY.md` |
+| Where does the agent-as-playtester literature live? | `open-loop-research/reference-code/papers/`, via its README |
 | What engine primitive does X? | `docs/api/INDEX.md`, then the routed tier file |
 | How do I compose the engine at all? | [consumer-guide.md](./consumer-guide.md) |
 | What's the worked shape for this composition? | [consumer-guide-recipes.md](./consumer-guide-recipes.md) |
+| My probe's numbers come out of a bot-driven run — now what? | [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) |
 | How do I run the process? | this file |
