@@ -1,5 +1,5 @@
 /**
- * Harness cell factory for the balance workbench loop.
+ * Harness cell factory for the balance workbench cycle.
  *
  * Bridges `createEngineFromSave` (per-run engine construction from a save
  * blob) with the harness `Cell` contract. The matrix runner rebuilds the
@@ -8,15 +8,15 @@
  * closure drives it.
  *
  * Ordering inside `setup`: build engine from save → apply perturb →
- * build analyzers → auto-subscribe `onLoopFinalize` to any published
- * LoopLog → loop runs to `ticks × tickDelta`.
+ * build analyzers → auto-subscribe `onCycleFinalize` to any published
+ * CycleLog → cycle runs to `ticks × tickDelta`.
  *
  * @cluster runners
  */
 
 import type { Analyzer } from '@/primitives/types';
 import type { Engine, EngineConfig, EngineModule } from '@/engine';
-import { LoopLogKey } from '@/systems/loop-log';
+import { CycleLogKey } from '@/systems/cycle-log';
 import { createEngineFromSave } from './create-engine';
 import type { Cell, RunContext } from './types';
 
@@ -52,9 +52,9 @@ export interface CreateSensitivityCellOptions {
    * default is `(engine) => defaultAnalyzerPack(engine)`; omit for
    * metric-free runs.
    *
-   * Analyzers exposing `onLoopFinalize` are auto-subscribed to the engine's
-   * `LoopLogKey` (when any module publishes one) inside `setup()`. No
-   * extra wiring step is required for the loop-finalize hook.
+   * Analyzers exposing `onCycleFinalize` are auto-subscribed to the engine's
+   * `CycleLogKey` (when any module publishes one) inside `setup()`. No
+   * extra wiring step is required for the cycle-finalize hook.
    */
   buildAnalyzers?: (engine: Engine) => Analyzer[];
   /**
@@ -87,7 +87,7 @@ let runCounter = 0;
  *
  * The returned cell holds the current run's engine in closure; setup
  * replaces it on each re-entry, so runs execute correctly in the harness's
- * sync sequential loop. Multiple concurrent invocations of a single cell
+ * sync sequential cycle. Multiple concurrent invocations of a single cell
  * are not supported — matrix execution is sync-sequential by design.
  *
  * @param options - {@link CreateSensitivityCellOptions} — save blob, module
@@ -137,10 +137,10 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     });
     perturb?.(engine, ctx);
     const analyzers: Analyzer[] = buildAnalyzers?.(engine) ?? [];
-    const log = engine.tryInject(LoopLogKey);
+    const log = engine.tryInject(CycleLogKey);
     if (log) {
       for (const analyzer of analyzers) {
-        const hook = analyzer.onLoopFinalize;
+        const hook = analyzer.onCycleFinalize;
         if (hook) loopFinalizeUnsubs.push(log.on('finalize', (entry) => hook(entry)));
       }
     }

@@ -40,8 +40,8 @@ import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from
 
 /**
  * Any object exposing a resolved set of persistent refs for composable reset
- * scope. Both {@link Reset} and Loop implement this — using a structural type
- * avoids circular imports between reset.ts and loop.ts.
+ * scope. Both {@link Reset} and Cycle implement this — using a structural type
+ * avoids circular imports between reset.ts and cycle.ts.
  */
 export interface ScopedReset {
   readonly resolvedScope: ReadonlySet<Persistent>;
@@ -49,7 +49,7 @@ export interface ScopedReset {
 
 /**
  * A reset scope entry: either a module ID (string) resolved via the persistent
- * ref registry, or another Reset/Loop whose resolved scope is unioned in.
+ * ref registry, or another Reset/Cycle whose resolved scope is unioned in.
  */
 export type ResetScope = string | ScopedReset;
 
@@ -69,7 +69,7 @@ export interface ResetOptions {
 
   /**
    * Module-scoped reset: declare which modules to reset by ID, or compose
-   * with other Reset/Loop objects to inherit their scope. The engine resolves
+   * with other Reset/Cycle objects to inherit their scope. The engine resolves
    * each module ID to all persistent refs created during that module's
    * install/connect phase (including nested category/definition contexts).
    *
@@ -138,7 +138,7 @@ export interface Reset extends ScopedReset {
 
   /**
    * The flattened set of persistent refs resolved from {@link ResetOptions.resetModules}.
-   * Empty when only `thingsToReset` is used. Exposed so other resets/loops can
+   * Empty when only `thingsToReset` is used. Exposed so other resets/cycles can
    * compose with this reset's scope via `resetModules: [thisReset]`.
    */
   readonly resolvedScope: ReadonlySet<Persistent>;
@@ -190,7 +190,7 @@ function resolveScope(modules: ResetScope[]): Set<Persistent> {
  *
  * Supports two scoping modes (can be combined):
  * - **`thingsToReset`** — manual list of objects/refs, reset via recursive walking
- * - **`resetModules`** — module IDs and/or other Reset/Loop objects, resolved
+ * - **`resetModules`** — module IDs and/or other Reset/Cycle objects, resolved
  *   via the persistent ref registry
  *
  * Inline `keep`/`retain` options provide retention without a separate

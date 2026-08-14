@@ -25,7 +25,7 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 
 - **Category systems** — Typed batch-registration surfaces for the validated incremental-game patterns: skills, producers, purchasables, achievements, challenges, dialog, subjects, zones. Each category exposes `register` / `getDef` / `getInstance` / `patch` (for mods) and self-enrols into a global content registry that consumer tooling can walk without install-time coupling.
 
-- **Loop / sequencer / time** — `createLoop`, `createSequencer` (with fill strategies), `createTimeSystem`, `createReset`, `createRetentionPolicy`. Reusable composition primitives for time-stepped and progression-based games.
+- **Cycle / sequencer / time** — `createCycle`, `createSequencer` (with fill strategies), `createTimeSystem`, `createReset`, `createRetentionPolicy`. Reusable composition primitives for time-stepped and progression-based games.
 
 - **Spatial primitives** — `core/spatial/graph` and `core/spatial/grid` for games that need adjacency without committing to a UI.
 

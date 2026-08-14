@@ -185,11 +185,11 @@ export interface IModifier {
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */
 export interface AnalyzerResult {
   name: string;
-  /** Scalar measurements collected during the run (e.g. `{ "peakGold": 4200, "loops": 12 }`). */
+  /** Scalar measurements collected during the run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
   metrics: Record<string, number | string | boolean>;
 }
 
-/** Observer attached to a headless run that collects metrics per tick and optionally per finalized loop. */
+/** Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. */
 export interface Analyzer {
   name: string;
   /** Called once before the first tick. Use to initialize accumulators. */
@@ -199,15 +199,15 @@ export interface Analyzer {
   /** Called once after the last tick. Use to finalize aggregated metrics. */
   onEnd?(): void;
   /**
-   * Called once per finalized loop when the analyzer is attached to a cell
-   * whose engine publishes a LoopLog — `createSensitivityCell` discovers the
-   * log via `engine.tryInject(LoopLogKey)` and auto-subscribes. The entry
-   * shape is structurally compatible with `LoopLogEntry` from the loop-log
+   * Called once per finalized cycle when the analyzer is attached to a cell
+   * whose engine publishes a CycleLog — `createSensitivityCell` discovers the
+   * log via `engine.tryInject(CycleLogKey)` and auto-subscribes. The entry
+   * shape is structurally compatible with `CycleLogEntry` from the cycle-log
    * system, so analyzers wired directly to `log.on('finalize', ...)` outside
    * a harness cell also satisfy this hook.
    */
-  onLoopFinalize?(entry: {
-    loopNumber: number;
+  onCycleFinalize?(entry: {
+    cycleNumber: number;
     elapsed: number;
     timestamp: number;
     deltas: ReadonlyArray<{

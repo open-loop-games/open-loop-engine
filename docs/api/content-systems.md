@@ -1,6 +1,6 @@
 # Content Systems
 
-The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog carry long-arc structure.
+The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
 
 ## Canonical entrypoints
 
@@ -8,7 +8,7 @@ The validated incremental primitives, each a typed registration surface over the
 - `createPurchasableCategory` — upgrades, gates, capped repeatables, perks, and bought effects in batch.
 - `createAchievementCategory` — observed milestones and tier ladders that auto-earn.
 - `createSkillCategory` — XP/level progression surfaces.
-- `createLoop`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.
+- `createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.
 - `createActionCategory` — ordered-execution queues with per-execution state machine.
 
 ## Achievement
@@ -71,7 +71,7 @@ per-metric best-of-run recording
 - `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:72`
 - `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:32`
 - `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:29`
-- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best loop outcome per metric. `src/systems/best-of.ts:238`
+- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best cycle outcome per metric. `src/systems/best-of.ts:238`
 
 ## Challenge Category
 
@@ -84,6 +84,27 @@ batch-create Challenges from content definitions
 - `interface ChallengeDef<Overrides extends Record<string, (...args: never[]) => unknown> = Record<string, (...args: never[]) => unknown>>` — Definition for a challenge. `src/systems/challenge-category.ts:65`
 - `function createChallengeCategory<Def extends ChallengeDef, State = void>(options: ChallengeCategoryOptions<Def, State>): ChallengeCategory<Def, State>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:335`
 
+## Cycle
+
+a bounded run that ends, resets a scope, and replays
+
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:198`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:116`
+- `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:34`
+- `interface CycleOptions` `src/systems/cycle.ts:42`
+
+## CycleLog
+
+per-cycle metric delta recording
+
+- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:150`
+- `interface CycleLog` — A CycleLog instance — the returned object from createCycleLog. `src/systems/cycle-log.ts:96`
+- `interface CycleLogDelta` — Per-metric change recorded during a single cycle. `src/systems/cycle-log.ts:63`
+- `interface CycleLogEntry` — A single cycle's recorded outcome. `src/systems/cycle-log.ts:72`
+- `interface CycleLogEvents` — Events emitted by a CycleLog instance. `src/systems/cycle-log.ts:85`
+- `const CycleLogKey: InjectionKey<CycleLog>` — Opt-in discovery key for introspection tools (sim, balance workbench, devtools). `src/systems/cycle-log.ts:42`
+- `interface CycleLogOptions` — Configuration for createCycleLog. `src/systems/cycle-log.ts:47`
+
 ## Inventory
 
 game-dev-friendly wrapper over ResourceBag
@@ -91,27 +112,6 @@ game-dev-friendly wrapper over ResourceBag
 - `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional auto-persistence. `src/systems/inventory.ts:106`
 - `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:46`
 - `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:19`
-
-## Loop
-
-constrained-replay incremental games
-
-- `function createLoop(options: LoopOptions): Loop` — Create a loop — the core building block of loop-incremental games. `src/systems/loop.ts:167`
-- `interface Loop extends ScopedReset` — A loop instance — the returned object from createLoop. `src/systems/loop.ts:99`
-- `interface LoopEvents` — Events emitted by a Loop instance. `src/systems/loop.ts:32`
-- `interface LoopOptions` `src/systems/loop.ts:40`
-
-## LoopLog
-
-per-loop metric delta recording
-
-- `function createLoopLog(options: LoopLogOptions): LoopLog` — Create a LoopLog that records per-loop metric deltas from a Loop's lifecycle. `src/systems/loop-log.ts:148`
-- `interface LoopLog` — A LoopLog instance — the returned object from createLoopLog. `src/systems/loop-log.ts:94`
-- `interface LoopLogDelta` — Per-metric change recorded during a single loop. `src/systems/loop-log.ts:61`
-- `interface LoopLogEntry` — A single loop's recorded outcome. `src/systems/loop-log.ts:70`
-- `interface LoopLogEvents` — Events emitted by a LoopLog instance. `src/systems/loop-log.ts:83`
-- `const LoopLogKey: InjectionKey<LoopLog>` — Opt-in discovery key for introspection tools (sim, balance workbench, devtools). `src/systems/loop-log.ts:42`
-- `interface LoopLogOptions` — Configuration for createLoopLog. `src/systems/loop-log.ts:45`
 
 ## Producer Category
 
@@ -147,6 +147,19 @@ Three factories in increasing flexibility: `createSimplePurchasable` for static 
 - `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:295`
 - `function setupSweepAutoPurchase(purchasables: Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:217`
 - `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:105`
+
+## RunPool
+
+core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state
+
+- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:199`
+- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:43`
+- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:49`
+- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:146`
+- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:94`
+- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:122`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:83`
+- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:36`
 
 ## Skill
 

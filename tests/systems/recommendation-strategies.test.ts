@@ -3,8 +3,8 @@ import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
-import { createLoop } from '@/systems/loop';
-import { createLoopLog } from '@/systems/loop-log';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
 import { createBestReplayDef, createGoalDef } from '@/systems/recommendation-strategies';
 import type { RecommendationContext } from '@/systems/recommendation';
@@ -26,7 +26,7 @@ function createTickManager() {
   };
 }
 
-/** Build a full Loop + LoopLog + BestOf stack and run N loops to populate data */
+/** Build a full Cycle + CycleLog + BestOf stack and run N cycles to populate data */
 function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean }) {
   const tick = createTickManager();
 
@@ -34,45 +34,45 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
   const gold = createResource(bn(0), { displayName: 'Gold' });
   endPersistentContext();
 
-  const loop = createLoop({
-    id: `${prefix}-loop`,
+  const cycle = createCycle({
+    id: `${prefix}-cycle`,
     thingsToReset: [gold],
     registerTick: tick.registerTick,
   });
 
-  const loopLog = createLoopLog({
-    loop,
+  const cycleLog = createCycleLog({
+    cycle,
     metrics: { gold },
   });
 
   const bestOf = createBestOf({
     id: `${prefix}-best`,
     metrics: { gold: { mode: 'absolute' } },
-    loopLog,
+    cycleLog,
     captureStrategy:
       opts?.captureStrategy !== false ? () => ({ queue: ['spell-a', 'spell-b'] }) : undefined,
   });
 
-  /** Run a loop cycle: set gold, tick, end. String gold allows values past the double range. */
+  /** Run a cycle cycle: set gold, tick, end. String gold allows values past the double range. */
   function runLoop(goldAmount: number | string, elapsed: number) {
-    loop.run();
+    cycle.run();
     addResource(gold, bn(goldAmount));
     tick.tick(elapsed);
-    loop.end();
+    cycle.end();
   }
 
   /** Build a RecommendationContext from the current state */
   function buildContext(currentSnapshot = {}): RecommendationContext {
     return {
-      loopLog,
+      cycleLog,
       bestOf,
-      loop,
+      cycle,
       currentSnapshot,
       state: {},
     };
   }
 
-  return { tick, gold, loop, loopLog, bestOf, runLoop, buildContext };
+  return { tick, gold, cycle, cycleLog, bestOf, runLoop, buildContext };
 }
 
 describe('createBestReplayDef', () => {
@@ -117,21 +117,21 @@ describe('createBestReplayDef', () => {
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
-  it('minLoops option gates applicability on loop count', () => {
+  it('minLoops option gates applicability on cycle count', () => {
     const { runLoop, buildContext } = createPopulatedStack('br-minloops');
 
     runLoop(100, 5);
 
     const strategy = createBestReplayDef('gold', { minLoops: 3 });
-    // loop.count is 1 after one completed loop
+    // cycle.count is 1 after one completed cycle
     expect(strategy.canApply(buildContext())).toBe(false);
 
     runLoop(80, 4);
-    // loop.count is 2
+    // cycle.count is 2
     expect(strategy.canApply(buildContext())).toBe(false);
 
     runLoop(60, 3);
-    // loop.count is 3
+    // cycle.count is 3
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
@@ -186,12 +186,12 @@ describe('createBestReplayDef', () => {
     expect(result.snapshot).toEqual({ queue: ['spell-a', 'spell-b'] });
   });
 
-  it('rationale contains metric comparison with current loop data', () => {
+  it('rationale contains metric comparison with current cycle data', () => {
     const { runLoop, buildContext } = createPopulatedStack('br-rationale');
 
-    // First loop: gold = 100 (sets the best)
+    // First cycle: gold = 100 (sets the best)
     runLoop(100, 5);
-    // Second loop: gold = 50 (worse, doesn't beat best)
+    // Second cycle: gold = 50 (worse, doesn't beat best)
     runLoop(50, 5);
 
     const strategy = createBestReplayDef('gold');
@@ -200,7 +200,7 @@ describe('createBestReplayDef', () => {
 
     expect(result.rationale.strategyId).toBe('best-replay:gold');
     expect(result.rationale.metrics.gold).toBeDefined();
-    // Current should be last loop's delta (50)
+    // Current should be last cycle's delta (50)
     expect(Decimal.eq(result.rationale.metrics.gold.current, 50)).toBe(true);
     // Projected should be the best value (100)
     expect(Decimal.eq(result.rationale.metrics.gold.projected, 100)).toBe(true);

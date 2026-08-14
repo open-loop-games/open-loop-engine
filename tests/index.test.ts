@@ -12,12 +12,12 @@ import {
   createPersistentEffectSystem,
   createPurchasableCategory,
   createSkillCategory,
-  createLoop,
-  createLoopLog,
-  LoopLogKey,
+  createCycle,
+  createCycleLog,
+  CycleLogKey,
 } from '@/index';
 import { getCurrentContext, getPersistentRefs } from '@/core/persistence';
-import type { LoopLog } from '@/index';
+import type { CycleLog } from '@/index';
 import type { EngineModule, InjectionKey, EngineCategories } from '@/index';
 
 describe('createEngine', () => {
@@ -608,27 +608,27 @@ describe('CategoriesKey — engine self-publish', () => {
   });
 });
 
-describe('LoopLogKey — discovery convention', () => {
-  it('module publishes a LoopLog; external consumer retrieves it via tryInject', () => {
-    let discovered: LoopLog | undefined;
+describe('CycleLogKey — discovery convention', () => {
+  it('module publishes a CycleLog; external consumer retrieves it via tryInject', () => {
+    let discovered: CycleLog | undefined;
 
     const game: EngineModule = {
       id: 'game',
       install(ctx) {
-        const loop = createLoop({
+        const cycle = createCycle({
           endCondition: () => false,
           thingsToReset: [],
           registerTick: () => () => {},
         });
-        const log = createLoopLog({ loop, metrics: {} });
-        ctx.provide(LoopLogKey, log);
+        const log = createCycleLog({ cycle, metrics: {} });
+        ctx.provide(CycleLogKey, log);
       },
     };
     const introspector: EngineModule = {
       id: 'introspector',
       dependencies: ['game'],
       install(ctx) {
-        discovered = ctx.tryInject(LoopLogKey);
+        discovered = ctx.tryInject(CycleLogKey);
       },
     };
 
@@ -642,12 +642,12 @@ describe('LoopLogKey — discovery convention', () => {
     engine.stop();
   });
 
-  it('returns undefined when no module publishes a loop log', () => {
+  it('returns undefined when no module publishes a cycle log', () => {
     let discovered: unknown = 'sentinel';
     const mod: EngineModule = {
       id: 'no-publisher',
       install(ctx) {
-        discovered = ctx.tryInject(LoopLogKey);
+        discovered = ctx.tryInject(CycleLogKey);
       },
     };
     const engine = createEngine({ gameId: 'test', persistence: false });

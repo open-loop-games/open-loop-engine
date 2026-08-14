@@ -2,7 +2,7 @@
  * Retention policy for declarative carryover across resets
  *
  * Snapshot/restore pattern: saves retained values before reset,
- * restores them after. Composes with the existing Reset/Loop hooks.
+ * restores them after. Composes with the existing Reset/Cycle hooks.
  *
  * Covers the universal retention categories:
  * - keep: refs that survive reset unchanged
@@ -55,7 +55,7 @@ export function fractional(rate: DecimalSource): (value: any) => any {
  * Creates a declarative retention policy for carrying values across resets.
  *
  * Call `snapshot()` before a reset to capture current values, then `restore()`
- * after the reset to write them back. Composes with existing Reset/Loop hooks
+ * after the reset to write them back. Composes with existing Reset/Cycle hooks
  * without modifying core.
  *
  * @param options - Refs to `keep` unchanged and refs to `retain` with custom

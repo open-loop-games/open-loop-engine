@@ -14,18 +14,18 @@ Start at the highest-level surface that fits, and drop down only when it fights 
 | --- | --- | --- |
 | **L1: Resource helpers** | `addResource` / `hasResource` / `displayResource`, `Resource.best` / `.cumulative` — direct currency mutation, display, lifetime trackers | resources.md#resource |
 | **L2: Category systems** | `createProducerCategory`, `createPurchasableCategory`, `createSkillCategory`, `createDialogCategory`, … — repeatable authored content, and the default for it | content-systems.md, content-narrative.md |
-| **L3: Raw primitives** | `createScalingPurchasable`, `createLoop`, `createModifierChain`, `createCategoryBase` — one-off systems, or registration shapes category mapping constrains | composition.md, mechanics.md, lifecycle.md |
+| **L3: Raw primitives** | `createScalingPurchasable`, `createCycle`, `createModifierChain`, `createCategoryBase` — one-off systems, or registration shapes category mapping constrains | composition.md, mechanics.md, lifecycle.md |
 | **L4: Declarative data** | `Gate`, `E` / `IEffect` — JSON/mod/save/sim-friendly gates and effects | mechanics.md#gate, mechanics.md#effects |
 
 ## Reserved names
 
 A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
-- **Loop** — loop-incremental gameplay run (Idle Loops, Cavernous, Loopy Loops). `createLoop`. → content-systems.md#loop. `end()` is an atomic end→reset→restart and `elapsed`/`running` are not persistent — a run that ends and dwells awaiting a player restart does not fit; that lifecycle stays consumer-side.
-- **LoopLog** — per-loop metric delta recorder; observes a `Loop`'s lifecycle. `createLoopLog`. → content-systems.md#looplog
+- **Cycle** — one bounded gameplay run that ends, resets a scope, and replays. `createCycle`. → content-systems.md#cycle. Named for the lifecycle, not a genre: a loop incremental's run (Idle Loops, Cavernous), a prestige layer's reincarnation, and a new-game-plus are all the same shape. `end()` is an atomic end→reset→restart and `elapsed`/`running` are not persistent — a run that ends and dwells awaiting a player restart does not fit; that lifecycle stays consumer-side.
+- **CycleLog** — per-cycle metric delta recorder; observes a `Cycle`'s lifecycle. `createCycleLog`. → content-systems.md#cyclelog
 - **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category
-- **`createReset`** vs **`Loop.thingsToReset`** — `createReset` is the standalone prestige primitive (lifecycle); `Loop` extends `ScopedReset` and carries its own reset list per run.
-- **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → harness.md#runpool. Distinct from `Loop` (single constrained-replay run) and from the engine's `TickDriver` (tick scheduler).
+- **`createReset`** vs **`Cycle`** — `createReset` is the standalone reset mechanic (scope, retention, `canReset` gate); `Cycle` drives one, adding the run's timer, counter, and restart cadence. `CycleOptions` carries shorthand for the common reset fields and a `reset` field for a pre-built one — it is deliberately not a mirror of `ResetOptions`.
+- **RunPool** — many opaque concurrent runs with per-run lifecycle. `createRunPool`. → content-systems.md#runpool. Distinct from `Cycle` (one bounded run, reset at its boundary) and from `TickDriver` (tick scheduler). It is a `src/core` gameplay primitive despite the sim-flavoured name — nothing about it is harness-only.
 - **Sequencer** — ordered dispatch of *authored content items* via a cursor. `createSequencer`. → composition.md#sequencer. Its task-table verb "schedule" means job/persona dispatch, not a timed phase cadence over a generated schedule (wave cycles have no items to dispatch, and stay consumer-side). Per-item repeat counts are consumer-side too — expand at enqueue or count in metadata; `repeat()` re-dispatches the current item once, without advancing.
 - **TimedProgress** — *forward-only* completion accumulator (negative speed is a no-op); not a bidirectional gauge and not an input schedule, despite the generic stem. `createTimedProgress`. → mechanics.md#timedprogress
 - **TimeSystem vs TimeBank** — `createTimeSystem` is the play-clock (how long has the player played); `createTimeBank` is a spendable reservoir of banked seconds (offline banking, bonus time). → runtime.md#time-tracking, lifecycle.md#time-bank
@@ -70,7 +70,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | in-game devtools / balance UI / walk all content | introspection.md#engine-categories |
 | upcoming unlock / "what changes next?" | harness.md#content-walker, runtime.md#transition-distance-primitives |
 | schedule jobs / persona rotation / ordered dispatch | composition.md#sequencer |
-| recommendation between loops | advisors.md#recommendation |
+| recommendation between cycles | advisors.md#recommendation |
 | spatial adjacency / grid bonuses | spatial.md#grid, spatial.md#graph |
 | routing / pathfinding / travel cost over a map | `SpatialGrid.distanceField` (weighted, multi-source, descend the field) or `SpatialGrid.bfs` (reachability + parent links) → spatial.md#grid |
 | balance parameter sweep (multi-variant) | harness.md#cell-aggregation-kernel |
@@ -92,7 +92,7 @@ Cross-cutting shapes rather than symbol names — "where do I read about X?" whe
 - **sensitivity sweep** — baseline + variants, per-metric `{absolute, relative}` deltas → harness.md#cell-aggregation-kernel
 - **transition distance** — "when does X happen?" math over current state → runtime.md#transition-distance-primitives
 - **picker enumeration** — walk modifiers, tunables, content for solvers/UIs → harness.md#picker, ../consumer-guide.md#introspection
-- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → harness.md#runpool, ../consumer-guide-recipes.md#indirect-control-worker-pools
+- **indirect-control worker pool** — Sequencer + TimedProgress + claim-on-pop, Majesty/DK shape → content-systems.md#runpool, ../consumer-guide-recipes.md#indirect-control-worker-pools
 - **persona roster** — keyed vector of personality params, sequencer-strategies selection → ../consumer-guide-recipes.md#persona-roster-composition, composition.md#sequencer
 - **reset scope** — `ScopedReset`, recursive walking of `thingsToReset` → lifecycle.md#reset, ../consumer-guide.md#resetting-persistent-refs-in-bulk
 - **retention across reset** — `keep` (verbatim) vs `retain` (transformed) carry-over → lifecycle.md#retention, ../consumer-guide.md#resetting-persistent-refs-in-bulk
@@ -110,9 +110,9 @@ Cross-cutting shapes rather than symbol names — "where do I read about X?" whe
 - **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second
 - **subject field kinds** — typed multi-field state per subject: scalar / vector / tier / flag / enum → content-narrative.md#subject-category, ../consumer-guide-recipes.md#character-interaction-surface
 - **best-of run recording** — per-metric best with optional projection, BestOf events → content-systems.md#bestof-tracker
-- **loop restart event** — `beforeRestart` / `afterRestart` for loop-incremental cadence → content-systems.md#loop
-- **Loop disambiguation** — `Loop` (gameplay) vs `LoopLog` (metrics) vs `RunPool` (many concurrent runs) → INDEX.md#reserved-names
-- **recommendation arbitration** — strategies ranked between loops, auto-apply or surface → advisors.md#recommendation
+- **cycle restart event** — `beforeRestart` / `afterRestart` for the end→reset→replay cadence → content-systems.md#cycle
+- **run-shaped surfaces** — `Cycle` (one bounded gameplay run) vs `CycleLog` (its metrics) vs `RunPool` (many concurrent runs) vs `TickDriver` (tick scheduler) → INDEX.md#reserved-names
+- **recommendation arbitration** — strategies ranked between cycles, auto-apply or surface → advisors.md#recommendation
 - **spatial agent steering** — steer an agent over a map: influence layers supply per-cell field values, the goal picker scores and ranks candidates built from them → spatial.md#influence-layer, advisors.md#goal-picker
 - **distance field / flow field** — least-cost distance from a source set to every cell, agents move by descending it. `SpatialGrid.distanceField`; the step direction is derived consumer-side so routing and rendering share one tie-break → spatial.md#grid
 
@@ -128,8 +128,8 @@ Short answers only; consumer-level reasoning lives in ../consumer-guide.md#commo
 | Generic multi-resource container | `createResourceBag` → resources.md#resource |
 | Game-facing item inventory with capacities | `createInventory` → content-systems.md#inventory |
 | Engine tick scheduler | `createTickDriver` → runtime.md#tickdriver |
-| Loop-incremental gameplay run | `createLoop` → content-systems.md#loop |
-| Many opaque concurrent runs | `createRunPool` → harness.md#runpool |
+| Bounded gameplay run that resets and replays | `createCycle` → content-systems.md#cycle |
+| Many opaque concurrent runs | `createRunPool` → content-systems.md#runpool |
 | Ordered schedule or persona dispatch | `createSequencer` and fill strategies → composition.md#sequencer |
 | Ranked recommendation / advisory choice | advisors → advisors.md |
 | Discover live engine surfaces | introspection registries → introspection.md |
@@ -192,18 +192,19 @@ Substrate the content systems compose against. `CategoryBase` + `ContentRegistry
 
 ### Content Systems — `content-systems.md`
 
-The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog carry long-arc structure.
+The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
 
 - `achievement` → content-systems.md#achievement
 - `action-category` → content-systems.md#action-category
 - `automation` → content-systems.md#automation-tiers
 - `best-of` → content-systems.md#bestof-tracker
 - `challenge-category` → content-systems.md#challenge-category
+- `cycle` → content-systems.md#cycle
+- `cycle-log` → content-systems.md#cyclelog
 - `inventory` → content-systems.md#inventory
-- `loop` → content-systems.md#loop
-- `loop-log` → content-systems.md#looplog
 - `producer-category` → content-systems.md#producer-category
 - `purchasable` → content-systems.md#purchasable
+- `run-pool` → content-systems.md#runpool
 - `skill` → content-systems.md#skill
 - `slot` → content-systems.md#slot
 - `zone` → content-systems.md#zone
@@ -270,7 +271,7 @@ Coordinate primitives for adjacency-driven games — grid, graph, scope stack, i
 
 ### Harness — `harness.md`
 
-Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers, run pools. Separable — game code never imports harness; balance tooling does.
+Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers. Separable — game code never imports harness; balance tooling does.
 
 - `analyzers` → harness.md#analyzers
 - `flow-channel` → harness.md#flow-channel-classification
@@ -278,7 +279,6 @@ Headless-sim substrate: runners, probes, content walkers, the picker, solvers, p
 - `perturbation` → harness.md#perturbation-applier
 - `picker` → harness.md#picker
 - `probe` → harness.md#probes
-- `run-pool` → harness.md#runpool
 - `runners` → harness.md#cell-aggregation-kernel
 - `solve` → harness.md#solvers
 - `types` → harness.md#measurement-harness-types

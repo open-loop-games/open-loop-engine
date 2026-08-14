@@ -68,7 +68,7 @@ export * from './conversion';
 // === DECLARATIVE BINDINGS ===
 // Types used by category `grants` / `restricts` / `rewards` fields and by
 // `ModifierChain.bind` / `bindings()`. Re-exported here so the
-// `open-loop-engine/systems` entry point is self-contained for API extraction.
+// `open-cycle-engine/systems` entry point is self-contained for API extraction.
 export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 
 // === PURCHASES ===
@@ -122,15 +122,15 @@ export * from './action-category';
 export * from './auto-purchase';
 
 // === LOOP INCREMENTALS ===
-// Loop: constrained-replay pattern (Idle Loops, Increlution, etc.)
-// Skill: dual-tier XP/level with permanent bonus accumulation across loops.
+// Cycle: constrained-replay pattern (Idle Loops, Increlution, etc.)
+// Skill: dual-tier XP/level with permanent bonus accumulation across cycles.
 // SkillCategory: batch-register Skills from content definitions.
-// Retention: policies for what persists between loops.
-// LoopLog: per-loop metric delta ring buffer for analytics.
+// Retention: policies for what persists between cycles.
+// CycleLog: per-cycle metric delta ring buffer for analytics.
 // BestOf: per-metric best-of-run tracking with strategy snapshots.
-// Recommendation: score-based inter-loop strategy arbitration over LoopLog + BestOf data.
-export * from './loop';
-export * from './loop-log';
+// Recommendation: score-based inter-cycle strategy arbitration over CycleLog + BestOf data.
+export * from './cycle';
+export * from './cycle-log';
 export * from './best-of';
 export * from './recommendation';
 export * from './recommendation-strategies';
@@ -183,14 +183,14 @@ export * from './slot';
 // === GOAL PICKER ===
 // Weighted-goal selection over a candidate pool: sweep-completed + score + top-N fill.
 // Composes Slot for persistence. Distinct from createConditionalStrategy (FillStrategy,
-// sequencer-driven) and createRecommendationSystem (between-loop arbitration).
+// sequencer-driven) and createRecommendationSystem (between-cycle arbitration).
 export * from './goal-picker';
 
 // === RULE ADVISOR ===
-// Intra-session profile-history advisor: aggregates LoopLog history into a
+// Intra-session profile-history advisor: aggregates CycleLog history into a
 // profile, runs analyzer heuristics, surfaces a ranked + dismissable list of
 // suggestions. Sibling to createRecommendationSystem along the time-horizon
-// axis (RecommendationSystem = inter-loop; RuleAdvisor = intra-session).
+// axis (RecommendationSystem = inter-cycle; RuleAdvisor = intra-session).
 export * from './rule-advisor';
 
 // === CHARACTER INTERACTION ===
@@ -250,7 +250,7 @@ export * from './automation';
 // === CROSS-LAYER TYPE RE-EXPORTS ===
 
 // Types from primitives and core that leak through systems' public API.
-// Selective, not broad: `open-loop-engine/systems` stays focused on
+// Selective, not broad: `open-cycle-engine/systems` stays focused on
 // systems-layer symbols; consumers still import values from the layer that
 // owns them.
 

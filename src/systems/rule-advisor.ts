@@ -1,8 +1,8 @@
 /**
  * Rule advisor — intra-session profile-history aggregator with ranked suggestions
  *
- * Pulls entries from a {@link LoopLog} (canonical case, entries are
- * loop-log shaped) or a caller-supplied function (BYO history) through an
+ * Pulls entries from a {@link CycleLog} (canonical case, entries are
+ * cycle-log shaped) or a caller-supplied function (BYO history) through an
  * `aggregate` step, runs caller-supplied
  * `analyzers` over the resulting profile and a parallel `context` value, ranks
  * + caps the merged suggestion list, and exposes a dismissable view with
@@ -11,9 +11,9 @@
  *
  * **Time-horizon split (vs {@link createRecommendationSystem}):** this primitive
  * covers the *intra-session* shape (re-fired on rule edits, encounter changes,
- * or any caller-defined signal). RecommendationSystem covers the *inter-loop*
- * shape (re-fired by `loop.on('afterRestart')`, picks one configuration to apply
- * next loop). Both surfaces ship; both stay advisory by design.
+ * or any caller-defined signal). RecommendationSystem covers the *inter-cycle*
+ * shape (re-fired by `cycle.on('afterRestart')`, picks one configuration to apply
+ * next cycle). Both surfaces ship; both stay advisory by design.
  *
  * **When to reach for this:**
  * - Multiple independent heuristics each emit zero-or-more suggestions
@@ -21,7 +21,7 @@
  * - Trigger cadence is consumer-driven (rule edits, encounter changes, ticks)
  *
  * **When not to reach for this:**
- * - Between-loop configuration arbitration → use {@link createRecommendationSystem}
+ * - Between-cycle configuration arbitration → use {@link createRecommendationSystem}
  * - Sequencer-driven queue filling → use `createConditionalStrategy`
  * - Weighted top-N selection over a candidate pool → use `createGoalPicker`
  *
@@ -29,12 +29,12 @@
  * dismissal set and last-visible-keys cache. Persistent counters (apply/dismiss
  * tallies) live caller-side as `persistent()` refs.
  *
- * @see {@link createLoopLog} for the canonical history source
- * @see {@link createRecommendationSystem} for the inter-loop sibling
+ * @see {@link createCycleLog} for the canonical history source
+ * @see {@link createRecommendationSystem} for the inter-cycle sibling
  */
 
 import { createEmitHandle, type Emittable } from '@/core/events';
-import type { LoopLog, LoopLogEntry } from './loop-log';
+import type { CycleLog, CycleLogEntry } from './cycle-log';
 
 // === TYPES ===
 
@@ -60,17 +60,17 @@ export interface Suggestion<TPayload = unknown> {
 }
 
 /**
- * History source — either a {@link LoopLog} (canonical case, equivalent to
- * `() => loopLog.history.value`) or a caller-supplied function returning the
+ * History source — either a {@link CycleLog} (canonical case, equivalent to
+ * `() => cycleLog.history.value`) or a caller-supplied function returning the
  * entry list. The function form is the typed path: `TEntry` is inferred from
- * the return type, so consumers don't spell generics. The LoopLog form is the
+ * the return type, so consumers don't spell generics. The CycleLog form is the
  * shorthand for the engine's canonical metric source; entries are
- * loop-log shaped at runtime.
+ * cycle-log shaped at runtime.
  *
  * Read fresh on each `reevaluate()` — pass a stable function reference; the
  * engine doesn't memoize.
  */
-export type HistorySource<TEntry> = LoopLog | (() => readonly TEntry[]);
+export type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[]);
 
 /**
  * Aggregator function — the windowed-history substrate, generic over the
@@ -125,8 +125,8 @@ export type SuggestionRankFn<TPayload> = (
  */
 export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined> {
   /**
-   * History source. Pass a {@link LoopLog} for the canonical engine case
-   * (entries are loop-log shaped) or a function returning the entry list for
+   * History source. Pass a {@link CycleLog} for the canonical engine case
+   * (entries are cycle-log shaped) or a function returning the entry list for
    * BYO history. Function form is the typed path — `TEntry` is inferred from
    * the return type.
    */
@@ -223,7 +223,7 @@ export interface RuleAdvisor<TPayload> {
    * cycle-end ones).
    *
    * Idempotent over identical history + dismissal state. Caller decides when
-   * to invoke (loop afterRestart, rule edits, encounter changes — the
+   * to invoke (cycle afterRestart, rule edits, encounter changes — the
    * canonical triggers).
    */
   reevaluate(trigger?: string): readonly Suggestion<TPayload>[];
@@ -286,7 +286,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * a ranked + dismissable suggestion list.
  *
  * Overloaded so that inference works for both `historySource` shapes — passing
- * a {@link LoopLog} pins `TEntry` to {@link LoopLogEntry}; passing a function
+ * a {@link CycleLog} pins `TEntry` to {@link CycleLogEntry}; passing a function
  * infers `TEntry` from its return type.
  *
  * @param options - History source, aggregate + analyzers, optional context/rank/cap/profile hook
@@ -296,7 +296,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * ```ts
  * // Profile-history advisor with parallel rule-set context (spell-compiler shape):
  * const advisor = createRuleAdvisor({
- *   historySource: loopLog,
+ *   historySource: cycleLog,
  *   context: () => ({ ruleSet: currentRuleSet.value, encounterId: currentEncounterId.value }),
  *   aggregate: (history, ctx) => aggregateRuleProfiles(history, ctx.ruleSet, ctx.encounterId),
  *   analyzers: [
@@ -309,7 +309,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * });
  *
  * // Caller-side trigger wiring with trigger labels:
- * loop.on('afterRestart', () => advisor.reevaluate('cycle'));
+ * cycle.on('afterRestart', () => advisor.reevaluate('cycle'));
  * watch(() => ruleSets.value, () => { advisor.reset(); advisor.reevaluate('edit'); });
  *
  * // Inferred-acceptance only counts edit-triggered drops:
@@ -326,8 +326,11 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * ```
  */
 export function createRuleAdvisor<TProfile, TPayload, TContext = undefined>(
-  options: Omit<RuleAdvisorOptions<LoopLogEntry, TProfile, TPayload, TContext>, 'historySource'> & {
-    historySource: LoopLog;
+  options: Omit<
+    RuleAdvisorOptions<CycleLogEntry, TProfile, TPayload, TContext>,
+    'historySource'
+  > & {
+    historySource: CycleLog;
   },
 ): RuleAdvisor<TPayload>;
 export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(

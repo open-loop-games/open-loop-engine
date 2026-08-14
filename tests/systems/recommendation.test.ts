@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
-import { createLoop } from '@/systems/loop';
-import { createLoopLog } from '@/systems/loop-log';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
 import { createRecommendationSystem } from '@/systems/recommendation';
 import type {
@@ -29,7 +29,7 @@ function createTickManager() {
   };
 }
 
-/** Create a minimal Loop + LoopLog + BestOf stack for testing */
+/** Create a minimal Cycle + CycleLog + BestOf stack for testing */
 function createTestStack(prefix: string) {
   const tick = createTickManager();
 
@@ -37,25 +37,25 @@ function createTestStack(prefix: string) {
   const gold = createResource(bn(0), { displayName: 'Gold' });
   endPersistentContext();
 
-  const loop = createLoop({
-    id: `${prefix}-loop`,
+  const cycle = createCycle({
+    id: `${prefix}-cycle`,
     thingsToReset: [gold],
     registerTick: tick.registerTick,
   });
 
-  const loopLog = createLoopLog({
-    loop,
+  const cycleLog = createCycleLog({
+    cycle,
     metrics: { gold },
   });
 
   const bestOf = createBestOf({
     id: `${prefix}-best`,
     metrics: { gold: { mode: 'absolute' } },
-    loopLog,
+    cycleLog,
     captureStrategy: () => ({ queue: 'test-snapshot' }),
   });
 
-  return { tick, gold, loop, loopLog, bestOf };
+  return { tick, gold, cycle, cycleLog, bestOf };
 }
 
 /** A simple strategy factory for tests */
@@ -81,11 +81,11 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('creates with no strategies; lastRecommendation is null', () => {
-    const { loop, loopLog, bestOf } = createTestStack('basic-empty');
+    const { cycle, cycleLog, bestOf } = createTestStack('basic-empty');
     const recs = createRecommendationSystem({
       id: 'rec-empty',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -97,13 +97,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('pre-registers strategies from options', () => {
-    const { loop, loopLog, bestOf } = createTestStack('basic-pre');
+    const { cycle, cycleLog, bestOf } = createTestStack('basic-pre');
     const s1 = makeStrategy({ id: 'a' });
     const s2 = makeStrategy({ id: 'b' });
     const recs = createRecommendationSystem({
       id: 'rec-pre',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -120,11 +120,11 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('returns null when no strategies are registered', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-none');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-none');
     const recs = createRecommendationSystem({
       id: 'rec-eval-none',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -134,11 +134,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('returns null when no strategies are applicable', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-skip');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-skip');
     const recs = createRecommendationSystem({
       id: 'rec-eval-skip',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -149,11 +149,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('picks the single applicable strategy', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-single');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-single');
     const recs = createRecommendationSystem({
       id: 'rec-eval-single',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -168,11 +168,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('picks the highest-scoring strategy among applicable ones', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-score');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-score');
     const recs = createRecommendationSystem({
       id: 'rec-eval-score',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -188,11 +188,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('first-registered wins on score tie', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-tie');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-tie');
     const recs = createRecommendationSystem({
       id: 'rec-eval-tie',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -207,11 +207,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('skips strategies where canApply returns false', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-filter');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-filter');
     const recs = createRecommendationSystem({
       id: 'rec-eval-filter',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -230,13 +230,13 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('passes getCurrentSnapshot and getState to strategy context', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-ctx');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-ctx');
     let capturedCtx: RecommendationContext | null = null;
 
     const recs = createRecommendationSystem({
       id: 'rec-eval-ctx',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({ loadout: 'fire' }),
       applySnapshot: () => {},
@@ -256,19 +256,19 @@ describe('createRecommendationSystem', () => {
     expect(capturedCtx).not.toBeNull();
     expect(capturedCtx!.currentSnapshot).toEqual({ loadout: 'fire' });
     expect(capturedCtx!.state).toEqual({ goal: 'gold' });
-    expect(capturedCtx!.loopLog).toBe(loopLog);
+    expect(capturedCtx!.cycleLog).toBe(cycleLog);
     expect(capturedCtx!.bestOf).toBe(bestOf);
-    expect(capturedCtx!.loop).toBe(loop);
+    expect(capturedCtx!.cycle).toBe(cycle);
   });
 
   it('defaults state to empty object when getState is not provided', () => {
-    const { loop, loopLog, bestOf } = createTestStack('eval-nostate');
+    const { cycle, cycleLog, bestOf } = createTestStack('eval-nostate');
     let capturedState: Record<string, unknown> = { should: 'not be here' };
 
     const recs = createRecommendationSystem({
       id: 'rec-eval-nostate',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -292,13 +292,13 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('emits recommend event when evaluation produces a winner', () => {
-    const { loop, loopLog, bestOf } = createTestStack('evt-rec');
+    const { cycle, cycleLog, bestOf } = createTestStack('evt-rec');
     const received: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-evt-rec',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -313,13 +313,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('does not emit recommend when no strategy applies', () => {
-    const { loop, loopLog, bestOf } = createTestStack('evt-norec');
+    const { cycle, cycleLog, bestOf } = createTestStack('evt-norec');
     const received: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-evt-norec',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -337,13 +337,13 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('does not call applySnapshot when autoApply is false', () => {
-    const { loop, loopLog, bestOf } = createTestStack('auto-off');
+    const { cycle, cycleLog, bestOf } = createTestStack('auto-off');
     const applySpy = vi.fn();
 
     const recs = createRecommendationSystem({
       id: 'rec-auto-off',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
@@ -356,14 +356,14 @@ describe('createRecommendationSystem', () => {
   });
 
   it('calls applySnapshot and emits apply when autoApply is true', () => {
-    const { loop, loopLog, bestOf } = createTestStack('auto-on');
+    const { cycle, cycleLog, bestOf } = createTestStack('auto-on');
     const applySpy = vi.fn();
     const applyEvents: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-auto-on',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
@@ -381,13 +381,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('does not mutate the already-emitted recommend payload when auto-applying', () => {
-    const { loop, loopLog, bestOf } = createTestStack('auto-clone');
+    const { cycle, cycleLog, bestOf } = createTestStack('auto-clone');
     const recommendEvents: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-auto-clone',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -410,14 +410,14 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('apply() calls applySnapshot on a pending recommendation', () => {
-    const { loop, loopLog, bestOf } = createTestStack('apply-manual');
+    const { cycle, cycleLog, bestOf } = createTestStack('apply-manual');
     const applySpy = vi.fn();
     const applyEvents: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-apply-manual',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
@@ -435,13 +435,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('apply() is a no-op when lastRecommendation is null', () => {
-    const { loop, loopLog, bestOf } = createTestStack('apply-null');
+    const { cycle, cycleLog, bestOf } = createTestStack('apply-null');
     const applySpy = vi.fn();
 
     const recs = createRecommendationSystem({
       id: 'rec-apply-null',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
@@ -452,13 +452,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('apply() is a no-op when recommendation is already applied', () => {
-    const { loop, loopLog, bestOf } = createTestStack('apply-dup');
+    const { cycle, cycleLog, bestOf } = createTestStack('apply-dup');
     const applySpy = vi.fn();
 
     const recs = createRecommendationSystem({
       id: 'rec-apply-dup',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
@@ -478,13 +478,13 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('dismiss() clears lastRecommendation and emits dismiss', () => {
-    const { loop, loopLog, bestOf } = createTestStack('dismiss-ok');
+    const { cycle, cycleLog, bestOf } = createTestStack('dismiss-ok');
     let dismissed = false;
 
     const recs = createRecommendationSystem({
       id: 'rec-dismiss-ok',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -503,13 +503,13 @@ describe('createRecommendationSystem', () => {
   });
 
   it('dismiss() is a no-op when lastRecommendation is already null', () => {
-    const { loop, loopLog, bestOf } = createTestStack('dismiss-null');
+    const { cycle, cycleLog, bestOf } = createTestStack('dismiss-null');
     let dismissed = false;
 
     const recs = createRecommendationSystem({
       id: 'rec-dismiss-null',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -523,17 +523,17 @@ describe('createRecommendationSystem', () => {
   });
 
   // ==========================================================================
-  // Loop wiring
+  // Cycle wiring
   // ==========================================================================
 
-  it('evaluates automatically on loop afterRestart', () => {
-    const { tick, gold, loop, loopLog, bestOf } = createTestStack('wire-auto');
+  it('evaluates automatically on cycle afterRestart', () => {
+    const { tick, gold, cycle, cycleLog, bestOf } = createTestStack('wire-auto');
     const received: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-wire-auto',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -542,24 +542,24 @@ describe('createRecommendationSystem', () => {
 
     recs.on('recommend', (rec) => received.push(rec));
 
-    // Run a loop cycle: start → tick → end
-    loop.run();
+    // Run a cycle cycle: start → tick → end
+    cycle.run();
     addResource(gold, bn(50));
     tick.tick(1);
-    loop.end();
+    cycle.end();
 
     expect(received).toHaveLength(1);
     expect(received[0].strategyId).toBe('auto');
   });
 
   it('dispose() stops auto-evaluation on subsequent restarts', () => {
-    const { tick, gold, loop, loopLog, bestOf } = createTestStack('wire-disp');
+    const { tick, gold, cycle, cycleLog, bestOf } = createTestStack('wire-disp');
     const received: Recommendation[] = [];
 
     const recs = createRecommendationSystem({
       id: 'rec-wire-disp',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -569,10 +569,10 @@ describe('createRecommendationSystem', () => {
     recs.on('recommend', (rec) => received.push(rec));
     recs.dispose();
 
-    loop.run();
+    cycle.run();
     addResource(gold, bn(50));
     tick.tick(1);
-    loop.end();
+    cycle.end();
 
     expect(received).toHaveLength(0);
   });
@@ -582,11 +582,11 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('register() adds a strategy that subsequent evaluate() can select', () => {
-    const { loop, loopLog, bestOf } = createTestStack('reg-add');
+    const { cycle, cycleLog, bestOf } = createTestStack('reg-add');
     const recs = createRecommendationSystem({
       id: 'rec-reg-add',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -600,11 +600,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('register() is a no-op for duplicate ids', () => {
-    const { loop, loopLog, bestOf } = createTestStack('reg-dup');
+    const { cycle, cycleLog, bestOf } = createTestStack('reg-dup');
     const recs = createRecommendationSystem({
       id: 'rec-reg-dup',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -616,11 +616,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('unregister() removes a strategy', () => {
-    const { loop, loopLog, bestOf } = createTestStack('reg-rm');
+    const { cycle, cycleLog, bestOf } = createTestStack('reg-rm');
     const recs = createRecommendationSystem({
       id: 'rec-reg-rm',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -633,11 +633,11 @@ describe('createRecommendationSystem', () => {
   });
 
   it('unregister() is a no-op for unknown ids', () => {
-    const { loop, loopLog, bestOf } = createTestStack('reg-rmnone');
+    const { cycle, cycleLog, bestOf } = createTestStack('reg-rmnone');
     const recs = createRecommendationSystem({
       id: 'rec-reg-rmnone',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -653,11 +653,11 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('lastRecommendation persists via storedRecommendation ref', () => {
-    const { loop, loopLog, bestOf } = createTestStack('persist');
+    const { cycle, cycleLog, bestOf } = createTestStack('persist');
     const recs = createRecommendationSystem({
       id: 'rec-persist',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
@@ -696,13 +696,13 @@ describe('createRecommendationSystem', () => {
   // ==========================================================================
 
   it('evaluate() replaces previous recommendation', () => {
-    const { loop, loopLog, bestOf } = createTestStack('replace');
+    const { cycle, cycleLog, bestOf } = createTestStack('replace');
     let callCount = 0;
 
     const recs = createRecommendationSystem({
       id: 'rec-replace',
-      loop,
-      loopLog,
+      cycle,
+      cycleLog,
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},

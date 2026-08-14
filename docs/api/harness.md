@@ -1,6 +1,6 @@
 # Harness
 
-Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers, run pools. Separable — game code never imports harness; balance tooling does.
+Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers. Separable — game code never imports harness; balance tooling does.
 
 ## Canonical entrypoints
 
@@ -15,7 +15,7 @@ Headless-sim substrate: runners, probes, content walkers, the picker, solvers, p
 
 Reusable in-run trackers (resource peaks, loop finalize, default pack).
 
-- `function createLoopFinalizeTracker(): Analyzer` — Create an Analyzer that counts finalized loops and snapshots the most recent loop's deltas into the summary. `src/harness/analyzers/loop-finalize.ts:28`
+- `function createCycleFinalizeTracker(): Analyzer` — Create an Analyzer that counts finalized cycles and snapshots the most recent cycle's deltas into the summary. `src/harness/analyzers/cycle-finalize.ts:28`
 - `function createResourcePeakTracker(resource: Resource): Analyzer` — Create an Analyzer that samples a single resource every tick and emits `{ peak, final, avg }` at the end of the run. `src/harness/analyzers/resource-peak.ts:68`
 - `function createSeriesTracker(resource: Resource): Analyzer` — Create an Analyzer that records a single resource's value at every tick and emits it as `series:{displayName}.t{i}` (zero-based tick index). `src/harness/analyzers/series.ts:47`
 - `function defaultAnalyzerPack(engine: Engine): Analyzer[]` — Build a fresh analyzer pack for the given engine. `src/harness/analyzers/default-pack.ts:43`
@@ -70,19 +70,6 @@ Seed-sweep runners. `runProbe` collects per-beat termination-time distributions 
 - `interface Waypoint` — One named time-anchored snapshot target. `src/harness/probe/waypoint.ts:22`
 - `interface WaypointProbeConfig<T>` — Configuration for runWaypointProbe. `src/harness/probe/waypoint.ts:42`
 - `interface WaypointSnapshot<T>` — Per-waypoint × per-seed inspector output. `src/harness/probe/waypoint.ts:29`
-
-## RunPool
-
-core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state
-
-- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:199`
-- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:43`
-- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:49`
-- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:146`
-- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:94`
-- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:122`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:83`
-- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:36`
 
 ## Cell-aggregation kernel
 
@@ -143,7 +130,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each tick in a runUntil loop. `src/harness/types.ts:386`
 - `interface Variant<C extends Cell | UntilCell = Cell>` — A named config patch — the generic equivalent of borglike's domain- specific `excludeUpgrades` axis. `src/harness/types.ts:237`
 - `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:63`
-- `interface Analyzer` — Observer attached to a headless run that collects metrics per tick and optionally per finalized loop. `src/primitives/types.ts:193`
+- `interface Analyzer` — Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. `src/primitives/types.ts:193`
 - `interface AnalyzerResult` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:186`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:47`
 - `interface GameStateAccessor` — Read-only view of game state used when evaluating conditions and resolving effects. `src/primitives/types.ts:233`

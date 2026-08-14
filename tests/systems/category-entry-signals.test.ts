@@ -264,7 +264,7 @@ describe('Category.id exposure', () => {
     });
     expect(skill.id).toBe('skills/combat');
 
-    const chal = createChallengeCategory<ChalDef>({ id: 'challenges/loop' });
-    expect(chal.id).toBe('challenges/loop');
+    const chal = createChallengeCategory<ChalDef>({ id: 'challenges/cycle' });
+    expect(chal.id).toBe('challenges/cycle');
   });
 });

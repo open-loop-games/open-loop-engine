@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
-import { createLoop, createLoopLog } from '@/systems';
+import { createCycle, createCycleLog } from '@/systems';
 import { runMatrix } from '@/harness';
 
 /** An analyzer that counts finalize calls. The presence of this counter
@@ -8,32 +8,32 @@ import { runMatrix } from '@/harness';
 function createLoopCounterAnalyzer(): Analyzer {
   let finalized = 0;
   return {
-    name: 'loop-counter',
-    onLoopFinalize: () => {
+    name: 'cycle-counter',
+    onCycleFinalize: () => {
       finalized += 1;
     },
     summarize: (): AnalyzerResult => ({
-      name: 'loop-counter',
+      name: 'cycle-counter',
       metrics: { finalized },
     }),
   };
 }
 
-describe('runMatrix composition with direct LoopLog finalize subscription', () => {
-  it('delivers one onLoopFinalize call per completed loop, isolated per run', () => {
-    // Each cell.tick drives an internally-registered loop tick handler.
-    // The loop ends every 1 second of elapsed time — at dt=0.05, that's
-    // one loop per 20 ticks. 100 ticks ⇒ 5 finalized loops per run.
+describe('runMatrix composition with direct CycleLog finalize subscription', () => {
+  it('delivers one onCycleFinalize call per completed cycle, isolated per run', () => {
+    // Each cell.tick drives an internally-registered cycle tick handler.
+    // The cycle ends every 1 second of elapsed time — at dt=0.05, that's
+    // one cycle per 20 ticks. 100 ticks ⇒ 5 finalized cycles per run.
     let loopTickHandler: ((dt: number) => void) | null = null;
 
     const result = runMatrix({
       cells: [
         {
-          name: 'five-loops',
+          name: 'five-cycles',
           setup: () => {
             const analyzers = [createLoopCounterAnalyzer()];
-            const loop = createLoop({
-              endCondition: () => loop.elapsed.value >= 1.0 - 1e-9,
+            const cycle = createCycle({
+              endCondition: () => cycle.elapsed.value >= 1.0 - 1e-9,
               thingsToReset: [],
               registerTick: (cb) => {
                 loopTickHandler = cb;
@@ -42,12 +42,12 @@ describe('runMatrix composition with direct LoopLog finalize subscription', () =
                 };
               },
             });
-            const log = createLoopLog({ loop, metrics: {} });
+            const log = createCycleLog({ cycle, metrics: {} });
             for (const analyzer of analyzers) {
-              const hook = analyzer.onLoopFinalize;
+              const hook = analyzer.onCycleFinalize;
               if (hook) log.on('finalize', (entry) => hook(entry));
             }
-            loop.run();
+            cycle.run();
             return analyzers;
           },
           tick: (dt) => loopTickHandler?.(dt),

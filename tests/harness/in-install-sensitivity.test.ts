@@ -14,8 +14,8 @@ import { describe, it, expect } from 'vitest';
 import {
   addResource,
   applyPerturbation,
-  createLoop,
-  createLoopLog,
+  createCycle,
+  createCycleLog,
   createPickerSnapshot,
   createSensitivityCell,
   ChainRegistryKey,
@@ -24,7 +24,7 @@ import {
   createMultiplicativeModifier,
   createResource,
   defaultAnalyzerPack,
-  LoopLogKey,
+  CycleLogKey,
   runMatrix,
   runSensitivity,
   type Engine,
@@ -213,10 +213,10 @@ describe('in-install sensitivity integration', () => {
     source.stop();
   });
 
-  it('createSensitivityCell auto-binds onLoopFinalize when the engine publishes a LoopLog', () => {
+  it('createSensitivityCell auto-binds onCycleFinalize when the engine publishes a CycleLog', () => {
     // Receipt for the workbench dead-wire fix: defaultAnalyzerPack ships
-    // createLoopFinalizeTracker when LoopLogKey is published, and the cell
-    // setup auto-subscribes any onLoopFinalize hook via log.on('finalize', ...).
+    // createCycleFinalizeTracker when CycleLogKey is published, and the cell
+    // setup auto-subscribes any onCycleFinalize hook via log.on('finalize', ...).
     // Before the auto-bind, this metric was silently zero in every workbench run.
     const TICKS_PER_LOOP = 5;
     const LOOPS = 3;
@@ -224,12 +224,12 @@ describe('in-install sensitivity integration', () => {
 
     function createLoopGoldModule(): EngineModule {
       return {
-        id: 'loop-gold',
+        id: 'cycle-gold',
         install(ctx) {
           const gold = createResource(0, { displayName: GOLD_NAME });
           let tickIndex = 0;
           let loopTickHandler: ((dt: number) => void) | null = null;
-          const loop = createLoop({
+          const cycle = createCycle({
             endCondition: () => tickIndex > 0 && tickIndex % TICKS_PER_LOOP === 0,
             thingsToReset: [gold],
             registerTick: (cb) => {
@@ -239,21 +239,21 @@ describe('in-install sensitivity integration', () => {
               };
             },
           });
-          const log = createLoopLog({ loop, metrics: { gold } });
-          ctx.provide(LoopLogKey, log);
+          const log = createCycleLog({ cycle, metrics: { gold } });
+          ctx.provide(CycleLogKey, log);
           ctx.onTick((dt) => {
             tickIndex += 1;
             addResource(gold, 1);
             loopTickHandler?.(dt);
           });
-          loop.run();
+          cycle.run();
         },
       };
     }
 
     const source = createEngine({
-      gameId: 'loop-receipt-source',
-      persistenceNamespace: `loop-receipt-${Math.random().toString(36).slice(2)}`,
+      gameId: 'cycle-receipt-source',
+      persistenceNamespace: `cycle-receipt-${Math.random().toString(36).slice(2)}`,
       storageAdapter: createMapStorage(),
       persistence: true,
     });
@@ -263,7 +263,7 @@ describe('in-install sensitivity integration', () => {
     const blob = source.saveManager!.exportSave();
 
     const cell = createSensitivityCell({
-      name: 'loop',
+      name: 'cycle',
       saveBlob: blob,
       modules: () => [createLoopGoldModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
@@ -273,7 +273,7 @@ describe('in-install sensitivity integration', () => {
 
     const result = runMatrix({ cells: [cell], seeds: [1] });
 
-    const loopsMetric = result.cells[0]!.aggregate.metrics['loop-finalize.loops'];
+    const loopsMetric = result.cells[0]!.aggregate.metrics['cycle-finalize.cycles'];
     expect(loopsMetric).toBeDefined();
     expect(loopsMetric!.avg).toBe(LOOPS);
 

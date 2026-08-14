@@ -66,13 +66,13 @@ export const TIER_MANIFEST = [
     tier: 'content-systems',
     title: 'Content Systems',
     scope:
-      'The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Loop / Challenge / Zone / Slot / AutomationTiers / LoopLog carry long-arc structure.',
+      'The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.',
     entrypoints: [
       '`createProducerCategory` — buildings/generators whose ownership creates continuous resource flow.',
       '`createPurchasableCategory` — upgrades, gates, capped repeatables, perks, and bought effects in batch.',
       '`createAchievementCategory` — observed milestones and tier ladders that auto-earn.',
       '`createSkillCategory` — XP/level progression surfaces.',
-      '`createLoop`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.',
+      '`createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.',
       '`createActionCategory` — ordered-execution queues with per-execution state machine.',
     ],
     clusters: [
@@ -81,11 +81,12 @@ export const TIER_MANIFEST = [
       'automation',
       'best-of',
       'challenge-category',
+      'cycle',
+      'cycle-log',
       'inventory',
-      'loop',
-      'loop-log',
       'producer-category',
       'purchasable',
+      'run-pool',
       'skill',
       'slot',
       'zone',
@@ -193,7 +194,7 @@ export const TIER_MANIFEST = [
     tier: 'harness',
     title: 'Harness',
     scope:
-      'Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers, run pools. Separable — game code never imports harness; balance tooling does.',
+      'Headless-sim substrate: runners, probes, content walkers, the picker, solvers, perturbation, analyzers. Separable — game code never imports harness; balance tooling does.',
     entrypoints: [
       '`runHeadless` / `runUntil` — deterministic fixed-tick and predicate-bounded simulations.',
       '`replayLive` / `createTickCounter` — replay live-play dt cadence (speed-scaled) deterministically; count sub-ticks for fixed-mode speed-invariance assertions.',
@@ -209,7 +210,6 @@ export const TIER_MANIFEST = [
       'perturbation',
       'picker',
       'probe',
-      'run-pool',
       'runners',
       'solve',
       'types',

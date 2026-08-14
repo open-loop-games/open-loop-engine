@@ -1,12 +1,12 @@
 /**
- * Recommendation system — inter-loop arbitration across registered defs
+ * Recommendation system — inter-cycle arbitration across registered defs
  *
- * Composes LoopLog (per-loop metric history), BestOf (best-of-run records),
- * and Loop (lifecycle events) into a score-based recommendation surface.
+ * Composes CycleLog (per-cycle metric history), BestOf (best-of-run records),
+ * and Cycle (lifecycle events) into a score-based recommendation surface.
  * Registered defs evaluate historical data and propose configurations for
- * the next loop; the system picks the highest-scoring winner.
+ * the next cycle; the system picks the highest-scoring winner.
  *
- * - {@link createRecommendationSystem} — sole factory, wires into Loop lifecycle
+ * - {@link createRecommendationSystem} — sole factory, wires into Cycle lifecycle
  *
  * Key features:
  * - Pluggable def registration with `canApply` / `score` / `recommend`
@@ -15,17 +15,17 @@
  * - Auto-apply mode for full automation (T6 Optimizer pattern)
  * - Advisory mode for surfacing suggestions (T5 Advisor pattern)
  *
- * `RecommendationDef` is the inter-loop sibling of {@link FillStrategy}:
- * FillStrategy picks the next action *within* a loop; recommendation defs
- * pick the configuration *between* loops.
+ * `RecommendationDef` is the inter-cycle sibling of {@link FillStrategy}:
+ * FillStrategy picks the next action *within* a cycle; recommendation defs
+ * pick the configuration *between* cycles.
  *
- * @see {@link createLoopLog} for the per-loop metric source
+ * @see {@link createCycleLog} for the per-cycle metric source
  * @see {@link createBestOf} for per-metric best tracking with snapshots
- * @see {@link createLoop} for the lifecycle this wires into
+ * @see {@link createCycle} for the lifecycle this wires into
  * @see ./recommendation-strategies.ts for built-in def factories
  * @see {@link createRuleAdvisor} for the intra-session sibling — same advisory
  *   shape, but re-fired on consumer signals (rule edits, encounter changes)
- *   instead of `loop.afterRestart`, and emits a ranked list of independent
+ *   instead of `cycle.afterRestart`, and emits a ranked list of independent
  *   suggestions rather than one winning configuration
  */
 
@@ -39,8 +39,8 @@ import {
   type State,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import type { Loop } from './loop';
-import type { LoopLog } from './loop-log';
+import type { Cycle } from './cycle';
+import type { CycleLog } from './cycle-log';
 import type { BestOf } from './best-of';
 
 // === TYPES ===
@@ -50,12 +50,12 @@ import type { BestOf } from './best-of';
  * and `recommend` methods. Built fresh each `evaluate()` call.
  */
 export interface RecommendationContext {
-  /** The LoopLog providing per-loop metric history */
-  loopLog: LoopLog;
+  /** The CycleLog providing per-cycle metric history */
+  cycleLog: CycleLog;
   /** The BestOf providing per-metric best records and snapshots */
   bestOf: BestOf;
-  /** The Loop instance (access count, elapsed, etc.) */
-  loop: Loop;
+  /** The Cycle instance (access count, elapsed, etc.) */
+  cycle: Cycle;
   /** Current game configuration snapshot, from `getCurrentSnapshot()` */
   currentSnapshot: State;
   /** Consumer-provided game state for strategy evaluation, from `getState()` */
@@ -81,7 +81,7 @@ export interface RecommendationRationale {
 
 /** The output of a def's `recommend()` method */
 export interface RecommendationResult {
-  /** The proposed configuration to apply next loop (opaque to the engine) */
+  /** The proposed configuration to apply next cycle (opaque to the engine) */
   snapshot: State;
   /** Structured explanation data */
   rationale: RecommendationRationale;
@@ -159,11 +159,11 @@ export interface RecommendationSystemOptions {
    */
   id?: string;
 
-  /** The Loop whose `afterRestart` event triggers evaluation */
-  loop: Loop;
+  /** The Cycle whose `afterRestart` event triggers evaluation */
+  cycle: Cycle;
 
-  /** The LoopLog providing per-loop metric history */
-  loopLog: LoopLog;
+  /** The CycleLog providing per-cycle metric history */
+  cycleLog: CycleLog;
 
   /**
    * The BestOf providing per-metric best records and snapshots.
@@ -204,7 +204,7 @@ export interface RecommendationSystemOptions {
  * A recommendation system instance — the returned object from
  * {@link createRecommendationSystem}.
  *
- * Evaluates registered defs after each loop restart, picks the
+ * Evaluates registered defs after each cycle restart, picks the
  * highest-scoring applicable one, and either surfaces it as an advisory
  * recommendation or auto-applies it.
  */
@@ -244,7 +244,7 @@ export interface RecommendationSystem {
    *
    * Returns the produced {@link Recommendation} or `null` if no def applied
    * or the BestOf resolver returned `null` (no active context).
-   * Called automatically on `loop.on('afterRestart')` and can also be called manually.
+   * Called automatically on `cycle.on('afterRestart')` and can also be called manually.
    */
   evaluate(): Recommendation | null;
 
@@ -260,7 +260,7 @@ export interface RecommendationSystem {
   /** Subscribe to recommendation system events */
   on: Emittable<RecommendationSystemEvents>['on'];
 
-  /** Unsubscribe from the loop's `afterRestart` event */
+  /** Unsubscribe from the cycle's `afterRestart` event */
   dispose(): void;
 }
 
@@ -319,22 +319,22 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
 
 /**
  * Create a recommendation system that evaluates registered defs after
- * each loop restart and surfaces or auto-applies the winning configuration.
+ * each cycle restart and surfaces or auto-applies the winning configuration.
  *
- * Composes LoopLog (metric history), BestOf (best configs), and Loop
+ * Composes CycleLog (metric history), BestOf (best configs), and Cycle
  * (lifecycle) into a score-based recommendation surface. Defs are the
- * inter-loop sibling of FillStrategy: they pick *what configuration to
- * use next*, not what action to run within a loop.
+ * inter-cycle sibling of FillStrategy: they pick *what configuration to
+ * use next*, not what action to run within a cycle.
  *
- * @param options - Loop/LoopLog/BestOf to compose with, snapshot callbacks, and optional defs
+ * @param options - Cycle/CycleLog/BestOf to compose with, snapshot callbacks, and optional defs
  * @returns A RecommendationSystem with evaluate/apply/dismiss lifecycle and event hooks
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   id: 'advisor',
- *   loop: gameLoop,
- *   loopLog: myLoopLog,
+ *   cycle: gameLoop,
+ *   cycleLog: myCycleLog,
  *   bestOf: myBestOf,
  *   getCurrentSnapshot: () => ({ loadout: currentLoadout.snapshot() }),
  *   applySnapshot: (snap) => currentLoadout.restore(snap.loadout),
@@ -349,7 +349,7 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  *   showAdvisorPanel(rec.rationale.summary, rec.rationale.metrics);
  * });
  *
- * // Optimizer mode (T6): auto-apply best config each loop
+ * // Optimizer mode (T6): auto-apply best config each cycle
  * recs.autoApply.value = true;
  * ```
  */
@@ -359,8 +359,8 @@ export function createRecommendationSystem(
   const autoId = `recSystem_${recSystemCounter++}`;
   const {
     id,
-    loop,
-    loopLog,
+    cycle,
+    cycleLog,
     bestOf,
     getCurrentSnapshot,
     applySnapshot,
@@ -396,9 +396,9 @@ export function createRecommendationSystem(
     const resolved = resolveBestOf();
     if (!resolved) return null;
     return {
-      loopLog,
+      cycleLog,
       bestOf: resolved,
-      loop,
+      cycle,
       currentSnapshot: getCurrentSnapshot(),
       state: getState?.() ?? {},
     };
@@ -451,8 +451,8 @@ export function createRecommendationSystem(
     return rec;
   }
 
-  // --- Loop wiring ---
-  const unsubAfterRestart = loop.on('afterRestart', () => {
+  // --- Cycle wiring ---
+  const unsubAfterRestart = cycle.on('afterRestart', () => {
     evaluate();
   });
 

@@ -12,7 +12,7 @@ export { createSensitivityCell } from './create-sensitivity-cell';
 export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
 export {
   createResourcePeakTracker,
-  createLoopFinalizeTracker,
+  createCycleFinalizeTracker,
   defaultAnalyzerPack,
   createSeriesTracker,
   seriesAnalyzerPack,
@@ -140,8 +140,8 @@ export type {
   LevelDrivenSkill,
   SkillCategory,
   SkillCategoryEntry,
-  LoopLogEntry,
-  LoopLogDelta,
+  CycleLogEntry,
+  CycleLogDelta,
 } from '../systems';
 export type {
   Engine,

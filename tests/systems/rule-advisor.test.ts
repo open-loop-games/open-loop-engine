@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { createRuleAdvisor, type Suggestion } from '@/systems/rule-advisor';
-import { type LoopLog, type LoopLogEntry } from '@/systems/loop-log';
+import { type CycleLog, type CycleLogEntry } from '@/systems/cycle-log';
 
 beforeEach(() => {
   // Stateless primitive — no shared persistent state to reset.
 });
 
 // ----------------------------------------------------------------------------
-// LoopLog stub — covers the LoopLog branch of historySource. Function-form
+// CycleLog stub — covers the CycleLog branch of historySource. Function-form
 // historySource is exercised directly in the function-form tests below.
 // ----------------------------------------------------------------------------
 
-function fakeLoopLog<T = LoopLogEntry>(history: T[] = []): LoopLog {
+function fakeLoopLog<T = CycleLogEntry>(history: T[] = []): CycleLog {
   const h = ref<T[]>(history);
-  return { history: h } as unknown as LoopLog;
+  return { history: h } as unknown as CycleLog;
 }
 
 // ============================================================================
@@ -81,11 +81,11 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
 });
 
 // ============================================================================
-// historySource branches: LoopLog form and function form
+// historySource branches: CycleLog form and function form
 // ============================================================================
 
 describe('createRuleAdvisor — historySource branches', () => {
-  it('reads from a LoopLog when historySource is a LoopLog instance', () => {
+  it('reads from a CycleLog when historySource is a CycleLog instance', () => {
     const log = fakeLoopLog([{ value: 1 }, { value: 2 }]);
     let seen: readonly { value: number }[] = [];
     const advisor = createRuleAdvisor({

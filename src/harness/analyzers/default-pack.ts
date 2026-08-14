@@ -7,8 +7,8 @@
  * - One {@link createResourcePeakTracker} per entry in the engine's
  *   {@link ResourceRegistryKey} — the per-engine resource registry,
  *   auto-populated by every `createResource()` call during install/connect.
- * - A {@link createLoopFinalizeTracker} iff the engine has a canonical
- *   LoopLog published via {@link LoopLogKey}. Games without a loop cadence
+ * - A {@link createCycleFinalizeTracker} iff the engine has a canonical
+ *   CycleLog published via {@link CycleLogKey}. Games without a cycle cadence
  *   skip it automatically.
  *
  * Freshness comes from being called inside each harness `Cell.setup()` —
@@ -19,8 +19,8 @@
 import type { Analyzer } from '@/primitives/types';
 import type { Engine } from '@/engine';
 import { ResourceRegistryKey } from '@/core/registries';
-import { LoopLogKey } from '@/systems/loop-log';
-import { createLoopFinalizeTracker } from './loop-finalize';
+import { CycleLogKey } from '@/systems/cycle-log';
+import { createCycleFinalizeTracker } from './cycle-finalize';
 import { createResourcePeakTracker } from './resource-peak';
 
 /**
@@ -45,8 +45,8 @@ export function defaultAnalyzerPack(engine: Engine): Analyzer[] {
   const pack: Analyzer[] = (registry?.list() ?? []).map((entry) =>
     createResourcePeakTracker(entry.resource),
   );
-  if (engine.tryInject(LoopLogKey) !== undefined) {
-    pack.push(createLoopFinalizeTracker());
+  if (engine.tryInject(CycleLogKey) !== undefined) {
+    pack.push(createCycleFinalizeTracker());
   }
   return pack;
 }

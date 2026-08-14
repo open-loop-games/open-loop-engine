@@ -1,8 +1,8 @@
 /**
- * Built-in recommendation defs — common inter-loop patterns
+ * Built-in recommendation defs — common inter-cycle patterns
  *
  * Sugar factories for the two most common recommendation patterns found
- * across incremental games with loop mechanics:
+ * across incremental games with cycle mechanics:
  *
  * - {@link createBestReplayDef} — "replay the best-known config for this metric"
  *   (Cavernous II loadBestRoute, Melvor Idle combat loadouts)
@@ -31,7 +31,7 @@ export interface BestReplayDefOptions {
   /** Override the def id. Default: `best-replay:${metricKey}` */
   id?: string;
   /**
-   * Minimum completed loops before this def becomes applicable.
+   * Minimum completed cycles before this def becomes applicable.
    * Default: 1 (needs at least one recorded best).
    */
   minLoops?: number;
@@ -82,7 +82,7 @@ function magnitudeScore(x: Decimal): number {
  * so that strategy snapshots are recorded alongside best entries.
  *
  * @param metricKey - The BestOf metric key to optimize for
- * @param options - Optional id override and minimum loop count
+ * @param options - Optional id override and minimum cycle count
  * @returns A {@link RecommendationDef} ready to register
  *
  * @example
@@ -115,7 +115,7 @@ export function createBestReplayDef(
     id: strategyId,
 
     canApply(ctx: RecommendationContext): boolean {
-      if (ctx.loop.count.value < minLoops) return false;
+      if (ctx.cycle.count.value < minLoops) return false;
       return getValidEntry(ctx) !== null;
     },
 
@@ -130,7 +130,7 @@ export function createBestReplayDef(
     recommend(ctx: RecommendationContext) {
       const entry = getValidEntry(ctx)!;
 
-      const lastEntry = ctx.loopLog.history.value[ctx.loopLog.history.value.length - 1];
+      const lastEntry = ctx.cycleLog.history.value[ctx.cycleLog.history.value.length - 1];
       const lastDelta = lastEntry?.deltas.find((d) => d.key === metricKey);
       const current = lastDelta?.delta ?? Decimal.dZero;
       const projected = entry.projected ?? entry.value;
@@ -147,7 +147,7 @@ export function createBestReplayDef(
               delta,
             },
           },
-          summary: `Replay best ${metricKey} config (${entry.value} in ${entry.elapsed.toFixed(1)}s, loop #${entry.loopNumber})`,
+          summary: `Replay best ${metricKey} config (${entry.value} in ${entry.elapsed.toFixed(1)}s, cycle #${entry.cycleNumber})`,
         },
       };
     },
@@ -211,7 +211,7 @@ export function createGoalDef(options: GoalDefOptions): RecommendationDef {
       const entry = getEntry(ctx)!;
       const snapshot = entry.strategySnapshot ?? ctx.currentSnapshot;
 
-      const lastEntry = ctx.loopLog.history.value[ctx.loopLog.history.value.length - 1];
+      const lastEntry = ctx.cycleLog.history.value[ctx.cycleLog.history.value.length - 1];
       const lastDelta = lastEntry?.deltas.find((d) => d.key === metric);
       const current = lastDelta?.delta ?? Decimal.dZero;
       const projected = entry.projected ?? entry.value;

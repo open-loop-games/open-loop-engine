@@ -3,9 +3,9 @@ import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
-import { createLoop } from '@/systems/loop';
-import { createLoopLog } from '@/systems/loop-log';
-import type { LoopLogEntry } from '@/systems/loop-log';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog } from '@/systems/cycle-log';
+import type { CycleLogEntry } from '@/systems/cycle-log';
 import type { Analyzer } from '@/primitives/types';
 import { runHeadless } from '@/core/headless';
 
@@ -26,7 +26,7 @@ function createTickManager() {
   };
 }
 
-describe('createLoopLog', () => {
+describe('createCycleLog', () => {
   // ==========================================================================
   // Delta computation
   // ==========================================================================
@@ -37,10 +37,10 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
-    loop.end();
+    cycle.end();
 
     expect(log.history.value).toHaveLength(1);
     const delta = log.history.value[0].deltas[0];
@@ -54,11 +54,11 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
     addResource(gold, 50);
-    loop.end();
+    cycle.end();
 
     const delta = log.history.value[0].deltas[0];
     expect(delta.start.eq(0)).toBe(true);
@@ -70,14 +70,14 @@ describe('createLoopLog', () => {
     const { registerTick } = createTickManager();
     let counter = 0;
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({
-      loop,
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({
+      cycle,
       metrics: { counter: () => counter },
     });
 
     counter = 100;
-    loop.end();
+    cycle.end();
 
     const delta = log.history.value[0].deltas[0];
     expect(delta.start.eq(0)).toBe(true);
@@ -92,15 +92,15 @@ describe('createLoopLog', () => {
     const permStat = persistent<number>(10);
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [temp], registerTick });
-    const log = createLoopLog({
-      loop,
+    const cycle = createCycle({ thingsToReset: [temp], registerTick });
+    const log = createCycleLog({
+      cycle,
       metrics: { permStat },
     });
 
-    // permStat grows during the loop but is NOT reset
+    // permStat grows during the cycle but is NOT reset
     permStat.value = 25;
-    loop.end();
+    cycle.end();
 
     const delta = log.history.value[0].deltas[0];
     expect(delta.start.eq(10)).toBe(true);
@@ -114,11 +114,11 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
     addResource(gold, 200);
-    loop.end();
+    cycle.end();
 
     // Delta should reflect the 200 gained before reset
     expect(log.history.value[0].deltas[0].delta.eq(200)).toBe(true);
@@ -127,53 +127,53 @@ describe('createLoopLog', () => {
   });
 
   // ==========================================================================
-  // Consecutive loops
+  // Consecutive cycles
   // ==========================================================================
 
-  it('consecutive loops produce independent deltas', () => {
+  it('consecutive cycles produce independent deltas', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-consec');
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
-    // Loop 0: earn 50
+    // Cycle 0: earn 50
     addResource(gold, 50);
-    loop.end();
+    cycle.end();
 
-    // Loop 1: earn 120
+    // Cycle 1: earn 120
     addResource(gold, 120);
-    loop.end();
+    cycle.end();
 
     expect(log.history.value).toHaveLength(2);
     expect(log.history.value[0].deltas[0].delta.eq(50)).toBe(true);
     expect(log.history.value[1].deltas[0].delta.eq(120)).toBe(true);
   });
 
-  it('loopNumber is loop.count before increment', () => {
+  it('cycleNumber is cycle.count before increment', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    loop.end(); // count was 0 at beforeRestart
-    loop.end(); // count was 1 at beforeRestart
+    cycle.end(); // count was 0 at beforeRestart
+    cycle.end(); // count was 1 at beforeRestart
 
-    expect(log.history.value[0].loopNumber).toBe(0);
-    expect(log.history.value[1].loopNumber).toBe(1);
+    expect(log.history.value[0].cycleNumber).toBe(0);
+    expect(log.history.value[1].cycleNumber).toBe(1);
   });
 
-  it('elapsed reflects loop.elapsed at finalize time', () => {
+  it('elapsed reflects cycle.elapsed at finalize time', () => {
     const { registerTick, tick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    loop.run();
+    cycle.run();
     tick(3.5);
-    loop.end();
+    cycle.end();
 
     expect(log.history.value[0].elapsed).toBeCloseTo(3.5);
   });
@@ -185,30 +185,30 @@ describe('createLoopLog', () => {
   it('prunes oldest unpinned beyond maxLogs', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {}, maxLogs: 3 });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {}, maxLogs: 3 });
 
-    for (let i = 0; i < 5; i++) loop.end();
+    for (let i = 0; i < 5; i++) cycle.end();
 
     expect(log.history.value).toHaveLength(3);
-    // Oldest remaining should be loop 2 (loops 0 and 1 pruned)
-    expect(log.history.value[0].loopNumber).toBe(2);
+    // Oldest remaining should be cycle 2 (cycles 0 and 1 pruned)
+    expect(log.history.value[0].cycleNumber).toBe(2);
   });
 
   it('pinned entries survive pruning', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {}, maxLogs: 2 });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {}, maxLogs: 2 });
 
-    loop.end(); // entry 0
+    cycle.end(); // entry 0
     log.pin(0); // pin it
-    loop.end(); // entry 1
-    loop.end(); // entry 2
-    loop.end(); // entry 3 — should prune unpinned, keeping pinned + 2 newest unpinned
+    cycle.end(); // entry 1
+    cycle.end(); // entry 2
+    cycle.end(); // entry 3 — should prune unpinned, keeping pinned + 2 newest unpinned
 
-    // Pinned entry (loop 0) + 2 most recent unpinned
-    expect(log.history.value.some((e) => e.loopNumber === 0 && e.pinned)).toBe(true);
+    // Pinned entry (cycle 0) + 2 most recent unpinned
+    expect(log.history.value.some((e) => e.cycleNumber === 0 && e.pinned)).toBe(true);
     const unpinned = log.history.value.filter((e) => !e.pinned);
     expect(unpinned).toHaveLength(2);
   });
@@ -216,27 +216,27 @@ describe('createLoopLog', () => {
   it('unpin allows entry to be pruned', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {}, maxLogs: 2 });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {}, maxLogs: 2 });
 
-    loop.end(); // entry 0
+    cycle.end(); // entry 0
     log.pin(0);
-    loop.end(); // entry 1
-    loop.end(); // entry 2 — pinned entry survives
+    cycle.end(); // entry 1
+    cycle.end(); // entry 2 — pinned entry survives
 
-    expect(log.history.value.some((e) => e.loopNumber === 0)).toBe(true);
+    expect(log.history.value.some((e) => e.cycleNumber === 0)).toBe(true);
 
     log.unpin(0);
-    loop.end(); // entry 3 — now entry 0 can be pruned
+    cycle.end(); // entry 3 — now entry 0 can be pruned
 
-    expect(log.history.value.some((e) => e.loopNumber === 0)).toBe(false);
+    expect(log.history.value.some((e) => e.cycleNumber === 0)).toBe(false);
   });
 
   it('pin/unpin out-of-bounds are no-ops', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
     // Should not throw
     log.pin(-1);
@@ -257,14 +257,14 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
-    const received: LoopLogEntry[] = [];
+    const received: CycleLogEntry[] = [];
     log.on('finalize', (entry) => received.push(entry));
 
     addResource(gold, 42);
-    loop.end();
+    cycle.end();
 
     expect(received).toHaveLength(1);
     expect(received[0]).toStrictEqual(log.history.value[0]);
@@ -277,8 +277,8 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
 
     let goldAtFinalize: Decimal | null = null;
     log.on('finalize', () => {
@@ -287,7 +287,7 @@ describe('createLoopLog', () => {
     });
 
     addResource(gold, 75);
-    loop.end();
+    cycle.end();
 
     expect(goldAtFinalize!.eq(75)).toBe(true);
   });
@@ -299,15 +299,15 @@ describe('createLoopLog', () => {
   it('dispose stops recording entries', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    loop.end();
+    cycle.end();
     expect(log.history.value).toHaveLength(1);
 
     log.dispose();
-    loop.end();
-    loop.end();
+    cycle.end();
+    cycle.end();
 
     expect(log.history.value).toHaveLength(1);
   });
@@ -319,42 +319,42 @@ describe('createLoopLog', () => {
   it('setContext attaches data to the finalized entry', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
     log.setContext('spell', { id: 'fireball', hits: 3 });
     log.setContext('result', 'success');
-    loop.end();
+    cycle.end();
 
     const entry = log.history.value[0];
     expect(entry.context).toEqual({ spell: { id: 'fireball', hits: 3 }, result: 'success' });
   });
 
-  it('context resets after each loop restart', () => {
+  it('context resets after each cycle restart', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    log.setContext('tag', 'loop-0');
-    loop.end();
+    log.setContext('tag', 'cycle-0');
+    cycle.end();
 
-    // Second loop — no setContext calls
-    loop.end();
+    // Second cycle — no setContext calls
+    cycle.end();
 
-    expect(log.history.value[0].context).toEqual({ tag: 'loop-0' });
+    expect(log.history.value[0].context).toEqual({ tag: 'cycle-0' });
     expect(log.history.value[1].context).toEqual({});
   });
 
   it('setContext overwrites previous value for same key', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
     log.setContext('count', 1);
     log.setContext('count', 5);
-    loop.end();
+    cycle.end();
 
     expect(log.history.value[0].context).toEqual({ count: 5 });
   });
@@ -362,11 +362,11 @@ describe('createLoopLog', () => {
   it('finalized entry context is a snapshot (not a live reference)', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
     log.setContext('val', 'before');
-    loop.end();
+    cycle.end();
 
     // Mutating after finalize should not affect the stored entry
     log.setContext('val', 'after');
@@ -376,10 +376,10 @@ describe('createLoopLog', () => {
   it('entries without setContext calls have empty context', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    loop.end();
+    cycle.end();
     expect(log.history.value[0].context).toEqual({});
   });
 
@@ -390,10 +390,10 @@ describe('createLoopLog', () => {
   it('empty metrics record produces entry with empty deltas', () => {
     const { registerTick } = createTickManager();
 
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
 
-    loop.end();
+    cycle.end();
 
     expect(log.history.value).toHaveLength(1);
     expect(log.history.value[0].deltas).toHaveLength(0);
@@ -405,11 +405,11 @@ describe('createLoopLog', () => {
     const big = createResource(bn(0), { displayName: 'Big' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [big], registerTick });
-    const log = createLoopLog({ loop, metrics: { big } });
+    const cycle = createCycle({ thingsToReset: [big], registerTick });
+    const log = createCycleLog({ cycle, metrics: { big } });
 
     addResource(big, bn('1e308'));
-    loop.end();
+    cycle.end();
 
     expect(log.history.value[0].deltas[0].delta.eq(bn('1e308'))).toBe(true);
   });
@@ -418,18 +418,18 @@ describe('createLoopLog', () => {
   // Analyzer wiring via log.on('finalize', ...)
   // ==========================================================================
 
-  it('log.on(finalize, ...) delivers one onLoopFinalize call per loop over a headless run', () => {
-    const entries: LoopLogEntry[] = [];
+  it('log.on(finalize, ...) delivers one onCycleFinalize call per cycle over a headless run', () => {
+    const entries: CycleLogEntry[] = [];
     const loopAnalyzer: Analyzer = {
-      name: 'loop-counter',
-      onLoopFinalize: (entry) => entries.push(entry as LoopLogEntry),
+      name: 'cycle-counter',
+      onCycleFinalize: (entry) => entries.push(entry as CycleLogEntry),
       summarize: () => ({
-        name: 'loop-counter',
-        metrics: { loops: entries.length },
+        name: 'cycle-counter',
+        metrics: { cycles: entries.length },
       }),
     };
 
-    // Separate tick-only analyzer to verify coexistence with loop-aware analyzers
+    // Separate tick-only analyzer to verify coexistence with cycle-aware analyzers
     let tickCount = 0;
     const tickAnalyzer: Analyzer = {
       name: 'ticker',
@@ -444,46 +444,46 @@ describe('createLoopLog', () => {
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
-    log.on('finalize', (entry) => loopAnalyzer.onLoopFinalize?.(entry));
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
+    log.on('finalize', (entry) => loopAnalyzer.onCycleFinalize?.(entry));
 
-    // Drive 3 loops: each tick adds gold, every 2 ticks end a loop
+    // Drive 3 cycles: each tick adds gold, every 2 ticks end a cycle
     const result = runHeadless({
       setup: () => [loopAnalyzer, tickAnalyzer],
       tick: () => {
         addResource(gold, 10);
-        if (tickCount % 2 === 1) loop.end();
+        if (tickCount % 2 === 1) cycle.end();
       },
       ticks: 6,
     });
 
     expect(entries).toHaveLength(3);
-    expect(entries[0].loopNumber).toBe(0);
+    expect(entries[0].cycleNumber).toBe(0);
     expect(entries[0].deltas[0].delta.eq(20)).toBe(true);
     expect(tickCount).toBe(6);
-    expect(result.analyzerResults[0].metrics.loops).toBe(3);
+    expect(result.analyzerResults[0].metrics.cycles).toBe(3);
     expect(result.analyzerResults[1].metrics.ticks).toBe(6);
   });
 
   it('unsubscribe returned by log.on removes the finalize subscription', () => {
-    const entries: LoopLogEntry[] = [];
+    const entries: CycleLogEntry[] = [];
     const analyzer: Analyzer = {
       name: 'x',
-      onLoopFinalize: (entry) => entries.push(entry as LoopLogEntry),
+      onCycleFinalize: (entry) => entries.push(entry as CycleLogEntry),
       summarize: () => ({ name: 'x', metrics: {} }),
     };
 
     const { registerTick } = createTickManager();
-    const loop = createLoop({ thingsToReset: [], registerTick });
-    const log = createLoopLog({ loop, metrics: {} });
-    const dispose = log.on('finalize', (entry) => analyzer.onLoopFinalize?.(entry));
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    const log = createCycleLog({ cycle, metrics: {} });
+    const dispose = log.on('finalize', (entry) => analyzer.onCycleFinalize?.(entry));
 
-    loop.end();
+    cycle.end();
     expect(entries).toHaveLength(1);
 
     dispose();
-    loop.end();
+    cycle.end();
     expect(entries).toHaveLength(1);
   });
 });

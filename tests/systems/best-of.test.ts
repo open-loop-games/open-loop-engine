@@ -3,8 +3,8 @@ import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
-import { createLoop } from '@/systems/loop';
-import { createLoopLog } from '@/systems/loop-log';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
 import type { BestOfEntry } from '@/systems/best-of';
 
@@ -36,7 +36,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     const entry = bestOf.entries.value.gold;
     expect(entry).not.toBeNull();
@@ -50,11 +50,11 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
-    bestOf.submit({ key: 'gold', value: 50, elapsed: 5, loopNumber: 1 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 50, elapsed: 5, cycleNumber: 1 });
 
     expect(bestOf.entries.value.gold!.value.eq(100)).toBe(true);
-    expect(bestOf.entries.value.gold!.loopNumber).toBe(0);
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(0);
   });
 
   it('higher absolute value replaces best and emits newBest', () => {
@@ -66,8 +66,8 @@ describe('createBestOf', () => {
     const received: { key: string; entry: BestOfEntry }[] = [];
     bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
-    bestOf.submit({ key: 'gold', value: 200, elapsed: 20, loopNumber: 1 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 200, elapsed: 20, cycleNumber: 1 });
 
     expect(bestOf.entries.value.gold!.value.eq(200)).toBe(true);
     expect(received).toHaveLength(2); // both submissions were new bests
@@ -80,10 +80,10 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'perSecond' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 }); // 10/s
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 5, loopNumber: 1 }); // 20/s
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 }); // 10/s
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 5, cycleNumber: 1 }); // 20/s
 
-    expect(bestOf.entries.value.gold!.loopNumber).toBe(1);
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(1);
     expect(bestOf.entries.value.gold!.perSecond.eq(20)).toBe(true);
   });
 
@@ -93,82 +93,82 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'perSecond' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 5, loopNumber: 0 }); // 20/s
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 1 }); // 10/s
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 5, cycleNumber: 0 }); // 20/s
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 1 }); // 10/s
 
-    expect(bestOf.entries.value.gold!.loopNumber).toBe(0);
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(0);
   });
 
   // ==========================================================================
-  // LoopLog integration
+  // CycleLog integration
   // ==========================================================================
 
-  it('auto-subscribes to LoopLog finalize events', () => {
+  it('auto-subscribes to CycleLog finalize events', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-auto');
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
     const bestOf = createBestOf({
       id: 'bo-ll-auto',
       metrics: { gold: { mode: 'absolute' } },
-      loopLog: log,
+      cycleLog: log,
     });
 
-    loop.run();
+    cycle.run();
     addResource(gold, 50);
     tick(5);
-    loop.end();
+    cycle.end();
 
     expect(bestOf.entries.value.gold).not.toBeNull();
     expect(bestOf.entries.value.gold!.value.eq(50)).toBe(true);
   });
 
-  it('ignores LoopLog deltas for unregistered metric keys', () => {
+  it('ignores CycleLog deltas for unregistered metric keys', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('bo-ll-ignore');
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
     const bestOf = createBestOf({
       id: 'bo-ll-ignore',
       metrics: { xp: { mode: 'absolute' } }, // tracks xp, not gold
-      loopLog: log,
+      cycleLog: log,
     });
 
     addResource(gold, 100);
-    loop.end();
+    cycle.end();
 
     expect(bestOf.entries.value.xp).toBeNull();
   });
 
-  it('tracks multiple metrics from a single LoopLog finalize', () => {
+  it('tracks multiple metrics from a single CycleLog finalize', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-multi');
     const gold = createResource(bn(0), { displayName: 'Gold' });
     const xp = createResource(bn(0), { displayName: 'XP' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold, xp], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold, xp } });
+    const cycle = createCycle({ thingsToReset: [gold, xp], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold, xp } });
     const bestOf = createBestOf({
       id: 'bo-ll-multi',
       metrics: {
         gold: { mode: 'absolute' },
         xp: { mode: 'perSecond' },
       },
-      loopLog: log,
+      cycleLog: log,
     });
 
-    loop.run();
+    cycle.run();
     addResource(gold, 100);
     addResource(xp, 50);
     tick(10);
-    loop.end();
+    cycle.end();
 
     expect(bestOf.entries.value.gold!.value.eq(100)).toBe(true);
     expect(bestOf.entries.value.xp!.perSecond.eq(5)).toBe(true);
@@ -189,7 +189,7 @@ describe('createBestOf', () => {
       },
     });
 
-    bestOf.submit({ key: 'strength', value: 200, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'strength', value: 200, elapsed: 10, cycleNumber: 0 });
 
     const entry = bestOf.entries.value.strength!;
     expect(entry.value.eq(200)).toBe(true);
@@ -202,7 +202,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     expect(bestOf.entries.value.gold!.projected).toBeUndefined();
   });
 
@@ -222,16 +222,16 @@ describe('createBestOf', () => {
     });
 
     // sqrt(100) = 10
-    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, cycleNumber: 0 });
     // sqrt(81) = 9 — lower projected, should NOT replace
-    bestOf.submit({ key: 'strength', value: 81, elapsed: 5, loopNumber: 1 });
+    bestOf.submit({ key: 'strength', value: 81, elapsed: 5, cycleNumber: 1 });
 
-    expect(bestOf.entries.value.strength!.loopNumber).toBe(0);
+    expect(bestOf.entries.value.strength!.cycleNumber).toBe(0);
 
     // sqrt(121) = 11 — higher projected, SHOULD replace
-    bestOf.submit({ key: 'strength', value: 121, elapsed: 20, loopNumber: 2 });
+    bestOf.submit({ key: 'strength', value: 121, elapsed: 20, cycleNumber: 2 });
 
-    expect(bestOf.entries.value.strength!.loopNumber).toBe(2);
+    expect(bestOf.entries.value.strength!.cycleNumber).toBe(2);
   });
 
   it('compareBy: observed ignores projection for ranking', () => {
@@ -246,11 +246,11 @@ describe('createBestOf', () => {
       },
     });
 
-    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, cycleNumber: 0 });
     // Higher observed value wins even though projected might differ
-    bestOf.submit({ key: 'strength', value: 200, elapsed: 10, loopNumber: 1 });
+    bestOf.submit({ key: 'strength', value: 200, elapsed: 10, cycleNumber: 1 });
 
-    expect(bestOf.entries.value.strength!.loopNumber).toBe(1);
+    expect(bestOf.entries.value.strength!.cycleNumber).toBe(1);
     // But projected is still stored for display
     expect(bestOf.entries.value.strength!.projected!.eq(Decimal.sqrt(200))).toBe(true);
   });
@@ -267,11 +267,11 @@ describe('createBestOf', () => {
     });
 
     // projected=10, elapsed=10 → 1/s
-    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'strength', value: 100, elapsed: 10, cycleNumber: 0 });
     // projected=10, elapsed=5 → 2/s — wins on projected per second
-    bestOf.submit({ key: 'strength', value: 100, elapsed: 5, loopNumber: 1 });
+    bestOf.submit({ key: 'strength', value: 100, elapsed: 5, cycleNumber: 1 });
 
-    expect(bestOf.entries.value.strength!.loopNumber).toBe(1);
+    expect(bestOf.entries.value.strength!.cycleNumber).toBe(1);
   });
 
   // ==========================================================================
@@ -284,7 +284,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     bestOf.invalidate('gold');
 
     const entry = bestOf.entries.value.gold!;
@@ -298,9 +298,9 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     bestOf.invalidate('gold');
-    bestOf.submit({ key: 'gold', value: 1, elapsed: 10, loopNumber: 1 }); // worse value, but stale
+    bestOf.submit({ key: 'gold', value: 1, elapsed: 10, cycleNumber: 1 }); // worse value, but stale
 
     expect(bestOf.entries.value.gold!.value.eq(1)).toBe(true);
     expect(bestOf.entries.value.gold!.status).toBe('valid');
@@ -312,8 +312,8 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' }, xp: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
-    bestOf.submit({ key: 'xp', value: 50, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    bestOf.submit({ key: 'xp', value: 50, elapsed: 10, cycleNumber: 0 });
     bestOf.invalidateAll();
 
     expect(bestOf.entries.value.gold!.status).toBe('stale');
@@ -326,7 +326,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     bestOf.clear('gold');
 
     expect(bestOf.entries.value.gold).toBeNull();
@@ -338,8 +338,8 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' }, xp: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
-    bestOf.submit({ key: 'xp', value: 50, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    bestOf.submit({ key: 'xp', value: 50, elapsed: 10, cycleNumber: 0 });
     bestOf.clearAll();
 
     expect(bestOf.entries.value.gold).toBeNull();
@@ -358,7 +358,7 @@ describe('createBestOf', () => {
       captureStrategy: capture,
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     expect(capture).toHaveBeenCalledOnce();
     expect(bestOf.entries.value.gold!.strategySnapshot).toEqual({ queue: ['mine', 'smelt'] });
@@ -370,7 +370,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     expect(bestOf.entries.value.gold!.strategySnapshot).toBeUndefined();
   });
@@ -387,7 +387,7 @@ describe('createBestOf', () => {
       key: 'gold',
       value: 100,
       elapsed: 10,
-      loopNumber: 0,
+      cycleNumber: 0,
       strategySnapshot: { queue: ['manual'] },
     });
 
@@ -405,7 +405,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: bn('1.5e308'), elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: bn('1.5e308'), elapsed: 10, cycleNumber: 0 });
 
     const entry = bestOf.entries.value.gold!;
     expect(entry.value.eq(bn('1.5e308'))).toBe(true);
@@ -425,7 +425,7 @@ describe('createBestOf', () => {
     const received: { key: string; entry: BestOfEntry }[] = [];
     bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     expect(received).toHaveLength(1);
     expect(received[0].key).toBe('gold');
@@ -438,12 +438,12 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     const received: unknown[] = [];
     bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
 
-    bestOf.submit({ key: 'gold', value: 50, elapsed: 5, loopNumber: 1 });
+    bestOf.submit({ key: 'gold', value: 50, elapsed: 5, cycleNumber: 1 });
 
     expect(received).toHaveLength(0);
   });
@@ -454,13 +454,13 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'absolute' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     bestOf.invalidate('gold');
 
     const received: unknown[] = [];
     bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
 
-    bestOf.submit({ key: 'gold', value: 1, elapsed: 10, loopNumber: 1 });
+    bestOf.submit({ key: 'gold', value: 1, elapsed: 10, cycleNumber: 1 });
 
     expect(received).toHaveLength(1);
   });
@@ -475,7 +475,7 @@ describe('createBestOf', () => {
       metrics: { gold: { mode: 'perSecond' } },
     });
 
-    bestOf.submit({ key: 'gold', value: 100, elapsed: 0, loopNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 0, cycleNumber: 0 });
 
     expect(bestOf.entries.value.gold!.perSecond.eq(Infinity)).toBe(true);
   });
@@ -489,33 +489,33 @@ describe('createBestOf', () => {
     const received: unknown[] = [];
     bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
 
-    bestOf.submit({ key: 'silver', value: 100, elapsed: 10, loopNumber: 0 });
+    bestOf.submit({ key: 'silver', value: 100, elapsed: 10, cycleNumber: 0 });
 
     expect(received).toHaveLength(0);
   });
 
-  it('dispose stops auto-tracking from LoopLog', () => {
+  it('dispose stops auto-tracking from CycleLog', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('bo-dispose');
     const gold = createResource(bn(0), { displayName: 'Gold' });
     endPersistentContext();
 
-    const loop = createLoop({ thingsToReset: [gold], registerTick });
-    const log = createLoopLog({ loop, metrics: { gold } });
+    const cycle = createCycle({ thingsToReset: [gold], registerTick });
+    const log = createCycleLog({ cycle, metrics: { gold } });
     const bestOf = createBestOf({
       id: 'bo-dispose',
       metrics: { gold: { mode: 'absolute' } },
-      loopLog: log,
+      cycleLog: log,
     });
 
     addResource(gold, 50);
-    loop.end();
+    cycle.end();
     expect(bestOf.entries.value.gold!.value.eq(50)).toBe(true);
 
     bestOf.dispose();
 
     addResource(gold, 200);
-    loop.end();
+    cycle.end();
     // Still 50 — disposed, so the second finalize was not tracked
     expect(bestOf.entries.value.gold!.value.eq(50)).toBe(true);
   });

@@ -1,18 +1,18 @@
 /**
- * LoopLog system — per-loop metric delta recording
+ * CycleLog system — per-cycle metric delta recording
  *
- * Records the change in each registered metric across a single loop,
+ * Records the change in each registered metric across a single cycle,
  * building a ring buffer of entries for analytics and UI.
  *
- * - {@link createLoopLog} — sole factory, wires into Loop lifecycle events
+ * - {@link createCycleLog} — sole factory, wires into Cycle lifecycle events
  *
  * Key features:
  * - Explicit metric registration (Persistent refs or getter functions)
- * - Snapshot at loop start, delta computed before restart
+ * - Snapshot at cycle start, delta computed before restart
  * - Ring buffer with configurable capacity and per-entry pinning
  * - `finalize` event for downstream consumers (e.g. best-of tracking)
  *
- * @see {@link createLoop} for the Loop lifecycle this composes with
+ * @see {@link createCycle} for the Cycle lifecycle this composes with
  * @see {@link createRetentionPolicy} for a similar snapshot/restore pattern
  */
 
@@ -21,33 +21,35 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { isPersistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { InjectionKey } from '@/primitives/types';
-import type { Loop } from './loop';
+import type { Cycle } from './cycle';
 
 // === TYPES ===
 
 /**
  * Opt-in discovery key for introspection tools (sim, balance workbench,
- * devtools). Games that maintain a canonical LoopLog publish it during
+ * devtools). Games that maintain a canonical CycleLog publish it during
  * `install()` or `connect()`:
  *
  * ```ts
- * const log = createLoopLog({ loop, metrics });
- * context.provide(LoopLogKey, log);
+ * const log = createCycleLog({ cycle, metrics });
+ * context.provide(CycleLogKey, log);
  * ```
  *
- * Consumers read via `engine.tryInject(LoopLogKey)`. Absent when the game
- * doesn't use a loop cadence — discovery tools must handle `undefined`.
+ * Consumers read via `engine.tryInject(CycleLogKey)`. Absent when the game
+ * doesn't use a cycle cadence — discovery tools must handle `undefined`.
  * Sibling to `CategoriesKey`: a convention, not engine machinery.
  */
-export const LoopLogKey: InjectionKey<LoopLog> = Symbol('engine:loop-log') as InjectionKey<LoopLog>;
+export const CycleLogKey: InjectionKey<CycleLog> = Symbol(
+  'engine:cycle-log',
+) as InjectionKey<CycleLog>;
 
-/** Configuration for {@link createLoopLog} */
-export interface LoopLogOptions {
-  /** The Loop instance whose lifecycle drives snapshot/diff timing */
-  loop: Loop;
+/** Configuration for {@link createCycleLog} */
+export interface CycleLogOptions {
+  /** The Cycle instance whose lifecycle drives snapshot/diff timing */
+  cycle: Cycle;
 
   /**
-   * Named metrics to record each loop. Each value is either a Persistent ref
+   * Named metrics to record each cycle. Each value is either a Persistent ref
    * (read via `.value`) or a getter function (called each snapshot).
    * Use getters for computed quantities not stored in persistent refs.
    */
@@ -57,8 +59,8 @@ export interface LoopLogOptions {
   maxLogs?: number;
 }
 
-/** Per-metric change recorded during a single loop */
-export interface LoopLogDelta {
+/** Per-metric change recorded during a single cycle */
+export interface CycleLogDelta {
   key: string;
   start: Decimal;
   end: Decimal;
@@ -66,39 +68,39 @@ export interface LoopLogDelta {
   delta: Decimal;
 }
 
-/** A single loop's recorded outcome */
-export interface LoopLogEntry {
-  /** Loop number at finalize time (loop.count before increment) */
-  loopNumber: number;
+/** A single cycle's recorded outcome */
+export interface CycleLogEntry {
+  /** Cycle number at finalize time (cycle.count before increment) */
+  cycleNumber: number;
   /** Elapsed time in seconds at finalize time */
   elapsed: number;
   timestamp: number;
-  deltas: LoopLogDelta[];
-  /** Consumer-populated structured annotations from the loop */
+  deltas: CycleLogDelta[];
+  /** Consumer-populated structured annotations from the cycle */
   context: Record<string, unknown>;
   pinned: boolean;
 }
 
-/** Events emitted by a {@link LoopLog} instance */
-export interface LoopLogEvents {
+/** Events emitted by a {@link CycleLog} instance */
+export interface CycleLogEvents {
   /** Fired after deltas are computed and the entry is pushed to history */
-  finalize: (entry: LoopLogEntry) => void;
+  finalize: (entry: CycleLogEntry) => void;
 }
 
 /**
- * A LoopLog instance — the returned object from {@link createLoopLog}.
+ * A CycleLog instance — the returned object from {@link createCycleLog}.
  *
- * Subscribes to a Loop's `beforeRestart`/`afterRestart` events to record
- * per-loop metric deltas in a reactive ring buffer.
+ * Subscribes to a Cycle's `beforeRestart`/`afterRestart` events to record
+ * per-cycle metric deltas in a reactive ring buffer.
  */
-export interface LoopLog {
+export interface CycleLog {
   /** Reactive history buffer — newest entry is last */
-  readonly history: Ref<LoopLogEntry[]>;
-  /** Subscribe to LoopLog events */
-  on: Emittable<LoopLogEvents>['on'];
+  readonly history: Ref<CycleLogEntry[]>;
+  /** Subscribe to CycleLog events */
+  on: Emittable<CycleLogEvents>['on'];
   /**
-   * Attach a named annotation to the current loop's context.
-   * Context resets each loop (on afterRestart) and is captured into the
+   * Attach a named annotation to the current cycle's context.
+   * Context resets each cycle (on afterRestart) and is captured into the
    * finalized entry. Calling with the same key overwrites the previous value.
    */
   setContext(key: string, value: unknown): void;
@@ -106,7 +108,7 @@ export interface LoopLog {
   pin(index: number): void;
   /** Unpin an entry by index, allowing it to be pruned */
   unpin(index: number): void;
-  /** Unsubscribe from loop events */
+  /** Unsubscribe from cycle events */
   dispose(): void;
 }
 
@@ -119,21 +121,21 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
 // === FACTORIES ===
 
 /**
- * Create a LoopLog that records per-loop metric deltas from a Loop's lifecycle.
+ * Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle.
  *
- * Snapshots all registered metrics at loop start and computes deltas before
+ * Snapshots all registered metrics at cycle start and computes deltas before
  * each restart. Works for both resetting resources (delta = accumulated value)
- * and permanent stats (delta = growth during the loop).
+ * and permanent stats (delta = growth during the cycle).
  *
- * @param options - Loop to observe, metrics to track, and optional ring buffer size
- * @returns A LoopLog with reactive history, finalize event, and pin/unpin controls
+ * @param options - Cycle to observe, metrics to track, and optional ring buffer size
+ * @returns A CycleLog with reactive history, finalize event, and pin/unpin controls
  *
  * @example
  * ```ts
- * const log = createLoopLog({
- *   loop: gameLoop,
+ * const log = createCycleLog({
+ *   cycle: gameLoop,
  *   metrics: {
- *     gold: goldResource,                    // Persistent ref (resets each loop)
+ *     gold: goldResource,                    // Persistent ref (resets each cycle)
  *     totalStrength: () => strength.base,    // Getter (permanent stat)
  *   },
  *   maxLogs: 15,
@@ -145,11 +147,11 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  * });
  * ```
  */
-export function createLoopLog(options: LoopLogOptions): LoopLog {
-  const { loop, metrics, maxLogs = 10 } = options;
+export function createCycleLog(options: CycleLogOptions): CycleLog {
+  const { cycle, metrics, maxLogs = 10 } = options;
 
-  const history = ref<LoopLogEntry[]>([]);
-  const handle = createEmitHandle<LoopLogEvents>();
+  const history = ref<CycleLogEntry[]>([]);
+  const handle = createEmitHandle<CycleLogEvents>();
 
   // Snapshot state — intentionally ephemeral, no persistent() calls
   let startSnapshot: Record<string, Decimal> = {};
@@ -181,17 +183,17 @@ export function createLoopLog(options: LoopLogOptions): LoopLog {
 
   takeSnapshot();
 
-  const unsubBefore = loop.on('beforeRestart', () => {
-    const deltas: LoopLogDelta[] = [];
+  const unsubBefore = cycle.on('beforeRestart', () => {
+    const deltas: CycleLogDelta[] = [];
     for (const [key, metric] of Object.entries(metrics)) {
       const start = startSnapshot[key] ?? Decimal.dZero;
       const end = readMetric(metric);
       deltas.push({ key, start, end, delta: new Decimal(Decimal.sub(end, start)) });
     }
 
-    const entry: LoopLogEntry = {
-      loopNumber: loop.count.value,
-      elapsed: loop.elapsed.value,
+    const entry: CycleLogEntry = {
+      cycleNumber: cycle.count.value,
+      elapsed: cycle.elapsed.value,
       timestamp: Date.now(),
       deltas,
       context: { ...currentContext },
@@ -203,7 +205,7 @@ export function createLoopLog(options: LoopLogOptions): LoopLog {
     handle.emit('finalize', entry);
   });
 
-  const unsubAfter = loop.on('afterRestart', () => {
+  const unsubAfter = cycle.on('afterRestart', () => {
     takeSnapshot();
     currentContext = {};
   });

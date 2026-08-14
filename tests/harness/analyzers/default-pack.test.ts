@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createEngine } from '@/index';
 import type { EngineModule, EngineConfig } from '@/index';
 import { createResource } from '@/core/resource';
-import { createLoop } from '@/systems/loop';
-import { createLoopLog, LoopLogKey } from '@/systems/loop-log';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog, CycleLogKey } from '@/systems/cycle-log';
 import { defaultAnalyzerPack } from '@/harness/analyzers/default-pack';
 
 // Helper: wrap a top-level resource-creation closure in an EngineModule so it
@@ -44,18 +44,18 @@ describe('defaultAnalyzerPack', () => {
     engine.stop();
   });
 
-  it('appends a loop-finalize tracker when a LoopLog is published via LoopLogKey', () => {
+  it('appends a cycle-finalize tracker when a CycleLog is published via CycleLogKey', () => {
     const mod: EngineModule = {
       id: 'game',
       install(ctx) {
         createResource(0, { displayName: 'gold' });
-        const loop = createLoop({
+        const cycle = createCycle({
           endCondition: () => false,
           thingsToReset: [],
           registerTick: () => () => {},
         });
-        const log = createLoopLog({ loop, metrics: {} });
-        ctx.provide(LoopLogKey, log);
+        const log = createCycleLog({ cycle, metrics: {} });
+        ctx.provide(CycleLogKey, log);
       },
     };
     const engine = testEngine('pack-looplog');
@@ -64,12 +64,12 @@ describe('defaultAnalyzerPack', () => {
 
     const pack = defaultAnalyzerPack(engine);
     const names = pack.map((a) => a.name);
-    expect(names).toContain('loop-finalize');
+    expect(names).toContain('cycle-finalize');
     expect(names).toContain('resource-peak:gold');
     engine.stop();
   });
 
-  it('omits the loop-finalize tracker when no LoopLog is published', () => {
+  it('omits the cycle-finalize tracker when no CycleLog is published', () => {
     const engine = testEngine('pack-no-looplog');
     engine.use(resourceModule('gold-mod', () => createResource(0, { displayName: 'gold' })));
     engine.start();

@@ -56,7 +56,7 @@ prestige and layer mechanics
 - `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:135`
 - `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:162`
 - `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:59`
-- `type ResetScope = string | ScopedReset` — A reset scope entry: either a module ID (string) resolved via the persistent ref registry, or another Reset/Loop whose resolved scope is unioned in. `src/systems/reset.ts:54`
+- `type ResetScope = string | ScopedReset` — A reset scope entry: either a module ID (string) resolved via the persistent ref registry, or another Reset/Cycle whose resolved scope is unioned in. `src/systems/reset.ts:54`
 - `interface ScopedReset` — Any object exposing a resolved set of persistent refs for composable reset scope. `src/systems/reset.ts:46`
 
 ## Resettable protocol

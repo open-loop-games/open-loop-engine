@@ -1,27 +1,27 @@
 /**
  * BestOf tracker — per-metric best-of-run recording
  *
- * Tracks which loop run produced the best outcome for each registered metric,
+ * Tracks which cycle run produced the best outcome for each registered metric,
  * with optional strategy snapshot capture for reproducibility.
  *
- * - {@link createBestOf} — sole factory, optionally wires into LoopLog finalize events
+ * - {@link createBestOf} — sole factory, optionally wires into CycleLog finalize events
  *
  * Key features:
  * - Declared metrics with configurable comparison mode (absolute or per-second)
  * - Optional projection functions to estimate permanent gain from observed deltas
- * - Automatic tracking via LoopLog integration or manual submit()
+ * - Automatic tracking via CycleLog integration or manual submit()
  * - Strategy snapshot capture for recording winning configurations
  * - Explicit invalidation with stale state preservation
  * - Persistent storage across sessions via persistent()
  *
- * @see {@link createLoopLog} for the delta source this composes with
+ * @see {@link createCycleLog} for the delta source this composes with
  */
 
 import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { persistent, withPersistentContext, type State } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import type { LoopLog, LoopLogEntry } from './loop-log';
+import type { CycleLog, CycleLogEntry } from './cycle-log';
 
 // === TYPES ===
 
@@ -57,8 +57,8 @@ export interface BestOfMetricDef {
 
   /**
    * When set (and > 0), the stored incumbent's comparison value decays with
-   * age measured in loop count: every `recencyHalfLifeLoops` loops that pass
-   * between the incumbent's loop and the current candidate's loop halve its
+   * age measured in cycle count: every `recencyHalfLifeLoops` cycles that pass
+   * between the incumbent's cycle and the current candidate's cycle halve its
    * effective value. The candidate is always treated as fresh (no decay).
    *
    * Intended for "recency bias" features where the advisor should favor
@@ -79,10 +79,10 @@ export interface BestOfEntry {
   perSecond: Decimal;
   /** Projected permanent gain, if a projection function was provided */
   projected: Decimal | undefined;
-  /** Loop duration in seconds */
+  /** Cycle duration in seconds */
   elapsed: number;
-  /** Which loop number produced this */
-  loopNumber: number;
+  /** Which cycle number produced this */
+  cycleNumber: number;
   /** When this record was set (Unix ms) */
   timestamp: number;
   /** Consumer-provided opaque configuration snapshot, or undefined */
@@ -97,7 +97,7 @@ interface SerializedBestOfEntry {
   perSecond: string;
   projected: string | undefined;
   elapsed: number;
-  loopNumber: number;
+  cycleNumber: number;
   timestamp: number;
   strategySnapshot: State | undefined;
   status: BestOfStatus;
@@ -111,8 +111,8 @@ export interface BestOfCandidate {
   value: DecimalSource;
   /** Elapsed time in seconds */
   elapsed: number;
-  /** Loop number */
-  loopNumber: number;
+  /** Cycle number */
+  cycleNumber: number;
   /** Override for strategy snapshot (takes precedence over captureStrategy) */
   strategySnapshot?: State;
 }
@@ -131,8 +131,8 @@ export interface BestOfOptions {
   /** Metric definitions: which keys to track and how to compare them */
   metrics: Record<string, BestOfMetricDef>;
 
-  /** Auto-subscribe to a LoopLog's finalize event for automatic tracking */
-  loopLog?: LoopLog;
+  /** Auto-subscribe to a CycleLog's finalize event for automatic tracking */
+  cycleLog?: CycleLog;
 
   /** Called to capture the current strategy/config when a new best is recorded */
   captureStrategy?: () => State;
@@ -141,8 +141,8 @@ export interface BestOfOptions {
 /**
  * A BestOf instance — the returned object from {@link createBestOf}.
  *
- * Tracks per-metric best loop outcomes with comparison, invalidation,
- * and optional LoopLog integration.
+ * Tracks per-metric best cycle outcomes with comparison, invalidation,
+ * and optional CycleLog integration.
  */
 export interface BestOf {
   /** Reactive map of current best per metric key (null if no best recorded) */
@@ -162,14 +162,14 @@ export interface BestOf {
   /**
    * Runtime override for incumbent recency decay, applied to every metric
    * on this instance. Pass a positive number to enable age-based decay
-   * (half-life in loop count), or `undefined` to clear the override and
+   * (half-life in cycle count), or `undefined` to clear the override and
    * fall back to each metric's static `recencyHalfLifeLoops` config.
    *
    * Useful for toggling decay at runtime without mutating shared metric
    * config objects.
    */
   setRecencyHalfLifeLoops(halfLifeLoops: number | undefined): void;
-  /** Unsubscribe from LoopLog if connected */
+  /** Unsubscribe from CycleLog if connected */
   dispose(): void;
 }
 
@@ -181,7 +181,7 @@ function serialize(entry: BestOfEntry): SerializedBestOfEntry {
     perSecond: entry.perSecond.toString(),
     projected: entry.projected?.toString(),
     elapsed: entry.elapsed,
-    loopNumber: entry.loopNumber,
+    cycleNumber: entry.cycleNumber,
     timestamp: entry.timestamp,
     strategySnapshot: entry.strategySnapshot,
     status: entry.status,
@@ -194,7 +194,7 @@ function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
     perSecond: new Decimal(raw.perSecond),
     projected: raw.projected != null ? new Decimal(raw.projected) : undefined,
     elapsed: raw.elapsed,
-    loopNumber: raw.loopNumber,
+    cycleNumber: raw.cycleNumber,
     timestamp: raw.timestamp,
     strategySnapshot: raw.strategySnapshot,
     status: raw.status,
@@ -209,13 +209,13 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
 // === FACTORIES ===
 
 /**
- * Create a BestOf tracker that records the best loop outcome per metric.
+ * Create a BestOf tracker that records the best cycle outcome per metric.
  *
- * Compares each new loop result against the stored best and replaces it when
- * the new result wins. Supports both automatic tracking via LoopLog and manual
+ * Compares each new cycle result against the stored best and replaces it when
+ * the new result wins. Supports both automatic tracking via CycleLog and manual
  * submission for custom metric sources.
  *
- * @param options - Persistence ID, metric definitions, optional LoopLog and strategy capture
+ * @param options - Persistence ID, metric definitions, optional CycleLog and strategy capture
  * @returns A BestOf with reactive entries, submit/invalidate/clear API, and newBest event
  *
  * @example
@@ -226,7 +226,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  *     gold: { mode: 'perSecond' },
  *     xp: { mode: 'absolute' },
  *   },
- *   loopLog: myLoopLog,
+ *   cycleLog: myCycleLog,
  *   captureStrategy: () => ({ queue: actionQueue.serialize() }),
  * });
  *
@@ -236,7 +236,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  * ```
  */
 export function createBestOf(options: BestOfOptions): BestOf {
-  const { id, metrics, loopLog, captureStrategy } = options;
+  const { id, metrics, cycleLog, captureStrategy } = options;
 
   // --- Reactive state ---
   const store = withPersistentContext(id, () =>
@@ -267,9 +267,9 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
   /**
    * Decay the incumbent's comparison value by its age. Age is measured in
-   * loops between the incumbent and the current candidate. Returns the
+   * cycles between the incumbent and the current candidate. Returns the
    * original value unchanged when no half-life is configured or the age
-   * is non-positive (candidate from same or earlier loop — shouldn't happen
+   * is non-positive (candidate from same or earlier cycle — shouldn't happen
    * in practice, but clamped defensively).
    */
   function applyRecencyDecay(
@@ -299,7 +299,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
       perSecond: Decimal;
       projected: Decimal | undefined;
       elapsed: number;
-      loopNumber: number;
+      cycleNumber: number;
     },
     existing: SerializedBestOfEntry,
     metricDef: BestOfMetricDef,
@@ -315,8 +315,8 @@ export function createBestOf(options: BestOfOptions): BestOf {
     );
     const existingVal = applyRecencyDecay(
       rawExistingVal,
-      existing.loopNumber,
-      candidate.loopNumber,
+      existing.cycleNumber,
+      candidate.cycleNumber,
       resolveRecencyHalfLife(metricDef),
     );
 
@@ -354,7 +354,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
           perSecond: candidatePS,
           projected,
           elapsed: candidate.elapsed,
-          loopNumber: candidate.loopNumber,
+          cycleNumber: candidate.cycleNumber,
         },
         existing,
         metricDef,
@@ -371,7 +371,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
       perSecond: candidatePS,
       projected,
       elapsed: candidate.elapsed,
-      loopNumber: candidate.loopNumber,
+      cycleNumber: candidate.cycleNumber,
       timestamp: Date.now(),
       strategySnapshot: snapshot,
       status: 'valid',
@@ -381,20 +381,20 @@ export function createBestOf(options: BestOfOptions): BestOf {
     handle.emit('newBest', candidate.key, entry);
   }
 
-  function handleFinalize(logEntry: LoopLogEntry): void {
+  function handleFinalize(logEntry: CycleLogEntry): void {
     for (const delta of logEntry.deltas) {
       if (!(delta.key in metrics)) continue;
       trySubmit({
         key: delta.key,
         value: delta.delta,
         elapsed: logEntry.elapsed,
-        loopNumber: logEntry.loopNumber,
+        cycleNumber: logEntry.cycleNumber,
       });
     }
   }
 
-  // --- LoopLog integration ---
-  const unsubLoopLog = loopLog?.on('finalize', handleFinalize);
+  // --- CycleLog integration ---
+  const unsubCycleLog = cycleLog?.on('finalize', handleFinalize);
 
   // --- Public API ---
   return {
@@ -439,7 +439,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
     },
 
     dispose() {
-      unsubLoopLog?.();
+      unsubCycleLog?.();
     },
   };
 }
