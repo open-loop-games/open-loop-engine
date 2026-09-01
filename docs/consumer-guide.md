@@ -43,7 +43,7 @@ The `map*` function is where your game's definition shape meets the engine's opt
 
 What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll` / `patch`), and per-def lifecycle. Mods extend definitions via `registry.patch()` without touching the original module.
 
-**Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without install-time coupling. No publishing step; reading is opt-in. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
+**Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without importing the module that declared it. No publishing step; reading is opt-in. This is about who can *read* your content, not about where it may be constructed: the registry, like every other ambient handle, is only wired during `install()` / `connect()`. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
 
 **Predicate-gated purchasables.** A purchasable's shape is its requirements, not its name. Swap `createCostRequirement` for a predicate requirement and the same primitive becomes an unlock — no cost charged, the `active` ref flips when the requirement is met (pair with `setupSweepAutoPurchase` to auto-flip on the first true tick). Progression gates, tier ladders, era unlocks, and visibility flags all read through the one accessor — `category.getPurchasable(id)?.active.value` — with no parallel visibility store to keep in sync.
 
@@ -51,6 +51,24 @@ Two predicate-requirement forms, in preference order:
 
 - `createGateRequirement({ gate })` — the Gate-authored path. Express the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `unlock`, `flag`, `state`, `all`/`any`/`not`) and the adapter lifts it into the Requirement contract. The Gate is the only form that's serializable for save/mod/sim and supports `timeUntilGateFlip` for predictor UIs. Use this whenever the predicate can be expressed as a Gate.
 - `createBooleanRequirement({ requirement })` — the closure escape hatch. Use when the predicate doesn't fit a Gate kind (arbitrary cross-system computation, opaque consumer state). Same runtime shape as the Gate adapter, but the predicate isn't introspectable.
+
+**What a Gate needs wired.** A Gate reads only the handles its kinds use, and the engine resolves them from the ambient scope — so construct gates inside `install()` / `connect()`, and hold the result rather than re-resolving from a player-driven path. `count-gte` and `unlock` resolve entirely through the category registry and need **no accessor at all**; the accessor-backed kinds (`resource-gte`, `cumulative-gte`, `flag`, `state`) need one, and it's yours to supply:
+
+```ts
+const engine = createEngine({
+  gameId: 'my-game',
+  // Only needed if you author accessor-backed Gate kinds. Category-only games skip it.
+  accessor: {
+    getResource: (id) => resourcesById[id]?.value ?? Decimal.dZero,
+    getRate: (id) => ratesById[id] ?? Decimal.dZero,
+    isUnlocked: (id) => flags[id] ?? false,
+    getState: (path) => readPath(gameState, path),
+    ...mutator, // applyResourceOp / setUnlocked / setState, for the effect side
+  },
+});
+```
+
+A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it — at construction for `createGateRequirement`, at first evaluation elsewhere.
 
 ```ts
 const unlocks = createPurchasableCategory<UnlockDef>({
@@ -187,7 +205,7 @@ The trick is when data needs to express predicates over live game state. An achi
 
 `Gate` is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
 
-Gate kinds split into two flavors. **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) are declarative against the accessor with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
+Gate kinds split into two flavors, and the split decides what you have to wire. **Rate-aware leaves** (`resource-gte`, `cumulative-gte`, `state`, `flag`) are declarative against the accessor with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it — these are the kinds that oblige you to supply a `GameStateAccessor`. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` and need no accessor — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
 
 **When NOT to reach for Gate.** When you have direct typed refs in scope, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is about *content definitions* (where the closure can't live anyway) — typed callsites inside engine module code stay typed.
 
