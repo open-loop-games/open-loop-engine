@@ -24,8 +24,15 @@ pnpm test             # Vitest run
 pnpm test:watch       # Vitest watch mode
 pnpm typecheck        # tsc --noEmit
 pnpm build            # tsc + tsc-alias (rewrites @/ paths in dist/) + build:api
-pnpm build:api        # regenerate docs/api/ from source
+pnpm build:api        # regenerate docs/api/ (needs a current dist/ — see below)
 ```
+
+`build:api` takes line anchors from source but signatures and blurbs from
+`dist/index.d.ts`. Run it without a preceding `tsc` and every anchor refreshes
+while the signatures stay at their last-built values — a doc that reads as
+regenerated and isn't. Use `pnpm build` after changing a public signature.
+A symbol also has to reach the root barrel to appear at all: exporting it from
+`src/systems/gate.ts` isn't enough, `src/systems/index.ts` has to re-export it.
 
 ## Commits
 
