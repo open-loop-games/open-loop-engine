@@ -49,9 +49,8 @@ import type { IEffect, GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 import { applyEffect } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
-import { getCurrentResourceRegistry } from '@/core/registries';
 import { getCurrentEngineCategories } from './engine-categories';
-import { evaluateGate, type Gate, type GateRuntime } from './gate';
+import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
 import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
@@ -352,19 +351,11 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   const accessor = optAccessor ?? ambient;
   const mutator = optMutator ?? ambient;
 
-  // Capture the GateRuntime triple at construction time (typically inside an
-  // engine install/connect block). Stays undefined when the full triple isn't
-  // available — Gate-typed fields throw at first eval with a clearer message.
-  const ambientCategoriesAtCreate = getCurrentEngineCategories();
-  const ambientRegistryAtCreate = getCurrentResourceRegistry();
-  const gateRuntime: GateRuntime | undefined =
-    accessor && ambientCategoriesAtCreate && ambientRegistryAtCreate
-      ? {
-          accessor,
-          categories: ambientCategoriesAtCreate,
-          registry: ambientRegistryAtCreate,
-        }
-      : undefined;
+  // Capture the GateRuntime at construction time — challenge defs register and
+  // evaluate long after the ambient scope closes. Handles the runtime doesn't
+  // carry are only an error for a gate kind that reads them, which evaluateGate
+  // checks per kind.
+  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
 
   // Track cleanup functions for each active challenge's scoped overrides/patches
   const activeCleanups = new Map<string, Array<() => void>>();
@@ -373,11 +364,6 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   function evalCondition(cond: boolean | Gate | undefined, fallback: boolean): boolean {
     if (cond === undefined) return fallback;
     if (typeof cond === 'boolean') return cond;
-    if (!gateRuntime) {
-      throw new Error(
-        'createChallengeCategory: a Gate field was supplied but the ambient runtime triple (accessor + categories + registry) was incomplete at category construction time. Call createChallengeCategory inside engine install/connect.',
-      );
-    }
     return evaluateGate(cond, gateRuntime);
   }
 

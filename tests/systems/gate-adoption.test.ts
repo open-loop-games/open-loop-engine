@@ -16,6 +16,7 @@ import {
   createChallengeCategory,
   createEngine,
   createGateRequirement,
+  createPurchasableCategory,
   createReset,
   createResource,
   createCostRequirement,
@@ -356,5 +357,83 @@ describe('createGateRequirement', () => {
     expect(result.beforeBoth).toBe(false);
     expect(result.afterBoth).toBe(true);
     stop();
+  });
+});
+
+// ============================================================================
+// Accessor-less engine — the cold-consumer path (studio/open-loop-engine#23)
+// ============================================================================
+
+/**
+ * Bootstrap without an `accessor` in the engine config — a consumer whose gates
+ * are all category-resolved has no reason to author one, and the type says it's
+ * optional. `install` runs inside the engine's install ambient.
+ */
+function bootstrapAccessorless<T>(install: () => T): { result: T; stop: () => void } {
+  let captured: T;
+  let upgrades: ReturnType<typeof createPurchasableCategory<{ id: string }>>;
+
+  const content: EngineModule = {
+    id: 'content',
+    install() {
+      upgrades = createPurchasableCategory<{ id: string }>({
+        id: 'producers',
+        mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 10 }),
+      });
+      upgrades.register({ id: 'farm' });
+      upgrades.getEntry('farm')!.purchasable.amount.value = new Decimal(5);
+    },
+  };
+
+  const game: EngineModule = {
+    id: 'game',
+    dependencies: ['content'],
+    install() {
+      captured = install();
+    },
+  };
+
+  const engine = createEngine({ gameId: 'test', persistence: false });
+  engine.use(content).use(game);
+  engine.start();
+
+  return { result: captured!, stop: () => engine.stop() };
+}
+
+describe('createGateRequirement — no ambient accessor', () => {
+  it('constructs and satisfies a category-only gate', () => {
+    const { result, stop } = bootstrapAccessorless(() =>
+      createGateRequirement({
+        gate: { kind: 'count-gte', category: 'producers', entity: 'farm', value: 5 },
+        description: '5 farms owned',
+      }),
+    );
+
+    expect(requirementsMet([result])).toBe(true);
+    stop();
+  });
+
+  it('throws at construction for an accessor-backed gate, naming the handle', () => {
+    expect(() =>
+      bootstrapAccessorless(() =>
+        createGateRequirement({ gate: { kind: 'flag', id: 'some-flag' } }),
+      ),
+    ).toThrow(/accessor/);
+  });
+
+  it('names the offending kind, not just the missing handle', () => {
+    expect(() =>
+      bootstrapAccessorless(() =>
+        createGateRequirement({
+          gate: {
+            kind: 'all',
+            of: [
+              { kind: 'count-gte', category: 'producers', entity: 'farm', value: 1 },
+              { kind: 'state', key: 'phase', operator: 'eq', value: 'idle' },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(/state/);
   });
 });

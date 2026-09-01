@@ -23,7 +23,7 @@ import {
 } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
-import { gateToCondition } from '@/systems/gate';
+import { gateToCondition, getAmbientGateRuntime, getRequiredGateHandles } from '@/systems/gate';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -414,6 +414,196 @@ describe('timeUntilGateFlip — dispatch table', () => {
     expect(dist.reason).toBe('computed');
     expect(dist.seconds).toBe(10);
     f.stop();
+  });
+});
+
+// ============================================================================
+// Accessor-less engine — category-only gates owe no GameStateAccessor
+// ============================================================================
+
+/**
+ * Builds an engine with **no** `accessor` in its config — the shape a consumer
+ * whose gates are all category-resolved would naturally write. Resolves the
+ * ambient runtime inside `install()`, exactly where an adoption site would.
+ */
+function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } {
+  let runtime: GateRuntime | undefined;
+
+  const game: EngineModule = {
+    id: 'game',
+    install() {
+      const upgCat = createPurchasableCategory<UpgDef>({
+        id: 'upgrades',
+        mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 5 }),
+      });
+      upgCat.register({ id: 'fast', name: 'Fast' });
+      upgCat.getEntry('fast')!.purchasable.amount.value = bn(3);
+    },
+  };
+
+  const observer: EngineModule = {
+    id: 'observer',
+    dependencies: ['game'],
+    install() {
+      runtime = getAmbientGateRuntime();
+    },
+  };
+
+  const engine = createEngine({ gameId: 'test', persistence: false });
+  engine.use(game).use(observer);
+  engine.start();
+
+  return { runtime: runtime!, stop: () => engine.stop() };
+}
+
+describe('evaluateGate — no ambient accessor', () => {
+  it('resolves an ambient runtime without throwing', () => {
+    const f = buildAccessorlessFixture();
+    expect(f.runtime.accessor).toBeUndefined();
+    expect(f.runtime.categories).toBeDefined();
+    expect(f.runtime.registry).toBeDefined();
+    f.stop();
+  });
+
+  it('evaluates count-gte and unlock against categories alone', () => {
+    const f = buildAccessorlessFixture();
+    expect(
+      evaluateGate(
+        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 3 },
+        f.runtime,
+      ),
+    ).toBe(true);
+    expect(
+      evaluateGate(
+        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 9 },
+        f.runtime,
+      ),
+    ).toBe(false);
+    expect(evaluateGate({ kind: 'unlock', category: 'upgrades', entity: 'fast' }, f.runtime)).toBe(
+      true,
+    );
+    f.stop();
+  });
+
+  it('combinators over category-only children evaluate too', () => {
+    const f = buildAccessorlessFixture();
+    const gate: Gate = {
+      kind: 'all',
+      of: [
+        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        { kind: 'not', of: { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 99 } },
+      ],
+    };
+    expect(evaluateGate(gate, f.runtime)).toBe(true);
+    f.stop();
+  });
+
+  it('accessor-backed kinds throw at evaluation, naming both the handle and the kind', () => {
+    const f = buildAccessorlessFixture();
+    for (const gate of [
+      { kind: 'resource-gte', resource: 'points', value: 1 },
+      { kind: 'flag', id: 'some-flag' },
+      { kind: 'state', key: 'phase', operator: 'eq', value: 'idle' },
+    ] as Gate[]) {
+      expect(() => evaluateGate(gate, f.runtime)).toThrow(
+        new RegExp(`accessor.*${gate.kind}|${gate.kind}.*accessor`),
+      );
+    }
+    f.stop();
+  });
+
+  it('a combinator throws only when the accessor-backed branch is actually reached', () => {
+    const f = buildAccessorlessFixture();
+    // `any` short-circuits on the true category leaf — the flag child never runs.
+    expect(
+      evaluateGate(
+        {
+          kind: 'any',
+          of: [
+            { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+            { kind: 'flag', id: 'some-flag' },
+          ],
+        },
+        f.runtime,
+      ),
+    ).toBe(true);
+    // `all` reaches the flag child once the category leaf passes.
+    expect(() =>
+      evaluateGate(
+        {
+          kind: 'all',
+          of: [
+            { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+            { kind: 'flag', id: 'some-flag' },
+          ],
+        },
+        f.runtime,
+      ),
+    ).toThrow(/accessor/);
+    f.stop();
+  });
+});
+
+// ============================================================================
+// getRequiredGateHandles — per-kind handle demand
+// ============================================================================
+
+describe('getRequiredGateHandles', () => {
+  const handles = (gate: Gate) => [...getRequiredGateHandles(gate)].sort();
+
+  it('category-aware leaves demand categories only', () => {
+    expect(handles({ kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 })).toEqual([
+      'categories',
+    ]);
+    expect(handles({ kind: 'unlock', category: 'achievements', entity: 'first' })).toEqual([
+      'categories',
+    ]);
+  });
+
+  it('accessor-backed leaves demand the accessor only', () => {
+    expect(handles({ kind: 'resource-gte', resource: 'gold', value: 50 })).toEqual(['accessor']);
+    expect(handles({ kind: 'flag', id: 'knowledge-rask' })).toEqual(['accessor']);
+    expect(handles({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' })).toEqual([
+      'accessor',
+    ]);
+  });
+
+  it('cumulative-gte demands the registry, and the accessor for its rate projection', () => {
+    expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual([
+      'accessor',
+      'registry',
+    ]);
+  });
+
+  it('combinators union their children, recursing through nesting', () => {
+    const gate: Gate = {
+      kind: 'all',
+      of: [
+        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        {
+          kind: 'not',
+          of: {
+            kind: 'any',
+            of: [
+              { kind: 'unlock', category: 'achievements', entity: 'first' },
+              { kind: 'flag', id: 'knowledge-rask' },
+            ],
+          },
+        },
+      ],
+    };
+    expect(handles(gate)).toEqual(['accessor', 'categories']);
+  });
+
+  it('a category-only tree demands nothing else — the accessor-free consumer case', () => {
+    const gate: Gate = {
+      kind: 'any',
+      of: [
+        { kind: 'count-gte', category: 'producers', entity: 'farm', value: 5 },
+        { kind: 'unlock', category: 'upgrades', entity: 'fast' },
+      ],
+    };
+    expect(handles(gate)).toEqual(['categories']);
   });
 });
 

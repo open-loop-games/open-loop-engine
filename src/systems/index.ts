@@ -50,12 +50,15 @@ export type {
   AnyGate,
   NotGate,
   GateRuntime,
+  GateHandle,
   GateRequirementOptions,
 } from './gate';
 export {
   evaluateGate,
   timeUntilGateFlip,
   getAmbientGateRuntime,
+  getRequiredGateHandles,
+  assertGateHandles,
   isGate,
   createGateRequirement,
 } from './gate';

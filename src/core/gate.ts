@@ -159,6 +159,60 @@ export function isGate(value: unknown): value is Gate {
 }
 
 /**
+ * The engine handles a Gate kind reads through at evaluation time. Named here
+ * rather than in `systems/gate.ts` so the pure walker below can stay at core
+ * layer; `GateRuntime` keys off this union.
+ */
+export type GateHandle = 'accessor' | 'categories' | 'registry';
+
+/**
+ * Which engine handles `gate` will actually reach for. Pure data → data;
+ * combinators union their children.
+ *
+ * The reason this exists: the handles a Gate needs are a function of its
+ * kinds, not of the union as a whole. Category-aware kinds (`count-gte`,
+ * `unlock`) resolve entirely through `EngineCategories` and never touch an
+ * accessor, so a consumer whose gates are category-only owes no
+ * `GameStateAccessor` at all. Adoption sites that hold the gate at
+ * construction call this to fail early and precisely instead of demanding the
+ * full triple up front.
+ *
+ * `cumulative-gte` returns both `registry` (the cumulative slot lives on the
+ * registered resource) and `accessor` (`timeUntilGateFlip` projects the
+ * cumulative ref through a synthetic accessor to reuse the rate machinery).
+ */
+export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
+  const out = new Set<GateHandle>();
+  collectGateHandles(gate, out);
+  return out;
+}
+
+function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
+  switch (gate.kind) {
+    case 'resource-gte':
+    case 'state':
+    case 'flag':
+      out.add('accessor');
+      return;
+    case 'cumulative-gte':
+      out.add('registry');
+      out.add('accessor');
+      return;
+    case 'count-gte':
+    case 'unlock':
+      out.add('categories');
+      return;
+    case 'all':
+    case 'any':
+      for (const child of gate.of) collectGateHandles(child, out);
+      return;
+    case 'not':
+      collectGateHandles(gate.of, out);
+      return;
+  }
+}
+
+/**
  * Project a Gate AST to {@link ICondition}. Pure data → data; no runtime
  * needed. Rate-aware kinds map directly; combinators recurse.
  *

@@ -49,7 +49,14 @@ import {
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/registries';
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
-import { type AllGate, type AnyGate, type Gate, type NotGate } from '@/core/gate';
+import {
+  getRequiredGateHandles,
+  type AllGate,
+  type AnyGate,
+  type Gate,
+  type GateHandle,
+  type NotGate,
+} from '@/core/gate';
 import {
   findCategoryEntrySignals,
   getCurrentEngineCategories,
@@ -72,28 +79,37 @@ export type {
   AnyGate,
   NotGate,
   Gate,
+  GateHandle,
 } from '@/core/gate';
-export { isGate, gateToCondition } from '@/core/gate';
+export { isGate, gateToCondition, getRequiredGateHandles } from '@/core/gate';
 
 /**
- * The three engine handles {@link evaluateGate} and {@link timeUntilGateFlip}
- * need at runtime. Adoption sites typically build one via
+ * The engine handles {@link evaluateGate} and {@link timeUntilGateFlip} read
+ * through. Adoption sites typically build one via
  * {@link getAmbientGateRuntime} during a factory's install/connect call and
  * close over it for evaluation. The plain-data bundle is also useful for tests
  * (construct directly to drive `evaluateGate` without standing up an engine)
  * and for partial overrides in factory options.
  *
+ * Every field is optional because the bundle describes what's *available*, not
+ * what a given Gate needs — which handles are actually required is a function
+ * of the gate's kinds ({@link getRequiredGateHandles}). A consumer whose gates
+ * are all category-resolved owes no {@link GameStateAccessor} at all. Reads
+ * are demand-checked per kind at evaluation, so a gate that does need a
+ * missing handle throws naming both.
+ *
  * Not auto-published under an injection key — the bundle is composition glue,
  * not a singleton.
  */
 export interface GateRuntime {
-  accessor: GameStateAccessor;
-  categories: EngineCategories;
-  registry: ResourceRegistry;
+  accessor?: GameStateAccessor;
+  categories?: EngineCategories;
+  registry?: ResourceRegistry;
 }
 
 /**
- * Resolve the three ambient handles into a {@link GateRuntime} bundle.
+ * Snapshot whichever ambient handles are currently wired into a
+ * {@link GateRuntime} bundle.
  *
  * Reads from `getCurrentGameStateAccessor()` / `getCurrentEngineCategories()` /
  * `getCurrentResourceRegistry()` — the same install-time ambient triple every
@@ -101,25 +117,21 @@ export interface GateRuntime {
  * `override` for tests or for callers that want to thread a non-ambient
  * accessor (mirrors the option-then-ambient shape of `createChallengeCategory`).
  *
- * Throws when any of the three is missing — Gate evaluation requires all three
- * and silent-undefined would be a footgun. Call inside an engine
- * `install()` / `connect()` (where the ambient triple is wired by `createEngine`)
- * or pass explicit overrides.
+ * Never throws: a missing handle is only an error for a gate whose kinds
+ * actually read it, which isn't knowable here. Evaluation demand-checks per
+ * kind, and adoption sites holding the gate at construction can fail earlier
+ * via {@link getRequiredGateHandles}.
+ *
+ * The ambient triple is only set during an engine `install()` / `connect()`,
+ * so call this there and close over the result — resolving lazily from a
+ * player-driven path gets an empty bundle.
  */
-export function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRuntime {
-  const accessor = override?.accessor ?? getCurrentGameStateAccessor();
-  const categories = override?.categories ?? getCurrentEngineCategories();
-  const registry = override?.registry ?? getCurrentResourceRegistry();
-  if (!accessor || !categories || !registry) {
-    const missing: string[] = [];
-    if (!accessor) missing.push('accessor');
-    if (!categories) missing.push('categories');
-    if (!registry) missing.push('registry');
-    throw new Error(
-      `getAmbientGateRuntime: missing ambient ${missing.join(', ')}. Call inside engine install/connect, or pass explicit overrides.`,
-    );
-  }
-  return { accessor, categories, registry };
+export function getAmbientGateRuntime(override?: GateRuntime): GateRuntime {
+  return {
+    accessor: override?.accessor ?? getCurrentGameStateAccessor(),
+    categories: override?.categories ?? getCurrentEngineCategories(),
+    registry: override?.registry ?? getCurrentResourceRegistry(),
+  };
 }
 
 // === EVALUATOR ===
@@ -143,24 +155,33 @@ export function getAmbientGateRuntime(override?: Partial<GateRuntime>): GateRunt
 export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
   switch (gate.kind) {
     case 'resource-gte':
-      return Decimal.gte(runtime.accessor.getResource(gate.resource), gate.value);
+      return Decimal.gte(
+        demand(runtime, 'accessor', gate.kind).getResource(gate.resource),
+        gate.value,
+      );
     case 'cumulative-gte': {
-      const ref = cumulativeRefFor(gate.resource, runtime);
+      const ref = cumulativeRefFor(gate.resource, runtime, gate.kind);
       return Decimal.gte(ref.value, gate.value);
     }
     case 'count-gte': {
-      const signals = findCategoryEntrySignals(runtime.categories, gate.category, gate.entity);
+      const categories = demand(runtime, 'categories', gate.kind);
+      const signals = findCategoryEntrySignals(categories, gate.category, gate.entity);
       if (!signals) return false;
       return Decimal.gte(signals.count.value, gate.value);
     }
     case 'unlock': {
-      const signals = findCategoryEntrySignals(runtime.categories, gate.category, gate.entity);
+      const categories = demand(runtime, 'categories', gate.kind);
+      const signals = findCategoryEntrySignals(categories, gate.category, gate.entity);
       return signals?.unlock.value ?? false;
     }
     case 'state':
-      return compareState(runtime.accessor.getState(gate.key), gate.operator, gate.value);
+      return compareState(
+        demand(runtime, 'accessor', gate.kind).getState(gate.key),
+        gate.operator,
+        gate.value,
+      );
     case 'flag':
-      return runtime.accessor.isUnlocked(gate.id);
+      return demand(runtime, 'accessor', gate.kind).isUnlocked(gate.id);
     case 'all':
       return gate.of.every((g) => evaluateGate(g, runtime));
     case 'any':
@@ -190,13 +211,14 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
     case 'resource-gte':
       return timeUntilConditionFlip(
         { type: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
-        runtime.accessor,
+        demand(runtime, 'accessor', gate.kind),
       );
     case 'cumulative-gte': {
       // Cumulative is monotone-increasing; flip distance equals canonical
       // resource-gte distance over the underlying ref read through a synthetic
       // accessor that supplies the cumulative ref's value/rate.
-      const ref = cumulativeRefFor(gate.resource, runtime);
+      const ref = cumulativeRefFor(gate.resource, runtime, gate.kind);
+      const accessor = demand(runtime, 'accessor', gate.kind);
       const cumulativeId = `${gate.resource}:cumulative`;
       const projected: ResourceCondition = {
         type: 'resource',
@@ -206,10 +228,10 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
       };
       const cumulativeAccessor: GameStateAccessor = {
         getResource: (id) =>
-          id === cumulativeId ? new Decimal(ref.value) : runtime.accessor.getResource(id),
-        getRate: (id) => runtime.accessor.getRate(id === cumulativeId ? gate.resource : id),
-        isUnlocked: (id) => runtime.accessor.isUnlocked(id),
-        getState: (path) => runtime.accessor.getState(path),
+          id === cumulativeId ? new Decimal(ref.value) : accessor.getResource(id),
+        getRate: (id) => accessor.getRate(id === cumulativeId ? gate.resource : id),
+        isUnlocked: (id) => accessor.isUnlocked(id),
+        getState: (path) => accessor.getState(path),
       };
       return timeUntilConditionFlip(projected, cumulativeAccessor);
     }
@@ -237,6 +259,47 @@ function combinatorFlip(
     distance: timeUntilGateFlip(child, runtime),
   }));
   return combineFlipDistances(children, gate.kind === 'all' ? 'and' : 'or');
+}
+
+// === HANDLE ASSERTION ===
+
+/**
+ * Throw unless `runtime` carries every handle `gate` will read.
+ *
+ * For adoption sites that hold the gate at construction: turns what would be a
+ * first-evaluation throw (often inside a `computed`, where the stack is far
+ * from the authoring mistake) into one at the registration callsite. Sites
+ * whose gates arrive later — category registries, dialog graphs — skip this and
+ * let the per-kind demand-check fire at evaluation.
+ *
+ * @param label prefix for the error, normally the calling factory's name.
+ *
+ * @example
+ * ```ts
+ * const runtime = getAmbientGateRuntime();
+ * assertGateHandles(def.requirement, runtime, 'createAchievement');
+ * ```
+ */
+export function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string): void {
+  const missing = [...getRequiredGateHandles(gate)].filter((handle) => !runtime[handle]);
+  if (missing.length === 0) return;
+  const kinds = [...collectKinds(gate)].join(', ');
+  throw new Error(
+    `${label}: this gate reads the ${missing.join(' and ')}, which the ambient runtime doesn't carry. ` +
+      `Gate kinds in play: ${kinds}. Wire the missing handle via createEngine({ accessor }) — ` +
+      `category-only gates ('count-gte', 'unlock') need no accessor — and construct inside engine install/connect.`,
+  );
+}
+
+function collectKinds(gate: Gate, out = new Set<Gate['kind']>()): ReadonlySet<Gate['kind']> {
+  if (gate.kind === 'all' || gate.kind === 'any') {
+    for (const child of gate.of) collectKinds(child, out);
+  } else if (gate.kind === 'not') {
+    collectKinds(gate.of, out);
+  } else {
+    out.add(gate.kind);
+  }
+  return out;
 }
 
 // === REQUIREMENT ADAPTER ===
@@ -278,6 +341,7 @@ export interface GateRequirementOptions {
 export function createGateRequirement(options: GateRequirementOptions): Requirement {
   const { gate, description } = options;
   const runtime = getAmbientGateRuntime();
+  assertGateHandles(gate, runtime, 'createGateRequirement');
   return createBooleanRequirement({
     requirement: computed(() => evaluateGate(gate, runtime)),
     description,
@@ -286,8 +350,28 @@ export function createGateRequirement(options: GateRequirementOptions): Requirem
 
 // === PRIVATE ===
 
-function cumulativeRefFor(resourceId: string, runtime: GateRuntime) {
-  const resource = runtime.registry.findById(resourceId);
+/**
+ * Read a handle the current gate kind needs, or throw naming both. The message
+ * carries the kind because "missing accessor" alone doesn't tell an author
+ * which of their gates is at fault — and category-only gates never reach here.
+ */
+function demand<K extends GateHandle>(
+  runtime: GateRuntime,
+  handle: K,
+  kind: Gate['kind'],
+): NonNullable<GateRuntime[K]> {
+  const value = runtime[handle];
+  if (!value) {
+    throw new Error(
+      `evaluateGate: '${kind}' gate needs the ${handle}, which was not available on the GateRuntime. ` +
+        `Wire it via createEngine({ ${handle === 'accessor' ? 'accessor' : handle} }) and resolve the runtime inside engine install/connect, or pass an explicit override.`,
+    );
+  }
+  return value as NonNullable<GateRuntime[K]>;
+}
+
+function cumulativeRefFor(resourceId: string, runtime: GateRuntime, kind: Gate['kind']) {
+  const resource = demand(runtime, 'registry', kind).findById(resourceId);
   if (!resource) {
     throw new Error(`Gate cumulative-gte: no resource '${resourceId}' registered`);
   }
