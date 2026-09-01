@@ -356,6 +356,10 @@ function buildTierField(
   const initial = override?.initial ?? schema.initial ?? 0;
   const maxIndex = schema.tiers.length - 1;
   const gates = override?.gates ?? schema.gates;
+  // Capture the Gate runtime at registration, not inside tryAdvance: subjects
+  // register during install but advance from gameplay, long after the ambient
+  // scope closes. `tryAdvance(accessor)` still layers a per-call override on top.
+  const gateRuntime = getAmbientGateRuntime();
 
   function clampIndex(i: number): number {
     return Math.max(0, Math.min(maxIndex, Math.floor(i)));
@@ -382,7 +386,7 @@ function buildTierField(
     if (current >= maxIndex) return null;
     const gate = gates?.[current];
     if (gate) {
-      const runtime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
+      const runtime = accessor ? { ...gateRuntime, accessor } : gateRuntime;
       if (!evaluateGate(gate, runtime)) return null;
     }
     setIndex(current + 1);

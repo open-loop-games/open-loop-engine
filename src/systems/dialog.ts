@@ -163,18 +163,18 @@ export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRunt
  * Construct a native dialog runtime backed by the supplied graphs + accessor + mutator.
  *
  * `condition` fields on nodes and choices accept `Gate` — predicates dispatch
- * through {@link evaluateGate} against the ambient Gate runtime (resolved per
- * evaluation via {@link getAmbientGateRuntime}). The engine's ambient triple
- * (accessor / categories / registry) must be wired — standard inside
- * `createEngine`'s install/connect.
+ * through {@link evaluateGate} against a {@link GateRuntime} captured once here
+ * at construction. Construct inside `createEngine`'s install/connect, where the
+ * ambient handles are wired: dialog is driven from player input long after that
+ * scope closes, so a lazily-resolved runtime would come back empty.
  *
  * Standard composition path: register dialog content via `createDialogCategory`,
  * then pass `category.getAll().flatMap(e => e.graphs)` as `graphs`. For tests
  * or one-off use, construct graphs inline.
  *
- * @param options Graphs + ambient accessor/mutator. The runtime captures these
- *   and uses them for outcome dispatch and condition read-back; Gate
- *   predicates resolve their own ambient triple at evaluation time.
+ * @param options Graphs + accessor/mutator. The runtime captures these for
+ *   outcome dispatch and condition read-back; `accessor` also seeds the
+ *   captured Gate runtime.
  * @returns A {@link NativeDialogRuntime} — the {@link DialogRuntime} adapter
  *   contract plus an event subscription handle.
  *
@@ -189,6 +189,10 @@ export function createNativeDialogRuntime(
   options: NativeDialogRuntimeOptions,
 ): NativeDialogRuntime {
   const { graphs, accessor, mutator } = options;
+  // Capture the Gate runtime now, not per evaluation: start/choices/choose are
+  // player-driven and run long after the engine's install/connect ambient
+  // closes. Mirrors the eager capture in createReset.
+  const gateRuntime = getAmbientGateRuntime({ accessor });
   const graphsById = new Map<string, DialogGraph>(graphs.map((g) => [g.id, g]));
   const nodesByGraph = new Map<string, Map<string, DialogNode>>();
   for (const g of graphs) {
@@ -216,7 +220,7 @@ export function createNativeDialogRuntime(
   }
 
   function holds(predicate: Gate): boolean {
-    return evaluateGate(predicate, getAmbientGateRuntime());
+    return evaluateGate(predicate, gateRuntime);
   }
 
   function recordVisit(graphId: string, nodeId: string): void {

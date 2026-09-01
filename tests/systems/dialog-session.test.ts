@@ -7,9 +7,14 @@ import { createDialogSession } from '@/systems/dialog-session';
 import type { DialogGraph } from '@/systems/dialog';
 
 /**
- * Run `fn` inside an engine install hook so the ambient GateRuntime triple
- * (accessor + categories + registry) is wired — required for dialog choice
- * conditions that dispatch through evaluateGate.
+ * Construct inside an engine install hook and hand the result back for the test
+ * to drive *after* `engine.start()` returns.
+ *
+ * The split is the point. A real game builds its dialog session during install
+ * — where the ambient accessor, categories and resource registry are wired —
+ * but calls start / choices / choose from player-driven UI long afterwards,
+ * when that ambient scope has closed. Construct and drive in the same hook and
+ * an eval-time ambient read passes here while failing in every real consumer.
  */
 function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
   let result: T;
@@ -87,47 +92,40 @@ const cycleGraph: DialogGraph = {
 
 describe('createDialogSession', () => {
   it('throws on an authored next-only cycle instead of hanging settle()', () => {
-    withEngine(buildAccessor(), () => {
-      const session = createDialogSession({ id: 'main', graphs: [cycleGraph] });
-      expect(() => session.start('loop-graph')).toThrow(/cycle/);
-    });
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [cycleGraph] }),
+    );
+    expect(() => session.start('loop-graph')).toThrow(/cycle/);
   });
 
   it('starts a graph and presents the entry node', () => {
-    withEngine(buildAccessor(), () => {
-      const session = createDialogSession({
-        id: 'main',
-        graphs: [greetingGraph],
-      });
-      session.start('rask-greeting');
-      const snap = session.present();
-      expect(snap?.nodeId).toBe('open');
-      expect(snap?.text).toContain('Rask');
-      // Gated choice is filtered out (knowledge-restricted-tip is not unlocked)
-      expect(snap?.choices.map((c) => c.id)).toEqual(['ask-training']);
-    });
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    session.start('rask-greeting');
+    const snap = session.present();
+    expect(snap?.nodeId).toBe('open');
+    expect(snap?.text).toContain('Rask');
+    // Gated choice is filtered out (knowledge-restricted-tip is not unlocked)
+    expect(snap?.choices.map((c) => c.id)).toEqual(['ask-training']);
   });
 
   it('reveals gated choices once the gate flips true', () => {
     const accessor = buildAccessor();
     accessor.setUnlocked('knowledge-restricted-tip', true);
-    withEngine(accessor, () => {
-      const session = createDialogSession({
-        id: 'main',
-        graphs: [greetingGraph],
-      });
-      session.start('rask-greeting');
-      const snap = session.present();
-      expect(snap?.choices.map((c) => c.id)).toEqual(['ask-training', 'ask-secret']);
-    });
+    const session = withEngine(accessor, () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    session.start('rask-greeting');
+    const snap = session.present();
+    expect(snap?.choices.map((c) => c.id)).toEqual(['ask-training', 'ask-secret']);
   });
 
   it('emits presented / chosen / finished events', () => {
-    withEngine(buildAccessor(), () => {
-      const session = createDialogSession({
-        id: 'main',
-        graphs: [greetingGraph],
-      });
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    {
       const presented = vi.fn();
       const chosen = vi.fn();
       const finished = vi.fn();
@@ -153,38 +151,32 @@ describe('createDialogSession', () => {
 
       session.finish();
       expect(finished).toHaveBeenCalledWith({ graphId: 'rask-greeting' });
-    });
+    }
   });
 
   it('writes choice outcomes via the mutator', () => {
     const accessor = buildAccessor();
     const setStateSpy = vi.spyOn(accessor, 'setState');
-    withEngine(accessor, () => {
-      const session = createDialogSession({
-        id: 'main',
-        graphs: [greetingGraph],
-      });
-      session.start('rask-greeting');
-      session.choose('ask-training');
-      // Training node's onEnter fires → state write to rel.npc-trust.rask.tier
-      expect(setStateSpy).toHaveBeenCalledWith('rel.npc-trust.rask.tier', 1);
-    });
+    const session = withEngine(accessor, () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    session.start('rask-greeting');
+    session.choose('ask-training');
+    // Training node's onEnter fires → state write to rel.npc-trust.rask.tier
+    expect(setStateSpy).toHaveBeenCalledWith('rel.npc-trust.rask.tier', 1);
   });
 
   it('snapshots runtime state into the persistent ref on every choose', () => {
-    withEngine(buildAccessor(), () => {
-      const session = createDialogSession({
-        id: 'snapshot',
-        graphs: [greetingGraph],
-      });
-      session.start('rask-greeting');
-      // Pre-choose presentation reflects the entry node.
-      expect(session.present()?.nodeId).toBe('open');
-      session.choose('ask-training');
-      // Post-choose presentation reflects the advanced node — proving the
-      // session's snapshot logic ran *after* the runtime mutation.
-      expect(session.present()?.nodeId).toBe('training');
-    });
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'snapshot', graphs: [greetingGraph] }),
+    );
+    session.start('rask-greeting');
+    // Pre-choose presentation reflects the entry node.
+    expect(session.present()?.nodeId).toBe('open');
+    session.choose('ask-training');
+    // Post-choose presentation reflects the advanced node — proving the
+    // session's snapshot logic ran *after* the runtime mutation.
+    expect(session.present()?.nodeId).toBe('training');
   });
 
   it('re-imports state into the runtime when save load writes to the persistent ref', () => {
@@ -194,8 +186,10 @@ describe('createDialogSession', () => {
     // This test simulates the deserialize step directly: flip loadingSave,
     // write a non-default state into the ref, flip back. Without the watcher,
     // session.isActive() would stay false.
-    withEngine(buildAccessor(), () => {
-      const session = createDialogSession({ id: 'load-sync', graphs: [greetingGraph] });
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'load-sync', graphs: [greetingGraph] }),
+    );
+    {
       expect(session.isActive()).toBe(false);
 
       const refs = getAllPersistentRefs();
@@ -223,7 +217,7 @@ describe('createDialogSession', () => {
 
       expect(session.isActive()).toBe(true);
       expect(session.present()?.nodeId).toBe('training');
-    });
+    }
   });
 
   it('throws when no ambient accessor is available and none was passed', () => {

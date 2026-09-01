@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
-import { createEngine, type EngineModule } from '@/index';
+import { createEngine, createPurchasableCategory, type EngineModule } from '@/index';
 import { createSubjectCategory } from '@/systems/subject-category';
 import { CategoriesKey } from '@/systems/engine-categories';
 
@@ -26,8 +26,13 @@ function buildAccessor(): GameStateAccessorMutator {
 }
 
 /**
- * Run `fn` inside an engine install hook so the ambient GateRuntime triple is
- * wired — required for tier-field tryAdvance to evaluate Gate predicates.
+ * Construct inside an engine install hook and hand the result back for the test
+ * to drive *after* `engine.start()` returns.
+ *
+ * The split is the point: subjects are registered during install, but
+ * `tryAdvance` is called from gameplay long after that ambient scope closes.
+ * Construct and drive in the same hook and an eval-time ambient read passes
+ * here while failing in every real consumer.
  */
 function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
   let result: T;
@@ -135,7 +140,7 @@ describe('createSubjectCategory', () => {
   describe('tier field (molcremental shape)', () => {
     it('advances through tiers when gates pass', () => {
       const accessor = buildAccessor();
-      withEngine(accessor, () => {
+      const rask = withEngine(accessor, () => {
         const cat = createSubjectCategory({
           id: 'npc-trust',
           fields: {
@@ -154,29 +159,64 @@ describe('createSubjectCategory', () => {
             },
           },
         });
-        const rask = cat.get('mentor-rask')!;
-        expect(rask.fields.trust.getTier()).toBe('stranger');
-
-        // Gate not satisfied — advance is blocked.
-        expect(rask.fields.trust.tryAdvance()).toBeNull();
-        expect(rask.fields.trust.getTier()).toBe('stranger');
-
-        // Satisfy first gate, advance to acquaintance.
-        accessor.setUnlocked('knowledge-rask-approach', true);
-        expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
-
-        // Second gate not yet satisfied.
-        expect(rask.fields.trust.tryAdvance()).toBeNull();
-
-        // Satisfy second + third gates, advance twice more.
-        accessor.setUnlocked('knowledge-rask-competence', true);
-        accessor.setUnlocked('knowledge-rask-task', true);
-        expect(rask.fields.trust.tryAdvance()).toBe('student');
-        expect(rask.fields.trust.tryAdvance()).toBe('trusted');
-
-        // Already at max — no further advance.
-        expect(rask.fields.trust.tryAdvance()).toBeNull();
+        return cat.get('mentor-rask')!;
       });
+      expect(rask.fields.trust.getTier()).toBe('stranger');
+
+      // Gate not satisfied — advance is blocked.
+      expect(rask.fields.trust.tryAdvance()).toBeNull();
+      expect(rask.fields.trust.getTier()).toBe('stranger');
+
+      // Satisfy first gate, advance to acquaintance.
+      accessor.setUnlocked('knowledge-rask-approach', true);
+      expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
+
+      // Second gate not yet satisfied.
+      expect(rask.fields.trust.tryAdvance()).toBeNull();
+
+      // Satisfy second + third gates, advance twice more.
+      accessor.setUnlocked('knowledge-rask-competence', true);
+      accessor.setUnlocked('knowledge-rask-task', true);
+      expect(rask.fields.trust.tryAdvance()).toBe('student');
+      expect(rask.fields.trust.tryAdvance()).toBe('trusted');
+
+      // Already at max — no further advance.
+      expect(rask.fields.trust.tryAdvance()).toBeNull();
+    });
+
+    it('evaluates a category-aware tier gate after install returns', () => {
+      // count-gte reads through EngineCategories, which tryAdvance's accessor
+      // parameter cannot supply — so this only passes if the field captured the
+      // full runtime at registration.
+      const accessor = buildAccessor();
+      const rask = withEngine(accessor, () => {
+        const upgrades = createPurchasableCategory<{ id: string }>({
+          id: 'upgrades',
+          mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 10 }),
+        });
+        upgrades.register({ id: 'charm' });
+
+        const cat = createSubjectCategory({
+          id: 'npc-standing',
+          fields: { trust: { kind: 'tier', tiers: ['stranger', 'known'] } },
+        });
+        cat.register({
+          id: 'mentor-rask',
+          fields: {
+            trust: {
+              gates: [{ kind: 'count-gte', category: 'upgrades', entity: 'charm', value: 2 }],
+            },
+          },
+        });
+        return {
+          subject: cat.get('mentor-rask')!,
+          charm: upgrades.getEntry('charm')!.purchasable,
+        };
+      });
+
+      expect(rask.subject.fields.trust.tryAdvance()).toBeNull();
+      rask.charm.amount.value = new Decimal(2);
+      expect(rask.subject.fields.trust.tryAdvance()).toBe('known');
     });
 
     it('emits advance events with from/to indices', () => {
