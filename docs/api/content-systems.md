@@ -16,20 +16,20 @@ The validated incremental primitives, each a typed registration surface over the
 milestone tracking with auto-unlock and tiered rewards
 
 - `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:98`
-- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:191`
+- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:205`
 - `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:92`
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:60`
 - `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:34`
 - `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:138`
 - `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:52`
 - `interface BaseTieredAchievementDef` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:105`
-- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:272`
+- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:286`
 - `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:278`
 - `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:294`
 - `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:138`
-- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — Optional `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:170`
+- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:170`
 - `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:155`
-- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:180`
+- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:192`
 - `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:116`
 
 ## Action Category

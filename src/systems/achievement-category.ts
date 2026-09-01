@@ -162,10 +162,10 @@ export interface TieredAchievementBuildDefParams<T = number> {
 }
 
 /**
- * Optional `buildDef` callback type for the `registerTiered` spec. Required
- * when the category's `Def` shape has fields beyond
- * {@link BaseTieredAchievementDef}; optional otherwise (default builds a
- * base-shape Def).
+ * `buildDef` callback type for the `registerTiered` spec. Required when the
+ * category's `Def` carries required fields beyond
+ * {@link BaseTieredAchievementDef}; optional when `Def` is the base shape
+ * (default builds a base-shape Def).
  */
 export type TieredAchievementBuildDef<Def, T = number> = (
   params: TieredAchievementBuildDefParams<T>,
@@ -173,13 +173,27 @@ export type TieredAchievementBuildDef<Def, T = number> = (
 
 /**
  * `registerTiered` parameter type. Carries the spec plus a `buildDef` that
- * is *required* when `Def` widens beyond {@link BaseTieredAchievementDef}
- * and *optional* (default = identity over base fields) when `Def` is the
- * base shape.
+ * is *optional* (default = identity over base fields) only when `Def` is
+ * the base shape, and *required* the moment `Def` widens beyond
+ * {@link BaseTieredAchievementDef}.
+ *
+ * The test is mutual assignability, not one-way `extends`: a superset Def
+ * still satisfies `Def extends Base`, so a one-way test leaves the callback
+ * optional for a Def carrying required fields the default synthesizer
+ * cannot populate — they resolve to `undefined` on every tier with no type
+ * error, and the failure only surfaces when a tier is earned. A Def whose
+ * extra fields are all optional stays on the optional branch, since nothing
+ * is lost by omitting the callback.
+ *
+ * Known gap: a union Def with one widened member (`Base | Widened`) keeps
+ * the optional form, because `Base` is assignable to the union. Defeating
+ * distributivity does not close it — assignability holds either way.
  */
 export type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> &
   (Def extends BaseTieredAchievementDef
-    ? { buildDef?: TieredAchievementBuildDef<Def, T> }
+    ? BaseTieredAchievementDef extends Def
+      ? { buildDef?: TieredAchievementBuildDef<Def, T> }
+      : { buildDef: TieredAchievementBuildDef<Def, T> }
     : { buildDef: TieredAchievementBuildDef<Def, T> });
 
 /**

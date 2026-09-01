@@ -44,7 +44,11 @@ import type { Computable } from '@/core/computed';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
-import type { AchievementCategory } from '@/systems/achievement-category';
+import type {
+  AchievementCategory,
+  BaseTieredAchievementDef,
+  TieredAchievementSpec,
+} from '@/systems/achievement-category';
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
 import type {
   ActionCategory,
@@ -679,5 +683,51 @@ describe('Formula first-passage contract', () => {
     // `lower`/`upper` are the caller's axis. Expansion and iteration counts are
     // the finder's business and stay off the public surface.
     expectTypeOf<keyof FirstPassageOptions>().toEqualTypeOf<'lower' | 'upper'>();
+  });
+});
+
+describe('registerTiered spec — buildDef optionality', () => {
+  /** Keys of `T` that may be omitted. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  // Every other field of the spec is required, so `buildDef` is the only key
+  // that can appear here — which makes the pin read as pure optionality.
+  it('is optional only for a Def mutually assignable with the base shape', () => {
+    // The base shape itself, and a Def declared separately with an identical
+    // shape (the common consumer spelling), both keep the callback optional:
+    // the default synthesizer populates every field they declare.
+    interface StructuralTwin {
+      id: string;
+      title: string;
+      description: string;
+      requirement: () => boolean;
+    }
+    expectTypeOf<
+      OptionalKeys<TieredAchievementSpec<BaseTieredAchievementDef>>
+    >().toEqualTypeOf<'buildDef'>();
+    expectTypeOf<OptionalKeys<TieredAchievementSpec<StructuralTwin>>>().toEqualTypeOf<'buildDef'>();
+
+    // Extra fields that are themselves optional lose nothing when the callback
+    // is omitted, so they stay on the optional branch.
+    interface LooselyWidened extends BaseTieredAchievementDef {
+      effect?: number;
+    }
+    expectTypeOf<OptionalKeys<TieredAchievementSpec<LooselyWidened>>>().toEqualTypeOf<'buildDef'>();
+  });
+
+  it('is required once Def carries a field the default synthesizer cannot populate', () => {
+    // A superset Def still satisfies `Def extends Base`, so a one-way test
+    // left the callback optional here and every tier's `effect` silently
+    // resolved to `undefined` — observable only when a tier was earned, far
+    // from the registration that caused it.
+    interface WidenedDef extends BaseTieredAchievementDef {
+      effect: number;
+    }
+    expectTypeOf<OptionalKeys<TieredAchievementSpec<WidenedDef>>>().toBeNever();
+
+    // A Def narrower than the base shape has never been on the optional branch.
+    expectTypeOf<OptionalKeys<TieredAchievementSpec<{ id: string }>>>().toBeNever();
   });
 });
