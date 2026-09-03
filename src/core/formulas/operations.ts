@@ -325,19 +325,21 @@ function quadraticSlopeSource(lhs: FormulaSource): FormulaSource | null {
  * Read a {@link quadraticSlopeSource} for one evaluation, or null to decline
  * the closed form.
  *
- * Sign is a per-call question for the same reason the value is: the closed-form
- * invert is `(-c + √(c² + 2·K·T)) / K`, which divides by K and roots a
- * possibly-negative discriminant, and a coefficient that is positive when the
- * integral is built can be negative later. Non-positive reads fall through to
- * bisection — which reports rather than solving for K < 0, since its `upper`
- * bracket roots a negative, but a reported failure beats a silent one.
+ * Read per call rather than captured, because the caller holds this for the
+ * life of a memoized integral formula and the coefficient can move under it.
+ *
+ * K = 0 collapses the antiderivative to a line, and the closed form divides by
+ * K; a non-finite K has no usable root. The *sign* of K is not a reason to
+ * decline — the callers gate on the discriminant instead, which is the thing
+ * that actually decides whether a real pre-image exists.
  *
  * @internal
  */
 function quadraticSlope(source: FormulaSource | null): DecimalSource | null {
   if (source == null) return null;
   const slope = unrefFormulaSource(source);
-  return Decimal.lte(slope, 0) ? null : slope;
+  if (!Decimal.isFinite(slope) || Decimal.eq(slope, 0)) return null;
+  return slope;
 }
 
 // ∫(f(x) + c) dx = F(x) + c·x. For `lhs` shapes whose antiderivative is K·x²/2
@@ -370,9 +372,15 @@ function buildIntegrateAdd(
 
       if (slope != null) {
         // K·x²/2 + c·x = T  →  K·x² + 2c·x - 2T = 0
-        // x = (-c + √(c² + 2KT)) / K  (positive root)
+        // x = (-c + √(c² + 2KT)) / K  — the positive root for K > 0, and the
+        // smaller of the two for K < 0, which is the first passage either way.
         const disc = Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-        return Decimal.div(Decimal.sub(Decimal.sqrt(disc), c), slope);
+        // A negative discriminant is a statement about the target, not the
+        // shape: no real pre-image. Fall through and let the generic path
+        // report it rather than rooting a negative and returning NaN.
+        if (Decimal.gte(disc, 0)) {
+          return Decimal.div(Decimal.sub(Decimal.sqrt(disc), c), slope);
+        }
       }
 
       // Generic shape (cubic and higher): solve F(x) + c·x = target by bisection.
@@ -466,12 +474,18 @@ function buildIntegrateSub(
       if (slope != null) {
         // variableOnLhs:  K·x²/2 - c·x = T  →  K·x² - 2c·x - 2T = 0  →  x = (c + √(c² + 2KT)) / K
         // !variableOnLhs: c·x - K·x²/2 = T  →  K·x² - 2c·x + 2T = 0  →  x = (c - √(c² - 2KT)) / K
-        if (variableOnLhs) {
-          const disc = Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-          return Decimal.div(Decimal.add(c, Decimal.sqrt(disc)), slope);
+        // Same discriminant gate as `integrateAdd`, and it fires in both
+        // orientations: `c² + 2KT` goes negative for K < 0, `c² - 2KT` for
+        // K > 0. The second was reachable on an ordinary positive slope and
+        // returned NaN from `√(negative)` without a word.
+        const disc = variableOnLhs
+          ? Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)))
+          : Decimal.sub(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
+        if (Decimal.gte(disc, 0)) {
+          return variableOnLhs
+            ? Decimal.div(Decimal.add(c, Decimal.sqrt(disc)), slope)
+            : Decimal.div(Decimal.sub(c, Decimal.sqrt(disc)), slope);
         }
-        const disc = Decimal.sub(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-        return Decimal.div(Decimal.sub(c, Decimal.sqrt(disc)), slope);
       }
 
       if (!hasVariable(F_input) || !(F_input as InvertibleFormula).isInvertible()) {

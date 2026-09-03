@@ -1658,10 +1658,12 @@ describe('reactive coefficients survive integral memoization', () => {
   });
 
   test('a coefficient that turns non-positive declines the closed form and reports', () => {
-    // Build/call split: the *shape* is settled once, the *sign* every call. A
-    // stale positive slope would keep feeding the closed form and return a
-    // confident wrong number; declining it lands in bisection, which cannot
-    // bracket a negative-K integral and says so.
+    // Build/call split: the *shape* is settled once, the *coefficient* every
+    // call. A stale positive slope would keep feeding the closed form and
+    // return a confident wrong number. Read live, K = -100 makes the
+    // discriminant `c² + 2KT` negative at this target — the integral
+    // `5x - 50x²` peaks at 0.125 and never reaches 1e5 — so there is no real
+    // pre-image and it is reported rather than invented.
     const level = ref<DecimalSource>(0);
     const coef = ref<DecimalSource>(1);
     const formula = Formula.variable(level).mul(coef).add(5);
@@ -1670,6 +1672,69 @@ describe('reactive coefficients survive integral memoization', () => {
 
     coef.value = -100;
     expect(() => formula.invertIntegral(1e5)).toLogError();
+  });
+});
+
+describe('the quadratic integral inverse is gated on its discriminant', () => {
+  // The closed form is `(-c + sqrt(c^2 + 2KT)) / K`. What makes it inapplicable
+  // is a negative discriminant — no real pre-image — or K = 0, where the
+  // integral is linear and the division is the thing that breaks. The sign of
+  // K is neither: for K < 0 the same expression yields the smaller root, which
+  // is the first passage, and declining it dropped the query into a bisection
+  // that cannot bracket a downward parabola.
+
+  test('a negative slope still inverts, to the first of the two roots', () => {
+    const level = ref<DecimalSource>(0);
+    const formula = Formula.variable(level).mul(-100).add(5);
+    // integral 5x - 50x^2, peaking at 0.125 (x = 0.05). Target 0.1 has real
+    // roots (5 -+ sqrt5)/100 = 0.02763932 and 0.07236068; first passage is the
+    // smaller.
+    expect(() => formula.invertIntegral(0.1)).not.toLogError();
+    expect(formula.invertIntegral(0.1)).compare_tolerance(0.02763932);
+    expect(formula.evaluateIntegral(formula.invertIntegral(0.1))).compare_tolerance(0.1);
+  });
+
+  test('a target past the peak has no pre-image and says so', () => {
+    const level = ref<DecimalSource>(0);
+    const formula = Formula.variable(level).mul(-100).add(5);
+    // Above 0.125 the discriminant goes negative. Declining is correct here.
+    expect(formula.tryInvertIntegral(1)).toMatchObject({ value: null });
+  });
+
+  test('a zero slope declines the closed form rather than dividing by it', () => {
+    const level = ref<DecimalSource>(0);
+    const coef = ref<DecimalSource>(4);
+    const formula = Formula.variable(level).mul(coef).add(5);
+
+    formula.invertIntegral(1e3);
+
+    coef.value = 0; // integral collapses to 5x, linear — no quadratic to solve
+    const x = formula.invertIntegral(1e3);
+    expect(new Decimal(x).isNan()).toBe(false);
+  });
+
+  test('a `k - f(x)` integral past its peak reports instead of returning NaN', () => {
+    // `c - K·x/1` integrates to `c·x - K·x²/2`, whose discriminant is
+    // `c² - 2KT` — negative for an ordinary *positive* K once the target
+    // clears the peak. Unguarded, `√(negative)` handed back NaN silently.
+    const level = ref<DecimalSource>(0);
+    const formula = Formula.constant(5).sub(Formula.variable(level).mul(100));
+    // 5x - 50x² peaks at 0.125; 1e5 is far past it.
+    expect(new Decimal(formula.invertIntegral(1e5)).isNan()).toBe(false);
+    expect(formula.tryInvertIntegral(1e5)).toMatchObject({ value: null });
+  });
+
+  test('integrateSub inverts a negative slope in both orientations', () => {
+    const level = ref<DecimalSource>(0);
+    // c*x - K*x^2/2 with K = -100: 5x + 50x^2, increasing and convex.
+    const right = Formula.constant(5).sub(Formula.variable(level).mul(-100));
+    expect(() => right.invertIntegral(1e5)).not.toLogError();
+    expect(right.evaluateIntegral(right.invertIntegral(1e5))).compare_tolerance(1e5);
+
+    // K*x^2/2 - c*x with K = 100: 50x^2 - 5x.
+    const left = Formula.variable(level).mul(100).sub(5);
+    expect(() => left.invertIntegral(1e5)).not.toLogError();
+    expect(left.evaluateIntegral(left.invertIntegral(1e5))).compare_tolerance(1e5);
   });
 });
 
