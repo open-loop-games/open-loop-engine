@@ -332,11 +332,9 @@ function buildIntegrateAdd(
   return new Formula({
     inputs: [F_integral, other],
     evaluate: (F_val: DecimalSource, c_val: DecimalSource): DecimalSource => {
-      if (slope != null) {
-        // F_val = K·x²/2 → x = √(2·F_val/K)
-        const x = Decimal.sqrt(Decimal.div(Decimal.mul(2, F_val), slope));
-        return Decimal.add(F_val, Decimal.mul(c_val, x));
-      }
+      // Recovering x from F(x) is what `F_integral.invert` is. The closed form
+      // for the K·x²/2 shapes is the same algebra spelled a second time, so it
+      // only adds a place for the two to disagree.
       if (!F_integral.isInvertible()) return Decimal.add(F_val, c_val);
       const x = (F_integral as InvertibleFormula).invert(F_val);
       return Decimal.add(F_val, Decimal.mul(c_val, x));
@@ -424,9 +422,10 @@ function buildIntegrateSub(
     inputs: [F_integral, other],
     evaluate: (F_val: DecimalSource, c_val: DecimalSource): DecimalSource => {
       let x: DecimalSource;
-      if (slope != null) {
-        x = Decimal.sqrt(Decimal.div(Decimal.mul(2, F_val), slope));
-      } else if (F_integral.isInvertible()) {
+      // Same reasoning as `buildIntegrateAdd`: `F_integral.invert` already is
+      // the recovery of x from F(x), so open-coding it for the quadratic
+      // shapes only adds a second spelling that can drift from the first.
+      if (F_integral.isInvertible()) {
         x = (F_integral as InvertibleFormula).invert(F_val);
       } else {
         return variableOnLhs ? Decimal.sub(F_val, c_val) : Decimal.sub(c_val, F_val);

@@ -1111,6 +1111,22 @@ describe('Custom Formulas', () => {
   });
 });
 
+/**
+ * Brute-force `max n such that Σ_{i<n} f(A+i) ≤ R` — the discrete cumulative
+ * every buy-max answer is graded against.
+ */
+function discreteTruth(formula: GenericFormula, R: DecimalSource, A: number): number {
+  let n = 0;
+  let summed = new Decimal(0);
+  for (let i = 0; i < 10000; i++) {
+    const cost = formula.evaluate(A + i);
+    if (Decimal.add(summed, cost).gt(R)) return n;
+    n++;
+    summed = Decimal.add(summed, cost);
+  }
+  return n;
+}
+
 describe('Buy Max', () => {
   let resource: ReturnType<typeof createResource>;
   beforeAll(() => {
@@ -1340,18 +1356,6 @@ describe('Buy Max', () => {
     // pay(1), getCost(1), timeUntilAffordable use single-level cost.
     // calculateMaxAffordable must too — its answer is the discrete cumulative.
 
-    function discreteTruth(formula: GenericFormula, R: DecimalSource, A: number): number {
-      let n = 0;
-      let summed = new Decimal(0);
-      for (let i = 0; i < 10000; i++) {
-        const cost = formula.evaluate(A + i);
-        if (Decimal.add(summed, cost).gt(R)) return n;
-        n++;
-        summed = Decimal.add(summed, cost);
-      }
-      return n;
-    }
-
     test('exponential s=1.15: boundary R=10 reports 1 (integral predicts 0)', () => {
       const level = ref<DecimalSource>(0);
       const formula = Formula.exponential(level, 10, 1.15);
@@ -1555,5 +1559,29 @@ describe('Buy Max', () => {
       resourceRef.value = 100;
       expect(maxAffordable.value).compare_tolerance(5);
     });
+  });
+});
+
+describe('reactive coefficients survive integral memoization', () => {
+  // `getIntegralFormula` memoizes its result for the life of the formula, so
+  // anything the builders read while *constructing* it is frozen there. A
+  // coefficient is a `FormulaSource` — a ref or a variable-free sub-formula —
+  // and reading one eagerly turns it into a snapshot that a later modifier,
+  // upgrade or prestige multiplier never updates.
+
+  test('the forward integral recovers the real level, not one scaled by a stale slope', () => {
+    // Recovering x from F(x) with a frozen coefficient reports the wrong level
+    // and so charges the wrong `c·x` term. Invisible at level 0, where F(x) is
+    // zero and every slope agrees; this samples above it.
+    const level = ref<DecimalSource>(0);
+    const coef = ref<DecimalSource>(1);
+    const formula = Formula.variable(level).mul(coef).add(5);
+
+    formula.evaluateIntegral(); // build and memoize the integral against coef = 1
+
+    coef.value = 100;
+    level.value = 10;
+    // ∫₀¹⁰ (100x + 5) dx = 100·10²/2 + 5·10 = 5050
+    expect(formula.evaluateIntegral()).compare_tolerance(5050);
   });
 });
