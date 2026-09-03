@@ -1584,4 +1584,80 @@ describe('reactive coefficients survive integral memoization', () => {
     // ∫₀¹⁰ (100x + 5) dx = 100·10²/2 + 5·10 = 5050
     expect(formula.evaluateIntegral()).compare_tolerance(5050);
   });
+
+  test('a ref coefficient that moves is honoured by buy-max', () => {
+    // The ticket's reproduction. Asserted through the *same* computed across
+    // the change, so it covers the memoized integral and the threshold guard
+    // together — a fresh computed would exonerate the guard by accident.
+    const level = ref<DecimalSource>(0);
+    const coef = ref<DecimalSource>(1);
+    const formula = Formula.variable(level).mul(coef).add(5);
+    const maxAffordable = calculateMaxAffordable(
+      formula,
+      createResource(ref<DecimalSource>(1e5)),
+      true,
+    );
+
+    expect(maxAffordable.value).compare_tolerance(discreteTruth(formula, 1e5, 0));
+
+    coef.value = 100;
+    // Σ (100i + 5) ≤ 1e5 → 45. Read off a frozen slope of 1 the seed is 442,
+    // and the correction walk exhausts its budget 64 short of it at 378.
+    expect(maxAffordable.value).compare_tolerance(45);
+    expect(maxAffordable.value).compare_tolerance(discreteTruth(formula, 1e5, 0));
+  });
+
+  test('a formula-valued coefficient is re-evaluated, not snapshotted', () => {
+    // The shape a consumer actually writes: the multiplier is a whole
+    // variable-free sub-formula off a modifier chain, and `unrefFormulaSource`
+    // collapses all of it to one number at build time.
+    const level = ref<DecimalSource>(0);
+    const multiplier = ref<DecimalSource>(1);
+    const coef = Formula.constant(multiplier).mul(4);
+    const formula = Formula.variable(level).mul(coef).add(5);
+    const maxAffordable = calculateMaxAffordable(
+      formula,
+      createResource(ref<DecimalSource>(1e5)),
+      true,
+    );
+
+    expect(maxAffordable.value).compare_tolerance(discreteTruth(formula, 1e5, 0));
+
+    multiplier.value = 25;
+    expect(maxAffordable.value).compare_tolerance(discreteTruth(formula, 1e5, 0));
+  });
+
+  test('integrateSub reads its coefficient at invert time too', () => {
+    // The fix touches both builders; the ticket only ever exercised `add`.
+    // Inverting is where the slope still lives after the forward arm stopped
+    // consulting it, so this has to go through `invertIntegral` to bite.
+    const level = ref<DecimalSource>(0);
+    const coef = ref<DecimalSource>(1);
+    const formula = Formula.variable(level).mul(coef).sub(5);
+
+    formula.invertIntegral(1e5); // build and memoize against coef = 1
+
+    coef.value = 100;
+    // K·x²/2 - c·x = T with K = 100, c = 5, T = 1e5
+    //   → x = (5 + √(25 + 2·100·1e5)) / 100 ≈ 44.77
+    // A slope frozen at 1 answers 452.24 instead.
+    expect(formula.invertIntegral(1e5)).compare_tolerance(
+      Decimal.add(5, Decimal.sqrt(20000025)).div(100),
+    );
+  });
+
+  test('a coefficient that turns non-positive declines the closed form and reports', () => {
+    // Build/call split: the *shape* is settled once, the *sign* every call. A
+    // stale positive slope would keep feeding the closed form and return a
+    // confident wrong number; declining it lands in bisection, which cannot
+    // bracket a negative-K integral and says so.
+    const level = ref<DecimalSource>(0);
+    const coef = ref<DecimalSource>(1);
+    const formula = Formula.variable(level).mul(coef).add(5);
+
+    formula.evaluateIntegral();
+
+    coef.value = -100;
+    expect(() => formula.invertIntegral(1e5)).toLogError();
+  });
 });

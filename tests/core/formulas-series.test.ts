@@ -308,6 +308,42 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     payRequirements(req, offered);
     expect(Decimal.eq(wallet.value, 102)).toBe(true);
   });
+
+  test('a cost coefficient that moves after the integral is built charges honestly', () => {
+    // studio/open-loop-engine#29. Same drain, reached from a third side: here
+    // the count came out of an integral whose coefficient was read once, when
+    // the integral was built, while `pay` priced the levels live. The wallet is
+    // what notices — the count was 378 against a true 45, and `pay`'s clamp to
+    // zero turned the 333 unaffordable levels into free ones.
+    const coef = ref<DecimalSource>(1);
+    const funds = 1e5;
+    const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+    const p = createScalingPurchasable({
+      id: 'reactive-coefficient',
+      description: 'a cost curve whose slope is a modifier',
+      resource: wallet,
+      costFormula: (level) => Formula.variable(level).mul(coef).add(5),
+      bulkPurchase: true,
+    });
+
+    // Read once at coef = 1 — this is what builds and memoizes the integral.
+    expect(Decimal.gt(p.amountToPurchase.value, 0)).toBe(true);
+
+    coef.value = 100;
+    const bought = p.purchaseMax();
+    const spent = Decimal.sub(funds, wallet.value);
+    const truth = bruteForce(
+      (x) => Decimal.add(Decimal.mul(x, 100), 5),
+      0,
+      Number(bought.toString()),
+    );
+
+    expect(
+      Decimal.lte(relativeError(spent, truth), EXACT),
+      `spent ${spent.toString()} for ${String(bought)} levels worth ${truth.toString()}`,
+    ).toBe(true);
+    expect(Decimal.gt(wallet.value, 0)).toBe(true);
+  });
 });
 
 describe('a single-payment purchase charges the level it counted to', () => {

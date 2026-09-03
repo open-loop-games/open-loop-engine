@@ -299,24 +299,45 @@ function hasAnyVariable(f: unknown): boolean {
   return ((f as unknown as FormulaInternals).internalVariables ?? 0) > 0;
 }
 
-function quadraticSlope(lhs: FormulaSource): DecimalSource | null {
-  let slope: DecimalSource | null = null;
+/**
+ * The coefficient *source* for a `K·x²/2` antiderivative, or null when the
+ * shape needs bisection. Structural only — it never reads the value, because
+ * the caller holds the result for the life of a memoized integral formula and
+ * a coefficient is a `FormulaSource`, free to be a ref or a variable-free
+ * sub-formula that moves afterwards.
+ *
+ * @internal
+ */
+function quadraticSlopeSource(lhs: FormulaSource): FormulaSource | null {
   if (!(lhs instanceof Formula)) return null;
   // Plain variable: ∫x dx = x²/2 → slope 1
-  if (isPlainVariable(lhs)) {
-    slope = 1;
-  } else if ((lhs as unknown as FormulaInternals).internalEvaluate === Decimal.mul) {
+  if (isPlainVariable(lhs)) return 1;
+  if ((lhs as unknown as FormulaInternals).internalEvaluate === Decimal.mul) {
     // mul(var, k) or mul(k, var): ∫k·x dx = k·x²/2 → slope k
     const [a, b] = lhs.inputs;
-    if (isPlainVariable(a) && !hasAnyVariable(b)) slope = unrefFormulaSource(b);
-    else if (isPlainVariable(b) && !hasAnyVariable(a)) slope = unrefFormulaSource(a);
+    if (isPlainVariable(a) && !hasAnyVariable(b)) return b;
+    if (isPlainVariable(b) && !hasAnyVariable(a)) return a;
   }
-  // Closed-form invert is `(-c + √(c² + 2·K·T)) / K` — divide by K, sqrt of a
-  // possibly-negative discriminant for K ≤ 0. Skip closed-form for non-positive
-  // slopes; bisection handles those correctly (and they're rare in cost contexts).
-  if (slope == null) return null;
-  if (Decimal.lte(slope, 0)) return null;
-  return slope;
+  return null;
+}
+
+/**
+ * Read a {@link quadraticSlopeSource} for one evaluation, or null to decline
+ * the closed form.
+ *
+ * Sign is a per-call question for the same reason the value is: the closed-form
+ * invert is `(-c + √(c² + 2·K·T)) / K`, which divides by K and roots a
+ * possibly-negative discriminant, and a coefficient that is positive when the
+ * integral is built can be negative later. Non-positive reads fall through to
+ * bisection — which reports rather than solving for K < 0, since its `upper`
+ * bracket roots a negative, but a reported failure beats a silent one.
+ *
+ * @internal
+ */
+function quadraticSlope(source: FormulaSource | null): DecimalSource | null {
+  if (source == null) return null;
+  const slope = unrefFormulaSource(source);
+  return Decimal.lte(slope, 0) ? null : slope;
 }
 
 // ∫(f(x) + c) dx = F(x) + c·x. For `lhs` shapes whose antiderivative is K·x²/2
@@ -327,7 +348,7 @@ function buildIntegrateAdd(
   F_integral: GenericFormula,
   other: FormulaSource,
 ): GenericFormula {
-  const slope = quadraticSlope(lhs);
+  const slopeSource = quadraticSlopeSource(lhs);
 
   return new Formula({
     inputs: [F_integral, other],
@@ -345,6 +366,7 @@ function buildIntegrateAdd(
       c_input: FormulaSource,
     ): DecimalSource => {
       const c = unrefFormulaSource(c_input);
+      const slope = quadraticSlope(slopeSource);
 
       if (slope != null) {
         // K·x²/2 + c·x = T  →  K·x² + 2c·x - 2T = 0
@@ -416,7 +438,7 @@ function buildIntegrateSub(
   other: FormulaSource,
   variableOnLhs: boolean,
 ): GenericFormula {
-  const slope = quadraticSlope(variableSide);
+  const slopeSource = quadraticSlopeSource(variableSide);
 
   return new Formula({
     inputs: [F_integral, other],
@@ -439,6 +461,7 @@ function buildIntegrateSub(
       c_input: FormulaSource,
     ): DecimalSource => {
       const c = unrefFormulaSource(c_input);
+      const slope = quadraticSlope(slopeSource);
 
       if (slope != null) {
         // variableOnLhs:  K·x²/2 - c·x = T  →  K·x² - 2c·x - 2T = 0  →  x = (c + √(c² + 2KT)) / K
