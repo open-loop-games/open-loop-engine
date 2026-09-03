@@ -203,9 +203,7 @@ export function runEventModeLoop(
         break;
       }
       simTime += result.advanced;
-      const after = sampleDeps(inc, accessor);
-      diffInto(inc, before, after);
-      before = after;
+      before = commitDeps(inc, accessor, before);
     } else if ('fired' in result) {
       // Zero-distance tie: walker surfaces a finite transition at distance=0
       // but the probe cannot execute it (no auto-purchase module registered).
@@ -276,9 +274,7 @@ export function runEventModeLoop(
       engine.tickDriver.simulateTick(dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
-      const after = sampleDeps(inc, accessor);
-      diffInto(inc, before, after);
-      before = after;
+      before = commitDeps(inc, accessor, before);
     }
     steps++;
   }
@@ -328,6 +324,22 @@ function diffInto(inc: IncrementalSnapshot, before: DepSnapshot, after: DepSnaps
   for (const [path, afterVal] of after.states) {
     if (!Object.is(before.states.get(path), afterVal)) inc.invalidateState(path);
   }
+}
+
+/**
+ * Diff the tracked slice against `before` to invalidate what moved, and return
+ * the fresh sample as the next baseline. Diffing without re-baselining would
+ * re-invalidate the same deps on every later advance, so the two travel
+ * together.
+ */
+function commitDeps(
+  inc: IncrementalSnapshot,
+  accessor: GameStateAccessor,
+  before: DepSnapshot,
+): DepSnapshot {
+  const after = sampleDeps(inc, accessor);
+  diffInto(inc, before, after);
+  return after;
 }
 
 interface FastTickOutcome {
