@@ -337,6 +337,135 @@ describe('round-trip: invert(evaluate(x)) === x', () => {
   });
 });
 
+describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
+  // The direction `calculateMaxAffordable` actually calls, and the one link the
+  // chain skipped: the op round-trip above covers `invert`, and the oracle below
+  // covers `F(b) − F(a)` forward, but nothing swept the integral's inverse.
+  // Four defects lived there — a coefficient frozen at build time, a closed form
+  // open-coding what `F_integral.invert` already does, a gate on the sign of the
+  // coefficient rather than the discriminant, and `√(negative)` returning NaN.
+  //
+  // `add` and `sub` are the two builders that choose a closed-form quadratic
+  // over bisection, and each dispatches on which side carries the variable, so
+  // all four paths are swept. Both signs of `k`, because the closed form divides
+  // by it and roots a discriminant that moves with it.
+  //
+  // Domain per case is the branch the antiderivative *increases* on: it is a
+  // parabola with vertex at ±c/k and the closed form selects one of the two
+  // roots, so only that branch round-trips. Stating the branch is this law's
+  // domain statement, as `DOMAIN` is for the unary ops.
+
+  const C = 5;
+  const K = ['0.5', '3', '10', '-0.5', '-3', '-10'];
+
+  /** Samples across `(lo, hi)`, or climbing from `lo` when the branch is unbounded. */
+  function spread(lo: number, hi: number): string[] {
+    if (!Number.isFinite(hi)) return [0.5, 2, 10, 1e3, 1e6].map((d) => String(lo + d));
+    return [0.1, 0.3, 0.6, 0.9].map((f) => String(lo + (hi - lo) * f));
+  }
+
+  const CASES: Record<
+    string,
+    {
+      op: (variable: DecimalSource, k: DecimalSource) => GenericFormula;
+      /** The increasing branch, or null where it is empty on x ≥ 0. */
+      branch: (k: number) => [number, number] | null;
+    }
+  > = {
+    // ∫(k·x + c)dx = k·x²/2 + c·x, vertex at −c/k. Positive k puts the vertex
+    // below zero, so the whole domain increases; negative k caps it there.
+    'add(var·k, c)': {
+      op: (v, k) => F.variable(v).mul(k).add(C),
+      branch: (k) => (k > 0 ? [0, Infinity] : [0, -C / k]),
+    },
+    'add(c, var·k)': {
+      op: (v, k) => F.add(C, F.variable(v).mul(k)),
+      branch: (k) => (k > 0 ? [0, Infinity] : [0, -C / k]),
+    },
+    // ∫(k·x − c)dx = k·x²/2 − c·x, vertex at c/k — above zero for positive k,
+    // so the increasing branch starts there rather than at the origin.
+    'sub(var·k, c)': {
+      op: (v, k) => F.variable(v).mul(k).sub(C),
+      branch: (k) => (k > 0 ? [C / k, Infinity] : null),
+    },
+    // ∫(c − k·x)dx = c·x − k·x²/2, vertex at c/k. The mirror of the case above:
+    // positive k caps the branch, negative k opens it.
+    'sub(c, var·k)': {
+      op: (v, k) => F.sub(C, F.variable(v).mul(k)),
+      branch: (k) => (k > 0 ? [0, C / k] : [0, Infinity]),
+    },
+  };
+
+  /** The integral round-trip. Error graded in input space, per the header's rule 2. */
+  function expectIntegralRoundTrip(formula: GenericFormula, x: DecimalSource, tol: number) {
+    const { value, errors } = withoutEngineErrors(() => {
+      const target = formula.evaluateIntegral();
+      return { target, back: formula.invertIntegral(target) };
+    });
+    expect(errors, `engine logged while round-tripping the integral at x=${String(x)}`).toEqual([]);
+    const err = relativeError(value.back, x);
+    expect(
+      Decimal.lte(err, tol),
+      `x=${String(x)} → ∫=${String(value.target)} → invertIntegral=${String(value.back)}` +
+        ` (relative error ${err.toString()} in input space, tolerance ${tol})`,
+    ).toBe(true);
+  }
+
+  for (const [name, { op, branch }] of Object.entries(CASES)) {
+    for (const k of K) {
+      const span = branch(Number(k));
+      if (span == null) continue;
+      test(`${name} k=${k}`, () => {
+        for (const x of spread(span[0], span[1])) {
+          expectIntegralRoundTrip(op(x, k), x, DEFAULT_TOL);
+        }
+      });
+    }
+  }
+
+  test('a capped branch has a bounded image, and nothing past it has a pre-image', () => {
+    // The other half of the domain statement. Where the branch is capped the
+    // antiderivative peaks at ±c/k with value c²/(2·|k|), so no target above
+    // that is reachable — and the discriminant is exactly what goes negative
+    // there. Unguarded, the closed form rooted a negative and handed back NaN.
+    for (const k of ['0.5', '3', '10']) {
+      const beyond = Decimal.div(Decimal.pow(C, 2), Decimal.mul(2, k)).mul(2);
+      for (const [label, formula] of [
+        [`add(var·-${k}, c)`, F.variable(0).mul(Decimal.neg(k)).add(C)],
+        [`sub(c, var·${k})`, F.sub(C, F.variable(0).mul(k))],
+      ] as const) {
+        const { value, errors } = withoutEngineErrors(() => ({
+          graded: formula.tryInvertIntegral(beyond),
+          raw: formula.invertIntegral(beyond),
+        }));
+        expect(
+          value.graded.value,
+          `${label}: invented a pre-image for ${String(beyond)}, past a peak of ${String(Decimal.div(beyond, 2))}`,
+        ).toBeNull();
+        expect(
+          new Decimal(value.raw).isNan(),
+          `${label}: returned NaN for an unreachable target instead of reporting`,
+        ).toBe(false);
+        expect(errors.length, `${label}: no report for an unreachable target`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('sub(var·k, c) has no increasing branch for k < 0', () => {
+    // The one combination the sweep above has no domain for, asserted rather
+    // than omitted — an unswept combination is exactly how the inherited suite
+    // hid two wrong inverses. `∫(k·x − c)dx` differentiates to `k·x − c`, which
+    // is negative for every x ≥ 0 when k < 0, so the antiderivative only falls
+    // and no target has a pre-image on a rising branch.
+    for (const k of ['-0.5', '-3', '-10']) {
+      const formula = F.variable(0).mul(k).sub(C);
+      const at = (x: DecimalSource) => formula.evaluateIntegral(x);
+      expect(Decimal.lt(at('2'), at('1')), `k=${k}: ∫ rose between x=1 and x=2`).toBe(true);
+      expect(Decimal.lt(at('10'), at('2')), `k=${k}: ∫ rose between x=2 and x=10`).toBe(true);
+    }
+  });
+});
+
 describe('oracle fixture', () => {
   // The suite's own domains and the generator's are deliberately independent —
   // the round-trip laws need no oracle and own their sampling. That split is
