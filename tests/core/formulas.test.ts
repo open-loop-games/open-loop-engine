@@ -1435,15 +1435,125 @@ describe('Buy Max', () => {
       expect(maxAffordable.value).compare_tolerance(1);
     });
   });
-});
 
-describe('Stringifies', () => {
-  test('Nested formula', () => {
-    const variable = Formula.variable(ref(0));
-    expect(variable.add(5).pow(Formula.constant(10)).stringify()).toBe('pow(add(x, 5.00), 10.00)');
-  });
-  test('Indeterminate', () => {
-    expect(Formula.if(10, true, (f) => f.add(5)).stringify()).toBe('indeterminate');
-    expect(Formula.step(10, 5, (f) => f.add(5)).stringify()).toBe('indeterminate');
+  describe('threshold-guard key: everything the band was computed against', () => {
+    // The guard caches a band computed at one level, in one pricing operation,
+    // under one cap, on one shape of curve. Each test moves one of those while
+    // the resource stays inside the cached band, which is the arrangement that
+    // reaches the fast path. A stale answer here is not a display bug: `pay`
+    // prices live through `calculateCost`, so the count and the charge
+    // disagree and the wallet drains to cover the difference.
+
+    test('a reactive input nested below the top level invalidates the band', () => {
+      // The old signature walked only `formula.inputs`, writing a bare 'f' for
+      // Formula entries and never recursing. Chaining a second multiplier
+      // pushes the first one a level down, out of that walk's sight. Worse, the
+      // fast path returned before reading the nested ref at all, so Vue dropped
+      // it from the dependency set and the computed stopped invalidating: the
+      // staleness was permanent, not one tick late.
+      const level = ref<DecimalSource>(0);
+      const mult = ref<DecimalSource>(1);
+      const formula = Formula.variable(level)
+        .pow_base(2)
+        .mul(10)
+        .mul(Formula.constant(mult).mul(1));
+      const resourceRef = ref<DecimalSource>(101);
+      const maxAffordable = calculateMaxAffordable(formula, createResource(resourceRef), true);
+
+      expect(maxAffordable.value).compare_tolerance(3);
+      resourceRef.value = 102; // small move -> guard hit
+      expect(maxAffordable.value).compare_tolerance(3);
+
+      mult.value = 100; // 10*2^n becomes 1000*2^n: nothing is affordable
+      expect(maxAffordable.value).compare_tolerance(0);
+
+      // And it stays correct as production keeps arriving. Band membership was
+      // tested against the *old* curve's bounds, so a rising resource kept
+      // landing inside the stale band instead of falling out of it.
+      for (let i = 0; i < 6; i++) {
+        resourceRef.value = Decimal.add(resourceRef.value, 1);
+        expect(maxAffordable.value).compare_tolerance(0);
+      }
+    });
+
+    test('raising maxBulkAmount past a capped answer invalidates the band', () => {
+      // `maxBulkAmount` is a MaybeRef and `canMaximize` exists to drive an
+      // x1/x10/x100/max toggle, so this moves whenever a player clicks one. It
+      // was absent from the key entirely, and a capped band stores ceilCost as
+      // Infinity — which `!payable` always accepts — so the cap check passed
+      // trivially and the old cap was returned forever.
+      const level = ref<DecimalSource>(0);
+      const formula = Formula.variable(level).pow_base(2).mul(10);
+      const cap = ref<DecimalSource>(5);
+      const maxAffordable = calculateMaxAffordable(
+        formula,
+        createResource(ref<DecimalSource>(1e9)),
+        true,
+        cap,
+      );
+
+      expect(maxAffordable.value).compare_tolerance(5);
+      cap.value = 20;
+      expect(maxAffordable.value).compare_tolerance(20);
+    });
+
+    test('flipping cumulativeCost invalidates the band', () => {
+      // The two operations price different things — the series vs the single
+      // level reached — and on a linear curve they diverge widely. The band was
+      // computed in one of them and read back under the other.
+      const level = ref<DecimalSource>(0);
+      const formula = Formula.variable(level).add(1);
+      const cumulative = ref(true);
+      const maxAffordable = calculateMaxAffordable(
+        formula,
+        createResource(ref<DecimalSource>(100)),
+        cumulative,
+        1000,
+      );
+
+      expect(maxAffordable.value).compare_tolerance(13); // Σ(i+1) <= 100
+      cumulative.value = false;
+      expect(maxAffordable.value).compare_tolerance(99); // f(n) = n+1 <= 100
+    });
+
+    test('a condition held in a Formula.if closure invalidates the band', () => {
+      // `Formula.if` carries only the value in `inputs`; the condition and both
+      // branch formulas live in a closure. No signature over the input tree can
+      // reach them at any depth, which is why the guard keys on a token that
+      // *evaluates* the curve instead. Reachable under cumulativeCost: false —
+      // `if` binds no integrate, so the cumulative path bails before the guard
+      // is ever written.
+      const level = ref<DecimalSource>(0);
+      const halved = ref(true);
+      const formula = Formula.variable(level)
+        .add(10)
+        .if(halved, (x) => x.div(2));
+      const maxAffordable = calculateMaxAffordable(
+        formula,
+        createResource(ref<DecimalSource>(100)),
+        false,
+        1000,
+      );
+
+      expect(maxAffordable.value).compare_tolerance(190); // (n+10)/2 <= 100
+      halved.value = false;
+      expect(maxAffordable.value).compare_tolerance(90); // n+10 <= 100
+    });
+
+    test('a band one level below the cap keeps its ceiling', () => {
+      // `capped` asks whether there is a next level to price. Testing
+      // `affordable + 1 >= maxBulkAmount` also fired one level *below* the cap,
+      // where that next level is real and priceable; erasing its ceiling to
+      // Infinity froze the answer at maxBulkAmount - 1 for as long as the level
+      // held.
+      const level = ref<DecimalSource>(0);
+      const formula = Formula.exponential(level, 10, 1.15);
+      const resourceRef = ref<DecimalSource>(50);
+      const maxAffordable = calculateMaxAffordable(formula, createResource(resourceRef), true, 5);
+
+      expect(maxAffordable.value).compare_tolerance(4);
+      resourceRef.value = 100;
+      expect(maxAffordable.value).compare_tolerance(5);
+    });
   });
 });

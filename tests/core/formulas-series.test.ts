@@ -276,6 +276,38 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       expect(Decimal.gt(wallet.value, 0)).toBe(true);
     }
   });
+
+  test('a cost curve that changes under a warm affordability cache still charges honestly', () => {
+    // Same drain, reached from the other side. Above, the count and the charge
+    // disagreed because they were computed in different coordinates; here they
+    // disagree because `calculateMaxAffordable` answered out of a cache whose
+    // key could not see the cost change, while `pay` priced the levels live.
+    // The wallet is what notices either way.
+    const level = ref<DecimalSource>(0);
+    const surcharge = ref<DecimalSource>(1);
+    const cost = Formula.variable(level)
+      .pow_base(2)
+      .mul(10)
+      .mul(Formula.constant(surcharge).mul(1));
+    const wallet = createResource(ref<DecimalSource>(101), 'coins');
+    const req = createCostRequirement({
+      resource: wallet,
+      cost,
+      cumulativeCost: true,
+      maxBulkAmount: 100,
+    });
+
+    expect(Decimal.eq(maxRequirementsMet(req), 3)).toBe(true);
+    wallet.value = 102; // small move -> the affordability cache is warm
+    expect(Decimal.eq(maxRequirementsMet(req), 3)).toBe(true);
+
+    surcharge.value = 100; // every level now costs 100x: nothing is affordable
+    const offered = maxRequirementsMet(req);
+    expect(Decimal.eq(offered, 0)).toBe(true);
+
+    payRequirements(req, offered);
+    expect(Decimal.eq(wallet.value, 102)).toBe(true);
+  });
 });
 
 describe('a single-payment purchase charges the level it counted to', () => {

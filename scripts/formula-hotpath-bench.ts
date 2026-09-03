@@ -20,8 +20,9 @@
  */
 
 import { ref } from 'vue';
-import Decimal, { bn } from '@/primitives/decimal';
-import { F as Formula } from '@/core/formulas/formulas';
+import Decimal, { bn, type DecimalSource } from '@/primitives/decimal';
+import { F as Formula, calculateMaxAffordable } from '@/core/formulas/formulas';
+import { createResource } from '@/core/resource';
 import {
   createModifierChain,
   createAdditiveModifier,
@@ -61,7 +62,7 @@ function scenarioLinear(): void {
   const iters = 100_000;
 
   const depthRef = ref(0 as number);
-  const formula = Formula.variable(depthRef).times(0.15).add(1).times(baseHp);
+  const formula = Formula.variable(depthRef).mul(0.15).add(1).mul(baseHp);
 
   time('inline native math', (i) => baseHp * (1 + i * 0.15), iters);
   time(
@@ -92,7 +93,7 @@ function scenarioPolynomial(): void {
   const iters = 100_000;
 
   const levelRef = ref(1 as number);
-  const formula = Formula.variable(levelRef).pow(1.2).times(baseDmg);
+  const formula = Formula.variable(levelRef).pow(1.2).mul(baseDmg);
 
   time('inline native math', (i) => baseDmg * Math.pow(i + 1, 1.2), iters);
   time(
@@ -119,7 +120,7 @@ function scenarioExponential(): void {
   const iters = 100_000;
 
   const levelRef = ref(0 as number);
-  const formula = Formula.pow_base(1.1, levelRef).times(xpPerLevel);
+  const formula = Formula.pow_base(1.1, levelRef).mul(xpPerLevel);
 
   time('inline native math', (i) => xpPerLevel * Math.pow(1.1, i % 100), iters);
   time(
@@ -187,21 +188,79 @@ function scenarioFormulaConstruction(): void {
   const baseHp = 10;
 
   time(
-    'Formula.variable(ref).times(0.15).add(1).times(baseHp)',
+    'Formula.variable(ref).mul(0.15).add(1).mul(baseHp)',
     (i) => {
       const depthRef = ref(i as number);
-      return Formula.variable(depthRef).times(0.15).add(1).times(baseHp);
+      return Formula.variable(depthRef).mul(0.15).add(1).mul(baseHp);
     },
     iters,
   );
   time(
-    'Formula.variable(number).pow(1.2).times(baseDmg)',
+    'Formula.variable(number).pow(1.2).mul(baseDmg)',
     (i) =>
       Formula.variable(i + 1)
         .pow(1.2)
-        .times(25),
+        .mul(25),
     iters,
   );
+}
+
+/**
+ * Scenario F — the "buy max" threshold guard.
+ *
+ * `calculateMaxAffordable` caches an affordability band so a tick that only
+ * moves the resource answers without re-solving the curve. The guard is keyed
+ * on a token that evaluates the cost curve, so this measures what that key
+ * costs on the hot path against what it saves.
+ *
+ * Two things to keep in mind when reading or extending this. The function
+ * returns a `computed`, so a reactive dep has to be dirtied every iteration or
+ * the timing is of Vue's cache rather than the guard. And the guard-miss case
+ * has to move the *level*, not the resource, or it stays a hit.
+ */
+function scenarioMaxAffordableGuard(): void {
+  console.log('\n### Scenario F — calculateMaxAffordable threshold guard');
+  console.log('### Shape: exponential cost 10 x 1.15^level, "buy max" over a growing wallet');
+  const iters = 100_000;
+
+  const hitLevel = ref<DecimalSource>(0);
+  const hitCost = Formula.exponential(hitLevel, 10, 1.15);
+  const hitWallet = ref<DecimalSource>(1e6);
+  const hitResource = createResource(hitWallet);
+  const hitAffordable = calculateMaxAffordable(hitCost, hitResource, true, 1e9);
+  void hitAffordable.value; // prime the guard before timing
+  time(
+    'guard hit (resource nudged inside the band)',
+    (i) => {
+      // Tiny relative moves keep the wallet inside the cached band while still
+      // dirtying the computed, which is exactly the production tick the guard exists for.
+      hitWallet.value = Decimal.add(1e6, (i % 100) * 1e-6);
+      return hitAffordable.value;
+    },
+    iters,
+  );
+
+  const missLevel = ref<DecimalSource>(0);
+  const missCost = Formula.exponential(missLevel, 10, 1.15);
+  const missResource = createResource(ref<DecimalSource>(1e6));
+  const missAffordable = calculateMaxAffordable(missCost, missResource, true, 1e9);
+  void missAffordable.value; // prime the guard before timing
+  time(
+    'guard miss — level moved (full recomputation)',
+    (i) => {
+      missLevel.value = i % 50;
+      return missAffordable.value;
+    },
+    iters,
+  );
+
+  const baseCost = Formula.exponential(ref<DecimalSource>(7), 10, 1.15);
+  time(
+    'baseline: invertIntegral + evaluateIntegral',
+    () => baseCost.invertIntegral(Decimal.add(1e6, baseCost.evaluateIntegral())),
+    iters,
+  );
+  time('baseline: formula.evaluate() (the guard key)', () => baseCost.evaluate(), iters);
 }
 
 console.log('OL-525 F3 pre-bench — Formula.evaluate() vs inline vs Decimal chain');
@@ -213,5 +272,6 @@ scenarioPolynomial();
 scenarioExponential();
 scenarioModifierChain();
 scenarioFormulaConstruction();
+scenarioMaxAffordableGuard();
 
 console.log('\nDone.');

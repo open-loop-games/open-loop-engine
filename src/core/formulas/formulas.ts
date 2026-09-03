@@ -1399,7 +1399,9 @@ function payable(price: DecimalSource, balance: DecimalSource): boolean {
  * @param resource - The resource paying for the levels
  * @param cumulativeCost - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
  * @param maxBulkAmount - Ceiling on the returned count, for "buy max" caps. Default: unbounded
- * @returns Reactive count of affordable levels, recomputed as the resource and the formula's inputs change
+ * @returns Reactive count of affordable levels, recomputed as the resource, the
+ * cost curve, and both options change — including reactive values the curve
+ * reads from inside a `Formula.step` / `Formula.if` closure
  */
 export function calculateMaxAffordable(
   formula: GenericFormula,
@@ -1410,54 +1412,61 @@ export function calculateMaxAffordable(
   const computedCumulativeCost = processGetter(cumulativeCost);
   const computedmaxBulkAmount = processGetter(maxBulkAmount);
 
+  // Change token for the cost curve. Recomputes — and so returns a *fresh*
+  // object — whenever any reactive value the formula reads changes, which makes
+  // identity comparison an exact "has the curve moved?" test.
+  //
+  // Running `evaluate` is what makes it exact, and nothing cheaper is. A
+  // signature built by walking `formula.inputs` cannot see the state that
+  // `Formula.step` and `Formula.if` hold in a closure (their `inputs` carry
+  // only the value; the threshold, the condition and the whole modifier
+  // sub-formula do not appear there), nor anything a consumer-built
+  // `new Formula({ inputs, evaluate })` closes over. Evaluating reaches all of
+  // it, because it runs it.
+  //
+  // Identity rather than value, because an input can move the curve somewhere
+  // other than where it was sampled: a `step` threshold sliding from 100 to 200
+  // leaves the value at level 0 untouched while changing what the levels above
+  // it cost.
+  const curveToken = computed<{ at: DecimalSource }>(() => ({ at: formula.evaluate() }));
+
   // Threshold guard: cache the affordability band [floorCost, ceilCost) so ticks
   // where the resource changes by a small amount (production) can short-circuit
-  // with a pair of Decimal comparisons (~53ns each) instead of a full
-  // invertIntegral (~1.6µs) + evaluateIntegral (~1.9µs).
+  // with a handful of comparisons instead of a full invertIntegral +
+  // evaluateIntegral. See `scenarioF` in scripts/formula-hotpath-bench.ts.
   //
-  // The guard is only valid while the formula's innermostVariable (current level)
-  // hasn't changed. A purchase changes the level, which shifts the cost curve —
-  // the cached band no longer applies.
+  // Every field here is part of the key, and the fast path must test all of
+  // them: the band was computed at one level, in one pricing operation, under
+  // one cap, on one shape of curve, and it is stale if any of the four moved.
+  //
+  // The fast path must also *read* every reactive input on every run, which is
+  // why `curveToken` is read before the early return below rather than inside
+  // the test. Vue re-collects dependencies each run, so an input read only on
+  // the recomputation path is dropped from the dependency set the first time
+  // the guard hits — after which nothing invalidates this computed again and
+  // the staleness is permanent, not one tick late.
   let guard: {
     variable: DecimalSource; // innermostVariable snapshot
     affordable: DecimalSource; // cached result
     floorCost: DecimalSource; // total cost of buying `affordable` levels (resource must be >= this)
     ceilCost: DecimalSource; // total cost of buying `affordable + 1` levels (resource must be < this)
-    inputSig: string; // signature of non-variable formula inputs (detects base/mult changes, e.g. scope-pushed tunables)
+    token: { at: DecimalSource }; // curve identity the band was computed against
+    cumulative: boolean; // the pricing operation the band was computed in
+    maxBulk: DecimalSource; // the cap the band was clamped to
   } | null = null;
-
-  // Build a cheap signature of the formula's non-variable inputs. Used to
-  // invalidate the guard when scoped overrides (tunables, dynamic base
-  // costs) change the cost curve without changing `innermostVariable`.
-  // Non-Formula inputs are unwrapped; Formula inputs are represented by
-  // identity (not recursed) — a fully-resolved signature would defeat the
-  // guard's whole purpose.
-  function computeInputSignature(): string {
-    const parts: string[] = [];
-    for (const input of formula.inputs) {
-      if (input instanceof Formula) {
-        parts.push('f');
-        continue;
-      }
-      const v = unref(input as MaybeRef<DecimalSource>);
-      parts.push(String(v));
-    }
-    return parts.join('|');
-  }
 
   return computed(() =>
     profile('formula.calculateMaxAffordable', () => {
+      // Read first, on every path: this is the subscription to every reactive
+      // input the curve reads, not just the key it is compared by.
+      const token = curveToken.value;
       const maxBulkAmount = unref(computedmaxBulkAmount);
       if (Decimal.eq(maxBulkAmount, 1)) {
         guard = null;
-        return Decimal.gte(resource.value, formula.evaluate()) ? Decimal.dOne : Decimal.dZero;
+        return Decimal.gte(resource.value, token.at) ? Decimal.dOne : Decimal.dZero;
       }
 
       const cumulativeCost = unref(computedCumulativeCost);
-
-      // Compute input signature once — also registers reactive deps on any
-      // ref-based inputs so the outer computed invalidates when they change.
-      const inputSig = computeInputSignature();
 
       // --- Threshold guard fast path ---
       const currentVariable = unref(formula.innermostVariable) ?? 0;
@@ -1468,7 +1477,12 @@ export function calculateMaxAffordable(
       // stale-by-one for resource values sitting in it.
       if (
         guard !== null &&
-        guard.inputSig === inputSig &&
+        guard.token === token &&
+        guard.cumulative === cumulativeCost &&
+        // `maxBulkAmount` defaults to `dInf`, and `processGetter` hands back the
+        // same object each run, so identity settles the common case before the
+        // comparison that has to reason about infinities.
+        (guard.maxBulk === maxBulkAmount || Decimal.eq(guard.maxBulk, maxBulkAmount)) &&
         Decimal.eq(currentVariable, guard.variable) &&
         payable(guard.floorCost, resource.value) &&
         !payable(guard.ceilCost, resource.value)
@@ -1545,13 +1559,20 @@ export function calculateMaxAffordable(
       // integral-floor / discrete-ceil mix existed only to paper over the two
       // coordinates disagreeing, and a resource landing in that gap read a
       // stale-by-one answer out of the cache.
-      const capped = Decimal.gte(Decimal.add(affordable, 1), maxBulkAmount);
+      //
+      // `capped` asks whether a next level exists to price, so it tests
+      // `affordable + 1` *passing* the cap, not reaching it: at exactly the cap
+      // that level is still real, and giving the band an infinite ceiling
+      // instead of its price would freeze the answer one short.
+      const capped = Decimal.gt(Decimal.add(affordable, 1), maxBulkAmount);
       guard = {
         variable: currentVariable,
         affordable,
         floorCost: priceOf(affordable),
         ceilCost: capped ? Decimal.dInf : priceOf(Decimal.add(affordable, 1)),
-        inputSig,
+        token,
+        cumulative: cumulativeCost,
+        maxBulk: maxBulkAmount,
       };
 
       return affordable;
