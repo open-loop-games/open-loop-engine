@@ -1464,15 +1464,24 @@ export function calculateMaxAffordable(
       // input the curve reads, not just the key it is compared by.
       const token = curveToken.value;
       const maxBulkAmount = unref(computedmaxBulkAmount);
+      const cumulativeCost = unref(computedCumulativeCost);
+      const currentVariable = unref(formula.innermostVariable) ?? 0;
+
       if (Decimal.eq(maxBulkAmount, 1)) {
         guard = null;
-        return Decimal.gte(resource.value, token.at) ? Decimal.dOne : Decimal.dZero;
+        // Price the level being bought, in the operation `pay` will charge it
+        // in — the same question `priceOf(1)` answers on the general path, and
+        // the reason `cumulativeCost` is read above rather than below. A
+        // cumulative buy of one sums to `evaluate(A)`, which is `token.at`; a
+        // non-cumulative one pays `evaluate(A + 1)` for the level it reaches.
+        // Comparing against `token.at` in both granted a level the balance
+        // could not cover, and `pay` does not re-check — it subtracts and
+        // clamps at zero.
+        const price = cumulativeCost ? token.at : formula.evaluate(Decimal.add(currentVariable, 1));
+        return payable(price, resource.value) ? Decimal.dOne : Decimal.dZero;
       }
 
-      const cumulativeCost = unref(computedCumulativeCost);
-
       // --- Threshold guard fast path ---
-      const currentVariable = unref(formula.innermostVariable) ?? 0;
       // Band membership is tested with the same predicate the answer was
       // decided by (`payable` below), so the cached answer and a recomputation
       // cannot disagree at the boundary — a plain `gte`/`lt` pair here would

@@ -347,6 +347,54 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
 });
 
 describe('a single-payment purchase charges the level it counted to', () => {
+  test('a cap of 1 counts the level it is buying, not the one it is on', () => {
+    // `maxBulkAmount: 1` — createCostRequirement's default — takes a fast path
+    // that skips the seed and the correction walk entirely. It still has to
+    // answer the same question the general path does, and under
+    // `cumulativeCost: false` it did not: it compared the balance against
+    // `evaluate(A)`, the cost at the current level, while `pay` charges
+    // `evaluate(A + 1)` for the level being reached. Funds sit exactly at the
+    // current level's price, which is the value the fast path was reading and
+    // is strictly below the next level's on every increasing curve.
+    for (const startLevel of [0, 7]) {
+      for (const costScaling of [1.05, 1.15, 1.5, 2, 3]) {
+        const funds = Decimal.mul(10, Decimal.pow(costScaling, startLevel));
+        const level = ref<DecimalSource>(startLevel);
+        const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const shape = {
+          resource: wallet,
+          cumulativeCost: false as const,
+        };
+        const capped = createCostRequirement({
+          ...shape,
+          cost: Formula.exponential(level, 10, costScaling),
+          maxBulkAmount: 1,
+        });
+        const uncapped = createCostRequirement({
+          ...shape,
+          cost: Formula.exponential(level, 10, costScaling),
+          maxBulkAmount: Decimal.dInf,
+        });
+
+        const capAnswer = maxRequirementsMet(capped);
+        const truth = Decimal.min(maxRequirementsMet(uncapped), 1);
+        expect(
+          Decimal.eq(capAnswer, truth),
+          `level=${startLevel} s=${costScaling}: cap of 1 said ${String(capAnswer)}, uncapped clamped says ${String(truth)}`,
+        ).toBe(true);
+
+        // And the wallet is what notices if it doesn't: `pay` subtracts the
+        // live price and clamps at zero, so a level counted but not payable is
+        // a level granted free.
+        payRequirements(capped, capAnswer);
+        expect(
+          Decimal.gte(wallet.value, 0) && Decimal.lte(capped.getCost(capAnswer), funds),
+          `level=${startLevel} s=${costScaling}: charged ${String(capped.getCost(capAnswer))} out of ${String(funds)}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   // The sibling of the law above, one flag over. `cumulativeCost: false` prices
   // a bulk buy as one payment at the target level rather than a sum, so "bulk
   // charges what singles charge" does NOT hold here and is the wrong law. What

@@ -1152,16 +1152,26 @@ describe('Buy Max', () => {
       expect(calculateCost(formula, 5, false)).compare_tolerance(6);
     });
     test('A cost curve that evaluates to NaN affords nothing', () => {
-      // `maxBulkAmount === 1` short-circuits to `gte(resource, evaluate())`.
-      // break_eternity's `gte` answered `true` against NaN, so an undefined cost
-      // — `recip(0)` is NaN rather than Infinity — read as affordable and handed
-      // out a free level. Corrected in `primitives/decimal.ts`; gated here
-      // because this is the default single-buy path every purchasable takes.
-      const variable = Formula.variable(0);
-      const formula = Formula.recip(variable);
-      expect(new Decimal(formula.evaluate()).isNan()).toBe(true);
-      const maxAffordable = calculateMaxAffordable(formula, resource, false, 1);
-      expect(maxAffordable.value).compare_tolerance(0);
+      // `maxBulkAmount === 1` short-circuits past the seed and the correction
+      // walk. break_eternity's `gte` answered `true` against NaN, so an
+      // undefined cost — `recip(0)` is NaN rather than Infinity — read as
+      // affordable and handed out a free level. Corrected in
+      // `primitives/decimal.ts`; gated here because this is the default
+      // single-buy path every purchasable takes.
+      //
+      // The undefined level has to be the one being *priced*, and the two cost
+      // operations price different levels: a cumulative buy of one sums to
+      // `evaluate(A)`, a single-payment one pays `evaluate(A + 1)` for the
+      // level it reaches. Both are gated, each against its own curve.
+      const cumulativeLevel = ref<DecimalSource>(0);
+      const cumulative = Formula.recip(Formula.variable(cumulativeLevel));
+      expect(new Decimal(cumulative.evaluate()).isNan()).toBe(true);
+      expect(calculateMaxAffordable(cumulative, resource, true, 1).value).compare_tolerance(0);
+
+      const singleLevel = ref<DecimalSource>(0);
+      const single = Formula.recip(Formula.variable(singleLevel).sub(1));
+      expect(new Decimal(single.evaluate(1)).isNan()).toBe(true);
+      expect(calculateMaxAffordable(single, resource, false, 1).value).compare_tolerance(0);
     });
     test('Calculates max affordable and cost correctly', () => {
       const variable = Formula.variable(0);
