@@ -5,6 +5,7 @@ import Formula, {
   unrefFormulaSource,
 } from '@/core/formulas/formulas';
 import type {
+  FormulaSource,
   GenericFormula,
   IntegrableFormula,
   InvertibleFormula,
@@ -14,7 +15,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { ref } from 'vue';
+import { ref, type MaybeRef } from 'vue';
 import '../utils';
 
 type FormulaFunctions = keyof GenericFormula & keyof typeof Formula & keyof typeof Decimal;
@@ -1659,5 +1660,61 @@ describe('reactive coefficients survive integral memoization', () => {
 
     coef.value = -100;
     expect(() => formula.invertIntegral(1e5)).toLogError();
+  });
+});
+
+describe('buy-max returns no count it could not price', () => {
+  // The correction walk exists because the seed solves the continuous equation
+  // and the answer is discrete; it walks a level or two. Running the budget out
+  // means the two coordinates disagree wildly, and what the walk is holding
+  // when that happens was never passed through `canAfford`. `pay` does not
+  // re-check it — it subtracts and clamps at zero — so returning it is how a
+  // wrong seed becomes free levels.
+
+  /**
+   * A curve that prices honestly and inverts by a factor of 100 too far. The
+   * input has to be `Formula.variable`, not the bare ref: `internalVariables`
+   * counts only Formula inputs, and a node with none is rejected as
+   * non-invertible long before the walk.
+   */
+  function overshootingCurve(level: MaybeRef<DecimalSource>): InvertibleFormula {
+    return new Formula({
+      inputs: [Formula.variable(level)],
+      evaluate: (x: DecimalSource) => Decimal.add(Decimal.mul(x, 10), 10),
+      invert: (value: DecimalSource, lhs: FormulaSource) =>
+        (lhs as InvertibleFormula).invert(Decimal.mul(value, 100)),
+    }) as InvertibleFormula;
+  }
+
+  test('a seed the walk cannot reach answers 0 rather than an unpayable count', () => {
+    // Non-cumulative, so the seed is `formula.invert` — the lie — and pricing
+    // is `evaluate`, which stays honest. Under cumulativeCost the seed comes
+    // from `invertIntegral` instead and a lying `invert` is never consulted.
+    const level = ref<DecimalSource>(0);
+    const formula = overshootingCurve(level);
+    const maxAffordable = calculateMaxAffordable(
+      formula,
+      createResource(ref<DecimalSource>(100)),
+      false,
+    );
+
+    expect(() => maxAffordable.value).toLogError();
+    expect(maxAffordable.value).compare_tolerance(0);
+  });
+
+  test('a seed the walk can reach is still answered normally', () => {
+    // The postcondition must not fire on the ordinary case: the same curve,
+    // inverted honestly, walks home and reports nothing.
+    const level = ref<DecimalSource>(0);
+    const formula = Formula.variable(level).mul(10).add(10);
+    const maxAffordable = calculateMaxAffordable(
+      formula,
+      createResource(ref<DecimalSource>(100)),
+      false,
+    );
+
+    expect(() => maxAffordable.value).not.toLogError();
+    // evaluate(n) = 10n + 10 <= 100 -> n = 9
+    expect(maxAffordable.value).compare_tolerance(9);
   });
 });

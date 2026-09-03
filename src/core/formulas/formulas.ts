@@ -1455,6 +1455,9 @@ export function calculateMaxAffordable(
     maxBulk: DecimalSource; // the cap the band was clamped to
   } | null = null;
 
+  /** Latch for the correction-walk postcondition report — see its use below. */
+  let reportedWalkExhaustion = false;
+
   return computed(() =>
     profile('formula.calculateMaxAffordable', () => {
       // Read first, on every path: this is the subscription to every reactive
@@ -1541,9 +1544,38 @@ export function calculateMaxAffordable(
         // to arrive at the same place.
         affordable = Decimal.dZero;
       } else {
+        let verified = false;
         for (let i = 0; i < CORRECTION_LIMIT && Decimal.gt(affordable, 0); i++) {
-          if (canAfford(affordable)) break;
+          if (canAfford(affordable)) {
+            verified = true;
+            break;
+          }
           affordable = Decimal.sub(affordable, 1);
+        }
+        // Postcondition: the answer is a count `canAfford` accepted, or it is
+        // zero. Draining to zero satisfies it — nothing costs nothing. Running
+        // out of budget does not: what's left is a count nobody priced, and
+        // `pay` doesn't re-check it, it subtracts and clamps at zero, so the
+        // levels above what the resource covers are handed out free. Answering
+        // zero is the direction that can only under-buy.
+        //
+        // This costs monotonicity in the resource — a larger balance seeds
+        // further out, so it can exhaust where a smaller one walked home — but
+        // no caller depends on that, and an unpayable count is worse.
+        if (!verified && Decimal.gt(affordable, 0)) {
+          if (!reportedWalkExhaustion) {
+            // Once per call site: unlike the composition errors above, this is
+            // a numeric condition, and it sits in a computed that re-runs on
+            // every resource change.
+            reportedWalkExhaustion = true;
+            console.error(
+              'Max affordable correction walk exhausted its budget; the seed and the discrete price disagree by more than ' +
+                `${CORRECTION_LIMIT} levels. Returning 0 rather than a count that cannot be paid for.`,
+            );
+          }
+          profileEnd('formula.affordable.refine', correctionStart);
+          guard = null;
+          return Decimal.dZero;
         }
         for (let i = 0; i < CORRECTION_LIMIT && Decimal.lt(affordable, maxBulkAmount); i++) {
           const next = Decimal.add(affordable, 1);
