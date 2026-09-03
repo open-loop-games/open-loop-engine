@@ -66,9 +66,9 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
  * when even a single unit doesn't.
  *
  * Total cost is non-decreasing in `n`, so "fits" is a monotone predicate and a
- * binary search finds its boundary. Both helpers reach this through a reserve:
- * each passes an `available` already reduced by the floor, so the result is the
- * most that can be bought without breaching it.
+ * binary search finds its boundary. Callers reach this through
+ * {@link reserveClampedAmount}, which passes an `available` already reduced by
+ * the floor, so the result is the most that can be bought without breaching it.
  *
  * A `ceiling` of 1 needs no search, and a non-finite one means this cost can't
  * bind (free or unbounded) — both return `ceiling` unchanged.
@@ -125,19 +125,18 @@ export interface SetupSweepAutoPurchaseOptions {
    * below this value. Default: `0` (no reserve).
    *
    * Applied *per cost-resource*: each candidate's cost requirements are
-   * grouped by the resource they spend, and the same floor is held against
-   * each. Single-currency lists (the common case) see exactly the "leave N in
-   * the bank" semantic {@link SetupPolicyAutoPurchaseOptions.reserve}
-   * describes.
+   * grouped by the resource they spend, costs summed within a group, and the
+   * same floor held against each. Single-currency lists (the common case) see
+   * the plain "leave N in the bank" semantic.
    *
    * Re-read once per candidate, not once per beat, so a floor expressed as a
    * fraction of the live bank (`() => 0.2 * bank.value`) holds *cumulatively*
    * as earlier candidates in the sweep spend.
    *
    * The floor clamps rather than skips: a candidate that can afford three
-   * levels under the floor but not ten buys three. This is the one place the
-   * sweep is stricter than its policy sibling, which filters on the cost of a
-   * single unit.
+   * levels under the floor but not ten buys three. Its policy sibling clamps
+   * too, but screens candidates on a single unit first, since it buys one
+   * winner rather than everything affordable.
    *
    * Only top-level cost requirements are seen. Costs nested inside `anyOf` /
    * `allOf` are opaque to the floor — the same limitation `Purchasable.getCost`
@@ -159,10 +158,19 @@ export interface SetupSweepAutoPurchaseOptions {
  * Only top-level cost requirements are seen; costs nested inside `anyOf` /
  * `allOf` are opaque to the floor, the same limitation `Purchasable.getCost`
  * has.
+ *
+ * `ceiling` caps the search. It defaults to what a `purchase()` call would buy,
+ * which is what the sweep wants; the policy helper passes its own bulk amount
+ * instead. A `ceiling` of `1` answers the boolean "is one unit payable under
+ * the floor" without running the search at all.
  */
-function reserveClampedAmount(p: Purchasable, reserve: Decimal): DecimalSource {
+function reserveClampedAmount(
+  p: Purchasable,
+  reserve: Decimal,
+  ceilingArg: DecimalSource = p.amountToPurchase.value,
+): DecimalSource {
   const reqs: Requirement[] = Array.isArray(p.requirements) ? p.requirements : [p.requirements];
-  let ceiling = p.amountToPurchase.value;
+  let ceiling = ceilingArg;
 
   const byResource = new Map<Resource, CostRequirement[]>();
   for (const req of reqs) {
@@ -329,10 +337,16 @@ export interface SetupPolicyAutoPurchaseOptions {
    */
   bulkAmount?: Computable<DecimalSource>;
   /**
-   * Spending-discipline floor. The auto-buyer will not drive the producer's
-   * resource below this value — `canPurchase` is tightened to require
-   * `resource.value − reserve ≥ cost`. Orthogonal to policy, applied
+   * Spending-discipline floor. The auto-buyer will not drive any resource a
+   * purchase *spends* below this value: a candidate is screened out unless every
+   * paying cost requirement admits a single unit above the floor, measured per
+   * cost-resource. Note this is the resource the purchase costs, which is not
+   * necessarily the one the producer makes. Orthogonal to policy, applied
    * uniformly across every candidate. Default: `0` (no reserve).
+   *
+   * Only top-level cost requirements are seen. Costs nested inside `anyOf` /
+   * `allOf` are opaque to the floor — the same limitation `Purchasable.getCost`
+   * has.
    *
    * The floor also clamps {@link bulkAmount}: candidate selection screens on
    * the cost of a single unit, so the winning bulk buy is cut down to whatever
@@ -344,10 +358,12 @@ export interface SetupPolicyAutoPurchaseOptions {
    *
    * Mirrors the "leave N in the bank" pattern shared by Frozen Cookies
    * (Spontaneous Edifice / harvest bank), Cookie Monster (`PP` formula's
-   * bank term), and AutoTrimps (`spendingPerc`). Kept in the same currency
-   * as the producer's output; assumes cost-resource equals produce-resource
-   * (the Cookie Clicker shape that {@link selectionHybridPayback} is
-   * designed for).
+   * bank term), and AutoTrimps (`spendingPerc`).
+   *
+   * Independent of any reserve a {@link SelectionPolicy} scores with —
+   * {@link selectionHybridPayback}'s wait term reads whatever `getResource`
+   * the consumer wired, which is a ranking heuristic, not this floor. The two
+   * can disagree when cost-resource and produce-resource differ.
    */
   reserve?: Computable<DecimalSource>;
   /**
@@ -384,7 +400,8 @@ export interface SetupPolicyAutoPurchaseOptions {
  * 1. Accumulate `dt`. If below `interval`, return.
  * 2. If `enabled` is false, reset the accumulator and return.
  * 3. Filter producers by `canPurchase.value && repeatable !== undefined`
- *    and, when `reserve > 0`, `resource.value − reserve ≥ getCost(1)`.
+ *    and, when `reserve > 0`, whether a single unit is payable with every
+ *    cost-resource left at or above the floor.
  * 4. Pass the filtered list to `policy.pick()` and purchase the winner,
  *    clamping `bulkAmount` to what the reserve admits.
  * 5. Subtract `interval` from the accumulator (so beat timing stays stable)
@@ -530,11 +547,11 @@ export function setupPolicyAutoPurchase(
         if (!repeatable) continue;
         if (!repeatable.canPurchase.value) continue;
 
-        if (useReserve) {
-          const cost = Decimal.fromValue(repeatable.getCost(1));
-          const available = Decimal.fromValue(producer.resource.value);
-          if (Decimal.sub(available, reserve).lt(cost)) continue;
-        }
+        // Screened through the same helper the bulk clamp uses, so filter and
+        // clamp cannot disagree about what the floor admits. `producer.resource`
+        // is the *produced* resource; the floor belongs on whatever the
+        // purchase spends, which only the requirements know.
+        if (useReserve && Decimal.lte(reserveClampedAmount(repeatable, reserve, 1), 0)) continue;
 
         candidates.push(producer);
       }
@@ -549,12 +566,14 @@ export function setupPolicyAutoPurchase(
         // The candidate filter above only proved that a *single* unit fits
         // under the floor. Buying `bulk` on that evidence spends straight
         // through the reserve whenever `bulkAmount > 1`, so clamp to what the
-        // floor actually admits.
+        // floor actually admits. Capping the ceiling at `amountToPurchase`
+        // costs nothing — `purchase()` re-clamps there anyway — and keeps a
+        // non-finite `bulk` from making the clamp a no-op.
         const amount = useReserve
-          ? largestAffordable(
-              (n) => buyTarget.getCost(n),
-              Decimal.sub(best.resource.value, reserve),
-              bulk,
+          ? reserveClampedAmount(
+              buyTarget,
+              reserve,
+              Decimal.min(bulk, buyTarget.amountToPurchase.value),
             )
           : bulk;
 

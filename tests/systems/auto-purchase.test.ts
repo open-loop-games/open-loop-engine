@@ -287,7 +287,7 @@ describe('setupSweepAutoPurchase', () => {
 // ============================================================================
 
 describe('setupPolicyAutoPurchase', () => {
-  function makeCategory(resource: Resource) {
+  function makeCategory(resource: Resource, costResource: Resource = resource) {
     const { registerTick, tick } = createTickManager();
     const category = createProducerCategory<BuildingDef>({
       id: `auto-${Math.random().toString(36).slice(2, 8)}`,
@@ -296,7 +296,7 @@ describe('setupPolicyAutoPurchase', () => {
         baseRate: def.baseRate,
         trigger: 'continuous',
         purchase: {
-          costResource: resource,
+          costResource,
           baseCost: def.baseCost,
           costScaling: def.costScaling,
         },
@@ -639,6 +639,33 @@ describe('setupPolicyAutoPurchase', () => {
     expect(Decimal.gte(cookies.value, 70)).toBe(true);
     // ...and it bought as much as the floor allowed, rather than nothing.
     expect(Decimal.gt(category.getProducer('cursor')!.repeatable!.amount.value, 0)).toBe(true);
+  });
+
+  it('holds the floor on the cost resource, not the produced resource', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const chips = createTestResource('chips', 100);
+    const { category, registerTick, tick } = makeCategory(cookies, chips);
+
+    category.register({
+      id: 'cursor',
+      name: 'Cursor',
+      baseRate: 1,
+      baseCost: 50,
+      costScaling: 1.15,
+    });
+
+    // A unit costs 50 chips against a 90-chip floor on a 100 bank, so nothing
+    // is affordable under it. Measured against the *produced* resource — 1000
+    // cookies — the same candidate looks comfortably payable.
+    setupPolicyAutoPurchase(
+      category,
+      { enabled: true, interval: 1, policy: cheapestPolicy(), reserve: 90 },
+      registerTick,
+    );
+
+    tick(5);
+    expect(Decimal.eq(chips.value, 100)).toBe(true);
+    expect(Decimal.eq(category.getProducer('cursor')!.repeatable!.amount.value, 0)).toBe(true);
   });
 
   it('hybrid-payback re-scores per drained slot so the winner can flip mid-drain', () => {
