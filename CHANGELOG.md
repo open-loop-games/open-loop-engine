@@ -46,6 +46,14 @@ Initial public release. A headless TypeScript substrate for incremental and idle
 
 Pre-1.0. Expect breaking changes between minor versions until 1.0. The version bump for `feat!:` / `BREAKING CHANGE:` commits is **MINOR** (not MAJOR) while in 0.x — breaking changes are expected here. Pin `~0.1.0` if you need patch-only stability for a jam or short project.
 
+Contract changes made before this release was cut, recorded here because
+`release-it` generates from commits only from 0.1.1 onward:
+
+- **Sequencer `skip` ordering.** A list-mode sequencer now advances `cursor` past
+  the skipped item *before* emitting `skip`, matching queue mode (which already
+  popped first) and every other emit site in the primitive. A listener that read
+  `cursor` as pointing at the skipped item reads `cursor - 1`.
+
 ### Requirements
 
 - Node ≥ 18, ESM-only (no CommonJS export). Published JS and types carry explicit `.js` extensions, so plain node ESM works — no bundler required at runtime.

@@ -1766,3 +1766,123 @@ describe('Sequencer — save/load re-drive', () => {
     expect(q.currentItem?.id).toBe('wait-me');
   });
 });
+
+// The skip contract: by the time `skip` fires, the skip is already committed —
+// popped in queue mode, cursor past it in list mode. These are the only tests in
+// the file that observe sequencer state from inside a listener.
+describe('Sequencer — skip ordering', () => {
+  interface SkipMeta {
+    error: string | null;
+  }
+  const smi = (id: string): SequencerItem<SkipMeta> => ({ id, metadata: { error: null } });
+
+  it('list mode: cursor has advanced past the skipped item when skip fires', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    const seen: number[] = [];
+    q.on('skip', () => seen.push(q.cursor));
+
+    q.enqueue(qi('skip-me'));
+    q.enqueue(qi('run-me'));
+
+    expect(seen).toEqual([1]);
+    expect(q.currentItem?.id).toBe('run-me');
+  });
+
+  it('list mode: cursor has advanced when "notNow" degrades to skip without registerTick', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.canRun = (item) => (item.id === 'wait-me' ? 'notNow' : 'now');
+    const seen: number[] = [];
+    q.on('skip', () => seen.push(q.cursor));
+
+    q.enqueue(qi('wait-me'));
+    q.enqueue(qi('run-me'));
+
+    expect(seen).toEqual([1]);
+    expect(q.currentItem?.id).toBe('run-me');
+  });
+
+  it('list mode: cursor has advanced when a held item transitions to skip on retry', () => {
+    const tm = createTickManager();
+    const ctxId = `skip-order-retry-${Math.random().toString(36).slice(2, 8)}`;
+    let gate: StartResult = 'notNow';
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
+    });
+    endPersistentContext();
+    const seen: number[] = [];
+    q.on('skip', () => seen.push(q.cursor));
+
+    q.enqueue(qi('wait-me'));
+    q.enqueue(qi('run-me'));
+    expect(q.holding).toBe(true);
+
+    gate = 'never';
+    tm.fireTick();
+
+    expect(seen).toEqual([1]);
+    expect(q.currentItem?.id).toBe('run-me');
+  });
+
+  it('queue mode: the skipped item is already gone from items when skip fires', () => {
+    const q = makeQueue();
+    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    const seen: string[][] = [];
+    q.on('skip', () => seen.push(q.items.value.map((i) => i.id)));
+
+    q.enqueue(qi('skip-me'));
+    q.enqueue(qi('run-me'));
+
+    expect(seen).toEqual([[]]);
+  });
+
+  // The shape idle-loops-ng's action-runner uses to tag a skipped entry.
+  it('list mode: a listener tagging cursor - 1 marks the item that was skipped', () => {
+    const ctxId = `skip-order-tag-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer<SkipMeta>({
+      id: ctxId,
+      mode: 'list',
+      canRun: (item) => (item.id === 'b' ? 'never' : 'now'),
+    });
+    endPersistentContext();
+
+    q.on('skip', () => {
+      const priorIdx = q.cursor - 1;
+      if (priorIdx < 0) return;
+      q.patchItem(priorIdx, (m) => ({ ...m, error: 'Cannot run here' }));
+    });
+
+    q.enqueue(smi('a'));
+    q.enqueue(smi('b'));
+    q.enqueue(smi('c'));
+    expect(q.currentItem?.id).toBe('a');
+
+    q.complete();
+
+    expect(q.currentItem?.id).toBe('c');
+    expect(q.items.value.map((i) => i.metadata.error)).toEqual([null, 'Cannot run here', null]);
+  });
+
+  // The cursor advance is a read-modify-write across the emit; committing it first
+  // is what keeps a mutating listener from being overwritten on the way out.
+  it('list mode: clearing from a skip listener leaves the done sentinel intact', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    let cleared = false;
+    q.on('skip', () => {
+      if (cleared) return;
+      cleared = true;
+      q.clear();
+    });
+
+    q.enqueue(qi('skip-me'));
+
+    expect(q.items.value).toHaveLength(0);
+    expect(q.cursor).toBe(0);
+  });
+});

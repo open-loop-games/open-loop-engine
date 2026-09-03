@@ -66,7 +66,15 @@ export interface SequencerEvents<M = void> {
   cancel: (item: SequencerItem<M>) => void;
   /** Emitted when the current item is re-dispatched via `repeat()` instead of `complete()`. */
   repeat: (item: SequencerItem<M>) => void;
-  /** Emitted when dequeueNext skips an item that failed the canRun check with `'never'`. */
+  /**
+   * Emitted when an item fails its `canRun` check with `'never'` — either from
+   * `dequeueNext` walking the sequence, or from the retry tick when a held
+   * item's gate turns permanent.
+   *
+   * The skip is already committed when this fires: the item has been popped in
+   * queue mode, and in list mode `cursor` has advanced past it. A listener that
+   * wants the skipped item's index reads `cursor - 1`.
+   */
   skip: (item: SequencerItem<M>) => void;
   /**
    * Emitted when dequeueNext holds on `'notNow'` — the held item stays in
@@ -564,8 +572,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     } else if (result === 'never') {
       clearHold();
       if (isList) {
-        handle.emit('skip', held);
         rawCursor!.value++;
+        handle.emit('skip', held);
       } else {
         popHead();
         syncItems();
@@ -656,8 +664,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         }
 
         if (result === 'never') {
-          handle.emit('skip', next);
           rawCursor!.value++;
+          handle.emit('skip', next);
           continue;
         }
 
@@ -669,8 +677,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
           return null;
         }
         // No registerTick → degrade to 'never'
-        handle.emit('skip', next);
         rawCursor!.value++;
+        handle.emit('skip', next);
       }
 
       // Reached end of list — cursor sits at items.length (done sentinel)
