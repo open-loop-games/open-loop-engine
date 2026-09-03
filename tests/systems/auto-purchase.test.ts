@@ -216,6 +216,29 @@ describe('setupSweepAutoPurchase', () => {
     expect(Decimal.eq(chips.value, 100)).toBe(true);
   });
 
+  it('sums cost requirements that share a resource before applying the floor', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+
+    // Two 60-cost requirements drawn from one bank against a 900 floor: 100 of
+    // budget, 120 of cost. Measured per requirement each one "fits"; they spend
+    // from the same balance, so what the floor admits is their sum.
+    const combo = createPurchasable({
+      id: 'same-resource-combo',
+      requirements: [
+        createCostRequirement({ resource: cookies, cost: 60 }),
+        createCostRequirement({ resource: cookies, cost: 60 }),
+      ],
+      limit: 1,
+    });
+
+    setupSweepAutoPurchase([combo], { enabled: true, reserve: 900 }, registerTick);
+
+    tick(0.1);
+    expect(combo.active.value).toBe(false);
+    expect(Decimal.eq(cookies.value, 1_000)).toBe(true);
+  });
+
   it('throttles on interval and does not replay elapsed beats', () => {
     const ctx = beginPersistentContext('sweep-interval');
     const cookies = createTestResource('cookies', 1_000);

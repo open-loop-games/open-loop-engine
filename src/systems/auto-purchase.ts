@@ -28,7 +28,7 @@ import { persistent } from '@/core/persistence';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
 import type { Resource } from '@/core/resource';
 import type { RegisterTick } from '@/core/sequencer';
-import { isCostRequirement, type Requirement } from '@/core/requirements';
+import { isCostRequirement, type CostRequirement, type Requirement } from '@/core/requirements';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
 import type { Purchasable } from './purchasable';
 import type { Producer, ProducerCategory } from './producer-category';
@@ -151,21 +151,33 @@ export interface SetupSweepAutoPurchaseOptions {
  * or above `reserve`. Returns `0` when even a single level would breach the
  * floor.
  *
- * Each requirement is measured against its own resource — `Purchasable.getCost`
- * sums across requirements regardless of currency, which is meaningless for a
- * per-resource floor — and the tightest one wins.
+ * Requirements are grouped by the resource they spend and their costs summed
+ * within a group, because a group draws from one balance — `Purchasable.getCost`
+ * instead sums across *all* requirements regardless of currency, which is
+ * meaningless for a per-resource floor. The tightest group wins.
+ *
+ * Only top-level cost requirements are seen; costs nested inside `anyOf` /
+ * `allOf` are opaque to the floor, the same limitation `Purchasable.getCost`
+ * has.
  */
 function reserveClampedAmount(p: Purchasable, reserve: Decimal): DecimalSource {
   const reqs: Requirement[] = Array.isArray(p.requirements) ? p.requirements : [p.requirements];
   let ceiling = p.amountToPurchase.value;
 
+  const byResource = new Map<Resource, CostRequirement[]>();
   for (const req of reqs) {
     if (!isCostRequirement(req)) continue;
     if (!unref(req.requiresPay)) continue;
+    const group = byResource.get(req.resource);
+    if (group) group.push(req);
+    else byResource.set(req.resource, [req]);
+  }
 
+  for (const [resource, group] of byResource) {
     const affordable = largestAffordable(
-      (n) => req.getCost(n),
-      Decimal.sub(req.resource.value, reserve),
+      (n) =>
+        group.reduce<DecimalSource>((sum, req) => Decimal.add(sum, req.getCost(n)), Decimal.dZero),
+      Decimal.sub(resource.value, reserve),
       ceiling,
     );
     if (Decimal.lte(affordable, 0)) return Decimal.dZero;
