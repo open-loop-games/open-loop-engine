@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ref, computed, nextTick } from 'vue';
+import { Decimal } from '@/primitives/decimal';
 import { createPersistentEffectSystem } from '@/systems/persistent-effect';
 import {
   createModifierChain,
@@ -110,6 +111,34 @@ describe('activation', () => {
     expect(chain.modifiers.length).toBe(0);
     expect(system.isActive('belt').value).toBe(false);
     expect(system.getActive()).toEqual([]);
+  });
+
+  it('one registration binds and unbinds a batch across N distinct chains', async () => {
+    // The batch shape: a single def scopes a whole set of mechanics to one
+    // predicate, so they freeze and thaw together rather than per-chain.
+    const system = createSystem();
+    const chains = ['canvass', 'files', 'tipline'].map((id) => createModifierChain(id));
+    const active = ref(false);
+
+    system.register({
+      id: 'phase-scope',
+      active,
+      modifiers: chains.map((chain) => ({
+        chain,
+        modifier: () => createMultiplicativeModifier({ multiplier: 0 }),
+      })),
+    });
+
+    expect(chains.map((c) => c.modifiers.length)).toEqual([0, 0, 0]);
+
+    active.value = true;
+    await nextTick();
+    expect(chains.map((c) => c.modifiers.length)).toEqual([1, 1, 1]);
+    expect(chains.map((c) => new Decimal(c.apply(4)).toNumber())).toEqual([0, 0, 0]);
+
+    active.value = false;
+    await nextTick();
+    expect(chains.map((c) => c.modifiers.length)).toEqual([0, 0, 0]);
   });
 
   it('fires onActivate/onDeactivate hooks on edges', async () => {
