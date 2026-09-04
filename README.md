@@ -60,9 +60,12 @@ The engine carries its own docs — in the repo and in the installed package, un
 
 - **`docs/api/INDEX.md`** — router into the per-symbol surface. Task table, concept index, tier map. The answer to "does the engine already do X?"
 - **`docs/consumer-guide.md`** — how to think about composing the engine. Levels of abstraction (resource helpers → category systems → raw primitives → declarative data), persistence, modifier chains.
+- **`docs/consumer-guide-choosing.md`** — which primitive is mine, when two of them overlap. The boundaries INDEX's routing table is too short to draw: producer vs gated purchasable, Cycle vs RunPool, category vs raw purchasable.
 - **`docs/consumer-guide-recipes.md`** — the worked-pattern cookbook the guide routes into: worker pools, persona rosters, spatial boards, dialog and subjects.
 - **`docs/consumer-guide-balance.md`** — how numbers get chosen and verified: the closed-form spine, the probe that contradicts it, and the loop between them.
 - **`docs/consumer-guide-balance-agents.md`** — the layer that applies when a policy agent plays the game your probe measures: calibrating the agent, what it can't measure, and the harness checks that keep a bot-driven reading honest.
+
+- **`docs/domain-map.md`** — `ol-domain-map`, the bin that generates a vocabulary map of *your* game's domain types from their structure.
 
 `docs/api/` is generated from TSDoc, and each entry ends in a `src/…:line` pointer. `src/` ships for exactly that reason, so those pointers resolve in an installed copy — it's reference material, not an import surface, since `exports` admits only the subpaths listed above.
 

@@ -2,7 +2,7 @@
 
 How to express a game with `@open-loop/engine`. Read this after forking `open-loop-starter` and before writing your first module.
 
-This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [consumer-guide-balance.md](./consumer-guide-balance.md) for how numbers get chosen and verified; `CHANGELOG.md` for breaking-change migration blocks.
+This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [consumer-guide-choosing.md](./consumer-guide-choosing.md) when two primitives overlap and you need the boundary; [consumer-guide-recipes.md](./consumer-guide-recipes.md) for the worked-pattern cookbook; [consumer-guide-balance.md](./consumer-guide-balance.md) for how numbers get chosen and verified; `CHANGELOG.md` for breaking-change migration blocks.
 
 ## The expression spectrum
 
@@ -85,76 +85,6 @@ setupSweepAutoPurchase(unlocks.getAll().map((e) => e.instance), { enabled: true 
 // Elsewhere: unlocks.getPurchasable('coop-built')?.active.value
 ```
 
-### Choosing among purchasable primitives
-
-Three paths land in the consumer corpus, each fitting a different shape of need. "Purchase-shaped" here covers anything spent on with a cost requirement — buildings, upgrades, gates, perks, leveled instances:
-
-| Need | Use |
-|---|---|
-| Building with continuous rate (Cookie-Clicker shape, ambient auto-producers) | `createProducerCategory` |
-| Upgrades / gates / capped repeatables in batch (perks, milestones, sequential tiers, visibility unlocks) | `createPurchasableCategory` |
-| Per-instance customized leveled purchases (heterogeneous `effect` / `onPurchase` per instance, post-creation per-instance wiring) | raw `createScalingPurchasable` |
-
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, `createProducerCategory` bundles cost, count, rate aggregation, autobuy, and payback metric in one definition shape:
-
-```ts
-const buildings = createProducerCategory<ProducerDef>({
-  id: 'buildings',
-  registerTick: ctx.onTick,
-  mapProducer: (def) => ({
-    resource: cookies,
-    baseRate: def.baseRate,
-    display: def.name,
-    purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
-  }),
-});
-```
-
-**No rate, batch shape → purchasable category.** When many instances share an effect mapping — capped repeatables, sequential upgrade tiers, predicate-gated unlocks — `createPurchasableCategory` fits. The mapped `limit` selects the sub-shape: `1` for upgrades and gates, a finite cap for repeatable perks, omitted for unbounded:
-
-```ts
-const perks = createPurchasableCategory<PerkDef>({
-  id: 'ngplus-perks',
-  mapPurchasable: (def) => ({
-    display: { title: def.name, description: def.description },
-    requirements: (level) =>
-      createCostRequirement({
-        resource: dna,
-        cost: Formula.exponential(level, def.baseCost, def.costRatio),
-        maxBulkAmount: Decimal.dInf,
-      }),
-    limit: def.maxLevel,
-    effect: (amount) => def.effect(new Decimal(amount).toNumber()),
-  }),
-});
-```
-
-**Leveled costs take the factory form of `requirements`.** The callback receives the purchasable's own `amount` ref, which `def` alone can't supply — the ref doesn't exist until `createPurchasable` runs, and `mapState` is too late. Return an array over the same `level` for multi-resource ladders; `maxRequirementsMet` min-folds across them.
-
-The shape to avoid is a cost getter that reads the level back out of the category (`getPurchasable(def.id)?.amount.value`). It evaluates correctly one purchase at a time, so nothing looks wrong — but a non-Formula cost prices bulk as a linear extrapolation of the current rung, so buy-max undercharges any ladder and over-reports affordability by the same factor. A static cost has no such gap: linear is exact when the price doesn't move.
-
-**Per-instance closures → raw scaling purchasable.** When you're already iterating per definition and each instance needs its own post-creation wiring — a side-channel modifier closing over the produced purchasable's refs, custom retention listing, mapping into a per-instance lookup — drop to `createScalingPurchasable` directly inside the loop. This is a Level 3 drop-down (see below); the entry is here because future authors looking for "leveled purchasables" otherwise reach for the category and fight its shape:
-
-```ts
-for (const def of spellDefs) {
-  const purchasable = createScalingPurchasable({
-    id: `level-${def.id}`, resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
-    effect: (amount) => Decimal.mul(amount, Decimal.mul(def.baseDamage, 0.05)),
-    onPurchase: (amount) => schoolSkills.get(def.school)?.addXp(Decimal.mul(amount, 5)),
-  });
-
-  // post-creation wiring closing over per-instance refs
-  spellPotency.add(createAdditiveModifier({
-    addend: () => purchasable.effect.value,
-    enabled: () => Decimal.gt(purchasable.amount.value, 0),
-    description: `${def.name} levels`,
-  }));
-  spellLevels.set(def.id, purchasable);
-}
-```
-
-Path C trades self-registration for direct control — like any raw-primitive bypass, the purchasables fall outside the category registry (see *Categories self-register* above), so track them at the consumer (`Map<id, Purchasable>`) if anything needs batch access.
-
 ### Level 3: Raw primitives (when categories don't fit)
 
 If a category's `map*` is fighting you — the shape is too different, the timing is wrong, you need control the category doesn't expose — drop down to the raw `create*` function directly:
@@ -163,48 +93,11 @@ If a category's `map*` is fighting you — the shape is too different, the timin
 - `createCycle`, `createReset`, `createModifierChain` directly
 - `createCategoryBase` for category-shaped registries that don't fit any built-in shape. Pass `Instance = void` and omit `buildInstance` when entries are pure per-def state (no behavior object alongside the def). The base wires per-def persistent context (`{categoryId}/{def.id}`), auto-names persistent fields, and exposes `Resettable` so `createReset` / `createCycle.thingsToReset` walk the entries. This is the same primitive `createSkillCategory`, `createPurchasableCategory`, etc. compose internally — drop here when no system-level wrapper fits but the per-def-state-with-mod-aware-registration shape still does.
 
-This is the normal path for one-off constructs, not a failure. The engine's systems layer composes from these same primitives — dropping down gives you the same building blocks with full control. For the purchasable family specifically, the three-path table above resolves most "category or raw?" questions; reach here for the rest.
+This is the normal path for one-off constructs, not a failure. The engine's systems layer composes from these same primitives — dropping down gives you the same building blocks with full control. For the purchasable family specifically, [consumer-guide-choosing.md §Choosing among purchasable primitives](./consumer-guide-choosing.md#choosing-among-purchasable-primitives) resolves most "category or raw?" questions; reach here for the rest.
 
 ### Level 4: Declarative gates and effects (the data-driven escape hatch)
 
 `Gate` is the typed predicate-spec data shape; `IEffect` / `E` builder / `GameStateMutator` are the matching write side — plain data objects evaluated through pure functions against the engine's ambient runtime. Reach for this level when typed refs aren't available: save-file replay, mod configs loaded from JSON/YAML, balance-sim tools, content-registry patches that override behavior via data. The full treatment — Gate kind flavors, when to use vs. avoid, `StateGate` for indexed runtime collections, the closure escape hatch — lives in [§Data and runtime separation](#data-and-runtime-separation). For symbol-level detail see `api/mechanics.md#gate` and `api/mechanics.md#effects`; for the form-choice table (Gate vs Requirement vs `Computable<boolean>`) see `api/INDEX.md#predicate-forms`.
-
-## Common disambiguators
-
-`api/INDEX.md#common-disambiguators` is the short routing table; this section gives the consumer-level *why* for the cases where the routing answer alone isn't enough.
-
-**Purchasable vs achievement.** Player-initiated through requirements (and may spend resources) → purchasable. Observed by the game, auto-earns when true → achievement.
-
-**Producer vs predicate-gated purchasable.** Ownership contributes to a rate → producer. Ownership flips a boolean / grants an effect → purchasable (with `createBooleanRequirement` or a Gate-backed requirement). A predicate-gated purchasable doesn't become a producer just because it's gated.
-
-**TickDriver vs Cycle vs RunPool.** "How does time advance?" → `TickDriver`. "End this gameplay run, reset a scope, replay" → `Cycle`. "Track many independent concurrent run instances" → `RunPool`. The three primitives don't substitute for each other — a game can use all three. `Cycle` is named for that lifecycle rather than for the loop-incremental genre it came from: a prestige layer's reincarnation and a new-game-plus are the same shape and ship on it too.
-
-**Offline progress strategy.** Four families recur across the corpus — *extrapolation* (closed-form reward for time away), *tick-sim* (replay elapsed time through the loop), *cap-and-trickle* (release banked time at a bounded rate), and *banking* (idle becomes spendable fast-forward inside a later active session). The engine ships **mechanism, not policy**: `processOfflineTime` (blocking chunked replay through the TickDriver — covers extrapolation and tick-sim), `TickDriver.speedMultiplier` (the live tick scaler), and the `onStepsOverflow` / `onDeltaOverflow` hooks (the seam for *banking* dropped live-path time instead of discarding it). Which family you pick, whether catch-up runs blocking or drains gradually over frames, whether live-path overflow is re-routed losslessly, and how screen/menu gating works are all **consumer-side policy** composed on top. Two shipped points show the spread on the *same* mechanism: idle-loops-ng runs variable-mode + blocking `processOfflineTime` on load + a `bonus-time` banking reservoir; incloneution runs fixed-mode + a gradual `requestAnimationFrame`-budgeted drain that re-routes live overflow losslessly back into the catch-up queue. They diverge by design — don't reach for an engine primitive to unify them. The *banking* family is the one actually converging across consumers, and it has no engine surface today — build it on the overflow hooks. `processOfflineTime` itself is `api/lifecycle.md#offline`.
-
-**Sequencer vs advisor.** If the system has to remember what is currently scheduled, it's a sequencer. If it only needs to choose or recommend from candidates each time it's asked, it's an advisor / selection policy.
-
-**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `RecommendationDef` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` between cycles, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
-
-Two adjacent primitives sit in the wider advisor family but don't fit the immediate-choice shape above. `createGoalPicker` maintains a **weighted active-goal pool** (between-tick goal arbitration with persistent state, not a one-shot pick). `createRuleAdvisor` aggregates **observation history** into ranked suggestions surfaced to the player (derived from what happened, not selected from candidates). Both live in `api/advisors.md`; read its Canonical entrypoints block for the one-liner role of each.
-
-**Formula operations that answer near-identical questions.** Two clusters sit close enough to pick wrong without getting an error for it. *Which input?* — `invert` is the algebraic pre-image (unchecked, because the op table composes with it recursively), `tryInvert` grades that same answer and names the cases where the target falls in a gap the curve never evaluates into, and `firstPassage` answers what a time axis usually meant: the smallest input at which the curve *reaches* a target, needing no inverse at all. *Which total?* — `evaluateIntegral` is the bare antiderivative, `cumulative(a, b)` the continuous area across a span, `sum(a, n)` the discrete series.
-
-The compressor for both clusters: ask whether your axis is **levels** or **time**. A cost curve is indexed by level, so it wants `sum` — and `calculateCost` / `calculateMaxAffordable` both use it, so a bulk buy prices at exactly what those purchases cost bought singly. A rate integrated over elapsed seconds is `cumulative`, which is what `firstPassage` inverts. The two totals differ by a boundary term, not a rounding error, so the wrong one is wrong at any tolerance. Each method's tsdoc carries the distinction from the inside — the failure reasons, the size of the gap, the monotonicity and precision constraints — and cross-links its siblings; read them at the callsite rather than here.
-
-**Introspection vs harness.** "Discover what's live in this engine right now" → introspection. "Run a simulation against this engine state" → harness. A dev panel usually starts with introspection; a balance experiment starts with harness.
-
-**Unlock taxonomy.** Several primitives flip availability; pick by *who* trips the flip and *what* it gates.
-
-| Shape | Use | Flips |
-|---|---|---|
-| Player action that charges a cost | `createPurchasableCategory` with `createCostRequirement` | per-instance `active` / `amount` |
-| Predicate flips, no cost | `createPurchasableCategory` with `createGateRequirement` (`+ setupSweepAutoPurchase`) | per-instance `active` |
-| Observed milestone, auto-earns when true | `createAchievementCategory` | per-instance `earned` |
-| Named region grouping content | `createZoneSystem` | which entries are *addressable* |
-| Ordered ladder of feature availability | `createAutomationTiers` | which features are exposed |
-| Entity rank / relationship state | `createSubjectCategory` tier field | per-subject tier value |
-
-The first three flip per-instance bits the rest of the game reads directly (`active.value`, `earned.value`). The last three flip *what's even surfaced* — they restructure the addressable set, not a single boolean.
 
 ## Data and runtime separation
 
@@ -448,22 +341,7 @@ Neither snapshot subscribes to reactive changes — consumers drive recomputatio
 
 ## Composition recipes
 
-Recurring shapes consumers assemble from engine primitives — worked patterns from the consumer corpus, not engine symbols; single-consumer hand-rolls that earn an engine surface only once a second consumer independently reaches for them. The full cookbook lives in [consumer-guide-recipes.md](./consumer-guide-recipes.md), an invaluable condensed starter-components reference for a new consumer:
-
-- **Action execution** — `ActionCategory` vs worker-bundle vs `Slot`: which shape for "what's the player doing right now?"
-- **Indirect-control worker pools** — Sequencer + TimedProgress + claim-on-pop (Majesty/DK/DF shape).
-- **Pre-completion gating** — gate ActionCategory completion inside the `tick` closure; the omsi-loops hook-chain shape.
-- **Persona-roster composition** — a keyed vector of personality params over sequencer-strategies selection.
-- **Priority-weighted fill** — interleave multiple content categories under one priority order via a `passBonus` map.
-- **Character interaction** — dialog (contract-first runtime) and subjects (typed multi-field relationship state), and where they connect.
-- **Spatial grids** — `createSpatialGrid` board state, runtime placement/removal, the grid-replacement event gotcha, the adjacency→stat-bonus seam (pure evaluator over an occupancy view), and routing: distance fields by default, plus landmark heuristics from `distanceField` when a consumer-side A\* is genuinely the right shape.
-- **Cross-action bonuses** — A's yield scaled by B's state, as a binary-gate or level-scaled binding on A's gain chain.
-- **Sublinear per-source prestige payouts** — power-law transform of run output, summed per source rather than pooled.
-- **Shared pure state-function** — one pure fn over game state called by both the live tick and the balance harness, so the two can't drift.
-
-## Domain-language map
-
-Past a certain vocabulary size, re-reading your `data/` types to recall "what's an action vs a job, what references what" costs more than maintaining a small generated map. The engine ships `ol-domain-map` (a bin) for exactly this: point a per-game `domain-map.config.mjs` at your domain files and it emits a committed `domain-map.md` — vocabulary (enums + string-literal/discriminated unions, where membership is an is-a relation), the def inventory, and a field-name reference graph (the untyped-ID edges like `requiredExplorations` that type-graph tools miss). Source of truth is code STRUCTURE, not tsdoc — it regenerates from your types every run, so it can't drift. The config carries the dialect knobs (`scope` globs, `defSuffixes`, optional `nouns`/`stopwords`) plus a small hand-authored `curated` block for the cross-symbol concepts no single type owns. Wire `"domain-map": "ol-domain-map src/domain-map.config.mjs"` and commit both files; edit the config, never the `.md`. Run it from your pre-commit hook so a stale map can never be committed — the same regenerate-then-check discipline the engine uses for its own API docs. The starter's archetypes each carry a `domain-map.config.mjs`, worked across dialects (`Def` vs `Spec` suffixes). Note `ts-morph` must resolve for the bin — workspace consumers get it through the engine's own `node_modules`; a registry install needs it added consumer-side.
+Recurring shapes consumers assemble from engine primitives — worked patterns from the consumer corpus, not engine symbols; single-consumer hand-rolls that earn an engine surface only once a second consumer independently reaches for them. Action execution, worker pools, persona rosters, priority-weighted fill, dialog and subjects, spatial boards, cross-action bonuses, prestige payouts, and the shared pure state-function all live in [consumer-guide-recipes.md](./consumer-guide-recipes.md) — an invaluable condensed starter-components reference for a new consumer. Reach for it when you're building one of those; this guide covers how to think about composing them.
 
 ## When the engine should grow
 
