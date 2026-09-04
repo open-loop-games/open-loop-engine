@@ -12,7 +12,14 @@ import { beginPersistentContext, endPersistentContext } from '@/core/persistence
 
 const qi = (id: string): SequencerItem<void> => ({ id, metadata: undefined as void });
 
-function makeQueue(opts: { id?: string; maxAdvancesPerTick?: number } = {}) {
+function makeQueue(
+  opts: {
+    id?: string;
+    mode?: 'queue' | 'list';
+    maxAdvancesPerTick?: number;
+    startOnEnqueue?: boolean;
+  } = {},
+) {
   const ctxId = opts.id ?? `q-${Math.random().toString(36).slice(2, 8)}`;
   beginPersistentContext(ctxId);
   const q = createSequencer({ id: ctxId, ...opts });
@@ -216,6 +223,150 @@ describe('sequencer advance cap', () => {
 
     expect(completed).toEqual(['a', 'b', 'c']);
     expect(getDiagnostics().advanceCapTrips).toBe(0);
+  });
+});
+
+// ============================================================================
+// Instant-complete cascades — the two caps against a real emitter
+// ============================================================================
+
+// The emit-depth coverage above drives a bare `createEmitHandle`, where a
+// blocked emit is the whole observable outcome. Inside a sequencer it is not:
+// `dequeueNext` sets `current` and *then* emits `start`, so a dropped emit
+// leaves an item dispatched that no listener ever learns about and nothing will
+// ever complete. These drive the real emitter, where that distinction exists.
+
+describe('instant-complete cascades', () => {
+  /** Subscribe a `start` listener that immediately completes — the runaway shape. */
+  function completeOnStart(q: ReturnType<typeof makeQueue>, log?: string[]) {
+    q.on('start', (item) => {
+      log?.push(item.id);
+      q.complete();
+    });
+  }
+
+  it('drains a queue-mode cascade past the emit-depth cap', () => {
+    const q = makeQueue({ startOnEnqueue: false });
+    const starts: string[] = [];
+    const completes: string[] = [];
+    completeOnStart(q, starts);
+    q.on('complete', (item) => completes.push(item.id));
+
+    for (let i = 0; i < 20; i++) q.enqueue(qi(`i${i}`));
+    q.start();
+
+    expect(starts).toHaveLength(20);
+    expect(completes).toHaveLength(20);
+    expect(q.items.value).toHaveLength(0);
+    expect(q.currentItem).toBeNull();
+    // Depth stays constant however long the cascade runs.
+    expect(getDiagnostics().emitDepthTrips).toBe(0);
+  });
+
+  it('drains a list-mode cascade past the emit-depth cap', () => {
+    const q = makeQueue({ mode: 'list', startOnEnqueue: false });
+    const starts: string[] = [];
+    completeOnStart(q, starts);
+
+    for (let i = 0; i < 20; i++) q.enqueue(qi(`i${i}`));
+    q.start();
+
+    expect(starts).toHaveLength(20);
+    expect(q.cursor).toBe(20);
+    expect(q.currentItem).toBeNull();
+    expect(getDiagnostics().emitDepthTrips).toBe(0);
+  });
+
+  it('drains a cascade routed through a second sequencer', () => {
+    // Per-instance emit-depth counters cannot see a chain that alternates
+    // between sequencers — each reads half the true stack cost. Flattening is
+    // per-instance but covers this, since the cycle re-enters both.
+    const a = makeQueue({ id: 'cross-a', startOnEnqueue: false });
+    const b = makeQueue({ id: 'cross-b' });
+    const log: string[] = [];
+    let spawned = 0;
+
+    a.on('start', (item) => {
+      log.push(item.id);
+      if (spawned < 30) b.enqueue(qi(`b${spawned++}`));
+      a.complete();
+    });
+    b.on('start', (item) => {
+      log.push(item.id);
+      if (spawned < 30) a.enqueue(qi(`a${spawned++}`));
+      b.complete();
+    });
+
+    a.enqueue(qi('seed'));
+    a.start();
+
+    expect(log).toHaveLength(31);
+    expect(a.currentItem).toBeNull();
+    expect(b.currentItem).toBeNull();
+    expect(getDiagnostics().emitDepthTrips).toBe(0);
+  });
+
+  it('bounds a cascade by the advance cap, and resumes on the next tick', () => {
+    const q = makeQueue({ startOnEnqueue: false, maxAdvancesPerTick: 1000 });
+    const starts: string[] = [];
+    completeOnStart(q, starts);
+
+    for (let i = 0; i < 1500; i++) q.enqueue(qi(`i${i}`));
+    q.start();
+
+    expect(starts).toHaveLength(1000);
+    expect(getDiagnostics().advanceCapTrips).toBe(1);
+    expect(getDiagnostics().emitDepthTrips).toBe(0);
+    // Degraded, not wedged: nothing is left dispatched-but-unstarted.
+    expect(q.currentItem).toBeNull();
+    expect(q.items.value).toHaveLength(500);
+
+    q.resetAdvanceCount();
+    q.dequeueNext();
+
+    expect(starts).toHaveLength(1500);
+    expect(q.items.value).toHaveLength(0);
+  });
+
+  it('bounds an unconditional repeat() by the advance cap', () => {
+    // `repeat()` re-dispatches the same item forever. Flattened, that is a loop
+    // rather than a stack overflow, so the advance cap is what ends it.
+    const q = makeQueue({ startOnEnqueue: false, maxAdvancesPerTick: 1000 });
+    let starts = 0;
+    q.on('start', () => {
+      starts++;
+      q.repeat();
+    });
+
+    q.enqueue(qi('x'));
+    q.start();
+
+    expect(starts).toBe(1000);
+    expect(getDiagnostics().advanceCapTrips).toBe(1);
+  });
+
+  it("defers a listener's dispatch until the emit unwinds", () => {
+    // The observable edge of flattening: `complete()` inside a `start` listener
+    // is a state transition, not a dispatch. Nothing is running when it returns.
+    const q = makeQueue({ startOnEnqueue: false });
+    const observed: (string | null)[] = [];
+    let reentrantReturn: unknown = 'unset';
+
+    q.on('start', (item) => {
+      if (item.id !== 'first') return;
+      q.complete();
+      observed.push(q.currentItem?.id ?? null);
+      reentrantReturn = q.dequeueNext();
+    });
+
+    q.enqueue(qi('first'));
+    q.enqueue(qi('second'));
+    q.start();
+
+    expect(observed).toEqual([null]);
+    expect(reentrantReturn).toBeNull();
+    // The deferred dispatch still lands once the emit unwinds.
+    expect(q.currentItem?.id).toBe('second');
   });
 });
 

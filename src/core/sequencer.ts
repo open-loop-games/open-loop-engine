@@ -106,7 +106,11 @@ export interface SequencerOptions<M = void> {
   maxSize?: number;
   /**
    * Maximum number of complete→dequeueNext advances allowed per tick.
-   * Prevents runaway loops when items complete instantly.
+   * Prevents runaway loops when items complete instantly. This is the only cap
+   * a dispatch cascade hits — the chain is flattened rather than recursive, so
+   * emit depth stays constant however long the cascade runs. Once it trips,
+   * advancement pauses until the counter resets and resumes on the next tick;
+   * the running item is left dispatched and complete, never mid-dispatch.
    *
    * When {@link registerTick} is supplied the counter resets automatically at
    * each tick boundary. A sequencer driven manually without `registerTick` must
@@ -192,7 +196,15 @@ export interface Sequencer<M = void> {
    * event emit, and auto-start guard as the append path.
    */
   enqueue(item: SequencerItem<M>, options?: { at?: number }): boolean;
-  /** Pop from items → set as current. Falls back to fill strategy if items empty. */
+  /**
+   * Pop from items → set as current. Falls back to fill strategy if items empty.
+   *
+   * Returns the dispatched item, or `null` when nothing dispatched. Calling it
+   * from inside a sequencer event listener always returns `null`: the dispatch
+   * is deferred to the call already in progress, which runs it once the emit
+   * unwinds. A listener that needs the item should read {@link currentItem}
+   * afterwards rather than the return value.
+   */
   dequeueNext(): SequencerItem<M> | null;
   /** Mark current as completed, emit 'complete', then dequeueNext. */
   complete(): void;
@@ -650,7 +662,46 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // inside the loop) need both.
   const preempted = (): boolean => current.value !== '';
 
+  // An instant-complete listener drives dispatch by recursion: `emit('start')`
+  // → listener → `complete()` → `emit('complete')` → `dequeueNext()` →
+  // `emit('start')`. Left recursive, each item costs a real JS stack level and
+  // a level on the emit handle's depth counter, so the emit-depth cap ends the
+  // cascade after ten items — mid-dispatch, with `current` already set and its
+  // `start` emit dropped, which is a permanent wedge rather than a pause.
+  // Trampolining the re-entrant call flattens the chain to constant depth: a
+  // listener's `dequeueNext()` records the intent and returns, and the loop
+  // below runs the dispatch after the emit unwinds. That keeps depth near 1 for
+  // any cascade length and leaves `maxAdvancesPerTick` as the only cap that
+  // fires, which is what its contract promises.
+  //
+  // Any unbounded cascade must re-enter *some* sequencer's `dequeueNext`, so
+  // this also flattens chains routed through a second sequencer's listeners —
+  // per-instance emit-depth counters cannot see those at all.
+  let _dispatching = false;
+  let _redispatch = false;
+
   function dequeueNext(): SequencerItem<M> | null {
+    if (_dispatching) {
+      _redispatch = true;
+      return null;
+    }
+    _dispatching = true;
+    try {
+      // Return the first dispatch, matching the recursive form: the outer
+      // caller receives the item it caused, not whatever the cascade ended on.
+      const first = dequeueOnce();
+      while (_redispatch) {
+        _redispatch = false;
+        dequeueOnce();
+      }
+      return first;
+    } finally {
+      _dispatching = false;
+      _redispatch = false;
+    }
+  }
+
+  function dequeueOnce(): SequencerItem<M> | null {
     if (paused.value) return null;
     // While holding, the retry tick owns the dispatch decision — anything
     // enqueued meanwhile sits behind the held item.
