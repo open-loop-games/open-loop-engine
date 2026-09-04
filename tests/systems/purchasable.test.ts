@@ -423,3 +423,26 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
     expect(p.canPurchase.value).toBe(true); // 150 ≥ 100
   });
 });
+
+describe('createPurchasable — requirements as a factory over the level ref', () => {
+  it("hands the factory the purchasable's own amount ref, so the cost is invertible", () => {
+    const points = createResource(1e6, { displayName: 'points' });
+    const p = createPurchasable({
+      id: 'ladder',
+      display: 'Geometric ladder',
+      requirements: (level) =>
+        createCostRequirement({
+          resource: points,
+          cost: Formula.exponential(level, 10, 1.15),
+          maxBulkAmount: Decimal.dInf,
+        }),
+    });
+
+    // Cumulative, not linear: 10 + 11.5 + 13.225. The getter form prices 3 × 10.
+    expect(Decimal.eq_tolerance(p.getCost(3), 34.725, 1e-9)).toBe(true);
+
+    // No mirror watch: the cost tracks `amount` because it *is* `amount`.
+    p.purchase(2);
+    expect(Decimal.eq_tolerance(p.getCost(1), 13.225, 1e-9)).toBe(true);
+  });
+});

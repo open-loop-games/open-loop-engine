@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expectTypeOf } from 'vitest';
-import { ref, type ComputedRef, type Ref } from 'vue';
+import { ref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 
@@ -55,7 +55,10 @@ import type {
   ActionItemState,
   ActionItemMetadata,
 } from '@/systems/action-category';
-import type { PurchasableCategory } from '@/systems/purchasable-category';
+import type {
+  PurchasableCategory,
+  PurchasableCategoryOptions,
+} from '@/systems/purchasable-category';
 import type { ChallengeCategory, ChallengeDef } from '@/systems/challenge-category';
 import type {
   SubjectCategory,
@@ -68,7 +71,8 @@ import type {
 } from '@/systems/subject-category';
 import type { DialogCategory } from '@/systems/dialog-category';
 import type { ResettableObject } from '@/systems/resettable';
-import type { Purchasable } from '@/systems/purchasable';
+import type { Purchasable, PurchasableOptions } from '@/systems/purchasable';
+import type { Requirements } from '@/core/requirements';
 import type { TickDriverConfig } from '@/core/tick-driver';
 import type { BindOptions, BindingRecord, Grant, ModifierChain } from '@/core/modifier';
 
@@ -729,5 +733,30 @@ describe('registerTiered spec — buildDef optionality', () => {
 
     // A Def narrower than the base shape has never been on the optional branch.
     expectTypeOf<OptionalKeys<TieredAchievementSpec<{ id: string }>>>().toBeNever();
+  });
+});
+
+describe('PurchasableOptions.requirements — factory arm', () => {
+  // The factory arm is the only way to declare a cost that scales on the
+  // purchasable's own level: it hands the callback the live `amount` ref,
+  // which doesn't exist when the plain arm is evaluated. Dropping it would
+  // compile everywhere it isn't used and silently push consumers back onto a
+  // getter cost that misprices bulk purchases. `Requirements` is never a
+  // function, so the two arms stay unambiguous.
+  it('accepts a callback over the level ref alongside plain Requirements', () => {
+    expectTypeOf<PurchasableOptions['requirements']>().toMatchTypeOf<
+      Requirements | ((amount: MaybeRef<DecimalSource>) => Requirements)
+    >();
+    expectTypeOf<(amount: MaybeRef<DecimalSource>) => Requirements>().toMatchTypeOf<
+      PurchasableOptions['requirements']
+    >();
+    expectTypeOf<Requirements>().toMatchTypeOf<PurchasableOptions['requirements']>();
+  });
+
+  it('flows through mapPurchasable, which omits only `id`', () => {
+    type Mapped = ReturnType<PurchasableCategoryOptions<{ id: string }>['mapPurchasable']>;
+    expectTypeOf<(amount: MaybeRef<DecimalSource>) => Requirements>().toMatchTypeOf<
+      Mapped['requirements']
+    >();
   });
 });

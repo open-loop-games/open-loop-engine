@@ -11,6 +11,7 @@ import { createResource } from '@/core/resource';
 import { createCostRequirement, createBooleanRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createModifierChain } from '@/core/modifier';
+import Formula from '@/core/formulas/formulas';
 
 // ============================================================================
 // Helpers
@@ -766,5 +767,114 @@ describe('createPurchasableCategory grants', () => {
 
     secondGate.value = false;
     expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
+  });
+});
+
+// ============================================================================
+// Leveled costs — requirements factory over the purchasable's own level
+// ============================================================================
+
+interface LadderDef {
+  id: string;
+  name: string;
+  baseCost: number;
+}
+
+describe('PurchasableCategory — invertible leveled costs', () => {
+  it('prices buy-max along the real curve instead of extrapolating the current level', () => {
+    const gold = createTestResource('gold', 1e6);
+    const category = createPurchasableCategory<LadderDef>({
+      id: 'ladders',
+      mapPurchasable: (def) => ({
+        display: def.name,
+        requirements: (level) =>
+          createCostRequirement({
+            resource: gold,
+            cost: Formula.exponential(level, def.baseCost, 1.15),
+            maxBulkAmount: Decimal.dInf,
+          }),
+      }),
+    });
+
+    category.register([{ id: 'forge', name: 'Forge', baseCost: 10 }]);
+    const forge = category.getPurchasable('forge')!;
+
+    // A `cost: () => …` getter reading the level back out of the category
+    // prices this as 3 × 10; the Formula walks 10 + 11.5 + 13.225.
+    expect(Decimal.eq_tolerance(forge.getCost(3), 34.725, 1e-9)).toBe(true);
+
+    const spentBefore = gold.value;
+    const bought = forge.purchaseMax();
+    expect(Decimal.gt(bought, 1)).toBe(true);
+    expect(Decimal.eq(forge.amount.value, bought)).toBe(true);
+
+    // Every level bought was paid for at its own rung.
+    const paid = Decimal.sub(spentBefore, gold.value);
+    let expected: DecimalSource = Decimal.dZero;
+    for (let i = 0; Decimal.lt(i, bought); i++) {
+      expected = Decimal.add(expected, Decimal.mul(10, Decimal.pow(1.15, i)));
+    }
+    expect(Decimal.eq_tolerance(paid, expected, 1e-6)).toBe(true);
+
+    // One more level would be unaffordable — the walk consumed the curve.
+    expect(forge.canPurchase.value).toBe(false);
+  });
+
+  it('min-folds bulk across an array of per-resource ladders over one level', () => {
+    const iron = createTestResource('iron', 1e6);
+    const wood = createTestResource('wood', 5e5);
+    const category = createPurchasableCategory<LadderDef>({
+      id: 'multi-ladders',
+      mapPurchasable: (def) => ({
+        display: def.name,
+        requirements: (level) => [
+          createCostRequirement({
+            resource: iron,
+            cost: Formula.exponential(level, def.baseCost, 1.15),
+            maxBulkAmount: Decimal.dInf,
+          }),
+          createCostRequirement({
+            resource: wood,
+            cost: Formula.exponential(level, 20, 1.2),
+            maxBulkAmount: Decimal.dInf,
+          }),
+        ],
+      }),
+    });
+
+    category.register([{ id: 'forge', name: 'Forge', baseCost: 10 }]);
+    const forge = category.getPurchasable('forge')!;
+
+    forge.purchaseMax();
+    // The steeper wood ladder binds, so neither resource goes negative.
+    expect(Decimal.gte(iron.value, 0)).toBe(true);
+    expect(Decimal.gte(wood.value, 0)).toBe(true);
+    expect(forge.canPurchase.value).toBe(false);
+  });
+
+  it('keeps the cost on the loaded level after persistence rehydrates amount', () => {
+    const gold = createTestResource('gold', 1e6);
+    const category = createPurchasableCategory<LadderDef>({
+      id: 'rehydrated',
+      mapPurchasable: (def) => ({
+        display: def.name,
+        requirements: (level) =>
+          createCostRequirement({
+            resource: gold,
+            cost: Formula.exponential(level, def.baseCost, 1.15),
+            maxBulkAmount: Decimal.dInf,
+          }),
+      }),
+    });
+
+    category.register([{ id: 'forge', name: 'Forge', baseCost: 10 }]);
+    const forge = category.getPurchasable('forge')!;
+
+    // Save load writes straight through `amount`; there is no mirror to fall
+    // out of sync, so the next rung prices off the loaded level immediately.
+    forge.amount.value = 5;
+    expect(
+      Decimal.eq_tolerance(forge.getCost(1), Decimal.mul(10, Decimal.pow(1.15, 5)), 1e-9),
+    ).toBe(true);
   });
 });

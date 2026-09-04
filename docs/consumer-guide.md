@@ -117,12 +117,21 @@ const perks = createPurchasableCategory<PerkDef>({
   id: 'ngplus-perks',
   mapPurchasable: (def) => ({
     display: { title: def.name, description: def.description },
-    requirements: createCostRequirement({ resource: dna, cost: def.cost }),
+    requirements: (level) =>
+      createCostRequirement({
+        resource: dna,
+        cost: Formula.exponential(level, def.baseCost, def.costRatio),
+        maxBulkAmount: Decimal.dInf,
+      }),
     limit: def.maxLevel,
     effect: (amount) => def.effect(new Decimal(amount).toNumber()),
   }),
 });
 ```
+
+**Leveled costs take the factory form of `requirements`.** The callback receives the purchasable's own `amount` ref, which `def` alone can't supply — the ref doesn't exist until `createPurchasable` runs, and `mapState` is too late. Return an array over the same `level` for multi-resource ladders; `maxRequirementsMet` min-folds across them.
+
+The shape to avoid is a cost getter that reads the level back out of the category (`getPurchasable(def.id)?.amount.value`). It evaluates correctly one purchase at a time, so nothing looks wrong — but a non-Formula cost prices bulk as a linear extrapolation of the current rung, so buy-max undercharges any ladder and over-reports affordability by the same factor. A static cost has no such gap: linear is exact when the price doesn't move.
 
 **Per-instance closures → raw scaling purchasable.** When you're already iterating per definition and each instance needs its own post-creation wiring — a side-channel modifier closing over the produced purchasable's refs, custom retention listing, mapping into a per-instance lookup — drop to `createScalingPurchasable` directly inside the loop. This is a Level 3 drop-down (see below); the entry is here because future authors looking for "leveled purchasables" otherwise reach for the category and fight its shape:
 

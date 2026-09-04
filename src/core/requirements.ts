@@ -78,10 +78,25 @@ export interface CostRequirementOptions {
   resource: Resource;
 
   /**
-   * The cost amount. Can be:
-   * - A static value
-   * - A getter function
-   * - A Formula (enables bulk purchasing)
+   * The price of one purchase. Three shapes, and the choice decides whether
+   * bulk purchasing is priced correctly:
+   *
+   * - **A static value** — bulk is exact. `n` purchases cost `n × cost`.
+   * - **A getter or ref** — bulk is priced linearly off the *current* value,
+   *   which is exact only while that value doesn't move as you buy. A
+   *   level-independent getter (a tuning knob, a scoped override) is fine; a
+   *   getter that reads the buyer's own level is **silently mispriced** — three
+   *   rungs of a `1.15ⁿ` ladder charge `3c` rather than `c + 1.15c + 1.3225c`,
+   *   and affordability is over-reported to match.
+   * - **A {@link GenericFormula}** — bulk walks the real curve, via inversion
+   *   (`calculateMaxAffordable`) and closed-form summation (`calculateCost`).
+   *   The only correct shape for a cost that scales on what's being bought.
+   *
+   * The mispricing needs `maxBulkAmount > 1` to bite, so it can't be reached
+   * through `createPurchasableCategory` or `createScalingPurchasable` without
+   * asking for it. When a cost scales on a purchasable's own level,
+   * build it as a Formula over the level ref that
+   * `PurchasableOptions.requirements` hands its factory form.
    */
   cost: Computable<DecimalSource> | GenericFormula;
 
@@ -96,7 +111,13 @@ export interface CostRequirementOptions {
    */
   cumulativeCost?: Computable<boolean>;
 
-  /** Maximum bulk purchase amount (default: 1) */
+  /**
+   * Ceiling on how many purchases one bulk buy may satisfy. Default: `1`,
+   * which confines every cost shape to single purchases and is why a
+   * mispriced getter cost stays inert until this is raised. Raise it (to
+   * `Decimal.dInf` for uncapped) only alongside a Formula cost — see
+   * {@link CostRequirementOptions.cost}.
+   */
   maxBulkAmount?: Computable<DecimalSource>;
 
   /** Custom pay function (overrides default resource subtraction) */

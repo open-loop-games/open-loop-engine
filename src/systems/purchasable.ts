@@ -84,8 +84,31 @@ export interface PurchasableOptions {
   id?: string;
   /** UI text — either a full {@link PurchasableDisplay} or a plain string/getter for description-only */
   display: PurchasableDisplay | Computable<string>;
-  /** What the player must have/spend per purchase (cost requirements, boolean gates, etc.) */
-  requirements: Requirements;
+  /**
+   * What the player must have/spend per purchase (cost requirements, boolean gates, etc.).
+   *
+   * Pass a **factory** to build requirements over this purchasable's own level.
+   * The callback receives the live `amount` ref, which doesn't exist yet when
+   * the plain form is evaluated — so it's the only way to declare a cost that
+   * scales on the thing being bought:
+   *
+   * ```ts
+   * requirements: (level) =>
+   *   createCostRequirement({
+   *     resource: gold,
+   *     cost: Formula.exponential(level, def.baseCost, 1.15),
+   *     maxBulkAmount: Decimal.dInf,
+   *   })
+   * ```
+   *
+   * Prefer it over a `cost: () => …` getter that reads the level back out of a
+   * category: a getter cost is priced linearly at the *current* level, so
+   * buy-max silently undercharges a scaling ladder (see
+   * {@link CostRequirementOptions.cost}). A Formula over `level` is invertible,
+   * so bulk purchasing walks the real curve. Multiple resources work too —
+   * return an array of cost requirements over the same `level`.
+   */
+  requirements: Requirements | ((amount: MaybeRef<DecimalSource>) => Requirements);
   /** Maximum number of purchases. Default: `Infinity` (uncapped) */
   limit?: Computable<DecimalSource>;
   /** Starting amount (useful for purchasables that begin pre-purchased). Default: `0` */
@@ -490,10 +513,14 @@ function buildScalingEffect(
  * ```ts
  * const generator = createPurchasable({
  *   display: { description: 'Point Generator' },
- *   requirements: createCostRequirement({
- *     resource: points,
- *     cost: () => Decimal.pow(10, generator.amount.value),
- *   }),
+ *   // Factory form — `level` is this purchasable's own amount ref, so the
+ *   // cost is a Formula and `purchaseMax` walks the curve rung by rung.
+ *   requirements: (level) =>
+ *     createCostRequirement({
+ *       resource: points,
+ *       cost: Formula.exponential(level, 10, 1.15),
+ *       maxBulkAmount: Decimal.dInf,
+ *     }),
  *   effect: (amt) => Decimal.pow(2, amt),
  * });
  * generator.purchaseMax();
@@ -538,7 +565,15 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
 
-  const baseReqs = Array.isArray(requirements) ? requirements : [requirements];
+  // Factory form resolves here, after `amount` exists — that ordering is the
+  // whole point: a cost scaling on this purchasable's own level can't be
+  // declared before the ref it reads. `Requirements` is never a function, so
+  // the typeof discriminates unambiguously.
+  const resolvedRequirements =
+    typeof requirements === 'function' ? requirements(amount) : requirements;
+  const baseReqs = Array.isArray(resolvedRequirements)
+    ? resolvedRequirements
+    : [resolvedRequirements];
   const limitRequirement = buildLimitRequirement(processedLimit, amount);
   const allRequirements: Requirements = [...baseReqs, limitRequirement];
 

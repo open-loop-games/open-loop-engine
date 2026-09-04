@@ -14,7 +14,14 @@
  *   id: 'perks',
  *   mapPurchasable: (def) => ({
  *     display: { title: def.name, description: `Level up ${def.name}` },
- *     requirements: createCostRequirement({ resource: gold, cost: def.baseCost }),
+ *     // `level` is the perk's own amount ref — a Formula over it stays
+ *     // invertible, so buy-max prices each level at its own rung.
+ *     requirements: (level) =>
+ *       createCostRequirement({
+ *         resource: gold,
+ *         cost: Formula.exponential(level, def.baseCost, 1.15),
+ *         maxBulkAmount: Decimal.dInf,
+ *       }),
  *     limit: def.maxLevel,
  *     effect: (amount) => Decimal.pow(1.1, amount),
  *   }),
@@ -68,6 +75,13 @@ export interface PurchasableCategoryOptions<Def extends { id: string }, State = 
    *
    * Note: `id` is provided by the category — don't include it in the
    * returned options (it will be overwritten).
+   *
+   * For a cost that scales on the item's own level, return `requirements` in
+   * its factory form — the callback receives the live `amount` ref, which is
+   * what a Formula cost needs and what `def` alone cannot supply. See
+   * {@link PurchasableOptions.requirements}. Reading the level back out of the
+   * category with `getPurchasable(def.id)?.amount.value` is the shape to
+   * avoid: it works forwards but prices bulk purchases linearly.
    *
    * The optional `grants` field declares modifiers that bind to shared chains
    * while the purchasable is active. Each {@link Grant} is lowered to a
@@ -162,7 +176,7 @@ export interface PurchasableCategory<
  * @param options - Category ID and mapping function
  * @returns A {@link PurchasableCategory} with registry, lookup, and bulk purchase
  *
- * @example
+ * @example One-shot upgrades — a static cost is exact at `limit: 1`; leveled costs take the factory form of `requirements`.
  * ```ts
  * const upgrades = createPurchasableCategory<UpgDef>({
  *   id: 'upgrades',

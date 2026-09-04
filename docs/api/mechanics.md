@@ -149,23 +149,23 @@ composable value calculation chains
 
 Requirements system for gating purchases, unlocks, and actions
 
-- `function allOf(...children: Requirement[]): Requirement` — Compose requirements with AND semantics. `src/core/requirements.ts:365`
-- `function anyOf(...children: Requirement[]): Requirement` — Compose requirements with OR semantics. `src/core/requirements.ts:314`
-- `interface BooleanRequirementOptions` `src/core/requirements.ts:240`
-- `interface CostRequirement extends Requirement` — A requirement that costs a resource to satisfy. `src/core/requirements.ts:112`
+- `function allOf(...children: Requirement[]): Requirement` — Compose requirements with AND semantics. `src/core/requirements.ts:386`
+- `function anyOf(...children: Requirement[]): Requirement` — Compose requirements with OR semantics. `src/core/requirements.ts:335`
+- `interface BooleanRequirementOptions` `src/core/requirements.ts:261`
+- `interface CostRequirement extends Requirement` — A requirement that costs a resource to satisfy. `src/core/requirements.ts:133`
 - `interface CostRequirementOptions` `src/core/requirements.ts:76`
-- `function createBooleanRequirement<T extends BooleanRequirementOptions>(options: T): Requirement` — Create a simple true/false requirement. `src/core/requirements.ts:261`
-- `function createCostRequirement<T extends CostRequirementOptions>(options: T): CostRequirement` — Create a requirement based on spending a resource. `src/core/requirements.ts:151`
-- `function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void` — Create a pay function that resets to default. `src/core/requirements.ts:489`
-- `function getRequirementDescriptions(requirements: Requirements): string[]` — Get descriptions for all requirements. `src/core/requirements.ts:461`
-- `function isCostRequirement(req: Requirement): req is CostRequirement` — Check if a requirement is a cost requirement. `src/core/requirements.ts:500`
-- `function maxRequirementsMet(requirements: Requirements): DecimalSource` — Calculate the maximum number of times requirements can be met. `src/core/requirements.ts:409`
-- `function payByDivision(requirement: CostRequirement, amount?: DecimalSource): void` — Pay strategy: divide resource instead of subtract. `src/core/requirements.ts:472`
-- `function payByReset(requirement: CostRequirement, overrideValue?: DecimalSource): void` — Pay strategy: reset resource to default value. `src/core/requirements.ts:481`
-- `function payRequirements(requirements: Requirements, amount?: DecimalSource): void` — Pay the costs for one or more requirements. `src/core/requirements.ts:443`
+- `function createBooleanRequirement<T extends BooleanRequirementOptions>(options: T): Requirement` — Create a simple true/false requirement. `src/core/requirements.ts:282`
+- `function createCostRequirement<T extends CostRequirementOptions>(options: T): CostRequirement` — Create a requirement based on spending a resource. `src/core/requirements.ts:172`
+- `function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void` — Create a pay function that resets to default. `src/core/requirements.ts:510`
+- `function getRequirementDescriptions(requirements: Requirements): string[]` — Get descriptions for all requirements. `src/core/requirements.ts:482`
+- `function isCostRequirement(req: Requirement): req is CostRequirement` — Check if a requirement is a cost requirement. `src/core/requirements.ts:521`
+- `function maxRequirementsMet(requirements: Requirements): DecimalSource` — Calculate the maximum number of times requirements can be met. `src/core/requirements.ts:430`
+- `function payByDivision(requirement: CostRequirement, amount?: DecimalSource): void` — Pay strategy: divide resource instead of subtract. `src/core/requirements.ts:493`
+- `function payByReset(requirement: CostRequirement, overrideValue?: DecimalSource): void` — Pay strategy: reset resource to default value. `src/core/requirements.ts:502`
+- `function payRequirements(requirements: Requirements, amount?: DecimalSource): void` — Pay the costs for one or more requirements. `src/core/requirements.ts:464`
 - `interface Requirement` — Base requirement interface. `src/core/requirements.ts:28`
 - `type Requirements = Requirement | Requirement[]` — Utility type for accepting one or more requirements. `src/core/requirements.ts:69`
-- `function requirementsMet(requirements: Requirements): boolean` — Check if all requirements are met. `src/core/requirements.ts:393`
+- `function requirementsMet(requirements: Requirements): boolean` — Check if all requirements are met. `src/core/requirements.ts:414`
 
 ## TimedProgress
 

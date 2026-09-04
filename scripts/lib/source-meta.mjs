@@ -81,7 +81,7 @@ export const CLUSTER_TITLES = {
   },
   purchasable: {
     prologue:
-      'Three factories in increasing flexibility: `createSimplePurchasable` for static one-shot costs, `createScalingPurchasable` for leveled geometric scaling, `createPurchasable` for arbitrary requirements. See consumer-guide.md §Choosing among purchasable primitives.',
+      'Two consumer entry points: `createPurchasableCategory` batch-registers from content definitions and is the default; `createScalingPurchasable` is the per-instance escape hatch for leveled costs. `createPurchasable` is the raw factory both lower into. A cost that scales on the item\'s own level goes through the factory form of `requirements`, which receives the live level ref — a getter reading the level back out misprices bulk purchases. See consumer-guide.md §Choosing among purchasable primitives.',
   },
 }
 
