@@ -52,7 +52,7 @@ auto-saved refs with context-scoped registration
 prestige and layer mechanics
 
 - `function createReset<T extends ResetOptions>(options: T): Reset` — Create a reset mechanic. `src/systems/reset.ts:223`
-- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:378`
+- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:390`
 - `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:135`
 - `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:162`
 - `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:59`

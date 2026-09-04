@@ -380,3 +380,66 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     expect(yielded).toContain(skills.getSkill('reset-cat-yield-combat'));
   });
 });
+
+describe('Reset — listener re-entrancy', () => {
+  /** Run `fn` on the first emit only — re-entrancy, not recursion. */
+  function once(subscribe: (fn: () => void) => void, fn: () => void) {
+    let fired = false;
+    subscribe(() => {
+      if (fired) return;
+      fired = true;
+      fn();
+    });
+  }
+
+  it('refuses a reset re-entered from a beforeReset listener', () => {
+    beginPersistentContext('reset-reentry');
+    const skill = persistent<Decimal>(bn(0));
+    endPersistentContext();
+    let grants = 0;
+    let afterResets = 0;
+    const reset = createReset({
+      thingsToReset: [{ skill }],
+      retain: new Map([[skill, fractional(0.1)]]),
+      onReset: () => {
+        grants++;
+      },
+    });
+    reset.on('afterReset', () => afterResets++);
+
+    let nested: boolean | undefined;
+    once(
+      (fn) => reset.on('beforeReset', fn),
+      () => {
+        nested = reset.reset();
+      },
+    );
+
+    skill.value = bn(100);
+    expect(reset.reset()).toBe(true);
+
+    // The retain transform runs once per reset. A second, nested application
+    // would leave 1% rather than 10%.
+    expect(nested).toBe(false);
+    expect(skill.value.eq(10)).toBe(true);
+    expect(grants).toBe(1);
+    expect(afterResets).toBe(1);
+  });
+
+  it('still allows sequential resets after a refused re-entry', () => {
+    beginPersistentContext('reset-reentry-sequential');
+    const gold = persistent<Decimal>(bn(0));
+    endPersistentContext();
+    const reset = createReset({ thingsToReset: [{ gold }] });
+    once(
+      (fn) => reset.on('beforeReset', fn),
+      () => reset.reset(),
+    );
+
+    gold.value = bn(50);
+    expect(reset.reset()).toBe(true);
+    gold.value = bn(50);
+    expect(reset.reset()).toBe(true);
+    expect(gold.value.eq(0)).toBe(true);
+  });
+});

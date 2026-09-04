@@ -240,6 +240,14 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
   // Refs to skip during module-scoped reset (kept or retained refs)
   const retainedRefs = new Set<Persistent>([...(keep ?? []), ...(retain ? retain.keys() : [])]);
 
+  // A reset is a snapshot → wipe → restore sequence wrapped around synchronous
+  // emits and hooks, so a listener re-entering it runs a whole second sequence
+  // against half-reset state: the retain transforms compose (a 10% carry-over
+  // becomes 1%) and onReset fires per entry rather than per reset. Depth is
+  // never meaningful here — a reset already in progress will reach the same
+  // end state — so re-entry is refused rather than queued.
+  let _resetting = false;
+
   const reset: Reset = {
     thingsToReset: processedThingsToReset,
     resolvedScope: scope,
@@ -248,6 +256,8 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
     on: handle.on,
 
     reset(): boolean {
+      if (_resetting) return false;
+
       // Declarative readiness gate fires before any side-effects. Predictor /
       // UI consumers read the same Gate, so the imperative gate matches the
       // declarative projection.
@@ -261,15 +271,16 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
         if (result === false) return false;
       }
 
-      handle.emit('beforeReset');
-
-      // Snapshot retained values before reset
-      retention?.snapshot();
-
-      // Set loading flag to prevent watchers from triggering
-      loadingSave.value = true;
-
+      _resetting = true;
       try {
+        handle.emit('beforeReset');
+
+        // Snapshot retained values before reset
+        retention?.snapshot();
+
+        // Set loading flag to prevent watchers from triggering
+        loadingSave.value = true;
+
         // Reset via recursive object walking (legacy thingsToReset path)
         if (processedThingsToReset) {
           const things = unref(processedThingsToReset);
@@ -297,6 +308,7 @@ export function createReset<T extends ResetOptions>(options: T): Reset {
         return true;
       } finally {
         loadingSave.value = false;
+        _resetting = false;
       }
     },
   };

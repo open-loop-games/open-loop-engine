@@ -420,3 +420,55 @@ describe('createCycle — reset composition', () => {
     expect(restarts).toBe(1);
   });
 });
+
+describe('createCycle — listener re-entrancy', () => {
+  it('refuses a restart re-entered from a beforeRestart listener', () => {
+    const { registerTick, tick } = createTickManager();
+    beginPersistentContext('cycle-reentry');
+    const gold = createResource(bn(0), { displayName: 'Gold' });
+    endPersistentContext();
+    const cycle = createCycle({
+      id: 'cycle-reentry',
+      thingsToReset: [gold],
+      registerTick,
+    });
+
+    let nested: boolean | undefined;
+    let fired = false;
+    cycle.on('beforeRestart', () => {
+      if (fired) return;
+      fired = true;
+      nested = cycle.end();
+    });
+    let afterRestarts = 0;
+    cycle.on('afterRestart', () => afterRestarts++);
+
+    cycle.run();
+    tick(7);
+    expect(cycle.end()).toBe(true);
+
+    // The nested end() zeroes `elapsed` before the outer reads it, so an
+    // unrefused re-entry records a best time of 0 into a persistent ref.
+    expect(nested).toBe(false);
+    expect(cycle.count.value).toBe(1);
+    expect(cycle.bestTime.value).toBe(7);
+    expect(afterRestarts).toBe(1);
+  });
+
+  it('the cycle guard does not block its own inner reset', () => {
+    const { registerTick, tick } = createTickManager();
+    beginPersistentContext('cycle-reentry-inner');
+    const gold = createResource(bn(0), { displayName: 'Gold' });
+    endPersistentContext();
+    const reset = createReset({ thingsToReset: [gold] });
+    const cycle = createCycle({ id: 'cycle-reentry-inner', reset, registerTick });
+
+    addResource(gold, 500);
+    cycle.run();
+    tick(3);
+
+    expect(cycle.end()).toBe(true);
+    expect(gold.value.eq(0)).toBe(true);
+    expect(cycle.count.value).toBe(1);
+  });
+});

@@ -231,30 +231,45 @@ export function createCycle(options: CycleOptions): Cycle {
       onReset: onRestart,
     });
 
+  // `elapsed` is read after the emit and zeroed after that, so a listener
+  // re-entering `end()` zeroes it before the outer comparison sees it and the
+  // outer records a best time of 0 — into a persistent ref, where no later
+  // cycle can beat it. The count double-increments for the same reason. Guards
+  // the cycle's own bookkeeping only: the inner `reset` carries its own flag,
+  // and the call below is not re-entrant with respect to it.
+  let _restarting = false;
+
   function end(): boolean {
+    if (_restarting) return false;
+
     if (onBeforeRestart) {
       const result = onBeforeRestart();
       if (result === false) return false;
     }
 
-    handle.emit('beforeRestart');
+    _restarting = true;
+    try {
+      handle.emit('beforeRestart');
 
-    // Stats and elapsed commit only once the reset has actually run. A Reset
-    // carrying a `canReset` gate or an `onBeforeReset` hook can decline, and
-    // both checks fire before it touches any ref — so declining is clean and
-    // the cycle must not count, record a best time, or claim a restart.
-    if (!reset.reset()) return false;
+      // Stats and elapsed commit only once the reset has actually run. A Reset
+      // carrying a `canReset` gate or an `onBeforeReset` hook can decline, and
+      // both checks fire before it touches any ref — so declining is clean and
+      // the cycle must not count, record a best time, or claim a restart.
+      if (!reset.reset()) return false;
 
-    if (elapsed.value < bestTime.value) {
-      bestTime.value = elapsed.value;
+      if (elapsed.value < bestTime.value) {
+        bestTime.value = elapsed.value;
+      }
+      count.value++;
+
+      elapsed.value = 0;
+
+      handle.emit('afterRestart');
+
+      return true;
+    } finally {
+      _restarting = false;
     }
-    count.value++;
-
-    elapsed.value = 0;
-
-    handle.emit('afterRestart');
-
-    return true;
   }
 
   const unregisterTick = registerTick((dt: number) => {
