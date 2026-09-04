@@ -484,7 +484,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       if (startOnEnqueue && registerTick && current.value === '' && _liveItems.length > 0) {
         const unsubRedrive = registerTick(() => {
           unsubRedrive();
-          if (current.value === '' && !paused.value && !_holding) dequeueNext();
+          dequeueNext();
         });
       }
     },
@@ -637,9 +637,25 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     }
   }
 
+  // Emits are synchronous, so a listener can dispatch underneath a walk that
+  // is already in progress, or ahead of a caller's trailing `dequeueNext()`
+  // (complete/repeat/resetCursor all emit, then call). Dispatching a second
+  // item over a live `current` overwrites it with no terminal event, orphaning
+  // the running item. Every other emitter in the engine iterates a snapshot
+  // taken before the first emit and is immune by construction; `dequeueNext`
+  // is a cursor over live state and cannot be, so the invariant — never
+  // dispatch over a live current — is enforced here rather than at each
+  // callsite. Checked at entry and again per iteration: the two re-entry
+  // topologies (a caller's trailing call, and a listener re-entering from
+  // inside the loop) need both.
+  const preempted = (): boolean => current.value !== '';
+
   function dequeueNext(): SequencerItem<M> | null {
     if (paused.value) return null;
+    // While holding, the retry tick owns the dispatch decision — anything
+    // enqueued meanwhile sits behind the held item.
     if (_holding) return null;
+    if (preempted()) return null;
 
     if (++_advancesThisTick > maxAdvancesPerTick) {
       if (!_advanceCapHit) {
@@ -654,6 +670,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       // past items on 'now' — advance only on 'never' (skip) or 'hold'
       // exit via the retry path.
       while (rawCursor!.value < items.value.length) {
+        if (preempted()) return null;
         const next = items.value[rawCursor!.value];
         const result = _canRun ? _canRun(next) : 'now';
 
@@ -682,7 +699,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       }
 
       // Reached end of list — cursor sits at items.length (done sentinel)
-      return fill();
+      return preempted() ? null : fill();
     }
 
     // Queue mode: peek live head; pop in-place via _head++. We sync to
@@ -691,6 +708,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     let dirty = false;
     try {
       while (_head < _liveItems.length) {
+        if (preempted()) return null;
         const next = _liveItems[_head];
         const result = _canRun ? _canRun(next) : 'now';
 
@@ -726,7 +744,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     }
 
     // Queue empty — try fill strategy
-    return fill();
+    return preempted() ? null : fill();
   }
 
   // === PUBLIC INTERFACE ===
@@ -788,14 +806,12 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
       if (heldBroken) {
         clearHold();
-        if (current.value === '' && !paused.value) dequeueNext();
+        dequeueNext();
         return true;
       }
 
-      // Auto-start if nothing running and not paused. Skip while holding —
-      // the retry tick owns the current dispatch decision, and the new item
-      // sits behind the held one (append, or non-affecting positional insert).
-      if (startOnEnqueue && !_holding && current.value === '' && !paused.value) {
+      // Auto-start; dequeueNext owns the running/paused/holding preconditions.
+      if (startOnEnqueue) {
         dequeueNext();
       }
       return true;
@@ -948,9 +964,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         retryHeldItem();
         return;
       }
-      if (current.value === '') {
-        dequeueNext();
-      }
+      dequeueNext();
     },
 
     togglePause(): void {
@@ -959,9 +973,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     },
 
     start(): void {
-      if (current.value === '' && !paused.value) {
-        dequeueNext();
-      }
+      dequeueNext();
     },
 
     get fillStrategy() {
@@ -980,7 +992,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         // Gate removed while holding — dispatch the held item on next
         // dequeueNext call path.
         clearHold();
-        if (current.value === '' && !paused.value) dequeueNext();
+        dequeueNext();
       }
     },
 
@@ -1009,9 +1021,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         current.value = '';
         handle.emit('cancel', cancelled);
       }
-      if (!paused.value) {
-        dequeueNext();
-      }
+      dequeueNext();
     },
 
     on(event, handler) {

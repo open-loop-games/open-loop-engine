@@ -6,7 +6,12 @@ import {
   getAllPersistentRefs,
   deserializePersistents,
 } from '@/core/persistence';
-import { createSequencer, type SequencerItem, type StartResult } from '@/core/sequencer';
+import {
+  createSequencer,
+  type Sequencer,
+  type SequencerItem,
+  type StartResult,
+} from '@/core/sequencer';
 
 const qi = (id: string): SequencerItem<void> => ({ id, metadata: undefined as void });
 
@@ -1884,5 +1889,172 @@ describe('Sequencer — skip ordering', () => {
 
     expect(q.items.value).toHaveLength(0);
     expect(q.cursor).toBe(0);
+  });
+});
+
+describe('Sequencer — listener re-entrancy', () => {
+  /**
+   * Track dispatches against their terminal events. `dequeueNext` emits
+   * synchronously, so a listener can dispatch underneath the walk; the symptom
+   * is either a second `start` for the running item or — worse — a `start` that
+   * never gets a terminal event at all, because the walk overwrote `current`
+   * without cancelling what was there.
+   */
+  function trackLifecycle(q: {
+    on: Sequencer<void>['on'];
+    currentItem: SequencerItem<void> | null;
+  }) {
+    const starts: string[] = [];
+    const ended = new Set<string>();
+    q.on('start', (item) => starts.push(item.id));
+    q.on('complete', (item) => ended.add(item.id));
+    q.on('cancel', (item) => ended.add(item.id));
+    q.on('skip', (item) => ended.add(item.id));
+    return {
+      starts,
+      /** Started but never terminated, excluding whatever is running now. */
+      orphaned(): string[] {
+        const live = q.currentItem?.id;
+        return starts.filter((id) => id !== live && !ended.has(id));
+      },
+    };
+  }
+
+  /** Run `fn` on the first emit of `event` only — re-entrancy, not recursion. */
+  function once<E extends 'skip' | 'hold' | 'complete' | 'cancel' | 'repeat' | 'start'>(
+    q: Sequencer<void>,
+    event: E,
+    fn: () => void,
+  ) {
+    let fired = false;
+    q.on(event, () => {
+      if (fired) return;
+      fired = true;
+      fn();
+    });
+  }
+
+  it('queue mode: enqueueing from a complete listener does not orphan the next item', () => {
+    const q = makeQueue();
+    const seen = trackLifecycle(q);
+    once(q, 'complete', () => q.enqueue(qi('c')));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.complete();
+
+    expect(seen.starts).toEqual(['a', 'b']);
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('b');
+    expect(q.items.value.map((i) => i.id)).toEqual(['c']);
+  });
+
+  it('list mode: enqueueing from a complete listener does not re-start the running item', () => {
+    const q = makeQueue({ mode: 'list' });
+    const seen = trackLifecycle(q);
+    once(q, 'complete', () => q.enqueue(qi('c')));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.complete();
+
+    expect(seen.starts).toEqual(['a', 'b']);
+    expect(q.currentItem?.id).toBe('b');
+    expect(q.cursor).toBe(1);
+  });
+
+  it('queue mode: enqueueing from a skip listener does not orphan the next item', () => {
+    const q = makeQueue();
+    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    const seen = trackLifecycle(q);
+    q.pause();
+    q.enqueue(qi('skip-me'));
+    q.enqueue(qi('b'));
+    once(q, 'skip', () => q.enqueue(qi('c')));
+    q.resume();
+
+    expect(seen.starts).toEqual(['b']);
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('b');
+    expect(q.items.value.map((i) => i.id)).toEqual(['c']);
+  });
+
+  it('list mode: enqueueing from a skip listener does not re-start the dispatched item', () => {
+    const q = makeQueue({ mode: 'list' });
+    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    const seen = trackLifecycle(q);
+    once(q, 'skip', () => q.enqueue(qi('c')));
+
+    q.enqueue(qi('skip-me'));
+
+    expect(seen.starts).toEqual(['c']);
+    expect(q.currentItem?.id).toBe('c');
+  });
+
+  it('list mode: breaking the hold from a hold listener dispatches once', () => {
+    const tm = createTickManager();
+    const ctxId = `reentry-hold-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+    const seen = trackLifecycle(q);
+    // Inserting AT the cursor with nothing running breaks the hold, which
+    // re-drives from inside the `hold` emit still on the stack.
+    once(q, 'hold', () => q.enqueue(qi('jump-in'), { at: 0 }));
+
+    q.enqueue(qi('wait-me'));
+
+    expect(seen.starts).toEqual(['jump-in']);
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('jump-in');
+  });
+
+  it('list mode: enqueueing from resetCursor’s cancel listener does not orphan', () => {
+    const q = makeQueue({ mode: 'list' });
+    const seen = trackLifecycle(q);
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    once(q, 'cancel', () => q.enqueue(qi('c')));
+
+    q.resetCursor();
+
+    expect(seen.starts).toEqual(['a', 'a']);
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.cursor).toBe(0);
+  });
+
+  it('queue mode: enqueueing from a repeat listener does not orphan the repeated item', () => {
+    const q = makeQueue();
+    const seen = trackLifecycle(q);
+    q.enqueue(qi('a'));
+    once(q, 'repeat', () => q.enqueue(qi('c')));
+
+    q.repeat();
+
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('a');
+    expect(q.items.value.map((i) => i.id)).toEqual(['c']);
+  });
+
+  // The guard refuses a dispatch over a *live* current. `complete()` clears
+  // `current` before it emits, so completing from a start listener is a
+  // legitimate nested call and must still advance.
+  it('queue mode: completing from a start listener still dispatches the next item', () => {
+    const q = makeQueue();
+    const seen = trackLifecycle(q);
+    once(q, 'start', () => q.complete());
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+
+    expect(seen.starts).toEqual(['a', 'b']);
+    expect(seen.orphaned()).toEqual([]);
+    expect(q.currentItem?.id).toBe('b');
   });
 });
