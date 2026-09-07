@@ -8,17 +8,14 @@
  *
  * The category factory {@link createAchievementCategory} is the consumer
  * front door for batch-registering achievements; its `registerTiered`
- * method covers the threshold-ladder fanout. {@link createAchievement}
- * is engine-internal.
+ * method fans one tracked value into a run of threshold-gated tiers.
+ * {@link createAchievement} is engine-internal.
  *
  * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative,
  * {@link getEarnedCount} reactive count) live alongside the factory.
  *
  * Batch-registration over a content registry lives in
  * `./achievement-category` ({@link createAchievementCategory}).
- *
- * Implements the Achievement Systems pattern — foundation-tier, near-universal
- * across the incremental-games corpus.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';

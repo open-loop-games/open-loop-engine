@@ -10,9 +10,10 @@
  *   between candidates.
  * - {@link setupPolicyAutoPurchase} — pick-one-then-buy under a
  *   {@link SelectionPolicy}, throttled by an interval and gated by an
- *   optional reserve floor. The producer-chain shape: costs grow into each
- *   other, so naive max-buy wipes the player's resource on the cheapest
- *   option and we need a score-and-pick loop instead.
+ *   optional reserve floor. The contested-roster shape: producers with
+ *   escalating costs compete for one resource, so naive max-buy wipes the
+ *   player's resource on the cheapest option and we need a score-and-pick
+ *   loop instead.
  *
  * Names expose the trigger-shape (sweep vs policy), not the input-shape
  * (purchasable vs producer). The same policy primitive drives any candidate
@@ -390,7 +391,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  * Register a tick handler that auto-buys one producer per throttled beat
  * according to a {@link SelectionPolicy}.
  *
- * This is the producer-chain counterpart to {@link setupSweepAutoPurchase}
+ * This is the producer-roster counterpart to {@link setupSweepAutoPurchase}
  * (which covers leveled/one-shot upgrades). The two have different semantics
  * and coexist: upgrades use `purchaseMax()` uncontested, whereas producers
  * need a *pick-one-then-buy* loop because their costs grow into each other
