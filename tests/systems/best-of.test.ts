@@ -466,6 +466,56 @@ describe('createBestOf', () => {
   });
 
   // ==========================================================================
+  // Recency decay
+  // ==========================================================================
+
+  it('recencyHalfLifeCycles lets a weaker candidate beat an aged incumbent', () => {
+    const bestOf = createBestOf({
+      id: 'bo-recency',
+      metrics: { gold: { mode: 'absolute', recencyHalfLifeCycles: 2 } },
+    });
+
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    // One half-life old: incumbent compares as 50 — 60 wins.
+    bestOf.submit({ key: 'gold', value: 60, elapsed: 10, cycleNumber: 2 });
+
+    expect(bestOf.entries.value.gold!.value.eq(60)).toBe(true);
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(2);
+  });
+
+  it('recency decay does not touch the stored incumbent value', () => {
+    const bestOf = createBestOf({
+      id: 'bo-recency-stored',
+      metrics: { gold: { mode: 'absolute', recencyHalfLifeCycles: 2 } },
+    });
+
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    // One half-life old: incumbent compares as 50 — 40 still loses.
+    bestOf.submit({ key: 'gold', value: 40, elapsed: 10, cycleNumber: 2 });
+
+    expect(bestOf.entries.value.gold!.value.eq(100)).toBe(true);
+  });
+
+  it('setRecencyHalfLifeCycles overrides the static config and clears back to it', () => {
+    const bestOf = createBestOf({
+      id: 'bo-recency-override',
+      metrics: { gold: { mode: 'absolute' } },
+    });
+
+    bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 60, elapsed: 10, cycleNumber: 2 });
+    expect(bestOf.entries.value.gold!.value.eq(100)).toBe(true);
+
+    bestOf.setRecencyHalfLifeCycles(2);
+    bestOf.submit({ key: 'gold', value: 60, elapsed: 10, cycleNumber: 2 });
+    expect(bestOf.entries.value.gold!.value.eq(60)).toBe(true);
+
+    bestOf.setRecencyHalfLifeCycles(undefined);
+    bestOf.submit({ key: 'gold', value: 30, elapsed: 10, cycleNumber: 4 });
+    expect(bestOf.entries.value.gold!.value.eq(60)).toBe(true);
+  });
+
+  // ==========================================================================
   // Edge cases
   // ==========================================================================
 

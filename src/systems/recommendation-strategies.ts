@@ -34,7 +34,7 @@ export interface BestReplayDefOptions {
    * Minimum completed cycles before this def becomes applicable.
    * Default: 1 (needs at least one recorded best).
    */
-  minLoops?: number;
+  minCycles?: number;
 }
 
 /** Options for {@link createGoalDef} */
@@ -91,7 +91,7 @@ function magnitudeScore(x: Decimal): number {
  *   // ...
  *   defs: [
  *     createBestReplayDef('gold'),
- *     createBestReplayDef('xp', { minLoops: 3 }),
+ *     createBestReplayDef('xp', { minCycles: 3 }),
  *   ],
  * });
  * ```
@@ -101,7 +101,7 @@ export function createBestReplayDef(
   options?: BestReplayDefOptions,
 ): RecommendationDef {
   const strategyId = options?.id ?? `best-replay:${metricKey}`;
-  const minLoops = options?.minLoops ?? 1;
+  const minCycles = options?.minCycles ?? 1;
 
   function getValidEntry(ctx: RecommendationContext): BestOfEntry | null {
     const entry = ctx.bestOf.entries.value[metricKey];
@@ -115,7 +115,7 @@ export function createBestReplayDef(
     id: strategyId,
 
     canApply(ctx: RecommendationContext): boolean {
-      if (ctx.cycle.count.value < minLoops) return false;
+      if (ctx.cycle.count.value < minCycles) return false;
       return getValidEntry(ctx) !== null;
     },
 

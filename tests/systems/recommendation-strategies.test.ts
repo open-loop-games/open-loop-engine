@@ -54,7 +54,7 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
   });
 
   /** Run a cycle cycle: set gold, tick, end. String gold allows values past the double range. */
-  function runLoop(goldAmount: number | string, elapsed: number) {
+  function runCycle(goldAmount: number | string, elapsed: number) {
     cycle.run();
     addResource(gold, bn(goldAmount));
     tick.tick(elapsed);
@@ -72,7 +72,7 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
     };
   }
 
-  return { tick, gold, cycle, cycleLog, bestOf, runLoop, buildContext };
+  return { tick, gold, cycle, cycleLog, bestOf, runCycle, buildContext };
 }
 
 describe('createBestReplayDef', () => {
@@ -88,20 +88,20 @@ describe('createBestReplayDef', () => {
   });
 
   it('canApply returns false when entry has no strategySnapshot', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-nosnap', {
+    const { runCycle, buildContext } = createPopulatedStack('br-nosnap', {
       captureStrategy: false,
     });
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const strategy = createBestReplayDef('gold');
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
   it('canApply returns false when entry status is stale', () => {
-    const { runLoop, bestOf, buildContext } = createPopulatedStack('br-stale');
+    const { runCycle, bestOf, buildContext } = createPopulatedStack('br-stale');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
     bestOf.invalidate('gold');
 
     const strategy = createBestReplayDef('gold');
@@ -109,28 +109,28 @@ describe('createBestReplayDef', () => {
   });
 
   it('canApply returns true when valid entry with snapshot exists', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-ok');
+    const { runCycle, buildContext } = createPopulatedStack('br-ok');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const strategy = createBestReplayDef('gold');
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
-  it('minLoops option gates applicability on cycle count', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-minloops');
+  it('minCycles option gates applicability on cycle count', () => {
+    const { runCycle, buildContext } = createPopulatedStack('br-mincycles');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold', { minLoops: 3 });
+    const strategy = createBestReplayDef('gold', { minCycles: 3 });
     // cycle.count is 1 after one completed cycle
     expect(strategy.canApply(buildContext())).toBe(false);
 
-    runLoop(80, 4);
+    runCycle(80, 4);
     // cycle.count is 2
     expect(strategy.canApply(buildContext())).toBe(false);
 
-    runLoop(60, 3);
+    runCycle(60, 3);
     // cycle.count is 3
     expect(strategy.canApply(buildContext())).toBe(true);
   });
@@ -140,9 +140,9 @@ describe('createBestReplayDef', () => {
   // ==========================================================================
 
   it('score reflects entry value for natural arbitration', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-score');
+    const { runCycle, buildContext } = createPopulatedStack('br-score');
 
-    runLoop(200, 10);
+    runCycle(200, 10);
 
     const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
@@ -158,11 +158,11 @@ describe('createBestReplayDef', () => {
     // Two configs whose values exceed ~1e308 must still rank distinctly rather
     // than both scoring Infinity and collapsing arbitration to registration order.
     const low = createPopulatedStack('br-huge-low');
-    low.runLoop('1e400', 10);
+    low.runCycle('1e400', 10);
     const scoreLow = createBestReplayDef('gold').score(low.buildContext());
 
     const high = createPopulatedStack('br-huge-high');
-    high.runLoop('1e500', 10);
+    high.runCycle('1e500', 10);
     const scoreHigh = createBestReplayDef('gold').score(high.buildContext());
 
     expect(Number.isFinite(scoreLow)).toBe(true);
@@ -175,9 +175,9 @@ describe('createBestReplayDef', () => {
   // ==========================================================================
 
   it('recommend returns the stored strategySnapshot', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-rec');
+    const { runCycle, buildContext } = createPopulatedStack('br-rec');
 
-    runLoop(150, 5);
+    runCycle(150, 5);
 
     const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
@@ -187,12 +187,12 @@ describe('createBestReplayDef', () => {
   });
 
   it('rationale contains metric comparison with current cycle data', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-rationale');
+    const { runCycle, buildContext } = createPopulatedStack('br-rationale');
 
     // First cycle: gold = 100 (sets the best)
-    runLoop(100, 5);
+    runCycle(100, 5);
     // Second cycle: gold = 50 (worse, doesn't beat best)
-    runLoop(50, 5);
+    runCycle(50, 5);
 
     const strategy = createBestReplayDef('gold');
     const ctx = buildContext();
@@ -209,8 +209,8 @@ describe('createBestReplayDef', () => {
   });
 
   it('uses custom id when provided', () => {
-    const { runLoop, buildContext } = createPopulatedStack('br-custom-id');
-    runLoop(100, 5);
+    const { runCycle, buildContext } = createPopulatedStack('br-custom-id');
+    runCycle(100, 5);
 
     const strategy = createBestReplayDef('gold', { id: 'my-replay' });
     expect(strategy.id).toBe('my-replay');
@@ -233,9 +233,9 @@ describe('createGoalDef', () => {
   });
 
   it('canApply returns false when entry is below threshold', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-thresh');
+    const { runCycle, buildContext } = createPopulatedStack('gs-thresh');
 
-    runLoop(50, 5);
+    runCycle(50, 5);
 
     const strategy = createGoalDef({
       id: 'goal',
@@ -246,9 +246,9 @@ describe('createGoalDef', () => {
   });
 
   it('canApply returns true when entry meets threshold', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-thresh-ok');
+    const { runCycle, buildContext } = createPopulatedStack('gs-thresh-ok');
 
-    runLoop(150, 5);
+    runCycle(150, 5);
 
     const strategy = createGoalDef({
       id: 'goal',
@@ -259,9 +259,9 @@ describe('createGoalDef', () => {
   });
 
   it('canApply returns true with no threshold when any entry exists', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-nothresh');
+    const { runCycle, buildContext } = createPopulatedStack('gs-nothresh');
 
-    runLoop(10, 5);
+    runCycle(10, 5);
 
     const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     expect(strategy.canApply(buildContext())).toBe(true);
@@ -272,9 +272,9 @@ describe('createGoalDef', () => {
   // ==========================================================================
 
   it('maximize score is the entry value', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-score-max');
+    const { runCycle, buildContext } = createPopulatedStack('gs-score-max');
 
-    runLoop(200, 10);
+    runCycle(200, 10);
 
     const strategy = createGoalDef({
       id: 'goal',
@@ -287,9 +287,9 @@ describe('createGoalDef', () => {
   });
 
   it('minimize score is negative elapsed', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-score-min');
+    const { runCycle, buildContext } = createPopulatedStack('gs-score-min');
 
-    runLoop(200, 8);
+    runCycle(200, 8);
 
     const strategy = createGoalDef({
       id: 'goal',
@@ -305,9 +305,9 @@ describe('createGoalDef', () => {
   // ==========================================================================
 
   it('recommend returns strategySnapshot when available', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-snap');
+    const { runCycle, buildContext } = createPopulatedStack('gs-snap');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     const result = strategy.recommend(buildContext());
@@ -316,11 +316,11 @@ describe('createGoalDef', () => {
   });
 
   it('recommend falls back to currentSnapshot when no strategySnapshot', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-fallback', {
+    const { runCycle, buildContext } = createPopulatedStack('gs-fallback', {
       captureStrategy: false,
     });
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     // canApply still true (goal strategy doesn't require snapshot)
@@ -331,9 +331,9 @@ describe('createGoalDef', () => {
   });
 
   it('rationale reflects goal direction', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-rationale');
+    const { runCycle, buildContext } = createPopulatedStack('gs-rationale');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const maxStrategy = createGoalDef({
       id: 'max',
@@ -354,9 +354,9 @@ describe('createGoalDef', () => {
   });
 
   it('defaults prefer to maximize', () => {
-    const { runLoop, buildContext } = createPopulatedStack('gs-default');
+    const { runCycle, buildContext } = createPopulatedStack('gs-default');
 
-    runLoop(100, 5);
+    runCycle(100, 5);
 
     const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
     const result = strategy.recommend(buildContext());

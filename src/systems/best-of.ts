@@ -57,7 +57,7 @@ export interface BestOfMetricDef {
 
   /**
    * When set (and > 0), the stored incumbent's comparison value decays with
-   * age measured in cycle count: every `recencyHalfLifeLoops` cycles that pass
+   * age measured in cycle count: every `recencyHalfLifeCycles` cycles that pass
    * between the incumbent's cycle and the current candidate's cycle halve its
    * effective value. The candidate is always treated as fresh (no decay).
    *
@@ -65,7 +65,7 @@ export interface BestOfMetricDef {
    * fresh runs over calcified high-water marks. Leave unset for classic
    * strict best-of behavior.
    */
-  recencyHalfLifeLoops?: number;
+  recencyHalfLifeCycles?: number;
 }
 
 /** Validity status of a best-of entry */
@@ -163,12 +163,12 @@ export interface BestOf {
    * Runtime override for incumbent recency decay, applied to every metric
    * on this instance. Pass a positive number to enable age-based decay
    * (half-life in cycle count), or `undefined` to clear the override and
-   * fall back to each metric's static `recencyHalfLifeLoops` config.
+   * fall back to each metric's static `recencyHalfLifeCycles` config.
    *
    * Useful for toggling decay at runtime without mutating shared metric
    * config objects.
    */
-  setRecencyHalfLifeLoops(halfLifeLoops: number | undefined): void;
+  setRecencyHalfLifeCycles(halfLifeCycles: number | undefined): void;
   /** Unsubscribe from CycleLog if connected */
   dispose(): void;
 }
@@ -262,7 +262,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
   }
 
   function resolveRecencyHalfLife(def: BestOfMetricDef): number | undefined {
-    return recencyOverride !== undefined ? recencyOverride : def.recencyHalfLifeLoops;
+    return recencyOverride !== undefined ? recencyOverride : def.recencyHalfLifeCycles;
   }
 
   /**
@@ -274,14 +274,14 @@ export function createBestOf(options: BestOfOptions): BestOf {
    */
   function applyRecencyDecay(
     existingVal: Decimal,
-    existingLoop: number,
-    candidateLoop: number,
-    halfLifeLoops: number | undefined,
+    existingCycle: number,
+    candidateCycle: number,
+    halfLifeCycles: number | undefined,
   ): Decimal {
-    if (halfLifeLoops === undefined || halfLifeLoops <= 0) return existingVal;
-    const ageLoops = candidateLoop - existingLoop;
-    if (ageLoops <= 0) return existingVal;
-    const factor = Math.pow(0.5, ageLoops / halfLifeLoops);
+    if (halfLifeCycles === undefined || halfLifeCycles <= 0) return existingVal;
+    const ageCycles = candidateCycle - existingCycle;
+    if (ageCycles <= 0) return existingVal;
+    const factor = Math.pow(0.5, ageCycles / halfLifeCycles);
     return new Decimal(Decimal.mul(existingVal, factor));
   }
 
@@ -434,8 +434,8 @@ export function createBestOf(options: BestOfOptions): BestOf {
       store.value = {};
     },
 
-    setRecencyHalfLifeLoops(halfLifeLoops: number | undefined) {
-      recencyOverride = halfLifeLoops;
+    setRecencyHalfLifeCycles(halfLifeCycles: number | undefined) {
+      recencyOverride = halfLifeCycles;
     },
 
     dispose() {

@@ -319,8 +319,8 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  *
  * // BYO history (function form — TEntry inferred from return type):
  * const advisor = createRuleAdvisor({
- *   historySource: () => loopRecords,
- *   aggregate: (history) => aggregateLoopRecords(history),
+ *   historySource: () => cycleRecords,
+ *   aggregate: (history) => aggregateCycleRecords(history),
  *   analyzers: [emergingPatternAnalyzer],
  * });
  * ```
