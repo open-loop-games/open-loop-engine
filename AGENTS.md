@@ -40,17 +40,17 @@ A symbol also has to reach the root barrel to appear at all: exporting it from
 
 ## Commits
 
-Conventional commit prefixes — `release-it` picks the bump from accumulated commits at cut-point. Pre-1.0 (`preMajor: true`), `feat!:` / `BREAKING CHANGE:` bump MINOR, not MAJOR — breaking changes are expected in 0.x.
+Conventional commit prefixes — git-cliff reads them at a cut-point to pick the bump and write the changelog (`cliff.toml`). Pre-1.0 a breaking change bumps MINOR and every other releasable commit bumps PATCH, so a `^0.x.y` range takes features and fixes, and only a breaking release makes a consumer move its specifier.
 
-- `feat:` — new public API (MINOR bump)
-- `fix:` — bug fix (PATCH bump)
-- `refactor:` / `perf:` — internal change, no API surface change (PATCH bump)
+- `feat:` — new public API (PATCH pre-1.0, MINOR after)
+- `fix:` — bug fix (PATCH)
+- `refactor:` / `perf:` — internal change, no API surface change (PATCH)
 - `feat!:` / `fix!:` or `BREAKING CHANGE:` in body — breaking API change (MINOR pre-1.0, MAJOR after)
-- `chore:` / `docs:` / `test:` — no version bump
+- `chore:` / `docs:` / `test:` — no version bump, and no changelog line
 
-Releases are manual and batched: `pnpm exec release-it` at a cut-point bumps version, regenerates `CHANGELOG.md`, commits, tags. `.release-it.json` keeps it local (`push: false`, `npm.publish: false`); `pnpm publish` is a separate step (`publishConfig.access` is `public`, so no `--access` flag needed).
+Releases are manual and batched: `pnpm release` at a cut-point takes the version from git-cliff, prepends its section to `CHANGELOG.md`, sets `package.json`, commits `chore(release): <version>`, tags `v<version>` and pushes. `pnpm release --dry-run` previews the version and section; `--no-push` stops after the tag. The release commit runs the pre-commit hook, so a failing check stops the cut before a tag exists. Publishing is not the script's job — it runs in CI from the pushed tag (`publishConfig.access` is `public`, so no `--access` flag needed). The prepend recognises `CHANGELOG.md`'s header only when it matches `cliff.toml`'s `header` exactly; edit the two together or the file grows a second header.
 
-**First cut (0.1.0):** `package.json` already sits at `0.1.0` with no tags, so a plain `release-it` would bump *past* it and prepend a generated section above the hand-curated `0.1.0` entry. Cut the first release with `pnpm exec release-it --no-increment` to tag `0.1.0` as-is and keep the curated CHANGELOG. Subsequent releases run plain `release-it`.
+**First cut (0.1.0):** with no tag to measure from, `pnpm release` refuses to run. Cut by hand: date the `0.1.0` heading in `CHANGELOG.md` as `## 0.1.0 (YYYY-MM-DD)`, commit `chore(release): 0.1.0`, `git tag --annotate v0.1.0 --message v0.1.0`, `git push --follow-tags`. Every later release runs `pnpm release`.
 
 ### Publish surface
 
@@ -62,7 +62,7 @@ Scope is optional but encouraged: `feat(systems):`, `fix(core):`, etc.
 
 ### Breaking-change entries
 
-When committing a `feat!:` / `fix!:` or a change with `BREAKING CHANGE:` in the body, include both the consumer-side migration and the maintainer-side rationale inline in the commit body. `release-it` lifts these into `CHANGELOG.md` verbatim, so one surface serves both audiences — no separate migration doc, no parallel "removed things" ledger.
+When committing a `feat!:` / `fix!:` or a change with `BREAKING CHANGE:` in the body, include both the consumer-side migration and the maintainer-side rationale inline in the commit body. The changelog lifts everything from `BREAKING CHANGE:` up to the `Co-Authored-By` trailer into `CHANGELOG.md` verbatim, so one surface serves both audiences — no separate migration doc, no parallel "removed things" ledger. Prose above the token stays in the commit; anything below it ships.
 
 ```
 feat(core)!: replace Action primitive with Sequencer + task lookup
