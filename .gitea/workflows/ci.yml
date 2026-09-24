@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  REGISTRY: git.gamebois.lol
+  HUSKY: 0
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # `pnpm release` pushes the release commit and its tag together; the tag run
+    # is the one that matters, so the branch half of that push is skipped.
+    if: "!startsWith(github.ref, 'refs/heads/') || !startsWith(github.event.head_commit.message, 'chore(release):')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Version-keyed drift audits diff docs/api between tags, so what is
+      # committed has to be what a clean build generates.
+      - name: docs/api matches a clean build
+        run: |
+          if [ -n "$(git status --porcelain -- docs/api)" ]; then
+            git status --short -- docs/api
+            echo "docs/api is stale: run pnpm build and commit the result."
+            exit 1
+          fi
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The release commit sets the version; a tag that disagrees was cut wrong,
+      # and publishing it would put the wrong code under that version.
+      - name: Tag matches package.json
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME#v}" != "$PKG_VERSION" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package.json ${PKG_VERSION}"
+            exit 1
+          fi
+
+      # The registry lives here rather than in package.json: the manifest ships,
+      # and it names no internal host.
+      - name: Publish
+        run: |
+          cat <<EOF > ~/.npmrc
+          @open-loop:registry=https://${{ env.REGISTRY }}/api/packages/studio/npm/
+          //${{ env.REGISTRY }}/api/packages/studio/npm/:_authToken=${{ secrets.REGISTRY_TOKEN_STUDIO }}
+          EOF
+          pnpm publish --no-git-checks
