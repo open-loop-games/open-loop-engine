@@ -69,7 +69,7 @@ The engine carries its own docs — in the repo and in the installed package, un
 
 `docs/api/` is generated from TSDoc, and each entry ends in a `src/…:line` pointer. `src/` ships for exactly that reason, so those pointers resolve in an installed copy — it's reference material, not an import surface, since `exports` admits only the subpaths listed above.
 
-Migration guidance for breaking changes lives in the commit body of each `feat!:`/`fix!:` commit and is lifted verbatim into this repo's `CHANGELOG.md` — there is no separate migration doc.
+Migration guidance for breaking changes lives in the commit body of each `feat!:`/`fix!:` commit and is lifted verbatim into `CHANGELOG.md` — there is no separate migration doc. The changelog ships in the package, so after an upgrade the installed copy lists every change between the version you left and the one you're on.
 
 ## Stability and feedback
 
