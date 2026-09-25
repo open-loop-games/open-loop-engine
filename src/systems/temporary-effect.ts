@@ -468,8 +468,8 @@ export function createTemporaryEffectSystem(
   function dispose(): void {
     unsubscribeTick();
     stopHydrated();
-    // Clean up all instances without firing events
-    for (const instance of instances.value) unbindInstance(instance);
+    // Clean up all instances without firing events; releasing the slots unbinds them.
+    unbindByInstance.clear();
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
     slotsByDef.clear();

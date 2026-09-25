@@ -293,10 +293,10 @@ export function createPersistentEffectSystem(
   function dispose(): void {
     for (const entry of entries.values()) {
       entry.stopWatch();
-      if (entry.isApplied) removeBindings(entry);
       entry.slots.release();
     }
     entries.clear();
+    appliedVersion.value++;
   }
 
   const system: PersistentEffectSystem = {
