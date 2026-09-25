@@ -373,7 +373,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
   // Captured at construction — challenge defs register and evaluate long after
   // the ambient scope closes.
-  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
+  const predicates = createPredicateResolver({ accessor });
 
   // Track cleanup functions for each active challenge's scoped overrides/patches
   const activeCleanups = new Map<string, Array<() => void>>();

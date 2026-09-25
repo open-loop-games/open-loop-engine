@@ -641,7 +641,7 @@ export function createSubjectCategory<S extends FieldSchema>(
   // Captured here, not per register: subjects registered after install (late
   // content, mods) never see the ambient scope. `tryAdvance(accessor)` still
   // layers a per-call override on top.
-  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
+  const predicates = createPredicateResolver({ accessor });
 
   const base: CategoryBase<SubjectDef<S>, SubjectInstance<S>, void> = createCategoryBase<
     SubjectDef<S>,

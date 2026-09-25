@@ -312,7 +312,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
   options: AchievementCategoryOptions<Def, State>,
 ): AchievementCategory<Def, State> {
   const { id, accessor, mapAchievement, mapState } = options;
-  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
+  const predicates = createPredicateResolver({ accessor });
 
   const base: CategoryBase<Def, Achievement, State> = createCategoryBase({
     id,

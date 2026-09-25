@@ -422,7 +422,7 @@ export interface PredicateResolver {
  *
  * @example
  * ```ts
- * const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
+ * const predicates = createPredicateResolver({ accessor });
  * // per definition, at register:
  * const goal = predicates.adopt(def.goal, false, `challenge '${def.id}' goal`);
  * const canComplete = computed(() => active.value && goal.holds.value);
