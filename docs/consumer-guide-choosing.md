@@ -12,7 +12,7 @@ The split against [api/INDEX.md](api/INDEX.md) is by kind, not depth. INDEX answ
 
 **TickDriver vs Cycle vs RunPool.** "How does time advance?" → `TickDriver`. "End this gameplay run, reset a scope, replay" → `Cycle`. "Track many independent concurrent run instances" → `RunPool`. The three primitives don't substitute for each other — a game can use all three. `Cycle` is named for that lifecycle rather than for the loop-incremental genre it came from: a prestige layer's reincarnation and a new-game-plus are the same shape and ship on it too.
 
-**Offline progress strategy.** Four families recur across the corpus — *extrapolation* (closed-form reward for time away), *tick-sim* (replay elapsed time through the loop), *cap-and-trickle* (release banked time at a bounded rate), and *banking* (idle becomes spendable fast-forward inside a later active session). The engine ships **mechanism, not policy**: `processOfflineTime` (blocking chunked replay through the TickDriver — covers extrapolation and tick-sim), `TickDriver.speedMultiplier` (the live tick scaler), and the `onStepsOverflow` / `onDeltaOverflow` hooks (the seam for *banking* dropped live-path time instead of discarding it). Which family you pick, whether catch-up runs blocking or drains gradually over frames, whether live-path overflow is re-routed losslessly, and how screen/menu gating works are all **consumer-side policy** composed on top. Shipping consumers diverge on every one of those axes off the same mechanism — by design; don't reach for an engine primitive to unify them. The *banking* family is the one actually converging across consumers, and it has no engine surface today — build it on the overflow hooks. `processOfflineTime` itself is `api/lifecycle.md#offline`.
+**Offline progress strategy.** Four families recur across the corpus — *extrapolation* (closed-form reward for time away), *tick-sim* (replay elapsed time through the loop), *cap-and-trickle* (release banked time at a bounded rate), and *banking* (idle becomes spendable fast-forward inside a later active session). The engine ships **mechanism, not policy**: `processOfflineTime` (blocking chunked replay through the TickDriver — covers extrapolation and tick-sim), `TickDriver.speedMultiplier` (the live tick scaler), the `onStepsOverflow` / `onDeltaOverflow` hooks (the seam for re-routing dropped live-path time instead of discarding it), and the time bank for the *banking* family. Which family you pick, whether catch-up runs blocking or drains gradually over frames, whether live-path overflow is re-routed losslessly, and how screen/menu gating works are all **consumer-side policy** composed on top. Shipping consumers diverge on every one of those axes off the same mechanism — by design; don't reach for an engine primitive to unify them. *Banking* is the one family converging across consumers, so it has a surface: `createTimeBank` is the reservoir (deposit and withdraw; earn policy stays yours), `createBankedAcceleration` spends it as a live speed boost and can bank dropped live time itself (`bankLiveOverflow`), and `burstDischarge` dumps it through `processOfflineTime` in one fast-forward. All of these are in `api/lifecycle.md`.
 
 **Sequencer vs advisor.** If the system has to remember what is currently scheduled, it's a sequencer. If it only needs to choose or recommend from candidates each time it's asked, it's an advisor / selection policy.
 
@@ -57,6 +57,7 @@ const buildings = createProducerCategory<ProducerDef>({
   mapProducer: (def) => ({
     resource: cookies,
     baseRate: def.baseRate,
+    trigger: 'continuous',
     display: def.name,
     purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
   }),
@@ -91,8 +92,9 @@ The shape to avoid is a cost getter that reads the level back out of the categor
 ```ts
 for (const def of spellDefs) {
   const purchasable = createScalingPurchasable({
-    id: `level-${def.id}`, resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
-    effect: (amount) => Decimal.mul(amount, Decimal.mul(def.baseDamage, 0.05)),
+    id: `level-${def.id}`, description: `${def.name} level`,
+    resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
+    effect: (amount: DecimalSource) => Decimal.mul(amount, Decimal.mul(def.baseDamage, 0.05)),
     onPurchase: (amount) => schoolSkills.get(def.school)?.addXp(Decimal.mul(amount, 5)),
   });
 
