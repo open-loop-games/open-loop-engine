@@ -64,6 +64,16 @@ describe('createSpatialGrid — construction & access', () => {
     expect(grid.inBounds(-1, 0)).toBe(false);
   });
 
+  it('only integer coordinates are in bounds, so reads and writes at a fraction throw', () => {
+    const grid = createSpatialGrid<Tile>({ width: 3, height: 3, initializer: floor });
+    expect(grid.inBounds(1.5, 2)).toBe(false);
+    expect(grid.inBounds(1, Number.NaN)).toBe(false);
+    expect(() => grid.at(1.5, 2)).toThrow(RangeError);
+    expect(() => grid.set(0, 0.5, { kind: 'wall' })).toThrow(RangeError);
+    expect(() => grid.setSilent(0.5, 0, { kind: 'wall' })).toThrow(RangeError);
+    expect(grid.tryAt(1.5, 2)).toBeUndefined();
+  });
+
   it('set() always emits cellChanged, even when the value is equal', () => {
     const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
     const events: Array<[number, number, Tile, Tile]> = [];

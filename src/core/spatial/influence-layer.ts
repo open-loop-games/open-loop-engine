@@ -301,11 +301,9 @@ export function createInfluenceLayer(
   const handle = createEmitHandle<InfluenceLayerEvents>();
   const { width, height } = grid;
 
-  // Whether the source stands on a grid cell: in bounds, at integer coordinates.
+  // Whether the source stands on a grid cell; the grid admits integer coordinates only.
   function onCell(source: InfluenceSource): boolean {
-    return (
-      Number.isInteger(source.x) && Number.isInteger(source.y) && grid.inBounds(source.x, source.y)
-    );
+    return grid.inBounds(source.x, source.y);
   }
 
   function checkSource(source: InfluenceSource): void {

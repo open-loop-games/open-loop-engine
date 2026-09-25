@@ -201,9 +201,9 @@ export interface SpatialGrid<T> {
    */
   readonly exploredPassableCount: number;
 
-  /** Returns the cell at (x, y). Throws if out of bounds. */
+  /** Returns the cell at (x, y). Throws if out of bounds or not integers. */
   at(x: number, y: number): T;
-  /** Returns the cell at (x, y), or undefined if out of bounds. */
+  /** Returns the cell at (x, y), or undefined if out of bounds or not integers. */
   tryAt(x: number, y: number): T | undefined;
   /**
    * Writes a value to (x, y) and emits `cellChanged` with the prior value.
@@ -226,6 +226,11 @@ export interface SpatialGrid<T> {
    * full-grid mutations (zero-fill, decay passes, map generation).
    */
   fill(mapper: (x: number, y: number, current: T) => T): void;
+  /**
+   * Whether (x, y) names a cell: both coordinates integers inside
+   * width × height. A fractional coordinate is never in bounds, so `at`,
+   * `set` and `setSilent` throw on one rather than address a non-cell.
+   */
   inBounds(x: number, y: number): boolean;
 
   /**
@@ -440,7 +445,8 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   let fovSubscribers = 0;
 
   const idx = (x: number, y: number): number => y * width + x;
-  const inBounds = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;
+  const inBounds = (x: number, y: number): boolean =>
+    Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < width && y < height;
 
   function checkBounds(x: number, y: number): void {
     if (!inBounds(x, y)) {
