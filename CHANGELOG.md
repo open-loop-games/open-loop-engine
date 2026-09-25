@@ -2,6 +2,20 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.2.2 (2026-09-25)
+
+### Features
+
+* **systems:** a dialog line whose choices gate off can advance (b0487c7)
+* **harness:** until-sweeps take a per-run teardown (6e3eff5)
+
+### Fixes
+
+* **systems:** a dialog start refused by its entry gate emits nothing (a67998f)
+* **systems:** a category def whose build throws takes its refs with it (eb271fa)
+* **systems:** a registry patch cannot rename its entry (61484eb)
+* **harness:** the picker offers an effect's modifier only as content (5561b52)
+
 ## 0.2.1 (2026-09-25)
 
 ### Fixes

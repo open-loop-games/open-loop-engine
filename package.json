@@ -1,6 +1,6 @@
 {
   "name": "@open-loop/engine",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Headless TypeScript substrate for incremental and idle games. Reactive state, big-number math, composable evaluation kernel, registration surfaces for skills/producers/purchasables/achievements/challenges/dialog/zones.",
   "license": "MIT",
   "author": "namahanna <namahanna@gmail.com>",
