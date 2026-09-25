@@ -5,8 +5,8 @@
  * state machine, no active/cancel/cooldown, no start/complete gates, no
  * progressive costs, no chain. Ticks on every registered tick and accumulates
  * `speed * dt` into `progress`. Fires `onProgress(delta)` when the tick
- * advances progress; fires `onComplete(overflow)` on the single tick that
- * *crosses* `duration`.
+ * advances progress; fires `onComplete(overflow)` once when progress reaches
+ * `duration`, and not again while it stays parked there.
  *
  * The tracker never auto-resets, never carries overflow, never stalls or
  * fails. Those are consumer decisions — this is a value that accumulates
@@ -63,11 +63,14 @@ export interface TimedProgressBaseOptions {
    */
   onProgress?: (delta: DecimalSource) => void;
   /**
-   * Called on the single tick that crosses from `progress < duration` to
-   * `progress >= duration`. `overflow` is how far past duration the raw
-   * advance would have gone. Consumers decide what to do next — reset,
-   * carry overflow, leave progress parked, etc. The tracker does nothing
-   * else on completion.
+   * Called on the first advancing tick that leaves `progress >= duration` —
+   * whether progress crossed the boundary or a shrinking `duration` dropped
+   * below it. `overflow` is how far past duration progress now stands.
+   * Consumers decide what to do next — reset, carry overflow, leave progress
+   * parked, etc. A parked tracker is not called again until progress falls
+   * below duration (a `reset()`, a carry, or a longer duration) and reaches
+   * it anew; progress restored past duration by a save load counts as parked.
+   * The tracker does nothing else on completion.
    */
   onComplete?: (overflow: DecimalSource) => void;
 }
@@ -157,8 +160,16 @@ function buildComputeds(
 }
 
 // === PRIVATE TICK ===
+/** Runtime-only record of whether the tracker has already completed at its current progress. */
+interface CompletionLatch {
+  completed: boolean;
+  /** The progress this tracker last wrote; any other value was written from outside. */
+  lastWritten: DecimalSource | undefined;
+}
+
 interface TimedProgressTickContext {
   state: TimedProgressState;
+  latch: CompletionLatch;
   tickProgressDelta: Ref<DecimalSource>;
   processed: ProcessedTimedProgressOptions;
   onProgress: TimedProgressOptions['onProgress'];
@@ -166,7 +177,7 @@ interface TimedProgressTickContext {
 }
 
 function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
-  const { state, tickProgressDelta, processed, onProgress, onComplete } = ctx;
+  const { state, latch, tickProgressDelta, processed, onProgress, onComplete } = ctx;
 
   const spd = new Decimal(unref(processed.speed));
   if (spd.lte(0)) {
@@ -184,15 +195,23 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
   const next = prev.add(delta);
   const dur = new Decimal(unref(processed.duration));
 
+  // Fire onComplete once per completion, so a consumer that parks progress
+  // past duration without resetting isn't called again on every tick. The
+  // latch, not a `prev < dur` crossing test, is what stops the re-fire: a
+  // duration that drops below progress between ticks is never crossed.
+  // Progress written from outside (load, reset, carried overflow) re-derives
+  // it — a value already at or past duration counts as parked.
+  if (prev.lt(dur)) latch.completed = false;
+  else if (latch.lastWritten === undefined || !prev.eq(latch.lastWritten)) latch.completed = true;
+
   state.progress.value = next;
+  latch.lastWritten = next;
   tickProgressDelta.value = delta;
 
   onProgress?.(delta);
 
-  // Fire onComplete only on the tick that *crosses* the boundary, so a
-  // consumer that parks progress past duration without resetting doesn't
-  // receive onComplete again on every subsequent tick.
-  if (prev.lt(dur) && next.gte(dur)) {
+  if (!latch.completed && next.gte(dur)) {
+    latch.completed = true;
     onComplete?.(next.sub(dur));
   }
 }
@@ -205,7 +224,7 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  * doesn't fit.
  *
  * The tracker has no opinion about what happens on completion — it fires
- * `onComplete(overflow)` once per boundary crossing and leaves everything else
+ * `onComplete(overflow)` once per completion and leaves everything else
  * to the consumer. Reset, carry overflow, grant rewards, subtract a cycle, or
  * do nothing: all are valid.
  *
@@ -237,11 +256,13 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
   const tickProgressDelta = ref<DecimalSource>(0) as Ref<DecimalSource>;
   const processed = buildProcessedOptions(options);
   const { percentComplete, timeRemaining } = buildComputeds(state, processed);
+  const latch: CompletionLatch = { completed: false, lastWritten: undefined };
 
   const unsubTick = options.registerTick((dt: number) =>
     tickTimedProgress(
       {
         state,
+        latch,
         tickProgressDelta,
         processed,
         onProgress: options.onProgress,

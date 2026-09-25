@@ -193,6 +193,66 @@ describe('createTimedProgress — onComplete boundary', () => {
     tp.dispose();
   });
 
+  it('fires onComplete when the duration drops below progress between ticks', () => {
+    const bus = makeTickBus();
+    const duration = ref<DecimalSource>(10);
+    let fires = 0;
+    const tp = createTimedProgress({
+      duration: () => duration.value,
+      speed: 1,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: () => {
+        fires++;
+      },
+    });
+    for (let i = 0; i < 5; i++) bus.tick(1); // progress 5 of 10
+    duration.value = 4; // an upgrade shortens the job past where it stands
+    bus.tick(1);
+    expect(fires).toBe(1);
+    bus.tick(1); // parked past duration — no re-fire
+    expect(fires).toBe(1);
+    tp.dispose();
+  });
+
+  it('fires again after the duration grows past a parked progress and is crossed', () => {
+    const bus = makeTickBus();
+    const duration = ref<DecimalSource>(2);
+    let fires = 0;
+    const tp = createTimedProgress({
+      duration: () => duration.value,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: () => {
+        fires++;
+      },
+    });
+    bus.tick(3); // 3 ≥ 2: fires, parks
+    duration.value = 5;
+    bus.tick(1); // 4 < 5
+    bus.tick(1); // 5 ≥ 5: crosses again
+    expect(fires).toBe(2);
+    tp.dispose();
+  });
+
+  it('does not fire for progress written past duration from outside, as a save load does', () => {
+    const bus = makeTickBus();
+    let fires = 0;
+    const tp = createTimedProgress({
+      duration: 10,
+      ephemeral: true,
+      registerTick: bus.registerTick,
+      onComplete: () => {
+        fires++;
+      },
+    });
+    bus.tick(1);
+    tp.progress.value = 12; // a parked tracker restored from a save
+    bus.tick(1);
+    expect(fires).toBe(0);
+    tp.dispose();
+  });
+
   it('reset() clears progress so the next crossing fires again', () => {
     const bus = makeTickBus();
     let fires = 0;
