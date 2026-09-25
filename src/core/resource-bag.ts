@@ -11,6 +11,7 @@
 import { reactive, watch } from 'vue';
 import { Decimal, renormIfLayer0 } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
+import { loadingSave } from './persistence';
 import type { Resource } from './resource';
 
 /** A capacity value that can be static or a reactive getter */
@@ -120,7 +121,9 @@ export interface ResourceBag {
   remainingCapacityForType(typeId: string): Decimal;
   /**
    * Establish a two-way reactive sync between this bag's type slot and a Resource ref.
-   * Returns an unsubscribe function that tears down the watchers.
+   * Writes to the resource are clamped to capacity, except during a save load or
+   * reset, when the written value is taken as saved. Returns an unsubscribe
+   * function that tears down the watchers.
    */
   link(typeId: string, resource: Resource<DecimalSource>): () => void;
   /** Serialize all non-zero amounts to a plain string-keyed record for persistence. */
@@ -366,7 +369,10 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         { flush: 'sync' },
       );
 
-      // Watch resource → bag
+      // Watch resource → bag. A save load (or reset) writes linked refs one
+      // at a time, so clamping here would measure each slot against the other
+      // slots' pre-load amounts, or against a capacity whose inputs haven't
+      // loaded yet. The loaded state was valid when saved: take it unclamped.
       const stopResourceWatch = watch(
         () => resource.value,
         (newVal) => {
@@ -374,6 +380,11 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
           const current = getAmount(typeId);
           if (!Decimal.eq(current, newVal)) {
             syncing = true;
+            if (loadingSave.value) {
+              writeAmount(typeId, toDecimal(newVal));
+              syncing = false;
+              return;
+            }
             setAmount(typeId, newVal);
             // If bag clamped the value, sync back to resource
             const afterSet = getAmount(typeId);

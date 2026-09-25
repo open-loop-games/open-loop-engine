@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { computed, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { bn } from '@/primitives/decimal';
-import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import type { DecimalSource } from '@/primitives/decimal';
+import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
 import { createResource, addResource } from '@/core/resource';
+import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 import {
   createResourceBag,
   transferBetweenBags,
@@ -435,6 +437,53 @@ describe('ResourceBag', () => {
       await nextTick();
       expect(new Decimal(gold1.value).eq(10)).toBe(true);
       expect(new Decimal(gold2.value).eq(99)).toBe(true);
+    });
+
+    it('a save load restores every linked slot under a shared cap', () => {
+      // Slots load one at a time; clamping each against the others' pre-load
+      // amounts would trim a valid save that moved its holdings between slots.
+      const mgr = createSaveManager({ gameId: 'bag-load', storageAdapter: createMemoryStorage() });
+      beginPersistentContext('bag-load');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      const stone = createResource<DecimalSource>(0, { id: 'stone' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacity: 50 });
+      bag.link('wood', wood);
+      bag.link('stone', stone);
+
+      bag.set('wood', 50);
+      const snapshot = mgr.exportSave();
+      bag.set('wood', 0);
+      bag.set('stone', 50);
+
+      expect(mgr.importSave(snapshot).success).toBe(true);
+      expect(new Decimal(wood.value).toNumber()).toBe(50);
+      expect(new Decimal(stone.value).toNumber()).toBe(0);
+      expect(bag.get('wood').toNumber()).toBe(50);
+      expect(bag.total().toNumber()).toBe(50);
+    });
+
+    it('a save load does not clamp against a capacity that reads later-loaded state', () => {
+      const mgr = createSaveManager({ gameId: 'bag-cap', storageAdapter: createMemoryStorage() });
+      beginPersistentContext('bag-cap-items');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      beginPersistentContext('bag-cap-bonus');
+      const capBonus = persistent<number>(0, { name: 'bonus' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacity: () => 10 + capBonus.value });
+      bag.link('wood', wood);
+
+      capBonus.value = 90;
+      bag.set('wood', 80);
+      const snapshot = mgr.exportSave();
+      capBonus.value = 0;
+      bag.set('wood', 0);
+
+      expect(mgr.importSave(snapshot).success).toBe(true);
+      expect(capBonus.value).toBe(90);
+      expect(new Decimal(wood.value).toNumber()).toBe(80);
+      expect(bag.get('wood').toNumber()).toBe(80);
     });
   });
 
