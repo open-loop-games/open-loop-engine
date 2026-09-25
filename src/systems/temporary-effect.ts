@@ -40,7 +40,7 @@
  * @cluster effects
  */
 
-import { computed, ref, shallowRef, unref, type ComputedRef, type Ref } from 'vue';
+import { computed, isRef, ref, shallowRef, unref, type ComputedRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
@@ -56,7 +56,12 @@ import type { ModifierBinding } from './modifier-binding';
 export interface TemporaryEffectDef {
   id: string;
   name?: string;
-  /** Base duration in seconds. Can be reactive for dynamic durations. */
+  /**
+   * Base duration in seconds. Can be reactive for dynamic durations. Must be
+   * finite: `register` and `apply` throw otherwise, since the saved
+   * countdown cannot hold `Infinity`. Use a persistent-effect system for an
+   * effect that lasts until removed.
+   */
   duration: Computable<DecimalSource>;
   /** Maximum concurrent instances of this effect. Default: 1 */
   maxStacks?: number;
@@ -167,6 +172,20 @@ interface InstanceCleanup {
   modifierRemovers: (() => void)[];
 }
 
+// === PRIVATE BUILDERS ===
+
+/** A duration in seconds, or a throw when the save's JSON could not hold it. */
+function toFiniteDuration(defId: string, duration: DecimalSource): number {
+  const seconds = new Decimal(duration).toNumber();
+  if (!Number.isFinite(seconds)) {
+    throw new Error(
+      `TemporaryEffect '${defId}': duration must be finite, got ${String(duration)}. ` +
+        `An effect that lasts until removed belongs in a persistent-effect system.`,
+    );
+  }
+  return seconds;
+}
+
 // === FACTORIES ===
 
 /**
@@ -210,7 +229,7 @@ export function createTemporaryEffectSystem(
   // --------------------------------------------------------------------
 
   function resolveDuration(def: TemporaryEffectDef): number {
-    return new Decimal(unref(processGetter(def.duration))).toNumber();
+    return toFiniteDuration(def.id, unref(processGetter(def.duration)));
   }
 
   function resolveModifier(binding: ModifierBinding): Modifier {
@@ -312,6 +331,9 @@ export function createTemporaryEffectSystem(
   function register(def: TemporaryEffectDef | TemporaryEffectDef[]): void {
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
+      if (typeof d.duration !== 'function' && !isRef(d.duration)) {
+        toFiniteDuration(d.id, d.duration);
+      }
       const maxStacks = d.maxStacks ?? 1;
       if (maxStacks > 1 && d.modifiers && typeof d.modifiers !== 'function') {
         for (const binding of d.modifiers) {

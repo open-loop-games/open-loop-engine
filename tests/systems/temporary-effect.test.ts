@@ -625,6 +625,20 @@ describe('dispose', () => {
 // ============================================================================
 
 describe('reactive duration', () => {
+  it('rejects a non-finite duration, which a save cannot hold', () => {
+    const { system } = createSystem();
+    expect(() => system.register({ id: 'forever', duration: Infinity })).toThrow(
+      /persistent-effect/,
+    );
+    expect(() => system.register({ id: 'nan', duration: Decimal.dNaN })).toThrow(/finite/);
+
+    const dur = ref<number>(5);
+    system.register({ id: 'burn', duration: dur });
+    dur.value = Infinity;
+    expect(() => system.apply('burn')).toThrow(/finite/);
+    expect(system.getActive()).toHaveLength(0);
+  });
+
   it('resolves duration from ref at apply time', () => {
     const { system } = createSystem();
     const dur = ref(5);
