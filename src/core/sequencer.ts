@@ -238,7 +238,13 @@ export interface Sequencer<M = void> {
    * ```
    */
   patchItem(index: number, patch: (metadata: M) => M): void;
-  /** Clear current without completing, emit 'cancel'. */
+  /**
+   * Abandon the current execution without completing it and emit `cancel`.
+   * That is the running item or, while {@link holding}, the held one: queue
+   * mode drops it, list mode leaves the cursor on it so a later start re-runs
+   * it. Execution then stops — nothing dispatches until `start()`, `resume()`
+   * or an auto-starting `enqueue()`.
+   */
   cancel(): void;
   /** Remove an item from the waiting sequence by index. */
   remove(index: number): void;
@@ -920,10 +926,19 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     },
 
     cancel(): void {
-      // Cancel also exits any active hold state — the caller is asking the
-      // sequencer to abandon whatever it was waiting on.
+      // A held item is the execution in progress, so it is cancelled as a
+      // running one would be: dropped in queue mode, left under the cursor in
+      // list mode. Nothing is running while holding.
       if (_holding) {
+        const held = peekHeldItem();
         clearHold();
+        if (!held) return;
+        if (!isList) {
+          popHead();
+          syncItems();
+        }
+        handle.emit('cancel', held);
+        return;
       }
       const cancelled = getCurrentItem();
       if (!cancelled) return;

@@ -712,6 +712,65 @@ describe('Sequencer — canRun tri-state', () => {
     expect(q.currentItem).toBeNull();
   });
 
+  it('cancel() while holding cancels the held item, as it would a running one', () => {
+    const tm = createTickManager();
+    const ctxId = `tri-cancel-${Math.random().toString(36).slice(2, 8)}`;
+
+    let gate: StartResult = 'notNow';
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: () => gate,
+    });
+    endPersistentContext();
+    const cancelled: string[] = [];
+    q.on('cancel', (item) => cancelled.push(item.id));
+
+    q.enqueue(qi('wait-me'));
+    q.enqueue(qi('next'));
+    expect(q.holding).toBe(true);
+
+    q.cancel();
+    expect(cancelled).toEqual(['wait-me']);
+    expect(q.holding).toBe(false);
+    expect(q.items.value.map((i) => i.id)).toEqual(['next']);
+
+    // Stopped, as after cancelling a running item: start() resumes.
+    gate = 'now';
+    tm.fireTick();
+    expect(q.currentItem).toBeNull();
+    q.start();
+    expect(q.currentItem?.id).toBe('next');
+  });
+
+  it('list mode: cancel() while holding cancels the held item and leaves the cursor on it', () => {
+    const tm = createTickManager();
+    const ctxId = `tri-list-cancel-${Math.random().toString(36).slice(2, 8)}`;
+
+    let gate: StartResult = 'notNow';
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: () => gate,
+    });
+    endPersistentContext();
+    const cancelled: string[] = [];
+    q.on('cancel', (item) => cancelled.push(item.id));
+
+    q.enqueue(qi('a'));
+    expect(q.holding).toBe(true);
+    q.cancel();
+    expect(cancelled).toEqual(['a']);
+    expect(q.holding).toBe(false);
+    expect(q.cursor).toBe(0);
+    gate = 'now';
+    q.start();
+    expect(q.currentItem?.id).toBe('a');
+  });
+
   it('list mode: "notNow" holds at cursor position without advancing', () => {
     const tm = createTickManager();
     const ctxId = `tri-list-hold-${Math.random().toString(36).slice(2, 8)}`;
