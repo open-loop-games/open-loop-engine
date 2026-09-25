@@ -58,6 +58,9 @@ export interface PersistentEffectDef {
   /**
    * Reactive predicate controlling whether bindings are applied.
    * System watches this: `false → true` applies bindings, `true → false` removes them.
+   * When an edge flips the predicate back (an `onActivate` that spends what
+   * it reads), the opposite edge follows at once. A predicate that reads a
+   * value the effect's own bindings change has no stable state and throws.
    */
   active: Computable<boolean>;
   /** Tags for query filtering */
@@ -125,7 +128,14 @@ interface DefEntry {
   slots: BindingSlots;
   modifierRemovers: (() => void)[];
   isApplied: boolean;
+  /** True while {@link settle} runs this entry's edges. */
+  settling: boolean;
 }
+
+// === CONSTANTS ===
+
+/** Edges one predicate change may run before the effect is judged to feed back on itself. */
+const MAX_SETTLE_EDGES = 8;
 
 // === FACTORIES ===
 
@@ -202,6 +212,39 @@ export function createPersistentEffectSystem(
     entry.isApplied = false;
   }
 
+  /**
+   * Run edges until the applied state matches the predicate. An edge can
+   * flip the predicate itself (a hook spends what it reads); the watcher
+   * call that flip triggers is swallowed by `settling`, and the loop
+   * re-reads the predicate instead.
+   */
+  function settle(entry: DefEntry): void {
+    if (entry.settling) return;
+    entry.settling = true;
+    try {
+      for (let edges = 0; entry.activeRef.value !== entry.isApplied; edges++) {
+        if (edges === MAX_SETTLE_EDGES) {
+          throw new Error(
+            `PersistentEffect '${entry.def.id}': 'active' keeps flipping as its own bindings ` +
+              `apply and remove — the predicate reads a value its bindings change.`,
+          );
+        }
+        const { def } = entry;
+        if (entry.isApplied) {
+          removeBindings(entry);
+          def.onDeactivate?.(def);
+          handle.emit('deactivated', def);
+        } else {
+          applyBindings(entry);
+          def.onActivate?.(def);
+          handle.emit('activated', def);
+        }
+      }
+    } finally {
+      entry.settling = false;
+    }
+  }
+
   function register(def: PersistentEffectDef | PersistentEffectDef[]): void {
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
@@ -219,6 +262,7 @@ export function createPersistentEffectSystem(
         slots: createBindingSlots(),
         modifierRemovers: [],
         isApplied: false,
+        settling: false,
       };
 
       // Claim chain positions now, so a binding evaluates at the same place
@@ -234,21 +278,7 @@ export function createPersistentEffectSystem(
       // in a tight loop with no microtask boundary, so a default (pre) flush
       // would leave the effect a step or more late. Mirrors achievement.ts /
       // automation.ts / resource-bag link watchers.
-      entry.stopWatch = watch(
-        activeRef,
-        (next) => {
-          if (next && !entry.isApplied) {
-            applyBindings(entry);
-            d.onActivate?.(d);
-            handle.emit('activated', d);
-          } else if (!next && entry.isApplied) {
-            removeBindings(entry);
-            d.onDeactivate?.(d);
-            handle.emit('deactivated', d);
-          }
-        },
-        { immediate: true, flush: 'sync' },
-      );
+      entry.stopWatch = watch(activeRef, () => settle(entry), { immediate: true, flush: 'sync' });
 
       entries.set(d.id, entry);
     }

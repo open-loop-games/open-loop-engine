@@ -267,6 +267,40 @@ describe('chain order', () => {
   });
 });
 
+describe('predicates its own edge flips', () => {
+  it('an activation hook that falsifies the predicate settles deactivated, events in order', () => {
+    const system = createSystem();
+    const chain = createModifierChain('charge');
+    const charges = ref(1);
+    const events: string[] = [];
+    system.on('activated', () => events.push('activated'));
+    system.on('deactivated', () => events.push('deactivated'));
+    system.register({
+      id: 'spend-charge',
+      active: () => charges.value > 0,
+      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      onActivate: () => charges.value--,
+    });
+
+    expect(events).toEqual(['activated', 'deactivated']);
+    expect(system.isActive('spend-charge').value).toBe(false);
+    expect(system.getActive()).toEqual([]);
+    expect(Decimal.eq(chain.apply(1), 1)).toBe(true);
+  });
+
+  it('throws when the predicate reads a value its own bindings change', () => {
+    const system = createSystem();
+    const chain = createModifierChain('feedback');
+    expect(() =>
+      system.register({
+        id: 'catch-up',
+        active: () => Decimal.lt(chain.apply(1), 10),
+        modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 100 }) }],
+      }),
+    ).toThrow(/its own bindings/);
+  });
+});
+
 describe('load-time reconstruction', () => {
   it('immediate watch applies bindings for defs already active at registration', () => {
     // Simulates saved state: the game state ref is "already true" at engine boot.
