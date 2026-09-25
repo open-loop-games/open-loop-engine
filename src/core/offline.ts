@@ -19,7 +19,7 @@ export interface OfflineProgressOptions {
  * passes the dt directly to tick callbacks (no speedMultiplier applied — offline
  * processing is wall-clock faithful).
  *
- * @returns Actual seconds processed (capped by maxOfflineSeconds).
+ * @returns Actual seconds processed: `elapsedSeconds` clamped to `[0, maxOfflineSeconds]`, with NaN read as 0.
  */
 export function processOfflineTime(
   tickDriver: TickDriver,
@@ -38,7 +38,9 @@ export function processOfflineTime(
   // the loop subtracted the full chunk — silently dropping the difference yet
   // still reporting the whole window processed. Clamp so every chunk is faithful.
   const chunkSize = Math.min(requestedChunk, tickDriver.maxDeltaTime);
-  const capped = Math.min(Math.max(elapsedSeconds, 0), maxOffline);
+  // NaN (a missing or garbled save timestamp) reads as no time away; +Infinity caps.
+  const elapsed = Number.isNaN(elapsedSeconds) ? 0 : elapsedSeconds;
+  const capped = Math.min(Math.max(elapsed, 0), maxOffline);
 
   let remaining = capped;
   while (remaining >= chunkSize) {

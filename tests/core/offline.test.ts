@@ -50,6 +50,14 @@ describe('processOfflineTime', () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+  it('treats a NaN elapsed (a missing or garbled timestamp) as zero', () => {
+    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
+    const fn = vi.fn();
+    tickDriver.onTick(fn);
+    expect(processOfflineTime(tickDriver, NaN)).toBe(0);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it('defaults to 3-day cap', () => {
     const tickDriver = createTickDriver({ tickRate: 1, maxDeltaTime: 500000 });
     const result = processOfflineTime(tickDriver, 1_000_000);
