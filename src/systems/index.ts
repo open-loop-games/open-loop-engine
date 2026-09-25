@@ -86,6 +86,7 @@ export {
   type PurchasableEvents,
   type PurchasableOptions,
   type ScalingPurchasableCost,
+  type ScalingPurchasableEffect,
   type ScalingPurchasableOptions,
 } from './purchasable';
 export * from './purchasable-category';

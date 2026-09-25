@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { ref, unref } from 'vue';
+import { isRef, ref, unref } from 'vue';
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
@@ -236,7 +236,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
       baseCost: 10,
       costScaling: 1.15,
       // Linear effect: 1 + 0.5 * amount
-      effect: (amount) => Formula.variable(amount).mul(0.5).add(1),
+      effectFormula: (amount) => Formula.variable(amount).mul(0.5).add(1),
     });
 
     expect(p.effectCurve).toBeDefined();
@@ -365,7 +365,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
       baseCost: 100,
       costScaling: 10,
       limit: 3,
-      effect: (amount) => Formula.variable(amount).mul(1).add(1),
+      effectFormula: (amount) => Formula.variable(amount).mul(1).add(1),
     });
 
     const bought = p.purchaseMax();
@@ -395,7 +395,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
   });
 });
 
-describe('createScalingPurchasable — closure cost (costFormula)', () => {
+describe('createScalingPurchasable — closure cost (cost / costFormula)', () => {
   it('opaque closure cost reads through scalingAmount as level rises', () => {
     const r = createResource(1e9, { id: 'r', displayName: 'r' });
     // Super-exponential: 10^(1 + level²) — not expressible in engine Formula
@@ -404,7 +404,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
       id: 'closure-superexp',
       description: 'superexp',
       resource: r,
-      costFormula: (level) => Decimal.pow(10, Decimal.add(1, Decimal.pow(level, 2))),
+      cost: (level) => Decimal.pow(10, Decimal.add(1, Decimal.pow(level, 2))),
       bulkPurchase: false,
     });
 
@@ -421,7 +421,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
       id: 'closure-pay',
       description: 'closure pay',
       resource: r,
-      costFormula: (level) => Decimal.add(100, Decimal.mul(level, 50)),
+      cost: (level) => Decimal.add(100, Decimal.mul(level, 50)),
       bulkPurchase: false,
     });
 
@@ -449,6 +449,38 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
     expect(Decimal.eq(p.getCost(1), 104)).toBe(true); // 2²+100 at level 2
   });
 
+  it('costFormula returning a plain value prices every rung at it', () => {
+    const r = createResource(1000, { id: 'r', displayName: 'r' });
+    const p = createScalingPurchasable({
+      id: 'formula-constant',
+      description: 'constant',
+      resource: r,
+      costFormula: () => 40,
+    });
+
+    expect(Decimal.eq(p.getCost(1), 40)).toBe(true);
+    expect(Decimal.eq(p.purchaseMax(), 25)).toBe(true);
+    expect(Decimal.eq(r.value, 0)).toBe(true);
+  });
+
+  it('calls a plain cost function only with the plain level', () => {
+    const r = createResource(1000, { id: 'r', displayName: 'r' });
+    const seen: unknown[] = [];
+    const p = createScalingPurchasable({
+      id: 'closure-args',
+      description: 'args',
+      resource: r,
+      cost: (level) => {
+        seen.push(level);
+        return 10;
+      },
+    });
+
+    p.getCost(1);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((level) => !isRef(level))).toBe(true);
+  });
+
   it('opaque closure that indexes a table by level builds and prices each rung', () => {
     const r = createResource(1000, { id: 'r', displayName: 'r' });
     const COSTS = [{ cost: 10 }, { cost: 25 }, { cost: 70 }];
@@ -456,7 +488,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
       id: 'closure-table',
       description: 'table',
       resource: r,
-      costFormula: (level: DecimalSource) => COSTS[Number(level)]!.cost,
+      cost: (level: DecimalSource) => COSTS[Number(level)]!.cost,
       limit: COSTS.length,
     });
 
@@ -473,7 +505,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
       id: 'closure-no-bulk',
       description: 'no bulk',
       resource: r,
-      costFormula: (level) => Decimal.add(10, Decimal.mul(level, 1)),
+      cost: (level) => Decimal.add(10, Decimal.mul(level, 1)),
     });
 
     // amountToPurchase caps at 1 because the cost is non-Formula.
@@ -503,7 +535,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
       id: 'closure-canpurchase',
       description: 'reactive',
       resource: r,
-      costFormula: (level) => Decimal.add(100, Decimal.mul(level, 100)),
+      cost: (level) => Decimal.add(100, Decimal.mul(level, 100)),
       bulkPurchase: false,
     });
 

@@ -45,6 +45,7 @@ import {
   tunable,
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
+import type { FormulaSource } from '@/core/formulas/types';
 import type {
   CreateEngineFromSaveOptions,
   MatrixUntilConfig,
@@ -945,23 +946,50 @@ describe('Purchasable factories — id and options shape', () => {
     expectTypeOf<Config['costScaling']>().toEqualTypeOf<Computable<DecimalSource>>();
   });
 
-  it('the closure cost arm accepts a Formula factory or an opaque amount function', async () => {
+  it('each cost and effect shape takes its own key', async () => {
     const { createScalingPurchasable } = await import('@/index');
     const { F } = await import('@/core/formulas/formulas');
     const resource = createResource(0, { id: 'closure-gold', displayName: 'gold' });
-    // Formula-factory form — bulk-purchase math works through inversion.
+    // Formula factories — invertible, so bulk purchase and `effectCurve` work.
     createScalingPurchasable({
       id: 'closure-formula',
       description: 'test',
       resource,
-      costFormula: (amount: MaybeRef<DecimalSource>) => F.variable(amount).mul(10),
+      costFormula: (amount) => F.variable(amount).mul(10),
+      effectFormula: (amount) => F.variable(amount).add(1),
     });
-    // Opaque value-function form — single-purchase only, no Formula required.
+    // Plain functions of the level — forward evaluation only.
     createScalingPurchasable({
       id: 'closure-opaque',
       description: 'test',
       resource,
-      costFormula: (amount: DecimalSource) => amount,
+      cost: (amount) => Decimal.pow(10, Decimal.pow(amount, 2)),
+      effect: (amount) => Decimal.mul(amount, 2),
+    });
+    // A factory annotated `FormulaSource` may return a plain value.
+    createScalingPurchasable({
+      id: 'closure-source',
+      description: 'test',
+      resource,
+      costFormula: (amount: MaybeRef<DecimalSource>): FormulaSource => F.variable(amount),
+    });
+    // @ts-expect-error — one cost shape per purchasable.
+    createScalingPurchasable({
+      id: 'both-cost-arms',
+      description: 'test',
+      resource,
+      baseCost: 10,
+      costScaling: 1.15,
+      costFormula: (amount: MaybeRef<DecimalSource>) => F.variable(amount),
+    });
+    createScalingPurchasable({
+      id: 'factory-under-effect',
+      description: 'test',
+      resource,
+      baseCost: 10,
+      costScaling: 1.15,
+      // @ts-expect-error — a Formula factory goes under `effectFormula`.
+      effect: (amount) => F.variable(amount),
     });
   });
 });

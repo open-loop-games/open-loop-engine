@@ -142,14 +142,18 @@ export interface PurchasableOptions {
   bulkPurchase?: Computable<boolean>;
 }
 
+/** Formula factory over a purchasable's level — receives the engine-owned level ref. */
+type LevelCurve = (level: MaybeRef<DecimalSource>) => FormulaSource;
+
 /**
  * Cost configuration for {@link ScalingPurchasableOptions}. Discriminated
  * union — provide exactly one shape:
  *
  * - **Geometric** (`baseCost + costScaling`) — closed-form `baseCost × costScaling^amount`.
- * - **Closure** (`costFormula`) — arbitrary cost shape closing over the
- *   purchasable's level. Use for non-geometric scaling (super-exponential,
- *   piecewise, factorial-bumped) that the geometric form can't express.
+ * - **Formula** (`costFormula`) — any curve the Formula vocabulary expresses.
+ *   Invertible, so bulk purchasing walks the real curve.
+ * - **Function** (`cost`) — arbitrary cost shape the Formula vocabulary can't
+ *   express (super-exponential, piecewise, a table lookup). Single-purchase only.
  */
 export type ScalingPurchasableCost =
   | {
@@ -160,34 +164,69 @@ export type ScalingPurchasableCost =
        * Can be a ref/getter for scoped tuning.
        */
       costScaling: Computable<DecimalSource>;
+      costFormula?: never;
+      cost?: never;
     }
   | {
       /**
-       * Closure-form cost. Two shapes — same polymorphism as `effect`:
-       *
-       * - `(amount: MaybeRef<DecimalSource>) => FormulaSource` — Formula factory.
-       *   Receives the engine's persistent level ref; returned Formula supports
-       *   `.invert()` and bulk-purchase math via `calculateMaxAffordable`.
-       * - `(amount: DecimalSource) => DecimalSource` — opaque value function.
-       *   Single-purchase only (bulk-purchase math is unavailable for non-Formula costs).
-       *   Use for cost shapes that aren't expressible as engine Formulas
-       *   (super-exponential, piecewise, factorial-bumped).
-       *
-       * The two shapes are told apart by calling the function once at creation
-       * with the level **ref**, so an opaque function sees one call whose
-       * argument is a `Ref`, not a `DecimalSource`. Its result is discarded, and
-       * a throw from it is caught; every later call gets the plain level.
+       * Formula factory for the cost of the next level. Called once at
+       * creation with the level ref; the returned Formula supports `.invert()`
+       * and bulk-purchase math via `calculateMaxAffordable`. A plain value
+       * returned instead prices every level at that value.
        */
-      costFormula:
-        | ((amount: MaybeRef<DecimalSource>) => FormulaSource)
-        | ((amount: DecimalSource) => DecimalSource);
+      costFormula: LevelCurve;
+      baseCost?: never;
+      costScaling?: never;
+      cost?: never;
+    }
+  | {
+      /**
+       * Cost of the next level as a plain function of the current level,
+       * re-read whenever the level changes. Single-purchase only — bulk math
+       * needs a Formula.
+       */
+      cost: (level: DecimalSource) => DecimalSource;
+      baseCost?: never;
+      costScaling?: never;
+      costFormula?: never;
+    };
+
+/**
+ * Effect configuration for {@link ScalingPurchasableOptions} — at most one of
+ * `effect` (a static base or a plain function) or `effectFormula` (a Formula
+ * factory). Omitted, the purchasable carries no effect.
+ */
+export type ScalingPurchasableEffect =
+  | {
+      /**
+       * Effect per level. Two shapes:
+       *
+       * - `DecimalSource` — static base applied as `base^amount`. Auto-wrapped as
+       *   an invertible/integrable `Formula` internally; exposed on the result as
+       *   `effectCurve` for inversion queries ("level required for ×100?").
+       * - `(amount: DecimalSource) => DecimalSource` — genuinely custom logic.
+       *   Forward evaluation only; `effectCurve` is undefined.
+       */
+      effect?: DecimalSource | ((amount: DecimalSource) => DecimalSource);
+      effectFormula?: never;
+    }
+  | {
+      /**
+       * Formula factory for the effect. Receives the level ref; the returned
+       * Formula becomes `effectCurve` on the result. Use this for
+       * non-exponential curves (linear, polynomial, soft-capped) that still
+       * need invertibility.
+       */
+      effectFormula: LevelCurve;
+      effect?: never;
     };
 
 /**
  * Shorthand options for {@link createScalingPurchasable} — leveled purchases
- * with either geometric or closure-form cost scaling. Defaults `limit: Infinity`.
+ * with geometric, Formula or function cost scaling. Defaults `limit: Infinity`.
  *
- * Cost shape is supplied via the {@link ScalingPurchasableCost} discriminator.
+ * Cost and effect shapes each take their own key — see
+ * {@link ScalingPurchasableCost} and {@link ScalingPurchasableEffect}.
  */
 export type ScalingPurchasableOptions = {
   /** Save identity — see {@link PurchasableOptions.id}. */
@@ -199,31 +238,9 @@ export type ScalingPurchasableOptions = {
   /** The resource spent to purchase */
   resource: Resource;
   /**
-   * Effect per level. Three shapes:
-   *
-   * - `DecimalSource` — static base applied as `base^amount`. Auto-wrapped as
-   *   an invertible/integrable `Formula` internally; exposed on the result as
-   *   `effectCurve` for inversion queries ("level required for ×100?").
-   * - `(amount: MaybeRef<DecimalSource>) => FormulaSource` — Formula factory.
-   *   Receives the skill-owned amount ref; returned Formula becomes `effectCurve`
-   *   on the result. Use this for non-exponential curves (linear, polynomial,
-   *   soft-capped) that still need invertibility.
-   * - `(amount: DecimalSource) => DecimalSource` — opaque escape hatch for
-   *   genuinely custom logic. Forward evaluation only; `effectCurve` is undefined.
-   *
-   * Function shapes are told apart the same way as
-   * {@link ScalingPurchasableCost}'s `costFormula`: one call at creation with
-   * the level ref, so an opaque function sees a `Ref` once. That call's
-   * result and any throw from it are discarded.
-   */
-  effect?:
-    | DecimalSource
-    | ((amount: MaybeRef<DecimalSource>) => FormulaSource)
-    | ((amount: DecimalSource) => DecimalSource);
-  /**
    * Formatted current effect, for effects a `×N` readout misrenders
    * (additive bonuses, flat amounts). Can be a ref or getter. Default: `×`
-   * followed by the effect, when `effect` is set.
+   * followed by the effect, when an effect is set.
    */
   effectDisplay?: Computable<string>;
   /** Maximum number of purchases. Default: `Infinity` */
@@ -236,7 +253,8 @@ export type ScalingPurchasableOptions = {
   visibility?: Computable<boolean>;
   /** Whether bulk purchasing is enabled. Default: `true` */
   bulkPurchase?: Computable<boolean>;
-} & ScalingPurchasableCost;
+} & ScalingPurchasableCost &
+  ScalingPurchasableEffect;
 
 /**
  * A purchasable — the returned object from {@link createPurchasable}.
@@ -275,11 +293,10 @@ export interface Purchasable {
   /** Current effect value — computed from amount for leveled, or static for one-shot */
   effect: ComputedRef<DecimalSource>;
   /**
-   * The underlying effect Formula when one exists — present when effect was a
-   * {@link Formula} factory or the `DecimalSource` shorthand in
-   * {@link ScalingPurchasableOptions}. Use `.invert(target)` for
-   * "level required for effect ≥ target" queries. Undefined when the effect
-   * was configured as an opaque value function.
+   * The underlying effect Formula when one exists — present when
+   * {@link ScalingPurchasableOptions} set `effectFormula` or a `DecimalSource`
+   * `effect`. Use `.invert(target)` for "level required for effect ≥ target"
+   * queries. Undefined when the effect was configured as a plain function.
    */
   effectCurve?: GenericFormula;
   /** Whether this purchasable is currently visible */
@@ -428,10 +445,10 @@ function buildGetCost(baseReqs: Requirement[]): (purchaseAmount?: DecimalSource)
 
 /**
  * Resolve the {@link ScalingPurchasableOptions} cost discriminator into a
- * {@link CostRequirement}. The closure variant is invoked once at creation
- * time; if it returns a {@link Formula}, the result is invertible and bulk
- * purchasing works via `calculateMaxAffordable`. Opaque value functions
- * become a `Computable<DecimalSource>` cost (single-purchase only).
+ * {@link CostRequirement}. A `costFormula` factory is invoked once at creation
+ * and its Formula makes the cost invertible, so bulk purchasing works via
+ * `calculateMaxAffordable`. A `cost` function becomes a getter cost
+ * (single-purchase only).
  *
  * Either way, the cost reads through the engine's persistent `scalingAmount`
  * ref — the mirror+watch in the factory body keeps it synced with
@@ -442,34 +459,21 @@ function buildScalingCostRequirement(
   scalingAmount: Ref<DecimalSource>,
   limit: Computable<DecimalSource> | undefined,
 ): Requirement {
-  if ('costFormula' in options) {
-    // Try as Formula factory first; a throw means an opaque value function
-    // that can't take the level ref (a table lookup, a branch on the level).
-    let factoryResult: unknown;
-    try {
-      factoryResult = (options.costFormula as (a: MaybeRef<DecimalSource>) => FormulaSource)(
-        scalingAmount,
-      );
-    } catch {
-      factoryResult = undefined;
-    }
-
-    if (factoryResult instanceof Formula) {
-      return createCostRequirement({
-        resource: options.resource,
-        cost: factoryResult,
-        maxBulkAmount: limit ?? Decimal.dInf,
-      });
-    }
-
-    // Opaque value function — the factory returned a DecimalSource, not a
-    // Formula. Re-shape as a getter so subsequent reads re-invoke the closure
-    // against the live `scalingAmount.value`. Bulk math is unavailable
-    // (createCostRequirement only supports it for Formula costs).
-    const valueFn = options.costFormula as (a: DecimalSource) => DecimalSource;
+  if (options.costFormula !== undefined) {
     return createCostRequirement({
       resource: options.resource,
-      cost: () => valueFn(scalingAmount.value),
+      cost: toFormula(options.costFormula(scalingAmount)),
+      maxBulkAmount: limit ?? Decimal.dInf,
+    });
+  }
+
+  if (options.cost !== undefined) {
+    // Re-read against the live level; bulk math is unavailable
+    // (createCostRequirement only supports it for Formula costs).
+    const costFn = options.cost;
+    return createCostRequirement({
+      resource: options.resource,
+      cost: () => costFn(scalingAmount.value),
       maxBulkAmount: 1,
     });
   }
@@ -489,45 +493,32 @@ function buildScalingCostRequirement(
 }
 
 /**
- * Resolve the {@link ScalingPurchasableOptions.effect} option into a forward
+ * Resolve the {@link ScalingPurchasableEffect} options into a forward
  * function and (when possible) an invertible {@link Formula}.
  */
 function buildScalingEffect(
-  effectOption: ScalingPurchasableOptions['effect'],
+  options: ScalingPurchasableEffect,
   scalingAmount: Ref<DecimalSource>,
 ): {
   effectFn: ((amount: DecimalSource) => DecimalSource) | undefined;
   effectCurve: GenericFormula | undefined;
 } {
-  if (effectOption === undefined) {
-    return { effectFn: undefined, effectCurve: undefined };
+  const { effect, effectFormula } = options;
+  const fromCurve = (curve: GenericFormula) => ({
+    effectCurve: curve,
+    effectFn: (amount: DecimalSource) => new Decimal(curve.evaluate(amount)),
+  });
+  if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(scalingAmount)));
+  if (effect === undefined || typeof effect === 'function') {
+    return { effectCurve: undefined, effectFn: effect };
   }
+  // A static base auto-wraps as `base^amount`, an invertible Formula.
+  return fromCurve(Formula.variable(scalingAmount).pow_base(effect));
+}
 
-  if (typeof effectOption !== 'function') {
-    // DecimalSource shorthand — auto-wrap `base^amount` as an invertible Formula.
-    const curve = Formula.variable(scalingAmount).pow_base(effectOption);
-    return {
-      effectCurve: curve,
-      effectFn: (amount) => new Decimal(curve.evaluate(amount)),
-    };
-  }
-
-  // Function — try as Formula factory first, fall back to opaque value function.
-  let factoryResult: unknown;
-  try {
-    factoryResult = (effectOption as (a: MaybeRef<DecimalSource>) => FormulaSource)(scalingAmount);
-  } catch {
-    factoryResult = undefined;
-  }
-  if (factoryResult instanceof Formula) {
-    const curve = factoryResult as GenericFormula;
-    return {
-      effectCurve: curve,
-      effectFn: (amount) => new Decimal(curve.evaluate(amount)),
-    };
-  }
-  const valueFn = effectOption as (a: DecimalSource) => DecimalSource;
-  return { effectCurve: undefined, effectFn: (amount) => valueFn(amount) };
+/** Lift a factory's return to a Formula — a plain value becomes a constant. */
+function toFormula(source: FormulaSource): GenericFormula {
+  return source instanceof Formula ? source : Formula.constant(source);
 }
 
 // === FACTORIES ===
@@ -677,9 +668,12 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
  *
  * Cost configuration is a discriminated union (see {@link ScalingPurchasableCost}):
  * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ amount`.
- * - **Closure**: `costFormula` accepts a Formula factory (invertible, bulk-aware) or
- *   an opaque `(level) => Decimal` value function (single-purchase) for cost shapes
- *   that don't fit geometric scaling.
+ * - **Formula**: `costFormula` takes a Formula factory (invertible, bulk-aware).
+ * - **Function**: `cost` takes a plain `(level) => Decimal` function
+ *   (single-purchase) for cost shapes no Formula expresses.
+ *
+ * The effect follows the same split: `effect` takes a static base or a plain
+ * function, `effectFormula` a Formula factory (see {@link ScalingPurchasableEffect}).
  *
  * Defaults to `limit: Infinity`.
  *
@@ -698,16 +692,27 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
  * });
  * ```
  *
- * @example Closure cost (super-exponential, piecewise, factorial-bumped, etc.)
+ * @example Formula cost and effect (invertible, bulk-aware)
+ * ```ts
+ * const forge = createScalingPurchasable({
+ *   id: 'forge',
+ *   description: 'Forge',
+ *   resource: ore,
+ *   costFormula: (level) => Formula.variable(level).pow(2).add(100),
+ *   effectFormula: (level) => Formula.variable(level).mul(0.5).add(1),
+ * });
+ * ```
+ *
+ * @example Function cost (super-exponential, piecewise, factorial-bumped, etc.)
  * ```ts
  * const crystalUpgrade = createScalingPurchasable({
  *   id: 'crystal',
  *   description: 'Crystal upgrade',
  *   resource: prestigeShards,
- *   costFormula: (level: DecimalSource) => Decimal.pow(10,
+ *   cost: (level) => Decimal.pow(10,
  *     baseLogCost + costIncrement * (0.5 * Math.pow(Decimal.sub(level, 0.5).toNumber(), 2) - 1/8)
  *   ),
- *   effect: (level: DecimalSource) => Decimal.pow(2, level),
+ *   effect: (level) => Decimal.pow(2, level),
  * });
  * ```
  */
@@ -716,7 +721,6 @@ export function createScalingPurchasable(options: ScalingPurchasableOptions): Pu
     id,
     title,
     description,
-    effect: effectOption,
     effectDisplay,
     limit,
     initialAmount,
@@ -731,7 +735,7 @@ export function createScalingPurchasable(options: ScalingPurchasableOptions): Pu
   const scalingAmount = ref<DecimalSource>(initialAmount ?? 0) as Ref<DecimalSource>;
 
   const costRequirement = buildScalingCostRequirement(options, scalingAmount, limit);
-  const { effectFn, effectCurve } = buildScalingEffect(effectOption, scalingAmount);
+  const { effectFn, effectCurve } = buildScalingEffect(options, scalingAmount);
 
   const purchasable: Purchasable = {
     ...createPurchasable({
