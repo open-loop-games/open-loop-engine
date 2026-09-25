@@ -105,7 +105,7 @@ persistent game state with multi-slot support
 - `function validateSaveData(refs: Map<string, Persistent>, data: Record<string, unknown>, options: ValidateSaveDataOptions): ValidateSaveDataResult` — Validate raw save data against the live persistent-ref registry. `src/core/save-validation.ts:206`
 - `interface ValidateSaveDataOptions` `src/core/save-validation.ts:181`
 - `interface ValidateSaveDataResult` `src/core/save-validation.ts:188`
-- `interface ValidationIssue` — A single field-level validation failure, suitable for `save:validation-error`. `src/core/save-validation.ts:73`
+- `interface ValidationIssue` — A single field-level validation failure, suitable for `save:validation-failed`. `src/core/save-validation.ts:73`
 
 ## Time bank
 
