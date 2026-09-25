@@ -22,30 +22,30 @@ catch-up progress by replaying elapsed seconds through the TickDriver in chunks
 
 auto-saved refs with context-scoped registration
 
-- `function createDefinitionStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of per-definition persistent state, where each `stateFactory` result must be an *object* of persistent refs (property keys become the stable save names). `src/core/persistence.ts:914`
-- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:661`
-- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1089`
-- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:763`
-- `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:995`
-- `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:799`
-- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's current value equals its default. `src/core/persistence.ts:697`
-- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:613`
-- `const NonPersistent: unique symbol` — Symbol for the non-persistent computed wrapper. `src/core/persistence.ts:83`
-- `function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeof NonPersistent]` — Get the non-persistent computed wrapper for a persistent ref. `src/core/persistence.ts:623`
-- `function noPersist<T extends object>(obj: T): T` `src/core/persistence.ts:624`
-- `function persistent<T>(defaultValue: (T & StateConstraint<T>) | Ref<T & StateConstraint<T>>, options?: PersistentOptions<T>): Persistent<T>` — Create a persistent ref that will be saved/loaded automatically. `src/core/persistence.ts:489`
-- `type Persistent<T = State> = Ref<T> & { readonly [PersistentState]: Ref<T>; readonly [DefaultValue]: T; readonly [StackTrace]: string; [Deleted]: boolean; readonly [NonPersistent]: NonPersistent<T>; [SaveDataPath]: string[] | undefined; readonly [CheckNaN]: boolean; [PersistentName]: string | undefined; readonly [PersistentSchema]: unknown; readonly [PersistentDecimal]: boolean; readonly [Lifetime]: boolean; }` — A ref that is automatically saved and loaded. `src/core/persistence.ts:136`
-- `const PersistentDecimal: unique symbol` — Marks a ref as Decimal-valued for schema derivation. `src/core/persistence.ts:110`
-- `const PersistentName: unique symbol` — Stable name of this persistent ref inside its context. `src/core/persistence.ts:96`
-- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:427`
-- `const PersistentSchema: unique symbol` — Explicit Zod schema for this ref's runtime save validation. `src/core/persistence.ts:103`
-- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its default value. `src/core/persistence.ts:672`
-- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize collected persistent refs to a save object. `src/core/persistence.ts:947`
-- `function setPersistentName(ref: Persistent, name: string): void` — Assign a stable save-data name to a persistent ref inside its context. `src/core/persistence.ts:586`
-- `type State` — Serializable state types that can be saved/loaded safely. `src/core/persistence.ts:34`
-- `type StateConstraint<T>` — Compile-time constraint that validates T is serializable without requiring explicit index signatures on interfaces. `src/core/persistence.ts:58`
-- `type StatePrimitive = string | number | boolean | null | undefined` — Primitive subset of State for use in conditional type branches. `src/core/persistence.ts:46`
-- `function withPersistentContext<T>(id: string, fn: () => T): T` — Run a block inside a persistent context, guaranteeing the context is closed even if the block throws. `src/core/persistence.ts:323`
+- `function createDefinitionStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of per-definition persistent state, where each `stateFactory` result must be an *object* of persistent refs (property keys become the stable save names). `src/core/persistence.ts:968`
+- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:715`
+- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1143`
+- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:817`
+- `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:1049`
+- `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:853`
+- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's current value equals its default. `src/core/persistence.ts:751`
+- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:667`
+- `const NonPersistent: unique symbol` — Symbol for the non-persistent computed wrapper. `src/core/persistence.ts:84`
+- `function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeof NonPersistent]` — Get the non-persistent computed wrapper for a persistent ref. `src/core/persistence.ts:677`
+- `function noPersist<T extends object>(obj: T): T` `src/core/persistence.ts:678`
+- `function persistent<T>(defaultValue: (T & StateConstraint<T>) | Ref<T & StateConstraint<T>>, options?: PersistentOptions<T>): Persistent<T>` — Create a persistent ref that will be saved/loaded automatically. `src/core/persistence.ts:543`
+- `type Persistent<T = State> = Ref<T> & { readonly [PersistentState]: Ref<T>; readonly [DefaultValue]: T; readonly [StackTrace]: string; [Deleted]: boolean; readonly [NonPersistent]: NonPersistent<T>; [SaveDataPath]: string[] | undefined; readonly [CheckNaN]: boolean; [PersistentName]: string | undefined; readonly [PersistentSchema]: unknown; readonly [PersistentDecimal]: boolean; readonly [Lifetime]: boolean; }` — A ref that is automatically saved and loaded. `src/core/persistence.ts:137`
+- `const PersistentDecimal: unique symbol` — Marks a ref as Decimal-valued for schema derivation. `src/core/persistence.ts:111`
+- `const PersistentName: unique symbol` — Stable name of this persistent ref inside its context. `src/core/persistence.ts:97`
+- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:481`
+- `const PersistentSchema: unique symbol` — Explicit Zod schema for this ref's runtime save validation. `src/core/persistence.ts:104`
+- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its default value. `src/core/persistence.ts:726`
+- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize collected persistent refs to a save object. `src/core/persistence.ts:1001`
+- `function setPersistentName(ref: Persistent, name: string): void` — Assign a stable save-data name to a persistent ref inside its context. `src/core/persistence.ts:640`
+- `type State` — Serializable state types that can be saved/loaded safely. `src/core/persistence.ts:35`
+- `type StateConstraint<T>` — Compile-time constraint that validates T is serializable without requiring explicit index signatures on interfaces. `src/core/persistence.ts:59`
+- `type StatePrimitive = string | number | boolean | null | undefined` — Primitive subset of State for use in conditional type branches. `src/core/persistence.ts:47`
+- `function withPersistentContext<T>(id: string, fn: () => T): T` — Run a block inside a persistent context, guaranteeing the context is closed even if the block throws. `src/core/persistence.ts:377`
 
 ## Reset
 
@@ -81,27 +81,27 @@ persistent game state with multi-slot support
 
 - `function addField(data: SaveData, path: string, defaultValue: unknown, opts?: AddFieldOptions): SaveData` — Write `defaultValue` at `path`. `src/core/save-migrations.ts:167`
 - `interface AddFieldOptions` `src/core/save-migrations.ts:148`
-- `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:87`
-- `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:516`
+- `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:88`
+- `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:536`
 - `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: a live `Decimal` instance, a finite `number`, or a numeric string (including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits). `src/core/save-validation.ts:59`
 - `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref's default value and options. `src/core/save-validation.ts:92`
 - `function dropField(data: SaveData, path: string): SaveData` — Remove the value at `path`. `src/core/save-migrations.ts:139`
-- `const ENGINE_SAVE_VERSION = 3` — Engine-internal save-format version, stored in the envelope under `_engine.version`. `src/core/save-manager.ts:59`
+- `const ENGINE_SAVE_VERSION = 3` — Engine-internal save-format version, stored in the envelope under `_engine.version`. `src/core/save-manager.ts:60`
 - `function forEachDefinition(data: SaveData, contextId: string, fn: (entry: SaveData, id: string) => void): SaveData` — Iterate over each entry in a collection-shaped context (a top-level group of per-definition state). `src/core/save-migrations.ts:195`
 - `function getNested(data: SaveData, path: string): unknown` — Read the value at a `.`-separated nested path in a save-data tree. `src/core/save-migrations.ts:43`
 - `function getSchemaForRef(ref: Persistent): ZodType` — Get the effective schema for a persistent ref — explicit override wins, else auto-derive. `src/core/save-validation.ts:141`
 - `function renameField(data: SaveData, oldPath: string, newPath: string): SaveData` — Move a value from `oldPath` to `newPath`. `src/core/save-migrations.ts:93`
 - `function retypeField(data: SaveData, path: string, transform: (oldValue: unknown) => unknown): SaveData` — Apply `transform` to the value at `path`. `src/core/save-migrations.ts:117`
-- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:211`
-- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:196`
-- `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:164`
-- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: persists, loads, imports, and exports versioned game state. `src/core/save-manager.ts:257`
-- `interface SaveManagerConfig` — Configuration for creating a save manager. `src/core/save-manager.ts:109`
-- `type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>` — One step of a consumer save migration: receives the save data written by version N and returns it reshaped for version N + 1. `src/core/save-manager.ts:106`
-- `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:170`
-- `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:180`
+- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:212`
+- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:197`
+- `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:165`
+- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: persists, loads, imports, and exports versioned game state. `src/core/save-manager.ts:277`
+- `interface SaveManagerConfig` — Configuration for creating a save manager. `src/core/save-manager.ts:110`
+- `type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>` — One step of a consumer save migration: receives the save data written by version N and returns it reshaped for version N + 1. `src/core/save-manager.ts:107`
+- `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:171`
+- `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:181`
 - `function setNested(data: SaveData, path: string, value: unknown): void` — Write `value` at a `.`-separated nested path, creating intermediate objects as needed. `src/core/save-migrations.ts:64`
-- `interface StorageAdapter` — Pluggable storage backend. `src/core/save-manager.ts:64`
+- `interface StorageAdapter` — Pluggable storage backend. `src/core/save-manager.ts:65`
 - `function validateSaveData(refs: Map<string, Persistent>, data: Record<string, unknown>, options: ValidateSaveDataOptions): ValidateSaveDataResult` — Validate raw save data against the live persistent-ref registry. `src/core/save-validation.ts:206`
 - `interface ValidateSaveDataOptions` `src/core/save-validation.ts:181`
 - `interface ValidateSaveDataResult` `src/core/save-validation.ts:188`

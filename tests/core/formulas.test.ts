@@ -1155,12 +1155,15 @@ describe('Buy Max', () => {
     resource = createResource(ref(100000));
   });
   describe('Without cumulative cost', () => {
-    test('Errors on calculating max affordable of non-invertible formula', () => {
+    test('Counts a non-invertible formula by searching its price', () => {
+      // With no inverse there is no seed, and the count comes from the price
+      // alone: |1 + n| ≤ 100000 reaches n = 99999.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.abs(variable);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
-      expect(() => maxAffordable.value).toLogError();
+      expect(() => maxAffordable.value).not.toLogError();
+      expect(maxAffordable.value).compare_tolerance(99999);
     });
     test('Prices a non-invertible formula by evaluating it, without erroring', () => {
       // Non-cumulative cost is a single evaluation at the target level, so
@@ -1239,12 +1242,24 @@ describe('Buy Max', () => {
     });
   });
   describe('With cumulative cost', () => {
-    test('Errors on calculating max affordable of non-invertible formula', () => {
+    test('Counts a non-invertible formula by searching its price', () => {
+      // Σ(1 + i) = n(n+1)/2 ≤ 100000 reaches n = 446.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
       const formula = Formula.abs(variable);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
-      expect(() => maxAffordable.value).toLogError();
+      expect(() => maxAffordable.value).not.toLogError();
+      expect(maxAffordable.value).compare_tolerance(446);
+    });
+    test('A chain with no series and no integral counts only the span it can price', () => {
+      // `abs` has no closed-form series and no integral, so a sum longer than
+      // the term-by-term span has no price, and a count nobody priced is never
+      // returned. 1e9 would reach ~44720 one at a time; in one purchase it
+      // reaches the longest priceable span, the same one `calculateCost` charges.
+      const formula = Formula.abs(Formula.variable(ref(1)));
+      const maxAffordable = calculateMaxAffordable(formula, createResource(ref(1e9)), true);
+      expect(maxAffordable.value).compare_tolerance(1000);
+      expect(() => calculateCost(formula, 1001, true)).toLogError();
     });
     test('Sums a formula with no closed-form series term by term', () => {
       // `abs` binds neither a series rule nor an integral, so there is nothing
@@ -1765,13 +1780,14 @@ describe('buy-max returns no count it could not price', () => {
   // means the two coordinates disagree wildly, and what the walk is holding
   // when that happens was never passed through `canAfford`. `pay` does not
   // re-check it — it subtracts and clamps at zero — so returning it is how a
-  // wrong seed becomes free levels.
+  // wrong seed becomes free levels. The search that takes over prices every
+  // count it answers.
 
   /**
    * A curve that prices honestly and inverts by a factor of 100 too far. The
    * input has to be `Formula.variable`, not the bare ref: `internalVariables`
-   * counts only Formula inputs, and a node with none is rejected as
-   * non-invertible long before the walk.
+   * counts only Formula inputs, and a node with none has no variable to seed
+   * from at all.
    */
   function overshootingCurve(level: MaybeRef<DecimalSource>): InvertibleFormula {
     return new Formula({
@@ -1782,7 +1798,7 @@ describe('buy-max returns no count it could not price', () => {
     }) as InvertibleFormula;
   }
 
-  test('a seed the walk cannot reach answers 0 rather than an unpayable count', () => {
+  test('a seed the walk cannot reach is recovered by searching the price', () => {
     // Non-cumulative, so the seed is `formula.invert` — the lie — and pricing
     // is `evaluate`, which stays honest. Under cumulativeCost the seed comes
     // from `invertIntegral` instead and a lying `invert` is never consulted.
@@ -1794,8 +1810,9 @@ describe('buy-max returns no count it could not price', () => {
       false,
     );
 
-    expect(() => maxAffordable.value).toLogError();
-    expect(maxAffordable.value).compare_tolerance(0);
+    expect(() => maxAffordable.value).not.toLogError();
+    // evaluate(n) = 10n + 10 <= 100 -> n = 9
+    expect(maxAffordable.value).compare_tolerance(9);
   });
 
   test('a seed the walk can reach is still answered normally', () => {

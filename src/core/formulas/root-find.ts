@@ -33,7 +33,7 @@ export interface FindCrossingOptions {
   /**
    * First guess for the top of the bracket — ideally a closed form for a
    * simplified version of the same problem, so the expansion loop rarely runs.
-   * Defaults to `lower + 1`.
+   * Defaults to `lower + 1`, which is also what a non-finite guess falls back to.
    */
   upper?: DecimalSource;
   /** Doublings allowed while growing `upper` until it brackets `target`. Defaults to 32. */
@@ -114,7 +114,10 @@ export function findCrossing(
   // bisecting below it would answer outside the domain the caller declared.
   if (Decimal.gte(f(lo), target)) return lo;
 
-  if (Decimal.lte(hi, lo)) hi = new Decimal(Decimal.add(lo, 1));
+  // A non-finite guess is no guess: callers derive `upper` from a closed form
+  // that can divide by a zero slope, and neither Infinity nor NaN is ever
+  // `lte` the floor, so it would otherwise be kept and never bracket.
+  if (!Decimal.isFinite(hi) || Decimal.lte(hi, lo)) hi = new Decimal(Decimal.add(lo, 1));
   // Every `hi` is tested, including the last one the loop produces — and the
   // test is "did we reach it", not "are we still short". A non-comparable `f`
   // (NaN past some magnitude) therefore falls through to `null` rather than

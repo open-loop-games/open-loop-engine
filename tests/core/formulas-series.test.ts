@@ -348,6 +348,44 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
   });
 });
 
+describe('a flat price is an ordinary authored value', () => {
+  test('costScaling 1 buys in bulk, singly, and under a cap', () => {
+    // A ratio of 1 has no continuous inverse to seed buy-max from — `1ˣ/ln 1`
+    // is 0/0 — and the count still has to come out of the price.
+    const capped = createScalingPurchasable({
+      id: 'flat-capped',
+      resource: createResource(ref<DecimalSource>(100), 'coins'),
+      baseCost: 10,
+      costScaling: 1,
+      limit: 5,
+      bulkPurchase: true,
+    });
+    expect(String(capped.purchaseMax())).toBe('5');
+    expect(String(capped.amount.value)).toBe('5');
+
+    const wallet = createResource(ref<DecimalSource>(100), 'coins');
+    const bulk = createScalingPurchasable({
+      id: 'flat-bulk',
+      resource: wallet,
+      baseCost: 10,
+      costScaling: 1,
+      bulkPurchase: true,
+    });
+    expect(String(bulk.purchaseMax())).toBe('10');
+    expect(String(wallet.value)).toBe('0');
+
+    const single = createScalingPurchasable({
+      id: 'flat-single',
+      resource: createResource(ref<DecimalSource>(100), 'coins'),
+      baseCost: 10,
+      costScaling: 1,
+      bulkPurchase: false,
+    });
+    expect(single.canPurchase.value).toBe(true);
+    expect(String(single.purchase())).toBe('1');
+  });
+});
+
 describe('a single-payment purchase charges the level it counted to', () => {
   test('a cap of 1 counts the level it is buying, not the one it is on', () => {
     // `maxBulkAmount: 1` — createCostRequirement's default — takes a fast path

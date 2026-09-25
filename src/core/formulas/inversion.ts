@@ -141,9 +141,20 @@ const VALUE_SPACE_CEILING = '1e300';
  * `16 − log₁₀(log₁₀ x)` significant digits, not 16.
  */
 export function inversionTolerance(target: DecimalSource): number {
-  const exponent = Math.abs(Decimal.log10(Decimal.abs(target)).toNumber());
-  if (!Number.isFinite(exponent) || exponent <= 308) return BASE_TOLERANCE;
-  return Math.max(BASE_TOLERANCE, EPSILON * exponent * Math.LN10 * 4);
+  return Math.max(BASE_TOLERANCE, representationFloor(target));
+}
+
+/**
+ * Relative error `value` carries from being stored at all: zero at layer 0,
+ * where the float64 holds the value itself, and the stored exponent's ulp
+ * carried into value space above it.
+ *
+ * @internal
+ */
+export function representationFloor(value: DecimalSource): number {
+  const exponent = Math.abs(Decimal.log10(Decimal.abs(value)).toNumber());
+  if (!Number.isFinite(exponent) || exponent <= 308) return 0;
+  return EPSILON * exponent * Math.LN10 * 4;
 }
 
 /**

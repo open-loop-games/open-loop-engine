@@ -18,14 +18,15 @@
  *    agrees to 1e-9 can sit a long way off in input space.
  */
 
-import Formula, { F, calculateCost } from '@/core/formulas/formulas';
-import { inversionTolerance } from '@/core/formulas/inversion';
+import Formula, { F, calculateCost, calculateMaxAffordable } from '@/core/formulas/formulas';
+import { inversionTolerance, representationFloor } from '@/core/formulas/inversion';
+import { createResource } from '@/core/resource';
 import { findCrossing } from '@/core/formulas/root-find';
 import type { GenericFormula, InvertibleFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { describe, expect, test, vi } from 'vitest';
-import { ref } from 'vue';
+import { ref, type MaybeRef } from 'vue';
 import oracle from './fixtures/formula-oracle.json';
 
 // === DOMAIN SAMPLES ===
@@ -690,6 +691,18 @@ describe('root finding: findCrossing', () => {
     expect(String(x)).toBe('0');
   });
 
+  test('a non-finite upper guess is ignored rather than bracketed from', () => {
+    // Callers seed `upper` from a simplified problem's closed form, and that
+    // form divides by a slope that can be zero. An Infinity or NaN bound never
+    // compares below `lo`, so it has to be recognised as no guess at all.
+    const f = (v: Decimal) => Decimal.mul(v, 10);
+    for (const upper of [Decimal.dInf, Decimal.dNaN]) {
+      const x = findCrossing(f, '1000', { upper });
+      expect(x, `upper ${String(upper)}`).not.toBeNull();
+      expect(Decimal.lte(relativeError(x!, 100), DEFAULT_TOL), `got ${String(x)}`).toBe(true);
+    }
+  });
+
   test('an unbracketable target returns null rather than the bound it never crossed', () => {
     // A bounded function: `tanh`-like saturation at 10. Nothing reaches 20, and
     // the old per-caller loops would have returned their final `hi` regardless.
@@ -1211,6 +1224,142 @@ describe('oracle: Σ matches a high-precision reference where brute force cannot
       ).toBe(true);
     }
   });
+});
+
+describe('buy-max: the count is what buying one level at a time reaches', () => {
+  // Every curve a designer can author, including those with no inverse, no
+  // integral, a flat price, or a derivative singular at level 0. The count must
+  // be the one sequential single purchases reach — never one they can't pay
+  // for, and never short of one they can.
+
+  /** Levels bought one at a time until the next is unaffordable, or the cap. */
+  function bruteMax(formula: GenericFormula, level: number, balance: DecimalSource, cap: number) {
+    let n = 0;
+    let spent = new Decimal(0);
+    while (n + 1 <= cap) {
+      const price = spent.add(formula.evaluate(level + n));
+      if (!price.lte(balance)) break;
+      spent = price;
+      n++;
+    }
+    return n;
+  }
+
+  type Curve = (level: MaybeRef<DecimalSource>) => GenericFormula;
+
+  /** Non-decreasing on [0, ∞), so a single payment's count is well-posed too. */
+  const RISING: Record<string, Curve> = {
+    'exponential 10·1.15ⁿ': (l) => Formula.exponential(l, 10, 1.15),
+    'linear 5n+10': (l) => Formula.linear(l, 10, 5),
+    'polynomial 10n²': (l) => Formula.polynomial(l, 10, 2),
+    'polynomial 10n^1.5': (l) => Formula.polynomial(l, 10, 1.5),
+    '10√n + 5': (l) => F.variable(l).sqrt().mul(10).add(5),
+    'clamped 10·1.15ⁿ ∨ 1': (l) => Formula.exponential(l, 10, 1.15).max(1),
+  };
+  /** Priced only cumulatively: flat (a single payment reaches any level) or not monotone. */
+  const CUMULATIVE_ONLY: Record<string, Curve> = {
+    'flat exponential 10·1ⁿ': (l) => Formula.exponential(l, 10, 1),
+    'flat linear 0n+10': (l) => Formula.linear(l, 10, 0),
+    '(10·1.15ⁿ)²': (l) => F.variable(l).pow_base(1.15).mul(10).pow(2),
+    '100·(|n − 3| + 1)': (l) => F.variable(l).sub(3).abs().add(1).mul(100),
+  };
+
+  const LEVELS = [0, 1, 7];
+  const BALANCES = ['0', '5', '100', '1e4', '1e6'];
+  const CAPS = [Infinity, 3, 2.5];
+
+  function sweep(name: string, curve: Curve, cumulative: boolean) {
+    for (const level of LEVELS) {
+      for (const balance of BALANCES) {
+        for (const cap of CAPS) {
+          const formula = curve(ref<DecimalSource>(level));
+          const { value: count, errors } = withoutEngineErrors(
+            () =>
+              calculateMaxAffordable(
+                formula,
+                createResource(ref<DecimalSource>(balance)),
+                cumulative,
+                cap === Infinity ? Decimal.dInf : cap,
+              ).value,
+          );
+          const label = `${name} level=${level} balance=${balance} cap=${cap}`;
+          expect(errors, `${label} logged`).toEqual([]);
+          if (cumulative) {
+            const truth = bruteMax(formula, level, balance, Math.floor(cap));
+            expect(String(count), label).toBe(String(new Decimal(truth)));
+          } else {
+            // A single payment's count can run to billions, past enumerating,
+            // so it is checked against its definition: the level it reaches is
+            // payable, and the next one is not unless the cap stops it first.
+            expect(Decimal.eq(count, Decimal.floor(count)), `${label}: ${String(count)}`).toBe(
+              true,
+            );
+            const reached = (n: DecimalSource) => formula.evaluate(Decimal.add(level, n));
+            if (Decimal.gt(count, 0)) {
+              expect(
+                Decimal.lte(reached(count), balance),
+                `${label}: ${String(count)} unpayable`,
+              ).toBe(true);
+            }
+            if (Decimal.lt(count, Math.floor(cap))) {
+              expect(
+                Decimal.gt(reached(Decimal.add(count, 1)), balance),
+                `${label}: stopped at ${String(count)} short of a payable level`,
+              ).toBe(true);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (const [name, curve] of Object.entries({ ...RISING, ...CUMULATIVE_ONLY })) {
+    test(`${name} — cumulative`, () => sweep(name, curve, true));
+  }
+  for (const [name, curve] of Object.entries(RISING)) {
+    test(`${name} — single payment`, () => sweep(name, curve, false));
+  }
+
+  test('a flat single payment reaches any level, so the count is the cap', () => {
+    // Uncapped there is no largest count, and the curve is undefined at an
+    // infinite level (0·∞), so the answer is only the largest count priced.
+    for (const curve of [
+      CUMULATIVE_ONLY['flat exponential 10·1ⁿ'],
+      CUMULATIVE_ONLY['flat linear 0n+10'],
+    ]) {
+      const resource = createResource(ref<DecimalSource>(100));
+      const at = (cap?: DecimalSource) =>
+        calculateMaxAffordable(curve(ref<DecimalSource>(0)), resource, false, cap).value;
+      expect(String(at(40))).toBe('40');
+      expect(Decimal.gte(at(), '1e300'), `uncapped: ${String(at())}`).toBe(true);
+    }
+  });
+});
+
+describe('affordability: a balance short of the price affords nothing, at every magnitude', () => {
+  // The slack exists to absorb the ulp a closed form carries, so it is sized in
+  // the coordinate the price is stored in: relative at layer 0, the stored
+  // exponent's ulp above it. A slack stated on the stored exponent itself grows
+  // with the magnitude and grants levels the balance is orders of magnitude
+  // short of.
+  for (const price of ['50', '1e100', '1e1000', '1e1000000', '1e1000000000', '1e1000000000000']) {
+    test(`price ${price}`, () => {
+      const floor = Math.max(1e-12, representationFloor(price));
+      const short = Decimal.mul(price, 1 - 10 * floor);
+      expect(Decimal.lt(short, price), 'the short balance is representable').toBe(true);
+      for (const cap of [1, Decimal.dInf]) {
+        const at = (balance: DecimalSource) =>
+          calculateMaxAffordable(
+            Formula.exponential(ref<DecimalSource>(0), price, 1.15),
+            createResource(ref<DecimalSource>(balance)),
+            true,
+            cap,
+          ).value;
+        expect(String(at(short)), `short by 10× the floor, cap ${String(cap)}`).toBe('0');
+        expect(String(at(price)), `exactly the price, cap ${String(cap)}`).toBe('1');
+      }
+    });
+  }
 });
 
 describe('tetration family', () => {

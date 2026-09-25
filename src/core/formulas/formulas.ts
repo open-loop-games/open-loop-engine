@@ -29,10 +29,12 @@ import {
   captureInversionFailures,
   inversionTolerance,
   landsOnTarget,
+  representationFloor,
   reportInversionFailure,
   type Inversion,
 } from './inversion';
 import { findFirstPassage, type FirstPassageOptions, type Passage } from './passage';
+import { bracketMidpoint } from './root-find';
 import { NOT_SUMMABLE, arithmeticSeries, exactSeries, type Series } from './series';
 import type {
   EvaluateFunction,
@@ -1404,31 +1406,14 @@ export function findNonInvertible(formula: GenericFormula): GenericFormula | nul
 }
 
 /**
- * Calculate the maximum number of purchases affordable with the current resource amount.
+ * Relative slack when comparing a closed-form price against a balance at
+ * layer 0.
  *
- * This is the "buy max" calculation for repeatables and conversions, and it
- * answers the discrete question — the largest `n` with `Σ f(a+i) ≤ resource`,
- * which is exactly what `n` sequential single purchases would cost.
- * {@link calculateCost} prices that same `n` through the same operation, so the
- * count and the charge can't disagree.
- *
- * Continuous inversion still does the work: the integral seeds the answer in one
- * step and a short exact correction lands it, rather than summing levels one at
- * a time from zero.
- *
- * @param formula - Cost formula (must be invertible; must be integrable if `cumulativeCost` is true)
- * @param resource - The resource being spent
- * @param cumulativeCost - If true, buying `n` costs `Σ f(a+i)`. If false, it costs `f(a+n)` alone. Default: `true`
- * @param maxBulkAmount - Cap on the returned amount. Default: `Infinity`
- * @returns Reactive computed with the max affordable amount
- */
-/**
- * Relative slack when comparing a closed-form price against a balance.
- *
- * Matches the tolerance `createCostRequirement` applies to flat costs. Tight
- * enough not to grant a level a player is meaningfully short of (a 49.99
- * balance never affords a 50 cost), wide enough to absorb the ulp a closed form
- * carries where summing the same levels one at a time would land exactly.
+ * Matches the tolerance `createCostRequirement` applies to the ratio of balance
+ * to a flat cost. Tight enough not to grant a level a player is meaningfully
+ * short of (a 49.99 balance never affords a 50 cost), wide enough to absorb the
+ * ulp a closed form carries where summing the same levels one at a time would
+ * land exactly.
  */
 const AFFORDABILITY_TOLERANCE = 1e-12;
 
@@ -1440,24 +1425,41 @@ const AFFORDABILITY_TOLERANCE = 1e-12;
  * answer false against NaN in *both* directions, so a bare `gt` would read
  * "not more than the balance" and hand out levels without limit.
  *
+ * The slack is relative to the price, compared as the ratio `price / balance`,
+ * and widens above layer 0 only to the ulp the stored exponent carries.
+ * `Decimal`'s own tolerance comparisons apply their tolerance to that stored
+ * exponent, which makes it an absolute slack in orders of magnitude.
+ *
  * @internal
  */
 function payable(price: DecimalSource, balance: DecimalSource): boolean {
   if (!Decimal.isFinite(price)) return false;
-  return Decimal.lte_tolerance(price, balance, AFFORDABILITY_TOLERANCE);
+  if (Decimal.lte(price, balance)) return true;
+  if (!Decimal.gt(balance, 0)) return false;
+  const slack = Math.max(AFFORDABILITY_TOLERANCE, representationFloor(price));
+  return Decimal.lte(Decimal.div(price, balance), 1 + slack);
 }
 
 /**
- * Count how many levels a resource can currently afford on a cost curve.
+ * Count how many levels a resource can currently afford on a cost curve — the
+ * "buy max" for repeatables and conversions.
  *
- * Counts through the same series {@link calculateCost} charges, so the count
- * and the charge agree — a bulk buy is priced at exactly what the same
- * purchases cost one at a time.
+ * Answers the discrete question: the largest `n` whose price, in the operation
+ * {@link calculateCost} charges, fits the balance. That is exactly the count
+ * sequential single purchases would reach, so the count and the charge agree.
+ * Any curve works, including one with no inverse or no integral. Where an
+ * inverse exists it seeds the answer in one step and a short exact walk lands
+ * it; otherwise, or when the seed is far off, a bracketed search over whole
+ * counts finds it. The search needs the price to rise with the count, which a
+ * cumulative price does whenever no level costs less than nothing, and a single
+ * payment does when the curve is non-decreasing. On a curve that breaks that,
+ * the answer is still a count the balance can pay for, possibly short of the
+ * largest.
  *
- * @param formula - Cost formula (must be invertible; must be integrable if cumulative)
+ * @param formula - Cost formula — the price of the level at its variable
  * @param resource - The resource paying for the levels
  * @param cumulativeCost - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
- * @param maxBulkAmount - Ceiling on the returned count, for "buy max" caps. Default: unbounded
+ * @param maxBulkAmount - Ceiling on the returned count, for "buy max" caps; a fractional cap counts the whole levels below it. Default: unbounded
  * @returns Reactive count of affordable levels, recomputed as the resource, the
  * cost curve, and both options change — including reactive values the curve
  * reads from inside a `Formula.step` / `Formula.if` closure
@@ -1514,9 +1516,6 @@ export function calculateMaxAffordable(
     maxBulk: DecimalSource; // the cap the band was clamped to
   } | null = null;
 
-  /** Latch for the correction-walk postcondition report — see its use below. */
-  let reportedWalkExhaustion = false;
-
   return computed(() =>
     profile('formula.calculateMaxAffordable', () => {
       // Read first, on every path: this is the subscription to every reactive
@@ -1562,10 +1561,8 @@ export function calculateMaxAffordable(
       }
 
       // --- Full recomputation ---
-      if (!formula.isInvertible()) {
-        console.error('Cannot calculate max affordable of non-invertible formula');
-        return 0;
-      }
+      // Counts are whole levels, so a fractional cap admits the levels below it.
+      const cap = Decimal.floor(maxBulkAmount);
 
       /** Total charged for buying `n` levels — the same operation the purchase pays. */
       const priceOf = (n: DecimalSource): DecimalSource =>
@@ -1573,84 +1570,14 @@ export function calculateMaxAffordable(
           ? (formula.sum(currentVariable, n).value ?? Decimal.dInf)
           : formula.evaluate(Decimal.add(currentVariable, n));
 
-      let affordable: DecimalSource;
-      if (cumulativeCost) {
-        if (!formula.isIntegralInvertible()) {
-          console.error('Cannot calculate max affordable of formula with non-invertible integral');
-          return 0;
-        }
-        affordable = profile('formula.affordable.integral', () =>
-          Decimal.floor(
-            formula.invertIntegral(Decimal.add(resource.value, formula.evaluateIntegral())),
-          ).sub(currentVariable),
-        );
-      } else {
-        // invert(R) returns the absolute variable level at which evaluate
-        // equals R; for non-cumulative cost (a single payment of
-        // evaluate(targetLevel) covers reaching that level), the buyable
-        // count is invert(R) − currentVariable. Clamped to 0 because invert
-        // can drop below currentVariable when even the current level's cost
-        // exceeds R.
-        affordable = Decimal.floor(formula.invert(resource.value)).sub(currentVariable);
-      }
-      affordable = Decimal.clamp(affordable, 0, maxBulkAmount);
-
       /** Whether buying `n` levels is payable out of the current balance. */
       const canAfford = (n: DecimalSource): boolean => payable(priceOf(n), resource.value);
 
-      // The seed solves the *continuous* equation, so it lands within about a
-      // level of the discrete answer — half of one for every geometric curve,
-      // since the two differ by the fixed factor ln(s)/(s−1). Correcting it
-      // against the exact price walks a couple of steps at most; the bound is a
-      // backstop for curves whose two coordinates drift further apart, not a
-      // search.
-      const CORRECTION_LIMIT = 64;
+      const seed = profile('formula.affordable.integral', () =>
+        seedAffordable(formula, resource.value, currentVariable, cumulativeCost, cap),
+      );
       const correctionStart = profileStart();
-      if (!Decimal.isFinite(priceOf(affordable))) {
-        // A curve that prices nothing at the seed prices nothing anywhere the
-        // walk could reach, and walking would only spend the correction budget
-        // to arrive at the same place.
-        affordable = Decimal.dZero;
-      } else {
-        let verified = false;
-        for (let i = 0; i < CORRECTION_LIMIT && Decimal.gt(affordable, 0); i++) {
-          if (canAfford(affordable)) {
-            verified = true;
-            break;
-          }
-          affordable = Decimal.sub(affordable, 1);
-        }
-        // Postcondition: the answer is a count `canAfford` accepted, or it is
-        // zero. Draining to zero satisfies it — nothing costs nothing. Running
-        // out of budget does not: what's left is a count nobody priced, and
-        // `pay` doesn't re-check it, it subtracts and clamps at zero, so the
-        // levels above what the resource covers are handed out free. Answering
-        // zero is the direction that can only under-buy.
-        //
-        // This costs monotonicity in the resource — a larger balance seeds
-        // further out, so it can exhaust where a smaller one walked home — but
-        // no caller depends on that, and an unpayable count is worse.
-        if (!verified && Decimal.gt(affordable, 0)) {
-          if (!reportedWalkExhaustion) {
-            // Once per call site: unlike the composition errors above, this is
-            // a numeric condition, and it sits in a computed that re-runs on
-            // every resource change.
-            reportedWalkExhaustion = true;
-            console.error(
-              'Max affordable correction walk exhausted its budget; the seed and the discrete price disagree by more than ' +
-                `${CORRECTION_LIMIT} levels. Returning 0 rather than a count that cannot be paid for.`,
-            );
-          }
-          profileEnd('formula.affordable.refine', correctionStart);
-          guard = null;
-          return Decimal.dZero;
-        }
-        for (let i = 0; i < CORRECTION_LIMIT && Decimal.lt(affordable, maxBulkAmount); i++) {
-          const next = Decimal.add(affordable, 1);
-          if (!canAfford(next)) break;
-          affordable = next;
-        }
-      }
+      const affordable = countAffordable(canAfford, cap, seed);
       profileEnd('formula.affordable.refine', correctionStart);
 
       // --- Update threshold guard ---
@@ -1664,7 +1591,7 @@ export function calculateMaxAffordable(
       // `affordable + 1` *passing* the cap, not reaching it: at exactly the cap
       // that level is still real, and giving the band an infinite ceiling
       // instead of its price would freeze the answer one short.
-      const capped = Decimal.gt(Decimal.add(affordable, 1), maxBulkAmount);
+      const capped = Decimal.gt(Decimal.add(affordable, 1), cap);
       guard = {
         variable: currentVariable,
         affordable,
@@ -1678,6 +1605,124 @@ export function calculateMaxAffordable(
       return affordable;
     }),
   );
+}
+
+/**
+ * The continuous answer, as a whole count clamped to `[0, cap]`, or `null` when
+ * the curve has no inverse to solve it with or the inverse has no answer here.
+ *
+ * @internal
+ */
+function seedAffordable(
+  formula: GenericFormula,
+  balance: DecimalSource,
+  currentVariable: DecimalSource,
+  cumulativeCost: boolean,
+  cap: DecimalSource,
+): DecimalSource | null {
+  // A seed is an accelerator, so an inverse that fails is a missing seed rather
+  // than a report: the search answers without one.
+  const { value: level, failure } = captureInversionFailures(() => {
+    if (cumulativeCost) {
+      if (!formula.isIntegralInvertible()) return null;
+      return formula.invertIntegral(Decimal.add(balance, formula.evaluateIntegral()));
+    }
+    // `invert(R)` is the level whose single payment is R, so the count is the
+    // distance to it from here.
+    return formula.isInvertible() ? formula.invert(balance) : null;
+  });
+  if (failure != null || level == null) return null;
+  const count = Decimal.sub(Decimal.floor(level), currentVariable);
+  return Decimal.isFinite(count) ? Decimal.clamp(count, 0, cap) : null;
+}
+
+/**
+ * How far the walk from a seed goes in either direction before handing over to
+ * the search. The seed solves the continuous equation, so it lands within about
+ * a level of the discrete answer — half of one for every geometric curve, since
+ * the two differ by the fixed factor ln(s)/(s−1) — and the walk takes a couple
+ * of steps. Past this bound the seed was not close, and bisecting is cheaper.
+ */
+const CORRECTION_LIMIT = 64;
+
+/** Bound on the bracket search's expansions and halvings. */
+const SEARCH_LIMIT = 256;
+
+/**
+ * Largest whole count in `[0, cap]` that `canAfford` accepts, for a
+ * `canAfford` that holds up to some count and fails above it.
+ *
+ * Every count returned has passed `canAfford` (or is zero), including when the
+ * precondition fails or a budget runs out. The answer can then fall short, but
+ * it is never a count nobody priced: `pay` doesn't re-check it, it subtracts and
+ * clamps at zero, so an unpriced count hands out free levels.
+ *
+ * @internal
+ */
+function countAffordable(
+  canAfford: (n: DecimalSource) => boolean,
+  cap: DecimalSource,
+  seed: DecimalSource | null,
+): DecimalSource {
+  if (Decimal.lt(cap, 1)) return Decimal.dZero;
+  let lo: DecimalSource = Decimal.dZero;
+  let hi: DecimalSource | null = null;
+
+  if (seed != null) {
+    let n = seed;
+    let verified = false;
+    for (let i = 0; i < CORRECTION_LIMIT; i++) {
+      if (canAfford(n)) {
+        verified = true;
+        break;
+      }
+      hi = n;
+      if (!Decimal.gt(n, 0)) return Decimal.dZero;
+      n = Decimal.sub(n, 1);
+    }
+    if (verified) {
+      lo = n;
+      for (let i = 0; i < CORRECTION_LIMIT; i++) {
+        if (!Decimal.lt(lo, cap)) return lo;
+        const next = Decimal.add(lo, 1);
+        if (!canAfford(next)) return lo;
+        lo = next;
+      }
+    }
+  }
+
+  // Bracket `lo` (affordable) below `hi` (not), then halve on whole counts.
+  if (hi == null) {
+    // A curve that never outgrows the balance — a flat single payment — is
+    // affordable at the cap itself, including an unbounded one.
+    if (canAfford(cap)) return cap;
+    if (Decimal.isFinite(cap)) {
+      hi = cap;
+    } else {
+      let probe = Decimal.max(Decimal.add(Decimal.mul(lo, 2), 1), 1);
+      for (let i = 0; i < SEARCH_LIMIT && hi == null; i++) {
+        if (!canAfford(probe)) {
+          hi = probe;
+        } else {
+          lo = probe;
+          // Squaring reaches any magnitude in a few dozen steps, and the halving
+          // below is geometric, so overshooting costs nothing.
+          probe = Decimal.max(Decimal.add(Decimal.mul(probe, 2), 1), Decimal.pow(probe, 2));
+        }
+      }
+      if (hi == null) return lo;
+    }
+  }
+  for (let i = 0; i < SEARCH_LIMIT && Decimal.gt(Decimal.sub(hi, lo), 1); i++) {
+    let mid: DecimalSource = Decimal.floor(bracketMidpoint(new Decimal(lo), new Decimal(hi)));
+    if (Decimal.lte(mid, lo)) mid = Decimal.add(lo, 1);
+    else if (Decimal.gte(mid, hi)) mid = Decimal.sub(hi, 1);
+    // Past 2^53 a whole count has no neighbour to step to.
+    if (Decimal.lte(mid, lo) || Decimal.gte(mid, hi)) break;
+    if (canAfford(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /**
