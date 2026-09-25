@@ -14,8 +14,8 @@
 import { computed, unref, type MaybeRef } from 'vue';
 import { Decimal, type DecimalSource, formatSmall, renormIfLayer0 } from '@/primitives/decimal';
 import { processGetter, type Computable } from './computed';
-import type { Resource } from './resource';
-import { SkipPersistence, DefaultValue, cloneDefault, type Persistent } from './persistence';
+import { resetResource, type Resource } from './resource';
+import { SkipPersistence } from './persistence';
 import type { GenericFormula } from './formulas';
 import { calculateCost, calculateMaxAffordable, isFormula } from './formulas';
 
@@ -494,10 +494,8 @@ export function payByDivision(requirement: CostRequirement, amount: DecimalSourc
  * Standard prestige behavior.
  */
 export function payByReset(requirement: CostRequirement, overrideValue?: DecimalSource): void {
-  const resource = requirement.resource as Resource & Partial<Persistent<DecimalSource>>;
-  const fallback = resource[DefaultValue];
-  requirement.resource.value =
-    overrideValue ?? (fallback !== undefined ? cloneDefault(fallback) : 0);
+  if (overrideValue !== undefined) requirement.resource.value = overrideValue;
+  else resetResource(requirement.resource);
 }
 
 /**

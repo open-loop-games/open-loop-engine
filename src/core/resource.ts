@@ -31,7 +31,7 @@ import {
   type StateConstraint,
   NonPersistent,
   DefaultValue,
-  cloneDefault,
+  resetPersistent,
 } from './persistence';
 import { withChain } from './trace';
 import { getCurrentResourceRegistry } from './registries';
@@ -422,10 +422,7 @@ export function hasResource(resource: Resource<DecimalSource>, amount: DecimalSo
  * @param resource - The resource to reset
  */
 export function resetResource<T extends DecimalSource>(resource: Resource<T>): void {
-  const persistentResource = resource as Resource<T> & Partial<Persistent<T>>;
-  if (persistentResource[DefaultValue] !== undefined) {
-    resource.value = cloneDefault(persistentResource[DefaultValue]);
-  } else {
-    resource.value = 0 as T;
-  }
+  // The noPersist wrapper carries the default too, so this also covers it.
+  if (DefaultValue in resource) resetPersistent(resource as Resource<T> & Persistent<T>);
+  else resource.value = 0 as T;
 }

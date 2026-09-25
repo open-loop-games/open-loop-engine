@@ -22,12 +22,11 @@ import { ref, unref, type Ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
-  DefaultValue,
   Lifetime,
   SkipPersistence,
   type Persistent,
-  cloneDefault,
   isPersistent,
+  resetPersistent,
   loadingSave,
   getModulePersistentRefs,
   getPersistentRefs,
@@ -336,17 +335,14 @@ export function createReset(options: ResetOptions): Reset {
         if (processedThingsToReset) {
           const things = unref(processedThingsToReset);
           for (const thing of things) {
-            if (isPersistent(thing)) resetRef(thing);
+            if (isPersistent(thing)) resetPersistent(thing);
             else resetObject(thing);
           }
         }
 
         // Reset via module-scoped refs
         for (const ref of resolveModules(warnUnknownModule)) {
-          if (retainedRefs.has(ref)) continue;
-          if (DefaultValue in ref) {
-            ref.value = cloneDefault(ref[DefaultValue]);
-          }
+          if (!retainedRefs.has(ref)) resetPersistent(ref);
         }
 
         // Restore retained values
@@ -369,13 +365,6 @@ export function createReset(options: ResetOptions): Reset {
 }
 
 // === RESET IMPLEMENTATION ===
-
-/** Write a persistent ref's default back into it. */
-function resetRef(p: Persistent): void {
-  if (DefaultValue in p) {
-    p.value = cloneDefault(p[DefaultValue]);
-  }
-}
 
 /**
  * Recursively reset the persistent refs in an object tree, skipping any
@@ -401,7 +390,7 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
 
   // If it's a persistent ref, reset it
   if (isPersistent(obj)) {
-    if (!obj[Lifetime]) resetRef(obj);
+    if (!obj[Lifetime]) resetPersistent(obj);
     return;
   }
 
