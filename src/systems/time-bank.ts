@@ -37,6 +37,7 @@ import { resolveComputable, type Computable } from '@/core/computed';
 import { processOfflineTime, type OfflineProgressOptions } from '@/core/offline';
 import type { TickDriver } from '@/core/tick-driver';
 import type { Persistent } from '@/core/persistence';
+import { createPredicateResolver, type Predicate } from './gate';
 
 // Counter fallback for bank persistent-context ids — same shape as
 // TickDriver's: collision-free for multiple banks in one runtime, but
@@ -165,9 +166,10 @@ export interface BankedAccelerationConfig {
   /**
    * Predicate re-resolved each tick; while false, acceleration and drain
    * suspend (driver back at baseline) without ending the spend. For "only
-   * while actively playing" gates. Can be a ref or getter.
+   * while actively playing" gates. A Gate resolves through the runtime
+   * captured at `createBankedAcceleration` time.
    */
-  gate?: Computable<boolean>;
+  gate?: Predicate;
   /**
    * When true, banks the seconds `TickDriver` drops when a tab-hide or hitch
    * outruns `maxDeltaTime`, by chaining onto `onDeltaOverflow`. The one
@@ -221,6 +223,7 @@ export interface BankedAcceleration {
  */
 export function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration {
   const { tickDriver, bank, spendMultiplier, drainMode = 'excess', gate } = config;
+  const spendGate = createPredicateResolver().adopt(gate, true, 'createBankedAcceleration gate');
 
   const isSpending = ref(false);
   let baseline = 1;
@@ -257,7 +260,7 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
     }
     // Arm the factor for the next tick: gate suspension and reactive
     // spendMultiplier changes take effect one tick later.
-    const open = gate === undefined || resolveComputable(gate);
+    const open = spendGate.read();
     applyBonus(open ? resolveComputable(spendMultiplier) : 1);
   });
 
@@ -279,7 +282,7 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
       if (isSpending.value || bank.banked.value <= 0) return false;
       baseline = tickDriver.speedMultiplier;
       isSpending.value = true;
-      const open = gate === undefined || resolveComputable(gate);
+      const open = spendGate.read();
       applyBonus(open ? resolveComputable(spendMultiplier) : 1);
       return true;
     },

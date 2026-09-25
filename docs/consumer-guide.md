@@ -69,7 +69,7 @@ const engine = createEngine({
 });
 ```
 
-A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it — at construction for `createGateRequirement`, at first evaluation elsewhere.
+A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it, where you authored it: at construction for `createGateRequirement`, and when the definition registers for a system's predicate field. Every systems-layer predicate field — challenge `visible` / `canStart` / `goal`, achievement `requirement` / `visible` / `hidden`, purchasable and producer visibility, automation tiers, cycle `endCondition`, reset `canReset`, a grant's `when` — takes a `Predicate`: a boolean, ref, getter or Gate. Code that reads one back off a definition evaluates it with `evaluatePredicate(def.goal, runtime)`, or reads the instance's reactive field instead.
 
 ```ts
 const unlocks = createPurchasableCategory<UnlockDef>({
@@ -135,7 +135,7 @@ No per-game predicate interface, no module-side implementation table, no closure
 
 **Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A borglike-style "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
 
-A custom-predicate Gate kind carrying a closure is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed closure game-side via `Computable<boolean>` on fields that accept that union arm (or `createBooleanRequirement` on requirement-shaped fields) and keep it out of `Gate` entirely. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way. See idle-loops-ng's `data/builders.ts` for the worked pattern.
+A custom-predicate Gate kind carrying a closure is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed getter game-side on a `Predicate` field (or `createBooleanRequirement` on requirement-shaped fields) and keep it out of `Gate` entirely. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way. See idle-loops-ng's `data/builders.ts` for the worked pattern.
 
 ## Persistence
 

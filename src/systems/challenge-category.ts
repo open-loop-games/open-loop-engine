@@ -51,7 +51,7 @@ import type { GameStateMutator } from '@/core/effects';
 import { applyEffect } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentEngineCategories } from './engine-categories';
-import { bindGateRuntime, evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
+import { bindGateRuntime, createPredicateResolver, type Predicate } from './gate';
 import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
@@ -72,21 +72,16 @@ export interface ChallengeDef<
   name: string;
 
   /**
-   * Visibility gate — hidden challenges don't appear in UI.
+   * Visibility gate — hidden challenges don't appear in UI. Default: `true`
    *
-   * Accepts a plain `boolean` or a {@link Gate} resolved through the ambient
-   * {@link GateRuntime}. Gate is the declarative form — predictor-friendly,
-   * category-aware, with the flat-id escape hatch for consumer-side
-   * progression flags.
+   * A {@link Gate} resolves through the runtime the category captured at
+   * construction, and is what the transition walker predicts; a boolean,
+   * ref or getter is opaque to it.
    */
-  visible?: boolean | Gate;
+  visible?: Predicate;
 
-  /**
-   * Start gate — prevents entering when not met.
-   *
-   * Accepts the same two forms as {@link visible}.
-   */
-  canStart?: boolean | Gate;
+  /** Start gate — prevents entering when not met. Default: `true` */
+  canStart?: Predicate;
 
   /**
    * Overrides pushed to the override registry while this challenge is active.
@@ -108,15 +103,12 @@ export interface ChallengeDef<
    * the category's `registerTick` drives. A category without `registerTick`
    * never checks it; call {@link Challenge.complete} instead.
    *
-   * Two forms:
-   * - {@link Gate} — declarative typed predicate spec. Resolved through the
-   *   ambient {@link GateRuntime}. Predictor- and devtool-friendly, no
-   *   consumer-side path conventions; preferred for category-aware goals.
-   * - `() => boolean` — callback form; skips Gate's introspection. Prefer
-   *   when the check naturally reads typed refs in scope and introspection
-   *   isn't needed.
+   * A {@link Gate} is predictor- and devtool-friendly, with no consumer-side
+   * path conventions; prefer it for category-aware goals. A getter or ref
+   * suits a check that reads typed refs in scope where introspection isn't
+   * needed. Omitted, the goal never holds.
    */
-  goal?: (() => boolean) | Gate;
+  goal?: Predicate;
 
   /** Maximum number of completions. Default: 1. AD Eternity Challenges use 5. */
   completionLimit?: number;
@@ -370,24 +362,15 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   const accessor = optAccessor ?? ambient;
   const mutator = optMutator ?? ambient;
 
-  // Capture the GateRuntime at construction time — challenge defs register and
-  // evaluate long after the ambient scope closes. Handles the runtime doesn't
-  // carry are only an error for a gate kind that reads them, which evaluateGate
-  // checks per kind.
-  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
+  // Captured at construction — challenge defs register and evaluate long after
+  // the ambient scope closes.
+  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
 
   // Track cleanup functions for each active challenge's scoped overrides/patches
   const activeCleanups = new Map<string, Array<() => void>>();
   // The challenge whose enter() has pushed its scopes but not yet set `active`
   // — its entry reset settles in between, and must not pop them.
   let entering: string | undefined;
-
-  /** Evaluate a boolean / Gate field, defaulting to fallback if undefined. */
-  function evalCondition(cond: boolean | Gate | undefined, fallback: boolean): boolean {
-    if (cond === undefined) return fallback;
-    if (typeof cond === 'boolean') return cond;
-    return evaluateGate(cond, gateRuntime);
-  }
 
   /** Push scoped overrides and content patches for a challenge def */
   function pushScopes(def: Def): Array<() => void> {
@@ -448,20 +431,17 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       const completed = computed(() => completions.value > 0);
       const maxed = computed(() => completions.value >= limit);
 
-      const canComplete = computed(() => {
-        if (!active.value) return false;
-        if (typeof def.goal === 'function') return def.goal();
-        return evalCondition(def.goal, false);
-      });
+      const label = `challenge '${def.id}'`;
+      const goal = predicates.adopt(def.goal, false, `${label} goal`);
+      const canStart = predicates.adopt(def.canStart, true, `${label} canStart`);
+      const visible = predicates.adopt(def.visible, true, `${label} visible`);
+
+      const canComplete = computed(() => active.value && goal.holds.value);
 
       const canStartComputed = computed(() => {
         if (maxed.value) return false;
         if (active.value) return false;
-        return evalCondition(def.canStart, true);
-      });
-
-      const visibleComputed = computed(() => {
-        return evalCondition(def.visible, true);
+        return canStart.holds.value;
       });
 
       function enter(): boolean {
@@ -532,8 +512,8 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       // bound inside the per-def persistent-context scope opened by
       // createCategoryBase, so chain.bind auto-derives attribution ids like
       // `{categoryId}/{def.id}/{description}`.
-      setupDeclarativeBindings(def.restricts, active);
-      setupDeclarativeBindings(def.rewards, completed);
+      setupDeclarativeBindings(def.restricts, active, predicates);
+      setupDeclarativeBindings(def.rewards, completed, predicates);
 
       const challenge: Challenge = {
         id: def.id,
@@ -543,13 +523,13 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         maxed,
         canComplete,
         canStart: canStartComputed,
-        visible: visibleComputed,
+        visible: visible.holds,
         enter,
         exit,
         complete,
         toggle,
       };
-      bindGateRuntime(challenge, gateRuntime);
+      bindGateRuntime(challenge, predicates.runtime);
       return challenge;
     },
     buildState: mapState,

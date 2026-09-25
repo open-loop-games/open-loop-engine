@@ -144,9 +144,8 @@ export type Predicate = Computable<boolean> | Gate;
  * `Computable<boolean>` (boolean / Ref / getter) and from `ICondition`
  * (which has a `type` discriminant, not `kind`).
  *
- * Used by adoption sites that accept `Computable<boolean> | Gate` union
- * fields to dispatch on the Gate arm before falling through to the
- * computable branch.
+ * Used by adoption sites that accept {@link Predicate} fields to dispatch on
+ * the Gate arm before falling through to the computable branch.
  */
 export function isGate(value: unknown): value is Gate {
   if (value === null || typeof value !== 'object') return false;

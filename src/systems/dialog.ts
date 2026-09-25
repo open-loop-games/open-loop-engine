@@ -19,7 +19,7 @@
 import type { IEffect, GameStateAccessor } from '@/primitives/types';
 import { applyEffect, type GameStateMutator } from '@/core/effects';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
+import { createPredicateResolver, evaluateGate, type Gate } from './gate';
 
 // === TYPES ===
 
@@ -182,9 +182,10 @@ export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRunt
  *
  * `condition` fields on nodes and choices accept `Gate` — predicates dispatch
  * through {@link evaluateGate} against a {@link GateRuntime} captured once here
- * at construction. Construct inside `createEngine`'s install/connect, where the
- * ambient handles are wired: dialog is driven from player input long after that
- * scope closes, so a lazily-resolved runtime would come back empty.
+ * at construction, where every condition's handles are asserted. Construct
+ * inside `createEngine`'s install/connect, where the ambient handles are wired:
+ * dialog is driven from player input long after that scope closes, so a
+ * lazily-resolved runtime would come back empty.
  *
  * Standard composition path: register dialog content via `createDialogCategory`,
  * then pass `category.getAll().flatMap(e => e.graphs)` as `graphs`. For tests
@@ -210,11 +211,21 @@ export function createNativeDialogRuntime(
   // Capture the Gate runtime now, not per evaluation: start/choices/choose are
   // player-driven and run long after the engine's install/connect ambient
   // closes. Mirrors the eager capture in createReset.
-  const gateRuntime = getAmbientGateRuntime({ accessor });
+  const predicates = createPredicateResolver({ accessor });
+  const gateRuntime = predicates.runtime;
   const graphsById = new Map<string, DialogGraph>(graphs.map((g) => [g.id, g]));
   const nodesByGraph = new Map<string, Map<string, DialogNode>>();
   for (const g of graphs) {
     nodesByGraph.set(g.id, new Map(g.nodes.map((n) => [n.id, n])));
+    for (const node of g.nodes) {
+      const label = `dialog '${g.id}' node '${node.id}'`;
+      if (node.condition) predicates.assert(node.condition, `${label} condition`);
+      for (const choice of node.choices ?? []) {
+        if (choice.condition) {
+          predicates.assert(choice.condition, `${label} choice '${choice.id}' condition`);
+        }
+      }
+    }
   }
 
   const events = createEmitHandle<DialogRuntimeEvents>();

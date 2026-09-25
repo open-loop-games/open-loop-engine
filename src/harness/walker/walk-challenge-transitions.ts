@@ -1,16 +1,16 @@
 /**
  * Content walker — enumerate pending challenge transitions.
  *
- * `ChallengeDef` carries `visible`, `canStart` and `goal` as a boolean, a
- * {@link Gate} or (for `goal`) a closure. A field emits a transition whenever
+ * `ChallengeDef` carries `visible`, `canStart` and `goal` as a Predicate — a
+ * boolean, ref, getter or {@link Gate}. A field emits a transition whenever
  * it could still flip the way the transition names:
  *
  * - a Gate predicts its flip through {@link timeUntilGateFlip}, over the
  *   runtime the challenge category evaluates it with and the walker's
  *   accessor — a computed distance for resource and cumulative leaves,
  *   `opaque-predicate` for category, flag and state leaves;
- * - a closure has no mechanical distance and emits `opaque-predicate`, so
- *   stasis detection never mistakes it for a field that can't change;
+ * - a getter or ref has no mechanical distance and emits `opaque-predicate`,
+ *   so stasis detection never mistakes it for a field that can't change;
  * - a constant never flips and emits nothing.
  *
  * Emissions per challenge entity:
@@ -23,6 +23,7 @@
  *   (`completions === completionLimit - 1`), with the same distance.
  */
 
+import { isRef } from 'vue';
 import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps, TransitionDistance } from '@/core/transitions';
@@ -65,7 +66,7 @@ function predictFieldFlip(value: unknown, runtime: GateRuntime): FieldFlip | und
   if (isGate(value)) {
     return { distance: timeUntilGateFlip(value, runtime), deps: collectGateDeps(value) };
   }
-  if (typeof value === 'function') {
+  if (typeof value === 'function' || isRef(value)) {
     return {
       distance: { seconds: null, reason: 'opaque-predicate' },
       deps: { resources: new Set(), rates: new Set(), unlocks: new Set(), states: new Set() },

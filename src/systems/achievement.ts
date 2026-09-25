@@ -31,7 +31,7 @@ import {
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
-import { evaluateGate, getAmbientGateRuntime, isGate, type Gate, type GateRuntime } from './gate';
+import { createPredicateResolver, type Gate, type Predicate, type PredicateResolver } from './gate';
 
 // === TYPES ===
 
@@ -65,28 +65,24 @@ export interface AchievementOptions<T = unknown> {
   /**
    * Requirement that must hold for the achievement to auto-earn.
    *
-   * Two forms accepted:
-   * - `Computable<boolean>` — boolean / ref / getter. Closes over scope refs;
-   *   opaque to the predictor.
-   * - {@link Gate} — declarative typed predicate spec. Resolved through the
-   *   {@link GateRuntime} the achievement category captured at construction
-   *   (categories + registry + accessor wired by `createEngine`). Predictor
-   *   consumers read `Achievement.gate` to call `timeUntilGateFlip` for
-   *   distance projection.
+   * A boolean, ref or getter closes over scope refs and is opaque to the
+   * predictor. A {@link Gate} resolves through the runtime the achievement
+   * category captured at construction, and predictor consumers read it back
+   * as `Achievement.gate` to call `timeUntilGateFlip` for distance projection.
    *
    * If omitted, the achievement only earns via an explicit
    * {@link Achievement.complete} call.
    */
-  requirement?: Computable<boolean> | Gate;
+  requirement?: Predicate;
 
   /** The effect/reward value when this achievement is earned. */
   effect?: Computable<T>;
 
-  /** Whether this achievement is hidden until earned. */
-  hidden?: Computable<boolean>;
+  /** Whether this achievement is hidden until earned. Default: `false` */
+  hidden?: Predicate;
 
-  /** Whether this achievement is visible. */
-  visible?: Computable<boolean>;
+  /** Whether this achievement is visible. Default: `true` */
+  visible?: Predicate;
 
   /** Optional image URL for the achievement */
   image?: Computable<string>;
@@ -164,15 +160,15 @@ export interface AchievementEvents {
  * A once-and-stay-earned milestone with optional reactive effect and
  * auto-completing requirement watch.
  *
- * @param gateRuntime - handles a Gate-form requirement evaluates through; the
- *   category passes the one it captured, so content registered after install
- *   still resolves. Defaults to the ambient runtime.
+ * @param predicates - resolver the predicate fields adopt through; the
+ *   category passes the one it built, so content registered after install
+ *   still resolves. Defaults to one over the ambient runtime.
  *
  * @internal
  */
 export function createAchievement<T = unknown>(
   options: AchievementOptions<T>,
-  gateRuntime?: GateRuntime,
+  predicates: PredicateResolver = createPredicateResolver(),
 ): Achievement<T> {
   const {
     id,
@@ -200,51 +196,26 @@ export function createAchievement<T = unknown>(
     earnedAt: persistent<number | null>(null, { name: 'earnedAt', lifetime: true }),
   }));
 
-  const processedHidden = hidden !== undefined ? processGetter(hidden) : undefined;
-  const processedVisible = visible !== undefined ? processGetter(visible) : undefined;
+  const adoptedRequirement = predicates.adopt(requirement, true, `achievement '${id}' requirement`);
+  const hiddenRef = predicates.adopt(hidden, false, `achievement '${id}' hidden`).holds;
+  const visibleRef = predicates.adopt(visible, true, `achievement '${id}' visible`).holds;
   const processedImage = image !== undefined ? processGetter(image) : undefined;
   const processedSmall = small !== undefined ? processGetter(small) : undefined;
   const processedEffect = effect !== undefined ? processGetter(effect) : undefined;
 
-  // Gate-form requirements: capture the spec on the instance for predictor use,
-  // and project to a reactive boolean via evaluateGate over a runtime resolved
-  // now, so the watcher's later fires don't rely on ambient still being set.
-  let gateField: Gate | undefined;
-  let processedRequirement: ReturnType<typeof processGetter<boolean>> | undefined;
-  if (requirement !== undefined) {
-    if (isGate(requirement)) {
-      gateField = requirement;
-      const runtime = gateRuntime ?? getAmbientGateRuntime();
-      processedRequirement = computed(() => evaluateGate(requirement, runtime));
-    } else {
-      processedRequirement = processGetter(requirement);
-    }
-  }
-
-  const hiddenRef = computed(() =>
-    processedHidden !== undefined ? unref(processedHidden) : false,
-  );
-  const visibleRef = computed(() =>
-    processedVisible !== undefined ? unref(processedVisible) : true,
-  );
   const imageRef = processedImage !== undefined ? computed(() => unref(processedImage)) : undefined;
   const smallRef = computed(() => (processedSmall !== undefined ? unref(processedSmall) : false));
   const effectRef =
     processedEffect !== undefined ? computed(() => unref(processedEffect)) : undefined;
 
-  const canComplete = computed(() => {
-    if (earned.value) return false;
-    if (processedRequirement === undefined) return true;
-
-    return unref(processedRequirement);
-  });
+  const canComplete = computed(() => !earned.value && adoptedRequirement.holds.value);
 
   const handle = createEmitHandle<AchievementEvents>();
 
   const achievement: Achievement<T> = {
     id,
     display,
-    gate: gateField,
+    gate: adoptedRequirement.gate,
     earned,
     earnedAt,
     effect: effectRef,

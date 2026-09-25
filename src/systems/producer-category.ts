@@ -24,6 +24,7 @@ import { type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { createScalingPurchasable, type Purchasable } from './purchasable';
 import { getCurrentEngineCategories } from './engine-categories';
+import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
 import type { RegisterTick } from '@/core/sequencer';
 
 // === TYPES ===
@@ -53,8 +54,8 @@ export interface ProducerPurchaseConfig {
   initialAmount?: DecimalSource;
   /** Called after each purchase */
   onPurchase?: (amount: DecimalSource) => void;
-  /** Whether this producer is visible in the UI */
-  visibility?: Computable<boolean>;
+  /** Whether this producer is visible in the UI. Default: `true` */
+  visibility?: Predicate;
   /**
    * Whether a bare `repeatable.purchase()` buys as many as affordable rather
    * than one; `purchase(1)` buys one either way. Default: `true`
@@ -297,6 +298,7 @@ function buildProducer<Def extends { id: string }>(
   categoryId: string,
   mapProducer: ProducerCategoryOptions<Def>['mapProducer'],
   ctx: ProducerCategoryContext,
+  predicates: PredicateResolver,
 ): Producer {
   const mapping = mapProducer(def, ctx);
 
@@ -306,18 +308,21 @@ function buildProducer<Def extends { id: string }>(
   let repeatable: Purchasable | undefined;
   if (mapping.purchase) {
     const pc = mapping.purchase;
-    repeatable = createScalingPurchasable({
-      id: def.id,
-      description: mapping.display ?? def.id,
-      resource: pc.costResource,
-      baseCost: pc.baseCost,
-      costScaling: pc.costScaling,
-      limit: pc.limit,
-      initialAmount: pc.initialAmount,
-      onPurchase: pc.onPurchase,
-      visibility: pc.visibility,
-      bulkPurchase: pc.bulkPurchase,
-    });
+    repeatable = createScalingPurchasable(
+      {
+        id: def.id,
+        description: mapping.display ?? def.id,
+        resource: pc.costResource,
+        baseCost: pc.baseCost,
+        costScaling: pc.costScaling,
+        limit: pc.limit,
+        initialAmount: pc.initialAmount,
+        onPurchase: pc.onPurchase,
+        visibility: pc.visibility,
+        bulkPurchase: pc.bulkPurchase,
+      },
+      predicates,
+    );
   }
 
   const processedExtraCount =
@@ -436,10 +441,11 @@ export function createProducerCategory<Def extends { id: string }, State = void>
 ): ProducerCategory<Def, State> {
   const { id: categoryId, mapProducer, mapState, registerTick } = options;
   const ctx: ProducerCategoryContext = { registerTick };
+  const predicates = createPredicateResolver();
 
   const base: CategoryBase<Def, Producer, State> = createCategoryBase({
     id: categoryId,
-    buildInstance: (def) => buildProducer(def, categoryId, mapProducer, ctx),
+    buildInstance: (def) => buildProducer(def, categoryId, mapProducer, ctx, predicates),
     buildState: mapState,
     buildSignals: (_def, producer) => ({
       unlock: computed(() => Decimal.fromValue(producer.count.value).gt(0)),

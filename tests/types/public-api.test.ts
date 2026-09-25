@@ -1480,3 +1480,45 @@ describe('Removed surface stays removed', () => {
     expectTypeOf<import('@/harness').IncrementalSnapshotEntityRef>();
   });
 });
+
+describe('Systems predicate fields take Predicate', () => {
+  type P = import('@/index').Predicate;
+
+  it('Predicate is a boolean, ref, getter or Gate', () => {
+    expectTypeOf<P>().toEqualTypeOf<Computable<boolean> | import('@/index').Gate>();
+  });
+
+  it('every systems predicate field is Predicate', () => {
+    type Opt<T> = Exclude<T, undefined>;
+    expectTypeOf<Opt<import('@/index').AutomationTierDef['requirement']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<ChallengeDef['visible']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<ChallengeDef['canStart']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<ChallengeDef['goal']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').CycleOptions['endCondition']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').ResetOptions['canReset']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').BankedAccelerationConfig['gate']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<PurchasableOptions['visibility']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').ProducerPurchaseConfig['visibility']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').AchievementOptions['requirement']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').AchievementOptions['visible']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').AchievementOptions['hidden']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').TierFieldDef['gates']>>().toEqualTypeOf<
+      ReadonlyArray<P | undefined>
+    >();
+    expectTypeOf<Opt<Grant['when']>>().toEqualTypeOf<P>();
+  });
+
+  it('dialog conditions stay Gate-only', () => {
+    type Opt<T> = Exclude<T, undefined>;
+    expectTypeOf<Opt<import('@/index').DialogNode['condition']>>().toEqualTypeOf<
+      import('@/index').Gate
+    >();
+  });
+
+  it('the resolver adopts a Predicate into a reactive holds and keeps the Gate', () => {
+    type Adopted = ReturnType<import('@/index').PredicateResolver['adopt']>;
+    expectTypeOf<Adopted['holds']>().toEqualTypeOf<ComputedRef<boolean>>();
+    expectTypeOf<Adopted['gate']>().toEqualTypeOf<import('@/index').Gate | undefined>();
+    expectTypeOf<Parameters<typeof import('@/index').evaluatePredicate>[0]>().toEqualTypeOf<P>();
+  });
+});

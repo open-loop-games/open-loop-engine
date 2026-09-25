@@ -34,7 +34,7 @@
  * ```
  */
 
-import { computed, unref, watch, type ComputedRef, type WatchStopHandle } from 'vue';
+import { computed, watch, type ComputedRef, type WatchStopHandle } from 'vue';
 import {
   persistent,
   withPersistentContext,
@@ -45,7 +45,7 @@ import {
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
-import { processGetter, type Computable } from '@/core/computed';
+import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
 
@@ -66,9 +66,10 @@ export interface AutomationTierDef {
    * reset settles, and through {@link AutomationTiers.resetUnlocks}. Omit for
    * tiers unlocked imperatively via {@link AutomationTiers.unlock}.
    *
-   * Can be a static boolean, Vue ref, or getter for reactive evaluation.
+   * A getter or ref re-evaluates reactively; a Gate resolves through the
+   * runtime captured at `createAutomationTiers` time.
    */
-  requirement?: Computable<boolean>;
+  requirement?: Predicate;
 }
 
 /** Events emitted by an {@link AutomationTiers} instance. */
@@ -226,14 +227,26 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   const unsubs: WatchStopHandle[] = [];
 
+  const predicates = createPredicateResolver();
   const requirements = tiers.flatMap((tier) =>
-    tier.requirement === undefined ? [] : [{ tier, met: processGetter(tier.requirement) }],
+    tier.requirement === undefined
+      ? []
+      : [
+          {
+            tier,
+            met: predicates.adopt(
+              tier.requirement,
+              false,
+              `automation tier '${tier.id}' requirement`,
+            ).holds,
+          },
+        ],
   );
 
   /** Unlock every tier whose requirement holds; tiers in `silent` skip the event. */
   function unlockMet(silent?: ReadonlySet<string>): void {
     for (const { tier, met } of requirements) {
-      if (!unref(met) || unlocked.value.includes(tier.id)) continue;
+      if (!met.value || unlocked.value.includes(tier.id)) continue;
       if (silent?.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
       else automationTiers.unlock(tier.id);
     }
@@ -282,7 +295,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   for (const { tier, met } of requirements) {
     unsubs.push(
       watch(
-        () => unref(met),
+        met,
         (isMet) => {
           // Mid-load, a requirement can hold before `unlocked` is restored;
           // the settled state decides, once hydration ends.

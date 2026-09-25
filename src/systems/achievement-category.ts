@@ -46,7 +46,7 @@ import { type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { createAchievement, type Achievement, type AchievementOptions } from './achievement';
 import { getCurrentEngineCategories } from './engine-categories';
-import { getAmbientGateRuntime } from './gate';
+import { createPredicateResolver } from './gate';
 import type { Grant } from '@/core/modifier';
 import type { GameStateAccessor } from '@/primitives/types';
 
@@ -310,14 +310,14 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
   options: AchievementCategoryOptions<Def, State>,
 ): AchievementCategory<Def, State> {
   const { id, accessor, mapAchievement, mapState } = options;
-  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
+  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
 
   const base: CategoryBase<Def, Achievement, State> = createCategoryBase({
     id,
     buildInstance: (def) => {
       const { grants, ...opts } = mapAchievement(def);
-      const achievement = createAchievement({ ...opts, id: def.id }, gateRuntime);
-      setupDeclarativeBindings(grants, achievement.earned);
+      const achievement = createAchievement({ ...opts, id: def.id }, predicates);
+      setupDeclarativeBindings(grants, achievement.earned, predicates);
       return achievement;
     },
     buildState: mapState,

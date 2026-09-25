@@ -138,6 +138,22 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
     expect(vis[0].distance.seconds).toBe(30); // (100 - 40) / 2
   });
 
+  it('emits an opaque visibility-reveal for a ref-form visible', () => {
+    const accessor = mockAccessor();
+    const shown = ref(false);
+    const engine = buildEngineWithChallenges(
+      'vis-ref',
+      (c) => c.register({ id: 'secret', name: 'Secret', visible: shown }),
+      accessor,
+    );
+
+    const vis = walkChallengeTransitions(engine, accessor).filter(
+      (t) => t.kind === 'visibility-reveal',
+    );
+    expect(vis).toHaveLength(1);
+    expect(vis[0].distance.reason).toBe('opaque-predicate');
+  });
+
   it('skips visibility-reveal when already visible', () => {
     const accessor = mockAccessor({ resources: { gold: 150 }, rates: { gold: 1 } });
     const engine = buildEngineWithChallenges(

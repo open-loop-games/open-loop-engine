@@ -38,7 +38,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
 import { Resettable } from './resettable';
 import { createRetentionPolicy } from './retention';
-import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
+import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
 
@@ -98,14 +98,14 @@ export interface ResetOptions {
   resetModules?: ResetScope[];
 
   /**
-   * Declarative readiness gate. When supplied, {@link Reset.reset} returns
-   * `false` without performing the reset whenever this Gate evaluates falsy —
-   * matches the existing `onBeforeReset: () => false` cancellation contract,
-   * but visible to the predictor and to UI hints (call
+   * Readiness gate. When supplied, {@link Reset.reset} returns `false`
+   * without performing the reset whenever this evaluates falsy — matches the
+   * `onBeforeReset: () => false` cancellation contract. A Gate is
+   * also visible to the predictor and to UI hints (call
    * `timeUntilGateFlip(canReset, runtime)` for "time-until-prestige-ready").
    *
-   * Evaluated through the ambient {@link GateRuntime} captured at
-   * `createReset` time. Omit to default to "always allowed" (no gate).
+   * Evaluated when `reset()` is called; a Gate resolves through the runtime
+   * captured at `createReset` time. Omit to default to "always allowed".
    *
    * Order of cancellation checks at `reset()`:
    * 1. `canReset` (if supplied) — short-circuits if falsy
@@ -115,7 +115,7 @@ export interface ResetOptions {
    * predictor visibility, `onBeforeReset` is for imperative side-effects
    * that may also want to veto.
    */
-  canReset?: Gate;
+  canReset?: Predicate;
 
   /**
    * Refs that should survive the reset unchanged.
@@ -263,11 +263,9 @@ export function createReset(options: ResetOptions): Reset {
   const processedThingsToReset = thingsToReset != null ? processGetter(thingsToReset) : undefined;
   const handle = createEmitHandle<ResetEvents>();
 
-  // Capture the GateRuntime eagerly when canReset is supplied — reset() fires
-  // post-install when the ambient triple is no longer set, so we resolve once
-  // here (typically inside an engine install/connect call) and close over it.
-  const canResetRuntime: GateRuntime | undefined =
-    canReset !== undefined ? getAmbientGateRuntime() : undefined;
+  // Adopted now — reset() fires post-install, when the ambient runtime is no
+  // longer set.
+  const ready = createPredicateResolver().adopt(canReset, true, 'createReset canReset');
 
   // Build retention policy if keep/retain provided
   const hasRetention = (keep && keep.length > 0) || (retain && retain.size > 0);
@@ -316,9 +314,7 @@ export function createReset(options: ResetOptions): Reset {
       // Declarative readiness gate fires before any side-effects. Predictor /
       // UI consumers read the same Gate, so the imperative gate matches the
       // declarative projection.
-      if (canReset !== undefined && !evaluateGate(canReset, canResetRuntime!)) {
-        return false;
-      }
+      if (!ready.read()) return false;
 
       // Pre-reset hook
       if (onBeforeReset) {

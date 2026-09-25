@@ -22,11 +22,11 @@ import {
   PersistentName,
 } from '@/core/persistence';
 import type { Grant } from '@/core/modifier';
-import { processGetter } from '@/core/computed';
 import { isProfilingEnabled, profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
+import type { PredicateResolver } from './gate';
 import { buildGrantModifier } from './modifier-binding';
 import { Resettable, type ResettableObject } from './resettable';
 
@@ -272,8 +272,9 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
  *
  * Each entry may target a single chain or an array of chains; an array is
  * lowered to one `chain.bind` call per chain, all sharing the same composed
- * predicate. The per-entry `when` predicate is AND-composed with the outer
- * `active` — the resulting binding is active iff both resolve to `true`.
+ * predicate. The per-entry `when` predicate, adopted through the category's
+ * `predicates`, is AND-composed with the outer `active` — the resulting
+ * binding is active iff both resolve to `true`.
  *
  * Intended to be invoked inside the persistent-context scope the category
  * opens for each definition (so `chain.bind` derives stable attribution ids
@@ -284,6 +285,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
 export function setupDeclarativeBindings(
   grants: Grant[] | undefined,
   active: MaybeRef<boolean>,
+  predicates: PredicateResolver,
 ): void {
   if (grants == null || grants.length === 0) return;
   for (const grant of grants) {
@@ -292,8 +294,9 @@ export function setupDeclarativeBindings(
       grant.when == null
         ? active
         : (() => {
-            const when = processGetter(grant.when);
-            return computed(() => unref(active) !== false && unref(when) !== false);
+            const label = `grant '${grant.description ?? chains.map((c) => c.id).join(', ')}' when`;
+            const when = predicates.adopt(grant.when, true, label).holds;
+            return computed(() => unref(active) !== false && when.value);
           })();
     const modifier = buildGrantModifier(grant);
     // Pass the grant's stable text so bind derives its attribution id without

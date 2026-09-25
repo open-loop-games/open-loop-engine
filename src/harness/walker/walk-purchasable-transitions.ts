@@ -15,8 +15,8 @@
  * - `purchasable-maxed` — `amount === limit - 1` with a finite limit, so the
  *   next purchase would max out. Same distance as `becomes-affordable`.
  *
- * `visibility` is `Computable<boolean>` (not an `ICondition`), so the walker
- * cannot compute a flip distance for it. Hidden purchasables emit no
+ * The purchasable keeps no Gate for `visibility`, so the walker cannot
+ * compute a flip distance for it. Hidden purchasables emit no
  * `visibility-reveal` — the entity still surfaces via `becomes-affordable`
  * once a cost resource is present. Multi-cost purchasables (N>1 cost
  * requirements) use the first requirement's resource; this matches the

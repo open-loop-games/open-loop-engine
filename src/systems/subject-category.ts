@@ -29,7 +29,12 @@ import {
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { GameStateAccessor } from '@/primitives/types';
-import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
+import {
+  createPredicateResolver,
+  evaluateGate,
+  type Predicate,
+  type PredicateResolver,
+} from './gate';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
 import type { ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
@@ -61,7 +66,7 @@ export interface VectorFieldDef<Dims extends string = string> {
 
 /**
  * Ordered tier ladder with per-transition advancement gates. `gates[from]`
- * must evaluate true (or be absent) to advance from index `from` to `from+1`.
+ * must hold (or be absent) to advance from index `from` to `from+1`.
  * Per-subject overrides typically replace `gates` to give each subject its
  * own protocol; the tier list itself is schema-frozen.
  */
@@ -69,7 +74,7 @@ export interface TierFieldDef {
   kind: 'tier';
   tiers: readonly string[];
   initial?: number;
-  gates?: ReadonlyArray<Gate | undefined>;
+  gates?: ReadonlyArray<Predicate | undefined>;
 }
 
 /** Single persistent boolean per subject. */
@@ -143,9 +148,13 @@ export interface TierFieldInstance extends Emittable<TierFieldEvents> {
   getIndex(): number;
   getTier(): string | undefined;
   /**
-   * Try to advance one tier. Evaluates `gates[currentIndex]` against the
-   * supplied accessor (or the ambient one) before incrementing. Returns the
-   * new tier name, or `null` when blocked / already at max.
+   * Try to advance one tier. Evaluates `gates[currentIndex]` before
+   * incrementing. Returns the new tier name, or `null` when blocked / already
+   * at max.
+   *
+   * @param accessor - read in place of the category's for a Gate-form gate;
+   *   a getter or ref closes over its own state and ignores it. Its handles
+   *   are still asserted against the category's runtime at register.
    */
   tryAdvance(accessor?: GameStateAccessor): string | null;
   /** Hard set the tier index, bypassing gates. For migrations / reset / cheats. */
@@ -205,7 +214,7 @@ export type PerSubjectOverride<F extends FieldDef> = F extends ScalarFieldDef
   : F extends VectorFieldDef<infer Dims>
     ? { initialPerDim?: Partial<Record<Dims, number>> }
     : F extends TierFieldDef
-      ? { initial?: number; gates?: ReadonlyArray<Gate | undefined> }
+      ? { initial?: number; gates?: ReadonlyArray<Predicate | undefined> }
       : F extends FlagFieldDef
         ? { initial?: boolean }
         : F extends EnumFieldDef<infer V>
@@ -371,14 +380,19 @@ function buildTierField(
   fieldName: string,
   schema: TierFieldDef,
   override: PerSubjectOverride<TierFieldDef> | undefined,
-  gateRuntime: GateRuntime,
+  predicates: PredicateResolver,
+  subjectId: string,
 ): TierFieldInstance {
   if (schema.tiers.length === 0) {
     throw new Error(`Subject tier field "${fieldName}" must declare at least one tier`);
   }
   const initial = override?.initial ?? schema.initial ?? 0;
   const maxIndex = schema.tiers.length - 1;
-  const gates = override?.gates ?? schema.gates;
+  const gates = (override?.gates ?? schema.gates)?.map((gate, i) =>
+    gate === undefined
+      ? undefined
+      : predicates.adopt(gate, true, `subject '${subjectId}' tier '${fieldName}' gate ${i}`),
+  );
 
   const clampIndex = (i: number): number => clampTierIndex(schema, i);
   // Clamp the authored initial index into [0, maxIndex] (setIndex clamps; a raw
@@ -403,8 +417,11 @@ function buildTierField(
     if (current >= maxIndex) return null;
     const gate = gates?.[current];
     if (gate) {
-      const runtime = accessor ? { ...gateRuntime, accessor } : gateRuntime;
-      if (!evaluateGate(gate, runtime)) return null;
+      const holds =
+        accessor && gate.gate
+          ? evaluateGate(gate.gate, { ...predicates.runtime, accessor })
+          : gate.read();
+      if (!holds) return null;
     }
     setIndex(current + 1);
     return schema.tiers[current + 1] ?? null;
@@ -488,7 +505,8 @@ function buildField(
   fieldName: string,
   schema: FieldDef,
   override: unknown,
-  gateRuntime: GateRuntime,
+  predicates: PredicateResolver,
+  subjectId: string,
 ): FieldInstance<FieldDef> {
   switch (schema.kind) {
     case 'scalar':
@@ -508,7 +526,8 @@ function buildField(
         fieldName,
         schema,
         override as PerSubjectOverride<TierFieldDef> | undefined,
-        gateRuntime,
+        predicates,
+        subjectId,
       );
     case 'flag':
       return buildFlagField(
@@ -620,7 +639,7 @@ export function createSubjectCategory<S extends FieldSchema>(
   // Captured here, not per register: subjects registered after install (late
   // content, mods) never see the ambient scope. `tryAdvance(accessor)` still
   // layers a per-call override on top.
-  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
+  const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
 
   const base: CategoryBase<SubjectDef<S>, SubjectInstance<S>, void> = createCategoryBase<
     SubjectDef<S>,
@@ -637,7 +656,8 @@ export function createSubjectCategory<S extends FieldSchema>(
           fieldName,
           fieldSchema,
           override,
-          gateRuntime,
+          predicates,
+          def.id,
         ) as FieldInstance<S[typeof fieldName]>;
       }
       return { id: def.id, fields };

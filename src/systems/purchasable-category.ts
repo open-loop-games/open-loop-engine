@@ -49,6 +49,7 @@ import {
   type CategoryBase,
   type CategoryEntrySignals,
 } from './category-base';
+import { createPredicateResolver } from './gate';
 import { type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { createPurchasable, type Purchasable, type PurchasableOptions } from './purchasable';
@@ -203,13 +204,14 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
   options: PurchasableCategoryOptions<Def, State>,
 ): PurchasableCategory<Def, State> {
   const { id, mapPurchasable, mapState } = options;
+  const predicates = createPredicateResolver();
 
   const base: CategoryBase<Def, Purchasable, State> = createCategoryBase({
     id,
     buildInstance: (def) => {
       const { grants, ...opts } = mapPurchasable(def);
-      const purchasable = createPurchasable({ ...opts, id: def.id });
-      setupDeclarativeBindings(grants, purchasable.active);
+      const purchasable = createPurchasable({ ...opts, id: def.id }, predicates);
+      setupDeclarativeBindings(grants, purchasable.active, predicates);
       return purchasable;
     },
     buildState: mapState,

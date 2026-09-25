@@ -364,11 +364,10 @@ export function getBoundGateRuntime(owner: object): GateRuntime | undefined {
 /**
  * Throw unless `runtime` carries every handle `gate` will read for `use`.
  *
- * For adoption sites that hold the gate at construction: turns what would be a
- * first-evaluation throw (often inside a `computed`, where the stack is far
- * from the authoring mistake) into one at the registration callsite. Sites
- * whose gates arrive later — category registries, dialog graphs — skip this and
- * let the per-kind demand-check fire at evaluation.
+ * Turns what would be a first-evaluation throw (often inside a `computed`,
+ * where the stack is far from the authoring mistake) into one at the
+ * registration callsite. Systems reach it through a
+ * {@link PredicateResolver}, per definition as it registers.
  *
  * @param label prefix for the error, normally the calling factory's name.
  * @param use `'evaluate'` for a site that only evaluates the gate, `'predict'`

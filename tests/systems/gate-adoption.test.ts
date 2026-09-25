@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, unref } from 'vue';
 import {
   Decimal,
   createChallengeCategory,
@@ -31,6 +31,14 @@ import { createAchievement } from '@/systems/achievement';
 import { createAchievementCategory } from '@/systems/achievement-category';
 import { createSubjectCategory } from '@/systems/subject-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
+import { createModifierChain } from '@/core/modifier';
+import { createTickDriver } from '@/core/tick-driver';
+import { createAutomationTiers } from '@/systems/automation';
+import { createCycle } from '@/systems/cycle';
+import { createNativeDialogRuntime } from '@/systems/dialog';
+import { createProducerCategory } from '@/systems/producer-category';
+import { createBankedAcceleration, createTimeBank } from '@/systems/time-bank';
+import type { ChallengeDef } from '@/systems/challenge-category';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -640,5 +648,314 @@ describe('evaluatePredicate', () => {
     expect(
       evaluatePredicate({ kind: 'resource-gte', resource: 'x', value: 11 }, { accessor }),
     ).toBe(false);
+  });
+});
+
+// ============================================================================
+// Systems predicate fields — every field takes a Predicate, asserted at register
+// ============================================================================
+
+const pointsGte = (value: number) => ({ kind: 'resource-gte', resource: 'points', value }) as const;
+const unwiredFlag = { kind: 'flag', id: 'unwired' } as const;
+
+/** A tick source the test steps by hand. */
+function createManualTicks() {
+  const callbacks = new Set<(dt: number) => void>();
+  return {
+    registerTick(cb: (dt: number) => void) {
+      callbacks.add(cb);
+      return () => callbacks.delete(cb);
+    },
+    step(dt = 1) {
+      for (const cb of [...callbacks]) cb(dt);
+    },
+  };
+}
+
+describe('Predicate fields — every arm reaches the system', () => {
+  it('achievement visible and hidden take a Gate', () => {
+    const { result, stop } = bootstrap((api) => {
+      const cat = createAchievementCategory<{ id: string }>({
+        id: 'milestones',
+        mapAchievement: () => ({
+          display: { title: 'Secret' },
+          visible: pointsGte(5),
+          hidden: { kind: 'not', of: pointsGte(10) },
+        }),
+      });
+      cat.register({ id: 'secret' });
+      return { api, ach: cat.getAchievement('secret')! };
+    });
+
+    expect(result.ach.visible.value).toBe(false);
+    expect(result.ach.hidden.value).toBe(true);
+    result.api.points.value = 10;
+    expect(result.ach.visible.value).toBe(true);
+    expect(result.ach.hidden.value).toBe(false);
+    stop();
+  });
+
+  it('challenge visible, canStart and goal take refs and getters', () => {
+    const shown = ref(false);
+    const { result, stop } = bootstrap(() => {
+      const cat = createChallengeCategory<ChallengeDef>({ id: 'trials', mutuallyExclusive: false });
+      cat.register({
+        id: 't',
+        name: 'T',
+        visible: shown,
+        canStart: () => shown.value,
+        goal: shown,
+      });
+      return cat.getChallenge('t')!;
+    });
+
+    expect(result.visible.value).toBe(false);
+    expect(result.canStart.value).toBe(false);
+    shown.value = true;
+    expect(result.visible.value).toBe(true);
+    expect(result.enter()).toBe(true);
+    expect(result.canComplete.value).toBe(true);
+    stop();
+  });
+
+  it('reset canReset takes a getter', () => {
+    let allowed = false;
+    const reset = createReset({ thingsToReset: [], canReset: () => allowed });
+    expect(reset.reset()).toBe(false);
+    allowed = true;
+    expect(reset.reset()).toBe(true);
+  });
+
+  it('cycle endCondition takes a Gate', () => {
+    const ticks = createManualTicks();
+    const { result, stop } = bootstrap((api) => {
+      const cycle = createCycle({
+        id: 'loop',
+        thingsToReset: [],
+        endCondition: pointsGte(3),
+        registerTick: ticks.registerTick,
+      });
+      cycle.run();
+      return { api, cycle };
+    });
+
+    ticks.step();
+    expect(result.cycle.count.value).toBe(0);
+    result.api.points.value = 3;
+    ticks.step();
+    expect(result.cycle.count.value).toBe(1);
+    stop();
+  });
+
+  it('automation tier requirement takes a Gate', () => {
+    const { result, stop } = bootstrap((api) => ({
+      api,
+      tiers: createAutomationTiers({
+        id: 'auto',
+        tiers: [
+          { id: 'manual', name: 'Manual', order: 0 },
+          { id: 'basic', name: 'Basic', order: 1, requirement: pointsGte(7) },
+        ],
+      }),
+    }));
+
+    expect(result.tiers.isTierUnlocked('basic')).toBe(false);
+    result.api.points.value = 7;
+    expect(result.tiers.isTierUnlocked('basic')).toBe(true);
+    stop();
+  });
+
+  it('time-bank spend gate takes a Gate', () => {
+    const driver = createTickDriver({ tickRate: 20 });
+    const { result, stop } = bootstrap((api) => {
+      const bank = createTimeBank();
+      bank.deposit(100);
+      const accel = createBankedAcceleration({
+        tickDriver: driver,
+        bank,
+        spendMultiplier: 10,
+        gate: pointsGte(1),
+      });
+      return { api, accel };
+    });
+
+    result.accel.startSpending();
+    expect(driver.speedMultiplier).toBe(1);
+    result.api.points.value = 1;
+    driver.tickRaw(0.05);
+    expect(driver.speedMultiplier).toBe(10);
+    result.accel.dispose();
+    stop();
+  });
+
+  it('purchasable and producer visibility take a Gate', () => {
+    const { result, stop } = bootstrap((api) => {
+      const upgrades = createPurchasableCategory<{ id: string }>({
+        id: 'upgrades',
+        mapPurchasable: () => ({ display: {}, requirements: [], visibility: pointsGte(2) }),
+      });
+      upgrades.register({ id: 'u' });
+      const producers = createProducerCategory<{ id: string }>({
+        id: 'buildings',
+        mapProducer: () => ({
+          resource: api.points,
+          baseRate: 0,
+          trigger: 'continuous',
+          purchase: {
+            costResource: api.points,
+            baseCost: 0,
+            costScaling: 1,
+            visibility: pointsGte(2),
+          },
+        }),
+        registerTick: () => () => {},
+      });
+      producers.register({ id: 'farm' });
+      return {
+        api,
+        upgrade: upgrades.getPurchasable('u')!,
+        farm: producers.getProducer('farm')!.repeatable!,
+      };
+    });
+
+    expect(unref(result.upgrade.visibility)).toBe(false);
+    expect(unref(result.farm.visibility)).toBe(false);
+    result.api.points.value = 2;
+    expect(unref(result.upgrade.visibility)).toBe(true);
+    expect(unref(result.farm.visibility)).toBe(true);
+    stop();
+  });
+
+  it('subject tier gates take a getter', () => {
+    const open = ref(false);
+    const npcs = createSubjectCategory({
+      id: 'npcs',
+      fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'], gates: [() => open.value] } },
+    });
+    npcs.register({ id: 'rask' });
+    const trust = npcs.get('rask')!.fields.trust;
+
+    expect(trust.tryAdvance()).toBeNull();
+    open.value = true;
+    expect(trust.tryAdvance()).toBe('friend');
+  });
+
+  it('a grant when takes a Gate', () => {
+    const chain = createModifierChain('gold-rate');
+    const { result, stop } = bootstrap((api) => {
+      const upgrades = createPurchasableCategory<{ id: string }>({
+        id: 'upgrades',
+        mapPurchasable: () => ({
+          display: {},
+          requirements: [],
+          limit: 1,
+          initialAmount: 1,
+          grants: [{ chain, mult: 2, description: 'Doubler', when: pointsGte(4) }],
+        }),
+      });
+      upgrades.register({ id: 'doubler' });
+      return api;
+    });
+
+    expect(Decimal.fromValue(chain.apply(1)).toNumber()).toBe(1);
+    result.points.value = 4;
+    expect(Decimal.fromValue(chain.apply(1)).toNumber()).toBe(2);
+    stop();
+  });
+});
+
+describe('Predicate fields — a Gate missing a handle throws at register, labelled', () => {
+  it('achievement requirement, visible and hidden', () => {
+    for (const field of ['requirement', 'visible', 'hidden'] as const) {
+      const cat = createAchievementCategory<{ id: string }>({
+        id: `a-${field}`,
+        mapAchievement: () => ({ display: { title: 'A' }, [field]: unwiredFlag }),
+      });
+      expect(() => cat.register({ id: 'a' })).toThrow(new RegExp(`achievement 'a' ${field}: `));
+    }
+  });
+
+  it('challenge visible, canStart and goal', () => {
+    for (const field of ['visible', 'canStart', 'goal'] as const) {
+      const cat = createChallengeCategory<ChallengeDef>({ id: `c-${field}` });
+      expect(() => cat.register({ id: 'c', name: 'C', [field]: unwiredFlag })).toThrow(
+        new RegExp(`challenge 'c' ${field}: `),
+      );
+    }
+  });
+
+  it('reset canReset, cycle endCondition, automation requirement, time-bank gate', () => {
+    const ticks = createManualTicks();
+    expect(() => createReset({ thingsToReset: [], canReset: unwiredFlag })).toThrow(/canReset: /);
+    expect(() =>
+      createCycle({
+        thingsToReset: [],
+        endCondition: unwiredFlag,
+        registerTick: ticks.registerTick,
+      }),
+    ).toThrow(/endCondition: /);
+    expect(() =>
+      createAutomationTiers({
+        tiers: [{ id: 'basic', name: 'Basic', order: 0, requirement: unwiredFlag }],
+      }),
+    ).toThrow(/automation tier 'basic' requirement: /);
+    expect(() =>
+      createBankedAcceleration({
+        tickDriver: createTickDriver({ tickRate: 20 }),
+        bank: createTimeBank(),
+        spendMultiplier: 2,
+        gate: unwiredFlag,
+      }),
+    ).toThrow(/gate: /);
+  });
+
+  it('purchasable visibility and grant when', () => {
+    const chain = createModifierChain('rate');
+    const hidden = createPurchasableCategory<{ id: string }>({
+      id: 'hidden',
+      mapPurchasable: () => ({ display: {}, requirements: [], visibility: unwiredFlag }),
+    });
+    expect(() => hidden.register({ id: 'u' })).toThrow(/purchasable 'u' visibility: /);
+
+    const granted = createPurchasableCategory<{ id: string }>({
+      id: 'granted',
+      mapPurchasable: () => ({
+        display: {},
+        requirements: [],
+        grants: [{ chain, mult: 2, description: 'Doubler', when: unwiredFlag }],
+      }),
+    });
+    expect(() => granted.register({ id: 'u' })).toThrow(/grant 'Doubler' when: /);
+  });
+
+  it('subject tier gates', () => {
+    const npcs = createSubjectCategory({
+      id: 'npcs',
+      fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'], gates: [unwiredFlag] } },
+    });
+    expect(() => npcs.register({ id: 'rask' })).toThrow(/tier 'trust' gate 0: /);
+  });
+
+  it('dialog conditions, when the runtime is built', () => {
+    const noAccessor = {} as GameStateAccessor;
+    expect(() =>
+      createNativeDialogRuntime({
+        graphs: [
+          {
+            id: 'g',
+            entry: 'a',
+            nodes: [
+              {
+                id: 'a',
+                text: 'hi',
+                condition: { kind: 'count-gte', category: 'x', entity: 'y', value: 1 },
+              },
+            ],
+          },
+        ],
+        accessor: noAccessor,
+        mutator: { applyResourceOp: () => {}, setUnlocked: () => {}, setState: () => {} },
+      }),
+    ).toThrow(/dialog 'g' node 'a' condition: /);
   });
 });

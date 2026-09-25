@@ -29,6 +29,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
+import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
 
@@ -50,13 +51,14 @@ export interface CycleOptions {
 
   /**
    * Automatic termination condition, checked every tick while `running` is true.
-   * When it returns `true`, the cycle ends and the restart sequence fires.
+   * When it holds, the cycle ends and the restart sequence fires. A Gate
+   * resolves through the runtime captured at `createCycle` time.
    * Omit for manual-only cycles where the player calls `cycle.end()`.
    *
    * If that restart is declined (see {@link Cycle.end}), the cycle pauses
    * rather than retrying every tick; call `run()` to resume and re-check.
    */
-  endCondition?: () => boolean;
+  endCondition?: Predicate;
 
   /**
    * A pre-built {@link Reset} to drive instead of constructing one from the
@@ -251,6 +253,10 @@ export function createCycle(options: CycleOptions): Cycle {
 
   const running = ref(false);
   const handle = createEmitHandle<CycleEvents>();
+  const ended =
+    endCondition === undefined
+      ? undefined
+      : createPredicateResolver().adopt(endCondition, false, 'createCycle endCondition');
 
   const reset =
     providedReset ??
@@ -310,7 +316,7 @@ export function createCycle(options: CycleOptions): Cycle {
     elapsed.value += dt;
     // A declined restart leaves the end condition true, so re-trying next
     // tick would fire `beforeRestart` (and log a phantom cycle) every tick.
-    if (endCondition && endCondition() && !end()) {
+    if (ended?.read() && !end()) {
       running.value = false;
     }
   });

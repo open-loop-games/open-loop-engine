@@ -18,6 +18,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
 import { processGetter, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
+import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
 import { getCurrentFullContext } from './persistence';
 import { isProfilingEnabled, profile } from './profiler';
@@ -460,29 +461,32 @@ export type Grant =
       mult: Computable<DecimalSource>;
       /** Stable description used for attribution + UI breakdowns. */
       description: string;
-      /** Optional additional predicate AND-composed with the category's implicit active signal. */
-      when?: Computable<boolean>;
+      /**
+       * Optional additional predicate AND-composed with the owner's implicit
+       * active signal. A Gate is asserted when the owner registers.
+       */
+      when?: Predicate;
     }
   | {
       chain: ModifierChain | ModifierChain[];
       /** Additive value (or reactive source). */
       add: Computable<DecimalSource>;
       description: string;
-      when?: Computable<boolean>;
+      when?: Predicate;
     }
   | {
       chain: ModifierChain | ModifierChain[];
       /** Exponent value (or reactive source). */
       exp: Computable<DecimalSource>;
       description: string;
-      when?: Computable<boolean>;
+      when?: Predicate;
     }
   | {
       chain: ModifierChain | ModifierChain[];
       /** Hand-built modifier (or factory). Must have a description for attribution, or supply one inline. */
       modifier: Modifier | (() => Modifier);
       description?: string;
-      when?: Computable<boolean>;
+      when?: Predicate;
     };
 
 /**

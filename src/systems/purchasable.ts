@@ -43,6 +43,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
+import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
 
 // === TYPES ===
 
@@ -132,10 +133,7 @@ export interface PurchasableOptions {
   /** Callback fired after each purchase with the number of levels bought */
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
-  visibility?: Computable<boolean>;
-  // TODO(expansion): widen to `Computable<boolean> | Gate` when a consumer wants declarative
-  // visibility for devtools / balance-sim introspection. Gate already exists
-  // (src/systems/gate.ts); only consumer demand is pending.
+  visibility?: Predicate;
   /**
    * Whether bulk purchasing (buy-max) is enabled.
    * Default: `false` when limit is 1, `true` otherwise.
@@ -251,7 +249,7 @@ export type ScalingPurchasableOptions = {
   /** Callback fired after each purchase */
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this purchasable is visible. Default: `true` */
-  visibility?: Computable<boolean>;
+  visibility?: Predicate;
   /** Whether bulk purchasing is enabled. Default: `true` */
   bulkPurchase?: Computable<boolean>;
 } & ScalingPurchasableCost &
@@ -534,6 +532,8 @@ function toFormula(source: FormulaSource): GenericFormula {
  *
  * @internal
  * @param options - Configuration for the purchasable
+ * @param predicates - resolver `visibility` adopts through; a category passes
+ *   its own, so content registered after install still resolves
  * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
  *
  * @example Leveled repeatable
@@ -554,7 +554,10 @@ function toFormula(source: FormulaSource): GenericFormula {
  * generator.purchaseMax();
  * ```
  */
-export function createPurchasable(options: PurchasableOptions): Purchasable {
+export function createPurchasable(
+  options: PurchasableOptions,
+  predicates: PredicateResolver = createPredicateResolver(),
+): Purchasable {
   const {
     id,
     display,
@@ -584,7 +587,11 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
 
   const processedLimit = limit != null ? processGetter(limit) : Decimal.dInf;
   const isOneShot = Decimal.eq(unref(processedLimit), 1);
-  const processedVisibility = visibility != null ? processGetter(visibility) : true;
+  const processedVisibility = predicates.adopt(
+    visibility,
+    true,
+    `purchasable '${id}' visibility`,
+  ).holds;
   const processedBulkPurchase = bulkPurchase != null ? processGetter(bulkPurchase) : !isOneShot;
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
@@ -681,6 +688,9 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
  * Defaults to `limit: Infinity`.
  *
  * @param options - Shorthand configuration with resource and a cost shape
+ * @param predicates - resolver `visibility` adopts through. Defaults to one
+ *   over the ambient runtime, so build inside engine install/connect when
+ *   `visibility` is a Gate
  * @returns A {@link Purchasable} (same return type as createPurchasable)
  *
  * @example Geometric (most common)
@@ -719,7 +729,10 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
  * });
  * ```
  */
-export function createScalingPurchasable(options: ScalingPurchasableOptions): Purchasable {
+export function createScalingPurchasable(
+  options: ScalingPurchasableOptions,
+  predicates?: PredicateResolver,
+): Purchasable {
   const {
     id,
     title,
@@ -741,25 +754,28 @@ export function createScalingPurchasable(options: ScalingPurchasableOptions): Pu
   const { effectFn, effectCurve } = buildScalingEffect(options, scalingAmount);
 
   const purchasable: Purchasable = {
-    ...createPurchasable({
-      id,
-      display: {
-        title,
-        description,
-        effectDisplay:
-          effectDisplay ??
-          (effectFn
-            ? computed(() => `×${formatSmall(effectFn(scalingAmount.value), 2)}`)
-            : undefined),
+    ...createPurchasable(
+      {
+        id,
+        display: {
+          title,
+          description,
+          effectDisplay:
+            effectDisplay ??
+            (effectFn
+              ? computed(() => `×${formatSmall(effectFn(scalingAmount.value), 2)}`)
+              : undefined),
+        },
+        requirements: costRequirement,
+        limit,
+        initialAmount,
+        effect: effectFn,
+        onPurchase,
+        visibility,
+        bulkPurchase,
       },
-      requirements: costRequirement,
-      limit,
-      initialAmount,
-      effect: effectFn,
-      onPurchase,
-      visibility,
-      bulkPurchase,
-    }),
+      predicates,
+    ),
     effectCurve,
   };
 
