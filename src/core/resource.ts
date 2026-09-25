@@ -196,44 +196,36 @@ function buildResource<T>(
   saveName?: string,
 ): Resource<T> {
   const { displayName = 'points', precision = 0, small = false, id } = options;
-  // A display name is text, free to change or be translated; only a wrapped
-  // ref, which saves nothing, may be keyed by it.
-  const resolvedId = (isRef(defaultValue) ? (id ?? displayName) : id) as string;
-  const name = saveName ?? resolvedId;
-  if (!isRef(defaultValue) && name?.includes('.')) {
-    throw new Error(
-      `Resource id "${name}" contains ".", which save paths split on. Use another separator, such as "-".`,
-    );
-  }
-
-  // Create persistent or use existing ref. Save under a stable name — the
-  // resource's id unless the caller scopes it — so round-trips survive field
-  // reorders inside a context.
-  const resource: Partial<Resource<T>> = isRef(defaultValue)
-    ? defaultValue
-    : persistent(defaultValue, { name });
-
-  // Attach resource metadata
-  resource.id = resolvedId;
-  resource.displayName = displayName;
-  resource.precision = precision;
-  resource.small = small;
-
   // Single ambient-context read shared by the tracker setup below and the
   // registry registration at the end. The two sites both need to know
   // whether we're inside an engine namespace; nothing between them changes
   // the ambient context.
   const parentContext = getCurrentContext();
 
-  // If we created a persistent ref, also set metadata on the non-persistent wrapper
-  if (!isRef(defaultValue)) {
-    const nonPersistentResource = (resource as Persistent<T>)[NonPersistent] as unknown as Partial<
-      Resource<T>
-    >;
-    nonPersistentResource.id = resolvedId;
-    nonPersistentResource.displayName = displayName;
-    nonPersistentResource.precision = precision;
-    nonPersistentResource.small = small;
+  let resource: Partial<Resource<T>>;
+  if (isRef(defaultValue)) {
+    // A display name is text, free to change or be translated; only a wrapped
+    // ref, which saves nothing, may be keyed by it.
+    resource = Object.assign(defaultValue, {
+      id: id ?? displayName,
+      displayName,
+      precision,
+      small,
+    });
+  } else {
+    const name = saveName ?? id;
+    if (name?.includes('.')) {
+      throw new Error(
+        `Resource id "${name}" contains ".", which save paths split on. Use another separator, such as "-".`,
+      );
+    }
+    // Save under a stable name — the resource's id unless the caller scopes
+    // it — so round-trips survive field reorders inside a context. The
+    // non-persistent wrapper carries the same metadata.
+    const metadata = { id, displayName, precision, small };
+    const persistentResource = persistent(defaultValue, { name });
+    Object.assign(persistentResource[NonPersistent], metadata);
+    resource = Object.assign(persistentResource, metadata);
 
     // Cumulative + best trackers are intrinsic to a persistent resource —
     // their persistence path is identity-bound to the save name, so two
