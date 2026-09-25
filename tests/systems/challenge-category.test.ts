@@ -14,6 +14,7 @@ import { createContentRegistry } from '@/systems/content-registry';
 import { createReset, type Reset } from '@/systems/reset';
 import { createModifierChain } from '@/core/modifier';
 import { Decimal } from '@/primitives/decimal';
+import { saveAndClear } from '../helpers/save-roundtrip';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -176,8 +177,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
   it('a load of a mid-challenge save pushes its scopes without calling onEnter', () => {
     build().zombie.enter();
-    const midChallenge = save();
-    resetAllPersistentContexts();
+    const midChallenge = saveAndClear();
 
     const { combat, cost, log, zombie } = build();
     deserializePersistents(getAllPersistentRefs(), midChallenge);
@@ -221,8 +221,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
   it('a second load of the same save adds no second scope', () => {
     build().zombie.enter();
-    const midChallenge = save();
-    resetAllPersistentContexts();
+    const midChallenge = saveAndClear();
 
     const { rules, log } = build();
     deserializePersistents(getAllPersistentRefs(), midChallenge);

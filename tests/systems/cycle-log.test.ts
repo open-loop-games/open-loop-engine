@@ -8,8 +8,6 @@ import {
   endPersistentContext,
   deserializePersistents,
   getAllPersistentRefs,
-  resetAllPersistentContexts,
-  serializePersistents,
   withPersistentContext,
 } from '@/core/persistence';
 import { createReset } from '@/systems/reset';
@@ -19,6 +17,7 @@ import type { CycleLogEntry } from '@/systems/cycle-log';
 import type { Analyzer } from '@/primitives/types';
 import { runHeadless } from '@/core/headless';
 import { createManualTicks } from '../helpers/manual-ticks';
+import { saveAndClear } from '../helpers/save-roundtrip';
 
 describe('createCycleLog', () => {
   // ==========================================================================
@@ -503,8 +502,7 @@ describe('createCycleLog — the baseline follows loads and resets', () => {
   it('the first cycle after a load counts only growth since the load', () => {
     const first = build();
     first.strength.value = 1000;
-    const save = serializePersistents(getAllPersistentRefs());
-    resetAllPersistentContexts();
+    const save = saveAndClear();
 
     const { strength, cycle, log } = build();
     deserializePersistents(getAllPersistentRefs(), save);

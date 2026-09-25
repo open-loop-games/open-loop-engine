@@ -5,10 +5,9 @@ import {
   deserializePersistents,
   getAllPersistentRefs,
   persistent,
-  resetAllPersistentContexts,
-  serializePersistents,
   withPersistentContext,
 } from '@/core/persistence';
+import { saveAndClear } from '../helpers/save-roundtrip';
 
 const TIERS = [
   { id: 'manual', name: 'Manual', order: 0 },
@@ -248,9 +247,7 @@ describe('AutomationTiers — a met requirement is a level, not an edge', () => 
 
   function saveSession(gold: { value: number }): Record<string, unknown> {
     gold.value = 20;
-    const save = serializePersistents(getAllPersistentRefs());
-    resetAllPersistentContexts();
-    return save;
+    return saveAndClear();
   }
 
   it('a load emits no unlock for a tier the save already holds', () => {

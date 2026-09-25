@@ -11,11 +11,11 @@ import {
   getAllPersistentRefs,
   persistent,
   resetAllPersistentContexts,
-  serializePersistents,
   withPersistentContext,
 } from '@/core/persistence';
 import { createReset } from '@/systems/reset';
 import Formula from '@/core/formulas/formulas';
+import { saveAndClear } from '../helpers/save-roundtrip';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -205,9 +205,7 @@ describe('Achievement — a load restores state, it does not earn', () => {
 
   function saveSession(gold: { value: number }): Record<string, unknown> {
     gold.value = 20;
-    const save = serializePersistents(getAllPersistentRefs());
-    resetAllPersistentContexts();
-    return save;
+    return saveAndClear();
   }
 
   it('fires no onComplete or earned for an achievement the save already holds', () => {
