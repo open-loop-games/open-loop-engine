@@ -60,15 +60,20 @@ import type { RunUntilConfig, RunUntilResult } from './types';
  *
  * @example
  * ```ts
- * const engine = buildDirectorEngine(vars);
+ * const { engine, gold } = buildGame(); // your builder: the engine and a Resource it drives
  * engine.start();
- * const result = runUntil({
- *   engine,
- *   until: ({ simTime }) => engine.state.roundCount >= 1 || simTime > minutes(10),
- *   maxSimTime: minutes(10),
- * });
- * expect(result.terminated).toBe('predicate');
- * expect(result.elapsedSimulated).toBeLessThan(minutes(5));
+ * try {
+ *   const result = runUntil({
+ *     engine,
+ *     until: () => Decimal.gte(gold.value, 1000),
+ *     maxSimTime: 600,
+ *     seed: 1,
+ *   });
+ *   // 'predicate' once gold reaches 1000, 'maxSimTime' if ten minutes run out first
+ *   console.log(result.terminated, result.elapsedSimulated);
+ * } finally {
+ *   engine.stop();
+ * }
  * ```
  */
 export function runUntil(config: RunUntilConfig): RunUntilResult {

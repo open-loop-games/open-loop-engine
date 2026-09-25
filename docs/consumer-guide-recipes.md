@@ -465,7 +465,7 @@ export function shouldCollapse(exp: Expedition, p: CollapsePolicyParams): boolea
 if (effectiveOrder.value >= 3 && shouldCollapse(exp, collapsePolicy.value)) exp.collapse();
 
 // harness: the sim's runUntil predicate calls the SAME fn
-runUntil(() => shouldCollapse(exp, { tapOutSeconds }));
+runUntil({ engine, until: () => shouldCollapse(exp, { tapOutSeconds }), maxSimTime });
 ```
 
 **Integration step** — `(s, dt) => s'`. A pure reflecting/accumulating step the live variable-dt tick integrates and the harness replays at a fixed sim step, so online and offline integrate identically.
