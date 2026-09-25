@@ -485,7 +485,7 @@ export function createEngine(config: EngineConfig): Engine {
     }
   }
   // Every subscription and effect made on the engine's behalf, released by dispose().
-  const cleanups: (() => void)[] = [];
+  const cleanups = new Set<() => void>();
   const moduleScope = effectScope(true);
   // Populated at start() with the per-engine injection map built from
   // install() / connect() `provide()` calls. Exposed via engine.tryInject
@@ -496,19 +496,26 @@ export function createEngine(config: EngineConfig): Engine {
   // them — consumers wire the manager's import/export/save/load to their UI.
   // The manager emits them inside the engine's namespace.
   if (saveManager) {
-    cleanups.push(
+    cleanups.add(
       saveManager.on('save:before-serialize', () => {
         for (const cb of saveCallbacks) cb();
       }),
+    );
+    cleanups.add(
       saveManager.on('save:loaded', ({ timestamp }) => {
         for (const cb of loadCallbacks) cb({ success: true, timestamp });
       }),
     );
   }
 
+  /** Hold `unsub` for dispose(), returning an unsubscribe that also lets it go. */
   function track(unsub: () => void): () => void {
-    cleanups.push(unsub);
-    return unsub;
+    const off = () => {
+      cleanups.delete(off);
+      unsub();
+    };
+    cleanups.add(off);
+    return off;
   }
 
   function topologicalSort(mods: EngineModule[]): EngineModule[] {
@@ -690,7 +697,8 @@ export function createEngine(config: EngineConfig): Engine {
       if (disposed) return;
       engine.stop();
       moduleScope.stop();
-      for (const unsub of cleanups.splice(0)) unsub();
+      for (const unsub of [...cleanups]) unsub();
+      cleanups.clear();
       // Drop the in-memory persistent-context registry for this engine's
       // namespace so a fresh engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.
