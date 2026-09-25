@@ -20,7 +20,6 @@ import { createTimeSystem } from '@/systems/time';
 import { createTimeBank } from '@/systems/time-bank';
 import { createBestOf } from '@/systems/best-of';
 import { createAutomationTiers } from '@/systems/automation';
-import { createRecommendationSystem } from '@/systems/recommendation';
 import { createDialogSession } from '@/systems/dialog-session';
 import { createAchievementCategory } from '@/systems/achievement-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
@@ -33,6 +32,12 @@ import { createProducerCategory } from '@/systems/producer-category';
 import { createCostRequirement } from '@/core/requirements';
 import Formula from '@/core/formulas/formulas';
 import { fractional } from '@/systems/retention';
+import {
+  AUTOMATION_TIER_DEFS,
+  buildRecommendationStack,
+  dialogAccessorStub,
+  noopRegisterTick as registerTick,
+} from './fixtures/stateful-systems';
 
 describe('Reset', () => {
   it('resets persistent refs to defaults', () => {
@@ -662,8 +667,6 @@ describe('Reset — listener re-entrancy', () => {
 });
 
 describe('Reset — system-owned cross-run state survives a reset of its own module', () => {
-  const registerTick = () => () => {};
-
   /** Every stateful system a module can build, all inside module `m`. */
   function buildSystems() {
     return withPersistentContext('m', () => {
@@ -672,32 +675,13 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       const bank = createTimeBank();
       const bestOf = createBestOf({ id: 'm-best', metrics: { gold: { mode: 'absolute' } } });
       const pool = createRunPool({ id: 'm-pool', deathPolicy: 'park' });
-      const tiers = createAutomationTiers({
-        tiers: [
-          { id: 'manual', name: 'Manual', order: 0 },
-          { id: 'basic', name: 'Basic', order: 1 },
-        ],
-      });
+      const tiers = createAutomationTiers({ tiers: AUTOMATION_TIER_DEFS });
       const cycleLog = createCycleLog({ cycle, metrics: {} });
-      const recs = createRecommendationSystem({
-        cycle,
-        cycleLog,
-        bestOf,
-        getCurrentSnapshot: () => ({}),
-        applySnapshot: () => {},
-      });
+      const recs = buildRecommendationStack(cycle, cycleLog, bestOf);
       const dialog = createDialogSession({
         id: 'm-dialog',
         graphs: [],
-        accessor: {
-          getResource: () => bn(0),
-          isUnlocked: () => false,
-          getState: () => undefined,
-          getRate: () => Decimal.dZero,
-          applyResourceOp: () => {},
-          setUnlocked: () => {},
-          setState: () => {},
-        },
+        accessor: dialogAccessorStub,
       });
       const achievements = createAchievementCategory<{ id: string }>({
         id: 'm-achievements',

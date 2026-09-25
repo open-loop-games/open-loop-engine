@@ -8,7 +8,7 @@ import {
   resetAllPersistentContexts,
   withPersistentContext,
 } from '@/core/persistence';
-import { bn, Decimal } from '@/primitives/decimal';
+import { Decimal } from '@/primitives/decimal';
 import { createRunPool } from '@/core/run-pool';
 import { createSequencer } from '@/core/sequencer';
 import { createRoundRobinStrategy } from '@/core/sequencer-strategies';
@@ -32,6 +32,12 @@ import { createTimeBank } from '@/systems/time-bank';
 import { createTimeSystem } from '@/systems/time';
 import { createZoneSystem } from '@/systems/zone';
 import { createManualTicks } from '../helpers/manual-ticks';
+import {
+  AUTOMATION_TIER_DEFS,
+  buildRecommendationStack,
+  dialogAccessorStub,
+  noopRegisterTick as registerTick,
+} from './fixtures/stateful-systems';
 
 // A `thingsToReset: [system]` walk resets what a module reset of the system's
 // own module does, and nothing the module reset would leave alone.
@@ -45,8 +51,6 @@ interface Case {
   /** Extra checks on the system after a `thingsToReset` reset. */
   check?: (system: never) => void;
 }
-
-const registerTick = () => () => {};
 
 const cases: Case[] = [
   {
@@ -115,13 +119,7 @@ const cases: Case[] = [
   },
   {
     name: 'automation tiers',
-    build: () =>
-      createAutomationTiers({
-        tiers: [
-          { id: 'manual', name: 'Manual', order: 0 },
-          { id: 'basic', name: 'Basic', order: 1 },
-        ],
-      }),
+    build: () => createAutomationTiers({ tiers: AUTOMATION_TIER_DEFS }),
     dirty: (tiers: ReturnType<typeof createAutomationTiers>) => tiers.unlock('basic'),
   },
   {
@@ -141,13 +139,7 @@ const cases: Case[] = [
       const cycle = createCycle({ resetModules: [], registerTick });
       const cycleLog = createCycleLog({ cycle, metrics: {} });
       const bestOf = createBestOf({ id: 'm-rec-best', metrics: {} });
-      return createRecommendationSystem({
-        cycle,
-        cycleLog,
-        bestOf,
-        getCurrentSnapshot: () => ({}),
-        applySnapshot: () => {},
-      });
+      return buildRecommendationStack(cycle, cycleLog, bestOf);
     },
     dirty: (recs: ReturnType<typeof createRecommendationSystem>) => {
       recs.autoApply.value = true;
@@ -159,15 +151,7 @@ const cases: Case[] = [
       createDialogSession({
         id: 'm-dialog',
         graphs: [],
-        accessor: {
-          getResource: () => bn(0),
-          isUnlocked: () => false,
-          getState: () => undefined,
-          getRate: () => Decimal.dZero,
-          applyResourceOp: () => {},
-          setUnlocked: () => {},
-          setState: () => {},
-        },
+        accessor: dialogAccessorStub,
       }),
     dirty: () => {},
   },

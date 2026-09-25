@@ -16,8 +16,7 @@ import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-
 import { createCostRequirement } from '@/core/requirements';
 import { createInventory } from '@/systems/inventory';
 import { createEngine } from '@/engine';
-
-const registerTick = () => () => {};
+import { noopRegisterTick as registerTick } from './fixtures/stateful-systems';
 
 const INVENTORY_KEYS = [
   'storage/loop.anchor',
