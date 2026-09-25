@@ -101,12 +101,16 @@ export interface AchievementCategoryEntry<Def extends { id: string }, State = vo
  * `buildDef` can synthesize without a consumer callback. Extend this when
  * authoring a Def type that participates in tier registration but doesn't
  * carry consumer-specific fields beyond the base authoring contract.
+ *
+ * @typeParam T - Type of the tier's `effect` value
  */
-export interface BaseTieredAchievementDef {
+export interface BaseTieredAchievementDef<T = unknown> {
   id: string;
   title: string;
   description: string;
   requirement: () => boolean;
+  /** The tier's {@link TieredAchievementTier.effect}, for `mapAchievement` to forward. */
+  effect?: T;
 }
 
 /**
@@ -119,7 +123,8 @@ export interface TieredAchievementTier<T = number> {
    *
    * Accepts a plain `DecimalSource` for static thresholds or a
    * {@link FormulaSource} for dynamic thresholds that scale with other game
-   * state. Formula thresholds are re-evaluated each time the tier is checked.
+   * state. Formula thresholds are re-evaluated each time the tier is checked;
+   * the default description formats the threshold once, at registration.
    */
   threshold: DecimalSource | FormulaSource;
   /** Appended to `baseName` for this tier's display title (e.g. `"I"`, `"II"`). */
@@ -191,7 +196,7 @@ export type TieredAchievementBuildDef<Def, T = number> = (
  */
 export type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> &
   (Def extends BaseTieredAchievementDef
-    ? BaseTieredAchievementDef extends Def
+    ? BaseTieredAchievementDef<T> extends Def
       ? { buildDef?: TieredAchievementBuildDef<Def, T> }
       : { buildDef: TieredAchievementBuildDef<Def, T> }
     : { buildDef: TieredAchievementBuildDef<Def, T> });
@@ -222,10 +227,12 @@ export interface AchievementCategory<
    * registered into this category through the standard `register()` path.
    *
    * Each tier becomes one `Def` (via the spec's `buildDef`, or a default
-   * identity over `{id, title, description, requirement}` when the
-   * category's `Def` is the base shape). The resulting achievements appear
-   * in `getAll()`, `registry`, reset traversal, and EngineCategories walks
-   * just like normal entries.
+   * identity over `{id, title, description, requirement, effect}` when the
+   * category's `Def` is the base shape). The category's `mapAchievement`
+   * must forward `requirement` and `effect`, or the tiers never earn and
+   * carry no bonus. The resulting achievements appear in `getAll()`,
+   * `registry`, reset traversal, and EngineCategories walks just like normal
+   * entries.
    *
    * @returns The tier achievements in tier order, suitable for binding
    *   directly (e.g. `getEarnedCount(tiers)`) without re-querying.
@@ -349,6 +356,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
               title: params.title,
               description: params.description,
               requirement: params.requirement,
+              effect: tier.effect,
             } as unknown as Def);
         defs.push(def);
       }

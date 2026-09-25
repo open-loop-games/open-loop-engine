@@ -688,7 +688,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
 
   it('a module reset re-fires no achievement whose requirement still holds', () => {
     let rewards = 0;
-    const lifetimeGold = persistent(100, { lifetime: true });
+    const lifetimeGold = persistent<number>(100, { lifetime: true });
     withPersistentContext('m', () => {
       const achievements = createAchievementCategory<{ id: string }>({
         id: 'm-achievements',

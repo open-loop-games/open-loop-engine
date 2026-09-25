@@ -216,7 +216,7 @@ describe('AutomationTiers — a met requirement is a level, not an edge', () => 
   function buildSession(tierDefs: { id: string; name: string; order: number }[]) {
     const events: string[] = [];
     return withPersistentContext('m', () => {
-      const gold = persistent(0, { name: 'gold' });
+      const gold = persistent<number>(0, { name: 'gold' });
       const tiers = createAutomationTiers({
         tiers: [
           { id: 'manual', name: 'Manual', order: 0 },

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { createAchievement } from '@/systems/achievement';
+import { createAchievement, getCombinedAchievementEffect } from '@/systems/achievement';
 import {
   createAchievementCategory,
   type BaseTieredAchievementDef,
@@ -139,6 +139,29 @@ describe('AchievementCategory.registerTiered', () => {
     expect(ach2!.earned.value).toBe(true);
   });
 
+  it("carries each tier's effect through the default def to mapAchievement", () => {
+    const cat = createAchievementCategory<BaseTieredAchievementDef<number>>({
+      id: 'tier-effect-cat',
+      mapAchievement: (def) => ({
+        display: { title: def.title },
+        requirement: def.requirement,
+        effect: def.effect,
+      }),
+    });
+    const tiers = cat.registerTiered({
+      baseId: 'tier-effect',
+      baseName: 'Tier Effect',
+      getValue: () => 50,
+      tiers: [
+        { threshold: 10, suffix: 'I', effect: 2 },
+        { threshold: 20, suffix: 'II', effect: 3 },
+      ],
+    });
+
+    expect(tiers.map((t) => t.effect?.value)).toEqual([2, 3]);
+    expect(getCombinedAchievementEffect(tiers).toNumber()).toBe(6);
+  });
+
   it('Formula threshold with no variable works as a constant', async () => {
     const gold = ref<DecimalSource>(0);
     const staticFormula = Formula.constant(new Decimal(250));
@@ -163,7 +186,7 @@ describe('Achievement — a load restores state, it does not earn', () => {
   function buildSession(ids: string[]) {
     const log: string[] = [];
     return withPersistentContext('m', () => {
-      const gold = persistent(0, { name: 'gold' });
+      const gold = persistent<number>(0, { name: 'gold' });
       const achievements = createAchievementCategory<{ id: string }>({
         id: 'ach',
         mapAchievement: (def) => ({
