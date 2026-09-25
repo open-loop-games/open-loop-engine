@@ -16,9 +16,9 @@
  * @see {@link createRetentionPolicy} for a similar snapshot/restore pattern
  */
 
-import { ref, type Ref } from 'vue';
+import { ref, watch, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { isPersistent, type Persistent } from '@/core/persistence';
+import { isPersistent, loadingSave, onHydrated, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { InjectionKey } from '@/primitives/types';
 import type { Cycle } from './cycle';
@@ -125,6 +125,11 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  * each restart. Works for both resetting resources (delta = accumulated value)
  * and permanent stats (delta = growth during the cycle).
  *
+ * The snapshot is not saved. A metric a save load or a reset writes is
+ * re-snapshotted once the load or reset settles, so the first cycle after a
+ * load counts growth since the load, and a reset mid-cycle doesn't show up as
+ * a negative delta.
+ *
  * @param options - Cycle to observe, metrics to track, and optional ring buffer size
  * @returns A CycleLog with reactive history, finalize event, and pin/unpin controls
  *
@@ -181,6 +186,24 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
 
   takeSnapshot();
 
+  // Metrics a load or reset wrote, re-snapshotted once it settles. Tracking
+  // the writes (rather than re-snapshotting everything) keeps an untouched
+  // permanent stat's growth so far, and ignores another engine's load.
+  const rewritten = new Set<string>();
+  const stopWatches = Object.entries(metrics).map(([key, metric]) =>
+    watch(
+      metric,
+      () => {
+        if (loadingSave.value) rewritten.add(key);
+      },
+      { flush: 'sync' },
+    ),
+  );
+  const stopHydrated = onHydrated(() => {
+    for (const key of rewritten) startSnapshot[key] = readMetric(metrics[key]);
+    rewritten.clear();
+  });
+
   const unsubBefore = cycle.on('beforeRestart', () => {
     const deltas: CycleLogDelta[] = [];
     for (const [key, metric] of Object.entries(metrics)) {
@@ -225,6 +248,8 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
     dispose() {
       unsubBefore();
       unsubAfter();
+      stopHydrated();
+      for (const stop of stopWatches) stop();
     },
   };
 }

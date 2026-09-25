@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
-import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  persistent,
+  beginPersistentContext,
+  endPersistentContext,
+  deserializePersistents,
+  getAllPersistentRefs,
+  resetAllPersistentContexts,
+  serializePersistents,
+  withPersistentContext,
+} from '@/core/persistence';
+import { createReset } from '@/systems/reset';
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import type { CycleLogEntry } from '@/systems/cycle-log';
@@ -485,5 +495,54 @@ describe('createCycleLog', () => {
     dispose();
     cycle.end();
     expect(entries).toHaveLength(1);
+  });
+});
+
+describe('createCycleLog — the baseline follows loads and resets', () => {
+  /** Module `m`: a permanent stat and a run-scoped wallet, logged per cycle. */
+  function build() {
+    const { registerTick } = createTickManager();
+    return withPersistentContext('m', () => {
+      const strength = persistent<number>(0, { name: 'strength', lifetime: true });
+      const gold = persistent<number>(0, { name: 'gold' });
+      const cycle = createCycle({ registerTick });
+      const log = createCycleLog({ cycle, metrics: { strength, gold } });
+      return { strength, gold, cycle, log };
+    });
+  }
+
+  function lastDelta(log: ReturnType<typeof build>['log'], key: string): number {
+    const entry = log.history.value[log.history.value.length - 1];
+    return entry.deltas.find((d) => d.key === key)!.delta.toNumber();
+  }
+
+  it('the first cycle after a load counts only growth since the load', () => {
+    const first = build();
+    first.strength.value = 1000;
+    const save = serializePersistents(getAllPersistentRefs());
+    resetAllPersistentContexts();
+
+    const { strength, cycle, log } = build();
+    deserializePersistents(getAllPersistentRefs(), save);
+    strength.value += 10;
+    cycle.end();
+
+    expect(lastDelta(log, 'strength')).toBe(10);
+  });
+
+  it('a reset mid-cycle re-baselines the metrics it wrote and keeps the rest', () => {
+    const { strength, gold, cycle, log } = build();
+    strength.value = 5;
+    gold.value = 40;
+    cycle.end();
+
+    strength.value += 2;
+    createReset({ resetModules: ['m'] }).reset();
+    strength.value += 3;
+    gold.value += 3;
+    cycle.end();
+
+    expect(lastDelta(log, 'strength')).toBe(5);
+    expect(lastDelta(log, 'gold')).toBe(3);
   });
 });
