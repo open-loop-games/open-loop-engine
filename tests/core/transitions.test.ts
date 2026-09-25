@@ -3,10 +3,13 @@ import { bn } from '@/primitives/decimal';
 import type { ICondition, GameStateAccessor } from '@/primitives/types';
 import {
   collectConditionDeps,
+  combineFlipDistances,
   timeUntilAffordable,
   timeUntilConditionFlip,
   timeUntilResource,
   type AffordableLike,
+  type ChildFlipResult,
+  type TransitionDistance,
 } from '@/core/transitions';
 
 /**
@@ -407,6 +410,53 @@ describe('timeUntilConditionFlip — not combinator', () => {
     const c: ICondition = { type: 'not', condition: { type: 'unlock', target: 'smithing' } };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
+  });
+});
+
+describe('combineFlipDistances — children that never flip', () => {
+  const computed = (seconds: number): TransitionDistance => ({ seconds, reason: 'computed' });
+  const never: TransitionDistance = { seconds: null, reason: 'no-rate' };
+  const child = (currentlyTrue: boolean, distance: TransitionDistance): ChildFlipResult => ({
+    currentlyTrue,
+    distance,
+  });
+
+  it('OR currently-false takes the soonest child that flips, past ones that never do', () => {
+    const d = combineFlipDistances([child(false, never), child(false, computed(10))], 'or');
+    expect(d).toEqual(computed(10));
+  });
+
+  it('AND currently-true takes the soonest child that breaks, past ones that never do', () => {
+    const d = combineFlipDistances([child(true, computed(5)), child(true, never)], 'and');
+    expect(d).toEqual(computed(5));
+  });
+
+  it('a min over children that all never flip never flips', () => {
+    const d = combineFlipDistances([child(false, never), child(false, never)], 'or');
+    expect(d).toEqual(never);
+  });
+
+  it('a min still propagates an opaque or uncomputable child, which may flip at any time', () => {
+    for (const open of [
+      { seconds: null, reason: 'opaque-predicate' },
+      { seconds: null, reason: 'uncomputable' },
+    ] as TransitionDistance[]) {
+      expect(
+        combineFlipDistances(
+          [child(false, never), child(false, computed(10)), child(false, open)],
+          'or',
+        ),
+      ).toEqual(open);
+    }
+  });
+
+  it('a max propagates a child that never flips: the combinator waits on it', () => {
+    expect(combineFlipDistances([child(false, computed(10)), child(false, never)], 'and')).toEqual(
+      never,
+    );
+    expect(combineFlipDistances([child(true, computed(10)), child(true, never)], 'or')).toEqual(
+      never,
+    );
   });
 });
 

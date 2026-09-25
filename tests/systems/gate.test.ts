@@ -506,6 +506,29 @@ describe('timeUntilGateFlip — cumulative-gte', () => {
     f.stop();
   });
 
+  it('an any-gate drops a cumulative branch with no inflow, but not one it cannot bound', () => {
+    const f = buildFixture();
+    f.setRate('wood', new Decimal(10));
+    const gate: Gate = {
+      kind: 'any',
+      of: [
+        { kind: 'resource-gte', resource: 'wood', value: 100 },
+        { kind: 'cumulative-gte', resource: 'points', value: 10 },
+      ],
+    };
+    expect(timeUntilGateFlip(gate, withRates(f, { net: -2, inflow: 0 }))).toEqual({
+      seconds: 10,
+      reason: 'computed',
+    });
+    // A stalled net rate says nothing about the inflow, so the cumulative
+    // branch may still flip first.
+    expect(timeUntilGateFlip(gate, withRates(f, { net: -2 }))).toEqual({
+      seconds: null,
+      reason: 'uncomputable',
+    });
+    f.stop();
+  });
+
   it('a met gate never flips back under rates, however the balance drains', () => {
     const f = buildFixture();
     f.points.value = 50;

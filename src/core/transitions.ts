@@ -149,8 +149,9 @@ export function timeUntilAffordable(
  *     (Currently-true children assumed stable over the horizon — monotonicity).
  *   - OR currently-true → max over currently-true children's flip-to-false distances.
  *   - OR currently-false → min over children's flip-to-true distances.
- *   - Strict-null: any child returning `null` propagates null with its reason. A lower-bound
- *     variant (use computable children as a floor) is a separate candidate primitive.
+ *   - Null children follow {@link combineFlipDistances}: `'no-rate'` drops out of a min,
+ *     and any other null propagates with its reason. A lower-bound variant (use computable
+ *     children as a floor) is a separate candidate primitive.
  * - `not` — recurse on the inner condition (NOT flips iff inner flips).
  * - `unlock`, `state` — always `'opaque-predicate'` (no mechanical distance).
  */
@@ -284,7 +285,12 @@ export interface ChildFlipResult {
  * - AND currently-false → max over currently-false children's flip-to-true distances.
  * - OR  currently-true → max over currently-true children's flip-to-false distances.
  * - OR  currently-false → min over children's flip-to-true distances.
- * - Strict-null: any child returning `null` propagates null with its reason.
+ * - Under `min`, a `'no-rate'` child never flips, so it can't be the first
+ *   to: it drops out, and the result is `'no-rate'` only when every child is.
+ * - Otherwise strict-null: any child returning `null` propagates null with its
+ *   reason — `'opaque-predicate'` and `'uncomputable'` under either mode, since
+ *   such a child may flip at any time, and `'no-rate'` under `max`, since the
+ *   combinator waits on a child that never flips.
  * - Empty `children` or no actionable subset → `'uncomputable'`.
  */
 export function combineFlipDistances(
@@ -312,11 +318,19 @@ export function combineFlipDistances(
     return { seconds: null, reason: 'uncomputable' };
   }
 
-  const firstNull = actionable.find((s) => s.distance.seconds === null);
+  // Under `min` a child that never flips can't be the first to, so it drops
+  // out. Any other null leaves the answer open, and under `max` a child that
+  // never flips means the combinator never does.
+  const decisive =
+    mode === 'min' ? actionable.filter((s) => s.distance.reason !== 'no-rate') : actionable;
+  if (decisive.length === 0) {
+    return { seconds: null, reason: 'no-rate' };
+  }
+  const firstNull = decisive.find((s) => s.distance.seconds === null);
   if (firstNull) {
     return firstNull.distance;
   }
-  const seconds = actionable.map((s) => s.distance.seconds as number);
+  const seconds = decisive.map((s) => s.distance.seconds as number);
   const chosen = mode === 'min' ? Math.min(...seconds) : Math.max(...seconds);
   return { seconds: chosen, reason: 'computed' };
 }
