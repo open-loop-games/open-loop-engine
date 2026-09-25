@@ -1,15 +1,12 @@
 /**
  * Type definitions for the formula system
  *
- * The formula type hierarchy reflects capability levels:
- * - {@link GenericFormula} — any formula (evaluate only)
- * - {@link InvertibleFormula} — can run backward ("what input gives this output?")
- * - {@link IntegrableFormula} — can compute cumulative cost via integration
- * - {@link InvertibleIntegralFormula} — full capability: evaluate, invert, integrate, invert-integral
- *
  * Most consumers only need {@link FormulaSource} (a formula or a raw value) and
- * {@link GenericFormula}. The narrower types matter when using {@link calculateMaxAffordable}
- * or {@link calculateCost}, which require invertibility/integrability.
+ * {@link GenericFormula}. What a formula can do — invert, integrate, invert its
+ * integral — depends on the ops in its chain and is answered at runtime by
+ * `isInvertible()` / `isIntegrable()` / `isIntegralInvertible()`. Every formula
+ * carries every method, so a type naming a capability could not tell one
+ * formula from another.
  */
 
 import type { DecimalSource } from '@/primitives/decimal';
@@ -23,23 +20,6 @@ export type GenericFormula = Formula<any>;
 
 /** A formula or a raw Decimal value — the universal input type for formula operations */
 export type FormulaSource = MaybeRef<DecimalSource> | GenericFormula;
-
-/** A formula that supports backward evaluation (invert) */
-export type InvertibleFormula = GenericFormula & {
-  invert: NonNullable<GenericFormula['invert']>;
-};
-
-/** A formula that supports cumulative cost calculation via integration */
-export type IntegrableFormula = InvertibleFormula & {
-  evaluateIntegral: NonNullable<GenericFormula['evaluateIntegral']>;
-  getIntegralFormula: NonNullable<GenericFormula['getIntegralFormula']>;
-  calculateConstantOfIntegration: NonNullable<GenericFormula['calculateConstantOfIntegration']>;
-};
-
-/** A formula with full capability: evaluate, invert, integrate, and invert the integral */
-export type InvertibleIntegralFormula = IntegrableFormula & {
-  invertIntegral: NonNullable<GenericFormula['invertIntegral']>;
-};
 
 /** Forward evaluation function signature — used in {@link GeneralFormulaOptions} */
 export type EvaluateFunction<T extends FormulaSource[]> = (

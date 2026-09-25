@@ -469,7 +469,7 @@ function buildScalingEffect(
 
   if (typeof effectOption !== 'function') {
     // DecimalSource shorthand — auto-wrap `base^amount` as an invertible Formula.
-    const curve = (Formula.variable(scalingAmount) as GenericFormula).pow_base(effectOption);
+    const curve = Formula.variable(scalingAmount).pow_base(effectOption);
     return {
       effectCurve: curve,
       effectFn: (amount) => new Decimal(curve.evaluate(amount)),

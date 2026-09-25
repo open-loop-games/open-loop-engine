@@ -22,7 +22,7 @@ import Formula, { F, calculateCost, calculateMaxAffordable } from '@/core/formul
 import { inversionTolerance, representationFloor } from '@/core/formulas/inversion';
 import { createResource } from '@/core/resource';
 import { findCrossing } from '@/core/formulas/root-find';
-import type { GenericFormula, InvertibleFormula } from '@/core/formulas/types';
+import type { GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { describe, expect, test, vi } from 'vitest';
@@ -1076,7 +1076,7 @@ describe('cumulative cost: integral vs discrete sum', () => {
 
   for (const [name, build] of Object.entries(CURVES)) {
     test(`${name} — calculateCost reproduces Σ f(i) exactly`, () => {
-      const formula = build() as InvertibleFormula;
+      const formula = build() as GenericFormula;
       for (const n of [1, 2, 5, 8]) {
         const cost = calculateCost(formula, n, true);
         const truth = discreteSum(formula, 0, n);
@@ -1094,7 +1094,7 @@ describe('cumulative cost: integral vs discrete sum', () => {
     // name, so that a consumer indexing by level reached for `calculateCost`
     // and silently got this gap charged to it. Both remain reachable; they are
     // no longer reachable by accident.
-    const formula = Formula.exponential(0, 10, 1.15) as InvertibleFormula;
+    const formula = Formula.exponential(0, 10, 1.15) as GenericFormula;
     const n = 8;
     const summed = discreteSum(formula, 0, n);
     expect(Decimal.lte(relativeError(calculateCost(formula, n, true), summed), 1e-12)).toBe(true);

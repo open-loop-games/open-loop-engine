@@ -5,13 +5,7 @@ import Formula, {
   findNonInvertible,
   unrefFormulaSource,
 } from '@/core/formulas/formulas';
-import type {
-  FormulaSource,
-  GenericFormula,
-  IntegrableFormula,
-  InvertibleFormula,
-  InvertibleIntegralFormula,
-} from '@/core/formulas/types';
+import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
@@ -206,7 +200,7 @@ describe('Creating Formulas', () => {
   describe('Constants', () => {
     function testConstant(
       desc: string,
-      formulaFunc: () => InvertibleFormula,
+      formulaFunc: () => GenericFormula,
       expectedValue: DecimalSource = 10,
     ) {
       describe(desc, () => {
@@ -364,7 +358,7 @@ describe('Variables', () => {
 });
 
 describe('Inverting', () => {
-  let variable: IntegrableFormula;
+  let variable: GenericFormula;
   let constant: GenericFormula;
   beforeAll(() => {
     variable = Formula.variable(10);
@@ -440,8 +434,8 @@ describe('Inverting', () => {
   });
 
   describe('Inverting calculates the value of the variable', () => {
-    let variable: IntegrableFormula;
-    let constant: IntegrableFormula;
+    let variable: GenericFormula;
+    let constant: GenericFormula;
     beforeAll(() => {
       variable = Formula.variable(2);
       constant = Formula.constant(3);
@@ -513,8 +507,8 @@ describe('Inverting', () => {
 });
 
 describe('Integrating', () => {
-  let variable: IntegrableFormula;
-  let constant: IntegrableFormula;
+  let variable: GenericFormula;
+  let constant: GenericFormula;
   beforeAll(() => {
     variable = Formula.variable(ref(10));
     constant = Formula.constant(10);
@@ -526,7 +520,7 @@ describe('Integrating', () => {
     expect(variable.evaluateIntegral(20)).compare_tolerance(Decimal.pow(20, 2).div(2)));
 
   describe('Integrable functions marked as such', () => {
-    function checkFormula(formula: IntegrableFormula) {
+    function checkFormula(formula: GenericFormula) {
       expect(formula.isIntegrable()).toBe(true);
       expect(() => formula.evaluateIntegral()).to.not.throw();
     }
@@ -593,39 +587,16 @@ describe('Integrating', () => {
   describe.todo('Integrable formulas integrate correctly');
 
   test('Integrating nested formulas', () => {
+    // 30·(10(x + 10))² + 10 integrates by substitution through the linear ops
+    // under `pow`: ∫₀¹⁰ = 1000·[(x + 10)³]₀¹⁰ + 10·10 = 7000100.
     const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
-    const actualCost = new Array(10)
-      .fill(null)
-      .reduce((acc, _, i) => acc.add(formula.evaluate(i)), new Decimal(0));
-    // Check if the calculated cost is within 10% of the actual cost,
-    // because this is an approximation
-    expect(
-      Decimal.sub(
-        actualCost,
-        Decimal.add(formula.evaluateIntegral(), formula.calculateConstantOfIntegration()),
-      )
-        .abs()
-        .div(actualCost)
-        .toNumber(),
-    ).toBeLessThan(0.1);
+    expect(formula.cumulative(0, 10)).compare_tolerance(7000100);
   });
 
-  test('Integrating nested formulas with overridden variable', () => {
+  test('Integrating nested formulas over an offset span', () => {
+    // ∫₅²⁰ = 1000·(30³ − 15³) + 10·15 = 23625150.
     const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
-    const actualCost = new Array(20)
-      .fill(null)
-      .reduce((acc, _, i) => acc.add(formula.evaluate(i)), new Decimal(0));
-    // Check if the calculated cost is within 10% of the actual cost,
-    // because this is an approximation
-    expect(
-      Decimal.sub(
-        actualCost,
-        Decimal.add(formula.evaluateIntegral(20), formula.calculateConstantOfIntegration()),
-      )
-        .abs()
-        .div(actualCost)
-        .toNumber(),
-    ).toBeLessThan(0.1);
+    expect(formula.cumulative(5, 20)).compare_tolerance(23625150);
   });
 
   test('Integrating nested complex formulas', () => {
@@ -709,8 +680,8 @@ describe('Integrating', () => {
 });
 
 describe('Inverting integrals', () => {
-  let variable: InvertibleIntegralFormula;
-  let constant: InvertibleIntegralFormula;
+  let variable: GenericFormula;
+  let constant: GenericFormula;
   beforeAll(() => {
     variable = Formula.variable(10);
     constant = Formula.constant(10);
@@ -720,7 +691,7 @@ describe('Inverting integrals', () => {
     expect(variable.invertIntegral(20)).compare_tolerance(Decimal.sqrt(20).mul(Decimal.sqrt(2))));
 
   describe('Invertible Integral functions marked as such', () => {
-    function checkFormula(formula: InvertibleIntegralFormula) {
+    function checkFormula(formula: GenericFormula) {
       expect(formula.isIntegralInvertible()).toBe(true);
       expect(() => formula.invertIntegral(10)).not.toLogError();
     }
@@ -1074,7 +1045,7 @@ describe('Conditionals', () => {
 });
 
 describe('Custom Formulas', () => {
-  let variable: InvertibleIntegralFormula;
+  let variable: GenericFormula;
   beforeAll(() => {
     variable = Formula.variable(1);
   });
@@ -1174,7 +1145,7 @@ describe('Custom Formulas', () => {
   });
 
   describe('Formula as input', () => {
-    let customFormula: InvertibleIntegralFormula;
+    let customFormula: GenericFormula;
     beforeAll(() => {
       customFormula = new Formula({
         inputs: [variable],
@@ -1454,7 +1425,7 @@ describe('Buy Max', () => {
       // spins forever. The cost must still resolve to a finite value.
       const purchases = ref(new Decimal(2).pow(53));
       const variable = Formula.variable(purchases);
-      const cost = calculateCost(variable, 20, true, 10);
+      const cost = calculateCost(variable, 20, true);
       expect(Decimal.isFinite(cost)).toBe(true);
     });
   });
@@ -1850,13 +1821,13 @@ describe('buy-max returns no count it could not price', () => {
    * counts only Formula inputs, and a node with none has no variable to seed
    * from at all.
    */
-  function overshootingCurve(level: MaybeRef<DecimalSource>): InvertibleFormula {
+  function overshootingCurve(level: MaybeRef<DecimalSource>): GenericFormula {
     return new Formula({
       inputs: [Formula.variable(level)],
       evaluate: (x: DecimalSource) => Decimal.add(Decimal.mul(x, 10), 10),
       invert: (value: DecimalSource, lhs: FormulaSource) =>
-        (lhs as InvertibleFormula).invert(Decimal.mul(value, 100)),
-    }) as InvertibleFormula;
+        (lhs as GenericFormula).invert(Decimal.mul(value, 100)),
+    }) as GenericFormula;
   }
 
   test('a seed the walk cannot reach is recovered by searching the price', () => {

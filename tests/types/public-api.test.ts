@@ -1118,7 +1118,49 @@ describe('ActionCategory.replay (B8)', () => {
   });
 });
 
+describe('Formula capability is a runtime question', () => {
+  type Index = typeof import('@/index');
+  type GenericFormula = import('@/index').GenericFormula;
+
+  it('calculateCost takes any formula, in one signature', () => {
+    expectTypeOf<Parameters<Index['calculateCost']>>().toEqualTypeOf<
+      [formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean]
+    >();
+  });
+
+  it('the capability predicates answer a boolean rather than narrowing', () => {
+    expectTypeOf<ReturnType<GenericFormula['isInvertible']>>().toEqualTypeOf<boolean>();
+    expectTypeOf<ReturnType<GenericFormula['isIntegrable']>>().toEqualTypeOf<boolean>();
+    expectTypeOf<ReturnType<GenericFormula['isIntegralInvertible']>>().toEqualTypeOf<boolean>();
+  });
+
+  it('cost-curve factories take a reactive or formula-valued parameter anywhere after the level', async () => {
+    const { Formula } = await import('@/index');
+    const slope = ref<DecimalSource>(5);
+    expectTypeOf(Formula.linear(0, Formula.constant(10), slope)).toEqualTypeOf<GenericFormula>();
+    expectTypeOf(Formula.exponential(0, 10, slope)).toEqualTypeOf<GenericFormula>();
+    expectTypeOf(Formula.polynomial(0, slope, Formula.constant(2))).toEqualTypeOf<GenericFormula>();
+    expectTypeOf(Formula.preset(0, 'moderate', slope)).toEqualTypeOf<GenericFormula>();
+  });
+});
+
 describe('Removed surface stays removed', () => {
+  it('the formula capability types no longer resolve from the root barrel', () => {
+    // @ts-expect-error — structurally identical to GenericFormula; check isInvertible() at runtime.
+    type _InvertibleFormula = import('@/index').InvertibleFormula;
+    // @ts-expect-error — same; check isIntegrable().
+    type _IntegrableFormula = import('@/index').IntegrableFormula;
+    // @ts-expect-error — same; check isIntegralInvertible().
+    type _InvertibleIntegralFormula = import('@/index').InvertibleIntegralFormula;
+  });
+
+  it('Formula.calculateConstantOfIntegration is gone — price levels with sum', () => {
+    type Keys = keyof import('@/index').GenericFormula;
+    expectTypeOf<
+      'calculateConstantOfIntegration' extends Keys ? true : false
+    >().toEqualTypeOf<false>();
+  });
+
   it('IResource and IModifier no longer resolve from the root barrel', () => {
     // @ts-expect-error — IResource was replaced by the Resource union.
     type _IResource = import('@/index').IResource;

@@ -44,12 +44,9 @@ import type {
   FormulaSource,
   GeneralFormulaOptions,
   GenericFormula,
-  IntegrableFormula,
   IntegrateFunction,
   FormulaProperties,
   InvertFunction,
-  InvertibleFormula,
-  InvertibleIntegralFormula,
   SubstitutionFunction,
   SubstitutionStack,
   SumFunction,
@@ -61,7 +58,7 @@ export function isFormula(value: unknown): value is GenericFormula {
 }
 
 /** Check if a formula source contains exactly one variable (required for inversion) */
-export function hasVariable(value: FormulaSource): value is InvertibleFormula {
+export function hasVariable(value: FormulaSource): value is GenericFormula {
   return value instanceof Formula && value.hasVariable();
 }
 
@@ -459,15 +456,15 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * pre-image at all for 3.5. For that question use {@link tryInvert}, which
    * grades the answer against the target it was given.
    */
-  isInvertible(): this is InvertibleFormula {
+  isInvertible(): boolean {
     return this.hasVariable() && (this.internalInvert != null || this.internalEvaluate == null);
   }
 
-  isIntegrable(): this is IntegrableFormula {
+  isIntegrable(): boolean {
     return this.hasVariable() && this.internalIntegrate != null;
   }
 
-  isIntegralInvertible(): this is InvertibleIntegralFormula {
+  isIntegralInvertible(): boolean {
     if (!this.isIntegrable()) return false;
     return this.getIntegralFormula().isInvertible();
   }
@@ -794,13 +791,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       );
       return 0;
     }
-    return (this.getIntegralFormula() as InvertibleFormula).invert(value);
-  }
-
-  calculateConstantOfIntegration() {
-    const integral = this.getIntegralFormula().evaluate(1);
-    const actualCost = Decimal.div(Decimal.add(this.evaluate(0), this.evaluate(1)), 2);
-    return Decimal.sub(actualCost, integral);
+    return this.getIntegralFormula().invert(value);
   }
 
   getIntegralFormula(stack?: SubstitutionStack): GenericFormula {
@@ -883,10 +874,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   // === STATIC CONSTRUCTORS ===
 
   /**
-   * Create a constant formula — a fixed value with no variable.
-   * Constants are always invertible and integrable (they pass through).
+   * Create a constant formula — a fixed value with no variable. With nothing to
+   * solve for, it is neither invertible nor integrable.
    */
-  public static constant(value: MaybeRef<DecimalSource>): InvertibleIntegralFormula {
+  public static constant(value: MaybeRef<DecimalSource>): GenericFormula {
     return new Formula({ inputs: [value] });
   }
 
@@ -905,7 +896,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * cost.invert(40);  // what level costs 40?
    * ```
    */
-  public static variable(value: MaybeRef<DecimalSource>): InvertibleIntegralFormula {
+  public static variable(value: MaybeRef<DecimalSource>): GenericFormula {
     return new Formula({ variable: value });
   }
 
@@ -920,25 +911,26 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * @param variable - Level input — typically a reactive ref (e.g., `purchasable.amount`),
    *   or a raw `DecimalSource` for ad-hoc evaluation via `.evaluate(level)`.
-   * @param base - Cost at level 0. Can be a ref for scoped tuning.
+   * @param base - Cost at level 0
    * @param mult - Per-level multiplier (e.g., `1.15` = +15% per level)
+   *
+   * Every parameter after `variable` can be a ref or a variable-free Formula,
+   * for a value a modifier or a tuning knob moves at runtime.
    *
    * @example
    * ```ts
    * const cost = Formula.exponential(purchasable.amount, 10, 1.15);
-   * cost.evaluate();           // reactive — cost at current level
-   * cost.invert(100);          // what level costs 100?
-   * cost.sum(0, 5);           // what levels 0..4 cost, bought one at a time
+   * cost.evaluate();   // reactive — cost at current level
+   * cost.invert(100);  // what level costs 100?
+   * cost.sum(0, 5);    // what levels 0..4 cost, bought one at a time
    * ```
    */
   public static exponential(
     variable: MaybeRef<DecimalSource>,
-    base: MaybeRef<DecimalSource>,
-    mult: DecimalSource,
-  ): InvertibleIntegralFormula {
-    return (Formula.variable(variable) as GenericFormula)
-      .pow_base(mult)
-      .mul(base) as InvertibleIntegralFormula;
+    base: FormulaSource,
+    mult: FormulaSource,
+  ): GenericFormula {
+    return Formula.variable(variable).pow_base(mult).mul(base);
   }
 
   /**
@@ -950,15 +942,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * @param variable - Level input (ref or raw DecimalSource)
    * @param base - Cost at level 0
    * @param coef - Per-level increment
+   *
+   * `base` and `coef` can be a ref or a variable-free Formula, as on
+   * {@link Formula.exponential}.
    */
   public static linear(
     variable: MaybeRef<DecimalSource>,
-    base: DecimalSource,
-    coef: DecimalSource,
-  ): InvertibleIntegralFormula {
-    return (Formula.variable(variable) as GenericFormula)
-      .mul(coef)
-      .add(base) as InvertibleIntegralFormula;
+    base: FormulaSource,
+    coef: FormulaSource,
+  ): GenericFormula {
+    return Formula.variable(variable).mul(coef).add(base);
   }
 
   /**
@@ -970,15 +963,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * @param variable - Level input (ref or raw DecimalSource)
    * @param base - Coefficient
    * @param exp - Exponent
+   *
+   * `base` and `exp` can be a ref or a variable-free Formula, as on
+   * {@link Formula.exponential}.
    */
   public static polynomial(
     variable: MaybeRef<DecimalSource>,
-    base: DecimalSource,
-    exp: DecimalSource,
-  ): InvertibleIntegralFormula {
-    return (Formula.variable(variable) as GenericFormula)
-      .pow(exp)
-      .mul(base) as InvertibleIntegralFormula;
+    base: FormulaSource,
+    exp: FormulaSource,
+  ): GenericFormula {
+    return Formula.variable(variable).pow(exp).mul(base);
   }
 
   /**
@@ -999,8 +993,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   public static preset(
     variable: MaybeRef<DecimalSource>,
     preset: 'gentle' | 'moderate' | 'aggressive',
-    base: DecimalSource,
-  ): InvertibleIntegralFormula {
+    base: FormulaSource,
+  ): GenericFormula {
     const mult = preset === 'gentle' ? 1.07 : preset === 'aggressive' ? 1.3 : 1.15;
     return Formula.exponential(variable, base, mult);
   }
@@ -1038,7 +1032,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   public static step(
     value: FormulaSource,
     start: Computable<DecimalSource>,
-    formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
+    formulaModifier: (value: GenericFormula) => GenericFormula,
   ) {
     const formula = formulaModifier(Formula.variable(0));
     const processedStart = processGetter(start);
@@ -1072,7 +1066,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   public step(
     start: Computable<DecimalSource>,
-    formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
+    formulaModifier: (value: GenericFormula) => GenericFormula,
   ) {
     return Formula.step(this, start, formulaModifier);
   }
@@ -1093,8 +1087,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   public static if(
     value: FormulaSource,
     condition: Computable<boolean>,
-    formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
-    elseFormulaModifier?: (value: InvertibleIntegralFormula) => GenericFormula,
+    formulaModifier: (value: GenericFormula) => GenericFormula,
+    elseFormulaModifier?: (value: GenericFormula) => GenericFormula,
   ) {
     // Branches are built over a placeholder variable and evaluated at the
     // input, as `step` does. Writing the input into a ref instead would make
@@ -1130,8 +1124,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   public if(
     condition: Computable<boolean>,
-    formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
-    elseFormulaModifier?: (value: InvertibleIntegralFormula) => GenericFormula,
+    formulaModifier: (value: GenericFormula) => GenericFormula,
+    elseFormulaModifier?: (value: GenericFormula) => GenericFormula,
   ) {
     return Formula.if(this, condition, formulaModifier, elseFormulaModifier);
   }
@@ -1140,8 +1134,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   public conditional(
     condition: Computable<boolean>,
-    formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
-    elseFormulaModifier?: (value: InvertibleIntegralFormula) => GenericFormula,
+    formulaModifier: (value: GenericFormula) => GenericFormula,
+    elseFormulaModifier?: (value: GenericFormula) => GenericFormula,
   ): GenericFormula {
     return Formula.if(this, condition, formulaModifier, elseFormulaModifier);
   }
@@ -1720,26 +1714,16 @@ function countAffordable(
  * {@link calculateMaxAffordable}, which counts levels through the same
  * operation so the count and the charge agree.
  *
- * @param formula - Cost formula (must be invertible; must be integrable if cumulative)
- * @param amountToBuy - Number of levels to price
+ * @param formula - Cost formula — the price of the level at its variable
+ * @param amountToBuy - Number of levels to price; a fractional amount takes every whole level below it
  * @param cumulativeCost - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
- * @returns The total cost as a DecimalSource
+ * @returns The total cost, or 0 with a report when the span has no price
  */
 export function calculateCost(
-  formula: InvertibleFormula,
-  amountToBuy: DecimalSource,
-  cumulativeCost?: true,
-): DecimalSource;
-export function calculateCost(
-  formula: InvertibleIntegralFormula,
-  amountToBuy: DecimalSource,
-  cumulativeCost: boolean,
-): DecimalSource;
-export function calculateCost(
-  formula: InvertibleFormula,
+  formula: GenericFormula,
   amountToBuy: DecimalSource,
   cumulativeCost = true,
-) {
+): DecimalSource {
   const origValue = unref(formula.innermostVariable) ?? 0;
   if (Decimal.lte(amountToBuy, 0)) return Decimal.dZero;
   if (!cumulativeCost) return formula.evaluate(Decimal.add(origValue, amountToBuy));

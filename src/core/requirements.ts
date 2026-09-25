@@ -16,7 +16,7 @@ import { Decimal, type DecimalSource, formatSmall, renormIfLayer0 } from '@/prim
 import { processGetter, type Computable } from './computed';
 import type { Resource } from './resource';
 import { SkipPersistence, DefaultValue, cloneDefault, type Persistent } from './persistence';
-import type { GenericFormula, InvertibleFormula } from './formulas';
+import type { GenericFormula } from './formulas';
 import { calculateCost, calculateMaxAffordable, isFormula } from './formulas';
 
 // === CORE TYPES ===
@@ -185,11 +185,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
 
   function getCost(amount: DecimalSource = 1): DecimalSource {
     if (isFormula(processedCost)) {
-      return calculateCost(
-        processedCost as InvertibleFormula,
-        amount,
-        unref(processedCumulativeCost),
-      );
+      return calculateCost(processedCost, amount, unref(processedCumulativeCost));
     }
     return Decimal.mul(unref(processedCost), amount);
   }

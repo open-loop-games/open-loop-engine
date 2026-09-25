@@ -15,13 +15,7 @@ import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
 import { findCrossing } from './root-find';
 import { NOT_SUMMABLE, exactSeries, geometricSeries, powerSeries, type Series } from './series';
-import type {
-  FormulaSource,
-  GenericFormula,
-  InvertFunction,
-  InvertibleFormula,
-  SubstitutionStack,
-} from './types';
+import type { FormulaSource, GenericFormula, InvertFunction, SubstitutionStack } from './types';
 
 const ln10 = Decimal.ln(10);
 
@@ -120,7 +114,7 @@ export function passthrough<T extends GenericFormula | DecimalSource>(value: T):
 }
 
 export function invertPassthrough(value: DecimalSource, ...inputs: FormulaSource[]) {
-  const variable = inputs.find((input) => hasVariable(input)) as InvertibleFormula | undefined;
+  const variable = inputs.find((input) => hasVariable(input));
   if (variable == null) {
     reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
     return 0;
@@ -356,7 +350,7 @@ function buildIntegrateAdd(
       // for the K·x²/2 shapes is the same algebra spelled a second time, so it
       // only adds a place for the two to disagree.
       if (!F_integral.isInvertible()) return Decimal.add(F_val, c_val);
-      const x = (F_integral as InvertibleFormula).invert(F_val);
+      const x = F_integral.invert(F_val);
       return Decimal.add(F_val, Decimal.mul(c_val, x));
     },
     invert: (
@@ -381,14 +375,14 @@ function buildIntegrateAdd(
       }
 
       // Generic shape (cubic and higher): solve F(x) + c·x = target by bisection.
-      if (!hasVariable(F_input) || !(F_input as InvertibleFormula).isInvertible()) {
+      if (!hasVariable(F_input) || !F_input.isInvertible()) {
         reportInversionFailure(
           'not-invertible',
           'Could not invert integrateAdd: integral lhs is not invertible',
         );
         return 0;
       }
-      const F = F_input as InvertibleFormula;
+      const F = F_input;
       // F⁻¹(target) is the answer when c = 0, so it makes a tight starting
       // bracket for the general case.
       const x = findCrossing((v) => Decimal.add(F.evaluate(v), Decimal.mul(c, v)), target, {
@@ -453,7 +447,7 @@ function buildIntegrateSub(
       // the recovery of x from F(x), so open-coding it for the quadratic
       // shapes only adds a second spelling that can drift from the first.
       if (F_integral.isInvertible()) {
-        x = (F_integral as InvertibleFormula).invert(F_val);
+        x = F_integral.invert(F_val);
       } else {
         return variableOnLhs ? Decimal.sub(F_val, c_val) : Decimal.sub(c_val, F_val);
       }
@@ -485,14 +479,14 @@ function buildIntegrateSub(
         }
       }
 
-      if (!hasVariable(F_input) || !(F_input as InvertibleFormula).isInvertible()) {
+      if (!hasVariable(F_input) || !F_input.isInvertible()) {
         reportInversionFailure(
           'not-invertible',
           'Could not invert integrateSub: integral lhs is not invertible',
         );
         return 0;
       }
-      const F = F_input as InvertibleFormula;
+      const F = F_input;
       // `c·x - F(x)` rises then falls, so it is only monotone up to its turning
       // point. `findCrossing` cannot detect the violation, and this branch keeps
       // the pre-existing behaviour of taking the first crossing it finds.
