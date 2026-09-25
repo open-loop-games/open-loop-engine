@@ -157,9 +157,9 @@ export interface TemporaryEffectSystem {
   isActive(defId: string): ComputedRef<boolean>;
   /** How many instances of the given def are active (reactive) */
   activeCount(defId: string): ComputedRef<number>;
-  /** All currently active instances (snapshot copy) */
+  /** All currently active instances, as a fresh array each call (reactive) */
   getActive(): TemporaryEffectInstance[];
-  /** Active instances whose def has the given tag */
+  /** Active instances whose def has the given tag (reactive) */
   getByTag(tag: string): TemporaryEffectInstance[];
   /** Reconstruct active instances from saved state. Call after save load. */
   restore(): void;

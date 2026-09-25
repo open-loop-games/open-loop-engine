@@ -37,7 +37,7 @@
  * @cluster effects
  */
 
-import { computed, watch, unref, type ComputedRef, type WatchStopHandle } from 'vue';
+import { computed, ref, watch, unref, type ComputedRef, type WatchStopHandle } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
@@ -109,9 +109,9 @@ export interface PersistentEffectSystem {
   allDefs(): readonly PersistentEffectDef[];
   /** Whether the given def is currently active (reactive) */
   isActive(defId: string): ComputedRef<boolean>;
-  /** All currently active definitions (snapshot copy) */
+  /** All currently active definitions, as a fresh array each call (reactive) */
   getActive(): PersistentEffectDef[];
-  /** Active definitions with the given tag */
+  /** Active definitions with the given tag (reactive) */
   getByTag(tag: string): PersistentEffectDef[];
   /** Subscribe to system events */
   on: Emittable<PersistentEffectEvents>['on'];
@@ -189,6 +189,8 @@ export function createPersistentEffectSystem(
 ): PersistentEffectSystem {
   const entries = new Map<string, DefEntry>();
   const handle = createEmitHandle<PersistentEffectEvents>();
+  // Bumped on every edge so `getActive` / `getByTag` track the applied set.
+  const appliedVersion = ref(0);
 
   function resolveModifier(binding: ModifierBinding): Modifier {
     return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
@@ -204,12 +206,14 @@ export function createPersistentEffectSystem(
       }
     }
     entry.isApplied = true;
+    appliedVersion.value++;
   }
 
   function removeBindings(entry: DefEntry): void {
     for (const remover of entry.modifierRemovers) remover();
     entry.modifierRemovers = [];
     entry.isApplied = false;
+    appliedVersion.value++;
   }
 
   /**
@@ -299,6 +303,7 @@ export function createPersistentEffectSystem(
   }
 
   function getActive(): PersistentEffectDef[] {
+    void appliedVersion.value;
     const out: PersistentEffectDef[] = [];
     for (const entry of entries.values()) {
       if (entry.isApplied) out.push(entry.def);

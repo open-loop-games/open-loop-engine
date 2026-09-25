@@ -360,6 +360,20 @@ describe('queries', () => {
     expect(system.getByTag('flame').map((d) => d.id)).toEqual(['b']);
   });
 
+  it('getActive and getByTag are reactive, like temporary-effect', () => {
+    const system = createSystem();
+    const aura = ref(false);
+    system.register({ id: 'aura', active: aura, tags: ['glow'] });
+    const active = computed(() => system.getActive().map((d) => d.id));
+    const glowing = computed(() => system.getByTag('glow').length);
+    expect(active.value).toEqual([]);
+    expect(glowing.value).toBe(0);
+
+    aura.value = true;
+    expect(active.value).toEqual(['aura']);
+    expect(glowing.value).toBe(1);
+  });
+
   it('emits activated/deactivated events', async () => {
     const system = createSystem();
     const active = ref(false);
