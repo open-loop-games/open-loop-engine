@@ -1,7 +1,7 @@
 /**
  * Shared types for the content-walker family. Three leaf walkers —
- * {@link walkChallengeTransitions} (C1), walkPurchasableTransitions (C2),
- * walkProducerTransitions (C3) — emit the same {@link Transition} shape so
+ * {@link walkChallengeTransitions}, walkPurchasableTransitions,
+ * walkProducerTransitions — emit the same {@link Transition} shape so
  * `createTransitionSnapshot` can concatenate, sort, and group uniformly.
  *
  * Unified shape so the canonical engine-internal consumers (`runUntil`'s
@@ -26,11 +26,11 @@ export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
 /**
  * A pending state change surfaced by the content walkers.
  *
- * `kind` is narrowed per `source` (e.g. challenge emits `visibility-reveal`,
- * `start-unlock`, `goal-complete`, `challenge-maxed`; purchasable emits
- * `becomes-affordable`, `purchasable-maxed`; producer emits
- * `producer-self-pays`). Consumers that need exhaustive narrowing pattern-
- * match on `source` first, then on `kind`.
+ * `kind` is narrowed per `source`: challenge emits `visibility-reveal`,
+ * `start-unlock`, `goal-complete` and `challenge-maxed`; purchasable emits
+ * `becomes-affordable` and `purchasable-maxed`; producer emits
+ * `producer-becomes-affordable`. Consumers that need exhaustive narrowing
+ * pattern-match on `source` first, then on `kind`.
  */
 export interface Transition {
   /** Which content-walker leaf produced this transition. */
