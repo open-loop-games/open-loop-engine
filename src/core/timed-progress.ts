@@ -264,21 +264,16 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
   const tickProgressDelta = ref<DecimalSource>(0) as Ref<DecimalSource>;
   const processed = buildProcessedOptions(options);
   const { percentComplete, timeRemaining } = buildComputeds(state, processed);
-  const latch: CompletionLatch = { completed: false, lastWritten: undefined };
+  const tickCtx: TimedProgressTickContext = {
+    state,
+    latch: { completed: false, lastWritten: undefined },
+    tickProgressDelta,
+    processed,
+    onProgress: options.onProgress,
+    onComplete: options.onComplete,
+  };
 
-  const unsubTick = options.registerTick((dt: number) =>
-    tickTimedProgress(
-      {
-        state,
-        latch,
-        tickProgressDelta,
-        processed,
-        onProgress: options.onProgress,
-        onComplete: options.onComplete,
-      },
-      dt,
-    ),
-  );
+  const unsubTick = options.registerTick((dt: number) => tickTimedProgress(tickCtx, dt));
 
   const timedProgress: TimedProgress = {
     id: actualId,
