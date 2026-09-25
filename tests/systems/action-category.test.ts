@@ -17,6 +17,7 @@ import { Resettable } from '@/systems/resettable';
 import { createEngine, type EngineModule } from '@/engine';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import type { RegisterTick } from '@/core/sequencer';
+import { enableProfiling, getProfileReport } from '@/core/profiler';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -110,6 +111,20 @@ describe('createActionCategory — registration + per-def state', () => {
     expect(category.getEntry('mine')?.def.baseTicks).toBe(5);
     expect(category.getAll().map((e) => e.def.id)).toEqual(['chop', 'mine']);
     expect(Decimal.eq(category.getState('chop')!.timesCompleted.value, 0)).toBe(true);
+  });
+
+  it('profiles the dispatcher tick under category/def/tick while profiling is on', () => {
+    const { category, driver } = makeCategory();
+    category.register([{ id: 'chop', baseTicks: 5 }]);
+    category.enqueue('chop', { payload: { count: 1 } });
+    const off = enableProfiling();
+    try {
+      driver.tick(1);
+      const labels = getProfileReport().entries.map((e) => e.name);
+      expect(labels).toContain(`${category.id}/chop/tick`);
+    } finally {
+      off();
+    }
   });
 
   it('throws on enqueue of an unregistered defId', () => {

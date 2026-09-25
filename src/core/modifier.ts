@@ -20,7 +20,7 @@ import { processGetter, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import { getCurrentChainRegistry } from './registries';
 import { getCurrentFullContext } from './persistence';
-import { profile } from './profiler';
+import { isProfilingEnabled, profile } from './profiler';
 
 /**
  * A single step in a value calculation pipeline.
@@ -333,19 +333,21 @@ export function createSequentialModifier<T extends Modifier>(
         return typeof desc === 'function' ? desc() : desc;
       });
 
+  // Reduce body keeps the accumulator renormalized so each modifier's
+  // typeof fast path can fire; the final return wraps once to Decimal so
+  // consumers chaining `.mul()/.gt()/.toNumber()` on the output see the
+  // instance form.
+  const applyAll = (gain: DecimalSource): Decimal =>
+    toFinalDecimal(
+      modifiers
+        .filter((m) => unref(m.enabled) !== false)
+        .reduce<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.apply(acc)), gain),
+    );
+
   return {
-    // Reduce body keeps the accumulator renormalized so each modifier's
-    // typeof fast path can fire; the final return wraps once to Decimal so
-    // consumers chaining `.mul()/.gt()/.toNumber()` on the output see the
-    // instance form.
+    // Hot path: the profile closure is only built while someone is profiling.
     apply: (gain: DecimalSource) =>
-      profile('modifier.chain.apply', () =>
-        toFinalDecimal(
-          modifiers
-            .filter((m) => unref(m.enabled) !== false)
-            .reduce<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.apply(acc)), gain),
-        ),
-      ),
+      isProfilingEnabled() ? profile('modifier.chain.apply', () => applyAll(gain)) : applyAll(gain),
 
     // Getters, so a child that gains or loses `invert` / `description` after
     // composition (a nested chain, say) is seen on the next read.

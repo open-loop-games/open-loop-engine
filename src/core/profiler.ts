@@ -49,7 +49,11 @@ export function enableProfiling(): () => void {
   };
 }
 
-/** Whether any caller currently holds a profile subscription. */
+/**
+ * Whether any caller currently holds a profile subscription. Hot wrap sites
+ * check it before building a label or a closure for {@link profile}, so
+ * they too cost one branch while nobody is profiling.
+ */
 export function isProfilingEnabled(): boolean {
   return refcount > 0;
 }

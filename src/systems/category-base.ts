@@ -30,7 +30,7 @@ import {
   type ModifierDescription,
 } from '@/core/modifier';
 import { processGetter } from '@/core/computed';
-import { profile } from '@/core/profiler';
+import { isProfilingEnabled, profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { createContentRegistryHandle, type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
@@ -381,7 +381,7 @@ export function setupCategoryTick<Def extends { id: string }, Instance, State>(
   };
 
   return registerTick((dt: number) => {
-    if (profileLabel) {
+    if (profileLabel && isProfilingEnabled()) {
       profile(profileLabel, () => walk(dt));
     } else {
       walk(dt);
