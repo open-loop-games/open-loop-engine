@@ -268,8 +268,9 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
   accessor?: GameStateAccessor;
 
   /**
-   * Game state mutator for applying reward effects.
-   * Required if any defs use rewards (IEffect[]).
+   * Game state mutator that applies `completionEffects`. Falls back to the
+   * ambient accessor wired by `createEngine`; registering a def with
+   * `completionEffects` throws when neither resolves.
    */
   mutator?: GameStateMutator;
 
@@ -440,6 +441,13 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   const base: CategoryBase<Def, Challenge, State> = createCategoryBase({
     id: categoryId,
     buildInstance(def: Def): Challenge {
+      if (def.completionEffects?.length && !(accessor && mutator)) {
+        throw new Error(
+          `Challenge "${def.id}" has completionEffects but category "${categoryId}" has no ` +
+            'accessor and mutator to apply them; pass both, or build it inside createEngine',
+        );
+      }
+
       const active = persistent<boolean>(false, { name: 'active', lifetime: true });
       const completions = persistent<number>(0, { name: 'completions', lifetime: true });
       const limit = def.completionLimit ?? 1;

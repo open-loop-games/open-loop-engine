@@ -8,6 +8,7 @@ import {
   withPersistentContext,
 } from '@/core/persistence';
 import { createOverrideRegistry } from '@/core/override-registry';
+import { E } from '@/core/effects';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createContentRegistry } from '@/systems/content-registry';
 import { createReset, type Reset } from '@/systems/reset';
@@ -272,5 +273,19 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     expect(combat()).toBe(10);
     expect(cost()).toBe(5);
     expect(log).toEqual(['enter zombie']);
+  });
+});
+
+describe('ChallengeCategory — completionEffects need a mutator', () => {
+  it('throws at register when a def has completionEffects and no mutator resolves', () => {
+    const challenges = createChallengeCategory({ id: 'ch-no-mutator' });
+
+    expect(() =>
+      challenges.register({
+        id: 'grant',
+        name: 'Grant',
+        completionEffects: [E.resource('gold', 'add', 1)],
+      }),
+    ).toThrow(/completionEffects/);
   });
 });
