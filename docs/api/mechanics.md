@@ -55,8 +55,7 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:75`
 - `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:100`
 - `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:95`
-- `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1722`
-- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean): DecimalSource` `src/core/formulas/formulas.ts`
+- `function calculateCost(formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1722`
 - `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "buy max" for repeatables and conversions. `src/core/formulas/formulas.ts:1447`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:72`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:25`
@@ -73,15 +72,12 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `type GenericFormula = Formula<any>` — Any Formula instance, regardless of capability. `src/core/formulas/types.ts:19`
 - `function geometricSeries(base: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ base^(from + i)` for `i` in `[0, count)`. `src/core/formulas/series.ts:86`
 - `type GuardedFormulasToDecimals<T extends FormulaSource[]> = TupleGuard<T>` — Inference-friendly alias of FormulasToDecimals that keeps tuple positions intact under TypeScript's mapped-type rules. `src/core/formulas/types.ts:134`
-- `function hasVariable(value: FormulaSource): value is InvertibleFormula` — Check if a formula source contains exactly one variable (required for inversion). `src/core/formulas/formulas.ts:61`
-- `type IntegrableFormula` — A formula that supports cumulative cost calculation via integration. `src/core/formulas/types.ts`
+- `function hasVariable(value: FormulaSource): value is GenericFormula` — Check if a formula source contains exactly one variable (required for inversion). `src/core/formulas/formulas.ts:61`
 - `type IntegrateFunction<T extends FormulaSource[]> = (this: Formula<T>, stack: SubstitutionStack | undefined, ...inputs: T) => GenericFormula` — Integration function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:38`
 - `type Inversion` — Diagnosed result of Formula.tryInvert / Formula.tryInvertIntegral. `src/core/formulas/inversion.ts:66`
 - `type InversionFailureReason` — Why an inversion has no usable answer. `src/core/formulas/inversion.ts:39`
 - `function inversionTolerance(target: DecimalSource): number` — Relative tolerance the image check can honestly demand at `target`'s magnitude. `src/core/formulas/inversion.ts:143`
 - `type InvertFunction<T extends FormulaSource[]> = (this: Formula<T>, value: DecimalSource, ...inputs: T) => DecimalSource` — Inversion function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:31`
-- `type InvertibleFormula` — A formula that supports backward evaluation (invert). `src/core/formulas/types.ts`
-- `type InvertibleIntegralFormula` — A formula with full capability: evaluate, invert, integrate, and invert the integral. `src/core/formulas/types.ts`
 - `function isFormula(value: unknown): value is GenericFormula` — Type guard for Formula instances. `src/core/formulas/formulas.ts:56`
 - `type Passage` — Result of Formula.firstPassage. `src/core/formulas/passage.ts:67`
 - `function powerSeries(power: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource | null` — `Σ (from + i)^power` for `i` in `[0, count)`, at non-negative integer `power`, non-negative `from` and integer `count`. `src/core/formulas/series.ts:113`
