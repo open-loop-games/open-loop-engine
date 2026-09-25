@@ -10,12 +10,12 @@
  *
  * 1. {@link createIncrementalSnapshot} each iteration — finite-distance head is
  *    the next walker-visible event.
- * 2. {@link advanceToNextEvent} advances the engine by the smallest finite
- *    distance, floored at `tickDelta` so dense auto-purchase cadence can't
- *    collapse the advance into a per-step snapshot-rebuild cliff, and capped
- *    at the remaining budget so no advance crosses `maxSimTime`. Every engine
- *    advance goes through {@link simulateSpan}, so a distance beyond the
- *    driver's `maxDeltaTime` is simulated in full, not clamped.
+ * 2. {@link resolveNextEvent} picks the smallest finite distance, floored at
+ *    `tickDelta` so dense auto-purchase cadence can't collapse the advance
+ *    into a per-step snapshot-rebuild cliff, and capped at the remaining
+ *    budget so no advance crosses `maxSimTime`. Every engine advance goes
+ *    through {@link simulateSpan}, so a distance beyond the driver's
+ *    `maxDeltaTime` is simulated in full, not clamped.
  * 3. Refuse handling splits by reason:
  *    - `'opaque-present'` — fall back to a `tickDelta` step. Opaque
  *      transitions could flip after a tick, so we tick and re-resolve.
@@ -51,15 +51,15 @@ import { Decimal } from '@/primitives/decimal';
 import { ResourceRegistryKey, type ResourceRegistry } from '@/core/registries';
 
 /** @internal */
-export type AdvanceToNextEventResult =
-  | { advanced: number; fired: Transition[] }
-  | { advanced: 0; reason: 'no-finite-transition' }
-  | { advanced: 0; reason: 'opaque-present' };
+export type NextEvent =
+  | { dt: number; fired: Transition[] }
+  | { reason: 'no-finite-transition' }
+  | { reason: 'opaque-present' };
 
 /**
- * Advance `engine` by the smallest finite transition distance in `snapshot`,
- * never past `remaining` sim-seconds, or refuse if the snapshot cannot be
- * mechanically resolved.
+ * How far to advance: the smallest finite transition distance in `snapshot`,
+ * never past `remaining` sim-seconds, or a refusal if the snapshot cannot be
+ * mechanically resolved. Touches no engine; the caller simulates `dt`.
  *
  * Refuse reasons:
  *
@@ -73,32 +73,30 @@ export type AdvanceToNextEventResult =
  *
  * The realized advance is floored at `tickDelta`: dense auto-purchase cadence
  * can collapse the head distance to a few milliseconds, and stepping by that
- * raw distance pays a full incremental-snapshot rebuild (plus checkpoint
- * export under `bisectTolSec`) per micro-step — the performance cliff this
- * floor exists to avoid. Flooring makes event mode asymptotically never worse than
- * tick mode; `fired` still reports only the transitions tied at the raw head
- * distance; the caller's existing bisection (triggered whenever
- * `advanced > bisectTolSec`) covers the case where the floor overshoots the
- * walker-reported fire time. The `remaining` cap applies after the floor, so
+ * raw distance pays a full incremental-snapshot rebuild per micro-step — the
+ * performance cliff this floor exists to avoid. Flooring makes event mode
+ * asymptotically never worse than tick mode; `fired` still reports only the
+ * transitions tied at the raw head distance; the caller's bisection
+ * (triggered whenever `dt > bisectTolSec`) covers the case where the floor
+ * overshoots the walker-reported fire time. The `remaining` cap applies after the floor, so
  * an advance cut short by the budget leaves `fired` unfired.
  *
  * @internal
  */
-export function advanceToNextEvent(
-  engine: Engine,
+export function resolveNextEvent(
   snapshot: TransitionSnapshot,
   tickDelta: number,
   remaining: number,
-): AdvanceToNextEventResult {
+): NextEvent {
   for (const t of snapshot.all) {
     if (t.distance.reason === 'opaque-predicate') {
-      return { advanced: 0, reason: 'opaque-present' };
+      return { reason: 'opaque-present' };
     }
   }
 
   const head = snapshot.all[0];
   if (!head || head.distance.seconds === null) {
-    return { advanced: 0, reason: 'no-finite-transition' };
+    return { reason: 'no-finite-transition' };
   }
 
   const rawDt = head.distance.seconds;
@@ -108,9 +106,7 @@ export function advanceToNextEvent(
     if (t.distance.seconds === rawDt) fired.push(t);
     else break;
   }
-
-  simulateSpan(engine.tickDriver, dt);
-  return { advanced: dt, fired };
+  return { dt, fired };
 }
 
 /** @internal */
@@ -177,20 +173,18 @@ export function runEventModeLoop(
     if (simTime >= maxSimTime) break;
 
     const snapshot = inc.rebuild();
-    const checkpoint =
-      bisectTolSec !== undefined
-        ? { blob: engine.saveManager!.exportSave(), rng: getRNGState() }
-        : null;
-    const advanceStart = profileStart();
-    const result = advanceToNextEvent(engine, snapshot, tickDelta, maxSimTime - simTime);
-    profileEnd('runUntil.event.advance', advanceStart);
+    const result = resolveNextEvent(snapshot, tickDelta, maxSimTime - simTime);
 
     if ('fired' in result) {
-      if (
-        checkpoint !== null &&
-        result.advanced > bisectTolSec! &&
-        predicate({ tick: steps, simTime: simTime + result.advanced })
-      ) {
+      // Only an advance bisection could narrow needs the pre-advance state.
+      const checkpoint =
+        bisectTolSec !== undefined && result.dt > bisectTolSec
+          ? { blob: engine.saveManager!.exportSave(), rng: getRNGState() }
+          : null;
+      const advanceStart = profileStart();
+      simulateSpan(engine.tickDriver, result.dt);
+      profileEnd('runUntil.event.advance', advanceStart);
+      if (checkpoint !== null && predicate({ tick: steps, simTime: simTime + result.dt })) {
         // Predicate flipped during this advance. Restore + replay sub-intervals
         // to narrow the fire time to within `bisectTolSec`; otherwise the
         // top-of-loop check on the next iteration would record
@@ -199,7 +193,7 @@ export function runEventModeLoop(
           engine,
           predicate,
           checkpoint,
-          result.advanced,
+          result.dt,
           bisectTolSec!,
           simTime,
           steps,
@@ -208,7 +202,7 @@ export function runEventModeLoop(
         terminated = 'predicate';
         break;
       }
-      simTime += result.advanced;
+      simTime += result.dt;
       before = commitDeps(inc, sample, before);
     } else if (result.reason === 'no-finite-transition') {
       // Walker sees nothing advancing. Tick at `tickDelta` without rebuilding

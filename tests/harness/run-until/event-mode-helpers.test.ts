@@ -8,7 +8,7 @@ import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot } from '@/harness';
-import { advanceToNextEvent } from '@/harness/run-until-helpers/event-mode';
+import { resolveNextEvent } from '@/harness/run-until-helpers/event-mode';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -87,7 +87,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   return engine;
 }
 
-describe('advanceToNextEvent', () => {
+describe('resolveNextEvent', () => {
   it('advances by the smallest finite distance on a reachable snapshot', () => {
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
     const engine = buildPurchasableEngine('adv-reachable');
@@ -95,10 +95,10 @@ describe('advanceToNextEvent', () => {
     // Walker sees gold=0, rate=5, cost=20 → 4s until affordable.
     expect(snap.all.length).toBeGreaterThan(0);
 
-    const result = advanceToNextEvent(engine, snap, 1, Infinity);
+    const result = resolveNextEvent(snap, 1, Infinity);
     expect('fired' in result).toBe(true);
     if ('fired' in result) {
-      expect(result.advanced).toBeCloseTo(4, 5);
+      expect(result.dt).toBeCloseTo(4, 5);
       expect(result.fired.length).toBeGreaterThan(0);
       expect(result.fired[0]!.kind).toBe('becomes-affordable');
     }
@@ -109,10 +109,10 @@ describe('advanceToNextEvent', () => {
     const engine = buildPurchasableEngine('adv-floor');
     const snap = createTransitionSnapshot(engine, accessor);
     // Walker sees a 4s head distance; floor at a tickDelta well past it.
-    const result = advanceToNextEvent(engine, snap, 10, Infinity);
+    const result = resolveNextEvent(snap, 10, Infinity);
     expect('fired' in result).toBe(true);
     if ('fired' in result) {
-      expect(result.advanced).toBe(10);
+      expect(result.dt).toBe(10);
       // `fired` still reports the transitions tied at the raw head distance,
       // not whatever the walker would see at the floored advance.
       expect(result.fired.length).toBeGreaterThan(0);
@@ -125,9 +125,9 @@ describe('advanceToNextEvent', () => {
     const engine = buildPurchasableEngine('adv-budget');
     const snap = createTransitionSnapshot(engine, accessor);
     // 4s head distance, floored to 10s, capped at the 2.5s left in the budget.
-    const result = advanceToNextEvent(engine, snap, 10, 2.5);
+    const result = resolveNextEvent(snap, 10, 2.5);
     expect('fired' in result).toBe(true);
-    expect(result.advanced).toBe(2.5);
+    expect(result).toMatchObject({ dt: 2.5 });
   });
 
   it('refuses with `no-finite-transition` on an empty snapshot', () => {
@@ -135,8 +135,8 @@ describe('advanceToNextEvent', () => {
     const snap = createTransitionSnapshot(engine, mockAccessor());
     expect(snap.all).toHaveLength(0);
 
-    const result = advanceToNextEvent(engine, snap, 1, Infinity);
-    expect(result).toEqual({ advanced: 0, reason: 'no-finite-transition' });
+    const result = resolveNextEvent(snap, 1, Infinity);
+    expect(result).toEqual({ reason: 'no-finite-transition' });
   });
 
   it('refuses with `no-finite-transition` when every transition is null-distance non-opaque', () => {
@@ -148,8 +148,8 @@ describe('advanceToNextEvent', () => {
     expect(snap.all.length).toBeGreaterThan(0);
     expect(snap.all[0]!.distance.seconds).toBeNull();
 
-    const result = advanceToNextEvent(engine, snap, 1, Infinity);
-    expect(result).toEqual({ advanced: 0, reason: 'no-finite-transition' });
+    const result = resolveNextEvent(snap, 1, Infinity);
+    expect(result).toEqual({ reason: 'no-finite-transition' });
   });
 
   it('refuses with `opaque-present` when any transition is opaque-predicate', () => {
@@ -159,7 +159,7 @@ describe('advanceToNextEvent', () => {
     // Every emission on the opaque challenge is opaque-predicate.
     expect(snap.all.some((t) => t.distance.reason === 'opaque-predicate')).toBe(true);
 
-    const result = advanceToNextEvent(engine, snap, 1, Infinity);
-    expect(result).toEqual({ advanced: 0, reason: 'opaque-present' });
+    const result = resolveNextEvent(snap, 1, Infinity);
+    expect(result).toEqual({ reason: 'opaque-present' });
   });
 });
