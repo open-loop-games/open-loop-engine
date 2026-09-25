@@ -10,6 +10,7 @@ import {
   type Modifier,
 } from '@/index';
 import { createPickerSnapshot } from '@/harness/picker';
+import { applyPerturbation } from '@/harness/perturbation';
 
 describe('createPickerSnapshot', () => {
   it('runs both walkers and returns a grouped snapshot', () => {
@@ -116,6 +117,53 @@ describe('createPickerSnapshot', () => {
     expect(snap.content[0].address.source).toBe('content');
     expect(snap.chains).toHaveLength(1);
     expect(snap.chains[0].label).toBe('damage[*]');
+
+    engine.stop();
+  });
+
+  it('offers a live effect binding only as its content entry, factory-built or overlaid', () => {
+    let damage!: ReturnType<typeof createModifierChain>;
+    let temp!: ReturnType<typeof createTemporaryEffectSystem>;
+    const mod: EngineModule = {
+      id: 'owned',
+      install(ctx) {
+        damage = createModifierChain('damage');
+        temp = createTemporaryEffectSystem({ id: 'buffs', registerTick: (cb) => ctx.onTick(cb) });
+        temp.register({
+          id: 'rage',
+          duration: 5,
+          // A factory builds a fresh modifier per activation, so the content
+          // walker's object never matches the one standing in the chain.
+          modifiers: [
+            { chain: damage, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) },
+          ],
+        });
+        temp.register({
+          id: 'focus',
+          duration: 5,
+          modifiers: [{ chain: damage, modifier: createMultiplicativeModifier({ multiplier: 3 }) }],
+        });
+        temp.apply('rage');
+        temp.apply('focus');
+      },
+    };
+    const engine = createEngine({
+      gameId: 'pk-owned',
+      persistence: false,
+      persistenceNamespace: `pk-owned-${Math.random().toString(36).slice(2)}`,
+    });
+    engine.use(mod);
+    engine.start();
+
+    const labels = () => createPickerSnapshot(engine).all.map((e) => e.label);
+    expect(damage.modifiers).toHaveLength(2);
+    expect(labels()).toEqual(['buffs.rage[0]', 'buffs.focus[0]', 'damage[*]']);
+
+    // A content perturbation seats a wrapper in the slot; that is effect-owned too.
+    const focus = createPickerSnapshot(engine).content.find((e) => e.label === 'buffs.focus[0]')!;
+    const cleanup = applyPerturbation(engine, focus, { kind: 'scalar-multiply', factor: 2 });
+    expect(labels()).toEqual(['buffs.rage[0]', 'buffs.focus[0]', 'damage[*]']);
+    cleanup();
 
     engine.stop();
   });

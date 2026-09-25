@@ -11,6 +11,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import type { Engine } from '@/engine';
 import type { Modifier } from '@/core/modifier';
 import { ChainRegistryKey } from '@/core/registries';
+import { isSlotBound } from '@/systems/binding-slots';
 import { forEachChainRegistryEntry } from '../walk';
 import type { ModifierPickerEntry } from './types';
 
@@ -20,7 +21,9 @@ import type { ModifierPickerEntry } from './types';
  * - one `chain-apply` entry per chain (targets the chain as a whole —
  *   perturbation appends a scalar wrapper, so empty-at-walk-time chains
  *   remain perturbable once they populate via purchases/binds).
- * - one `modifier-index` entry per existing modifier in each chain.
+ * - one `modifier-index` entry per existing modifier in each chain, except
+ *   those an effect binding put there — the content walker offers those,
+ *   and a chain-side swap would outlive the effect.
  *
  * Missing registry (e.g. an engine constructed outside the standard
  * `createEngine` flow) degrades to an empty array — not a crash.
@@ -55,6 +58,7 @@ export function walkChainRegistry(engine: Engine): ModifierPickerEntry[] {
       return;
     }
 
+    if (isSlotBound(modifier)) return;
     const modifierIndex = indexInChain as number;
     entries.push({
       kind: 'modifier',

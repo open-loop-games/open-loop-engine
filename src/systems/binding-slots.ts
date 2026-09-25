@@ -9,7 +9,8 @@
  * A binding can also carry overlays — wraps applied to whatever it resolves
  * to, on the live activations and on every later one until removed. The
  * balance harness perturbs effect content through them, reaching a
- * definition's slots by its system and id via {@link overlayBinding}.
+ * definition's slots by its system and id via {@link overlayBinding}, and
+ * tells an effect's modifiers from a chain's own via {@link isSlotBound}.
  *
  * @cluster effects
  */
@@ -53,6 +54,12 @@ interface LiveBinding {
 
 // === FACTORIES ===
 
+/**
+ * How many live bindings each object stands in, across every definition — a
+ * static modifier can stand in several activations at once.
+ */
+const seated = new WeakMap<Modifier, number>();
+
 /** Create the slot table for one effect definition. */
 export function createBindingSlots(): BindingSlots {
   // A factory-form binding list can aim one index at different chains across
@@ -78,7 +85,15 @@ export function createBindingSlots(): BindingSlots {
 
   function seat(binding: LiveBinding): void {
     const wraps = overlays.get(binding.index) ?? [];
-    binding.remove = binding.slot.add(wraps.reduce((m, wrap) => wrap(m), binding.resolved));
+    const standing = wraps.reduce((m, wrap) => wrap(m), binding.resolved);
+    seated.set(standing, (seated.get(standing) ?? 0) + 1);
+    const remove = binding.slot.add(standing);
+    binding.remove = () => {
+      remove();
+      const count = (seated.get(standing) ?? 1) - 1;
+      if (count > 0) seated.set(standing, count);
+      else seated.delete(standing);
+    };
   }
 
   /** Re-seat binding `index`'s live modifiers under the current overlays, keeping slot order. */
@@ -133,6 +148,7 @@ export function createBindingSlots(): BindingSlots {
       };
     },
     release() {
+      for (const binding of live) binding.remove();
       for (const byChain of byIndex.values()) for (const slot of byChain.values()) slot.release();
       byIndex.clear();
       live.length = 0;
@@ -140,7 +156,7 @@ export function createBindingSlots(): BindingSlots {
   };
 }
 
-// === OVERLAY ACCESS ===
+// === HARNESS ACCESS ===
 
 /** Effect system → its definitions' slot tables, by def id. */
 const slotsBySystem = new WeakMap<object, (defId: string) => BindingSlots | undefined>();
@@ -175,4 +191,15 @@ export function overlayBinding(
   const slots = lookup(defId);
   if (!slots) throw new Error(`effect def "${defId}" has no binding slots`);
   return slots.overlay(index, wrap);
+}
+
+/**
+ * Whether `modifier` stands in a binding slot: an effect activation put it
+ * in its chain and removes it when the effect ends, so only the effect's own
+ * binding can perturb it without stranding a wrapper there.
+ *
+ * @internal The balance harness's picker.
+ */
+export function isSlotBound(modifier: Modifier): boolean {
+  return seated.has(modifier);
 }

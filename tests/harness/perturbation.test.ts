@@ -15,7 +15,12 @@ import {
   type Engine,
   type EngineModule,
 } from '@/index';
-import { walkChainRegistry, walkContent, walkTunables } from '@/harness/picker';
+import {
+  createPickerSnapshot,
+  walkChainRegistry,
+  walkContent,
+  walkTunables,
+} from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
 
 function num(v: unknown): number {
@@ -131,16 +136,24 @@ describe('applyPerturbation — chain-registry source', () => {
   });
 
   it('finds the discovered modifier after an earlier slot fills and shifts its index', () => {
-    const { engine, on, dmg } = persistentDamage('pert-cr-stale');
-    on.flat.value = false;
+    let dmg!: ReturnType<typeof createModifierChain>;
+    let slot!: ReturnType<ReturnType<typeof createModifierChain>['reserve']>;
+    const engine = startEngine('pert-cr-stale', {
+      id: 'economy',
+      install() {
+        dmg = createModifierChain('dmg');
+        slot = dmg.reserve();
+        dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
+      },
+    });
     const multEntry = walkChainRegistry(engine).find((e) => e.label === 'dmg[0]')!;
-    on.flat.value = true;
+    slot.add(createAdditiveModifier({ addend: 5 }));
 
     // mult wrapped: (1 + 5) × 2 + 10; the modifier now at index 0 would give (1 + 5 + 10) × 2.
     const cleanup = applyPerturbation(engine, multEntry, { kind: 'scalar-add', delta: 10 });
-    expect(num(dmg().apply(1))).toBe(22);
+    expect(num(dmg.apply(1))).toBe(22);
     cleanup();
-    expect(num(dmg().apply(1))).toBe(12);
+    expect(num(dmg.apply(1))).toBe(12);
     engine.stop();
   });
 
@@ -529,6 +542,26 @@ describe('applyPerturbation — content source', () => {
     cleanup();
     expect(dmg.modifiers).toEqual([stacks[1], stacks[2]]);
     expect(num(dmg.apply(1))).toBe(12);
+    engine.stop();
+  });
+
+  it('offers an effect modifier once, so perturbing the snapshot strands nothing when effects end', () => {
+    const { engine, on, dmg } = persistentDamage('pert-content-owned');
+    // Every per-modifier entry on the chain; the factory-built mult isn't the walk-time object.
+    const entries = createPickerSnapshot(engine).all.filter(
+      (e) => e.kind === 'modifier' && e.chain === dmg() && e.label !== 'dmg[*]',
+    );
+    expect(entries.map((e) => e.label)).toEqual(['gear.flat[0]', 'gear.mult[0]']);
+
+    const cleanups = entries.map((e) =>
+      applyPerturbation(engine, e, { kind: 'scalar-multiply', factor: 3 }),
+    );
+    on.flat.value = false;
+    on.mult.value = false;
+    expect(dmg().modifiers).toHaveLength(0);
+    for (const cleanup of cleanups) cleanup();
+    expect(dmg().modifiers).toHaveLength(0);
+    expect(num(dmg().apply(1))).toBe(1);
     engine.stop();
   });
 
