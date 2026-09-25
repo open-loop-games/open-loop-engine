@@ -193,13 +193,20 @@ function serialize(entry: BestOfEntry): SerializedBestOfEntry {
   };
 }
 
+/** The entry's cycle number, read from `loopNumber` in an entry saved before the rename. */
+function savedCycleNumber(raw: SerializedBestOfEntry): number {
+  return (
+    (raw as { cycleNumber?: number }).cycleNumber ?? (raw as { loopNumber?: number }).loopNumber!
+  );
+}
+
 function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
   return {
     value: new Decimal(raw.value),
     perSecond: new Decimal(raw.perSecond),
     projected: raw.projected != null ? new Decimal(raw.projected) : undefined,
     elapsed: raw.elapsed,
-    cycleNumber: raw.cycleNumber,
+    cycleNumber: savedCycleNumber(raw),
     timestamp: raw.timestamp,
     strategySnapshot: raw.strategySnapshot,
     status: raw.status,
@@ -324,7 +331,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
     );
     const existingVal = applyRecencyDecay(
       rawExistingVal,
-      existing.cycleNumber,
+      savedCycleNumber(existing),
       candidate.cycleNumber,
       resolveRecencyHalfLife(metricDef),
     );

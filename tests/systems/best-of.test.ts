@@ -2,7 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
-import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  endPersistentContext,
+  getAllPersistentRefs,
+  deserializePersistents,
+} from '@/core/persistence';
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
@@ -481,6 +486,31 @@ describe('createBestOf', () => {
 
     expect(bestOf.entries.value.gold!.value.eq(60)).toBe(true);
     expect(bestOf.entries.value.gold!.cycleNumber).toBe(2);
+  });
+
+  it('an entry saved before the cycleNumber rename still ages and can be beaten', () => {
+    const bestOf = createBestOf({
+      id: 'bo-legacy',
+      metrics: { gold: { mode: 'absolute', recencyHalfLifeCycles: 2 } },
+    });
+    deserializePersistents(getAllPersistentRefs(), {
+      'bo-legacy': {
+        store: {
+          gold: {
+            value: '100',
+            perSecond: '10',
+            elapsed: 10,
+            loopNumber: 0,
+            timestamp: 0,
+            status: 'valid',
+          },
+        },
+      },
+    });
+
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(0);
+    bestOf.submit({ key: 'gold', value: 60, elapsed: 10, cycleNumber: 2 });
+    expect(bestOf.entries.value.gold!.value.eq(60)).toBe(true);
   });
 
   it('recency decay does not touch the stored incumbent value', () => {
