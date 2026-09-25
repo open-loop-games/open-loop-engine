@@ -23,6 +23,7 @@ shared skeleton for batch-registration categories
 generic typed registry for game content definitions
 
 - `interface ContentRegistry<T extends { id: string; }>` — A typed, Map-backed registry for game content definitions. `src/systems/content-registry.ts:44`
+- `type ContentRegistryView<T extends { id: string; }>` — A ContentRegistry without `register` — what a category exposes as its `registry`. `src/systems/content-registry.ts:104`
 - `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:140`
 
 ## Sequencer

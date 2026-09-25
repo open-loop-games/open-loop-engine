@@ -25,7 +25,7 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 - `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(name: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:176`
 - `function createTuningRegistry(name: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:277`
 - `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:82`
-- `function tunable<R>(registry: OverrideRegistry<Record<string, (...args: never[]) => unknown>>, key: string, defaultFn: () => R): ComputedRef<R>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:405`
+- `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:405`
 - `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:159`
 - `type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>` — Typed narrow over OverrideRegistry for "values intentionally declared as tuning surface." Every key resolves to a zero-arg reader returning a `DecimalSource`. `src/core/override-registry.ts:146`
 
@@ -48,9 +48,6 @@ three per-engine enumerable collections that external introspection tools (balan
 
 - `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:53`
 - `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:61`
-- `function createChainRegistry(): ChainRegistry` — Create a fresh, empty chain registry. `src/core/registries.ts:69`
-- `function createEffectSystemRegistry(): EffectSystemRegistry` — Create a fresh, empty effect-system registry. `src/core/registries.ts:141`
-- `function createResourceRegistry(): ResourceRegistry` — Create a fresh, empty resource registry. `src/core/registries.ts:224`
 - `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef` that the picker needs. `src/core/registries.ts:119`
 - `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:128`
 - `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:131`

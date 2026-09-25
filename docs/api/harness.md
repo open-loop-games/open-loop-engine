@@ -17,7 +17,7 @@ Reusable in-run trackers (resource peaks, loop finalize, default pack).
 
 - `function createCycleFinalizeTracker(): Analyzer` — Create an Analyzer that counts finalized cycles and snapshots the most recent cycle's deltas into the summary. `src/harness/analyzers/cycle-finalize.ts:28`
 - `function createResourcePeakTracker(resource: Resource): Analyzer` — Create an Analyzer that samples a single resource every tick and emits `{ peak, final, avg }` at the end of the run. `src/harness/analyzers/resource-peak.ts:68`
-- `function createSeriesTracker(resource: Resource): Analyzer` — Create an Analyzer that records a single resource's value at every tick and emits it as `series:{displayName}.t{i}` (zero-based tick index). `src/harness/analyzers/series.ts:48`
+- `function createSeriesTracker(resource: Resource): Analyzer` — Create an Analyzer that records a single resource's value at every tick and emits it as `series:{id}.t{i}` (zero-based tick index). `src/harness/analyzers/series.ts:48`
 - `function defaultAnalyzerPack(engine: Engine): Analyzer[]` — Build a fresh analyzer pack for the given engine. `src/harness/analyzers/default-pack.ts:43`
 - `function seriesAnalyzerPack(engine: Engine): Analyzer[]` — Build one createSeriesTracker per entry in the engine's resource registry — the trajectory-capturing counterpart to defaultAnalyzerPack. `src/harness/analyzers/series.ts:86`
 
@@ -150,7 +150,6 @@ Enumerate purchasables, producers, and challenges with their next-transition tim
 - `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:246`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:85`
 - `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:92`
-- `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:81`
 - `interface Transition` — A pending state change surfaced by the content walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:47`
 - `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which content-walker leaf produced a given Transition. `src/harness/walker/types.ts:24`

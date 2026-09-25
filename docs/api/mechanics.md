@@ -40,7 +40,7 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:85`
 - `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:99`
 - `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:93`
-- `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:105`
+- `function replacementBinding(options: ReplacementBindingOptions): Grant[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:105`
 - `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:44`
 - `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:59`
 - `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:129`
@@ -105,15 +105,20 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `function getRequiredGateHandles(gate: Gate, use?: 'evaluate' | 'predict'): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:194`
 - `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:150`
 - `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:108`
+- `type Predicate = Computable<boolean> | Gate` — A yes/no condition in any authoring form: a constant, a ref or getter over state in scope, or a Gate the engine can introspect and predict. `src/core/gate.ts:138`
 - `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:21`
 - `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:70`
 - `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:58`
+- `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:412`
 - `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string, use?: 'evaluate' | 'predict'): void` — Throw unless `runtime` carries every handle `gate` will read for `use`. `src/systems/gate.ts:383`
 - `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:538`
+- `function createPredicateResolver(override?: GateRuntime): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:461`
 - `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:173`
+- `function evaluatePredicate(predicate: Predicate, runtime: GateRuntime): boolean` — Evaluate a Predicate once against `runtime` — for consumer code that reads a predicate field back off a definition. `src/systems/gate.ts:498`
 - `interface GateRequirementOptions` `src/systems/gate.ts:505`
 - `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:122`
 - `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:147`
+- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateRuntime. `src/systems/gate.ts:425`
 - `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:235`
 
 ## Modifier
