@@ -36,8 +36,12 @@ export interface Modifier {
   invert?: (gain: DecimalSource) => DecimalSource;
   /** When `false`, this modifier is skipped in apply/invert chains. Can be a ref for reactive toggling. */
   enabled?: MaybeRef<boolean>;
-  /** Human-readable description for UI breakdown panels */
-  description?: MaybeGetter<ModifierDescription>;
+  /**
+   * Human-readable description for UI breakdown panels. A single modifier
+   * describes itself with one line; a composite ({@link createSequentialModifier},
+   * a {@link ModifierChain}) returns one line per enabled, described child.
+   */
+  description?: MaybeGetter<ModifierDescription | ModifierDescription[]>;
 }
 
 /** A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel */
@@ -324,7 +328,7 @@ export function createSequentialModifier<T extends Modifier>(
   const describeAll = (): ModifierDescription[] =>
     modifiers
       .filter((m) => unref(m.enabled) !== false && m.description != null)
-      .map((m) => {
+      .flatMap((m) => {
         const desc = m.description!;
         return typeof desc === 'function' ? desc() : desc;
       });
@@ -628,7 +632,7 @@ export function createModifierChain(id: string): ModifierChain {
       if (items.length === 0 || items.every((m) => m.enabled == null)) return true;
       return items.some((m) => unref(m.enabled) !== false);
     }),
-    get description(): MaybeGetter<ModifierDescription> | undefined {
+    get description(): MaybeGetter<ModifierDescription | ModifierDescription[]> | undefined {
       void itemsVersion.value;
       return composed.description;
     },
@@ -743,7 +747,7 @@ function delegateWithEnabled(raw: Modifier, enabled: MaybeRef<boolean>): Modifie
     get description() {
       const desc = raw.description;
       return typeof desc === 'function'
-        ? () => (raw.description as () => ModifierDescription)()
+        ? () => (raw.description as () => ModifierDescription | ModifierDescription[])()
         : desc;
     },
     enabled,

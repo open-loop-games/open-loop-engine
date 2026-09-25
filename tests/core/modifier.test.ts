@@ -255,6 +255,17 @@ describe('createModifierChain', () => {
 });
 
 describe('nested chains', () => {
+  it('a chain describes itself as one flat line per described child', () => {
+    const inner = createModifierChain('desc-inner');
+    const outer = createModifierChain('desc-outer');
+    inner.add(createMultiplicativeModifier({ multiplier: 3, description: 'Triple' }));
+    outer.add(createAdditiveModifier({ addend: 1, description: 'Base' }));
+    outer.add(inner);
+    const desc = outer.description;
+    const lines = typeof desc === 'function' ? desc() : desc;
+    expect(Array.isArray(lines) && lines.map((l) => l.text)).toEqual(['Base', 'Triple']);
+  });
+
   it('an outer chain drops invert once an added inner chain loses it', () => {
     const inner = createModifierChain('nest-inner');
     const outer = createModifierChain('nest-outer');
