@@ -105,6 +105,15 @@ export interface RecommendationDef {
   /**
    * Numeric score for arbitration. Higher wins. Only called when `canApply`
    * returns `true`. On ties, the first-registered def wins.
+   *
+   * Scores are compared raw across every registered def, so defs sharing a
+   * system must score on one scale. The built-ins score in these units, each
+   * log10 floored at 0 (magnitudes below 1 score 0):
+   * - `createBestReplayDef` — log10 of the best entry's per-second rate, or of
+   *   its value when that rate isn't finite.
+   * - `createGoalDef` — log10 of the best entry's value under `'maximize'`;
+   *   minus its elapsed seconds under `'minimize'`, which never beats a
+   *   non-negative score.
    */
   score: (ctx: RecommendationContext) => number;
   /**
@@ -338,8 +347,11 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  *   cycle: gameLoop,
  *   cycleLog: myCycleLog,
  *   bestOf: myBestOf,
- *   getCurrentSnapshot: () => ({ loadout: currentLoadout.snapshot() }),
- *   applySnapshot: (snap) => currentLoadout.restore(snap.loadout),
+ *   // Snapshots are opaque `State`; keep one shape across these callbacks
+ *   // and bestOf's captureStrategy.
+ *   getCurrentSnapshot: () => currentLoadout.snapshot(),
+ *   applySnapshot: (snap) => currentLoadout.restore(snap),
+ *   // Scores compare raw across defs: log10 of gold/s against log10 of xp.
  *   defs: [
  *     createBestReplayDef('gold'),
  *     createGoalDef({ id: 'max-xp', metric: 'xp' }),

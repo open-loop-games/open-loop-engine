@@ -44,8 +44,12 @@ export interface GoalDefOptions {
   /** The BestOf metric key to optimize for */
   metric: string;
   /**
-   * `'maximize'` — prefer the config with the highest value (default).
-   * `'minimize'` — prefer the config with the lowest elapsed time for a given threshold.
+   * How the metric's best entry is scored. `'maximize'` (default) scores it by
+   * log10 of its value; `'minimize'` scores that same entry by minus its
+   * elapsed seconds. BestOf keeps one entry per metric, ranked by its value
+   * or per-second rate, so `'minimize'` recommends the same snapshot as `'maximize'` and
+   * cannot surface a faster, lower-value config — only the score and the
+   * summary wording change.
    */
   prefer?: 'maximize' | 'minimize';
   /**
@@ -161,8 +165,9 @@ export function createBestReplayDef(
 
 /**
  * Create a def that selects the configuration optimizing for a specific
- * metric goal. More opinionated than {@link createBestReplayDef} — it
- * supports goal direction (maximize value vs minimize time) and threshold gating.
+ * metric goal. More opinionated than {@link createBestReplayDef} — it adds
+ * threshold gating and a choice of score (value or elapsed time) for the
+ * metric's best entry.
  *
  * @param options - Goal definition with metric, direction, and optional threshold
  * @returns A {@link RecommendationDef} ready to register
@@ -175,7 +180,9 @@ export function createBestReplayDef(
  *     createGoalDef({ id: 'farm-gold', metric: 'gold', prefer: 'maximize' }),
  *     createGoalDef({
  *       id: 'speed-clear', metric: 'damage', prefer: 'minimize',
- *       threshold: 1000,  // only suggest when damage > 1000 is achievable
+ *       // Applicable once the best run reached 1000 damage; scored by that
+ *       // run's elapsed time, not by searching for a faster one.
+ *       threshold: 1000,
  *     }),
  *   ],
  * });
