@@ -659,6 +659,17 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   }
 
   /**
+   * Write raw save text into `slotId`, or remove its save when `raw` is null.
+   * Storage then no longer holds the save a failed load refused, so the
+   * slot's protection lifts.
+   */
+  function writeRawSlot(slotId: number, raw: string | null): void {
+    if (raw === null) storage.removeItem(slotStorageKey(slotId));
+    else storage.setItem(slotStorageKey(slotId), raw);
+    _protectedSlots.delete(slotId);
+  }
+
+  /**
    * Normalize an envelope's `data` field to an object: if v3 envelope marks
    * `_engine.compression === 'lz'`, decompress and JSON.parse. Throws
    * `LoadFailure('parse-error')` on any decompression / parse failure.
@@ -866,8 +877,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     deleteSave() {
-      storage.removeItem(activeStorageKey());
-      _protectedSlots.delete(_activeSlotId);
+      writeRawSlot(_activeSlotId, null);
     },
 
     peek(): SavePeek | null {
@@ -902,8 +912,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       const idx = _slots.findIndex((s) => s.id === slotId);
       if (idx === -1) throw new Error(`Save slot ${slotId} not found`);
       _slots.splice(idx, 1);
-      storage.removeItem(slotStorageKey(slotId));
-      _protectedSlots.delete(slotId);
+      writeRawSlot(slotId, null);
       saveSlotIndex();
     },
 
@@ -954,7 +963,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       }
       const destId = allocSlot(name);
       const raw = storage.getItem(slotStorageKey(srcId));
-      if (raw !== null) storage.setItem(slotStorageKey(destId), raw);
+      if (raw !== null) writeRawSlot(destId, raw);
       return destId;
     },
 
@@ -965,13 +974,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       if (!_slots.find((s) => s.id === destId)) {
         throw new Error(`Save slot ${destId} not found`);
       }
-      const raw = storage.getItem(slotStorageKey(srcId));
-      if (raw !== null) {
-        storage.setItem(slotStorageKey(destId), raw);
-      } else {
-        storage.removeItem(slotStorageKey(destId));
-      }
-      _protectedSlots.delete(destId);
+      writeRawSlot(destId, storage.getItem(slotStorageKey(srcId)));
     },
 
     exportSlot(slotId: number): string | null {
@@ -997,8 +1000,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         }
         targetId = slotId;
       }
-      storage.setItem(slotStorageKey(targetId), data);
-      _protectedSlots.delete(targetId);
+      writeRawSlot(targetId, data);
       return { success: true, timestamp: envelope.timestamp, slotId: targetId };
     },
   };
