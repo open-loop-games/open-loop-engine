@@ -204,7 +204,7 @@ export function createPersistentEffectSystem(
       }
 
       const activeSource = processGetter(d.active);
-      const activeRef = computed(() => !!unref(activeSource));
+      const activeRef = computed(() => unref(activeSource));
 
       const entry: DefEntry = {
         def: d,

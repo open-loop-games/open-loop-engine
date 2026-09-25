@@ -272,7 +272,7 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
 
       const scored: { id: TCandidate; score: number; order: number }[] = [];
       for (let i = 0; i < candidates.length; i++) {
-        const id = candidates[i]!;
+        const id = candidates[i];
         if (isActive(id)) continue;
         scored.push({ id, score: scorer(id, weights, context), order: i });
       }

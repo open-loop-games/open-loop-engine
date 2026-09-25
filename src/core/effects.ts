@@ -41,12 +41,7 @@ export interface GameStateMutator {
 // === HELPERS ===
 /** Duck-type check for objects with an evaluate() method (Formula, etc.) */
 function isEvaluable(v: unknown): v is { evaluate(): DecimalSource } {
-  return (
-    v != null &&
-    typeof v === 'object' &&
-    'evaluate' in v &&
-    typeof (v as { evaluate: unknown }).evaluate === 'function'
-  );
+  return v != null && typeof v === 'object' && 'evaluate' in v && typeof v.evaluate === 'function';
 }
 
 // === RESOLUTION & APPLICATION ===

@@ -46,8 +46,8 @@ function percentile(sorted: number[], p: number): number {
 export function computeMetricStats(values: number[]): MetricStats {
   // Caller ensures values.length >= 1. Single-pass min/max/avg, then a copy
   // for the sort so we don't mutate the caller's buffer.
-  let min = values[0]!;
-  let max = values[0]!;
+  let min = values[0];
+  let max = values[0];
   let sum = 0;
   for (const v of values) {
     if (v < min) min = v;
@@ -66,7 +66,7 @@ export function computeMetricStats(values: number[]): MetricStats {
   const stddev = Math.sqrt(sqSum / values.length);
   const sorted = [...values].sort((a, b) => a - b);
   const mid = sorted.length >> 1;
-  const median = sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
+  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   const p50 = percentile(sorted, 0.5);
   return {
     min,
@@ -94,8 +94,8 @@ function bucketize(values: number[], spec: HistogramSpec): MetricHistogram {
   const counts = new Array<number>(nBuckets).fill(0);
   let underflow = 0;
   let overflow = 0;
-  const lo = edges[0]!;
-  const hi = edges[nBuckets]!;
+  const lo = edges[0];
+  const hi = edges[nBuckets];
   for (const v of values) {
     if (v < lo) {
       underflow += 1;
@@ -106,15 +106,15 @@ function bucketize(values: number[], spec: HistogramSpec): MetricHistogram {
       continue;
     }
     if (v === hi) {
-      counts[nBuckets - 1]! += 1;
+      counts[nBuckets - 1] += 1;
       continue;
     }
     // Linear scan — edges arrays in practice are short (tens at most) and
     // dominate cache locality over a binary search. Revisit if a consumer
     // declares hundreds of buckets.
     for (let i = 0; i < nBuckets; i++) {
-      if (v < edges[i + 1]!) {
-        counts[i]! += 1;
+      if (v < edges[i + 1]) {
+        counts[i] += 1;
         break;
       }
     }

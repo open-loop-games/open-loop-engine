@@ -281,10 +281,7 @@ export function createTemporaryEffectSystem(
       if (!def) continue;
 
       def.onTick?.(instance, dt);
-      (instance.timeRemaining as Ref<number>).value = Math.max(
-        0,
-        instance.timeRemaining.value - dt,
-      );
+      instance.timeRemaining.value = Math.max(0, instance.timeRemaining.value - dt);
 
       if (instance.timeRemaining.value <= 0) {
         def.onExpire?.(instance);
@@ -341,7 +338,7 @@ export function createTemporaryEffectSystem(
 
     if (behavior === 'refresh' && currentCount > 0) {
       const existing = instances.value.find((i) => i.defId === defId)!;
-      (existing.timeRemaining as Ref<number>).value = dur;
+      existing.timeRemaining.value = dur;
       def.onApply?.(existing);
       handle.emit('applied', existing);
       syncSavedState();

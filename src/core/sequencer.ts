@@ -399,7 +399,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         }
         // New format: { id, m } objects
         const obj = entry as { id: string; m: M };
-        return { id: obj.id, metadata: obj.m } as SequencerItem<M>;
+        return { id: obj.id, metadata: obj.m };
       });
     } catch {
       // Legacy comma-delimited format
@@ -828,17 +828,14 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       // no running item (the cursor's "next dispatch" slot now points at the
       // new item rather than the held one). For at < cur the cursor shifts
       // and the held item stays tracked; for at > cur nothing changes.
-      const heldBroken =
-        _holding &&
-        !isAppend &&
-        (isList ? (at as number) === rawCursor!.value : (at as number) === 0);
+      const heldBroken = _holding && !isAppend && (isList ? at === rawCursor!.value : at === 0);
 
       if (isAppend) {
         _liveItems.push(item);
       } else {
         // Splice into the live array offset by _head so the public view sees
         // the insert at the requested index. `at` here is 0..viewLen-1.
-        _liveItems.splice(_head + (at as number), 0, item);
+        _liveItems.splice(_head + at, 0, item);
         if (isList) {
           const cur = rawCursor!.value;
           // Cursor follows when the insert lands behind it (cursor's
@@ -846,7 +843,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
           // running item must stay tracked; when current is empty, the
           // cursor is a "next dispatch" pointer and the inserted item
           // should become next.
-          if ((at as number) < cur || ((at as number) === cur && current.value !== '')) {
+          if (at < cur || (at === cur && current.value !== '')) {
             rawCursor!.value = cur + 1;
           }
         }

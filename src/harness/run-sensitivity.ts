@@ -111,7 +111,7 @@ function expandVariants<C extends Cell | UntilCell>(config: SensitivityConfig<C>
     product.length = 0;
     product.push(...next);
   }
-  if (product.length === 1 && product[0]!.length === 0) return out;
+  if (product.length === 1 && product[0].length === 0) return out;
 
   for (const combo of product) {
     const name = combo.map((e) => `${e.axisName}=${String(e.value)}`).join(' × ');
@@ -144,13 +144,13 @@ function runFixedTickPath(
   const matrix = runMatrix({
     cells,
     seeds: config.seeds,
-    onRunComplete: config.onRunComplete as never,
+    onRunComplete: config.onRunComplete,
     onCellComplete: config.onCellComplete,
     aggregate: config.aggregate,
   });
-  const baselineResult = matrix.cells[0]!;
+  const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
-    const cell = matrix.cells[i + 1]!;
+    const cell = matrix.cells[i + 1];
     return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
   });
   return { baseline: baselineResult, variants: variantResults };
@@ -188,9 +188,9 @@ function runUntilPath<C extends Cell | UntilCell>(
     bisectTolSec: config.bisectTolSec,
     stasisProbeInterval: config.stasisProbeInterval,
   });
-  const baselineResult = matrix.cells[0]!;
+  const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
-    const cell = matrix.cells[i + 1]!;
+    const cell = matrix.cells[i + 1];
     return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
   });
   return { baseline: baselineResult, variants: variantResults };

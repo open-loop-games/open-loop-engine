@@ -206,7 +206,7 @@ export function cloneDefault<T>(value: T): T {
   if (value instanceof Decimal) return new Decimal(value) as T;
   if (Array.isArray(value)) return value.map((v) => cloneDefault(v)) as unknown as T;
   const out: Record<string, unknown> = {};
-  for (const k of Object.keys(value as object)) {
+  for (const k of Object.keys(value)) {
     out[k] = cloneDefault((value as Record<string, unknown>)[k]);
   }
   return out as T;
@@ -231,7 +231,7 @@ function getStackTrace(): string {
 function checkNaNAndWrite<T>(persistentRef: Persistent<T>, value: T): void {
   // Only check NaN on numeric/Decimal values — strings, booleans, arrays, etc. are never NaN
   if (typeof value === 'number' || value instanceof Decimal) {
-    if (Decimal.isNaN(value as DecimalSource)) {
+    if (Decimal.isNaN(value)) {
       console.error(
         `Attempted to save NaN value to ${persistentRef[SaveDataPath]?.join('.') ?? 'unregistered persistent'}`,
         '\nCreated at:\n' + persistentRef[StackTrace],
@@ -575,6 +575,10 @@ export function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeo
 export function noPersist<T extends object>(obj: T): T;
 export function noPersist<T extends Persistent<S> | object, S>(value: T): T | NonPersistent<S> {
   if (NonPersistent in value) {
+    // TS 6 narrows `value` only to `T & Record<typeof NonPersistent, unknown>`; TS 7,
+    // which the type-aware linter runs on, narrows further. Drop the cast and this
+    // disable when the engine compiles with TS 7.
+    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion
     return (value as Persistent<S>)[NonPersistent];
   }
 
@@ -594,7 +598,7 @@ export function noPersist<T extends Persistent<S> | object, S>(value: T): T | No
       if (key === SkipPersistence) return true;
       return Reflect.has(target, key);
     },
-  }) as T;
+  });
 }
 
 /**
@@ -1006,8 +1010,8 @@ function reviveValue(loaded: unknown, defaultNode: unknown): unknown {
     return loaded.map((el, i) => reviveValue(el, defaultNode[i] ?? defaultNode[0]));
   }
   if (isRevivableObject(defaultNode) && isRevivableObject(loaded)) {
-    const dn = defaultNode as Record<string, unknown>;
-    const ld = loaded as Record<string, unknown>;
+    const dn = defaultNode;
+    const ld = loaded;
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(ld)) {
       out[k] = k in dn ? reviveValue(ld[k], dn[k]) : ld[k];

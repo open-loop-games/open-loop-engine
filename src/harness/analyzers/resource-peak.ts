@@ -87,7 +87,7 @@ export function createResourcePeakTracker(resource: Resource): Analyzer {
     },
     summarize(): AnalyzerResult {
       if (samples.length === 0) sample();
-      const final = samples[samples.length - 1]!;
+      const final = samples[samples.length - 1];
       const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
       return {
         name,

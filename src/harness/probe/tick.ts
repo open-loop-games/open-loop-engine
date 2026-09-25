@@ -88,7 +88,7 @@ export function runProbe(config: ProbeConfig): BeatResult[] {
       stasisProbeInterval: config.stasisProbeInterval,
     });
 
-    const aggregate = result.cells[0]!.aggregate;
+    const aggregate = result.cells[0].aggregate;
     const counts = aggregate.terminationCounts ?? {
       predicate: 0,
       maxSimTime: 0,

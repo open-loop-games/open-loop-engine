@@ -147,7 +147,7 @@ export function createBestReplayDef(
               delta,
             },
           },
-          summary: `Replay best ${metricKey} config (${entry.value} in ${entry.elapsed.toFixed(1)}s, cycle #${entry.cycleNumber})`,
+          summary: `Replay best ${metricKey} config (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, cycle #${entry.cycleNumber})`,
         },
       };
     },
@@ -225,7 +225,7 @@ export function createGoalDef(options: GoalDefOptions): RecommendationDef {
           metrics: {
             [metric]: { current, projected, delta },
           },
-          summary: `Goal: ${direction} ${metric} (best: ${entry.value} in ${entry.elapsed.toFixed(1)}s)`,
+          summary: `Goal: ${direction} ${metric} (best: ${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s)`,
         },
       };
     },

@@ -249,7 +249,7 @@ export function createSlot(options: SlotOptions): Slot {
       if (!isInPool(itemId)) return false;
       if (options.canSelect && !options.canSelect(itemId)) return false;
       if (_selected.value.length > 0) {
-        internalDeselect(_selected.value[0]!);
+        internalDeselect(_selected.value[0]);
       }
     } else {
       if (!canSelectItem(itemId)) return false;

@@ -382,7 +382,7 @@ export function tunable<R>(
   key: string,
   defaultFn: () => R,
 ): ComputedRef<R> {
-  registry.setDefault(key, defaultFn as (...args: never[]) => unknown);
+  registry.setDefault(key, defaultFn);
   return computed(() => {
     // Register a reactive dep on the scope stack so push/cleanup retriggers.
     // The default fn's own reads register deps on the underlying state.

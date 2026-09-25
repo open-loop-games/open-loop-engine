@@ -91,9 +91,9 @@ export interface AdditiveModifierOptions {
  * })
  * ```
  */
-export function createAdditiveModifier<T extends AdditiveModifierOptions, S = OperationModifier<T>>(
+export function createAdditiveModifier<T extends AdditiveModifierOptions>(
   options: T,
-): S {
+): OperationModifier<T> {
   const { addend, description, enabled, smallerIsBetter } = options;
 
   const processedAddend = processGetter(addend);
@@ -116,7 +116,7 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions, S = Op
               isBad: smallerIsBetter ? isPositive : Decimal.lt(value, 0),
             };
           },
-  } as S;
+  } as unknown as OperationModifier<T>;
 }
 
 // === MULTIPLICATIVE MODIFIER ===
@@ -164,10 +164,9 @@ export interface MultiplicativeModifierOptions {
  * modifiers through {@link createPersistentEffectSystem} rather than
  * toggling `enabled` manually.
  */
-export function createMultiplicativeModifier<
-  T extends MultiplicativeModifierOptions,
-  S = OperationModifier<T>,
->(options: T): S {
+export function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(
+  options: T,
+): OperationModifier<T> {
   const { multiplier, description, enabled, smallerIsBetter } = options;
 
   const processedMultiplier = processGetter(multiplier);
@@ -189,7 +188,7 @@ export function createMultiplicativeModifier<
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
-  } as S;
+  } as unknown as OperationModifier<T>;
 }
 
 // === EXPONENTIAL MODIFIER ===
@@ -231,10 +230,9 @@ export interface ExponentialModifierOptions {
  * })
  * ```
  */
-export function createExponentialModifier<
-  T extends ExponentialModifierOptions,
-  S = OperationModifier<T>,
->(options: T): S {
+export function createExponentialModifier<T extends ExponentialModifierOptions>(
+  options: T,
+): OperationModifier<T> {
   const { exponent, description, enabled, supportLowNumbers, smallerIsBetter } = options;
 
   const processedExponent = processGetter(exponent);
@@ -282,7 +280,7 @@ export function createExponentialModifier<
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
-  } as S;
+  } as unknown as OperationModifier<T>;
 }
 
 // === SEQUENTIAL MODIFIER ===
@@ -314,12 +312,11 @@ export function createExponentialModifier<
  * production.invert!(17.1);  // ≈ 0 (reverses the chain)
  * ```
  */
-export function createSequentialModifier<
-  T extends Modifier,
-  S = WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
-    readonly children: readonly T[];
-  },
->(modifiers: T[]): S {
+export function createSequentialModifier<T extends Modifier>(
+  modifiers: T[],
+): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
+  readonly children: readonly T[];
+} {
   return {
     // Reduce body keeps the accumulator renormalized so each modifier's
     // typeof fast path can fire; the final return wraps once to Decimal so
@@ -362,7 +359,7 @@ export function createSequentialModifier<
 
     /** Read-only access to the component modifiers in this chain */
     children: modifiers as readonly T[],
-  } as S;
+  } as ReturnType<typeof createSequentialModifier<T>>;
 }
 
 // === MODIFIER CHAIN ===
@@ -701,7 +698,7 @@ export function createModifierChain(id: string): ModifierChain {
       const removeFromChain = chain.add(modifier);
       return () => {
         removeFromChain();
-        bindingsById.delete(bindingId!);
+        bindingsById.delete(bindingId);
       };
     },
 
@@ -747,7 +744,7 @@ function resolveDescriptionText(modifier: Modifier): string | undefined {
     const texts = resolved.map((d) => d.text).filter((t) => t != null && t !== '');
     return texts.length > 0 ? texts.join('+') : undefined;
   }
-  return (resolved as ModifierDescription).text;
+  return resolved.text;
 }
 
 // === UTILITY FUNCTIONS ===

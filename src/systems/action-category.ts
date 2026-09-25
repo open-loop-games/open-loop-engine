@@ -620,7 +620,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
       patchByDefId(defId, (m) => {
         const nextPayload =
           typeof update === 'function'
-            ? (update as (p: Payload) => Payload)(m.payload)
+            ? update(m.payload)
             : ({ ...(m.payload as object), ...update } as Payload);
         return { ...m, payload: nextPayload };
       });

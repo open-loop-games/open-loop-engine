@@ -243,7 +243,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     get value(): readonly RunHandle<Id>[] {
       return currentView();
     },
-  } as { readonly value: readonly RunHandle<Id>[] };
+  };
 
   // Reactive on: (a) collection mutations via _liveVersion, (b) per-handle
   // alive ref flips (each is a Vue ref).

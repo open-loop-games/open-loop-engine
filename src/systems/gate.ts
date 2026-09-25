@@ -367,7 +367,7 @@ function demand<K extends GateHandle>(
         `Wire it via createEngine({ ${handle === 'accessor' ? 'accessor' : handle} }) and resolve the runtime inside engine install/connect, or pass an explicit override.`,
     );
   }
-  return value as NonNullable<GateRuntime[K]>;
+  return value;
 }
 
 function cumulativeRefFor(resourceId: string, runtime: GateRuntime, kind: Gate['kind']) {

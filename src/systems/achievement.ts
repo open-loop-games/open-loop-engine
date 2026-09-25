@@ -207,7 +207,7 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
   const imageRef = processedImage !== undefined ? computed(() => unref(processedImage)) : undefined;
   const smallRef = computed(() => (processedSmall !== undefined ? unref(processedSmall) : false));
   const effectRef =
-    processedEffect !== undefined ? computed(() => unref(processedEffect) as T) : undefined;
+    processedEffect !== undefined ? computed(() => unref(processedEffect)) : undefined;
 
   const canComplete = computed(() => {
     if (earned.value) return false;
@@ -224,7 +224,7 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
     gate: gateField,
     earned,
     earnedAt,
-    effect: effectRef as Ref<T> | undefined,
+    effect: effectRef,
     hidden: hiddenRef,
     visible: visibleRef,
     image: imageRef,

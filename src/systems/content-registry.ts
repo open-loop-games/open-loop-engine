@@ -162,7 +162,7 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
       for (const [id, partial] of Object.entries(patches)) {
         const entry = store.get(id)!;
         const snapshot: Record<string, unknown> = {};
-        for (const key of Object.keys(partial as object)) {
+        for (const key of Object.keys(partial)) {
           snapshot[key] = (entry as Record<string, unknown>)[key];
         }
         snapshots.set(id, snapshot);

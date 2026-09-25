@@ -39,9 +39,7 @@ import type { Cycle } from './cycle';
  * doesn't use a cycle cadence — discovery tools must handle `undefined`.
  * Sibling to `CategoriesKey`: a convention, not engine machinery.
  */
-export const CycleLogKey: InjectionKey<CycleLog> = Symbol(
-  'engine:cycle-log',
-) as InjectionKey<CycleLog>;
+export const CycleLogKey: InjectionKey<CycleLog> = Symbol('engine:cycle-log');
 
 /** Configuration for {@link createCycleLog} */
 export interface CycleLogOptions {

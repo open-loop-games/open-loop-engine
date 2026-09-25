@@ -106,7 +106,7 @@ interface TimedProgressState {
 function buildTimedProgressState(id: string, ephemeral: boolean | undefined): TimedProgressState {
   if (ephemeral) {
     return {
-      progress: ref<DecimalSource>(0) as Ref<DecimalSource>,
+      progress: ref<DecimalSource>(0),
     };
   }
   // Compose the ambient context with this tracker's id rather than letting the

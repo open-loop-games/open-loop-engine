@@ -195,7 +195,7 @@ export function createConversion<
   function evaluateOutput(out: ConversionOutput, snapshot: Record<string, Decimal>): Decimal {
     const amt = out.amount;
     if (typeof amt === 'function') {
-      return new Decimal((amt as (s: Record<string, Decimal>) => DecimalSource)(snapshot));
+      return new Decimal(amt(snapshot));
     }
     return new Decimal(unref(amt as MaybeRef<DecimalSource>));
   }

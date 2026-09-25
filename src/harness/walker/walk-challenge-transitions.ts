@@ -30,7 +30,7 @@ import {
   timeUntilConditionFlip,
   type TransitionDeps,
 } from '@/core/transitions';
-import { gateToCondition, isGate, type Gate } from '@/systems/gate';
+import { gateToCondition, isGate } from '@/systems/gate';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
 import { forEachCategoryEntity } from '../walk';
@@ -58,7 +58,7 @@ interface ChallengeEntity {
 function toRateAwareCondition(value: unknown): ICondition | undefined {
   if (!isGate(value)) return undefined;
   try {
-    return gateToCondition(value as Gate);
+    return gateToCondition(value);
   } catch {
     // category-aware Gate (count-gte / unlock) — opaque to this walker.
     return undefined;

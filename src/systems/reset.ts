@@ -220,7 +220,7 @@ function resolveScope(modules: ResetScope[]): Set<Persistent> {
  * })
  * ```
  */
-export function createReset<T extends ResetOptions>(options: T): Reset {
+export function createReset(options: ResetOptions): Reset {
   const { thingsToReset, resetModules, keep, retain, canReset, onBeforeReset, onReset } = options;
 
   const processedThingsToReset = thingsToReset != null ? processGetter(thingsToReset) : undefined;

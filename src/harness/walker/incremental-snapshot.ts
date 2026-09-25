@@ -332,7 +332,7 @@ export function createIncrementalSnapshot(
       const bucket = byEntity.get(ek);
       if (!bucket || bucket.size === 0) continue;
       const labels = Array.from(bucket);
-      const sample = entries.get(labels[0]!);
+      const sample = entries.get(labels[0]);
       if (!sample) continue;
       const { entityRef, entity } = sample;
       for (const label of labels) dropEntry(label);

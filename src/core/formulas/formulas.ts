@@ -63,7 +63,7 @@ export function hasVariable(value: FormulaSource): value is InvertibleFormula {
 
 /** Evaluate a FormulaSource to a DecimalSource — unwraps refs and evaluates formulas */
 export function unrefFormulaSource(value: FormulaSource, variable?: DecimalSource) {
-  return value instanceof Formula ? value.evaluate(variable) : (unref(value) as DecimalSource);
+  return value instanceof Formula ? value.evaluate(variable) : unref(value);
 }
 
 function integrateVariable(this: GenericFormula) {

@@ -104,9 +104,7 @@ export interface EngineCategories {
  *
  * @see {@link EngineCategories} — the published shape
  */
-export const CategoriesKey: InjectionKey<EngineCategories> = Symbol(
-  'engine:categories',
-) as InjectionKey<EngineCategories>;
+export const CategoriesKey: InjectionKey<EngineCategories> = Symbol('engine:categories');
 
 // ---------------------------------------------------------------------------
 // Ambient current-accumulator context

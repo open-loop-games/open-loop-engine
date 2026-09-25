@@ -97,13 +97,13 @@ a bounded run that ends, resets a scope, and replays
 
 per-cycle metric delta recording
 
-- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:150`
-- `interface CycleLog` — A CycleLog instance — the returned object from createCycleLog. `src/systems/cycle-log.ts:96`
-- `interface CycleLogDelta` — Per-metric change recorded during a single cycle. `src/systems/cycle-log.ts:63`
-- `interface CycleLogEntry` — A single cycle's recorded outcome. `src/systems/cycle-log.ts:72`
-- `interface CycleLogEvents` — Events emitted by a CycleLog instance. `src/systems/cycle-log.ts:85`
+- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:148`
+- `interface CycleLog` — A CycleLog instance — the returned object from createCycleLog. `src/systems/cycle-log.ts:94`
+- `interface CycleLogDelta` — Per-metric change recorded during a single cycle. `src/systems/cycle-log.ts:61`
+- `interface CycleLogEntry` — A single cycle's recorded outcome. `src/systems/cycle-log.ts:70`
+- `interface CycleLogEvents` — Events emitted by a CycleLog instance. `src/systems/cycle-log.ts:83`
 - `const CycleLogKey: InjectionKey<CycleLog>` — Opt-in discovery key for introspection tools (sim, balance workbench, devtools). `src/systems/cycle-log.ts:42`
-- `interface CycleLogOptions` — Configuration for createCycleLog. `src/systems/cycle-log.ts:47`
+- `interface CycleLogOptions` — Configuration for createCycleLog. `src/systems/cycle-log.ts:45`
 
 ## Inventory
 
@@ -133,7 +133,7 @@ unified purchase primitives for incremental games
 Two consumer entry points: `createPurchasableCategory` batch-registers from content definitions and is the default; `createScalingPurchasable` is the per-instance escape hatch for leveled costs. `createPurchasable` is the raw factory both lower into. A cost that scales on the item's own level goes through the factory form of `requirements`, which receives the live level ref — a getter reading the level back out misprices bulk purchases. See consumer-guide.md §Choosing among purchasable primitives.
 
 - `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:195`
-- `function createScalingPurchasable<T extends ScalingPurchasableOptions>(options: T): Purchasable` — Create a purchasable with leveled cost scaling — the L3 escape hatch for per-instance customized leveled purchases. `src/systems/purchasable.ts:678`
+- `function createScalingPurchasable(options: ScalingPurchasableOptions): Purchasable` — Create a purchasable with leveled cost scaling — the L3 escape hatch for per-instance customized leveled purchases. `src/systems/purchasable.ts:678`
 - `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:225`
 - `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:119`
 - `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:106`

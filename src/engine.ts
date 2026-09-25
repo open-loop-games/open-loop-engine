@@ -88,14 +88,10 @@ export interface EngineEvents {}
 // Engine services pre-provided before any module installs.
 
 /** Inject the TickDriver instance. Always available. */
-export const TickDriverKey: InjectionKey<TickDriver> = Symbol(
-  'engine:tick-driver',
-) as InjectionKey<TickDriver>;
+export const TickDriverKey: InjectionKey<TickDriver> = Symbol('engine:tick-driver');
 
 /** Inject the save manager. Available when `persistence` is not `false`. */
-export const SaveManagerKey: InjectionKey<SaveManager> = Symbol(
-  'engine:save',
-) as InjectionKey<SaveManager>;
+export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 
 // `EngineCategories` and `CategoriesKey` live alongside the category
 // factories in `./systems/engine-categories` and flow through the
@@ -651,7 +647,7 @@ export function createEngine(config: EngineConfig): Engine {
     },
 
     tryInject<T>(key: InjectionKey<T>): T | undefined {
-      return publicInjections?.get(key as unknown as symbol) as T | undefined;
+      return publicInjections?.get(key) as T | undefined;
     },
 
     // === MOD SUPPORT ===

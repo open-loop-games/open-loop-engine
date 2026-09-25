@@ -38,9 +38,9 @@ import type { WorkItem } from './types';
 export function createWorkPlan<C>(config: { cells: C[]; seeds: number[] }): WorkItem<C>[] {
   const plan: WorkItem<C>[] = [];
   for (let cellIdx = 0; cellIdx < config.cells.length; cellIdx++) {
-    const cell = config.cells[cellIdx]!;
+    const cell = config.cells[cellIdx];
     for (let seedIdx = 0; seedIdx < config.seeds.length; seedIdx++) {
-      plan.push({ cellIdx, seedIdx, seed: config.seeds[seedIdx]!, cell });
+      plan.push({ cellIdx, seedIdx, seed: config.seeds[seedIdx], cell });
     }
   }
   return plan;

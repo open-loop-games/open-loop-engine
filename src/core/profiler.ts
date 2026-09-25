@@ -231,7 +231,7 @@ export function formatProfileReport(report: ProfileReport): string {
         `[p50 ${e.p50Us.toFixed(0).padStart(5)}µs  ` +
         `p95 ${e.p95Us.toFixed(0).padStart(5)}µs  ` +
         `p99 ${e.p99Us.toFixed(0).padStart(5)}µs]  ` +
-        `${e.name}`,
+        e.name,
     );
   }
   return lines.join('\n');

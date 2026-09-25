@@ -47,8 +47,8 @@ export function bisectTuner(config: TunerConfig): TunerResult {
   // an early one. Both endpoints map ∞ → +∞ for direction detection. Forward
   // = higher value → later fire (cost-like); inverted = higher value → earlier
   // fire (multiplier/bonus-like).
-  const tLoFinite = isFinite(tLo) ? tLo : +Infinity;
-  const tHiFinite = isFinite(tHi) ? tHi : +Infinity;
+  const tLoFinite = isFinite(tLo) ? tLo : Infinity;
+  const tHiFinite = isFinite(tHi) ? tHi : Infinity;
   const direction: 'forward' | 'inverted' = tHiFinite >= tLoFinite ? 'forward' : 'inverted';
 
   let a = lo;

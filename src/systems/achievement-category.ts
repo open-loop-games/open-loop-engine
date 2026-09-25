@@ -324,7 +324,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
 
       const defs: Def[] = [];
       for (let index = 0; index < tiers.length; index++) {
-        const tier = tiers[index]!;
+        const tier = tiers[index];
         const tierId = `${baseId}-${index + 1}`;
         const isFormulaThreshold = tier.threshold instanceof Formula;
         const evalThreshold = (): DecimalSource =>

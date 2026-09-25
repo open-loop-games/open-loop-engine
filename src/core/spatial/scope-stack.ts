@@ -53,10 +53,12 @@ import type { SpatialGraph, GraphNode } from './graph';
 import type { Unsubscribe } from './types';
 
 /**
- * Caller-owned scope-state label. The three defaults are conventional; any
- * string is valid so consumers can widen the vocabulary without engine churn.
+ * Caller-owned scope-state label. `'pristine'`, `'unstable'` and `'stable'` are
+ * the conventional labels; any string is valid so consumers can widen the
+ * vocabulary without engine churn. Plain `string` rather than a literal union
+ * plus `(string & {})`, so a consumer's `state === 'stable'` check narrows.
  */
-export type ScopeState = 'pristine' | 'unstable' | 'stable' | string;
+export type ScopeState = string;
 
 /** Options accepted by {@link createScopeStack}. */
 export interface ScopeStackOptions<N, E> {

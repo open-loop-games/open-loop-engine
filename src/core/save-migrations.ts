@@ -199,7 +199,7 @@ export function forEachDefinition(
 ): SaveData {
   const section = data[contextId];
   if (section == null || typeof section !== 'object') return data;
-  for (const id of Object.keys(section as SaveData)) {
+  for (const id of Object.keys(section)) {
     const entry = (section as SaveData)[id];
     if (entry == null || typeof entry !== 'object') continue;
     fn(entry as SaveData, id);

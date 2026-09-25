@@ -91,14 +91,14 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
       // process alive. `stop?.` tolerates lightweight test fakes.
       engine.stop?.();
     }
-    perCellRuns[item.cellIdx]!.push(result);
+    perCellRuns[item.cellIdx].push(result);
     config.onRunComplete?.(item, result);
 
     if (
       cellResults[item.cellIdx] === null &&
-      perCellRuns[item.cellIdx]!.length === config.seeds.length
+      perCellRuns[item.cellIdx].length === config.seeds.length
     ) {
-      const runs = perCellRuns[item.cellIdx]!;
+      const runs = perCellRuns[item.cellIdx];
       const cellResult: CellResult = {
         name: cell.name,
         runs,
@@ -115,7 +115,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
     (cell, i) =>
       cellResults[i] ?? {
         name: cell.name,
-        runs: perCellRuns[i]!,
+        runs: perCellRuns[i],
         aggregate: {
           metrics: {},
           terminationCounts: { predicate: 0, maxSimTime: 0, unreachable: 0 },

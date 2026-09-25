@@ -102,7 +102,7 @@ export function createPriorityStrategy<M = void>(
       if (candidates.length === 0) return null;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { priority: _, ...item } = candidates[0];
-      return item as SequencerItem<M>;
+      return item;
     },
   };
 }

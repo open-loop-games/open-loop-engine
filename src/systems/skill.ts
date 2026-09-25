@@ -208,7 +208,7 @@ export type Skill = LevelDrivenSkill | AccumulatorSkill;
 
 /** Coerce a FormulaSource to a Formula — wrap raw values in `Formula.constant`. */
 function toFormula(source: FormulaSource): GenericFormula {
-  return source instanceof Formula ? (source as GenericFormula) : Formula.constant(source);
+  return source instanceof Formula ? source : Formula.constant(source);
 }
 
 /**
@@ -410,7 +410,7 @@ export function createSkill(options: SkillOptions): Skill {
     return {
       ...base,
       multiplierCurve: multiplierCurve!,
-    } as LevelDrivenSkill;
+    };
   }
 
   return {
@@ -429,7 +429,7 @@ export function createSkill(options: SkillOptions): Skill {
       const delta = Decimal.sub(projectedRetention, currentRetention);
       return Decimal.max(delta, 0);
     },
-  } as AccumulatorSkill;
+  };
 }
 
 // === PUBLIC UTILITIES ===

@@ -260,10 +260,10 @@ export interface ProducerCategory<
  * by `createProducerCategory` inside the per-definition persistent context
  * opened by {@link createCategoryBase}.
  */
-function buildProducer<Def extends { id: string }, State>(
+function buildProducer<Def extends { id: string }>(
   def: Def,
   categoryId: string,
-  mapProducer: ProducerCategoryOptions<Def, State>['mapProducer'],
+  mapProducer: ProducerCategoryOptions<Def>['mapProducer'],
   ctx: ProducerCategoryContext,
 ): Producer {
   const mapping = mapProducer(def, ctx);

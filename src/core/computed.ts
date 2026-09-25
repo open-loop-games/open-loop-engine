@@ -62,7 +62,7 @@ export function resolveComputable<T>(value: Computable<T>): T {
  */
 export function processGetter<T>(obj: Computable<T>): MaybeRef<T> {
   if (isFunction(obj) && obj.length === 0) {
-    return computed(obj as () => T);
+    return computed(obj);
   }
   return obj as MaybeRef<T>;
 }

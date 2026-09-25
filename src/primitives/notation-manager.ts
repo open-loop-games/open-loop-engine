@@ -71,7 +71,7 @@ export class NotationManager {
     const roundFn = sigFigRounding(sigFigs);
     for (const notation of this.notations.values()) {
       if ('rounding' in notation) {
-        (notation as Notation & { rounding: unknown }).rounding = roundFn;
+        notation.rounding = roundFn;
       }
     }
   }

@@ -10,6 +10,9 @@ export type RequiredKeys<T> = {
 /**
  * Type guard for checking if a value is a function
  */
+// `R` looks single-use but carries inference: it absorbs the non-function arm so
+// `T` and `S` infer from the function arm. `| unknown` would collapse the union.
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function isFunction<T, S extends ReadonlyArray<unknown>, R>(
   functionOrValue: ((...args: S) => T) | R,
 ): functionOrValue is (...args: S) => T {

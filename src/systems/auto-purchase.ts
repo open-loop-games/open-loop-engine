@@ -280,7 +280,7 @@ export function setupSweepAutoPurchase(
     }
 
     accumulator.value += dt;
-    const interval = Math.max(0, Number(unref(processedInterval)) || 0);
+    const interval = Math.max(0, unref(processedInterval) || 0);
     if (interval <= 0) {
       accumulator.value = 0;
       runSweep();
@@ -505,7 +505,7 @@ export function setupPolicyAutoPurchase(
     }
 
     accumulator.value += dt;
-    const interval = Math.max(0, Number(unref(processedInterval)) || 0);
+    const interval = Math.max(0, unref(processedInterval) || 0);
     if (accumulator.value < interval) return;
 
     const list = getList();

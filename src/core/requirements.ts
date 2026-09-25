@@ -169,9 +169,7 @@ export interface CostRequirement extends Requirement {
  * })
  * ```
  */
-export function createCostRequirement<T extends CostRequirementOptions>(
-  options: T,
-): CostRequirement {
+export function createCostRequirement(options: CostRequirementOptions): CostRequirement {
   const { resource, cost, requiresPay, cumulativeCost, maxBulkAmount, pay, description } = options;
 
   const processedCost = isFormula(cost) ? cost : processGetter(cost);
@@ -279,9 +277,7 @@ export interface BooleanRequirementOptions {
  * })
  * ```
  */
-export function createBooleanRequirement<T extends BooleanRequirementOptions>(
-  options: T,
-): Requirement {
+export function createBooleanRequirement(options: BooleanRequirementOptions): Requirement {
   const { requirement, description } = options;
 
   return {
@@ -337,7 +333,7 @@ export function anyOf(...children: Requirement[]): Requirement {
     requirementMet: computed(() => children.some((c) => requirementsMet(c))),
     requiresPay: computed(() => {
       for (const child of children) {
-        if (requirementsMet(child)) return Boolean(unref(child.requiresPay));
+        if (requirementsMet(child)) return unref(child.requiresPay);
       }
       return false;
     }),

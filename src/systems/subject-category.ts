@@ -437,9 +437,7 @@ function buildEnumField<V extends string>(
   // `?? ` would swallow an explicit `initial: null` override (PerSubjectOverride
   // types it as `V | null`), so a subject can't start 'unset' against a non-null
   // schema default. Treat only `undefined` as "not overridden".
-  const initial = (
-    override?.initial !== undefined ? override.initial : (schema.initial ?? null)
-  ) as V | null;
+  const initial = override?.initial !== undefined ? override.initial : (schema.initial ?? null);
   if (initial !== null && !schema.values.includes(initial)) {
     throw new Error(
       `Subject enum field "${fieldName}" initial "${initial}" not in declared values [${schema.values.join(', ')}]`,
@@ -480,31 +478,31 @@ function buildField(
         fieldName,
         schema,
         override as PerSubjectOverride<ScalarFieldDef> | undefined,
-      ) as FieldInstance<FieldDef>;
+      );
     case 'vector':
       return buildVectorField(
         fieldName,
         schema,
         override as PerSubjectOverride<VectorFieldDef> | undefined,
-      ) as FieldInstance<FieldDef>;
+      );
     case 'tier':
       return buildTierField(
         fieldName,
         schema,
         override as PerSubjectOverride<TierFieldDef> | undefined,
-      ) as FieldInstance<FieldDef>;
+      );
     case 'flag':
       return buildFlagField(
         fieldName,
         schema,
         override as PerSubjectOverride<FlagFieldDef> | undefined,
-      ) as FieldInstance<FieldDef>;
+      );
     case 'enum':
       return buildEnumField(
         fieldName,
         schema,
         override as PerSubjectOverride<EnumFieldDef> | undefined,
-      ) as FieldInstance<FieldDef>;
+      );
   }
 }
 
@@ -639,6 +637,10 @@ function buildSubjectSignals<S extends FieldSchema>(
     const field = instance.fields[fieldName];
     const def = schema[fieldName];
     const override = subjectDef.fields?.[fieldName];
+    // TS 6 doesn't narrow `field` by `kind` through the mapped schema type; TS 7,
+    // which the type-aware linter runs on, does. Drop the casts and this disable
+    // when the engine compiles with TS 7.
+    /* oxlint-disable typescript/no-unnecessary-type-assertion */
     switch (field.kind) {
       case 'scalar':
         return (
@@ -672,6 +674,7 @@ function buildSubjectSignals<S extends FieldSchema>(
         return (field as EnumFieldInstance).get() !== effective;
       }
     }
+    /* oxlint-enable typescript/no-unnecessary-type-assertion */
   }
 
   return {

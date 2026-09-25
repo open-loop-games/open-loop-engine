@@ -299,7 +299,7 @@ function buildPurchasableDisplay(
   showAmount: boolean;
 } {
   if (typeof display === 'object' && display !== null && 'description' in display) {
-    const disp = display as PurchasableDisplay;
+    const disp = display;
     return {
       title: processGetter(disp.title),
       description: processGetter(disp.description),
@@ -423,7 +423,7 @@ function buildScalingCostRequirement(
     if (factoryResult instanceof Formula) {
       return createCostRequirement({
         resource: options.resource,
-        cost: factoryResult as GenericFormula,
+        cost: factoryResult,
         maxBulkAmount: limit ?? Decimal.dInf,
       });
     }
@@ -526,7 +526,7 @@ function buildScalingEffect(
  * generator.purchaseMax();
  * ```
  */
-export function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable {
+export function createPurchasable(options: PurchasableOptions): Purchasable {
   const {
     id,
     display,
@@ -675,9 +675,7 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
  * });
  * ```
  */
-export function createScalingPurchasable<T extends ScalingPurchasableOptions>(
-  options: T,
-): Purchasable {
+export function createScalingPurchasable(options: ScalingPurchasableOptions): Purchasable {
   const {
     id,
     title,
