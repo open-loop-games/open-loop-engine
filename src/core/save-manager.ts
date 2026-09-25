@@ -476,7 +476,7 @@ function describeType(v: unknown): string {
 
 // === FACTORY ===
 
-/** Sentinel thrown by `applyEnvelope` to signal a typed failure to callers. */
+/** Sentinel thrown by the load path to carry a typed failure to the one place that reports it. */
 class LoadFailure extends Error {
   constructor(
     public readonly reason: SaveLoadFailureReason,
@@ -504,11 +504,6 @@ function parseEnvelope(raw: string): SaveEnvelope {
     throw new LoadFailure('parse-error', new Error('not a save envelope'));
   }
   return e as SaveEnvelope;
-}
-
-/** The `detail` a failed {@link parseEnvelope} reports. */
-function parseFailureDetail(err: unknown): unknown {
-  return err instanceof LoadFailure ? err.detail : err;
 }
 
 /**
@@ -764,6 +759,45 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     deserializePersistents(refs, validation.data);
   }
 
+  /** Parse raw save text as an envelope of this game. Throws a `LoadFailure`. */
+  function readEnvelope(raw: string): SaveEnvelope {
+    const e = parseEnvelope(raw);
+    if (e.gameId !== gameId) throw new LoadFailure('wrong-game-id');
+    return e;
+  }
+
+  /** Announce a failed load or import of `slotId`, protecting the slot when asked. */
+  function failLoad(slotId: number, err: unknown, protect: boolean): SaveLoadResult {
+    const [reason, detail]: [SaveLoadFailureReason, unknown] =
+      err instanceof LoadFailure ? [err.reason, err.detail] : ['unknown', err];
+    handle.emit('save:load-failed', { slotId, reason, detail });
+    if (protect) {
+      _protectedSlots.add(slotId);
+      handle.emit('save:slot-protected', { slotId, reason });
+    }
+    return { success: false };
+  }
+
+  /**
+   * Parse, check and apply raw save text to live state under `slotId`, then
+   * announce the outcome. `protectOnFail` decides whether a failure protects
+   * the slot, which only a load from storage wants.
+   */
+  function applySaveText(raw: string, slotId: number, protectOnFail: boolean): SaveLoadResult {
+    return deferHydration(() => {
+      let e: SaveEnvelope;
+      try {
+        e = readEnvelope(raw);
+        applyEnvelope(e, slotId);
+      } catch (err) {
+        return failLoad(slotId, err, protectOnFail);
+      }
+      _protectedSlots.delete(slotId);
+      handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
+      return { success: true, timestamp: e.timestamp };
+    }, reportReconcileError(slotId));
+  }
+
   /** Report a post-load reconcile's throw without failing the load it followed. */
   function reportReconcileError(slotId: number): (err: unknown) => void {
     return (err) => {
@@ -776,8 +810,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     const raw = storage.getItem(key);
     if (!raw) return null;
     try {
-      const e = parseEnvelope(raw);
-      if (e.gameId !== gameId) return null;
+      const e = readEnvelope(raw);
       return {
         timestamp: e.timestamp,
         version: e.version,
@@ -812,35 +845,12 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     load(): SaveLoadResult {
-      const slotId = _activeSlotId;
       const raw = storage.getItem(activeStorageKey());
       if (!raw) {
-        handle.emit('save:load-failed', { slotId, reason: 'not-found' });
+        handle.emit('save:load-failed', { slotId: _activeSlotId, reason: 'not-found' });
         return { success: false };
       }
-      const fail = (reason: SaveLoadFailureReason, detail?: unknown): SaveLoadResult => {
-        handle.emit('save:load-failed', { slotId, reason, detail });
-        _protectedSlots.add(slotId);
-        handle.emit('save:slot-protected', { slotId, reason });
-        return { success: false };
-      };
-      let e: SaveEnvelope;
-      try {
-        e = parseEnvelope(raw);
-      } catch (err) {
-        return fail('parse-error', parseFailureDetail(err));
-      }
-      if (e.gameId !== gameId) return fail('wrong-game-id');
-      return deferHydration(() => {
-        try {
-          applyEnvelope(e, slotId);
-        } catch (err) {
-          return err instanceof LoadFailure ? fail(err.reason, err.detail) : fail('unknown', err);
-        }
-        _protectedSlots.delete(slotId);
-        handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
-        return { success: true, timestamp: e.timestamp };
-      }, reportReconcileError(slotId));
+      return applySaveText(raw, _activeSlotId, true);
     },
 
     exportSave() {
@@ -848,37 +858,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     importSave(data): SaveLoadResult {
-      const slotId = _activeSlotId;
-      let e: SaveEnvelope;
-      try {
-        e = parseEnvelope(data);
-      } catch (err) {
-        handle.emit('save:load-failed', {
-          slotId,
-          reason: 'parse-error',
-          detail: parseFailureDetail(err),
-        });
-        return { success: false };
-      }
-      if (e.gameId !== gameId) {
-        handle.emit('save:load-failed', { slotId, reason: 'wrong-game-id' });
-        return { success: false };
-      }
-      return deferHydration(() => {
-        try {
-          applyEnvelope(e, slotId);
-        } catch (err) {
-          if (err instanceof LoadFailure) {
-            handle.emit('save:load-failed', { slotId, reason: err.reason, detail: err.detail });
-          } else {
-            handle.emit('save:load-failed', { slotId, reason: 'unknown', detail: err });
-          }
-          return { success: false };
-        }
-        _protectedSlots.delete(slotId);
-        handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
-        return { success: true, timestamp: e.timestamp };
-      }, reportReconcileError(slotId));
+      return applySaveText(data, _activeSlotId, false);
     },
 
     hasSave() {
@@ -1004,20 +984,9 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     importSlot(data: string, slotId?: number): SaveLoadResult & { slotId?: number } {
       let envelope: SaveEnvelope;
       try {
-        envelope = parseEnvelope(data);
+        envelope = readEnvelope(data);
       } catch (err) {
-        const targetId = slotId ?? _activeSlotId;
-        handle.emit('save:load-failed', {
-          slotId: targetId,
-          reason: 'parse-error',
-          detail: parseFailureDetail(err),
-        });
-        return { success: false };
-      }
-      if (envelope.gameId !== gameId) {
-        const targetId = slotId ?? _activeSlotId;
-        handle.emit('save:load-failed', { slotId: targetId, reason: 'wrong-game-id' });
-        return { success: false };
+        return failLoad(slotId ?? _activeSlotId, err, false);
       }
       let targetId: number;
       if (slotId === undefined) {
