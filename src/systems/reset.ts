@@ -444,6 +444,12 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
  * `afterReset` event and zeroes the ref each time it fires; the consumer is
  * responsible for advancing the ref each tick (`elapsed.value += dt`).
  *
+ * Session-only: the ref isn't persisted, so it restarts at 0 on every load.
+ * For a "time this prestige" that survives reloads, keep a `persistent(0)`
+ * in the module and zero it from the reset's `afterReset` yourself. The
+ * subscription lasts as long as the reset; build one timer per reset, not
+ * one per view.
+ *
  * @param reset - The reset whose `afterReset` event zeroes the timer
  * @returns A ref tracking seconds since the last reset
  */
