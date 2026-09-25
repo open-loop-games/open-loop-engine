@@ -487,47 +487,50 @@ export function composeInfluenceLayers(
     return combine(buf, x, y);
   }
 
+  // The Chebyshev walk under sum() and peak(), matching the single-layer
+  // contract: an out-of-bounds center visits nothing (so 0 / null), and only
+  // in-bounds cells are visited. An out-of-bounds coordinate reads a
+  // fabricated 0 from each layer, which a combine need not map to 0, so
+  // visiting it would skew the result.
+  function forEachInBox(
+    x: number,
+    y: number,
+    radius: number,
+    fn: (cx: number, cy: number, value: number) => void,
+  ): void {
+    if (!readers[0].inBounds(x, y)) return;
+    const r = Math.max(0, Math.floor(radius));
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const cx = x + dx;
+        const cy = y + dy;
+        if (readers[0].inBounds(cx, cy)) fn(cx, cy, combinedAt(cx, cy));
+      }
+    }
+  }
+
   return {
     at: combinedAt,
-    // sum() and peak() match the single-layer contract: an out-of-bounds
-    // center yields 0 / null, and only in-bounds cells are visited. An
-    // out-of-bounds coordinate reads a fabricated 0 from each layer, which a
-    // combine need not map to 0, so visiting it would skew the result.
     sum(x, y, radius) {
-      if (!readers[0].inBounds(x, y)) return 0;
-      const r = Math.max(0, Math.floor(radius));
       let total = 0;
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const cx = x + dx;
-          const cy = y + dy;
-          if (!readers[0].inBounds(cx, cy)) continue;
-          total += combinedAt(cx, cy);
-        }
-      }
+      forEachInBox(x, y, radius, (_cx, _cy, v) => {
+        total += v;
+      });
       return total;
     },
     peak(x, y, radius) {
-      if (!readers[0].inBounds(x, y)) return null;
-      const r = Math.max(0, Math.floor(radius));
       let bestX = -Infinity;
       let bestY = -Infinity;
       let bestValue = -Infinity;
       let any = false;
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const cx = x + dx;
-          const cy = y + dy;
-          if (!readers[0].inBounds(cx, cy)) continue;
-          const v = combinedAt(cx, cy);
-          if (!any || v > bestValue) {
-            bestX = cx;
-            bestY = cy;
-            bestValue = v;
-            any = true;
-          }
+      forEachInBox(x, y, radius, (cx, cy, v) => {
+        if (!any || v > bestValue) {
+          bestX = cx;
+          bestY = cy;
+          bestValue = v;
+          any = true;
         }
-      }
+      });
       if (!any) return null;
       return { x: bestX, y: bestY, value: bestValue };
     },
