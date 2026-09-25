@@ -9,6 +9,7 @@ import {
   subtractResource,
   hasResource,
   resetResource,
+  displayResource,
 } from '@/core/resource';
 
 describe('Resource', () => {
@@ -70,6 +71,13 @@ describe('Resource', () => {
     addResource(gold, 30);
     await nextTick();
     expect(gold.cumulative!.value.gte(80)).toBe(true);
+  });
+  it('small values stay hidden by default at any precision', () => {
+    beginPersistentContext('test-resource-small-default');
+    const dust = createResource(bn(0.00001), { id: 'dust', precision: 2 });
+    const hidden = createResource(bn(0.00001), { id: 'hidden', precision: 2, small: false });
+    endPersistentContext();
+    expect(displayResource(dust)).toBe(displayResource(hidden));
   });
   it('resetResource restores default', () => {
     beginPersistentContext('test-resource-reset');

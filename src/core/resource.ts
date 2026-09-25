@@ -168,7 +168,7 @@ export function createResource<T>(
   defaultValue: (T & StateConstraint<T>) | Ref<T>,
   options: ResourceOptions = {},
 ): Resource<T> {
-  const { displayName = 'points', precision = 0, small = undefined, id } = options;
+  const { displayName = 'points', precision = 0, small = false, id } = options;
   // A display name is text, free to change or be translated; only a wrapped
   // ref, which saves nothing, may be keyed by it.
   const resolvedId = (isRef(defaultValue) ? (id ?? displayName) : id) as string;
