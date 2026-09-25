@@ -99,7 +99,8 @@ export interface ResourceOptions {
    * Save and registry identity — the key Gates and the resource registry
    * look the resource up by. Required for a persistent resource, whose value
    * saves under it; a wrapped ref saves nothing and falls back to
-   * `displayName`. Collision within a persistent context throws at creation.
+   * `displayName`. Collision within a persistent context throws at creation,
+   * and so does a `.` in a persistent resource's id, since save paths split on it.
    */
   id?: string;
 }
@@ -172,6 +173,11 @@ export function createResource<T>(
   // A display name is text, free to change or be translated; only a wrapped
   // ref, which saves nothing, may be keyed by it.
   const resolvedId = (isRef(defaultValue) ? (id ?? displayName) : id) as string;
+  if (!isRef(defaultValue) && id?.includes('.')) {
+    throw new Error(
+      `Resource id "${resolvedId}" contains ".", which save paths split on. Use another separator, such as "-".`,
+    );
+  }
 
   // Create persistent or use existing ref. Use the resource's id as the
   // save-data name so round-trips survive field reorders inside a context.

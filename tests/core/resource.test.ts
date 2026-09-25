@@ -79,6 +79,14 @@ describe('Resource', () => {
     endPersistentContext();
     expect(displayResource(dust)).toBe(displayResource(hidden));
   });
+  it('a dotted id throws an error naming the resource id', () => {
+    beginPersistentContext('mine');
+    try {
+      expect(() => createResource(0, { id: 'ore.iron' })).toThrow(/Resource id "ore\.iron"/);
+    } finally {
+      endPersistentContext();
+    }
+  });
   it('resetResource restores default', () => {
     beginPersistentContext('test-resource-reset');
     const gold = createResource(bn(100), { id: 'Gold', displayName: 'Gold' });
