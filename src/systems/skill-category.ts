@@ -47,6 +47,9 @@ import { type Modifier } from '@/core/modifier';
 
 // === TYPES ===
 
+/** `Omit` applied to each member of a union, so the mode discriminants survive. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 /**
  * Options for {@link createSkillCategory}.
  *
@@ -64,13 +67,14 @@ export interface SkillCategoryOptions<Def extends { id: string }, State = void> 
    * Called once per definition during {@link SkillCategory.register}.
    * The returned options are passed to `createSkill()`.
    *
-   * Return `levelToMultiplier` for level-driven mode or `retentionFormula`
-   * for accumulator mode — each definition chooses independently.
+   * Return exactly one of `levelToMultiplier` (level-driven mode) or
+   * `retentionFormula` (accumulator mode) — each definition chooses
+   * independently.
    *
    * Note: `id` is provided by the category — don't include it in the
    * returned options (it will be overwritten).
    */
-  mapSkill: (def: Def) => Omit<SkillOptions, 'id'>;
+  mapSkill: (def: Def) => DistributiveOmit<SkillOptions, 'id'>;
 
   /**
    * Create per-instance state alongside the Skill.
@@ -184,11 +188,7 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
   const base: CategoryBase<Def, Skill, State> = createCategoryBase({
     id,
     buildInstance: (def) => {
-      const opts = mapSkill(def);
-      // createSkill has discriminated overloads (AccumulatorSkillOptions | LevelDrivenSkillOptions).
-      // The mapSkill return is Omit<SkillOptions, 'id'> which is the union before discrimination.
-      // The runtime call is correct — cast to satisfy the overload resolution.
-      return createSkill({ ...opts, id: def.id } as Parameters<typeof createSkill>[0]);
+      return createSkill({ ...mapSkill(def), id: def.id });
     },
     buildState: mapState,
     buildSignals: (_def, skill) => ({

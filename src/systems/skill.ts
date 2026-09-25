@@ -371,6 +371,7 @@ function buildLevelUpEmitter(
  */
 export function createSkill(options: AccumulatorSkillOptions): AccumulatorSkill;
 export function createSkill(options: LevelDrivenSkillOptions): LevelDrivenSkill;
+export function createSkill(options: SkillOptions): Skill;
 export function createSkill(options: SkillOptions): Skill {
   const { id } = options;
   const isLevelDriven = 'levelToMultiplier' in options && options.levelToMultiplier != null;

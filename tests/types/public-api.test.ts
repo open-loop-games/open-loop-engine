@@ -28,6 +28,7 @@ import {
   createRuleAdvisor,
   createSkillCategory,
   createSpatialGrid,
+  Formula,
   type Engine,
   type EngineContext,
   type InjectionKey,
@@ -54,7 +55,7 @@ import type {
 } from '@/harness';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
-import type { SkillCategory } from '@/systems/skill-category';
+import type { SkillCategory, SkillCategoryOptions } from '@/systems/skill-category';
 import type {
   AchievementCategory,
   BaseTieredAchievementDef,
@@ -167,6 +168,29 @@ describe('createSkillCategory generic inference', () => {
   it('createSkillCategory itself is generic over Def/State', () => {
     // Pin the factory signature shape without invoking it.
     expectTypeOf(createSkillCategory<MySkillDef, MySkillState>).toBeFunction();
+  });
+
+  it('mapSkill returns exactly one skill mode', () => {
+    type MapSkill = SkillCategoryOptions<MySkillDef>['mapSkill'];
+
+    const levelDriven: MapSkill = (def) => ({
+      description: def.name,
+      xpToLevel: (xp) => Formula.variable(xp).floor(),
+      levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
+    });
+    const accumulator: MapSkill = () => ({
+      xpToLevel: (xp) => Formula.variable(xp).sqrt().floor(),
+      retentionFormula: (level) => Formula.variable(level).mul(0.01),
+    });
+    // @ts-expect-error — a skill needs `retentionFormula` or `levelToMultiplier`.
+    const neither: MapSkill = () => ({ xpToLevel: (xp) => Formula.variable(xp) });
+    // @ts-expect-error — the two modes are exclusive.
+    const both: MapSkill = () => ({
+      xpToLevel: (xp) => Formula.variable(xp),
+      levelToMultiplier: (level) => level,
+      retentionFormula: (level) => level,
+    });
+    void [levelDriven, accumulator, neither, both];
   });
 });
 
