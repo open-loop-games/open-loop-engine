@@ -10,7 +10,7 @@ Three engine shapes share the "what's the player doing right now?" surface. The 
 
 | Shape | When to reach for |
 |---|---|
-| `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). Idle Loops / Cavernous lineage. |
+| `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). A list-mode looper restarts a run with `replay()`; `sequencer.resetCursor()` moves only the cursor and leaves each slot's progress from the last run. Idle Loops / Cavernous lineage. |
 | Worker-bundle recipe | Single-active duration-driven execution from `Sequencer` + `TimedProgress` + a `getTask(id)` lookup. No per-execution state machine; the duration accumulator is the lifecycle. spell-compiler and maldacena shape; recipe below. |
 | `createSlot` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. progress-knight-ng's `currentJob` / `currentSkill` shape. |
 
@@ -61,7 +61,7 @@ Why no engine helper: the claim axis varies widely across games — round-robin,
 
 ## Pre-completion gating in ActionCategory
 
-ActionCategory's `complete` event is a post-event observer — by the time it fires, the item is already terminal. Consumers that need to gate completion (budget caps, mana / effort ceilings, mid-execution termination conditions) do it inside the `tick` closure, before declaring complete:
+ActionCategory's `complete` event is a post-event observer — by the time it fires, the item is already terminal, and it fires once per execution. Consumers that need to gate completion (budget caps, mana / effort ceilings, mid-execution termination conditions) do it inside the `tick` closure, before declaring complete with `sequencer.complete()`:
 
 ```ts
 mapAction: (def) => ({
@@ -70,7 +70,6 @@ mapAction: (def) => ({
 
     // Pre-completion gate: check budget caps before declaring complete
     if (shouldTerminate(entry, def)) {
-      category.setItemState(def.id, 'completed');
       category.sequencer.complete();
       return;
     }
@@ -94,7 +93,6 @@ mapAction: (def) => ({
 
     for (const hook of preCompletionHooks) {
       if (hook(entry, def) === 'terminate') {
-        category.setItemState(def.id, 'completed');
         category.sequencer.complete();
         return;
       }
@@ -115,7 +113,7 @@ Composition recipe for games with opponent AI, automated playtest bots, or conte
 
 The load-bearing observation from the field (80% corpus prevalence across RTS, strategy, RPG, and idle genres): the unit the field ships is a **roster of N differentiated agents**, not a single bot. Sub-shapes — difficulty tiers, parameterized personalities, mode rosters, exploitability profiles — are all instances of the same pattern: a keyed vector of personality params consumed by one decision architecture.
 
-**Engine substrate.** `SequencerItem<M>` carries persona identity in `id` and the param bundle in `meta<M>`. The sequencer-strategies module (`src/core/sequencer-strategies.ts`) provides selection policies:
+**Engine substrate.** `SequencerItem<M>` carries persona identity in `id` and the param bundle in `metadata: M`. The sequencer-strategies module (`src/core/sequencer-strategies.ts`) provides selection policies:
 
 - `createRoundRobinStrategy` — cycle across runs with a persistent rotation index
 - `createPriorityStrategy` — tier-ordered preference (monotonic difficulty)
@@ -127,12 +125,12 @@ Active-personality persistence (boundary-deferred-apply) is standard reactive co
 ```ts
 // N personalities as typed param bundles
 const personalities: SequencerItem<PersonaParams>[] = [
-  { id: 'aggressive', meta: { aggression: 0.9, patience: 0.2 } },
-  { id: 'defensive',  meta: { aggression: 0.3, patience: 0.8 } },
-  { id: 'adaptive',   meta: { aggression: 0.6, patience: 0.5 } },
+  { id: 'aggressive', metadata: { aggression: 0.9, patience: 0.2 } },
+  { id: 'defensive',  metadata: { aggression: 0.3, patience: 0.8 } },
+  { id: 'adaptive',   metadata: { aggression: 0.6, patience: 0.5 } },
 ];
 
-// Random rotation across runs — index persists across save/load
+// Round-robin rotation across runs — index persists across save/load
 sequencer.fillStrategy = createRoundRobinStrategy('persona', () => personalities);
 
 // Or opponent-conditioned selection: read measured player aggression
@@ -159,8 +157,7 @@ The convergent shape across consumers (incloneution `src/modules/automation.ts`,
 - A single fill strategy walks every relevant `category.getAll()`, filters by unlock + visibility, builds a candidate list, sorts descending by score, and returns the first item whose task's `canRun()` returns `'now'`.
 
 ```ts
-import { computed } from 'vue';
-import type { FillStrategy, SequencerItem } from '@open-loop/engine';
+import { computed, type FillStrategy, type SequencerItem } from '@open-loop/engine';
 
 const PASS_BONUS = {
   gathering: 5,
@@ -260,7 +257,21 @@ Cross-cutting concerns the field kinds don't carry — time decay, propagation (
 
 ### When dialog and subjects connect
 
-Both surfaces share the engine's predicate / effect machinery. A dialog node gates on subject state through the typed `StateGate` path: `{ kind: 'state', key: 'subject.npc-trust.mentor-rask.trust', operator: 'gte', value: 2 }` — the path is `{categoryId}.{subjectId}.{fieldName}` for scalar/tier/flag/enum fields, with an extra `.{dim}` segment for vector dimensions. A choice writes back through `E.state('subject.npc-trust.mentor-rask.trust', 3)` — the predicate side is Gate (typed AST); the effect side is the `E` builder (consumer-facing). Reserved path conventions are documented in `src/primitives/types.ts`.
+Both surfaces share the engine's predicate / effect machinery, through state paths **your accessor implements**. The engine resolves no subject path: a `state` Gate hands its key to your `GameStateAccessor.getState`, and `E.state` hands its path to your mutator's `setState`. Pick a convention — `{categoryId}.{subjectId}.{fieldName}`, plus `.{dim}` for a vector dimension, reads well — and map it onto the category:
+
+```ts
+getState: (path) => {
+  const [cat, subjectId] = path.split('.');
+  if (cat === 'npc-trust') return npcs.get(subjectId)?.fields.trust.getIndex();
+  // ...other roots
+},
+setState: (path, value) => {
+  const [cat, subjectId] = path.split('.');
+  if (cat === 'npc-trust') npcs.get(subjectId)?.fields.trust.setIndex(value as number);
+},
+```
+
+A dialog choice then gates on `{ kind: 'state', key: 'npc-trust.mentor-rask.trust', operator: 'gte', value: 2 }` and writes back with `E.state('npc-trust.mentor-rask.trust', 3)`. A path your accessor doesn't handle reads `undefined`, so the gate stays closed without an error — cover every root you author.
 
 Bespoke subject-aware atoms (a `SubjectGate` kind / `E.subject`) are intentionally **not** in the builder yet — single-game prevalence (CDDA's `n_npc_trust()` math-DSL is the sole canonical example) doesn't justify the API growth. The state-path encoding is the path until a second consumer needs the ergonomics.
 
@@ -470,4 +481,4 @@ The parameterization seam is "policy params as an argument; game state read howe
 
 Why no engine helper: nothing to extract — each policy/step is domain (target-picking, drift integration, seat rotation), and the shared part is already a one-liner (export the fn, call from both sides). The engine's only job is to make the harness side cheap: `runUntil`, memory storage, `AutomationTiers.unlock`, `pushScope` — the balance-harness kernel that assembles the second caller.
 
-This is the general form of studio CLAUDE.md § "Automation is game code, not a harness bot": that convention states the *automation-policy* case (AutomationTiers-gated, the harness drives the shipping tick); the integration-step flavor — an always-on economy step with no tier gate — is the same discipline applied outside automation. Consumers (each with a live `onTick` caller and a `balance/` sim caller): frontier `src/game/modules/auto-target.ts` (decision — `pickNextTarget` / `shouldCollapse`), multiverse-hr `src/modules/rotation.ts` (selection — `worstEligibleSeat` / `freshestBenchedReplacement`), fork `src/game/economy/drift.ts` (step — `advanceCenter`).
+This is the general form of "automation is game code, not a harness bot": a player-facing automation policy is a pure function gated by `AutomationTiers`, and the harness drives the shipping tick with the tier forced rather than re-implementing the policy ([consumer-guide-balance.md](./consumer-guide-balance.md) § The probe). The integration-step flavor — an always-on economy step with no tier gate — is the same discipline applied outside automation. Consumers (each with a live `onTick` caller and a `balance/` sim caller): frontier `src/game/modules/auto-target.ts` (decision — `pickNextTarget` / `shouldCollapse`), multiverse-hr `src/modules/rotation.ts` (selection — `worstEligibleSeat` / `freshestBenchedReplacement`), fork `src/game/economy/drift.ts` (step — `advanceCenter`).
