@@ -521,8 +521,13 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       // bound inside the per-def persistent-context scope opened by
       // createCategoryBase, so chain.bind auto-derives attribution ids like
       // `{categoryId}/{def.id}/{description}`.
-      setupDeclarativeBindings(def.restricts, active, predicates);
-      setupDeclarativeBindings(def.rewards, completed, predicates);
+      setupDeclarativeBindings(
+        def.restricts,
+        active,
+        predicates,
+        `challenge '${def.id}' restricts`,
+      );
+      setupDeclarativeBindings(def.rewards, completed, predicates, `challenge '${def.id}' rewards`);
 
       const challenge: Challenge = {
         id: def.id,

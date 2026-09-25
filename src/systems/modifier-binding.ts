@@ -160,9 +160,38 @@ export function buildGrantModifier(grant: Grant): Modifier {
  * @internal
  */
 export function flattenGrants(grants: readonly Grant[]): { grant: Grant; chain: ModifierChain }[] {
-  return grants.flatMap((grant) =>
-    (Array.isArray(grant.chain) ? grant.chain : [grant.chain]).map((chain) => ({ grant, chain })),
-  );
+  return grants.flatMap((grant) => grantChains(grant).map((chain) => ({ grant, chain })));
+}
+
+/**
+ * The chains one grant targets, a single chain as a list of one.
+ *
+ * @internal
+ */
+export function grantChains(grant: Grant): readonly ModifierChain[] {
+  return Array.isArray(grant.chain) ? grant.chain : [grant.chain];
+}
+
+/**
+ * Adopt each grant's `when` through `predicates`, keyed by grant. A grant
+ * without one has no entry.
+ *
+ * @param owner - names the definition in a `when` Gate's error, which then
+ *   names the grant by its description, else its index
+ * @internal
+ */
+export function adoptGrantWhens(
+  grants: readonly Grant[],
+  predicates: PredicateResolver,
+  owner: string,
+): Map<Grant, ComputedRef<boolean>> {
+  const whens = new Map<Grant, ComputedRef<boolean>>();
+  for (const [index, grant] of grants.entries()) {
+    if (grant.when == null) continue;
+    const name = grant.description == null ? `${index}` : `'${grant.description}'`;
+    whens.set(grant, predicates.adopt(grant.when, true, `${owner} grant ${name} when`).holds);
+  }
+  return whens;
 }
 
 /**
@@ -178,12 +207,7 @@ export function lowerGrants(
   predicates: PredicateResolver,
   owner: string,
 ): LoweredGrant[] {
-  const whenByGrant = new Map<Grant, ComputedRef<boolean>>();
-  for (const [index, grant] of grants.entries()) {
-    if (grant.when == null) continue;
-    const name = grant.description == null ? `${index}` : `'${grant.description}'`;
-    whenByGrant.set(grant, predicates.adopt(grant.when, true, `${owner} grant ${name} when`).holds);
-  }
+  const whenByGrant = adoptGrantWhens(grants, predicates, owner);
   return flattenGrants(grants).map(({ grant, chain }) => {
     const when = whenByGrant.get(grant);
     return {

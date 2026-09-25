@@ -319,7 +319,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     buildInstance: (def) => {
       const { grants, ...opts } = mapAchievement(def);
       const achievement = createAchievement({ ...opts, id: def.id }, predicates);
-      setupDeclarativeBindings(grants, achievement.earned, predicates);
+      setupDeclarativeBindings(grants, achievement.earned, predicates, `achievement '${def.id}'`);
       return achievement;
     },
     buildState: mapState,

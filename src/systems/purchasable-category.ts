@@ -213,7 +213,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     buildInstance: (def) => {
       const { grants, ...opts } = mapPurchasable(def);
       const purchasable = createPurchasable({ ...opts, id: def.id }, predicates);
-      setupDeclarativeBindings(grants, purchasable.active, predicates);
+      setupDeclarativeBindings(grants, purchasable.active, predicates, `purchasable '${def.id}'`);
       return purchasable;
     },
     buildState: mapState,

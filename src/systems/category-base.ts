@@ -28,7 +28,7 @@ import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
 import type { PredicateResolver } from './gate';
-import { buildGrantModifier } from './modifier-binding';
+import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-binding';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
@@ -286,24 +286,22 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
  * opens for each definition (so `chain.bind` derives stable attribution ids
  * from the current context).
  *
+ * @param owner - names the definition in a `when` Gate's error, e.g.
+ *   `"purchasable 'u1'"`
  * @internal
  */
 export function setupDeclarativeBindings(
   grants: Grant[] | undefined,
   active: MaybeRef<boolean>,
   predicates: PredicateResolver,
+  owner: string,
 ): void {
   if (grants == null || grants.length === 0) return;
+  const whens = adoptGrantWhens(grants, predicates, owner);
   for (const grant of grants) {
-    const chains = Array.isArray(grant.chain) ? grant.chain : [grant.chain];
+    const when = whens.get(grant);
     const composedActive =
-      grant.when == null
-        ? active
-        : (() => {
-            const label = `grant '${grant.description ?? chains.map((c) => c.id).join(', ')}' when`;
-            const when = predicates.adopt(grant.when, true, label).holds;
-            return computed(() => unref(active) !== false && when.value);
-          })();
+      when == null ? active : computed(() => unref(active) !== false && when.value);
     const modifier = buildGrantModifier(grant);
     // Pass the grant's stable text so bind derives its attribution id without
     // invoking the modifier's description getter — that getter formats the
@@ -311,7 +309,7 @@ export function setupDeclarativeBindings(
     // the entry is in the category map) freezes self-referential lookups at
     // their fallback. Escape-hatch grants without a description still fall back
     // to the getter inside bind.
-    for (const chain of chains)
+    for (const chain of grantChains(grant))
       chain.bind({ active: composedActive, modifier, description: grant.description });
   }
 }

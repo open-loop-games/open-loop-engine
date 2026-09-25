@@ -925,7 +925,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
         grants: [{ chain, mult: 2, description: 'Doubler', when: unwiredFlag }],
       }),
     });
-    expect(() => granted.register({ id: 'u' })).toThrow(/grant 'Doubler' when: /);
+    expect(() => granted.register({ id: 'u' })).toThrow(/purchasable 'u' grant 'Doubler' when: /);
   });
 
   it('subject tier gates', () => {
