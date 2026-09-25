@@ -16,7 +16,7 @@
  *   winner.
  *
  * Built-in factories follow the constructor-as-data carve-out (see
- * `open-loop-engine/CLAUDE.md` § Naming, noun-form helpers): call sites
+ * `AGENTS.md` § Code Rules, Naming, noun-form helpers): call sites
  * read as configuration, not as actions — `policy: selectionHybridPayback({ ... })`.
  * `FillStrategy` factories keep the verb form (`create*Strategy`) because
  * round-robin binds persistent cursor state; the convention extends across
@@ -134,7 +134,8 @@ export function selectionCheapest<T>(getCost: (t: T) => DecimalSource): Selectio
 }
 
 /**
- * Pick the candidate with the shortest payback period (smallest beat).
+ * Pick the candidate with the smallest beat — a per-candidate seconds figure
+ * the caller supplies, lower wins.
  *
  * Candidates whose beat is non-finite are skipped — the policy treats them
  * as having no defined payback. Treats each candidate in isolation; doesn't
@@ -143,8 +144,11 @@ export function selectionCheapest<T>(getCost: (t: T) => DecimalSource): Selectio
  * Monster, AutoTrimps) all blend in a wait term to handle that case
  * (see {@link selectionHybridPayback}).
  *
- * @param getBeat - Payback-period extractor in seconds. Typically
- *   `(p) => p.purchaseBeatSeconds.value`.
+ * @param getBeat - Seconds extractor. `(p) => p.purchaseBeatSeconds.value` is
+ *   the usual source: the time the producer's whole stack takes to earn its
+ *   next unit's cost, which favours tall stacks. For the marginal payback
+ *   period the surveyed userscripts rank by, pass cost over the rate one more
+ *   unit adds (`getCost(1) / computedRate` for a producer).
  */
 export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T> {
   return {
@@ -174,11 +178,13 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  * handing the decision to the pure payback term. Sourced from Cookie
  * Monster's `pp` formula and Frozen Cookies' `purchaseEfficiency`.
  *
- * Cold-start fallback: when `headlineRate = 0` (no passive production yet)
- * the wait term would blow up, so the score degenerates to `cost`
+ * Cold-start fallback: a candidate whose headline rate is ≤ 0 (no passive
+ * production yet) would blow up the wait term, so it scores `cost`
  * (cheapest-affordable) and relies on the caller's affordability filter to
- * gate "wait until first purchase becomes possible." Candidates with
- * `Δrate ≤ 0` are skipped — they have no payback term.
+ * gate "wait until first purchase becomes possible." The fallback is chosen
+ * per candidate, and `cost` is currency where the blended score is seconds:
+ * keep one pick to candidates that share a headline rate or cost resource.
+ * Candidates with `Δrate ≤ 0` are skipped — they have no payback term.
  *
  * @param opts - Per-candidate getters for cost / rate / resource +
  *   reserve floor + headline-rate aggregator. See {@link HybridPaybackOptions}.
