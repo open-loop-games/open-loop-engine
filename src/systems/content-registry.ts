@@ -35,11 +35,11 @@ import { ref } from 'vue';
 /**
  * A typed, Map-backed registry for game content definitions.
  *
- * Entries are stored by `id` and returned by reference (no cloning); the
- * entries themselves are plain objects, not reactive. The registry's reads
- * (`get`, `getAll`, `has`, `size`) are: a computed that reads an entry
- * through them re-evaluates after any `register`, `patch` or `pushPatches`.
- * A value copied out of an entry, or read off a held entry reference, does not.
+ * Entries are stored by `id` and returned by reference (no cloning). The
+ * entries are plain objects, but the reads (`get`, `getAll`, `has`, `size`)
+ * are reactive: a computed that reads an entry through them re-evaluates
+ * after any `register`, `patch` or `pushPatches`. One that read a copied
+ * field, or a field off an entry reference it held, does not.
  */
 export interface ContentRegistry<T extends { id: string }> {
   /** Human-readable name, included in error messages */
@@ -58,7 +58,8 @@ export interface ContentRegistry<T extends { id: string }> {
 
   /**
    * Shallow-patch an existing entry's fields (Object.assign semantics).
-   * The `id` field cannot be changed. A field a {@link pushPatches} scope
+   * The `id` field cannot be changed. Only the entry object changes: a value
+   * copied out of it earlier keeps the old one. A field a {@link pushPatches} scope
    * covers keeps the scope's value until every covering scope reverts, and
    * then takes the patched value.
    *

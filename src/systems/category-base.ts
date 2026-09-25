@@ -122,7 +122,13 @@ export interface CategoryBase<
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
-  /** The content registry — mods can call `registry.register()` or `registry.patch()` */
+  /**
+   * The content registry. `registry.patch()` / `pushPatches()` change the def;
+   * an instance sees the change only through a getter that reads `getDef(id)`
+   * or `registry.get(id)`, since value fields and closures over `def` are
+   * copied or frozen at register. Add defs with `register` — `registry.register()`
+   * leaves a def with no instance or state.
+   */
   readonly registry: ContentRegistry<Def>;
 
   /**

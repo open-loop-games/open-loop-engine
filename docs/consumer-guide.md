@@ -41,7 +41,7 @@ skills.register([{ id: 'woodcutting', xpDivisor: 10 }, { id: 'mining', xpDivisor
 
 The `map*` function is where your game's definition shape meets the engine's options shape. For simple cases this is mostly pass-through; for complex cases (skills with custom curves, actions with type-specific behavior) the mapper does real work.
 
-What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll` / `patch`), and per-def lifecycle. Mods extend definitions via `registry.patch()` without touching the original module.
+What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll`), and per-def lifecycle. A mod adds definitions through the category's own `register` — `registry.register()` would leave a def with no instance or state — and changes one with `registry.patch()` without touching the original module. A patch rewrites the def, not what was built from it: a live instance sees it only where its mapping reads the def back through `getDef(id)` inside a getter, since value fields and closures over `def` are copied or frozen at register.
 
 **Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without importing the module that declared it. No publishing step; reading is opt-in. This is about who can *read* your content, not about where it may be constructed: the registry, like every other ambient handle, is only wired during `install()` / `connect()`. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
 

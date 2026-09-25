@@ -97,7 +97,9 @@ export interface ChallengeDef<
   /**
    * Content patches applied while this challenge is active.
    * Map of registry name → entry id → partial fields.
-   * Reverted automatically on exit.
+   * Reverted automatically on exit. A patch changes the def only; content
+   * built from it sees the change where it reads the def back through the
+   * registry at use time, such as a getter over a category's `getDef(id)`.
    */
   contentPatches?: Record<string, Record<string, Partial<Record<string, unknown>>>>;
 

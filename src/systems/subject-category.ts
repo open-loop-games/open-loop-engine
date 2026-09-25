@@ -254,7 +254,13 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
   readonly id: string;
   /** Shared schema; readable for introspection and tooling. */
   readonly schema: S;
-  /** Content registry — mods can call `registry.register()` or `registry.patch()`. */
+  /**
+   * The content registry. `registry.patch()` / `pushPatches()` change the def;
+   * an instance sees the change only through a getter that reads `getDef(id)`
+   * or `registry.get(id)`, since value fields and closures over `def` are
+   * copied or frozen at register. Add defs with `register` — `registry.register()`
+   * leaves a def with no instance or state.
+   */
   readonly registry: ContentRegistry<SubjectDef<S>>;
   /** Register subjects against the shared schema. Can be called multiple times (base game + mods). */
   register(defs: SubjectDef<S> | SubjectDef<S>[]): void;
