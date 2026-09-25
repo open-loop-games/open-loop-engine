@@ -2,6 +2,18 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.1.2 (2026-09-25)
+
+### Fixes
+
+* **systems:** a cycle's run clock survives a save (df020cc)
+* **core:** a Decimal held by a number-default ref loads as a Decimal (936bfd9)
+* **systems:** a temporary effect's duration never trails its time remaining (aaea9f1)
+* **systems:** a BestOf entry saved before the cycleNumber rename reads its loopNumber (8cd3928)
+* **core:** the spatial grid snapshot carries a version (f97a192)
+* **core:** a save a newer engine wrote is refused, not misread (093b847)
+* **core:** RunPool stops saving an instance-id list nothing reads (f1bfb31)
+
 ## 0.1.1 (2026-09-25)
 
 ### Features
