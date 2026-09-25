@@ -443,9 +443,10 @@ export interface SetupPolicyAutoPurchaseOptions {
  * Behavior per tick:
  * 1. Accumulate `dt`. If below `interval`, return.
  * 2. If `enabled` is false, reset the accumulator and return.
- * 3. Filter producers by `canPurchase.value && repeatable !== undefined`
+ * 3. Filter continuous producers by `canPurchase.value && repeatable !== undefined`
  *    and, when `reserve > 0`, whether a single unit is payable with every
- *    cost-resource left at or above the floor.
+ *    cost-resource left at or above the floor. A manual producer yields only
+ *    when clicked, so its purchase is the player's call.
  * 4. Pass the filtered list to `policy.pick()` and purchase the winner,
  *    clamping `bulkAmount` to what the reserve admits.
  * 5. Subtract `interval` from the accumulator (so beat timing stays stable)
@@ -579,7 +580,7 @@ export function setupPolicyAutoPurchase(
       const candidates: Producer[] = [];
       for (const producer of list) {
         const { repeatable } = producer;
-        if (!repeatable) continue;
+        if (!repeatable || producer.trigger !== 'continuous') continue;
         if (!repeatable.canPurchase.value) continue;
 
         // Screened through the same helper the bulk clamp uses, so filter and

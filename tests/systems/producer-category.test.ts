@@ -438,6 +438,52 @@ describe('createProducerCategory', () => {
     expect(new Decimal(cookies.value).eq(3)).toBe(true);
   });
 
+  it('manual producer yields rate × count', () => {
+    const { registerTick } = createTickManager();
+    const cookies = createTestResource('cookies', 1e6);
+    const cursors = ref<DecimalSource>(3);
+
+    const category = createProducerCategory<ClickDef>({
+      id: 'manual-count',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: 'manual',
+        purchase: { costResource: cookies, baseCost: 10, costScaling: 1.15 },
+        extraCount: cursors,
+      }),
+      registerTick,
+    });
+
+    category.register({ id: 'click', name: 'Click', baseRate: 2 });
+    const producer = category.getProducer('click')!;
+    producer.repeatable!.purchase(2);
+    const before = new Decimal(cookies.value);
+
+    producer.activate!();
+    // count = 2 owned + 3 extra; 2 × 5 = 10
+    expect(new Decimal(cookies.value).sub(before).toNumber()).toBe(10);
+  });
+
+  it('manual producer has no purchase beat', () => {
+    const { registerTick } = createTickManager();
+    const cookies = createTestResource('cookies', 1e6);
+
+    const category = createProducerCategory<ClickDef>({
+      id: 'manual-beat',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: 'manual',
+        purchase: { costResource: cookies, baseCost: 10, costScaling: 1.15 },
+      }),
+      registerTick,
+    });
+
+    category.register({ id: 'click', name: 'Click', baseRate: 1 });
+    expect(category.getProducer('click')!.purchaseBeatSeconds.value).toBe(Infinity);
+  });
+
   it('manual producer does not tick', () => {
     const { registerTick, tick } = createTickManager();
     const cookies = createTestResource('cookies');

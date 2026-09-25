@@ -356,6 +356,33 @@ describe('setupPolicyAutoPurchase', () => {
     );
   });
 
+  it('skips manual producers', () => {
+    const cookies = createTestResource('cookies', 1_000_000);
+    const { registerTick, tick } = createTickManager();
+    const category = createProducerCategory<BuildingDef>({
+      id: `auto-${Math.random().toString(36).slice(2, 8)}`,
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: def.id === 'click' ? 'manual' : 'continuous',
+        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+      }),
+      registerTick,
+    });
+    category.register([
+      { id: 'click', name: 'Click', baseRate: 1, baseCost: 1, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
+    ]);
+
+    setupPolicyAutoPurchase(category, { enabled: true, policy: cheapestPolicy() }, registerTick);
+
+    tick(0.1);
+    expect(new Decimal(category.getProducer('click')!.repeatable!.amount.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('cursor')!.repeatable!.amount.value).toNumber()).toBe(
+      1,
+    );
+  });
+
   it('payback-period policy picks by shortest purchaseBeatSeconds', () => {
     const cookies = createTestResource('cookies', 1_000_000);
     const { category, registerTick, tick } = makeCategory(cookies);

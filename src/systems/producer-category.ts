@@ -73,13 +73,13 @@ export interface ProducerMapping {
   baseRate: DecimalSource;
   /**
    * `'continuous'` runs every tick; `'manual'` exposes `.activate()`, which
-   * credits `computedRate` once regardless of `count`.
+   * credits `computedRate × count` once per call.
    */
   trigger: 'continuous' | 'manual';
   /**
-   * If present, creates a ScalingPurchasable for purchase count. On a
-   * `'manual'` producer the count changes nothing `activate` yields, so the
-   * purchase is count-inert there.
+   * If present, creates a ScalingPurchasable for purchase count. The policy
+   * auto-buyer (`setupPolicyAutoPurchase`) skips a `'manual'`
+   * producer's purchase.
    */
   purchase?: ProducerPurchaseConfig;
   /** Display description for the repeatable (if purchase config present) */
@@ -165,7 +165,7 @@ export interface Producer {
   readonly rateChain: ModifierChain;
   /**
    * Per-unit rate: `baseRate` after `rateChain`, per second (continuous) or
-   * per activation (manual). A continuous producer's output is this × `count`.
+   * per activation (manual). The producer's output is this × `count`.
    */
   readonly computedRate: ComputedRef<DecimalSource>;
   /** The resource this producer generates */
@@ -197,15 +197,15 @@ export interface Producer {
   /**
    * Effective production count: `ownedCount + extraCount`, falling back to 1
    * when neither is configured (the click-clicker default). Drives the tick
-   * body, `purchaseBeatSeconds`, total-rate aggregation, and the entry's
-   * `count` signal; `activate` ignores it. For effects or costs that should
+   * body, `activate`, `purchaseBeatSeconds`, total-rate aggregation, and the
+   * entry's `count` signal. For effects or costs that should
    * apply to a single axis, bind `ownedCount` or `extraCount` directly instead.
    */
   readonly count: ComputedRef<DecimalSource>;
   /**
    * Seconds this producer's whole stack takes to earn the price of its next
    * unit: `getCost(1) / (computedRate * max(1, count))`. Returns `Infinity`
-   * when nothing is buyable or rate is zero.
+   * when nothing is buyable, rate is zero or the producer is manual.
    *
    * A stack-amortized beat, not a payback period. The next unit adds only
    * `computedRate`, so its own payback is `getCost(1) / computedRate`, longer
@@ -337,15 +337,16 @@ function buildProducer<Def extends { id: string }>(
   let activate: (() => void) | undefined;
   if (mapping.trigger === 'manual') {
     activate = () => {
-      addResource(mapping.resource, computedRate.value);
+      addResource(mapping.resource, Decimal.mul(computedRate.value, count.value));
     };
   }
 
   // Stack-amortized beat: cost / (rate * max(1, count)). Infinity when nothing
-  // is buyable or rate is zero so consumers can branch on a finite check
+  // is buyable, the rate is zero or the producer is manual (no rate per
+  // second to amortize against) so consumers can branch on a finite check
   // without wrapping the call.
   const purchaseBeatSeconds = computed<number>(() => {
-    if (!repeatable) return Infinity;
+    if (!repeatable || mapping.trigger !== 'continuous') return Infinity;
     const rate = Decimal.fromValue(computedRate.value);
     if (!rate.gt(0)) return Infinity;
     const effCount = Decimal.max(1, count.value);
