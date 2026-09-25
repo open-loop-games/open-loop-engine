@@ -83,13 +83,13 @@ persistent game state with multi-slot support
 - `interface AddFieldOptions` `src/core/save-migrations.ts:148`
 - `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:87`
 - `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:436`
-- `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: a live `Decimal` instance, a finite `number`, or a numeric string (including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits). `src/core/save-validation.ts:58`
-- `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref's default value and options. `src/core/save-validation.ts:86`
+- `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: a live `Decimal` instance, a finite `number`, or a numeric string (including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits). `src/core/save-validation.ts:59`
+- `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref's default value and options. `src/core/save-validation.ts:92`
 - `function dropField(data: SaveData, path: string): SaveData` — Remove the value at `path`. `src/core/save-migrations.ts:139`
 - `const ENGINE_SAVE_VERSION = 3` — Engine-internal save-format version, stored in the envelope under `_engine.version`. `src/core/save-manager.ts:59`
 - `function forEachDefinition(data: SaveData, contextId: string, fn: (entry: SaveData, id: string) => void): SaveData` — Iterate over each entry in a collection-shaped context (a top-level group of per-definition state). `src/core/save-migrations.ts:195`
 - `function getNested(data: SaveData, path: string): unknown` — Read the value at a `.`-separated nested path in a save-data tree. `src/core/save-migrations.ts:43`
-- `function getSchemaForRef(ref: Persistent): ZodType` — Get the effective schema for a persistent ref — explicit override wins, else auto-derive. `src/core/save-validation.ts:121`
+- `function getSchemaForRef(ref: Persistent): ZodType` — Get the effective schema for a persistent ref — explicit override wins, else auto-derive. `src/core/save-validation.ts:141`
 - `function renameField(data: SaveData, oldPath: string, newPath: string): SaveData` — Move a value from `oldPath` to `newPath`. `src/core/save-migrations.ts:93`
 - `function retypeField(data: SaveData, path: string, transform: (oldValue: unknown) => unknown): SaveData` — Apply `transform` to the value at `path`. `src/core/save-migrations.ts:117`
 - `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:195`
@@ -101,10 +101,10 @@ persistent game state with multi-slot support
 - `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:169`
 - `function setNested(data: SaveData, path: string, value: unknown): void` — Write `value` at a `.`-separated nested path, creating intermediate objects as needed. `src/core/save-migrations.ts:64`
 - `interface StorageAdapter` — Pluggable storage backend. `src/core/save-manager.ts:64`
-- `function validateSaveData(refs: Map<string, Persistent>, data: Record<string, unknown>, options: ValidateSaveDataOptions): ValidateSaveDataResult` — Validate raw save data against the live persistent-ref registry. `src/core/save-validation.ts:186`
-- `interface ValidateSaveDataOptions` `src/core/save-validation.ts:161`
-- `interface ValidateSaveDataResult` `src/core/save-validation.ts:168`
-- `interface ValidationIssue` — A single field-level validation failure, suitable for `save:validation-error`. `src/core/save-validation.ts:72`
+- `function validateSaveData(refs: Map<string, Persistent>, data: Record<string, unknown>, options: ValidateSaveDataOptions): ValidateSaveDataResult` — Validate raw save data against the live persistent-ref registry. `src/core/save-validation.ts:206`
+- `interface ValidateSaveDataOptions` `src/core/save-validation.ts:181`
+- `interface ValidateSaveDataResult` `src/core/save-validation.ts:188`
+- `interface ValidationIssue` — A single field-level validation failure, suitable for `save:validation-error`. `src/core/save-validation.ts:73`
 
 ## Time bank
 

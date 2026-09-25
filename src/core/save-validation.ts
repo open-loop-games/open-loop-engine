@@ -43,10 +43,11 @@ import {
 // break_eternity's `new Decimal(s)` silently coerces garbage strings to 0
 // instead of throwing, so we can't rely on construction alone. Require the
 // input to *look* numeric first: either a finite-ish leading character set
-// (digit, sign, decimal point, or `(` for hyper-e notation) or one of the
-// special literals serializePersistents emits for non-finite numbers.
+// (digit, sign, decimal point, or `(` for hyper-e notation), after the run of
+// `e`s that `Decimal.toString` writes from layer 2 up (`ee20`, `-ee-15.9`), or
+// one of the special literals serializePersistents emits for non-finite numbers.
 const DECIMAL_LITERAL = /^[-+]?(Infinity|NaN)$/;
-const DECIMAL_NUMERIC = /^[-+]?[\d.(]/;
+const DECIMAL_NUMERIC = /^[-+]?e*[-+]?[\d.(]/;
 
 /**
  * Zod schema that accepts the three concrete {@link DecimalSource} shapes a
@@ -78,15 +79,24 @@ export interface ValidationIssue {
 
 /**
  * Derive a Zod schema from a ref's default value and options. Recurses into
- * plain nested objects and homogeneous arrays (using the first element's
- * default as the element-shape witness). Primitive defaults map to lenient
- * schemas: numeric defaults accept `number | string` so DecimalSource and
+ * plain nested objects and arrays. Primitive defaults map to lenient schemas:
+ * numeric defaults accept `number | string` so DecimalSource and
  * non-finite-encoded strings (`"Infinity"`, `"NaN"`) both pass.
+ *
+ * Every derived schema except the Decimal one accepts `null`: a default says
+ * what kind a value has, not whether the ref's type admits null, and JSON only
+ * writes `null` where the game stored one. Rejecting it would reset a
+ * legitimately-unset field on load. A Decimal ref holding `null` is not a
+ * `DecimalSource`, so it stays rejected — pass an explicit `schema` for that.
  */
 export function deriveSchema(defaultValue: unknown, decimal = false): ZodType {
   if (decimal || defaultValue instanceof Decimal) {
     return decimalSchema;
   }
+  return deriveKindSchema(defaultValue).nullable();
+}
+
+function deriveKindSchema(defaultValue: unknown): ZodType {
   if (defaultValue === null || defaultValue === undefined) {
     return z.unknown();
   }
@@ -101,8 +111,7 @@ export function deriveSchema(defaultValue: unknown, decimal = false): ZodType {
       return z.boolean();
     case 'object': {
       if (Array.isArray(defaultValue)) {
-        const elementSchema = defaultValue.length > 0 ? deriveSchema(defaultValue[0]) : z.unknown();
-        return z.array(elementSchema);
+        return z.array(deriveElementSchema(defaultValue));
       }
       const shape: Record<string, ZodType> = {};
       for (const [k, v] of Object.entries(defaultValue as Record<string, unknown>)) {
@@ -115,6 +124,17 @@ export function deriveSchema(defaultValue: unknown, decimal = false): ZodType {
     default:
       return z.unknown();
   }
+}
+
+/** Element schema for an array default: the one kind its non-null elements share, else unknown. */
+function deriveElementSchema(elements: unknown[]): ZodType {
+  const present = elements.filter((el) => el !== null && el !== undefined);
+  if (present.length === 0) return z.unknown();
+  const kind = (el: unknown): string =>
+    el instanceof Decimal ? 'decimal' : Array.isArray(el) ? 'array' : typeof el;
+  const first = kind(present[0]);
+  if (present.some((el) => kind(el) !== first)) return z.unknown();
+  return deriveSchema(present[0]);
 }
 
 /** Get the effective schema for a persistent ref — explicit override wins, else auto-derive. */

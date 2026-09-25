@@ -25,6 +25,21 @@ describe('save-validation', () => {
       expect(decimalSchema.safeParse('Infinity').success).toBe(true);
     });
 
+    it('accepts every string Decimal.toString writes, layer 2 and up included', () => {
+      for (const v of [
+        '1e9e15',
+        '1e1e20',
+        '-1e1e20',
+        '1e-1e20',
+        '-1e-9e15',
+        '1e1e1e20',
+        '10^^10',
+      ]) {
+        const written = new Decimal(v).toString();
+        expect(decimalSchema.safeParse(written).success, `${v} → ${written}`).toBe(true);
+      }
+    });
+
     it('rejects non-numeric strings, null, undefined, and objects', () => {
       expect(decimalSchema.safeParse('banana').success).toBe(false);
       expect(decimalSchema.safeParse(null).success).toBe(false);
@@ -52,7 +67,14 @@ describe('save-validation', () => {
       expect(s.safeParse(42).success).toBe(true);
       expect(s.safeParse('Infinity').success).toBe(true);
       expect(s.safeParse(true).success).toBe(false);
-      expect(s.safeParse(null).success).toBe(false);
+    });
+
+    it('derived non-Decimal schemas accept null — JSON only writes null a game stored', () => {
+      expect(deriveSchema(0).safeParse(null).success).toBe(true);
+      expect(deriveSchema('ally').safeParse(null).success).toBe(true);
+      expect(deriveSchema(false).safeParse(null).success).toBe(true);
+      expect(deriveSchema({ at: { x: 0 } }).safeParse({ at: null }).success).toBe(true);
+      expect(deriveSchema(new Decimal(0)).safeParse(null).success).toBe(false);
     });
 
     it('string default → z.string', () => {
@@ -81,6 +103,17 @@ describe('save-validation', () => {
       const s = deriveSchema([1, 2, 3]);
       expect(s.safeParse([10, 20]).success).toBe(true);
       expect(s.safeParse([true]).success).toBe(false);
+    });
+
+    it('array default with null cells accepts nulls anywhere', () => {
+      const s = deriveSchema(['wall', null, 'floor']);
+      expect(s.safeParse([null, 'floor', null]).success).toBe(true);
+      expect(s.safeParse([1]).success).toBe(false);
+    });
+
+    it('array default mixing element kinds → z.array of unknown', () => {
+      const s = deriveSchema([1, 'two', { three: 3 }]);
+      expect(s.safeParse([{ three: 3 }, 'two', 1]).success).toBe(true);
     });
 
     it('empty array default → z.array of unknown', () => {
@@ -140,6 +173,25 @@ describe('save-validation', () => {
 
       expect(result.ok).toBe(true);
       expect(result.issues).toHaveLength(0);
+    });
+
+    it('a stored null and a layer-2 Decimal survive a strict JSON round-trip', () => {
+      resetAllPersistentContexts();
+      beginPersistentContext('vd-edges');
+      const stance = persistent<string | null>('ally', { name: 'stance' });
+      const cells = persistent<(string | null)[]>(['wall', 'floor'], { name: 'cells' });
+      const points = persistent(new Decimal(0), { name: 'points' });
+      endPersistentContext();
+      stance.value = null;
+      cells.value = ['wall', null];
+      points.value = new Decimal('1e1e20');
+
+      const refs = getAllPersistentRefs();
+      const data = JSON.parse(JSON.stringify(serializePersistents(refs)));
+      const result = validateSaveData(refs, data, { strict: true });
+
+      expect(result.issues).toEqual([]);
+      expect(result.ok).toBe(true);
     });
 
     it('self-heals bad leaves in non-strict mode by deleting them', () => {
