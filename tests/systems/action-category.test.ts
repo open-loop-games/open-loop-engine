@@ -14,6 +14,7 @@ import {
   type ActionItemState,
 } from '@/systems/action-category';
 import { Resettable } from '@/systems/resettable';
+import { createEngine, type EngineModule } from '@/engine';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import type { RegisterTick } from '@/core/sequencer';
 
@@ -510,5 +511,66 @@ describe('createActionCategory — list mode', () => {
       [0, 'pending'],
     ]);
     expect(runTicks()).toBe(first);
+  });
+});
+
+// ============================================================================
+// The createActionCategory @example, as written, inside a module install
+// ============================================================================
+
+describe('createActionCategory — TSDoc example', () => {
+  it('registers, runs and counts', () => {
+    interface SpellDef {
+      id: string;
+      baseCastTime: number;
+    }
+    interface SpellState {
+      timesCast: Persistent<number>;
+    }
+    let out: ActionCategory<SpellDef, SpellState> | undefined;
+
+    const magic: EngineModule = {
+      id: 'magic',
+      install(ctx) {
+        // --- example body ---
+        const spells: ActionCategory<SpellDef, SpellState> = createActionCategory<
+          SpellDef,
+          SpellState
+        >({
+          id: 'spells',
+          registerTick: ctx.onTick,
+          mapState: () => ({ timesCast: persistent(0) }),
+          mapAction: (def) => ({
+            signals: {
+              unlock: computed(() => true),
+              // Read state lazily: mapAction runs before the entry exists.
+              count: computed(() => spells.getState(def.id)?.timesCast.value ?? 0),
+            },
+            tick: ({ entry, dt, category }) => {
+              category.tickItemProgress(def.id, dt);
+              if ((category.currentItem?.progress as number) >= def.baseCastTime) {
+                entry.state.timesCast.value++;
+                category.sequencer.complete();
+              }
+            },
+          }),
+        });
+
+        spells.register({ id: 'fireball', baseCastTime: 2 });
+        spells.enqueue('fireball');
+        // --- end example body ---
+        out = spells;
+      },
+    };
+
+    const engine = createEngine({ gameId: 'action-example', persistence: false });
+    engine.use(magic);
+    engine.start();
+    engine.tickDriver.simulateTick(1);
+    engine.tickDriver.simulateTick(1);
+    engine.stop();
+
+    expect(out!.getState('fireball')!.timesCast.value).toBe(1);
+    expect(out!.getEntry('fireball')!.signals.count.value).toBe(1);
   });
 });

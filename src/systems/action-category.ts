@@ -289,25 +289,28 @@ function buildInitialMetadata<Payload>(
  * interface SpellDef { id: string; baseCastTime: number }
  * interface SpellState { timesCast: Persistent<number> }
  *
- * const spells = createActionCategory<SpellDef, SpellState>({
+ * // Annotated: the category is read inside its own mapAction.
+ * const spells: ActionCategory<SpellDef, SpellState> = createActionCategory<
+ *   SpellDef,
+ *   SpellState
+ * >({
  *   id: 'spells',
- *   mode: 'queue',
  *   registerTick: ctx.onTick,
- *   mapAction: (def, ctx) => ({
+ *   mapState: () => ({ timesCast: persistent(0) }),
+ *   mapAction: (def) => ({
  *     signals: {
  *       unlock: computed(() => true),
- *       count: spells.getEntry(def.id)!.state.timesCast,
+ *       // Read state lazily: mapAction runs before the entry exists.
+ *       count: computed(() => spells.getState(def.id)?.timesCast.value ?? 0),
  *     },
  *     tick: ({ entry, dt, category }) => {
  *       category.tickItemProgress(def.id, dt);
- *       const progress = category.currentItem!.progress as number;
- *       if (progress >= def.baseCastTime) {
+ *       if ((category.currentItem?.progress as number) >= def.baseCastTime) {
  *         entry.state.timesCast.value++;
  *         category.sequencer.complete();
  *       }
  *     },
  *   }),
- *   mapState: () => ({ timesCast: persistent(0) }),
  * });
  *
  * spells.register({ id: 'fireball', baseCastTime: 2 });
