@@ -112,13 +112,7 @@ export function timeUntilResource(
   if (Decimal.lte(rate, Decimal.dZero)) {
     return { seconds: null, reason: 'no-rate' };
   }
-  const distance = Decimal.sub(targetDec, current);
-  const seconds = toNumber(Decimal.div(distance, rate));
-  // An undefined amount or rate makes the distance indeterminate, not zero.
-  // `computed` promises a real `seconds`, so the indeterminate case takes the
-  // arm that already exists for it.
-  if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
-  return { seconds, reason: 'computed' };
+  return secondsToCover(Decimal.sub(targetDec, current), rate);
 }
 
 /**
@@ -203,8 +197,19 @@ function timeUntilResourceFlip(
   }
 
   const distance = needsUp ? Decimal.sub(targetDec, current) : Decimal.sub(current, targetDec);
-  const absRate = needsUp ? rate : Decimal.neg(rate);
-  const seconds = toNumber(Decimal.div(distance, absRate));
+  return secondsToCover(distance, needsUp ? rate : Decimal.neg(rate));
+}
+
+/**
+ * Seconds to close `gap` at a positive `rate`, floored at 0.
+ *
+ * @internal Shared by the resource and Gate flip-distance arithmetic.
+ */
+export function secondsToCover(gap: DecimalSource, rate: DecimalSource): TransitionDistance {
+  const seconds = toNumber(Decimal.div(gap, rate));
+  // An undefined amount or rate makes the distance indeterminate, not zero.
+  // `computed` promises a real `seconds`, so the indeterminate case takes the
+  // arm that already exists for it.
   if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
   return { seconds: Math.max(0, seconds), reason: 'computed' };
 }

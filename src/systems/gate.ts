@@ -49,12 +49,13 @@
  */
 
 import { computed, unref, type ComputedRef } from 'vue';
-import { Decimal, toNumber } from '@/primitives/decimal';
+import { Decimal } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { compareState } from '@/core/conditions';
 import { processGetter, resolveComputable, type Computable } from '@/core/computed';
 import {
   combineFlipDistances,
+  secondsToCover,
   timeUntilConditionFlip,
   type ChildFlipResult,
   type TransitionDeps,
@@ -316,9 +317,7 @@ function timeUntilCumulativeFlip(
   if (Decimal.lte(rate, Decimal.dZero)) {
     return { seconds: null, reason: inflow !== undefined ? 'no-rate' : 'uncomputable' };
   }
-  const seconds = toNumber(Decimal.div(Decimal.sub(gate.value, total), rate));
-  if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
-  return { seconds, reason: 'computed' };
+  return secondsToCover(Decimal.sub(gate.value, total), rate);
 }
 
 function combinatorFlip(
