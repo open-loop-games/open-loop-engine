@@ -301,11 +301,17 @@ export interface EngineConfig {
  * instance will reuse the same module ids in the same page lifetime.
  */
 export interface Engine {
+  /**
+   * Register a module for `start()` to install.
+   * @throws After `start()`, which installs the module set once.
+   */
   use(module: EngineModule): Engine;
   /**
    * Install registered modules and begin ticking. Does not load a save —
    * call `load()` explicitly after `start()` (modules must install first so
    * their persistent refs exist to hydrate).
+   * @throws On a disposed engine, a circular or missing dependency, or two
+   *   different module objects registered under one id.
    */
   start(): void;
   stop(): void;
@@ -506,7 +512,12 @@ export function createEngine(config: EngineConfig): Engine {
     const sorted: EngineModule[] = [];
     const visited = new Set<string>();
     const visiting = new Set<string>();
-    const modMap = new Map(mods.map((m) => [m.id, m]));
+    const modMap = new Map<string, EngineModule>();
+    for (const m of mods) {
+      const seen = modMap.get(m.id);
+      if (seen && seen !== m) throw new Error(`Two different modules share the id "${m.id}"`);
+      modMap.set(m.id, m);
+    }
 
     function visit(mod: EngineModule): void {
       if (visited.has(mod.id)) return;
@@ -541,6 +552,7 @@ export function createEngine(config: EngineConfig): Engine {
       return performLoad();
     },
     use(module) {
+      if (installed) throw new Error(`Cannot use("${module.id}") after start()`);
       modules.push(module);
       return engine;
     },

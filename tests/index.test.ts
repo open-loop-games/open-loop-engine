@@ -52,6 +52,27 @@ describe('createEngine', () => {
     expect(engine.registeredModules.map((m) => m.id)).toEqual(['a', 'b']);
     engine.stop();
   });
+  it('use() after start() throws instead of listing a module it never installs', () => {
+    const engine = createEngine({ gameId: 'test', persistence: false });
+    engine.start();
+    expect(() => engine.use({ id: 'late', install() {} })).toThrow(/start\(\)/);
+    expect(engine.registeredModules).toHaveLength(0);
+    engine.dispose();
+  });
+  it('start() throws on two distinct modules sharing an id', () => {
+    const engine = createEngine({ gameId: 'test', persistence: false });
+    engine.use({ id: 'twin', install() {} }).use({ id: 'twin', install() {} });
+    expect(() => engine.start()).toThrow(/twin/);
+  });
+  it('start() installs a module registered twice as the same object once', () => {
+    let installs = 0;
+    const mod: EngineModule = { id: 'once', install: () => void installs++ };
+    const engine = createEngine({ gameId: 'test', persistence: false });
+    engine.use(mod).use(mod);
+    engine.start();
+    expect(installs).toBe(1);
+    engine.dispose();
+  });
   it('validates module dependencies', () => {
     const mod: EngineModule = { id: 'needs-base', dependencies: ['base'], install() {} };
     const engine = createEngine({ gameId: 'test' });
