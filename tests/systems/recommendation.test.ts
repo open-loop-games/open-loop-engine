@@ -11,27 +11,11 @@ import type {
   Recommendation,
   RecommendationContext,
 } from '@/systems/recommendation';
-
-/** Simple tick manager matching the existing test pattern */
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
+import { createManualTicks } from '../helpers/manual-ticks';
 
 /** Create a minimal Cycle + CycleLog + BestOf stack for testing */
 function createTestStack(prefix: string) {
-  const tick = createTickManager();
+  const tick = createManualTicks();
 
   beginPersistentContext(`${prefix}-res`);
   const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });

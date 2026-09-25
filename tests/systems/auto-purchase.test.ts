@@ -22,26 +22,11 @@ import { createPurchasable, createScalingPurchasable } from '@/systems/purchasab
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createCostRequirement } from '@/core/requirements';
 import { F } from '@/core/formulas/formulas';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
 
 function createTestResource(name: string, initial: DecimalSource = 0): Resource {
   return createResource(initial, { id: name, displayName: name });
@@ -85,7 +70,7 @@ const hybridPaybackPolicy = (
 describe('setupSweepAutoPurchase', () => {
   it('purchases every affordable purchasable each tick', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     const cheap = createPurchasable({
       id: 'cheap',
@@ -107,7 +92,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('sweeps a category, including purchasables registered after setup', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const upgrades = createPurchasableCategory<{ id: string; cost: number }>({
       id: 'upgrades',
       mapPurchasable: (def) => ({
@@ -129,7 +114,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('skips purchasing while disabled and resumes when enabled', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const enabled = ref(false);
 
     const upgrade = createPurchasable({
@@ -150,7 +135,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('holds the reserve floor, clamping the buy instead of skipping it', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     // Cumulative cost of n levels: 100, ~433, ~1010. A 1000 bank reaches 3
     // outright; under a 400 floor only 600 is spendable, which reaches 2.
@@ -174,7 +159,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('skips a candidate whose first level alone would breach the floor', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     const cheap = createPurchasable({
       id: 'cheap',
@@ -197,7 +182,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('re-reads a bank-fraction reserve per candidate so the floor holds cumulatively', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     // Five 200-cost one-shots against a floor of half the *live* bank.
     // Re-read per candidate the floor shrinks as the bank drains, admitting
@@ -226,7 +211,7 @@ describe('setupSweepAutoPurchase', () => {
   it('applies the floor per cost-resource on a multi-currency candidate', () => {
     const cookies = createTestResource('cookies', 1_000);
     const chips = createTestResource('chips', 100);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     // Affordable in cookies under the floor, but chips has only 100 against a
     // 90 floor and a 50 cost — the second currency binds.
@@ -248,7 +233,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('sums cost requirements that share a resource before applying the floor', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     // Two 60-cost requirements drawn from one bank against a 900 floor: 100 of
     // budget, 120 of cost. Measured per requirement each one "fits"; they spend
@@ -271,7 +256,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('prices an unbounded buy against the floor rather than passing it through', () => {
     const cookies = createTestResource('cookies', 10);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     // A single payment that saturates toward 10: level n costs 10 - 5/(n+1).
     // A bank of 10 covers every level, so buy-max is unbounded, but under a 2
@@ -299,7 +284,7 @@ describe('setupSweepAutoPurchase', () => {
   it('throttles on interval and does not replay elapsed beats', () => {
     const ctx = beginPersistentContext('sweep-interval');
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     const levels = createPurchasable({
       id: 'levels',
@@ -325,7 +310,7 @@ describe('setupSweepAutoPurchase', () => {
 
   it('registers no persistent state when interval is omitted', () => {
     const cookies = createTestResource('cookies', 1_000);
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     const upgrade = createPurchasable({
       id: 'upgrade',
@@ -345,7 +330,7 @@ describe('setupSweepAutoPurchase', () => {
 
 describe('setupPolicyAutoPurchase', () => {
   function makeCategory(resource: Resource, costResource: Resource = resource) {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const category = createProducerCategory<BuildingDef>({
       id: `auto-${Math.random().toString(36).slice(2, 8)}`,
       mapProducer: (def) => ({
@@ -386,7 +371,7 @@ describe('setupPolicyAutoPurchase', () => {
 
   it('skips manual producers', () => {
     const cookies = createTestResource('cookies', 1_000_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const category = createProducerCategory<BuildingDef>({
       id: `auto-${Math.random().toString(36).slice(2, 8)}`,
       mapProducer: (def) => ({
@@ -824,7 +809,7 @@ describe('setupPolicyAutoPurchase', () => {
     // Regression: when a mid-run importSave restores the resource + purchase-
     // count state, the interval accumulator must be restored alongside them.
     const cookies = createResource<DecimalSource>(1_000_000);
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const mgr = createSaveManager({ gameId: 'ol-672', storageAdapter: createMemoryStorage() });
 
     beginPersistentContext('ol-672-autobuy');
@@ -877,7 +862,7 @@ describe('setupPolicyAutoPurchase', () => {
   it('interval accumulators save under what they drive, not how many ran before', () => {
     const build = () => {
       resetAllPersistentContexts();
-      const { registerTick } = createTickManager();
+      const { registerTick } = createManualTicks();
       withPersistentContext('shop', () => {
         const cookies = createResource<DecimalSource>(0, { id: 'cookies' });
         const category = createProducerCategory<BuildingDef>({

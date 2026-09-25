@@ -39,6 +39,7 @@ import { createNativeDialogRuntime } from '@/systems/dialog';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createBankedAcceleration, createTimeBank } from '@/systems/time-bank';
 import type { ChallengeDef } from '@/systems/challenge-category';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -658,20 +659,6 @@ describe('evaluatePredicate', () => {
 const pointsGte = (value: number) => ({ kind: 'resource-gte', resource: 'points', value }) as const;
 const unwiredFlag = { kind: 'flag', id: 'unwired' } as const;
 
-/** A tick source the test steps by hand. */
-function createManualTicks() {
-  const callbacks = new Set<(dt: number) => void>();
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.add(cb);
-      return () => callbacks.delete(cb);
-    },
-    step(dt = 1) {
-      for (const cb of [...callbacks]) cb(dt);
-    },
-  };
-}
-
 describe('Predicate fields — every arm reaches the system', () => {
   it('achievement visible and hidden take a Gate', () => {
     const { result, stop } = bootstrap((api) => {
@@ -739,10 +726,10 @@ describe('Predicate fields — every arm reaches the system', () => {
       return { api, cycle };
     });
 
-    ticks.step();
+    ticks.tick();
     expect(result.cycle.count.value).toBe(0);
     result.api.points.value = 3;
-    ticks.step();
+    ticks.tick();
     expect(result.cycle.count.value).toBe(1);
     stop();
   });

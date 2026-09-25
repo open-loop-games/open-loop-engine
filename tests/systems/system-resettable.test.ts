@@ -31,6 +31,7 @@ import { createTemporaryEffectSystem } from '@/systems/temporary-effect';
 import { createTimeBank } from '@/systems/time-bank';
 import { createTimeSystem } from '@/systems/time';
 import { createZoneSystem } from '@/systems/zone';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 // A `thingsToReset: [system]` walk resets what a module reset of the system's
 // own module does, and nothing the module reset would leave alone.
@@ -46,18 +47,6 @@ interface Case {
 }
 
 const registerTick = () => () => {};
-
-/** A tick source the test drives by hand. */
-function manualTicks() {
-  const listeners = new Set<(dt: number) => void>();
-  return {
-    registerTick: (fn: (dt: number) => void) => {
-      listeners.add(fn);
-      return () => void listeners.delete(fn);
-    },
-    tick: (dt: number) => listeners.forEach((fn) => fn(dt)),
-  };
-}
 
 const cases: Case[] = [
   {
@@ -110,12 +99,14 @@ const cases: Case[] = [
   {
     name: 'cycle',
     build: () => {
-      const ticks = manualTicks();
+      const ticks = createManualTicks();
       return Object.assign(createCycle({ resetModules: [], registerTick: ticks.registerTick }), {
         ticks,
       });
     },
-    dirty: (cycle: ReturnType<typeof createCycle> & { ticks: ReturnType<typeof manualTicks> }) => {
+    dirty: (
+      cycle: ReturnType<typeof createCycle> & { ticks: ReturnType<typeof createManualTicks> },
+    ) => {
       cycle.run();
       cycle.ticks.tick(5);
       cycle.end();
@@ -197,13 +188,13 @@ const cases: Case[] = [
   {
     name: 'timed progress',
     build: () => {
-      const ticks = manualTicks();
+      const ticks = createManualTicks();
       return Object.assign(
         createTimedProgress({ id: 'craft', duration: 10, registerTick: ticks.registerTick }),
         { ticks },
       );
     },
-    dirty: (progress: { ticks: ReturnType<typeof manualTicks> }) => progress.ticks.tick(4),
+    dirty: (progress: { ticks: ReturnType<typeof createManualTicks> }) => progress.ticks.tick(4),
   },
   {
     name: 'temporary effect system',

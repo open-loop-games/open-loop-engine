@@ -17,27 +17,11 @@ import { createResource, type Resource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
 import { ref } from 'vue';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Creates a simple registerTick that returns the tick function for manual calling */
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
 
 function createTestResource(name: string, initial: DecimalSource = 0): Resource {
   return createResource(initial, { id: name, displayName: name });
@@ -77,7 +61,7 @@ interface StatefulState {
 
 describe('createProducerCategory', () => {
   it('registers definitions and creates Producer instances', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -103,7 +87,7 @@ describe('createProducerCategory', () => {
   });
 
   it('continuous producers have correct initial computedRate', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -129,7 +113,7 @@ describe('createProducerCategory', () => {
   });
 
   it('getDef returns the definition from the registry', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -149,7 +133,7 @@ describe('createProducerCategory', () => {
   });
 
   it('creates per-instance state via mapState', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     beginPersistentContext('test-state');
@@ -184,7 +168,7 @@ describe('createProducerCategory', () => {
   });
 
   it('getAll returns entries in registration order', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -208,7 +192,7 @@ describe('createProducerCategory', () => {
   });
 
   it('getEntry returns full tuple', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     beginPersistentContext('test-entry');
@@ -237,7 +221,7 @@ describe('createProducerCategory', () => {
   });
 
   it('supports incremental registration (base + mod)', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -265,7 +249,7 @@ describe('createProducerCategory', () => {
   });
 
   it('throws on duplicate registration', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -298,7 +282,7 @@ describe('createProducerCategory', () => {
   });
 
   it('exposes registry for mod patching', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -328,7 +312,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('continuous producer adds resources each tick', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -350,7 +334,7 @@ describe('createProducerCategory', () => {
   });
 
   it('continuous producer scales with repeatable count', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies', 1000);
     const gold = createTestResource('gold');
 
@@ -383,7 +367,7 @@ describe('createProducerCategory', () => {
   });
 
   it('continuous producer without purchase has count 1', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -412,7 +396,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('manual producer exposes activate()', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -439,7 +423,7 @@ describe('createProducerCategory', () => {
   });
 
   it('manual producer yields rate × count', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1e6);
     const cursors = ref<DecimalSource>(3);
 
@@ -466,7 +450,7 @@ describe('createProducerCategory', () => {
   });
 
   it('manual producer has no purchase beat', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1e6);
 
     const category = createProducerCategory<ClickDef>({
@@ -485,7 +469,7 @@ describe('createProducerCategory', () => {
   });
 
   it('manual producer does not tick', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -512,7 +496,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('modifier chain affects computed rate', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -539,7 +523,7 @@ describe('createProducerCategory', () => {
   });
 
   it('modifier chain affects manual producer rate', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -568,7 +552,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('getTotalRate aggregates continuous producers for a resource', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -604,7 +588,7 @@ describe('createProducerCategory', () => {
   });
 
   it('getTotalRate excludes manual producers', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -628,7 +612,7 @@ describe('createProducerCategory', () => {
   });
 
   it('getTotalRate returns zero for untracked resource', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
     const gold = createTestResource('gold');
 
@@ -653,7 +637,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('repeatable is created when purchase config provided', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1000);
 
     const category = createProducerCategory<BuildingDef>({
@@ -692,7 +676,7 @@ describe('createProducerCategory', () => {
   // ==========================================================================
 
   it('extraCount folds into count alongside owned amount, exposing each axis separately', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies', 10000);
     const gold = createTestResource('gold');
     const generated = createTestResource('generated', 4);
@@ -729,7 +713,7 @@ describe('createProducerCategory', () => {
   });
 
   it('extraCount alone drives count when no purchase config is set', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const gold = createTestResource('gold');
     const generated = createTestResource('generated', 5);
 
@@ -758,7 +742,7 @@ describe('createProducerCategory', () => {
   });
 
   it('ownedCount and extraCount default to 0 when neither is configured (count = 1)', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -780,7 +764,7 @@ describe('createProducerCategory', () => {
   });
 
   it('two-tier cascade: T2 generates T1, T1 emits to coin (closed-form check)', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies', 1e6);
     const coin = createTestResource('coin');
     const generated1 = createTestResource('generated1');
@@ -844,7 +828,7 @@ describe('createProducerCategory', () => {
   });
 
   it('no repeatable when purchase config omitted', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -864,7 +848,7 @@ describe('createProducerCategory', () => {
   });
 
   it('reads a reactive costScaling into the next purchase cost', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1e9);
     const scaling = ref(2);
 
@@ -894,7 +878,7 @@ describe('createProducerCategory', () => {
 
 describe('Producer.purchaseBeatSeconds', () => {
   it('computes cost / (rate * max(1, count)) for purchasable producers', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1000);
 
     const category = createProducerCategory<BuildingDef>({
@@ -930,7 +914,7 @@ describe('Producer.purchaseBeatSeconds', () => {
   });
 
   it('returns Infinity when repeatable is absent', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<ClickDef>({
@@ -948,7 +932,7 @@ describe('Producer.purchaseBeatSeconds', () => {
   });
 
   it('returns Infinity when computed rate is zero', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
     const category = createProducerCategory<BuildingDef>({
@@ -978,7 +962,7 @@ describe('Producer.purchaseBeatSeconds', () => {
   });
 
   it('reacts to a ref-backed multiplier on the rateChain', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1000);
 
     const category = createProducerCategory<BuildingDef>({
@@ -1023,7 +1007,7 @@ describe('Producer.purchaseBeatSeconds', () => {
 
 describe('Producer signed-rate integration', () => {
   it('a net-negative composed rate drains the resource', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const catnip = createTestResource('catnip', 100);
 
     const category = createProducerCategory<BuildingDef>({
@@ -1057,7 +1041,7 @@ describe('Producer signed-rate integration', () => {
   });
 
   it('a drain floors at zero by default, taking what remains', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const catnip = createTestResource('catnip', 2);
 
     const category = createProducerCategory<BuildingDef>({
@@ -1086,7 +1070,7 @@ describe('Producer signed-rate integration', () => {
   });
 
   it('allowNegative lets the deficit accumulate below zero', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const catnip = createTestResource('catnip', 2);
 
     const category = createProducerCategory<BuildingDef>({
@@ -1118,7 +1102,7 @@ describe('Producer signed-rate integration', () => {
 describe('producer save keys', () => {
   function build(extraPurchasableFirst: boolean) {
     resetAllPersistentContexts();
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     return withPersistentContext('shop', () => {
       const cookies = createResource(1e6, { id: 'cookies', displayName: 'Cookies' });
       if (extraPurchasableFirst) {

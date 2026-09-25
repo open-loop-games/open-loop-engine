@@ -12,23 +12,7 @@ import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
 import type { BestOfEntry } from '@/systems/best-of';
-
-/** Simple tick manager matching the existing test pattern */
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
+import { createManualTicks } from '../helpers/manual-ticks';
 
 describe('createBestOf', () => {
   // ==========================================================================
@@ -109,7 +93,7 @@ describe('createBestOf', () => {
   // ==========================================================================
 
   it('auto-subscribes to CycleLog finalized events', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     beginPersistentContext('bo-ll-auto');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
@@ -132,7 +116,7 @@ describe('createBestOf', () => {
   });
 
   it('ignores CycleLog deltas for unregistered metric keys', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     beginPersistentContext('bo-ll-ignore');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
@@ -152,7 +136,7 @@ describe('createBestOf', () => {
   });
 
   it('tracks multiple metrics from a single CycleLog finalized event', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     beginPersistentContext('bo-ll-multi');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const xp = createResource(bn(0), { id: 'XP', displayName: 'XP' });
@@ -611,7 +595,7 @@ describe('createBestOf', () => {
   });
 
   it('dispose stops auto-tracking from CycleLog', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     beginPersistentContext('bo-dispose');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();

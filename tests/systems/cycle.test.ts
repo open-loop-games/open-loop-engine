@@ -14,27 +14,11 @@ import {
 import { createCycle } from '@/systems/cycle';
 import { createReset } from '@/systems/reset';
 import { fractional } from '@/systems/retention';
-
-/** Simple tick manager matching the action test pattern */
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
+import { createManualTicks } from '../helpers/manual-ticks';
 
 describe('createCycle', () => {
   it('initializes with zero count and Infinity bestTime', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -46,7 +30,7 @@ describe('createCycle', () => {
   });
 
   it('a grant in an afterRestart listener counts toward cumulative; one in onRestart does not', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     beginPersistentContext('cycle-grant');
     const pp = createResource(bn(0), { id: 'Prestige', displayName: 'Prestige' });
     endPersistentContext();
@@ -64,7 +48,7 @@ describe('createCycle', () => {
   });
 
   it('a zero-length cycle does not record a best time', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({ thingsToReset: [], registerTick });
     cycle.run();
     tick(3);
@@ -76,7 +60,7 @@ describe('createCycle', () => {
   });
 
   it('pauses when a restart its endCondition triggered is declined', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
     const cycle = createCycle({ reset, endCondition: () => true, registerTick });
     let beforeRestarts = 0;
@@ -91,7 +75,7 @@ describe('createCycle', () => {
   });
 
   it('a declined manual end() leaves the cycle running', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
     const cycle = createCycle({ reset, registerTick });
     cycle.run();
@@ -101,7 +85,7 @@ describe('createCycle', () => {
   });
 
   it('tracks elapsed time while running', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -113,7 +97,7 @@ describe('createCycle', () => {
   });
 
   it('elapsed survives a save round trip, so a reloaded run keeps timing from where it was', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({ id: 'cycle-elapsed-save', thingsToReset: [], registerTick });
     cycle.run();
     tick(5);
@@ -130,7 +114,7 @@ describe('createCycle', () => {
   });
 
   it('a reset from another Reset naming the cycle module zeroes the run clock', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = withPersistentContext('cycle-run-clock', () =>
       createCycle({ thingsToReset: [], registerTick }),
     );
@@ -147,7 +131,7 @@ describe('createCycle', () => {
   });
 
   it('a reset covering the cycle context still records the best time', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = withPersistentContext('cycle-self-reset', () =>
       createCycle({ resetModules: ['cycle-self-reset'], registerTick }),
     );
@@ -159,7 +143,7 @@ describe('createCycle', () => {
   });
 
   it('does not tick while paused', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -172,7 +156,7 @@ describe('createCycle', () => {
   });
 
   it('manual end() increments count and resets elapsed', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -186,7 +170,7 @@ describe('createCycle', () => {
   });
 
   it('tracks bestTime across cycles', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -211,7 +195,7 @@ describe('createCycle', () => {
   });
 
   it('resets persistent refs on end()', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     beginPersistentContext('cycle-reset-test');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const level = persistent(1);
@@ -231,7 +215,7 @@ describe('createCycle', () => {
   });
 
   it('calls onBeforeRestart before reset and onRestart after', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const order: string[] = [];
 
     beginPersistentContext('cycle-hooks-test');
@@ -258,7 +242,7 @@ describe('createCycle', () => {
   });
 
   it('cancels end() when onBeforeRestart returns false', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     beginPersistentContext('cycle-cancel-test');
     const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
@@ -276,7 +260,7 @@ describe('createCycle', () => {
   });
 
   it('auto-ends when endCondition becomes true', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     let health = 100;
 
     beginPersistentContext('cycle-auto-end-test');
@@ -303,7 +287,7 @@ describe('createCycle', () => {
   });
 
   it('exposes underlying reset as escape hatch', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -313,7 +297,7 @@ describe('createCycle', () => {
   });
 
   it('dispose() unregisters the tick callback', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
@@ -328,7 +312,7 @@ describe('createCycle', () => {
   });
 
   it('emits instance cycle events', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
     const events: string[] = [];
 
     const cycle = createCycle({
@@ -349,7 +333,7 @@ describe('createCycle', () => {
 
 describe('createCycle with resetModules', () => {
   it('resets module refs on end()', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     beginPersistentContext('cycle-rm-mod');
     const gold = persistent(0);
@@ -374,7 +358,7 @@ describe('createCycle with resetModules', () => {
   });
 
   it('inline keep preserves specific refs', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     beginPersistentContext('cycle-rm-keep');
     const temp = persistent(0);
@@ -396,7 +380,7 @@ describe('createCycle with resetModules', () => {
   });
 
   it('inline retain applies transforms', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     beginPersistentContext('cycle-rm-retain');
     const skill = createResource(bn(0), { id: 'Skill', displayName: 'Skill' });
@@ -418,7 +402,7 @@ describe('createCycle with resetModules', () => {
   });
 
   it('resolvedScope is accessible for composing into outer loops', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     beginPersistentContext('cycle-rm-scope');
     const r = persistent(0);
@@ -434,7 +418,7 @@ describe('createCycle with resetModules', () => {
   });
 
   it('composable: outer loop inherits inner loop scope', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     beginPersistentContext('cycle-rm-inner');
     const innerRef = persistent(0);
@@ -465,7 +449,7 @@ describe('createCycle with resetModules', () => {
 
 describe('createCycle — reset composition', () => {
   it('drives a pre-built Reset passed via `reset`, ignoring the shorthand fields', () => {
-    const { registerTick } = createTickManager();
+    const { registerTick } = createManualTicks();
 
     beginPersistentContext('cycle-provided-reset');
     const driven = persistent(0);
@@ -488,7 +472,7 @@ describe('createCycle — reset composition', () => {
   });
 
   it('aborts the restart when the underlying Reset declines', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
 
     beginPersistentContext('cycle-declining-reset');
     const tracked = persistent(0);
@@ -532,7 +516,7 @@ describe('createCycle — reset composition', () => {
 
 describe('createCycle — listener re-entrancy', () => {
   it('refuses a restart re-entered from a beforeRestart listener', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     beginPersistentContext('cycle-reentry');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
@@ -565,7 +549,7 @@ describe('createCycle — listener re-entrancy', () => {
   });
 
   it('the cycle guard does not block its own inner reset', () => {
-    const { registerTick, tick } = createTickManager();
+    const { registerTick, tick } = createManualTicks();
     beginPersistentContext('cycle-reentry-inner');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();

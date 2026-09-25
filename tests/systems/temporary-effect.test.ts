@@ -17,29 +17,13 @@ import { createMemoryStorage, type StorageAdapter } from '@/core/save-manager';
 import { createEngine, type Engine } from '@/engine';
 import { createReset } from '@/systems/reset';
 import type { TemporaryEffectDef, TemporaryEffectSystem } from '@/systems/temporary-effect';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
 
-/** Creates a simple registerTick that returns the tick function for manual calling */
-function createTickManager() {
-  const callbacks: ((dt: number) => void)[] = [];
-  return {
-    registerTick(cb: (dt: number) => void) {
-      callbacks.push(cb);
-      return () => {
-        const idx = callbacks.indexOf(cb);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    },
-    tick(dt: number) {
-      for (const cb of callbacks) cb(dt);
-    },
-  };
-}
-
-function createSystem(tm = createTickManager()) {
+function createSystem(tm = createManualTicks()) {
   const system = createTemporaryEffectSystem({
     id: 'test',
     registerTick: tm.registerTick,

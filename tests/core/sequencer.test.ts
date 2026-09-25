@@ -12,6 +12,7 @@ import {
   type SequencerItem,
   type StartResult,
 } from '@/core/sequencer';
+import { createManualTicks } from '../helpers/manual-ticks';
 
 const qi = (id: string): SequencerItem<void> => ({ id, metadata: undefined as void });
 
@@ -452,27 +453,6 @@ describe('Sequencer — startOnEnqueue', () => {
 // canRun tri-state — 'now' / 'never' / 'notNow' + hold-and-retry
 // ============================================================================
 
-/**
- * Minimal tick manager for driving the retry path in tests.
- * Returns both a registerTick function (for SequencerOptions) and a
- * fireTick() helper that invokes all registered callbacks once.
- */
-function createTickManager() {
-  const callbacks = new Set<(dt: number) => void>();
-  return {
-    registerTick(cb: (dt: number) => void): () => void {
-      callbacks.add(cb);
-      return () => callbacks.delete(cb);
-    },
-    fireTick(dt = 1) {
-      for (const cb of Array.from(callbacks)) cb(dt);
-    },
-    subscriberCount() {
-      return callbacks.size;
-    },
-  };
-}
-
 describe('Sequencer — canRun tri-state', () => {
   it('"now" dispatches normally', () => {
     const ctxId = `tri-now-${Math.random().toString(36).slice(2, 8)}`;
@@ -508,7 +488,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('"notNow" with registerTick enters hold state instead of advancing', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-hold-${Math.random().toString(36).slice(2, 8)}`;
     const events: string[] = [];
 
@@ -558,7 +538,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('transitions hold → "now" on retry tick, dispatching the held item', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-hold2now-${Math.random().toString(36).slice(2, 8)}`;
     const events: string[] = [];
 
@@ -577,13 +557,13 @@ describe('Sequencer — canRun tri-state', () => {
     expect(q.holding).toBe(true);
 
     // Tick fires while still 'notNow' — should stay held, not re-emit held
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(true);
     expect(events).toEqual(['hold:wait-me']);
 
     // Gate opens — next tick transitions to running
     gate = 'now';
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('wait-me');
     expect(events).toEqual(['hold:wait-me', 'start:wait-me']);
@@ -592,7 +572,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('transitions hold → "never" on retry tick, skipping and advancing', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-hold2never-${Math.random().toString(36).slice(2, 8)}`;
     const events: string[] = [];
 
@@ -614,14 +594,14 @@ describe('Sequencer — canRun tri-state', () => {
 
     // Gate becomes impossible — next tick skips and advances to 'run-me'
     gate = 'never';
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('run-me');
     expect(events).toEqual(['hold:wait-me', 'skip:wait-me', 'start:run-me']);
   });
 
   it('hold state persists across pause; retry resumes on unpause', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-pause-${Math.random().toString(36).slice(2, 8)}`;
 
     let gate: StartResult = 'notNow';
@@ -638,7 +618,7 @@ describe('Sequencer — canRun tri-state', () => {
 
     q.pause();
     // Tick fires while paused — should be a no-op, hold preserved
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(true);
     expect(q.currentItem).toBeNull();
 
@@ -650,7 +630,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('setting canRun = null while holding clears hold and dispatches', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-gate-off-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -670,7 +650,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('remove() at the held index drops hold and re-drives', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-remove-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -692,7 +672,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('clear() while holding exits hold cleanly', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-clear-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -713,7 +693,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('cancel() while holding cancels the held item, as it would a running one', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-cancel-${Math.random().toString(36).slice(2, 8)}`;
 
     let gate: StartResult = 'notNow';
@@ -738,14 +718,14 @@ describe('Sequencer — canRun tri-state', () => {
 
     // Stopped, as after cancelling a running item: start() resumes.
     gate = 'now';
-    tm.fireTick();
+    tm.tick();
     expect(q.currentItem).toBeNull();
     q.start();
     expect(q.currentItem?.id).toBe('next');
   });
 
   it('list mode: cancel() while holding cancels the held item and leaves the cursor on it', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-list-cancel-${Math.random().toString(36).slice(2, 8)}`;
 
     let gate: StartResult = 'notNow';
@@ -772,7 +752,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('list mode: resetCursor() while holding cancels the held item, then replays', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-list-reset-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -799,7 +779,7 @@ describe('Sequencer — canRun tri-state', () => {
   });
 
   it('list mode: "notNow" holds at cursor position without advancing', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `tri-list-hold-${Math.random().toString(36).slice(2, 8)}`;
 
     let gate: StartResult = 'notNow';
@@ -831,7 +811,7 @@ describe('Sequencer — canRun tri-state', () => {
 
     // Open the gate — retry dispatches 'b'
     gate = 'now';
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('b');
     expect(q.cursor).toBe(1);
@@ -1130,7 +1110,7 @@ describe('Sequencer — list-mode cursor & hold invariants', () => {
 describe('Sequencer — hold state invariants', () => {
   it('queue reorder clears hold when index 0 is disturbed', () => {
     const ctxId = `hold-reorder-${Math.random().toString(36).slice(2, 8)}`;
-    const tm = createTickManager();
+    const tm = createManualTicks();
     let gate: StartResult = 'notNow';
     beginPersistentContext(ctxId);
     const q = createSequencer({
@@ -1155,7 +1135,7 @@ describe('Sequencer — hold state invariants', () => {
 
   it('save/load rehydration drops the stale hold and re-drives', () => {
     const ctxId = `hold-hydrate-${Math.random().toString(36).slice(2, 8)}`;
-    const tm = createTickManager();
+    const tm = createManualTicks();
     beginPersistentContext(ctxId);
     const q = createSequencer({
       id: ctxId,
@@ -1185,7 +1165,7 @@ describe('Sequencer — hold state invariants', () => {
 
     // Post-load tick re-drives rather than stalling: canRun is still 'notNow',
     // so the reloaded item re-enters hold instead of being silently stranded.
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(true);
     expect(q.currentItem).toBeNull();
     expect(q.items.value.map((i) => i.id)).toEqual(['replaced']);
@@ -1302,7 +1282,7 @@ describe('Sequencer — enqueue positional `at`', () => {
 
 describe('Sequencer — enqueue positional `at` × hold state', () => {
   it('queue mode: `at: 0` while holding drops the hold and dispatches the new item', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `pos-hold-q-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -1331,7 +1311,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
   });
 
   it('queue mode: positional insert AFTER the held item leaves the hold intact', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `pos-hold-q-after-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -1354,7 +1334,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
   });
 
   it('list mode: insert AT the held cursor drops the hold and re-drives', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `pos-hold-list-${Math.random().toString(36).slice(2, 8)}`;
 
     beginPersistentContext(ctxId);
@@ -1442,7 +1422,7 @@ describe('Sequencer — repeat()', () => {
   });
 
   it('queue mode: repeat with canRun "notNow" on re-entry enters hold', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     let blockA = false;
     const ctxId = `repeat-hold-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
@@ -1468,7 +1448,7 @@ describe('Sequencer — repeat()', () => {
     expect(q.currentItem).toBeNull();
 
     blockA = false;
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('a');
   });
@@ -1536,7 +1516,7 @@ describe('Sequencer — repeat()', () => {
   });
 
   it('list mode: repeat with canRun "notNow" on re-entry holds at the same cursor', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     let blockA = false;
     const ctxId = `repeat-list-hold-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
@@ -1560,7 +1540,7 @@ describe('Sequencer — repeat()', () => {
     expect(q.currentItem).toBeNull();
 
     blockA = false;
-    tm.fireTick();
+    tm.tick();
     expect(q.holding).toBe(false);
     expect(q.cursor).toBe(0);
     expect(q.currentItem?.id).toBe('a');
@@ -1714,7 +1694,7 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
 
 describe('Sequencer — save/load re-drive', () => {
   it('resumes after a save taken mid-hold reloads into a fresh sequencer', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `hold-reload-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
@@ -1740,7 +1720,7 @@ describe('Sequencer — save/load re-drive', () => {
     expect(q.currentItem).toBeNull();
 
     // The blocking condition has since cleared; the post-load tick re-drives.
-    tm.fireTick();
+    tm.tick();
     expect(q.currentItem?.id).toBe('wait-me');
     expect(q.holding).toBe(false);
     // The one-shot re-drive tick unregistered itself — no live watcher leaks.
@@ -1750,7 +1730,7 @@ describe('Sequencer — save/load re-drive', () => {
   });
 
   it('re-enters hold on load when the item is still notNow', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `hold-reload-stillblocked-${Math.random().toString(36).slice(2, 8)}`;
     let gate: StartResult = 'notNow';
     beginPersistentContext(ctxId);
@@ -1765,20 +1745,20 @@ describe('Sequencer — save/load re-drive', () => {
       [ctxId]: { current: '', rawItems: JSON.stringify(['wait-me']), paused: false },
     });
 
-    tm.fireTick();
+    tm.tick();
     // Still blocked → the sequencer re-enters the hold path rather than stalling.
     expect(q.holding).toBe(true);
     expect(q.currentItem).toBeNull();
 
     // Condition clears → the retry tick dispatches.
     gate = 'now';
-    tm.fireTick();
+    tm.tick();
     expect(q.currentItem?.id).toBe('wait-me');
     expect(q.holding).toBe(false);
   });
 
   it('resumes list-mode hold from the saved cursor after reload', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `list-hold-reload-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
@@ -1800,7 +1780,7 @@ describe('Sequencer — save/load re-drive', () => {
     });
 
     expect(q.currentItem).toBeNull();
-    tm.fireTick();
+    tm.tick();
     // Re-drives from the loaded cursor (1), dispatching 'b' — proving the
     // deferral let rawCursor rehydrate before the re-drive read it. A
     // synchronous re-drive in the rawItems watch would have seen cursor 0
@@ -1810,7 +1790,7 @@ describe('Sequencer — save/load re-drive', () => {
   });
 
   it('does not auto-start on load when startOnEnqueue is false (planning mode)', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `plan-reload-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
@@ -1825,7 +1805,7 @@ describe('Sequencer — save/load re-drive', () => {
       [ctxId]: { current: '', rawItems: JSON.stringify(['planned']), paused: false },
     });
 
-    tm.fireTick();
+    tm.tick();
     // Explicit-control sequencer stays put until the consumer calls start().
     expect(q.currentItem).toBeNull();
     expect(q.items.value.map((i) => i.id)).toEqual(['planned']);
@@ -1835,7 +1815,7 @@ describe('Sequencer — save/load re-drive', () => {
   });
 
   it('stays paused on load and does not dispatch until resumed', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `paused-reload-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
@@ -1849,7 +1829,7 @@ describe('Sequencer — save/load re-drive', () => {
       [ctxId]: { current: '', rawItems: JSON.stringify(['wait-me']), paused: true },
     });
 
-    tm.fireTick();
+    tm.tick();
     // paused rehydrated true — the deferred re-drive must respect it.
     expect(q.currentItem).toBeNull();
 
@@ -1894,7 +1874,7 @@ describe('Sequencer — skip ordering', () => {
   });
 
   it('list mode: cursor has advanced when a held item transitions to skip on retry', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `skip-order-retry-${Math.random().toString(36).slice(2, 8)}`;
     let gate: StartResult = 'notNow';
     beginPersistentContext(ctxId);
@@ -1913,7 +1893,7 @@ describe('Sequencer — skip ordering', () => {
     expect(q.holding).toBe(true);
 
     gate = 'never';
-    tm.fireTick();
+    tm.tick();
 
     expect(seen).toEqual([1]);
     expect(q.currentItem?.id).toBe('run-me');
@@ -2078,7 +2058,7 @@ describe('Sequencer — listener re-entrancy', () => {
   });
 
   it('list mode: breaking the hold from a held listener dispatches once', () => {
-    const tm = createTickManager();
+    const tm = createManualTicks();
     const ctxId = `reentry-hold-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
