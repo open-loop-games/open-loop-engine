@@ -2,160 +2,28 @@
  * Equivalence suite for {@link createIncrementalSnapshot} against
  * {@link createTransitionSnapshot} (correctness contract).
  *
- * Step 4 always full-rebuilds on `rebuild()`. This suite confirms that
- * across a scripted mutation sequence (purchase / tick-driven rate change /
- * unlock flip / state mutation / challenge completion), the incremental
- * cache's `rebuild()` output is deep-equal to a fresh `createTransitionSnapshot`
- * call at every step. Targeted `invalidate*` calls and `invalidateAll()` must
- * both produce the same output, since step 4 ignores the dirty sets.
+ * Across scripted mutations on every dep axis (resource, rate, unlock,
+ * state) and on entity state (purchases, resets, challenge entry), the
+ * incremental cache's `rebuild()` — selective under targeted `invalidate*`
+ * calls, full under `invalidateAll()` — must deep-equal a fresh
+ * `createTransitionSnapshot` call.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
-import { createResource } from '@/core/resource';
-import { createCostRequirement } from '@/core/requirements';
-import { createPurchasableCategory } from '@/systems/purchasable-category';
-import { createProducerCategory } from '@/systems/producer-category';
-import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot, createIncrementalSnapshot } from '@/harness/walker';
+import {
+  buildMixedEngine,
+  expectSnapshotsEquivalent,
+  mutableAccessor,
+} from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
-
-interface MutableAccessorConfig {
-  resources: Record<string, number>;
-  rates: Record<string, number>;
-  unlocks: Record<string, boolean>;
-  state: Record<string, unknown>;
-}
-
-interface MutableAccessor {
-  accessor: GameStateAccessor;
-  config: MutableAccessorConfig;
-}
-
-/**
- * Accessor whose backing records can be mutated between rebuilds — models
- * real mutations (resource writes, rate changes, unlock flips) without
- * plumbing a whole reactive engine. The returned `config` object is the
- * same one the accessor reads from; write to it to stage a mutation.
- */
-function mutableAccessor(config: MutableAccessorConfig): MutableAccessor {
-  return {
-    accessor: {
-      getResource: (id) => bn(config.resources[id] ?? 0),
-      isUnlocked: (id) => config.unlocks[id] ?? false,
-      getState: (path) => config.state[path],
-      getRate: (id) => bn(config.rates[id] ?? 0),
-    },
-    config,
-  };
-}
-
-interface UpgradeDef {
-  id: string;
-  cost: number;
-}
-
-interface BuildingDef {
-  id: string;
-  baseRate: number;
-  baseCost: number;
-}
-
-/**
- * Engine with one category per leaf (purchasables / producers / challenges)
- * plus a challenge whose `canStart` gate mixes a resource condition, an
- * unlock, and a state read — so the equivalence test exercises every leaf
- * and every dep axis.
- */
-function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
-  const module: EngineModule = {
-    id: `inc-equivalence-${gameId}`,
-    install(ctx) {
-      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-      const gems = createResource(0, { id: 'gems', displayName: 'gems' });
-
-      const upgrades = createPurchasableCategory<UpgradeDef>({
-        id: 'upgrades',
-        mapPurchasable: (def) => ({
-          display: { description: def.id },
-          requirements: [createCostRequirement({ resource: gold, cost: def.cost })],
-          limit: 1,
-        }),
-      });
-      upgrades.register([
-        { id: 'slow', cost: 200 },
-        { id: 'fast', cost: 20 },
-      ]);
-
-      const buildings = createProducerCategory<BuildingDef>({
-        id: 'farms',
-        mapProducer: (def) => ({
-          resource: gems,
-          baseRate: def.baseRate,
-          trigger: 'continuous',
-          purchase: {
-            costResource: gold,
-            baseCost: def.baseCost,
-            costScaling: 1.15,
-          },
-        }),
-        registerTick: ctx.onTick,
-      });
-      buildings.register([
-        { id: 'wheat', baseRate: 1, baseCost: 50 },
-        { id: 'fallow', baseRate: 0, baseCost: 150 },
-      ]);
-
-      const challenges = createChallengeCategory({
-        id: 'trials',
-        accessor,
-      });
-      challenges.register({
-        id: 'bronze',
-        name: 'Bronze',
-        canStart: C.and(
-          C.resource('gems', 'gte', 5),
-          C.unlock('bronze-unlock'),
-          C.state('trial.seen', 'eq', true),
-        ),
-        goal: C.resource('gems', 'gte', 10),
-      });
-
-      ctx.provide(CategoriesKey, {
-        purchasables: [upgrades],
-        producers: [buildings],
-        challenges: [challenges],
-      } as EngineCategories);
-    },
-  };
-
-  const engine = createEngine({ gameId, persistence: false });
-  engine.use(module);
-  engine.start();
-  return { engine };
-}
-
-/** Deep-equal the three snapshot surfaces consumers read. */
-function expectSnapshotsEquivalent(
-  inc: ReturnType<typeof createIncrementalSnapshot>,
-  engine: ReturnType<typeof buildMixedEngine>['engine'],
-  accessor: GameStateAccessor,
-  label: string,
-): void {
-  const direct = createTransitionSnapshot(engine, accessor);
-  const cached = inc.rebuild();
-  expect(cached.all, `${label}: .all mismatch`).toEqual(direct.all);
-  expect(cached.challenges, `${label}: .challenges mismatch`).toEqual(direct.challenges);
-  expect(cached.purchasables, `${label}: .purchasables mismatch`).toEqual(direct.purchasables);
-  expect(cached.producers, `${label}: .producers mismatch`).toEqual(direct.producers);
-}
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -316,26 +184,117 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
     expectSnapshotsEquivalent(inc, engine, accessor, 'after-state');
   });
 
-  it('ignores targeted invalidation axis and still produces a correct full rebuild', () => {
-    // Step-4 contract: even when we invalidate only one axis, the rebuild is
-    // still a full walk and equivalent to createTransitionSnapshot. In other
-    // words, calling invalidateResource on a resource that didn't change
-    // must not affect correctness.
+  it('a selective rebuild does not pick up an un-invalidated change', () => {
     const { accessor, config } = mutableAccessor({
       resources: { gold: 0, gems: 0 },
       rates: { gold: 2, gems: 1 },
       unlocks: { 'bronze-unlock': false },
       state: { 'trial.seen': false },
     });
-    const { engine } = buildMixedEngine('inc-step4-contract', accessor);
+    const { engine } = buildMixedEngine('inc-silent', accessor);
     const inc = createIncrementalSnapshot(engine, accessor);
+    const before = inc.rebuild();
 
-    // Mutate two axes but only invalidate one — step 4 should still full-
-    // rebuild and pick up both.
-    config.resources.gold = 1000;
-    config.unlocks['bronze-unlock'] = true;
+    // The gold rate feeds every affordability distance, but only an
+    // unrelated id is invalidated, so the cache keeps the old distances.
+    config.rates.gold = 50;
+    inc.invalidateResource('gems');
+    const stale = inc.rebuild();
+    expect(stale.purchasables).toEqual(before.purchasables);
+    expect(stale.purchasables).not.toEqual(createTransitionSnapshot(engine, accessor).purchasables);
+
+    inc.invalidateRate('gold');
+    expectSnapshotsEquivalent(inc, engine, accessor, 'after-invalidating-the-rate');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Entity gating state
+// ---------------------------------------------------------------------------
+
+describe('createIncrementalSnapshot — entity gating changes', () => {
+  function setup(gameId: string, resources: Record<string, number>) {
+    const { accessor, config } = mutableAccessor({
+      resources,
+      rates: { gold: 2, gems: 1 },
+      unlocks: { 'bronze-unlock': true },
+      state: { 'trial.seen': true },
+    });
+    const fixture = buildMixedEngine(gameId, accessor);
+    const inc = createIncrementalSnapshot(fixture.engine, accessor);
+    const check = (label: string) =>
+      expectSnapshotsEquivalent(inc, fixture.engine, accessor, label);
+    return { ...fixture, accessor, config, inc, check };
+  }
+
+  it('a maxed purchasable returns after a reset un-maxes it', () => {
+    const { upgrades, config, inc, check } = setup('inc-gate-purchasable', { gold: 25, gems: 0 });
+    const fast = upgrades.getPurchasable('fast')!;
+
+    fast.amount.value = 1;
+    config.resources.gold = 5;
     inc.invalidateResource('gold');
-    expectSnapshotsEquivalent(inc, engine, accessor, 'full-rebuild-despite-narrow-signal');
+    check('after-purchase');
+    expect(inc.snapshot.purchasables.some((t) => t.entityId === 'fast')).toBe(false);
+
+    fast.amount.value = 0;
+    config.resources.gold = 10;
+    inc.invalidateResource('gold');
+    check('after-reset');
+    expect(inc.snapshot.purchasables.some((t) => t.entityId === 'fast')).toBe(true);
+  });
+
+  it('a raised limit un-maxes a purchasable without an invalidation', () => {
+    const { upgrades, upgradeLimit, inc, check } = setup('inc-gate-limit', { gold: 25, gems: 0 });
+    upgrades.getPurchasable('fast')!.amount.value = 1;
+    check('maxed');
+
+    upgradeLimit.value = 2;
+    check('after-raising-the-limit');
+    expect(inc.snapshot.purchasables.map((t) => t.label)).toContain(
+      'upgrades.fast.purchasable-maxed',
+    );
+  });
+
+  it('a maxed producer returns after a reset un-maxes it', () => {
+    const { buildings, config, inc, check } = setup('inc-gate-producer', { gold: 40, gems: 0 });
+    const mill = buildings.getProducer('mill')!.repeatable!;
+
+    mill.amount.value = 1;
+    config.resources.gold = 10;
+    inc.invalidateResource('gold');
+    check('after-purchase');
+
+    mill.amount.value = 0;
+    check('after-reset-without-invalidation');
+    expect(inc.snapshot.producers.some((t) => t.entityId === 'mill')).toBe(true);
+  });
+
+  it('entering a challenge surfaces its goal without an invalidation', () => {
+    const { trials, inc, check } = setup('inc-gate-enter', { gold: 20, gems: 5 });
+    check('before-enter');
+
+    expect(trials.getChallenge('bronze')!.enter()).toBe(true);
+    check('after-enter');
+    expect(inc.snapshot.challenges.map((t) => t.label)).toContain('trials.bronze.goal-complete');
+
+    trials.getChallenge('bronze')!.complete(true);
+    check('after-first-completion');
+  });
+
+  it('a challenge with no emissions re-emits when a dep of a silent gate moves', () => {
+    // bronze is revealed, startable and inactive: it emits nothing until a
+    // reset drops gold under its visibility gate.
+    const { config, inc, check } = setup('inc-gate-silent', { gold: 20, gems: 10 });
+    check('initial');
+    expect(inc.snapshot.challenges.some((t) => t.entityId === 'bronze')).toBe(false);
+
+    config.resources.gold = 0;
+    inc.invalidateResource('gold');
+    check('after-reset');
+    expect(inc.snapshot.challenges.map((t) => t.label)).toContain(
+      'trials.bronze.visibility-reveal',
+    );
   });
 });
 
@@ -364,9 +323,8 @@ describe('createIncrementalSnapshot — dirty-set plumbing', () => {
   });
 
   it('invalidateAll and exhaustive targeted invalidation yield identical rebuilds', () => {
-    // Single engine; two sequential rebuild paths over the same state must
-    // produce identical output in step 4 (no path-dependence, since
-    // invalidation signals are ignored).
+    // Single engine; the full and the selective path over the same state
+    // must produce identical output.
     const { accessor } = mutableAccessor({
       resources: { gold: 100, gems: 10 },
       rates: { gold: 2, gems: 1 },

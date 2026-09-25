@@ -7,26 +7,41 @@
  * `invalidateUnlock` / `invalidateState` / `invalidateAll`; the next
  * `rebuild()` honors those signals and re-emits only the affected entries.
  *
+ * Two things decide a leaf's output for one entity. The entity's own gating
+ * state (a purchasable's level and limit, a challenge's `active` flag and
+ * completions, ...) decides *which* transitions it emits; the accessor slots
+ * in each emission's `TransitionDeps` decide their distances. The cache keeps
+ * a registry of every walkable entity, independent of what it currently
+ * emits, with a small gate signature per entity read straight off the
+ * instance.
+ *
  * Rebuild paths:
  *
- * - `dirty.all` (or first call after construction) → **full rebuild**: walk
- *   every category entity via `forEachCategoryEntity`-style traversal and
- *   re-populate entries + reverse indices. This is the escape hatch for
+ * - `dirty.all` (or no walkable entity at all) → **full rebuild**: walk every
+ *   category entity via `forEachCategoryEntity`, re-populate the entity
+ *   registry, entries and reverse indices. This is the escape hatch for
  *   entity-set changes and the fallback when targeted invalidation isn't
  *   possible.
- * - Otherwise → **selective rebuild**: fan `dirty.*` through the reverse
- *   indices to a set of dirty entities, delete those entities' entries,
- *   re-emit each via the per-entity emitter attached to the cached
- *   `entityRef`/`entity`, merge back in, re-sort.
+ * - Otherwise → **selective rebuild**: an entity is dirty when `dirty.*`
+ *   reaches one of its entries through the reverse indices, or when its gate
+ *   signature moved since the last rebuild. Each dirty entity's entries are
+ *   dropped and re-emitted through its per-entity emitter, then re-sorted.
  *
  * Invariants:
  *
- * - **Entity set frozen per instance.** A selective rebuild trusts the cached
- *   entities — it does not re-walk the registry. Consumers that register new
- *   categories or new entities mid-run must call `invalidateAll()` to force a
- *   full re-walk on the next rebuild. This is load-bearing for the
- *   sample-diff wiring in `run-until-helpers/event-mode.ts`, which cannot
- *   observe entity registration through accessor reads.
+ * - **Entity set fixed at the last full walk.** A selective rebuild re-reads
+ *   every registered entity's gate signature but does not re-walk the
+ *   category registries. Consumers that register new categories or new
+ *   entities mid-run must call `invalidateAll()` to force a full re-walk on
+ *   the next rebuild. This is load-bearing for the sample-diff wiring in
+ *   `run-until-helpers/event-mode.ts`, which cannot observe entity
+ *   registration through accessor reads.
+ * - **Gating state needs no invalidation; dep slots do.** An entity whose
+ *   emissions went empty (maxed, inactive) stays registered and comes back
+ *   when its signature moves — a reset, an automation policy entering a
+ *   challenge. An emission with empty deps (a predicate the walker can't
+ *   meter) refreshes only with its entity: on a signature move, when another
+ *   of the entity's emissions is invalidated, or on `invalidateAll()`.
  * - `rebuild()` returns a fresh `TransitionSnapshot` object per call. Callers
  *   must not memoize on identity; use deep-equal on `.all` / group arrays.
  * - `accessor` is wrapped with a fresh {@link memoizeAccessor} per rebuild,
@@ -34,10 +49,15 @@
  *   rebuild collapse; reads across rebuilds do not.
  */
 
+import { unref } from 'vue';
+import { Decimal } from '@/primitives/decimal';
 import { CategoriesKey, type EngineCategories } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps } from '@/core/transitions';
+import type { Purchasable } from '@/systems/purchasable';
+import type { Producer } from '@/systems/producer-category';
+import type { Challenge } from '@/systems/challenge-category';
 import type { Transition, TransitionSource } from './types';
 import type { TransitionSnapshot } from './index';
 import { compareTransitions } from './compare-transitions';
@@ -103,15 +123,8 @@ export interface IncrementalSnapshot {
 interface CacheEntry {
   transition: Transition;
   deps: TransitionDeps;
-  entityRef: IncrementalSnapshotEntityRef;
-  entity: unknown;
+  entityKey: string;
 }
-
-const CATEGORY_KEY_TO_SOURCE: Partial<Record<keyof EngineCategories, TransitionSource>> = {
-  challenges: 'challenge',
-  purchasables: 'purchasable',
-  producers: 'producer',
-};
 
 type PerEntityEmit = (
   categoryId: string,
@@ -119,10 +132,77 @@ type PerEntityEmit = (
   accessor: GameStateAccessor,
 ) => { transition: Transition; deps: TransitionDeps }[];
 
-const PER_ENTITY_EMIT: Partial<Record<keyof EngineCategories, PerEntityEmit>> = {
-  challenges: emitChallengeTransitionsForEntity,
-  purchasables: emitPurchasableTransitionsForEntity,
-  producers: emitProducerTransitionsForEntity,
+/**
+ * Refresh `gate` in place from the entity's live gating state; true when any
+ * slot moved. Reads what the matching leaf's emission guards, cost lookup and
+ * `currentValue` read off the instance rather than through the accessor.
+ */
+type ReadGate = (entity: unknown, gate: unknown[]) => boolean;
+
+interface CategoryWalk {
+  source: TransitionSource;
+  emit: PerEntityEmit;
+  readGate: ReadGate;
+}
+
+/** A walkable entity, registered whether or not it currently emits. */
+interface EntityRecord {
+  key: string;
+  ref: IncrementalSnapshotEntityRef;
+  entity: unknown;
+  walk: CategoryWalk;
+  gate: unknown[];
+  labels: Set<string>;
+}
+
+/**
+ * Store `value` in `gate[i]` if it differs from what's there; true when it
+ * did. Decimals are compared by value and stored as copies, so an in-place
+ * mutation can't alias the stored slot.
+ */
+function updateSlot(gate: unknown[], i: number, value: unknown): boolean {
+  const prev = gate[i];
+  if (prev === value) return false;
+  if (prev instanceof Decimal && value instanceof Decimal) {
+    if (prev.eq(value)) return false;
+  }
+  gate[i] = value instanceof Decimal ? new Decimal(value) : value;
+  return true;
+}
+
+function readPurchasableGate(purchasable: Purchasable | undefined, gate: unknown[]): boolean {
+  // `maxed` and the `amount === limit - 1` cap check are functions of these two.
+  let moved = updateSlot(gate, 0, purchasable?.amount.value);
+  moved = updateSlot(gate, 1, purchasable && unref(purchasable.limit)) || moved;
+  return moved;
+}
+
+const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
+  challenges: {
+    source: 'challenge',
+    emit: emitChallengeTransitionsForEntity,
+    readGate(entity, gate) {
+      const { challenge } = entity as { challenge: Challenge };
+      let moved = updateSlot(gate, 0, challenge.active.value);
+      moved = updateSlot(gate, 1, challenge.completions.value) || moved;
+      moved = updateSlot(gate, 2, challenge.visible.value) || moved;
+      moved = updateSlot(gate, 3, challenge.canStart.value) || moved;
+      moved = updateSlot(gate, 4, challenge.canComplete.value) || moved;
+      return moved;
+    },
+  },
+  purchasables: {
+    source: 'purchasable',
+    emit: emitPurchasableTransitionsForEntity,
+    readGate: (entity, gate) =>
+      readPurchasableGate((entity as { purchasable: Purchasable }).purchasable, gate),
+  },
+  producers: {
+    source: 'producer',
+    emit: emitProducerTransitionsForEntity,
+    readGate: (entity, gate) =>
+      readPurchasableGate((entity as { producer: Producer }).producer.repeatable, gate),
+  },
 };
 
 /**
@@ -150,13 +230,7 @@ export function createIncrementalSnapshot(
   accessor: GameStateAccessor,
 ): IncrementalSnapshot {
   const entries = new Map<string, CacheEntry>();
-  // Per-entity bucket: entityKey → set of labels emitted by that entity.
-  // Used on the selective path to drop all of an entity's stale emissions
-  // before re-emitting — an entity may emit multiple transitions whose
-  // labels aren't fully discoverable from a single dep-axis hit (e.g. a
-  // challenge's `goal-complete` + `challenge-maxed` pair share a dep set,
-  // and a state-path mutation should refresh the whole pair).
-  const byEntity = new Map<string, Set<string>>();
+  const entities = new Map<string, EntityRecord>();
   const byResource = new Map<string, Set<string>>();
   const byRate = new Map<string, Set<string>>();
   const byUnlock = new Map<string, Set<string>>();
@@ -204,13 +278,6 @@ export function createIncrementalSnapshot(
   function indexEntry(entry: CacheEntry): void {
     const label = entry.transition.label;
     entries.set(label, entry);
-    const ek = entityKey(entry.entityRef);
-    let bucket = byEntity.get(ek);
-    if (!bucket) {
-      bucket = new Set();
-      byEntity.set(ek, bucket);
-    }
-    bucket.add(label);
     addToReverseIndex(byResource, entry.deps.resources, label);
     addToReverseIndex(byRate, entry.deps.rates, label);
     addToReverseIndex(byUnlock, entry.deps.unlocks, label);
@@ -221,12 +288,6 @@ export function createIncrementalSnapshot(
     const entry = entries.get(label);
     if (!entry) return;
     entries.delete(label);
-    const ek = entityKey(entry.entityRef);
-    const bucket = byEntity.get(ek);
-    if (bucket) {
-      bucket.delete(label);
-      if (bucket.size === 0) byEntity.delete(ek);
-    }
     removeFromReverseIndex(byResource, entry.deps.resources, label);
     removeFromReverseIndex(byRate, entry.deps.rates, label);
     removeFromReverseIndex(byUnlock, entry.deps.unlocks, label);
@@ -259,16 +320,11 @@ export function createIncrementalSnapshot(
     dirty.all = false;
   }
 
-  function emitForEntityRef(
-    entityRef: IncrementalSnapshotEntityRef,
-    entity: unknown,
-    memo: GameStateAccessor,
-  ): void {
-    const emit = PER_ENTITY_EMIT[entityRef.categoryKey];
-    if (!emit) return;
-    const emissions = emit(entityRef.categoryId, entity, memo);
+  function emitForRecord(record: EntityRecord, memo: GameStateAccessor): void {
+    const emissions = record.walk.emit(record.ref.categoryId, record.entity, memo);
     for (const { transition, deps } of emissions) {
-      indexEntry({ transition, deps, entityRef, entity });
+      indexEntry({ transition, deps, entityKey: record.key });
+      record.labels.add(transition.label);
     }
   }
 
@@ -277,22 +333,32 @@ export function createIncrementalSnapshot(
     const categories = engine.tryInject(CategoriesKey);
 
     entries.clear();
-    byEntity.clear();
+    entities.clear();
     byResource.clear();
     byRate.clear();
     byUnlock.clear();
     byState.clear();
 
     forEachCategoryEntity(categories, ({ categoryKey, categoryId, entityId, entity }) => {
-      const source = CATEGORY_KEY_TO_SOURCE[categoryKey];
-      if (!source) return;
-      const entityRef: IncrementalSnapshotEntityRef = {
-        source,
+      const walk = CATEGORY_WALKS[categoryKey];
+      if (!walk) return;
+      const ref: IncrementalSnapshotEntityRef = {
+        source: walk.source,
         categoryKey,
         categoryId,
         entityId,
       };
-      emitForEntityRef(entityRef, entity, memo);
+      const record: EntityRecord = {
+        key: entityKey(ref),
+        ref,
+        entity,
+        walk,
+        gate: [],
+        labels: new Set(),
+      };
+      walk.readGate(entity, record.gate);
+      entities.set(record.key, record);
+      emitForRecord(record, memo);
     });
 
     clearDirty();
@@ -309,8 +375,7 @@ export function createIncrementalSnapshot(
       if (!labels) continue;
       for (const label of labels) {
         const entry = entries.get(label);
-        if (!entry) continue;
-        out.add(entityKey(entry.entityRef));
+        if (entry) out.add(entry.entityKey);
       }
     }
   }
@@ -321,6 +386,11 @@ export function createIncrementalSnapshot(
     collectDirtyEntities(byRate, dirty.rates, dirtyEntities);
     collectDirtyEntities(byUnlock, dirty.unlocks, dirtyEntities);
     collectDirtyEntities(byState, dirty.states, dirtyEntities);
+    // Every record's signature is refreshed, dirty or not, so the stored gate
+    // always describes the state its entries were emitted from.
+    for (const record of entities.values()) {
+      if (record.walk.readGate(record.entity, record.gate)) dirtyEntities.add(record.key);
+    }
 
     if (dirtyEntities.size === 0) {
       clearDirty();
@@ -328,15 +398,11 @@ export function createIncrementalSnapshot(
     }
 
     const memo = memoizeAccessor(accessor);
-    for (const ek of dirtyEntities) {
-      const bucket = byEntity.get(ek);
-      if (!bucket || bucket.size === 0) continue;
-      const labels = Array.from(bucket);
-      const sample = entries.get(labels[0]);
-      if (!sample) continue;
-      const { entityRef, entity } = sample;
-      for (const label of labels) dropEntry(label);
-      emitForEntityRef(entityRef, entity, memo);
+    for (const key of dirtyEntities) {
+      const record = entities.get(key)!;
+      for (const label of record.labels) dropEntry(label);
+      record.labels.clear();
+      emitForRecord(record, memo);
     }
 
     clearDirty();
@@ -344,7 +410,7 @@ export function createIncrementalSnapshot(
   }
 
   function rebuild(): TransitionSnapshot {
-    if (dirty.all || entries.size === 0) return profile('walker.incFullRebuild', fullRebuild);
+    if (dirty.all || entities.size === 0) return profile('walker.incFullRebuild', fullRebuild);
     return profile('walker.incSelectiveRebuild', selectiveRebuild);
   }
 
