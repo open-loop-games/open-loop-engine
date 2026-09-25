@@ -333,70 +333,71 @@ function quadraticSlope(source: FormulaSource | null): DecimalSource | null {
   return slope;
 }
 
+/**
+ * The bare variable at the bottom of a single-variable chain — the `x` an
+ * antiderivative is taken in.
+ *
+ * @internal
+ */
+function variableLeaf(chain: FormulaSource): GenericFormula {
+  let node = chain as GenericFormula;
+  while (!isPlainVariable(node)) node = node.inputs.find(hasAnyVariable) as GenericFormula;
+  return node;
+}
+
 // ∫(f(x) + c) dx = F(x) + c·x. For `lhs` shapes whose antiderivative is K·x²/2
 // (variable or `mul(var, k)`), invert reduces to a quadratic and is closed-form;
-// otherwise fall back to bisection. Evaluate recovers x via F's existing invert.
+// otherwise fall back to bisection.
+//
+// The node's input is `x` itself, with `F` evaluated at it, rather than `F(x)`
+// with `x` recovered by inverting `F`: a flat `f` has a flat `F`, which says
+// nothing about where `x` is.
 function buildIntegrateAdd(
   lhs: FormulaSource,
   F_integral: GenericFormula,
   other: FormulaSource,
 ): GenericFormula {
   const slopeSource = quadraticSlopeSource(lhs);
+  const F = F_integral;
 
   return new Formula({
-    inputs: [F_integral, other],
-    evaluate: (F_val: DecimalSource, c_val: DecimalSource): DecimalSource => {
-      // Recovering x from F(x) is what `F_integral.invert` is. The closed form
-      // for the K·x²/2 shapes is the same algebra spelled a second time, so it
-      // only adds a place for the two to disagree.
-      if (!F_integral.isInvertible()) return Decimal.add(F_val, c_val);
-      const x = F_integral.invert(F_val);
-      return Decimal.add(F_val, Decimal.mul(c_val, x));
-    },
-    invert: (
-      target: DecimalSource,
-      F_input: FormulaSource,
-      c_input: FormulaSource,
-    ): DecimalSource => {
-      const c = unrefFormulaSource(c_input);
-      const slope = quadraticSlope(slopeSource);
+    inputs: [variableLeaf(lhs), other],
+    evaluate: (x: DecimalSource, c_val: DecimalSource): DecimalSource =>
+      Decimal.add(F.evaluate(x), Decimal.mul(c_val, x)),
+    invert: !F.isInvertible()
+      ? undefined
+      : (target: DecimalSource, _x: FormulaSource, c_input: FormulaSource): DecimalSource => {
+          const c = unrefFormulaSource(c_input);
+          const slope = quadraticSlope(slopeSource);
 
-      if (slope != null) {
-        // K·x²/2 + c·x = T  →  K·x² + 2c·x - 2T = 0
-        // x = (-c + √(c² + 2KT)) / K  — the positive root for K > 0, and the
-        // smaller of the two for K < 0, which is the first passage either way.
-        const disc = Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-        // A negative discriminant is a statement about the target, not the
-        // shape: no real pre-image. Fall through and let the generic path
-        // report it rather than rooting a negative and returning NaN.
-        if (Decimal.gte(disc, 0)) {
-          return Decimal.div(Decimal.sub(Decimal.sqrt(disc), c), slope);
-        }
-      }
+          if (slope != null) {
+            // K·x²/2 + c·x = T  →  K·x² + 2c·x - 2T = 0
+            // x = (-c + √(c² + 2KT)) / K  — the positive root for K > 0, and the
+            // smaller of the two for K < 0, which is the first passage either way.
+            const disc = Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
+            // A negative discriminant is a statement about the target, not the
+            // shape: no real pre-image. Fall through and let the generic path
+            // report it rather than rooting a negative and returning NaN.
+            if (Decimal.gte(disc, 0)) {
+              return Decimal.div(Decimal.sub(Decimal.sqrt(disc), c), slope);
+            }
+          }
 
-      // Generic shape (cubic and higher): solve F(x) + c·x = target by bisection.
-      if (!hasVariable(F_input) || !F_input.isInvertible()) {
-        reportInversionFailure(
-          'not-invertible',
-          'Could not invert integrateAdd: integral lhs is not invertible',
-        );
-        return 0;
-      }
-      const F = F_input;
-      // F⁻¹(target) is the answer when c = 0, so it makes a tight starting
-      // bracket for the general case.
-      const x = findCrossing((v) => Decimal.add(F.evaluate(v), Decimal.mul(c, v)), target, {
-        upper: F.invert(target),
-      });
-      if (x == null) {
-        reportInversionFailure(
-          'no-solution',
-          'Could not invert integrateAdd: target is out of the search range',
-        );
-        return 0;
-      }
-      return x;
-    },
+          // Generic shape (cubic and higher, or a flat slope): solve
+          // F(x) + c·x = target by bisection. F⁻¹(target) is the answer when
+          // c = 0, so it makes a tight starting bracket for the general case.
+          const x = findCrossing((v) => Decimal.add(F.evaluate(v), Decimal.mul(c, v)), target, {
+            upper: F.invert(target),
+          });
+          if (x == null) {
+            reportInversionFailure(
+              'no-solution',
+              'Could not invert integrateAdd: target is out of the search range',
+            );
+            return 0;
+          }
+          return x;
+        },
   });
 }
 
@@ -430,7 +431,8 @@ export const invertSub = makeBinaryInvert(
 );
 
 // ∫(f(x) - c) dx = F(x) - c·x; ∫(c - f(x)) dx = c·x - F(x).
-// Same closed-form-vs-bisection split as integrateAdd, with sign flips.
+// Same closed-form-vs-bisection split as integrateAdd, with sign flips, and the
+// same input: `x` itself, with `F` evaluated at it.
 function buildIntegrateSub(
   variableSide: FormulaSource,
   F_integral: GenericFormula,
@@ -438,75 +440,53 @@ function buildIntegrateSub(
   variableOnLhs: boolean,
 ): GenericFormula {
   const slopeSource = quadraticSlopeSource(variableSide);
+  const F = F_integral;
+  const at = (x: DecimalSource, c: DecimalSource): DecimalSource => {
+    const cx = Decimal.mul(c, x);
+    return variableOnLhs ? Decimal.sub(F.evaluate(x), cx) : Decimal.sub(cx, F.evaluate(x));
+  };
 
   return new Formula({
-    inputs: [F_integral, other],
-    evaluate: (F_val: DecimalSource, c_val: DecimalSource): DecimalSource => {
-      let x: DecimalSource;
-      // Same reasoning as `buildIntegrateAdd`: `F_integral.invert` already is
-      // the recovery of x from F(x), so open-coding it for the quadratic
-      // shapes only adds a second spelling that can drift from the first.
-      if (F_integral.isInvertible()) {
-        x = F_integral.invert(F_val);
-      } else {
-        return variableOnLhs ? Decimal.sub(F_val, c_val) : Decimal.sub(c_val, F_val);
-      }
-      const cx = Decimal.mul(c_val, x);
-      return variableOnLhs ? Decimal.sub(F_val, cx) : Decimal.sub(cx, F_val);
-    },
-    invert: (
-      target: DecimalSource,
-      F_input: FormulaSource,
-      c_input: FormulaSource,
-    ): DecimalSource => {
-      const c = unrefFormulaSource(c_input);
-      const slope = quadraticSlope(slopeSource);
+    inputs: [variableLeaf(variableSide), other],
+    evaluate: at,
+    invert: !F.isInvertible()
+      ? undefined
+      : (target: DecimalSource, _x: FormulaSource, c_input: FormulaSource): DecimalSource => {
+          const c = unrefFormulaSource(c_input);
+          const slope = quadraticSlope(slopeSource);
 
-      if (slope != null) {
-        // variableOnLhs:  K·x²/2 - c·x = T  →  K·x² - 2c·x - 2T = 0  →  x = (c + √(c² + 2KT)) / K
-        // !variableOnLhs: c·x - K·x²/2 = T  →  K·x² - 2c·x + 2T = 0  →  x = (c - √(c² - 2KT)) / K
-        // Same discriminant gate as `integrateAdd`, and it fires in both
-        // orientations: `c² + 2KT` goes negative for K < 0, `c² - 2KT` for
-        // K > 0. The second was reachable on an ordinary positive slope and
-        // returned NaN from `√(negative)` without a word.
-        const disc = variableOnLhs
-          ? Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)))
-          : Decimal.sub(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-        if (Decimal.gte(disc, 0)) {
-          return variableOnLhs
-            ? Decimal.div(Decimal.add(c, Decimal.sqrt(disc)), slope)
-            : Decimal.div(Decimal.sub(c, Decimal.sqrt(disc)), slope);
-        }
-      }
+          if (slope != null) {
+            // variableOnLhs:  K·x²/2 - c·x = T  →  K·x² - 2c·x - 2T = 0  →  x = (c + √(c² + 2KT)) / K
+            // !variableOnLhs: c·x - K·x²/2 = T  →  K·x² - 2c·x + 2T = 0  →  x = (c - √(c² - 2KT)) / K
+            // Same discriminant gate as `integrateAdd`, and it fires in both
+            // orientations: `c² + 2KT` goes negative for K < 0, `c² - 2KT` for
+            // K > 0. The second was reachable on an ordinary positive slope and
+            // returned NaN from `√(negative)` without a word.
+            const disc = variableOnLhs
+              ? Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)))
+              : Decimal.sub(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
+            if (Decimal.gte(disc, 0)) {
+              return variableOnLhs
+                ? Decimal.div(Decimal.add(c, Decimal.sqrt(disc)), slope)
+                : Decimal.div(Decimal.sub(c, Decimal.sqrt(disc)), slope);
+            }
+          }
 
-      if (!hasVariable(F_input) || !F_input.isInvertible()) {
-        reportInversionFailure(
-          'not-invertible',
-          'Could not invert integrateSub: integral lhs is not invertible',
-        );
-        return 0;
-      }
-      const F = F_input;
-      // `c·x - F(x)` rises then falls, so it is only monotone up to its turning
-      // point. `findCrossing` cannot detect the violation, and this branch keeps
-      // the pre-existing behaviour of taking the first crossing it finds.
-      const x = findCrossing(
-        (v) => {
-          const cx = Decimal.mul(c, v);
-          return variableOnLhs ? Decimal.sub(F.evaluate(v), cx) : Decimal.sub(cx, F.evaluate(v));
+          // `c·x - F(x)` rises then falls, so it is only monotone up to its turning
+          // point. `findCrossing` cannot detect the violation, and this branch keeps
+          // the pre-existing behaviour of taking the first crossing it finds.
+          const x = findCrossing((v) => at(v, c), target, {
+            upper: F.invert(variableOnLhs ? target : Decimal.neg(target)),
+          });
+          if (x == null) {
+            reportInversionFailure(
+              'no-solution',
+              'Could not invert integrateSub: target is out of the search range',
+            );
+            return 0;
+          }
+          return x;
         },
-        target,
-        { upper: F.invert(variableOnLhs ? target : Decimal.neg(target)) },
-      );
-      if (x == null) {
-        reportInversionFailure(
-          'no-solution',
-          'Could not invert integrateSub: target is out of the search range',
-        );
-        return 0;
-      }
-      return x;
-    },
   });
 }
 
@@ -723,12 +703,34 @@ export const invertPow = makeBinaryInvert(
   (value, other) => Decimal.ln(value).div(Decimal.ln(other)),
 );
 
+/**
+ * `∫ bᵘ du = bᵘ/ln b` — shared by `pow(b, u)` and `pow_base(u, b)`.
+ *
+ * At `b = 1` that quotient is 0/0 and the antiderivative is its limit, `u`. The
+ * base is read per evaluation rather than branched on at build, because the
+ * integral is memoized and a ratio that is a ref can reach 1 afterwards.
+ *
+ * @internal
+ */
+function exponentialAntiderivative(u: GenericFormula, base: FormulaSource): GenericFormula {
+  return new Formula({
+    inputs: [u, base],
+    evaluate: (uVal: DecimalSource, b: DecimalSource) =>
+      Decimal.eq(b, 1) ? uVal : Decimal.div(Decimal.pow(b, uVal), Decimal.ln(b)),
+    invert: (target: DecimalSource, uInput: FormulaSource, bInput: FormulaSource) => {
+      const b = unrefFormulaSource(bInput);
+      const inner = Decimal.eq(b, 1) ? target : Decimal.log(Decimal.mul(target, Decimal.ln(b)), b);
+      return (uInput as GenericFormula).invert(inner);
+    },
+  });
+}
+
 export const integratePow = makeBinaryIntegrate(
   (x, other) => {
     const pow = Formula.add(other, 1);
     return Formula.pow(x, pow).div(pow);
   },
-  (x, other) => Formula.pow(other, x).div(Formula.ln(other)),
+  (x, other) => exponentialAntiderivative(x, other),
 );
 
 // The inverse of `10ˣ` is `log₁₀`, not the 10th root — `root(v, 10)` inverts
@@ -746,7 +748,7 @@ export const invertPowBase = makeBinaryInvert(
 );
 
 export const integratePowBase = makeBinaryIntegrate(
-  (x, other) => Formula.pow(other, x).div(Formula.ln(other)),
+  (x, other) => exponentialAntiderivative(x, other),
   (x, other) => {
     const denominator = Formula.add(other, 1);
     return Formula.pow(x, denominator).div(denominator);

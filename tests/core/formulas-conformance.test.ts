@@ -480,6 +480,8 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
       'exponential 10·1.15ˣ': (v) => Formula.exponential(v, 10, 1.15),
       'exponential 5·2ˣ': (v) => Formula.exponential(v, 5, 2),
       'linear 5x+10': (v) => Formula.linear(v, 10, 5),
+      'flat linear 0x+10': (v) => Formula.linear(v, 10, 0),
+      'flat exponential 10·1ˣ': (v) => Formula.exponential(v, 10, 1),
       'polynomial 10x²': (v) => Formula.polynomial(v, 10, 2),
       'polynomial 3x³': (v) => Formula.polynomial(v, 3, 3),
       'polynomial 10x^1.5': (v) => Formula.polynomial(v, 10, 1.5),
@@ -494,14 +496,65 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
     }
   });
 
-  // Known defect: a flat curve's antiderivative evaluates to NaN. The `add`
-  // integral recovers `x` by inverting a zero-slope `F`, and `pow_base` at
-  // base 1 builds `1ˣ/ln 1`. Buy-max searches the price instead, so only the
-  // continuous operations (`cumulative`, `evaluateIntegral`) are affected.
-  test.fails('a flat curve integrates to its area', () => {
-    for (const formula of [Formula.linear(3, 10, 0), Formula.exponential(3, 10, 1)]) {
-      expect(String(formula.cumulative(0, 3))).toBe('30');
+  test('a flat curve integrates to its area, and its integral inverts', () => {
+    // A zero slope or a unit ratio is an ordinary authored value. Both are
+    // limits of the general antiderivative — `bˣ/ln b` is 0/0 at b = 1, and a
+    // flat `F` carries no information about `x` — so each builder and
+    // orientation that can go flat is swept.
+    const FLAT: Record<string, (v: DecimalSource) => GenericFormula> = {
+      'linear 0x+10': (v) => Formula.linear(v, 10, 0),
+      'sub(0x, −10)': (v) => F.variable(v).mul(0).sub(-10),
+      'sub(10, 0x)': (v) => F.sub(10, F.variable(v).mul(0)),
+      'exponential 10·1ˣ': (v) => Formula.exponential(v, 10, 1),
+      'pow(1, x)·10': (v) => F.pow(1, F.variable(v)).mul(10),
+    };
+    for (const [name, curve] of Object.entries(FLAT)) {
+      for (const [a, b] of [
+        ['0', '3'],
+        ['2.5', '7'],
+        ['1e3', '1e6'],
+      ]) {
+        const { value: area, errors } = withoutEngineErrors(() => curve(0).cumulative(a, b));
+        expect(errors, `${name} logged`).toEqual([]);
+        const truth = Decimal.mul(10, Decimal.sub(b, a));
+        expect(
+          Decimal.lte(relativeError(area, truth), 1e-12),
+          `${name} over [${a}, ${b}]: ${String(area)} vs ${truth.toString()}`,
+        ).toBe(true);
+      }
+      for (const x of ['0.5', '2', '10', '137.5', '1e3']) {
+        expectIntegralRoundTrip(curve(x), x, DEFAULT_TOL);
+      }
     }
+  });
+
+  test('a coefficient that moves onto and off the flat value integrates at each', () => {
+    // The integral is memoized on first build, so a slope or ratio that later
+    // reaches its flat value must be handled when evaluated, not when built.
+    const slope = ref<DecimalSource>(5);
+    const linear = Formula.linear(0, 10, slope);
+    const ratio = ref<DecimalSource>(1.15);
+    const exponential = Formula.exponential(0, 10, ratio);
+    const expectArea = (formula: GenericFormula, truth: DecimalSource, label: string) =>
+      expect(
+        Decimal.lte(relativeError(formula.cumulative(0, 4), truth), 1e-12),
+        `${label}: ${String(formula.cumulative(0, 4))} vs ${String(truth)}`,
+      ).toBe(true);
+
+    expectArea(linear, 80, 'slope 5'); // 5·16/2 + 40
+    expectArea(
+      exponential,
+      Decimal.mul(10, Decimal.sub(Decimal.pow(1.15, 4), 1)).div(Math.log(1.15)),
+      'ratio 1.15',
+    );
+    slope.value = 0;
+    ratio.value = 1;
+    expectArea(linear, 40, 'slope 0');
+    expectArea(exponential, 40, 'ratio 1');
+    slope.value = 2;
+    ratio.value = 2;
+    expectArea(linear, 56, 'slope 2'); // 2·16/2 + 40
+    expectArea(exponential, Decimal.mul(10, 15).div(Math.LN2), 'ratio 2');
   });
 
   test('a capped branch has a bounded image, and nothing past it has a pre-image', () => {
