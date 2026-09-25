@@ -128,7 +128,10 @@ export interface Cycle extends ScopedReset {
    */
   readonly count: Persistent<number>;
 
-  /** Fastest cycle completion in seconds (persistent, `Infinity` until first cycle) */
+  /**
+   * Fastest cycle completion in seconds (persistent, `Infinity` until first
+   * cycle). A cycle ended before any time elapsed doesn't count.
+   */
   readonly bestTime: Persistent<number>;
 
   /** Elapsed time in the current cycle, in seconds. Resets to 0 on restart. */
@@ -266,7 +269,9 @@ export function createCycle(options: CycleOptions): Cycle {
       // the cycle must not count, record a best time, or claim a restart.
       if (!reset.reset()) return false;
 
-      if (elapsed.value < bestTime.value) {
+      // A zero-length cycle (two ends with no tick between) isn't a run, and
+      // a best of 0 is one no later cycle could beat.
+      if (elapsed.value > 0 && elapsed.value < bestTime.value) {
         bestTime.value = elapsed.value;
       }
       count.value++;

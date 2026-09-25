@@ -55,6 +55,18 @@ describe('createCycle', () => {
     expect(Decimal.eq(pp.cumulative!.value, 10)).toBe(true);
   });
 
+  it('a zero-length cycle does not record a best time', () => {
+    const { registerTick, tick } = createTickManager();
+    const cycle = createCycle({ thingsToReset: [], registerTick });
+    cycle.run();
+    tick(3);
+    cycle.end();
+    cycle.end(); // a double-clicked restart, no tick in between
+
+    expect(cycle.count.value).toBe(2);
+    expect(cycle.bestTime.value).toBe(3);
+  });
+
   it('tracks elapsed time while running', () => {
     const { registerTick, tick } = createTickManager();
     const cycle = createCycle({
