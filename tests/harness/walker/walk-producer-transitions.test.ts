@@ -31,6 +31,7 @@ interface BuildingDef {
   id: string;
   baseRate: number;
   baseCost: number;
+  limit?: number;
 }
 
 interface ManualDef {
@@ -72,6 +73,7 @@ function buildEngineWithProducers(
             costResource: resource,
             baseCost: def.baseCost,
             costScaling: 1.15,
+            limit: def.limit,
           },
         }),
         registerTick: ctx.onTick,
@@ -242,6 +244,24 @@ describe('walkProducerTransitions — producer-becomes-affordable (no-rate)', ()
     expect(out[0].kind).toBe('producer-becomes-affordable');
     expect(out[0].distance.seconds).toBeNull();
     expect(out[0].distance.reason).toBe('no-rate');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Maxed repeatable — no emission
+// ---------------------------------------------------------------------------
+
+describe('walkProducerTransitions — maxed skip', () => {
+  it('skips a producer whose repeatable has reached its limit', () => {
+    const { engine, category } = buildEngineWithProducers('wpd-maxed', 'buildings', 'cookies', [
+      { id: 'mill', baseRate: 1, baseCost: 10, limit: 1 },
+    ]);
+    const repeatable = category.getProducer('mill')!.repeatable!;
+    repeatable.amount.value = 1;
+    expect(repeatable.maxed.value).toBe(true);
+
+    const accessor = mockAccessor({ resources: { cookies: 1000 }, rates: { cookies: 2 } });
+    expect(walkProducerTransitions(engine, accessor)).toEqual([]);
   });
 });
 

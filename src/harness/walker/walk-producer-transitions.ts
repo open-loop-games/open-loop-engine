@@ -16,7 +16,8 @@
  *   cost resource has no positive rate.
  *
  * Manual producers with no `repeatable` emit nothing — there's no purchase
- * to become affordable. Producers whose repeatable carries no cost
+ * to become affordable — and neither does a producer whose repeatable is
+ * maxed. Producers whose repeatable carries no cost
  * requirement (boolean-only gate) also skip; the walker can't resolve a
  * distance without a cost resource to meter against.
  *
@@ -103,6 +104,7 @@ function emitForEntity(
   // Manual producers with no `repeatable` have no "next purchase" transition
   // to describe — skip entirely rather than emit a null/no-rate placeholder.
   if (!producer.repeatable) return;
+  if (producer.repeatable.maxed.value) return;
 
   const reqs = producer.repeatable.requirements;
   const costReq = firstCostRequirement(Array.isArray(reqs) ? reqs : [reqs]);
