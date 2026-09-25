@@ -45,8 +45,8 @@ export interface ProducerPurchaseConfig {
   costResource: Resource;
   /** Cost of the first purchase. Can be a ref/getter for scoped tuning. */
   baseCost: Computable<DecimalSource>;
-  /** Multiplicative cost increase per level */
-  costScaling: DecimalSource;
+  /** Multiplicative cost increase per level. Can be a ref/getter for scoped tuning. */
+  costScaling: Computable<DecimalSource>;
   /** Maximum purchasable count */
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */

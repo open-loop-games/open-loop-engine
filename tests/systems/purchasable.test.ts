@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { unref } from 'vue';
+import { ref, unref } from 'vue';
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
@@ -330,6 +330,28 @@ describe('createScalingPurchasable — cost escalation regression', () => {
     p.purchase(1);
     // After three purchases (364 spent, 136 left), next cost is 172.8 — NOT affordable
     expect(p.canPurchase.value).toBe(false);
+  });
+});
+
+describe('createScalingPurchasable — reactive geometric cost', () => {
+  it('reads a ref costScaling into the next cost and the bulk cost', () => {
+    const r = createResource(1e9, { id: 'r', displayName: 'r' });
+    const scaling = ref<DecimalSource>(2);
+    const p = createScalingPurchasable({
+      id: 'reactive-scaling',
+      description: 'reactive scaling',
+      resource: r,
+      baseCost: 10,
+      costScaling: scaling,
+    });
+
+    p.purchase(1);
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(20, 5);
+
+    scaling.value = 3;
+    expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(30, 5);
+    // Levels 1 and 2 at the new rate: 10·3 + 10·9.
+    expect(new Decimal(p.getCost(2)).toNumber()).toBeCloseTo(120, 5);
   });
 });
 

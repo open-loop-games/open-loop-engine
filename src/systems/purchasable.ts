@@ -155,8 +155,11 @@ export type ScalingPurchasableCost =
   | {
       /** Cost of the first purchase. Can be a ref/getter for scoped tuning. */
       baseCost: Computable<DecimalSource>;
-      /** Multiplicative cost increase per level (e.g., `1.15` for 15% increase) */
-      costScaling: DecimalSource;
+      /**
+       * Multiplicative cost increase per level (e.g., `1.15` for 15% increase).
+       * Can be a ref/getter for scoped tuning.
+       */
+      costScaling: Computable<DecimalSource>;
     }
   | {
       /**
@@ -471,14 +474,16 @@ function buildScalingCostRequirement(
     });
   }
 
-  // Geometric path. processGetter so tunable()/ref baseCost flows reactively
-  // into the Formula. Formula.mul accepts MaybeRef<DecimalSource> via
-  // FormulaSource, so the exponential re-evaluates when the underlying ref
-  // updates (e.g., OverrideRegistry scope push swapping a tuning knob).
+  // Geometric path. processGetter so a tunable()/ref baseCost or costScaling
+  // flows reactively into the Formula. Formula sources accept
+  // MaybeRef<DecimalSource>, so the exponential re-evaluates when either
+  // underlying ref updates (e.g., OverrideRegistry scope push swapping a
+  // tuning knob).
   const processedBaseCost = processGetter(options.baseCost);
+  const processedCostScaling = processGetter(options.costScaling);
   return createCostRequirement({
     resource: options.resource,
-    cost: Formula.exponential(scalingAmount, processedBaseCost, options.costScaling),
+    cost: Formula.exponential(scalingAmount, processedBaseCost, processedCostScaling),
     maxBulkAmount: limit ?? Decimal.dInf,
   });
 }

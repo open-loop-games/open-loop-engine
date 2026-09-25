@@ -876,6 +876,28 @@ describe('Purchasable factories — id and options shape', () => {
     expectTypeOf(p).toEqualTypeOf<Purchasable>();
   });
 
+  it('the geometric arm and ProducerPurchaseConfig take costScaling as a ref or getter', async () => {
+    const { createScalingPurchasable } = await import('@/index');
+    const resource = createResource(0, { id: 'reactive-gold', displayName: 'gold' });
+    const scaling = ref<DecimalSource>(1.15);
+    createScalingPurchasable({
+      id: 'ref-scaling',
+      description: 'test',
+      resource,
+      baseCost: 10,
+      costScaling: scaling,
+    });
+    createScalingPurchasable({
+      id: 'getter-scaling',
+      description: 'test',
+      resource,
+      baseCost: 10,
+      costScaling: () => scaling.value,
+    });
+    type Config = import('@/systems/producer-category').ProducerPurchaseConfig;
+    expectTypeOf<Config['costScaling']>().toEqualTypeOf<Computable<DecimalSource>>();
+  });
+
   it('the closure cost arm accepts a Formula factory or an opaque amount function', async () => {
     const { createScalingPurchasable } = await import('@/index');
     const { F } = await import('@/core/formulas/formulas');

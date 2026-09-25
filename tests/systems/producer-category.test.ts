@@ -815,6 +815,30 @@ describe('createProducerCategory', () => {
     const producer = category.getProducer('click')!;
     expect(producer.repeatable).toBeUndefined();
   });
+
+  it('reads a reactive costScaling into the next purchase cost', () => {
+    const { registerTick } = createTickManager();
+    const cookies = createTestResource('cookies', 1e9);
+    const scaling = ref(2);
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'reactive-scaling',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: scaling },
+      }),
+      registerTick,
+    });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 1, baseCost: 10, costScaling: 0 });
+
+    const repeatable = category.getProducer('mine')!.repeatable!;
+    repeatable.purchase(1);
+    expect(new Decimal(repeatable.getCost(1)).toNumber()).toBeCloseTo(20, 5);
+    scaling.value = 3;
+    expect(new Decimal(repeatable.getCost(1)).toNumber()).toBeCloseTo(30, 5);
+  });
 });
 
 // ============================================================================
