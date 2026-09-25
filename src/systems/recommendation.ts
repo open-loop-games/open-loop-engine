@@ -196,7 +196,7 @@ export interface RecommendationSystemOptions {
   applySnapshot: (snapshot: State) => void;
 
   /**
-   * Definitions to register at construction time.
+   * Definitions to register at construction time; a repeated `id` throws.
    * Additional defs can be added later via `.register()`.
    */
   defs?: RecommendationDef[];
@@ -235,8 +235,8 @@ export interface RecommendationSystem {
   readonly defs: readonly RecommendationDef[];
 
   /**
-   * Register an additional def at runtime.
-   * No-op if a def with the same `id` is already registered.
+   * Register an additional def at runtime. Throws if a def with the same
+   * `id` is already registered; `unregister` it first to replace it.
    */
   register(def: RecommendationDef): void;
 
@@ -398,7 +398,16 @@ export function createRecommendationSystem(
   const handle = createEmitHandle<RecommendationSystemEvents>();
 
   // --- Def registry ---
-  const registeredDefs: RecommendationDef[] = [...(initialDefs ?? [])];
+  const registeredDefs: RecommendationDef[] = [];
+  function registerDef(def: RecommendationDef): void {
+    if (registeredDefs.some((s) => s.id === def.id)) {
+      throw new Error(
+        `RecommendationSystem "${contextId}": duplicate recommendation def id "${def.id}". Unregister the existing def before registering its replacement.`,
+      );
+    }
+    registeredDefs.push(def);
+  }
+  for (const def of initialDefs ?? []) registerDef(def);
 
   // --- Deserialized view ---
   const lastRecommendation = computed<Recommendation | null>(() => {
@@ -482,10 +491,7 @@ export function createRecommendationSystem(
       return registeredDefs as readonly RecommendationDef[];
     },
 
-    register(def: RecommendationDef) {
-      if (registeredDefs.some((s) => s.id === def.id)) return;
-      registeredDefs.push(def);
-    },
+    register: registerDef,
 
     unregister(defId: string) {
       const idx = registeredDefs.findIndex((s) => s.id === defId);

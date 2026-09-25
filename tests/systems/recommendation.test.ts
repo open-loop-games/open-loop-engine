@@ -599,7 +599,7 @@ describe('createRecommendationSystem', () => {
     expect(result!.strategyId).toBe('late');
   });
 
-  it('register() is a no-op for duplicate ids', () => {
+  it('register() throws on a repeated id and keeps the first def', () => {
     const { cycle, cycleLog, bestOf } = createTestStack('reg-dup');
     const recs = createRecommendationSystem({
       id: 'rec-reg-dup',
@@ -611,8 +611,25 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'a' })],
     });
 
-    recs.register(makeStrategy({ id: 'a', score: () => 999 }));
+    expect(() => recs.register(makeStrategy({ id: 'a', score: () => 999 }))).toThrow(
+      /duplicate recommendation def id "a"/,
+    );
     expect(recs.defs).toHaveLength(1);
+  });
+
+  it('a repeated id among the initial defs throws at construction', () => {
+    const { cycle, cycleLog, bestOf } = createTestStack('reg-dup-initial');
+    expect(() =>
+      createRecommendationSystem({
+        id: 'rec-reg-dup-initial',
+        cycle,
+        cycleLog,
+        bestOf,
+        getCurrentSnapshot: () => ({}),
+        applySnapshot: () => {},
+        defs: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'a' })],
+      }),
+    ).toThrow(/duplicate recommendation def id "a"/);
   });
 
   it('unregister() removes a strategy', () => {

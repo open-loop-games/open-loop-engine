@@ -48,6 +48,17 @@ describe('AutomationTiers', () => {
     expect(at.currentTierOrder.value).toBe(1);
   });
 
+  it('a repeated tier id throws', () => {
+    expect(() =>
+      createAutomationTiers({
+        tiers: [
+          { id: 'basic', name: 'Basic', order: 0 },
+          { id: 'basic', name: 'Basic II', order: 1 },
+        ],
+      }),
+    ).toThrow(/duplicate automation tier id "basic"/);
+  });
+
   it('handles empty tiers list', () => {
     const at = createAutomationTiers({ tiers: [] });
     expect(at.tiers).toEqual([]);

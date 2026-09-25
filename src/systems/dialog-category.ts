@@ -28,7 +28,7 @@ export interface DialogCategoryOptions<Def extends { id: string }> {
   /**
    * Map a content def to one or more dialog graphs. Most NPCs have one graph
    * (their canonical conversation tree); shop / quest givers may have several
-   * keyed by entry point.
+   * keyed by entry point. A graph id already mapped by any def throws.
    */
   mapDialog: (def: Def) => DialogGraph | DialogGraph[];
 }
@@ -53,7 +53,7 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
   getDef(id: string): Def | undefined;
   getEntry(id: string): DialogCategoryEntry<Def> | undefined;
   getAll(): DialogCategoryEntry<Def>[];
-  /** Flat lookup of a graph by its `id` field across every registered entry. */
+  /** Flat lookup of a graph by its `id` field across every registered entry; graph ids are unique across the category. */
   getGraph(graphId: string): DialogGraph | undefined;
   readonly size: number;
 }
@@ -96,7 +96,19 @@ export function createDialogCategory<Def extends { id: string }>(
       id: options.id,
       buildInstance: (def) => {
         const out = options.mapDialog(def);
-        return Array.isArray(out) ? out : [out];
+        const graphs = Array.isArray(out) ? out : [out];
+        for (const [i, graph] of graphs.entries()) {
+          const prior = base.getAll().find((e) => e.instance.some((g) => g.id === graph.id));
+          const clash = graphs.slice(0, i).some((g) => g.id === graph.id)
+            ? `def "${def.id}" maps to it twice`
+            : prior && `def "${prior.def.id}" and def "${def.id}" both map to it`;
+          if (clash) {
+            throw new Error(
+              `DialogCategory "${options.id}": duplicate dialog graph id "${graph.id}" — ${clash}. Graph ids are unique across a category.`,
+            );
+          }
+        }
+        return graphs;
       },
     },
   );

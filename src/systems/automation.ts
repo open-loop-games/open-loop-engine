@@ -51,7 +51,7 @@ import { processGetter, type Computable } from '@/core/computed';
 
 /** Definition for a single automation tier. */
 export interface AutomationTierDef {
-  /** Unique tier identifier (e.g., 'manual', 'basic', 'advanced'). */
+  /** Unique tier identifier (e.g., 'manual', 'basic', 'advanced'); a repeat throws. */
   id: string;
   /** Display name for the tier. */
   name: string;
@@ -176,7 +176,15 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   const tiers = [...rawTiers].sort((a, b) => a.order - b.order);
 
-  const tierMap = new Map(tiers.map((t) => [t.id, t]));
+  const tierMap = new Map<string, AutomationTierDef>();
+  for (const tier of tiers) {
+    if (tierMap.has(tier.id)) {
+      throw new Error(
+        `AutomationTiers: duplicate automation tier id "${tier.id}". Tier ids must be unique.`,
+      );
+    }
+    tierMap.set(tier.id, tier);
+  }
 
   // Default initial unlocks: lowest-order tier
   const defaultUnlocked = initiallyUnlocked ?? (tiers.length > 0 ? [tiers[0].id] : []);

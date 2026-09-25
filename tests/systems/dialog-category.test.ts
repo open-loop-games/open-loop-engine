@@ -66,6 +66,31 @@ describe('createDialogCategory', () => {
     expect(cat.getGraph('nonexistent')).toBeUndefined();
   });
 
+  it('a graph id repeated across defs throws, naming both defs', () => {
+    const cat = createDialogCategory<NpcDef>({
+      id: 'npcs',
+      mapDialog: () => buildGraph('greeting', 'Hi.'),
+    });
+
+    cat.register({ id: 'rask', name: 'Rask' });
+    expect(() => cat.register({ id: 'kael', name: 'Kael' })).toThrow(
+      /duplicate dialog graph id "greeting".*"rask".*"kael"/,
+    );
+    expect(cat.getDef('kael')).toBeUndefined();
+    expect(cat.getGraph('greeting')?.nodes[0].text).toBe('Hi.');
+  });
+
+  it('a graph id repeated within one def throws', () => {
+    const cat = createDialogCategory<NpcDef>({
+      id: 'npcs',
+      mapDialog: () => [buildGraph('greeting', 'Hi.'), buildGraph('greeting', 'Hey.')],
+    });
+
+    expect(() => cat.register({ id: 'rask', name: 'Rask' })).toThrow(
+      /duplicate dialog graph id "greeting"/,
+    );
+  });
+
   it('exposes registry for mod patches', () => {
     const cat = createDialogCategory<NpcDef>({
       id: 'npcs',
