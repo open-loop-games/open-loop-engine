@@ -101,7 +101,7 @@ describe('createEngine', () => {
     expect(ctx.onTick).toBeTypeOf('function');
     expect(ctx.onSave).toBeTypeOf('function');
     expect(ctx.onLoad).toBeTypeOf('function');
-    expect(ctx.onReset).toBeTypeOf('function');
+    expect(ctx.onReset).toBeUndefined();
     expect(ctx.provide).toBeTypeOf('function');
     expect(ctx.inject).toBeTypeOf('function');
     expect(ctx.tryInject).toBeTypeOf('function');

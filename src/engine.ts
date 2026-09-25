@@ -70,8 +70,6 @@ export type SaveHandler = () => void;
  * `success: true`, with the save's timestamp) — not the decoded payload.
  */
 export type LoadHandler = (result: SaveLoadResult) => void;
-/** Callback invoked when the engine resets, before persistent refs are restored. */
-export type ResetHandler = () => void;
 
 // `InjectionKey<T>` lives in `./primitives/types` so the systems and harness
 // entry points can reach it without a back-edge to the root module.
@@ -112,7 +110,7 @@ export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 /**
  * Per-module collaboration surface, handed to each {@link EngineModule}'s
  * `install` and `connect` callbacks. Exposes lifecycle hooks (tick / save /
- * load / reset), engine-wide event pub/sub, and the
+ * load), engine-wide event pub/sub, and the
  * {@link provide} / {@link inject} channel modules use to share APIs.
  */
 export interface EngineContext {
@@ -122,8 +120,6 @@ export interface EngineContext {
   onSave(callback: SaveHandler): void;
   /** Register a callback invoked after a save loads, by any entry point; see {@link LoadHandler}. */
   onLoad(callback: LoadHandler): void;
-  /** Register a callback invoked on game reset */
-  onReset(callback: ResetHandler): void;
 
   /**
    * Subscribe to an engine-wide event. Returns an unsubscribe function.
@@ -405,7 +401,6 @@ export function createEngine(config: EngineConfig): Engine {
   const modules: EngineModule[] = [];
   const saveCallbacks: SaveHandler[] = [];
   const loadCallbacks: LoadHandler[] = [];
-  const resetCallbacks: ResetHandler[] = [];
   const registeredMods: ModDef[] = [...(config.mods ?? [])];
   let selectedModId: string | null = null;
 
@@ -546,7 +541,6 @@ export function createEngine(config: EngineConfig): Engine {
           onTick: (cb) => tickDriver.onTick(cb),
           onSave: (cb) => saveCallbacks.push(cb),
           onLoad: (cb) => loadCallbacks.push(cb),
-          onReset: (cb) => resetCallbacks.push(cb),
           on: (event, handler) => eventBus.on(event, handler),
           emit: (event, ...args) => eventBus.emit(event, ...args),
           provide<T>(key: InjectionKey<T>, value: T) {

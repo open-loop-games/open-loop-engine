@@ -153,7 +153,6 @@ export type {
   TickHandler,
   SaveHandler,
   LoadHandler,
-  ResetHandler,
 } from '../engine';
 export { Decimal } from '../primitives/decimal';
 export type { ResettableObject } from '../systems/resettable';
