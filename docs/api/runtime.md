@@ -8,7 +8,7 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 - `EngineModule` / `EngineContext` — install/connect game content and share engine services.
 - `createTickDriver` — standalone tick scheduler when not using the full engine facade.
 - `createEmitHandle` — typed per-instance events for systems and categories.
-- `timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
+- `timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
 - `ref` / `computed` / `watch` / `effect` (re-exported from Vue) — reactivity API; import via the engine, not directly from `vue`, so subscriptions share the engine's `activeEffect` scope.
 
 ## Engine assembly

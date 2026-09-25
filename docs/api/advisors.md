@@ -27,9 +27,9 @@ score-and-pick over a candidate list
 - `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:95`
 - `interface HybridPaybackOptions<T>` — Options for selectionHybridPayback. `src/core/policy.ts:61`
 - `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:119`
-- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:249`
-- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:197`
-- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the shortest payback period (smallest beat). `src/core/policy.ts:149`
+- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:255`
+- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:203`
+- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:153`
 - `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:46`
 
 ## Recommendation
@@ -37,19 +37,19 @@ score-and-pick over a candidate list
 inter-cycle arbitration across registered defs
 
 - `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:30`
-- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:99`
-- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:184`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:358`
+- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:103`
+- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:191`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:370`
 - `interface GoalDefOptions` `src/systems/recommendation-strategies.ts:41`
-- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:118`
+- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:127`
 - `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:52`
 - `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:97`
 - `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:66`
 - `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:73`
 - `interface RecommendationResult` — The output of a def's `recommend()` method. `src/systems/recommendation.ts:83`
-- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:211`
-- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:145`
-- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:155`
+- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:220`
+- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:154`
+- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:164`
 
 ## Rule advisor
 
@@ -57,10 +57,10 @@ intra-session profile-history aggregator with ranked suggestions
 
 - `type AdvisorAggregatorFn<TEntry, TProfile, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TProfile` — Aggregator function — the windowed-history substrate, generic over the consumer's entry, profile, and parallel-context shapes. `src/systems/rule-advisor.ts:89`
 - `type AdvisorAnalyzerFn<TProfile, TPayload, TContext = undefined> = (profile: TProfile, context: TContext) => readonly Suggestion<TPayload>[]` — Analyzer function — domain-specific heuristic that consumes the aggregate plus the parallel `context` value and returns zero or more suggestions. `src/systems/rule-advisor.ts:102`
-- `function createRuleAdvisor<TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create an intra-session advisor that aggregates history into a profile, runs analyzers over the profile and a parallel context value, and surfaces a ranked + dismissable suggestion list. `src/systems/rule-advisor.ts:328`
-- `function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:336`
+- `function createRuleAdvisor<TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create an intra-session advisor that aggregates history into a profile, runs analyzers over the profile and a parallel context value, and surfaces a ranked + dismissable suggestion list. `src/systems/rule-advisor.ts:335`
+- `function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:343`
 - `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (canonical case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:73`
-- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:207`
+- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:209`
 - `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:190`
 - `interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined>` — Configuration for createRuleAdvisor. `src/systems/rule-advisor.ts:126`
 - `interface Suggestion<TPayload = unknown>` — One advisory output. `src/systems/rule-advisor.ts:46`
