@@ -31,13 +31,13 @@ function testEngine(gameId: string, overrides: Partial<EngineConfig> = {}) {
 }
 
 describe('defaultAnalyzerPack', () => {
-  it('builds one resource-peak tracker per resource registered on the engine', () => {
+  it('builds one resource-peak tracker per resource registered on the engine, keyed by id', () => {
     const engine = testEngine('pack-resources');
     engine.use(
-      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
+      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'Coins' })),
     );
     engine.use(
-      resourceModule('gems-mod', () => createResource(0, { id: 'gems', displayName: 'gems' })),
+      resourceModule('gems-mod', () => createResource(0, { id: 'gems', displayName: 'Coins' })),
     );
     engine.start();
 

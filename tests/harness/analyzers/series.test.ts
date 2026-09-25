@@ -31,9 +31,11 @@ describe('createSeriesTracker', () => {
     expect(Object.keys(metrics)).toHaveLength(5);
   });
 
-  it('analyzer name is namespaced by displayName', () => {
-    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-    expect(createSeriesTracker(gold).name).toBe('series:gold');
+  it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
+    const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
+    const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
+    expect(createSeriesTracker(prestige).name).toBe('series:prestige-points');
+    expect(createSeriesTracker(transcend).name).toBe('series:transcend-points');
   });
 
   it('zero-tick run reports a single-point series', () => {

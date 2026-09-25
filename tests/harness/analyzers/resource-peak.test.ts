@@ -30,12 +30,11 @@ describe('createResourcePeakTracker', () => {
     expect(metrics.avg).toBeCloseTo(2.5, 10);
   });
 
-  it('analyzer name is namespaced by displayName to prevent key collision', () => {
-    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-    const gems = createResource(0, { id: 'gems', displayName: 'gems' });
-
-    expect(createResourcePeakTracker(gold).name).toBe('resource-peak:gold');
-    expect(createResourcePeakTracker(gems).name).toBe('resource-peak:gems');
+  it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
+    const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
+    const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
+    expect(createResourcePeakTracker(prestige).name).toBe('resource-peak:prestige-points');
+    expect(createResourcePeakTracker(transcend).name).toBe('resource-peak:transcend-points');
   });
 
   it('zero-tick run reports the start-of-run value for all three metrics', () => {

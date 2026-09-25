@@ -5,12 +5,12 @@
  *
  * The runtime contract is the metric-key naming under the harness's
  * `${analyzerName}.${metricKey}` aggregation scheme:
- * `resource-peak:{displayName}.peak`, `.final`, `.avg`.
+ * `resource-peak:{id}.peak`, `.final`, `.avg`. Keys use {@link Resource.id},
+ * unique per engine, so two resources sharing a display name never merge;
+ * label a key via `ResourceRegistry.findById(id).displayName`.
  *
- * Resources are not addressable by stable ID at the engine level — `Resource`
- * is a `Ref<Decimal>` carrying a `displayName`. The tracker closure-captures
- * the ref directly so it can read `.value` on every tick without a per-tick
- * registry lookup. Discovery happens one level up in {@link defaultAnalyzerPack},
+ * The tracker closure-captures the ref directly so it can read `.value` on
+ * every tick without a per-tick registry lookup. Discovery happens one level up in {@link defaultAnalyzerPack},
  * which walks the engine's resource registry (via `ResourceRegistryKey`)
  * and constructs one tracker per entry.
  *
@@ -33,7 +33,7 @@ import { Decimal } from '@/primitives/decimal';
  * Metrics reported by a single {@link createResourcePeakTracker} instance.
  *
  * @internal Engine-internal shape. Consumers read these via the metric-key
- * naming (`resource-peak:{displayName}.peak/.final/.avg`) rather than by
+ * naming (`resource-peak:{id}.peak/.final/.avg`) rather than by
  * importing this type.
  */
 export interface ResourcePeakMetrics {
@@ -53,7 +53,7 @@ export interface ResourcePeakMetrics {
  * Create an {@link Analyzer} that samples a single resource every tick and
  * emits `{ peak, final, avg }` at the end of the run.
  *
- * The analyzer's `name` is `resource-peak:{displayName}` so multiple peak
+ * The analyzer's `name` is `resource-peak:{id}` so multiple peak
  * trackers coexist in a single run without metric-key collisions under the
  * harness's `${analyzerName}.${metricKey}` aggregation scheme.
  *
@@ -66,7 +66,7 @@ export interface ResourcePeakMetrics {
  * ```
  */
 export function createResourcePeakTracker(resource: Resource): Analyzer {
-  const name = `resource-peak:${resource.displayName}`;
+  const name = `resource-peak:${resource.id}`;
   const samples: number[] = [];
   let peak = -Infinity;
 

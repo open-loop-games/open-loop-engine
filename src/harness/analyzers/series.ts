@@ -1,7 +1,8 @@
 /**
  * Per-tick series tracker — samples a single resource every tick and emits
- * one scalar metric per tick (`series:{displayName}.t{i}`) instead of a
- * reduced peak/final/avg trio.
+ * one scalar metric per tick (`series:{id}.t{i}`) instead of a reduced
+ * peak/final/avg trio. Keys use {@link Resource.id}, unique per engine, so
+ * two resources sharing a display name never merge.
  *
  * The design leans on the harness aggregator rather than adding a new
  * Decimal-array metric type. {@link AnalyzerResult.metrics} is scalar-only,
@@ -30,9 +31,9 @@ import { Decimal } from '@/primitives/decimal';
 
 /**
  * Create an {@link Analyzer} that records a single resource's value at every
- * tick and emits it as `series:{displayName}.t{i}` (zero-based tick index).
+ * tick and emits it as `series:{id}.t{i}` (zero-based tick index).
  *
- * The analyzer's `name` is `series:{displayName}` so multiple series trackers
+ * The analyzer's `name` is `series:{id}` so multiple series trackers
  * coexist in one run without metric-key collisions under the harness's
  * `${analyzerName}.${metricKey}` aggregation scheme.
  *
@@ -45,7 +46,7 @@ import { Decimal } from '@/primitives/decimal';
  * ```
  */
 export function createSeriesTracker(resource: Resource): Analyzer {
-  const name = `series:${resource.displayName}`;
+  const name = `series:${resource.id}`;
   const samples: number[] = [];
 
   function sample(): void {
