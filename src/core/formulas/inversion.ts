@@ -45,8 +45,9 @@ export type InversionFailureReason =
   | 'not-invertible'
   /**
    * The chain has an inverse path, but no pre-image was found for *this* target
-   * — no closed form applies and the numeric search couldn't bracket it either.
-   * Target-dependent, so `isInvertible()` can be optimistic here: `tetrate` at
+   * — no closed form applies and the numeric search couldn't bracket it either,
+   * or the algebra answered a non-number (a target below an exponential's
+   * infimum takes `ln` of a non-positive value). Target-dependent, so `isInvertible()` can be optimistic here: `tetrate` at
    * height 0 binds an inverse and is still constant in its base.
    */
   | 'no-solution';

@@ -1016,6 +1016,6 @@ export function createPassthroughBinaryFormula(
     new Formula({
       inputs: [value, other],
       evaluate: operation,
-      invert: passthrough as InvertFunction<[FormulaSource, FormulaSource]>,
+      invert: invertPassthrough as InvertFunction<[FormulaSource, FormulaSource]>,
     });
 }

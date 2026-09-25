@@ -543,7 +543,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * ```ts
    * const xpToLevel = Formula.variable(xp).div(50).sqrt().floor();
    * xpToLevel.tryInvert(3);    // { value: 450, reason: 'exact' }
-   * xpToLevel.tryInvert(3.5);  // { value: 450, reason: 'outside-image', evaluatesTo: 3 }
+   * xpToLevel.tryInvert(3.5);  // { value: 612.5, reason: 'outside-image', evaluatesTo: 3 }
    * ```
    */
   tryInvert(value: DecimalSource, tolerance?: number): Inversion {
@@ -608,6 +608,9 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   ): Inversion {
     const { value: candidate, failure } = captureInversionFailures(() => run(value));
     if (failure !== null) return { value: null, reason: failure };
+    // Below a curve's infimum the algebra answers NaN (`ln` of a non-positive
+    // target), and `outside-image` promises a value the caller can use as-is.
+    if (!Decimal.isFinite(candidate)) return { value: null, reason: 'no-solution' };
     const forward = viaIntegral ? this.evaluateIntegral(candidate) : this.evaluate(candidate);
     const tol = tolerance ?? inversionTolerance(value);
     if (landsOnTarget(forward, value, tol)) return { value: candidate, reason: 'exact' };
@@ -1249,9 +1252,11 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   // === PASSTHROUGH BINARY OPS ===
 
   // Saturating floor/ceiling on a curve — `x.max(lo).min(hi)` is the clamp.
-  // Both invert by passthrough, which answers for a target the curve can never
-  // produce; `tryInvert` grades that as `outside-image` and `firstPassage`
-  // reports `no-crossing`, so the permissiveness is visible rather than silent.
+  // Both invert as the identity through the op, into the variable-bearing
+  // input, which also answers for a target past the bound that the curve can
+  // never produce; `tryInvert` grades that as `outside-image` and
+  // `firstPassage` reports `no-crossing`, so the permissiveness is visible
+  // rather than silent.
   public static max = ops.createPassthroughBinaryFormula(Decimal.max);
   public static min = ops.createPassthroughBinaryFormula(Decimal.min);
 
@@ -1326,22 +1331,22 @@ registerOps(binaryOps, 'binary');
 /**
  * Debug helper: find the operation that breaks invertibility in a formula chain.
  *
- * Walk the formula tree and return the first node that has an evaluate function
- * but no invert function. Returns `null` if the entire chain is invertible.
+ * Follows the variable down the chain and returns the deepest op that binds no
+ * inverse — every op above it reports non-invertible too, but only because it
+ * sits over this one. Returns `null` if the entire chain is invertible.
  *
  * @param formula - The formula to inspect
  * @returns The non-invertible node, or `null` if fully invertible
  */
 export function findNonInvertible(formula: GenericFormula): GenericFormula | null {
-  if ((formula as any).internalInvert == null && (formula as any).internalEvaluate != null) {
-    return formula;
-  }
   for (const input of formula.inputs) {
     if (hasVariable(input)) {
-      return findNonInvertible(input);
+      const below = findNonInvertible(input);
+      if (below != null) return below;
+      break;
     }
   }
-  return null;
+  return formula.isInvertible() ? null : formula;
 }
 
 /**

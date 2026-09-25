@@ -2,6 +2,7 @@
 import Formula, {
   calculateCost,
   calculateMaxAffordable,
+  findNonInvertible,
   unrefFormulaSource,
 } from '@/core/formulas/formulas';
 import type {
@@ -470,6 +471,26 @@ describe('Inverting', () => {
   describe('Inverting pass-throughs', () => {
     test('max', () => expect(Formula.max(variable, constant).invert(10)).compare_tolerance(10));
     test('min', () => expect(Formula.min(variable, constant).invert(10)).compare_tolerance(10));
+  });
+
+  test('A target below the curve reports no-solution rather than a NaN pre-image', () => {
+    // `ln` of a non-positive target is undefined, so the algebra has nothing to
+    // hand back — and `outside-image` promises a value a progress bar can use.
+    const cost = Formula.exponential(0, 10, 1.15);
+    for (const target of [0, -5]) {
+      const result = cost.tryInvert(target);
+      expect(result.reason, `target ${target}`).toBe('no-solution');
+      expect(result.value, `target ${target}`).toBeNull();
+      const integral = cost.tryInvertIntegral(target);
+      expect(integral.reason, `integral target ${target}`).toBe('no-solution');
+    }
+  });
+
+  test('findNonInvertible points at the op that breaks the chain', () => {
+    const abs = Formula.variable(0).abs();
+    const formula = abs.mul(3).add(1);
+    expect(findNonInvertible(formula)).toBe(abs);
+    expect(findNonInvertible(Formula.variable(0).mul(3).add(1))).toBeNull();
   });
 
   test('Inverting nested formulas', () => {

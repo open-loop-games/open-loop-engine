@@ -337,6 +337,47 @@ describe('round-trip: invert(evaluate(x)) === x', () => {
   });
 });
 
+describe('round-trip through a clamp: min / max over a composed chain', () => {
+  // A bound is the identity wherever it isn't saturating, so on that side the
+  // clamp must invert as the chain beneath it does. The bare variable is the one
+  // shape where "hand the target back" and "invert the chain" agree, which is
+  // why a law swept only over it cannot tell the two apart.
+  const CHAINS: [string, (x: GenericFormula) => GenericFormula, string[]][] = [
+    ['2x', (x) => x.mul(2), ['10', '137.5', '1e3']],
+    ['10·1.15ˣ', (x) => x.pow_base(1.15).mul(10), ['20', '32.95', '100']],
+    ['x² + 3', (x) => x.pow(2).add(3), ['5', '10', '1e3']],
+  ];
+  // Every sample evaluates above the floor and below the ceiling.
+  const FLOOR = '5';
+  const CEILING = '1e300';
+
+  for (const [label, chain, samples] of CHAINS) {
+    test(`${label} — both bounds, both orientations`, () => {
+      const clamps: ((x: GenericFormula) => GenericFormula)[] = [
+        (x) => chain(x).max(FLOOR),
+        (x) => F.max(FLOOR, chain(x)),
+        (x) => chain(x).min(CEILING),
+        (x) => F.min(CEILING, chain(x)),
+      ];
+      for (const build of clamps) {
+        for (const x of samples) {
+          expectRoundTrip(build(F.variable(x)), x, DEFAULT_TOL);
+        }
+      }
+    });
+  }
+
+  test('the saturated side still answers through the chain, and grades outside-image', () => {
+    // Below the floor nothing maps to the target; the chain's own pre-image is
+    // the algebra's answer, and `tryInvert` says it lands on the floor instead.
+    const clamped = F.variable(0).mul(2).max(FLOOR);
+    const { value, errors } = withoutEngineErrors(() => clamped.tryInvert('3'));
+    expect(errors).toEqual([]);
+    expect(value.reason).toBe('outside-image');
+    expect(Decimal.lte(relativeError(value.value!, '1.5'), DEFAULT_TOL)).toBe(true);
+  });
+});
+
 describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
   // The direction `calculateMaxAffordable` actually calls, and the one link the
   // chain skipped: the op round-trip above covers `invert`, and the oracle below
