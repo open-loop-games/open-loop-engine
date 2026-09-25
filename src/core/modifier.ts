@@ -103,7 +103,6 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
     apply: (gain: DecimalSource) => Decimal.add(gain, unref(processedAddend)),
     invert: (gain: DecimalSource) => Decimal.sub(gain, unref(processedAddend)),
     enabled: processedEnabled,
-    currentValue: computed(() => new Decimal(unref(processedAddend))),
     description:
       description == null
         ? undefined
@@ -116,7 +115,7 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
               isBad: smallerIsBetter ? isPositive : Decimal.lt(value, 0),
             };
           },
-  } as unknown as OperationModifier<T>;
+  } as OperationModifier<T>;
 }
 
 // === MULTIPLICATIVE MODIFIER ===
@@ -176,7 +175,6 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
     apply: (gain: DecimalSource) => Decimal.times(gain, unref(processedMultiplier)),
     invert: (gain: DecimalSource) => Decimal.div(gain, unref(processedMultiplier)),
     enabled: processedEnabled,
-    currentValue: computed(() => new Decimal(unref(processedMultiplier))),
     description:
       description == null
         ? undefined
@@ -188,7 +186,7 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
-  } as unknown as OperationModifier<T>;
+  } as OperationModifier<T>;
 }
 
 // === EXPONENTIAL MODIFIER ===
@@ -267,7 +265,6 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
       return toFinalDecimal(result);
     },
     enabled: processedEnabled,
-    currentValue: computed(() => new Decimal(unref(processedExponent))),
     description:
       description == null
         ? undefined
@@ -280,7 +277,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
-  } as unknown as OperationModifier<T>;
+  } as OperationModifier<T>;
 }
 
 // === SEQUENTIAL MODIFIER ===

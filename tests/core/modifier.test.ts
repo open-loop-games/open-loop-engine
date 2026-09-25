@@ -49,30 +49,6 @@ describe('Modifier system', () => {
     expect(new Decimal(result).eq(100)).toBe(true);
   });
 
-  describe('currentValue', () => {
-    it('additive modifier exposes current addend', () => {
-      const addend = ref(bn(10));
-      const mod = createAdditiveModifier({ addend });
-      expect(mod.currentValue.value.eq(10)).toBe(true);
-      addend.value = bn(25);
-      expect(mod.currentValue.value.eq(25)).toBe(true);
-    });
-    it('multiplicative modifier exposes current multiplier', () => {
-      const multiplier = ref(bn(3));
-      const mod = createMultiplicativeModifier({ multiplier });
-      expect(mod.currentValue.value.eq(3)).toBe(true);
-      multiplier.value = bn(5);
-      expect(mod.currentValue.value.eq(5)).toBe(true);
-    });
-    it('exponential modifier exposes current exponent', () => {
-      const exponent = ref(bn(2));
-      const mod = createExponentialModifier({ exponent });
-      expect(mod.currentValue.value.eq(2)).toBe(true);
-      exponent.value = bn(0.5);
-      expect(mod.currentValue.value.eq(0.5)).toBe(true);
-    });
-  });
-
   describe('children', () => {
     it('sequential modifier exposes children array', () => {
       const add = createAdditiveModifier({ addend: bn(10) });
@@ -89,14 +65,6 @@ describe('Modifier system', () => {
       expect(seq.children[0].enabled).toBe(enabled);
       enabled.value = false;
       expect(seq.children[0].enabled!.value).toBe(false);
-    });
-    it('children currentValue is readable for inspection', () => {
-      const add = createAdditiveModifier({ addend: bn(7) });
-      const mul = createMultiplicativeModifier({ multiplier: bn(3) });
-      const seq = createSequentialModifier([add, mul]);
-      const [child0, child1] = seq.children;
-      expect((child0 as any).currentValue.value.eq(7)).toBe(true);
-      expect((child1 as any).currentValue.value.eq(3)).toBe(true);
     });
   });
 });
