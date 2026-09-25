@@ -451,6 +451,31 @@ class LoadFailure extends Error {
 }
 
 /**
+ * Parse raw save text into an envelope, rejecting anything without a finite
+ * numeric `version` and an object- or string-typed `data`. Throws
+ * `LoadFailure('parse-error')` whose detail is the underlying error.
+ */
+function parseEnvelope(raw: string): SaveEnvelope {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new LoadFailure('parse-error', err);
+  }
+  const e = parsed as Partial<SaveEnvelope> | null;
+  const dataOk = typeof e?.data === 'string' || (typeof e?.data === 'object' && e.data !== null);
+  if (typeof e !== 'object' || e === null || !Number.isFinite(e.version) || !dataOk) {
+    throw new LoadFailure('parse-error', new Error('not a save envelope'));
+  }
+  return e as SaveEnvelope;
+}
+
+/** The `detail` a failed {@link parseEnvelope} reports. */
+function parseFailureDetail(err: unknown): unknown {
+  return err instanceof LoadFailure ? err.detail : err;
+}
+
+/**
  * Create a save manager — orchestrates serialization, slot management,
  * migrations, and validation around the persistent-ref tree. Wired into the
  * engine automatically unless {@link EngineConfig.persistence} is `false`;
@@ -521,7 +546,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     const raw = storage.getItem(slotsKey);
     if (raw) {
       try {
-        return JSON.parse(raw) as SaveSlot[];
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed as SaveSlot[];
       } catch {
         // Corrupted index — fall through to default
       }
@@ -685,7 +711,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     const raw = storage.getItem(key);
     if (!raw) return null;
     try {
-      const e = JSON.parse(raw) as SaveEnvelope;
+      const e = parseEnvelope(raw);
       if (e.gameId !== gameId) return null;
       return {
         timestamp: e.timestamp,
@@ -736,9 +762,9 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       };
       let e: SaveEnvelope;
       try {
-        e = JSON.parse(raw) as SaveEnvelope;
-      } catch (detail) {
-        return fail('parse-error', detail);
+        e = parseEnvelope(raw);
+      } catch (err) {
+        return fail('parse-error', parseFailureDetail(err));
       }
       if (e.gameId !== gameId) return fail('wrong-game-id');
       try {
@@ -759,9 +785,13 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       const slotId = _activeSlotId;
       let e: SaveEnvelope;
       try {
-        e = JSON.parse(data) as SaveEnvelope;
-      } catch (detail) {
-        handle.emit('save:load-failed', { slotId, reason: 'parse-error', detail });
+        e = parseEnvelope(data);
+      } catch (err) {
+        handle.emit('save:load-failed', {
+          slotId,
+          reason: 'parse-error',
+          detail: parseFailureDetail(err),
+        });
         return { success: false };
       }
       if (e.gameId !== gameId) {
@@ -907,10 +937,14 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     importSlot(data: string, slotId?: number): SaveLoadResult & { slotId?: number } {
       let envelope: SaveEnvelope;
       try {
-        envelope = JSON.parse(data) as SaveEnvelope;
-      } catch (detail) {
+        envelope = parseEnvelope(data);
+      } catch (err) {
         const targetId = slotId ?? _activeSlotId;
-        handle.emit('save:load-failed', { slotId: targetId, reason: 'parse-error', detail });
+        handle.emit('save:load-failed', {
+          slotId: targetId,
+          reason: 'parse-error',
+          detail: parseFailureDetail(err),
+        });
         return { success: false };
       }
       if (envelope.gameId !== gameId) {

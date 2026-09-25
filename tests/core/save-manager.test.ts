@@ -1324,6 +1324,43 @@ describe('SaveManager — events', () => {
   });
 });
 
+describe('SaveManager — envelope shape at the boundary', () => {
+  it.each([
+    ['null', 'null'],
+    ['no version or data', '{"gameId":"shape"}'],
+    ['null data', '{"gameId":"shape","version":1,"timestamp":1,"data":null}'],
+    ['non-numeric version', '{"gameId":"shape","version":"1","timestamp":1,"data":{}}'],
+  ])('importSave refuses %s as a parse error and leaves state alone', (_label, raw) => {
+    const mgr = createSaveManager({ gameId: 'shape', storageAdapter: createMapStorage() });
+    beginPersistentContext(`shape-ctx-${_label}`);
+    const x = persistent(0, { name: 'x' });
+    endPersistentContext();
+    x.value = 4;
+    const failed = vi.fn();
+    mgr.on('save:load-failed', failed);
+
+    expect(mgr.importSave(raw).success).toBe(false);
+    expect(failed.mock.calls[0][0].reason).toBe('parse-error');
+    expect(x.value).toBe(4);
+  });
+
+  it('load and importSlot refuse a stored or given `null`', () => {
+    const storage = createMapStorage();
+    storage.setItem('shape-null-slot-0', 'null');
+    const mgr = createSaveManager({ gameId: 'shape-null', storageAdapter: storage });
+    expect(mgr.load().success).toBe(false);
+    expect(mgr.importSlot('null').success).toBe(false);
+    expect(mgr.peek()).toBeNull();
+  });
+
+  it('treats a slot index that is not an array as corrupt', () => {
+    const storage = createMapStorage();
+    storage.setItem('shape-idx-slots', '{}');
+    const mgr = createSaveManager({ gameId: 'shape-idx', storageAdapter: storage });
+    expect(mgr.slots).toEqual([{ id: 0, name: 'Autosave' }]);
+  });
+});
+
 describe('SaveManager — failed-load slot protection', () => {
   function futureSlot(gameId: string, storage: ReturnType<typeof createMapStorage>): string {
     const raw = JSON.stringify({ version: 2, gameId, timestamp: 1, data: { x: { n: 5 } } });
