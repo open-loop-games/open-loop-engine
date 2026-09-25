@@ -53,7 +53,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | constrained loadout / persistent selection slot | content-systems.md#slot |
 | automation unlock ladder | content-systems.md#automation-tiers |
 | modifier bonus stacking on a chain | mechanics.md#modifier |
-| inversion-driven cost preview / "max-affordable" | mechanics.md#formulas |
+| "buy max" count / bulk cost preview | mechanics.md#formulas |
 | declarative gate (data-driven condition) | mechanics.md#gate |
 | new content category (skill, purchasable, producer, …) | composition.md#category-base |
 | dialog tree with branching | content-narrative.md#dialog |
@@ -105,7 +105,7 @@ Cross-cutting shapes rather than symbol names — "where do I read about X?" whe
 - **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects
 - **phase-scoped mechanic set** — one `PersistentEffectSystem` def carries N chain bindings behind one predicate, so a chapter's mechanics freeze and thaw together; the predicate may be one-way, and re-evaluates on load with no `restore()`. This is the batch verb for *gating*, the counterpart to `resetModules` for *wiping*. Per-def `visibility` stays one line per def → mechanics.md#effects, lifecycle.md#reset
 - **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide-choosing.md#choosing-among-purchasable-primitives
-- **inversion-driven affordability** — `calculateMaxAffordable`, `InvertibleFormula` → mechanics.md#formulas
+- **buy-max affordability** — `calculateMaxAffordable` counts the levels a balance covers, `calculateCost` prices them; any cost curve, an inverse only seeds the count → mechanics.md#formulas
 - **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel-classification
 - **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content
 - **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content

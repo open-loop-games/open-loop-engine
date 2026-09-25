@@ -652,7 +652,7 @@ describe('Formula series contract', () => {
   });
 
   it('prices and counts through the same two-boolean surface, with no operation knob', async () => {
-    const { calculateCost, calculateMaxAffordable } = await import('@/core/formulas/formulas');
+    const { calculateCost, calculateMaxAffordable } = await import('@/core/formulas/affordability');
     // `directSum` used to sit here selecting *which operation* the caller got —
     // integral below the threshold, series above it. Its absence is the fix.
     const { F } = await import('@/core/formulas/formulas');

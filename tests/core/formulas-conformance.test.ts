@@ -24,7 +24,8 @@
  *    agrees to 1e-9 can sit a long way off in input space.
  */
 
-import Formula, { F, calculateCost, calculateMaxAffordable } from '@/core/formulas/formulas';
+import Formula, { F } from '@/core/formulas/formulas';
+import { calculateCost, calculateMaxAffordable } from '@/core/formulas/affordability';
 import { inversionTolerance, representationFloor } from '@/core/formulas/inversion';
 import { createResource } from '@/core/resource';
 import { findCrossing } from '@/core/formulas/root-find';

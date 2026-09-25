@@ -21,7 +21,8 @@
 
 import { ref } from 'vue';
 import Decimal, { bn, type DecimalSource } from '@/primitives/decimal';
-import { F as Formula, calculateMaxAffordable } from '@/core/formulas/formulas';
+import { F as Formula } from '@/core/formulas/formulas';
+import { calculateMaxAffordable } from '@/core/formulas/affordability';
 import { createResource } from '@/core/resource';
 import {
   createModifierChain,

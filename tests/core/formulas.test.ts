@@ -1,10 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import Formula, {
-  calculateCost,
-  calculateMaxAffordable,
-  findNonInvertible,
-  unrefFormulaSource,
-} from '@/core/formulas/formulas';
+import Formula, { findNonInvertible, unrefFormulaSource } from '@/core/formulas/formulas';
+import { calculateCost, calculateMaxAffordable } from '@/core/formulas/affordability';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
