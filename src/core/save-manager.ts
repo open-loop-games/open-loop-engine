@@ -438,8 +438,7 @@ function migrateIndexToNamed(
       const ref = contextRefs[i];
       const oldVal = (bucket as Record<string, unknown>)[String(i)];
       if (oldVal === undefined) continue;
-      const name = ref[PersistentName];
-      const newKey = name ?? ref[SaveDataPath]![1];
+      const newKey = ref[PersistentName] ?? ref[SaveDataPath]![1];
       if (!looseTypeMatch(ref[DefaultValue], oldVal)) {
         console.warn(
           `[save] Legacy key migration type mismatch at "${contextId}.${i}" → "${contextId}.${newKey}": ` +
@@ -447,8 +446,7 @@ function migrateIndexToNamed(
         );
         continue;
       }
-      if (name === undefined) remapped[newKey] = oldVal;
-      else setNested(remapped, name, oldVal);
+      setNested(remapped, newKey, oldVal);
     }
     out[contextId] = remapped;
   }
