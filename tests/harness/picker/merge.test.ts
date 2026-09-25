@@ -11,6 +11,7 @@ import {
 } from '@/index';
 import { createPickerSnapshot } from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
+import { startEngine } from '../helpers';
 
 describe('createPickerSnapshot', () => {
   it('runs both walkers and returns a grouped snapshot', () => {
@@ -147,13 +148,7 @@ describe('createPickerSnapshot', () => {
         temp.apply('focus');
       },
     };
-    const engine = createEngine({
-      gameId: 'pk-owned',
-      persistence: false,
-      persistenceNamespace: `pk-owned-${Math.random().toString(36).slice(2)}`,
-    });
-    engine.use(mod);
-    engine.start();
+    const engine = startEngine('pk-owned', mod);
 
     const labels = () => createPickerSnapshot(engine).all.map((e) => e.label);
     expect(damage.modifiers).toHaveLength(2);

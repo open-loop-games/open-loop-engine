@@ -9,6 +9,7 @@ import {
   type EngineModule,
 } from '@/index';
 import { walkContent } from '@/harness/picker';
+import { startEngine } from '../helpers';
 
 describe('walkContent', () => {
   it('emits one entry per binding across temporary + persistent systems', () => {
@@ -137,13 +138,7 @@ describe('walkContent', () => {
         });
       },
     };
-    const engine = createEngine({
-      gameId: 'wco-5',
-      persistence: false,
-      persistenceNamespace: `wco-5-${Math.random().toString(36).slice(2)}`,
-    });
-    engine.use(mod);
-    engine.start();
+    const engine = startEngine('wco-5', mod);
 
     expect(walkContent(engine)[0].indexInChain).toBe(-1);
     built.value = true;
@@ -180,13 +175,7 @@ describe('walkContent — grant chain arrays', () => {
         });
       },
     };
-    const engine = createEngine({
-      gameId: 'wco-grants',
-      persistence: false,
-      persistenceNamespace: `wco-grants-${Math.random().toString(36).slice(2)}`,
-    });
-    engine.use(mod);
-    engine.start();
+    const engine = startEngine('wco-grants', mod);
 
     const entries = walkContent(engine);
     expect(entries.map((e) => [e.label, e.chain.id])).toEqual([

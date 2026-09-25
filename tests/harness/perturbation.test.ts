@@ -12,7 +12,6 @@ import {
   Decimal,
   TuningRegistriesKey,
   tunable,
-  type Engine,
   type EngineModule,
 } from '@/index';
 import {
@@ -22,20 +21,10 @@ import {
   walkTunables,
 } from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
+import { startEngine } from './helpers';
 
 function num(v: unknown): number {
   return Decimal.fromValue(v as Decimal).toNumber();
-}
-
-function startEngine(gameId: string, mod: EngineModule): Engine {
-  const engine = createEngine({
-    gameId,
-    persistence: false,
-    persistenceNamespace: `${gameId}-${Math.random().toString(36).slice(2)}`,
-  });
-  engine.use(mod);
-  engine.start();
-  return engine;
 }
 
 /** `dmg` = [flat +5, mult ×2], each bound by a persistent effect gated on its own flag. */
