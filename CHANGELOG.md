@@ -2,6 +2,23 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.1.4 (2026-09-25)
+
+### Features
+
+* **systems:** costScaling accepts a ref or getter (a75f3b6)
+* **systems:** auto-purchase keys by id, sweeps a category lazily (939aa25)
+* predict cumulative-gte from the gross inflow rate (c704754)
+
+### Fixes
+
+* **core:** hybrid payback ranks cold-start candidates by payback (4b2fafa)
+* every stateful system resets through [Resettable] (5df9278)
+* **harness:** a sensitivity cell disposes its last engine (f154183)
+* **core:** grid coordinates are integers (4bedf4f)
+* **systems:** cumulative-gte evaluates without an accessor (f6fdbda)
+* **core:** a min over flip distances skips children that never flip (5d07aac)
+
 ## 0.1.3 (2026-09-25)
 
 ### Features
