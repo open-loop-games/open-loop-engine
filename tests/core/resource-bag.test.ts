@@ -78,6 +78,19 @@ describe('ResourceBag', () => {
       expect(bag.get('wood').eq(-15)).toBe(true);
     });
 
+    it('add with a negative amount is a no-op returning zero', () => {
+      const bag = createResourceBag({ initial: { wood: 5 } });
+      expect(bag.add('wood', -10).toNumber()).toBe(0);
+      expect(bag.get('wood').toNumber()).toBe(5);
+    });
+
+    it('subtract with a negative amount is a no-op, so it cannot bypass capacity', () => {
+      const bag = createResourceBag({ capacity: 10, initial: { wood: 5 } });
+      expect(bag.subtract('wood', -100).toNumber()).toBe(0);
+      expect(bag.subtract('wood', -100, true).toNumber()).toBe(0);
+      expect(bag.get('wood').toNumber()).toBe(5);
+    });
+
     it('total sums all types', () => {
       const bag = createResourceBag({ initial: { wood: 10, iron: 5, gold: 3 } });
       expect(bag.total().eq(18)).toBe(true);

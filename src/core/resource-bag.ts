@@ -74,12 +74,14 @@ export interface ResourceBag {
   set(typeId: string, amount: DecimalSource): void;
   /**
    * Add to a type. Returns the amount actually added.
-   * Returns zero when overflow is 'block' and the add would exceed capacity.
+   * Returns zero when overflow is 'block' and the add would exceed capacity,
+   * and for a non-positive amount, which is a no-op.
    */
   add(typeId: string, amount: DecimalSource): Decimal;
   /**
    * Subtract from a type. Returns the amount actually subtracted.
    * Pass `allowNegative: true` to allow the balance to go below zero.
+   * A non-positive amount is a no-op and returns zero.
    */
   subtract(typeId: string, amount: DecimalSource, allowNegative?: boolean): Decimal;
   /** Return true if the bag holds at least `amount` of the given type. */
@@ -262,6 +264,8 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
     add(typeId: string, amount: DecimalSource): Decimal {
       const toAdd = toDecimal(amount);
+      // `!gt(0)` also turns NaN away.
+      if (!toAdd.gt(0)) return Decimal.dZero;
       const remaining = computeRemainingForType(typeId);
 
       if (overflow === 'block') {
@@ -281,6 +285,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
     subtract(typeId: string, amount: DecimalSource, allowNegative = false): Decimal {
       const toSub = toDecimal(amount);
+      if (!toSub.gt(0)) return Decimal.dZero;
       const current = getAmount(typeId);
 
       if (allowNegative) {
