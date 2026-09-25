@@ -36,10 +36,14 @@ export type DecimalSource = OrigDecimal | number | string;
 /** Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. */
 export type Decimal = OrigDecimal;
 
-// OVERFLOW_ABS caps below IEEE 754 double precision (2^53 ≈ 9e15). Arithmetic
-// results under this magnitude stay as native number; larger magnitudes
-// promote to Decimal via the original static.
+// OVERFLOW_ABS caps below IEEE 754 double precision (2^53 ≈ 9e15). The static
+// fast paths compute in number-space only when the result lands under this
+// magnitude; larger magnitudes fall through to the original static.
 const OVERFLOW_ABS = 1e15;
+
+// Smallest normal float64. A product or quotient under it has underflowed to a
+// subnormal or to 0 in number-space, where the Decimal answer is still exact.
+const MIN_NORMAL = 2.2250738585072014e-308;
 
 /**
  * Coerce a layer-0, small-magnitude Decimal back to native `number`. For
@@ -180,7 +184,10 @@ OrigDecimal.sub = function sub(a: DecimalSource, b: DecimalSource): Decimal {
 OrigDecimal.mul = function mul(a: DecimalSource, b: DecimalSource): Decimal {
   if (typeof a === 'number' && typeof b === 'number') {
     const r = a * b;
-    if (r < OVERFLOW_ABS && r > -OVERFLOW_ABS) return new OrigDecimal(r);
+    const abs = Math.abs(r);
+    if (abs < OVERFLOW_ABS && (abs >= MIN_NORMAL || a === 0 || b === 0)) {
+      return new OrigDecimal(r);
+    }
   }
   return origMul(a, b);
 };
@@ -188,7 +195,8 @@ OrigDecimal.mul = function mul(a: DecimalSource, b: DecimalSource): Decimal {
 OrigDecimal.div = function div(a: DecimalSource, b: DecimalSource): Decimal {
   if (typeof a === 'number' && typeof b === 'number' && b !== 0) {
     const r = a / b;
-    if (r < OVERFLOW_ABS && r > -OVERFLOW_ABS) return new OrigDecimal(r);
+    const abs = Math.abs(r);
+    if (abs < OVERFLOW_ABS && (abs >= MIN_NORMAL || a === 0)) return new OrigDecimal(r);
   }
   return origDiv(a, b);
 };

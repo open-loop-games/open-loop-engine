@@ -63,6 +63,45 @@ describe('Decimal static fast-path chain contract', () => {
   });
 });
 
+describe('Decimal static fast paths agree with the instance forms on tiny results', () => {
+  // Law: the patched number-space static equals the unpatched instance method
+  // wherever the product or quotient leaves the normal float range from below,
+  // measured in log10, where the Decimal answer keeps its precision.
+  const operands: number[] = [];
+  for (let e = -300; e <= 300; e += 23) operands.push(1.7 * 10 ** e, -4.3 * 10 ** e);
+
+  function expectAgreement(fast: Decimal, reference: Decimal, label: string): void {
+    if (reference.eq(0)) {
+      expect(fast.eq(0), label).toBe(true);
+      return;
+    }
+    expect(fast.sign, label).toBe(reference.sign);
+    const drift = Math.abs(fast.abs().log10().toNumber() - reference.abs().log10().toNumber());
+    expect(drift, label).toBeLessThan(1e-12);
+  }
+
+  it('mul', () => {
+    for (const a of operands) {
+      for (const b of operands) {
+        expectAgreement(Decimal.mul(a, b), new Decimal(a).mul(b), `mul(${a}, ${b})`);
+      }
+    }
+  });
+
+  it('div', () => {
+    for (const a of operands) {
+      for (const b of operands) {
+        expectAgreement(Decimal.div(a, b), new Decimal(a).div(b), `div(${a}, ${b})`);
+      }
+    }
+  });
+
+  it('a zero operand still answers zero', () => {
+    expect(Decimal.mul(0, 1e-200).eq(0)).toBe(true);
+    expect(Decimal.div(0, 1e200).eq(0)).toBe(true);
+  });
+});
+
 describe('ordering against NaN', () => {
   // break_eternity derives gte/lte/max/min from a strict comparison in a form
   // that assumes trichotomy, so each inverts against NaN: `gte` and `lte` answer
