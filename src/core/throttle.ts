@@ -3,7 +3,7 @@
  *
  * Gates a per-tick callback so it fires at most once per configured interval.
  * Useful for pacing automation checks (auto-buy, auto-prestige) that don't
- * warrant a full Action with progress/cooldown tracking.
+ * need progress or cooldown tracking.
  *
  * - {@link createThrottle} — sole factory
  *

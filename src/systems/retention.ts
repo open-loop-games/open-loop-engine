@@ -70,9 +70,10 @@ export function fractional(rate: DecimalSource): (value: any) => any {
  *   keep: [totalEarned, achievements],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
  * });
- * // In reset handler:
+ * // One policy shared by several resets. A single reset takes the same
+ * // `keep` / `retain` inline on `createReset` instead.
  * policy.snapshot();
- * reset.execute();
+ * prestige.reset();
  * policy.restore();
  * ```
  */

@@ -55,8 +55,9 @@ export interface ConditionalRule<M = void> {
  * )
  * ```
  *
- * @param getRules - Returns the current rule list. Called each tick, so the list
- *   itself can change at runtime (e.g., player editing automation rules).
+ * @param getRules - Returns the current rule list. Called each time the
+ *   sequencer runs dry and asks for its next item, so the list itself can
+ *   change at runtime (e.g., player editing automation rules).
  *
  * @example
  * ```ts

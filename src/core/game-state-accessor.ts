@@ -1,7 +1,8 @@
 /**
- * Ambient game-state-accessor context — the fifth cross-cutting ambient scope
- * alongside chain registry, effect-system registry, resource registry, and
- * persistence namespace.
+ * Ambient game-state-accessor context — one of the cross-cutting ambient scopes
+ * `createEngine` sets around `install()` / `connect()`, alongside the chain,
+ * effect-system, resource and tuning registries, the engine categories, and
+ * the persistence namespace.
  *
  * Problem it solves: `GameStateAccessor` (and its write-side partner
  * `GameStateMutator`) were previously threaded explicitly via options on
@@ -41,8 +42,8 @@ let _current: GameStateAccessorMutator | undefined;
  * don't stomp each other.
  *
  * Accepts `undefined` for engines that don't use an accessor (tests, engine-
- * only workbenches). In that case the previous ambient is restored on exit
- * and `getCurrentGameStateAccessor()` returns whatever was set before.
+ * only workbenches). In that case `getCurrentGameStateAccessor()` returns
+ * `undefined` inside `fn`, and the previous ambient is restored on exit.
  */
 export function withGameStateAccessor<T>(
   accessor: GameStateAccessorMutator | undefined,

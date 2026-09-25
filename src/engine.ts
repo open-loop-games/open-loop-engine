@@ -249,7 +249,10 @@ export interface EngineConfig {
    * Defaults to native setInterval/clearInterval.
    */
   timerProvider?: TimerProvider;
-  /** Interval in ms between autosaves. 0 or omitted disables autosave. */
+  /**
+   * Interval in ms between autosaves. 0 or omitted disables autosave. The
+   * autosave writes the save manager's active slot, whichever that is.
+   */
   autoSaveInterval?: number;
   /** Set to false to skip save manager creation. Default true. */
   persistence?: boolean;
@@ -345,8 +348,8 @@ export interface Engine {
   readonly tickDriver: TickDriver;
   readonly saveManager: SaveManager | undefined;
   /**
-   * The module set registered via `use()` plus any mod modules appended at
-   * `start()`. Exposed so forkable-instance helpers (scratch engines, sim
+   * The module set registered via `use()` plus any mod modules appended by
+   * `selectMod()`. Exposed so forkable-instance helpers (scratch engines, sim
    * workbenches) can spin up a second engine with the same module shape
    * without the caller tracking the list externally.
    */

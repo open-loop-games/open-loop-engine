@@ -16,8 +16,8 @@
  * const mgr = createSaveManager({ gameId: 'my-game' });
  * mgr.createSlot('Manual Save');  // slot 1
  * mgr.selectSlot(1);
- * mgr.save();
- * mgr.peekSlot(0);  // peek the autosave without switching
+ * mgr.save();       // save, and the engine's autosave, now write slot 1
+ * mgr.peekSlot(0);  // peek slot 0 without switching
  * ```
  *
  * @cluster save
@@ -130,7 +130,10 @@ export interface SaveManagerConfig {
    * step that returns anything but an object fails the load with `unknown`.
    */
   migrations?: Record<number, SaveMigration>;
-  /** Display name for the default slot (id 0). Default: 'Autosave' */
+  /**
+   * Display name for the default slot (id 0). Default: 'Autosave'. Only a
+   * label: the engine's autosave writes the active slot, not slot 0.
+   */
   defaultSlotName?: string;
   /** Maximum number of save slots. Default: 10 */
   maxSlots?: number;
@@ -489,7 +492,8 @@ function parseFailureDetail(err: unknown): unknown {
  *
  * Storage keys are prefixed with `gameId` (and `persistenceNamespace`, if
  * given), so two engines sharing a runtime never collide. The returned manager
- * emits `save` / `load` / `validation-error` events for instrumentation.
+ * emits the {@link SaveEvents} (`save:loaded`, `save:load-failed`,
+ * `save:validation-error` and the rest) for instrumentation.
  *
  * @param config - {@link SaveManagerConfig} carrying `gameId`, version,
  *   migrations, the optional storage adapter, and slot/compression knobs.
@@ -506,7 +510,7 @@ function parseFailureDetail(err: unknown): unknown {
  *     2: (data) => migrateV2toV3(data),
  *   },
  * });
- * saves.on('validation-error', (issue) => log('save issue', issue));
+ * saves.on('save:validation-error', (issue) => log('save issue', issue));
  * ```
  */
 export function createSaveManager(config: SaveManagerConfig): SaveManager {
