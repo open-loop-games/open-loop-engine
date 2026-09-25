@@ -1,8 +1,12 @@
 /**
- * Workbench engine builder — fresh `createEngine` under an isolated
+ * Scratch engine from a save — a fresh `createEngine` under an isolated
  * persistence namespace backed by in-memory storage, hydrated from a save
- * blob. `createSensitivityCell` composes this into a harness `Cell` for
- * per-run scratch engines.
+ * blob. Predictors, workers and the balance workbench load a player's save
+ * into one to simulate ahead without touching the live game;
+ * `createSensitivityCell` composes it into a harness `Cell` for per-run
+ * scratch engines.
+ *
+ * @cluster runners
  */
 
 import { createEngine } from '@/engine';
@@ -23,7 +27,7 @@ const NOOP_TIMER_PROVIDER: TimerProvider = {
   clearInterval: () => {},
 };
 
-/** @internal */
+/** Options for {@link createEngineFromSave}. */
 export interface CreateEngineFromSaveOptions {
   /** Exported save string (from `saveManager.exportSave()`). */
   saveBlob: string;
@@ -46,22 +50,41 @@ export interface CreateEngineFromSaveOptions {
   >;
 }
 
-/**
- * Create a fresh engine, install modules, start the loop, and hydrate from
- * the given save blob. Throws if the imported save fails to apply.
- *
- * The scratch engine defaults to a no-op timer provider, so `start()` arms no
- * real `setInterval` — the workbench drives ticks manually and a self-ticking
- * scratch engine would both race the manual stepping and leak. Pass
- * `config.timerProvider` to opt into a real timer (then the caller owns
- * stopping it). The caller owns the engine: its namespaced persistent refs
- * stay in the process-wide registry until `engine.dispose()`, so dropping
- * the reference alone retains them.
- *
- * @internal
- */
 let scratchCounter = 0;
 
+/**
+ * Load a save into a fresh, isolated engine running the given modules — a
+ * scratch copy of the game to simulate or inspect without touching the live
+ * one. It adopts the save's own `gameId`, so any save your game exported
+ * loads, and it installs the modules, starts the engine and imports the save.
+ *
+ * The engine gets a no-op timer, so `start()` arms no real `setInterval`:
+ * drive it with `tickDriver.stepOnce()` / `simulateTick`, or a harness
+ * runner. Pass `config.timerProvider` for a self-ticking one (then stop it
+ * yourself). The caller owns the engine: its namespaced persistent refs stay
+ * in the process-wide registry until `engine.dispose()`, so dropping the
+ * reference alone retains them.
+ *
+ * @param options - The save blob, the modules to install, and optionally a
+ *   persistence namespace and extra `createEngine` config.
+ * @returns The started engine, with the save applied.
+ * @throws {Error} when the blob isn't valid JSON or the save fails to import;
+ *   the half-built engine is disposed first.
+ *
+ * @example
+ * ```ts
+ * const scratch = createEngineFromSave({
+ *   saveBlob: engine.saveManager!.exportSave(),
+ *   modules: [economyModule, prestigeModule],
+ * });
+ * try {
+ *   const result = runUntil({ engine: scratch, until: () => prestigeReady(), maxSimTime: 3600 });
+ *   console.log(result.elapsedSimulated); // seconds until the player could prestige
+ * } finally {
+ *   scratch.dispose();
+ * }
+ * ```
+ */
 export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine {
   const {
     saveBlob,

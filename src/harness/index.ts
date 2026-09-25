@@ -9,6 +9,8 @@ export { runMatrixUntil } from './run-matrix-until';
 export { replayLive, createTickCounter } from './replay';
 export type { ReplayLiveOptions, TickCounter } from './replay';
 export { createSensitivityCell } from './create-sensitivity-cell';
+export { createEngineFromSave } from './create-engine';
+export type { CreateEngineFromSaveOptions } from './create-engine';
 export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
 export {
   createResourcePeakTracker,

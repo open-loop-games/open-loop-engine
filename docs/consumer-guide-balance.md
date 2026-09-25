@@ -218,6 +218,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 | `applyPerturbation` | Apply a perturbation to a `PickerEntry` and get an idempotent cleanup. |
 | `createPickerSnapshot` | Enumerate the engine's addressable choices (content, chain-registry, tunable). |
 | `createSensitivityCell` | Build a matrix cell from a save blob + per-run module factory + analyzer factory. |
+| `createEngineFromSave` | Load a save into an isolated scratch engine — a predictor or worker simulating ahead of the live game. |
 | `diffAggregates` | Per-metric delta between a variant cell and baseline. |
 | `createTransitionSnapshot` / `createIncrementalSnapshot` | Pending content transitions; caching overlay for time-series introspection. |
 | `defaultAnalyzerPack` / `seriesAnalyzerPack` | Cycle-finalize and resource-peak analyzers; per-resource trajectory capture. |

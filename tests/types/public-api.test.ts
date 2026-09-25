@@ -42,6 +42,7 @@ import {
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
 import type {
+  CreateEngineFromSaveOptions,
   MatrixUntilConfig,
   MatrixUntilResult,
   RunContext,
@@ -596,6 +597,12 @@ describe('runSensitivity', () => {
       baseline: { aggregate: { metrics: Record<string, unknown> } };
       variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
     }>();
+  });
+
+  it('exports createEngineFromSave for scratch engines', async () => {
+    const { createEngineFromSave } = await import('@/harness');
+    expectTypeOf(createEngineFromSave).parameter(0).toEqualTypeOf<CreateEngineFromSaveOptions>();
+    expectTypeOf(createEngineFromSave).returns.toEqualTypeOf<Engine>();
   });
 
   it('types until-sweep runs as RunUntilResult', () => {
