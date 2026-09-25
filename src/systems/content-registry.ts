@@ -63,7 +63,7 @@ export interface ContentRegistry<T extends { id: string }> {
    * covers keeps the scope's value until every covering scope reverts, and
    * then takes the patched value.
    *
-   * @throws If the id does not exist in the registry
+   * @throws If the id does not exist in the registry, or the partial carries a different `id`
    */
   patch(id: string, partial: Partial<Omit<T, 'id'>>): void;
 
@@ -87,7 +87,8 @@ export interface ContentRegistry<T extends { id: string }> {
    *
    * @param patches - Map of entry id → partial fields to override
    * @returns Idempotent cleanup function that reverts all patches
-   * @throws If any id does not exist in the registry
+   * @throws If any id does not exist in the registry, or its partial carries a different
+   *   `id`; no patch in the batch applies
    */
   pushPatches(patches: Record<string, Partial<Omit<T, 'id'>>>): () => void;
 
@@ -195,6 +196,14 @@ export function createContentRegistryHandle<T extends { id: string }>(
     }
   }
 
+  // The store key is the entry's id, so a partial that renames it would leave
+  // the entry filed under an id it no longer carries.
+  function assertKeepsId(verb: string, id: string, partial: object): void {
+    if (Object.hasOwn(partial, 'id') && (partial as { id?: unknown }).id !== id) {
+      throw new Error(`[${name}] Cannot change the id of "${id}" by ${verb}`);
+    }
+  }
+
   function remove(id: string): void {
     if (!store.delete(id)) return;
     bases.delete(id);
@@ -219,6 +228,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
       if (!existing) {
         throw new Error(`[${name}] Cannot patch unknown id: "${id}"`);
       }
+      assertKeepsId('patch', id, partial);
       const base = bases.get(id);
       for (const [key, value] of Object.entries(partial)) {
         if (base?.has(key)) base.set(key, value);
@@ -243,11 +253,12 @@ export function createContentRegistryHandle<T extends { id: string }>(
     },
 
     pushPatches(patches: Record<string, Partial<Omit<T, 'id'>>>): () => void {
-      // Validate all IDs exist before applying any patches
-      for (const id of Object.keys(patches)) {
+      // Validate every patch before applying any
+      for (const [id, partial] of Object.entries(patches)) {
         if (!store.has(id)) {
           throw new Error(`[${name}] Cannot pushPatches unknown id: "${id}"`);
         }
+        assertKeepsId('pushPatches', id, partial);
       }
 
       // The new scope is the top one, so applying it in place is its resolution.

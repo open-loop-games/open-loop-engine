@@ -120,12 +120,29 @@ describe('ContentRegistry', () => {
     expect(reg.get('a')).toEqual({ id: 'a', name: 'Modified', value: 99 });
   });
 
-  it('patch does not change id even if somehow included', () => {
+  it('patch throws on an id that differs from the target, leaving the entry intact', () => {
     const reg = make();
     reg.register({ id: 'a', name: 'Alpha', value: 1 });
-    // TypeScript prevents this, but test the runtime behavior
-    reg.patch('a', { name: 'Patched' } as any);
-    expect(reg.get('a')!.id).toBe('a');
+    // The type forbids `id`; an untyped caller must not desync entry and key.
+    expect(() => reg.patch('a', { id: 'x', name: 'Patched' } as any)).toThrow(
+      '[test] Cannot change the id of "a" by patch',
+    );
+    expect(reg.get('a')).toEqual({ id: 'a', name: 'Alpha', value: 1 });
+    reg.patch('a', { id: 'a', name: 'Same' } as any);
+    expect(reg.get('a')!.name).toBe('Same');
+  });
+
+  it('pushPatches throws on an id that differs from its target, applying none of the batch', () => {
+    const reg = make();
+    reg.register([
+      { id: 'a', name: 'Alpha', value: 1 },
+      { id: 'b', name: 'Beta', value: 2 },
+    ]);
+    expect(() => reg.pushPatches({ a: { value: 9 }, b: { id: 'x' } as any })).toThrow(
+      '[test] Cannot change the id of "b" by pushPatches',
+    );
+    expect(reg.get('a')!.value).toBe(1);
+    expect(reg.get('b')!.id).toBe('b');
   });
 
   it('throws when patching unknown id', () => {
