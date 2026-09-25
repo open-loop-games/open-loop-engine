@@ -34,19 +34,19 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface GameStateMutator` — Mutation interface for applying resolved effects to game state. `src/core/effects.ts:32`
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
 - `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:62`
-- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:187`
-- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:223`
-- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:55`
-- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:85`
-- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:99`
-- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:93`
+- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:186`
+- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:216`
+- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:54`
+- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:84`
+- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:98`
+- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:92`
 - `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:100`
 - `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:39`
-- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:57`
-- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:121`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:101`
-- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:139`
-- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:131`
+- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:56`
+- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:120`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:100`
+- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:138`
+- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:130`
 
 ## Formulas
 
@@ -95,26 +95,26 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
-- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:95`
-- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:101`
-- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:45`
-- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:33`
-- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:89`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:120`
-- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through at evaluation time. `src/core/gate.ts:166`
-- `function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:184`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:142`
-- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:107`
+- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:94`
+- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:100`
+- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:44`
+- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:32`
+- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:88`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:119`
+- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through at evaluation time. `src/core/gate.ts:165`
+- `function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:183`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:141`
+- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:106`
 - `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:20`
-- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:69`
-- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:57`
-- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle `gate` will read. `src/systems/gate.ts:283`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:341`
-- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:155`
-- `interface GateRequirementOptions` `src/systems/gate.ts:308`
-- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:104`
-- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:129`
-- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:209`
+- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:68`
+- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:56`
+- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle `gate` will read. `src/systems/gate.ts:362`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:419`
+- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:156`
+- `interface GateRequirementOptions` `src/systems/gate.ts:386`
+- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:105`
+- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:130`
+- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:215`
 
 ## Modifier
 
