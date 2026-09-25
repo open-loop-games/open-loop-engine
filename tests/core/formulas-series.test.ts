@@ -64,7 +64,7 @@ describe('closed forms match brute-force summation', () => {
 
   test('powerSeries — Σ(a + i)^p across the Faulhaber range', () => {
     for (let p = 0; p <= 8; p++) {
-      for (const from of [0, 1, 4, 100]) {
+      for (const from of [0, 1, 2.5, 4, 100]) {
         for (const count of [0, 1, 2, 5, 25]) {
           const value = powerSeries(p, from, count);
           expect(value, `p=${p} from=${from} count=${count} returned null`).not.toBeNull();
@@ -81,13 +81,13 @@ describe('closed forms match brute-force summation', () => {
   test('powerSeries — reports rather than guessing where Faulhaber does not apply', () => {
     expect(powerSeries(2.5, 0, 10)).toBeNull(); // fractional exponent — Hurwitz zeta
     expect(powerSeries(-1, 1, 10)).toBeNull(); // negative exponent — harmonic
-    expect(powerSeries(2, 0.5, 10)).toBeNull(); // fractional offset — not an integer index
+    expect(powerSeries(2, -1, 10)).toBeNull(); // negative offset — the expansion cancels
     expect(powerSeries(50, 0, 10)).toBeNull(); // past MAX_POWER
   });
 
   test('powerSeries — p=0 counts terms, including the 0⁰ one', () => {
-    // Σ i⁰ over [0, n) is n, which the prefix-sum difference alone gets wrong:
-    // it indexes from 1, so the i=0 term has to be peeled off explicitly.
+    // Σ i⁰ over [0, n) is n, and the Faulhaber prefix sums index from 1, so the
+    // i=0 term has to be counted explicitly.
     expect(Decimal.eq(powerSeries(0, 0, 6)!, 6)).toBe(true);
     expect(Decimal.eq(powerSeries(0, 3, 6)!, 6)).toBe(true);
   });
@@ -162,14 +162,16 @@ describe('linearity composes, and only linearity', () => {
     // `1.15^(2x)` is still geometric mathematically, but the op table only
     // claims the case it can prove — the inner must be the bare variable.
     // Reporting here is the design: a compositional guess is what produced
-    // eight inherited defects in this subsystem.
+    // eight inherited defects in this subsystem. The span has to outrun the
+    // term-by-term sum, which is exact for anything short.
     const f = Formula.variable(0).mul(2).pow_base(1.15);
-    expect(f.sum(0, 10).reason).not.toBe('exact');
+    expect(f.sum(0, 10).reason).toBe('exact');
+    expect(f.sum(0, 5000).reason).not.toBe('exact');
   });
 
   test('a genuinely non-elementary series reports rather than answering', () => {
     const f = Formula.variable(0).add(1).ln();
-    const series = f.sum(1, 10);
+    const series = f.sum(1, 5000);
     expect(series.reason).not.toBe('exact');
   });
 });
@@ -180,14 +182,14 @@ describe('Σ over a span the closed forms do not cover', () => {
     // Euler–Maclaurin arm. It must beat the raw integral it corrects.
     const f = Formula.variable(0).add(1).ln();
     const from = 1;
-    const count = 400;
+    const count = 2000;
     const series = f.sum(from, count);
     expect(series.reason).toBe('approximate');
     const truth = bruteForce((x) => f.evaluate(x), from, count);
     const err = relativeError(series.value!, truth);
-    // 1e-5, because the two corrections land at 2.21e-6 relative here (measured)
+    // 1e-6, because the two corrections land at 2.0e-7 relative here (measured)
     // — the bound is the measurement plus headroom, not an aspiration.
-    expect(Decimal.lt(err, 1e-5), `corrected error was ${err.toString()}`).toBe(true);
+    expect(Decimal.lt(err, 1e-6), `corrected error was ${err.toString()}`).toBe(true);
     const raw = relativeError(f.cumulative(from, from + count), truth);
     expect(Decimal.lt(err, raw)).toBe(true);
     // The reported estimate is the size of the last correction applied, so it

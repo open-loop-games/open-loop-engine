@@ -1094,6 +1094,125 @@ describe('cumulative cost: integral vs discrete sum', () => {
   });
 });
 
+describe('series: every grade Formula.sum gives holds against brute force', () => {
+  // The `Series` contract, swept over closed-form chains and chains with no
+  // closed form alike: an `exact` answer is Σ to the float floor, an
+  // `approximate` one sits within the error it reports. Chains that reach the
+  // Euler–Maclaurin arm only past the term-by-term span are swept there below,
+  // against the oracle.
+
+  function bruteSum(formula: GenericFormula, from: DecimalSource, count: number): Decimal {
+    let total = new Decimal(0);
+    for (let i = 0; i < count; i++) total = total.add(formula.evaluate(Decimal.add(from, i)));
+    return total;
+  }
+
+  const CHAINS: Record<string, () => GenericFormula> = {
+    'exponential 10·1.15ⁿ': () => Formula.exponential(0, 10, 1.15),
+    'flat exponential 10·1ⁿ': () => Formula.exponential(0, 10, 1),
+    'linear 5n+10': () => Formula.linear(0, 10, 5),
+    'flat linear 0n+10': () => Formula.linear(0, 10, 0),
+    'polynomial 10n²': () => Formula.polynomial(0, 10, 2),
+    'polynomial 10n^1.5': () => Formula.polynomial(0, 10, 1.5),
+    '10√n + 5': () => F.variable(0).sqrt().mul(10).add(5),
+    'ln(n + 1)': () => F.variable(0).add(1).ln(),
+    '|n − 3|': () => F.variable(0).sub(3).abs(),
+    // Nested non-linear ops: no integral exists for these, so nothing may be
+    // corrected into a price.
+    '(10·1.15ⁿ)²': () => F.variable(0).pow_base(1.15).mul(10).pow(2),
+    '1.15^(n²)': () => F.variable(0).pow(2).pow_base(1.15),
+    'exp(n/10)²': () => F.variable(0).div(10).exp().pow(2),
+    // Two variable leaves, both read at the level being summed.
+    'n·(n + 1)': () => F.variable(0).mul(F.variable(0).add(1)),
+  };
+
+  for (const [name, build] of Object.entries(CHAINS)) {
+    test(name, () => {
+      const formula = build();
+      for (const from of [0, 1, 7, 1000]) {
+        for (const count of [1, 2, 5, 40, 1000]) {
+          const { value: series, errors } = withoutEngineErrors(() => formula.sum(from, count));
+          const label = `${name} from=${from} count=${count}`;
+          expect(errors, `${label} logged`).toEqual([]);
+          expect(series.reason, label).not.toBe('not-summable');
+          const truth = bruteSum(formula, from, count);
+          const err = relativeError(series.value!, truth);
+          const bound = series.reason === 'approximate' ? series.error : 1e-12;
+          expect(
+            Decimal.lte(err, bound),
+            `${label}: ${series.reason} ${String(series.value)} vs Σ ${truth.toString()} (error ${err.toString()} > ${bound})`,
+          ).toBe(true);
+        }
+      }
+    });
+  }
+
+  test('a fractional count sums every level in [0, count)', () => {
+    // `i` ranges over the integers below `count`, so 2.5 is three levels — the
+    // same span a term-by-term loop visits, whichever arm answers.
+    for (const [name, build] of Object.entries(CHAINS)) {
+      const formula = build();
+      const series = formula.sum(4, 2.5);
+      const truth = bruteSum(formula, 4, 3);
+      expect(
+        Decimal.lte(relativeError(series.value!, truth), 1e-12),
+        `${name}: ${String(series.value)} vs Σ ${truth.toString()}`,
+      ).toBe(true);
+    }
+  });
+
+  test('a nested non-linear chain past the term-by-term span has nothing to correct', () => {
+    for (const name of ['(10·1.15ⁿ)²', '1.15^(n²)', 'exp(n/10)²']) {
+      const formula = CHAINS[name]();
+      expect(formula.isIntegrable(), `${name} claims an integral`).toBe(false);
+      const { value, errors } = withoutEngineErrors(() => formula.sum(0, 5000));
+      expect(errors, `${name} logged`).toEqual([]);
+      expect(value.reason, name).toBe('not-summable');
+    }
+  });
+});
+
+describe('oracle: Σ matches a high-precision reference where brute force cannot', () => {
+  const SERIES_OP: Record<string, (k: string) => GenericFormula> = {
+    pow: (k) => F.variable(0).pow(k),
+    root: (k) => F.variable(0).root(k),
+  };
+
+  test('power sums at high levels are exact, not differenced into noise', () => {
+    // Two prefix sums of size ~from^(p+1) differ by ~count·from^p, losing
+    // log₁₀(from/count) digits. The sum must hold to the float floor anyway.
+    const rows = oracle.series.filter((r) => r.op === 'pow' && Number.isInteger(Number(r.k)));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const { k, from, count, value: truth } of rows) {
+      const series = SERIES_OP.pow(k).sum(from, count);
+      const label = `Σ (n)^${k} from=${from} count=${count}`;
+      expect(series.reason, label).toBe('exact');
+      expect(
+        Decimal.lte(relativeError(series.value!, truth), 1e-14),
+        `${label}: ${String(series.value)} vs ${truth}`,
+      ).toBe(true);
+    }
+  });
+
+  test('the Euler–Maclaurin arm stays within its reported error, from level 0', () => {
+    // A fractional power has a singular derivative at 0, and a boundary
+    // difference that samples below the span reads the curve where it is not
+    // real-valued.
+    const rows = oracle.series.filter((r) => !(r.op === 'pow' && Number.isInteger(Number(r.k))));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const { op, k, from, count, value: truth } of rows) {
+      const series = SERIES_OP[op](k).sum(from, count);
+      const label = `Σ ${op}(n, ${k}) from=${from} count=${count}`;
+      expect(series.reason, label).toBe('approximate');
+      const err = relativeError(series.value!, truth);
+      expect(
+        series.reason === 'approximate' && Decimal.lte(err, series.error),
+        `${label}: ${String(series.value)} vs ${truth} (error ${err.toString()})`,
+      ).toBe(true);
+    }
+  });
+});
+
 describe('tetration family', () => {
   // No external reference reaches here, and these ops are where an inverse is
   // most likely to be wrong: each takes auxiliary arguments (height, base,

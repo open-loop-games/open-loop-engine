@@ -74,6 +74,13 @@ function integrateVariableInner(this: GenericFormula) {
   return this;
 }
 
+/**
+ * Longest span {@link Formula.sum} adds term by term when no closed form
+ * applies. Past it the sum is corrected from the integral or reported, rather
+ * than run as a loop long enough to stall a tick.
+ */
+const DIRECT_SUM_LIMIT = 1000;
+
 /** The bare variable's own series — `Σ(from + i)` is arithmetic and always exact. */
 function sumVariable(from: DecimalSource, count: DecimalSource): Series {
   return exactSeries(arithmeticSeries(from, count));
@@ -334,6 +341,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   protected readonly applySubstitution: SubstitutionFunction<T> | undefined;
   protected readonly description: string | undefined;
   protected readonly internalVariables: number;
+  /** Every op from here down to the variable has a substitution rule — see `setupFormula`. */
+  protected readonly substitutable: boolean;
 
   public readonly innermostVariable: MaybeRef<DecimalSource> | undefined;
 
@@ -358,6 +367,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     }
     this.inputs = readonlyProperties.inputs;
     this.internalVariables = readonlyProperties.internalVariables;
+    this.substitutable = readonlyProperties.substitutable;
     this.innermostVariable = readonlyProperties.innermostVariable;
     this.internalEvaluate = readonlyProperties.internalEvaluate;
     this.internalInvert = readonlyProperties.internalInvert;
@@ -377,6 +387,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       internalIntegrateInner: integrateVariableInner,
       internalSum: sumVariable as unknown as SumFunction<T>,
       applySubstitution: ops.passthrough as unknown as SubstitutionFunction<T>,
+      substitutable: true,
     };
   }
 
@@ -387,6 +398,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     return {
       inputs: inputs as T,
       internalVariables: 0,
+      substitutable: false,
     };
   }
 
@@ -403,7 +415,15 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     const innermostVariable = numVariables === 1 ? variable?.innermostVariable : undefined;
 
     const invertible = variable?.isInvertible() ?? false;
-    const integrable = variable?.isIntegrable() ?? false;
+    // An op with no substitution rule (`pow`, `pow_base`, `exp`, …) integrates
+    // only by substituting through everything beneath it, so every op down to
+    // the variable has to have one. Checked here, from structure, because the
+    // integral is built lazily and a failed build hands back a constant that
+    // every caller above would price as a real antiderivative.
+    const substitutable = applySubstitution != null && (variable?.substitutable ?? false);
+    const integrable =
+      (variable?.isIntegrable() ?? false) &&
+      (applySubstitution != null || (variable?.substitutable ?? false));
 
     return {
       inputs,
@@ -417,6 +437,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       // a silent `undefined` and lose which op broke the chain.
       internalSum: sum,
       applySubstitution,
+      substitutable,
       innermostVariable,
       internalVariables: numVariables,
     };
@@ -662,14 +683,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
 
   /**
-   * `Σ f(from + i)` for `i` in `[0, count)` — the discrete series.
+   * `Σ f(from + i)` for integer `i` in `[0, count)` — the discrete series. A
+   * fractional `count` therefore takes `⌈count⌉` terms.
    *
    * What a level-indexed cost actually is: buying `count` levels starting at
    * level `from` costs this, and it is not {@link cumulative} over the same
    * span. Exact where a closed form exists (the shipped `exponential` /
    * `linear` / `polynomial` curves and anything built from them by `+`, `−`,
-   * and constant `×`/`÷`); otherwise `approximate` via Euler–Maclaurin, or
-   * `not-summable` when there is no integral to correct.
+   * and constant `×`/`÷`), and exact term by term over a span of up to
+   * `DIRECT_SUM_LIMIT` levels; beyond that `approximate` via
+   * Euler–Maclaurin, or `not-summable` when there is no integral to correct.
    *
    * There is deliberately no unchecked twin the way {@link invert} sits under
    * {@link tryInvert}: `invert` is unchecked because the op table composes with
@@ -685,12 +708,33 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    */
   sum(from: DecimalSource, count: DecimalSource): Series {
     if (Decimal.lte(count, 0)) return exactSeries(Decimal.dZero);
-    if (!this.hasVariable()) return exactSeries(Decimal.mul(count, this.evaluate()));
+    const terms = Decimal.ceil(count);
+    if (this.internalVariables === 0) return exactSeries(Decimal.mul(terms, this.evaluate()));
+    // Closed forms apply with several variable leaves too: `evaluate` reads
+    // every leaf at the same level, and the linear identities split the chain
+    // wherever that holds, reporting where it doesn't.
     if (this.internalSum != null) {
-      const series = this.internalSum.call(this, from, count, ...this.inputs);
+      const series = this.internalSum.call(this, from, terms, ...this.inputs);
       if (series.value != null) return series;
     }
-    return this.correctedSum(from, count);
+    if (Decimal.lte(terms, DIRECT_SUM_LIMIT)) return this.directSum(from, terms);
+    return this.correctedSum(from, terms);
+  }
+
+  /**
+   * `Σ` by adding the terms — the definition, so `exact`. `not-summable` when a
+   * term is undefined, since no total over it is.
+   */
+  private directSum(from: DecimalSource, count: DecimalSource): Series {
+    // Count the terms, not the values: iterating a float over the *level* range
+    // stalls forever past 2^53, where the float ULP exceeds 1 and `i++` stops
+    // advancing. The span is bounded above, so the counter is safe.
+    let total: DecimalSource = Decimal.dZero;
+    const terms = toNumber(count);
+    for (let i = 0; i < terms; i++) {
+      total = Decimal.add(total, this.evaluate(Decimal.add(from, i)));
+    }
+    return Decimal.isNaN(total) ? NOT_SUMMABLE : exactSeries(total);
   }
 
   /**
@@ -704,21 +748,31 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * curves this arm exists to serve, the omitted tail is smaller still, so read
    * it as an accuracy claim rather than a proof.
    *
-   * Derivatives come from central differences at unit spacing, which is the
-   * grid the sum is defined on anyway.
+   * Derivatives come from second-order one-sided differences at unit spacing,
+   * the grid the sum is defined on, taken inward from each end so they sample
+   * only `[from, to]`. A central difference at `from` reads `f(from − 1)`,
+   * where a fractional power at level 0 is not real-valued.
    */
   private correctedSum(from: DecimalSource, count: DecimalSource): Series {
     if (!this.isIntegrable()) return NOT_SUMMABLE;
     const to = Decimal.add(from, count);
     const area = this.cumulative(from, to);
-    const trapezoid = Decimal.div(Decimal.sub(this.evaluate(to), this.evaluate(from)), 2);
+    const at = (x: DecimalSource, offset: number) => this.evaluate(Decimal.add(x, offset));
+    const trapezoid = Decimal.div(Decimal.sub(at(to, 0), at(from, 0)), 2);
 
-    const slopeAt = (x: DecimalSource) =>
-      Decimal.div(
-        Decimal.sub(this.evaluate(Decimal.add(x, 1)), this.evaluate(Decimal.sub(x, 1))),
-        2,
-      );
-    const curvature = Decimal.div(Decimal.sub(slopeAt(to), slopeAt(from)), 12);
+    // f′(x) ≈ ∓[3f(x) − 4f(x ± 1) + f(x ± 2)]/2, stepping into the span.
+    const slopeFrom = Decimal.div(
+      Decimal.add(
+        Decimal.sub(Decimal.mul(4, at(from, 1)), Decimal.mul(3, at(from, 0))),
+        Decimal.neg(at(from, 2)),
+      ),
+      2,
+    );
+    const slopeTo = Decimal.div(
+      Decimal.add(Decimal.sub(Decimal.mul(3, at(to, 0)), Decimal.mul(4, at(to, -1))), at(to, -2)),
+      2,
+    );
+    const curvature = Decimal.div(Decimal.sub(slopeTo, slopeFrom), 12);
 
     const value = Decimal.add(Decimal.sub(area, trapezoid), curvature);
     if (!Decimal.isFinite(value)) return NOT_SUMMABLE;
@@ -1661,28 +1715,6 @@ export function calculateCost(
 
   const series = formula.sum(origValue, amountToBuy);
   if (series.value != null) return series.value;
-
-  // Nothing closed-form and nothing to correct — the chain has no integral
-  // either. A short span is still exactly summable term by term, which is what
-  // the caller wanted; a long one has no honest answer to give.
-  if (Decimal.gt(amountToBuy, DIRECT_SUM_LIMIT)) {
-    console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
-    return 0;
-  }
-  // Count the terms, not the values: iterating a float over the *level* range
-  // stalls forever past 2^53, where the float ULP exceeds 1 and `i++` stops
-  // advancing. The span is bounded above, so the counter is safe.
-  let cost: DecimalSource = Decimal.dZero;
-  const terms = toNumber(amountToBuy);
-  for (let i = 0; i < terms; i++) {
-    cost = Decimal.add(cost, formula.evaluate(Decimal.add(origValue, i)));
-  }
-  return cost;
+  console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
+  return 0;
 }
-
-/**
- * Longest span {@link calculateCost} will sum term by term when a formula has
- * neither a closed-form series nor an integral to correct. Past it the honest
- * answer is a report, not a loop long enough to stall a tick.
- */
-const DIRECT_SUM_LIMIT = 1000;

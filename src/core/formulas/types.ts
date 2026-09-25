@@ -122,6 +122,7 @@ export type FormulaProperties<T extends [FormulaSource] | FormulaSource[]> = {
   internalIntegrateInner?: IntegrateFunction<T>;
   internalSum?: SumFunction<T>;
   applySubstitution?: SubstitutionFunction<T>;
+  substitutable: boolean;
   innermostVariable?: MaybeRef<DecimalSource>;
   description?: string;
 };

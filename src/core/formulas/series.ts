@@ -24,11 +24,11 @@
  * - `mᵛᵃʳ` — {@link geometricSeries}
  * - `varᵖ` at non-negative integer `p` — {@link powerSeries}
  *
- * Between them those cover `Formula.exponential`, `Formula.linear` and
- * `Formula.polynomial`, which is the cost-curve surface the engine ships.
- * Anything else reports `not-summable` and the caller decides what to do about
- * it — {@link calculateCost} sums a bounded span term by term and falls back to
- * an Euler–Maclaurin correction beyond it.
+ * Between them those cover `Formula.exponential`, `Formula.linear`, and
+ * `Formula.polynomial` at an integer exponent up to twelve. Anything else has
+ * no closed form here, and {@link Formula.sum} sums a bounded span term by term
+ * and corrects a longer one by Euler–Maclaurin, reporting `not-summable` when
+ * there is no integral to correct.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
@@ -39,13 +39,14 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
  * Diagnosed result of {@link Formula.sum}.
  *
  * - `exact` — a closed form applied, or the span was summed term by term.
- * - `approximate` — no closed form; `value` is the continuous integral with
- *   Euler–Maclaurin boundary corrections applied. `error` is the relative size
- *   of the last correction term, which bounds the truncation from above in the
- *   smooth monotone regime cost curves live in — read it as "accurate to about
- *   this much", not as a proof.
- * - `not-summable` — no closed form and no usable fallback: the chain isn't
- *   integrable either, so there is nothing to correct.
+ * - `approximate` — no closed form, and the span is too long to sum term by
+ *   term; `value` is the continuous integral with Euler–Maclaurin boundary
+ *   corrections applied. `error` is the relative size of the last correction
+ *   term, which bounds the truncation from above in the smooth monotone regime
+ *   cost curves live in — read it as "accurate to about this much", not as a
+ *   proof.
+ * - `not-summable` — no closed form, a span too long to sum term by term, and
+ *   no integral to correct; or a term the curve leaves undefined.
  *
  * Shape follows {@link Inversion} in `./inversion` — a value plus a `reason`
  * discriminator, `value: null` on the arm with no answer. Same contract
@@ -94,34 +95,45 @@ export function geometricSeries(
 }
 
 /**
- * `Σ (from + i)^power` for `i` in `[0, count)`, at non-negative integer `power`
- * and non-negative integer `from` — Faulhaber's formula, evaluated as the
- * difference of two prefix sums.
+ * `Σ (from + i)^power` for `i` in `[0, count)`, at non-negative integer `power`,
+ * non-negative `from` and integer `count`.
+ *
+ * Expanded binomially around `from` rather than differenced as two prefix sums:
+ * `Σᵢ (a+i)ᵖ = Σₖ C(p,k)·a^(p−k)·Tₖ`, with `Tₖ = Σ_{i<count} iᵏ` from
+ * Faulhaber. Every term is non-negative, so nothing cancels. The difference of
+ * prefix sums does cancel — two values of size `from^(p+1)` whose difference is
+ * `count·fromᵖ` — and loses `log₁₀(from/count)` digits, which is most of them at
+ * a high level.
  *
  * Returns `null` where no closed form applies: a negative or fractional
- * exponent (the sum is a Hurwitz zeta, not elementary), a fractional offset
- * (Faulhaber indexes integers), or an exponent past {@link MAX_POWER}.
+ * exponent (the sum is a Hurwitz zeta, not elementary), a negative offset
+ * (whose expansion alternates in sign and cancels), or an exponent past
+ * {@link MAX_POWER}.
  */
 export function powerSeries(
   power: DecimalSource,
   from: DecimalSource,
   count: DecimalSource,
 ): DecimalSource | null {
-  if (!isNonNegativeInteger(power) || !isNonNegativeInteger(from) || !isNonNegativeInteger(count)) {
+  if (!isNonNegativeInteger(power) || !isNonNegativeInteger(count) || Decimal.lt(from, 0)) {
     return null;
   }
   const p = new Decimal(power).toNumber();
   if (p > MAX_POWER) return null;
   if (Decimal.lte(count, 0)) return Decimal.dZero;
 
-  const last = Decimal.sub(Decimal.add(from, count), 1);
-  if (Decimal.eq(from, 0)) {
-    // `prefixPower` sums from 1, so the i=0 term is peeled off rather than
-    // reached by a `prefixPower(-1)` that the recurrence does not define.
-    // It vanishes for p ≥ 1 and is 0⁰ = 1 for p = 0.
-    return Decimal.add(Decimal.pow(0, p), prefixPower(p, last));
+  // `prefixPowers` sums from 1, and T₀ also counts the i=0 term, 0⁰ = 1; the
+  // i=0 term vanishes for every higher k.
+  const prefix = prefixPowers(p, Decimal.sub(count, 1));
+  let total: DecimalSource = Decimal.dZero;
+  for (let k = 0; k <= p; k++) {
+    const t = k === 0 ? count : prefix[k];
+    total = Decimal.add(
+      total,
+      Decimal.mul(binomial(p, k), Decimal.mul(integerPow(from, p - k), t)),
+    );
   }
-  return Decimal.sub(prefixPower(p, last), prefixPower(p, Decimal.sub(from, 1)));
+  return total;
 }
 
 /**
@@ -136,16 +148,17 @@ function isNonNegativeInteger(value: DecimalSource): boolean {
 }
 
 /**
- * `Σ_{k=1}^{n} k^p` via the standard recurrence
- * `(p+1)·Sₚ(n) = (n+1)^(p+1) − 1 − Σ_{j<p} C(p+1, j)·S_j(n)`.
+ * `S_q(n) = Σ_{k=1}^{n} k^q` for every `q` in `[0, p]`, via the standard
+ * recurrence `(q+1)·S_q(n) = (n+1)^(q+1) − 1 − Σ_{j<q} C(q+1, j)·S_j(n)`.
  *
  * Exact in exact arithmetic and stable here: every term on the right is the
- * same order as the result, so the alternating subtraction doesn't cancel.
+ * same order as the result or smaller, so the alternating subtraction doesn't
+ * cancel.
  *
  * @internal
  */
-function prefixPower(p: number, n: DecimalSource): DecimalSource {
-  if (Decimal.lt(n, 1)) return Decimal.dZero;
+function prefixPowers(p: number, n: DecimalSource): DecimalSource[] {
+  if (Decimal.lt(n, 1)) return Array.from({ length: p + 1 }, () => Decimal.dZero);
   const sums: DecimalSource[] = [n]; // S₀(n) = n
   for (let q = 1; q <= p; q++) {
     let acc = Decimal.sub(integerPow(Decimal.add(n, 1), q + 1), 1);
@@ -154,7 +167,7 @@ function prefixPower(p: number, n: DecimalSource): DecimalSource {
     }
     sums.push(Decimal.div(acc, q + 1));
   }
-  return sums[p];
+  return sums;
 }
 
 /**

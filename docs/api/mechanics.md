@@ -52,27 +52,27 @@ declarative game-state mutations from `IEffect` ASTs
 
 Algebraic expression trees with evaluate / invert / integrate.
 
-- `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:74`
-- `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:92`
-- `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:87`
-- `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1643`
-- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean): DecimalSource` `src/core/formulas/formulas.ts:1648`
-- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve. `src/core/formulas/formulas.ts:1411`
+- `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:75`
+- `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:99`
+- `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:94`
+- `function calculateCost(formula: InvertibleFormula, amountToBuy: DecimalSource, cumulativeCost?: true): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/formulas.ts:1697`
+- `function calculateCost(formula: InvertibleIntegralFormula, amountToBuy: DecimalSource, cumulativeCost: boolean): DecimalSource` `src/core/formulas/formulas.ts:1702`
+- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve. `src/core/formulas/formulas.ts:1465`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:92`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:45`
-- `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1299`
-- `function findNonInvertible(formula: GenericFormula): GenericFormula | null` — Debug helper: find the operation that breaks invertibility in a formula chain. `src/core/formulas/formulas.ts:1341`
+- `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1353`
+- `function findNonInvertible(formula: GenericFormula): GenericFormula | null` — Debug helper: find the operation that breaks invertibility in a formula chain. `src/core/formulas/formulas.ts:1395`
 - `interface FirstPassageOptions` — Bracket tuning for a first-passage search. `src/core/formulas/passage.ts:41`
-- `class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]>` — A composable math expression that supports forward evaluation, backward inversion, and cumulative integration. `src/core/formulas/formulas.ts:326`
-- `interface FormulaInstanceOps` — Instance-side mirror of FormulaStaticOps — the methods `registerOps` adds to `Formula.prototype`. `src/core/formulas/formulas.ts:149`
+- `class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]>` — A composable math expression that supports forward evaluation, backward inversion, and cumulative integration. `src/core/formulas/formulas.ts:333`
+- `interface FormulaInstanceOps` — Instance-side mirror of FormulaStaticOps — the methods `registerOps` adds to `Formula.prototype`. `src/core/formulas/formulas.ts:156`
 - `type FormulaOptions<T extends [FormulaSource] | FormulaSource[]> = VariableFormulaOptions | ConstantFormulaOptions | GeneralFormulaOptions<T>` — Union of all formula constructor option shapes. `src/core/formulas/types.ts:110`
 - `type FormulaSource = MaybeRef<DecimalSource> | GenericFormula` — A formula or a raw Decimal value — the universal input type for formula operations. `src/core/formulas/types.ts:25`
-- `interface FormulaStaticOps` — Type of the static methods `registerOps` adds to F. `src/core/formulas/formulas.ts:100`
-- `type FormulasToDecimals<T extends FormulaSource[]>` — Map a tuple of FormulaSource inputs to a tuple of DecimalSource outputs — the value shape `internalEvaluate` / `internalInvert` see at runtime. `src/core/formulas/types.ts:137`
+- `interface FormulaStaticOps` — Type of the static methods `registerOps` adds to F. `src/core/formulas/formulas.ts:107`
+- `type FormulasToDecimals<T extends FormulaSource[]>` — Map a tuple of FormulaSource inputs to a tuple of DecimalSource outputs — the value shape `internalEvaluate` / `internalInvert` see at runtime. `src/core/formulas/types.ts:138`
 - `type GeneralFormulaOptions<T extends [FormulaSource] | FormulaSource[]>` — Options for creating a formula with custom evaluate/invert/integrate functions. `src/core/formulas/types.ts:98`
 - `type GenericFormula = Formula<any>` — Any Formula instance, regardless of capability. `src/core/formulas/types.ts:22`
-- `function geometricSeries(base: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ base^(from + i)` for `i` in `[0, count)`. `src/core/formulas/series.ts:85`
-- `type GuardedFormulasToDecimals<T extends FormulaSource[]> = TupleGuard<T>` — Inference-friendly alias of FormulasToDecimals that keeps tuple positions intact under TypeScript's mapped-type rules. `src/core/formulas/types.ts:153`
+- `function geometricSeries(base: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ base^(from + i)` for `i` in `[0, count)`. `src/core/formulas/series.ts:86`
+- `type GuardedFormulasToDecimals<T extends FormulaSource[]> = TupleGuard<T>` — Inference-friendly alias of FormulasToDecimals that keeps tuple positions intact under TypeScript's mapped-type rules. `src/core/formulas/types.ts:154`
 - `function hasVariable(value: FormulaSource): value is InvertibleFormula` — Check if a formula source contains exactly one variable (required for inversion). `src/core/formulas/formulas.ts:60`
 - `type IntegrableFormula` — A formula that supports cumulative cost calculation via integration. `src/core/formulas/types.ts:33`
 - `type IntegrateFunction<T extends FormulaSource[]> = (this: Formula<T>, stack: SubstitutionStack | undefined, ...inputs: T) => GenericFormula` — Integration function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:58`
@@ -84,14 +84,14 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `type InvertibleIntegralFormula` — A formula with full capability: evaluate, invert, integrate, and invert the integral. `src/core/formulas/types.ts:40`
 - `function isFormula(value: unknown): value is GenericFormula` — Type guard for Formula instances. `src/core/formulas/formulas.ts:55`
 - `type Passage` — Result of Formula.firstPassage. `src/core/formulas/passage.ts:67`
-- `function powerSeries(power: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource | null` — `Σ (from + i)^power` for `i` in `[0, count)`, at non-negative integer `power` and non-negative integer `from` — Faulhaber's formula, evaluated as the difference of two prefix sums. `src/core/formulas/series.ts:105`
-- `type Series` — Diagnosed result of Formula.sum. `src/core/formulas/series.ts:54`
+- `function powerSeries(power: DecimalSource, from: DecimalSource, count: DecimalSource): DecimalSource | null` — `Σ (from + i)^power` for `i` in `[0, count)`, at non-negative integer `power` and non-negative integer `from` — Faulhaber's formula, evaluated as the difference of two prefix sums. `src/core/formulas/series.ts:113`
+- `type Series` — Diagnosed result of Formula.sum. `src/core/formulas/series.ts:55`
 - `type SubstitutionFunction<T extends FormulaSource[]> = (this: Formula<T>, variable: GenericFormula, ...inputs: T) => GenericFormula` — Substitution function signature (for nested integration) — used in GeneralFormulaOptions. `src/core/formulas/types.ts:79`
-- `type SubstitutionStack = ((value: GenericFormula) => GenericFormula)[] | undefined` — Stack of substitution functions used during nested integration. `src/core/formulas/types.ts:130`
+- `type SubstitutionStack = ((value: GenericFormula) => GenericFormula)[] | undefined` — Stack of substitution functions used during nested integration. `src/core/formulas/types.ts:131`
 - `type SumFunction<T extends FormulaSource[]> = (this: Formula<T>, from: DecimalSource, count: DecimalSource, ...inputs: T) => Series` — Summation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:71`
-- `type TupleGuard<T extends any[]> = T extends any[] ? FormulasToDecimals<T> : never` — Conditional wrapper that preserves the tuple shape through mapped-type inference. `src/core/formulas/types.ts:147`
-- `type UnaryFormulaInstanceOp = () => GenericFormula` — Instance-side signature of a unary op (`formula.neg()`). `src/core/formulas/formulas.ts:90`
-- `type UnaryFormulaOp = (value: FormulaSource) => GenericFormula` — Signature of a one-argument formula op (e.g. `src/core/formulas/formulas.ts:85`
+- `type TupleGuard<T extends any[]> = T extends any[] ? FormulasToDecimals<T> : never` — Conditional wrapper that preserves the tuple shape through mapped-type inference. `src/core/formulas/types.ts:148`
+- `type UnaryFormulaInstanceOp = () => GenericFormula` — Instance-side signature of a unary op (`formula.neg()`). `src/core/formulas/formulas.ts:97`
+- `type UnaryFormulaOp = (value: FormulaSource) => GenericFormula` — Signature of a one-argument formula op (e.g. `src/core/formulas/formulas.ts:92`
 - `function unrefFormulaSource(value: FormulaSource, variable?: DecimalSource): DecimalSource` — Evaluate a FormulaSource to a DecimalSource — unwraps refs and evaluates formulas. `src/core/formulas/formulas.ts:65`
 - `type VariableFormulaOptions` — Options for creating a variable formula (the "x" in a cost function). `src/core/formulas/types.ts:86`
 
