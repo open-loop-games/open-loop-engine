@@ -365,6 +365,38 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     expect(Decimal.eq(skills.getSkill('reset-cat-mining')!.xp.value, 0)).toBe(true);
   });
 
+  it('a category walk leaves nested lifetime refs alone, as a module reset does', () => {
+    const skills = createSkillCategory<{ id: string }>({
+      id: 'reset-cat-lifetime',
+      mapSkill: () => ({
+        xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
+        retentionFormula: (level) => Formula.variable(level).mul(0.01),
+      }),
+    });
+    skills.register({ id: 'reset-cat-lifetime-mastery' });
+    const mastery = skills.getSkill('reset-cat-lifetime-mastery')!;
+    mastery.xp.value = new Decimal(5000);
+    mastery.accumulateBonus();
+    const bonus = new Decimal(mastery.permanentBonus!.value);
+    expect(bonus.gt(0)).toBe(true);
+
+    createReset({ thingsToReset: [skills] }).reset();
+
+    expect(Decimal.eq(mastery.xp.value, 0)).toBe(true);
+    expect(Decimal.eq(mastery.permanentBonus!.value, bonus)).toBe(true);
+  });
+
+  it('a lifetime ref named directly in thingsToReset is still reset', () => {
+    beginPersistentContext('reset-lifetime-direct');
+    const best = persistent(0, { lifetime: true });
+    endPersistentContext();
+    best.value = 9;
+
+    createReset({ thingsToReset: [best] }).reset();
+
+    expect(best.value).toBe(0);
+  });
+
   it('category wrappers expose [Resettable] yielding their instances', () => {
     const skills = createSkillCategory<{ id: string; xpScale: number }>({
       id: 'reset-cat-yield',

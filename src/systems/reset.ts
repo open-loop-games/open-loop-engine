@@ -23,6 +23,7 @@ import { Decimal } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
   DefaultValue,
+  Lifetime,
   SkipPersistence,
   type Persistent,
   cloneDefault,
@@ -62,6 +63,10 @@ export interface ResetOptions {
    * - Objects with persistent refs (recursively searched)
    * - Resources
    * - Individual persistent refs
+   *
+   * The walk skips refs tagged `lifetime` (see `PersistentOptions.lifetime`),
+   * as `resetModules` does. A lifetime ref given here as its own entry is
+   * reset — that is the hard-wipe path for lifetime state.
    *
    * Optional when {@link resetModules} is provided.
    */
@@ -285,7 +290,8 @@ export function createReset(options: ResetOptions): Reset {
         if (processedThingsToReset) {
           const things = unref(processedThingsToReset);
           for (const thing of things) {
-            resetObject(thing);
+            if (isPersistent(thing)) resetRef(thing);
+            else resetObject(thing);
           }
         }
 
@@ -318,8 +324,17 @@ export function createReset(options: ResetOptions): Reset {
 
 // === RESET IMPLEMENTATION ===
 
+/** Write a persistent ref's default back into it. */
+function resetRef(p: Persistent): void {
+  if (DefaultValue in p) {
+    p.value = cloneDefault(p[DefaultValue]);
+  }
+}
+
 /**
- * Recursively reset all persistent refs in an object tree.
+ * Recursively reset the persistent refs in an object tree, skipping any
+ * tagged `lifetime` — the same refs a module-scoped reset skips. A lifetime
+ * ref is reset only when it is itself a top-level `thingsToReset` entry.
  *
  * Supports the {@link Resettable} protocol: objects implementing
  * `[Resettable]()` yield their resettable contents for recursive walking.
@@ -340,10 +355,7 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
 
   // If it's a persistent ref, reset it
   if (isPersistent(obj)) {
-    const p = obj as Persistent;
-    if (DefaultValue in p) {
-      p.value = cloneDefault(p[DefaultValue]);
-    }
+    if (!obj[Lifetime]) resetRef(obj);
     return;
   }
 

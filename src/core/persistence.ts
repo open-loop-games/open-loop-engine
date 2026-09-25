@@ -105,9 +105,10 @@ export const PersistentDecimal = Symbol('PersistentDecimal');
 export const SkipPersistence = Symbol('SkipPersistence');
 
 /**
- * Marks a persistent ref as "lifetime" — outside the reach of any
- * module-scoped reset. The flag is read by {@link getModulePersistentRefs},
- * which is the only path resets use to gather their scope.
+ * Marks a persistent ref as "lifetime" — outside the reach of any reset
+ * that doesn't name the ref itself. {@link getModulePersistentRefs} drops it
+ * from a module's scope, and a reset's `thingsToReset` walk passes over it
+ * wherever it sits inside a walked object or category.
  *
  * Default: absent / falsy. Set via `persistent(default, { lifetime: true })`
  * for trackers that model "full-life" state (cumulative gain, high-water
@@ -421,10 +422,12 @@ export interface PersistentOptions<T = unknown> {
    * The flag is the default for the trackers `Resource.cumulative` and
    * `Resource.best` — see {@link createResource}.
    *
-   * Opt-out for a specific reset: pass the lifetime ref directly via
-   * `createReset({ thingsToReset: [resource.cumulative] })`. The reset's
-   * `thingsToReset` set bypasses `getModulePersistentRefs` and resets any ref
-   * the consumer hands it.
+   * A `thingsToReset` walk skips the flag the same way: a lifetime ref found
+   * inside an object or category it walks is left alone.
+   *
+   * Opt-out for a specific reset: pass the lifetime ref itself as a
+   * top-level entry, `createReset({ thingsToReset: [resource.cumulative] })`.
+   * A ref named directly is reset whatever its flag.
    *
    * Default: `false`.
    */
