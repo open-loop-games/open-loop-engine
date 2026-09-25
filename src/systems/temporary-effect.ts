@@ -240,7 +240,9 @@ export function createTemporaryEffectSystem(
       duration,
       stackIndex,
       dispose() {
-        removeInstance(instance);
+        if (!cleanupMap.has(id)) return;
+        expireInstance(instance);
+        syncSavedState();
       },
     };
 
@@ -257,6 +259,13 @@ export function createTemporaryEffectSystem(
     instances.value = [...instances.value, instance];
 
     return instance;
+  }
+
+  /** End a live instance the way expiry does: onExpire, `expired`, then cleanup. */
+  function expireInstance(instance: TemporaryEffectInstance): void {
+    defs.get(instance.defId)?.onExpire?.(instance);
+    handle.emit('expired', instance);
+    removeInstance(instance);
   }
 
   function removeInstance(instance: TemporaryEffectInstance): void {
@@ -284,9 +293,7 @@ export function createTemporaryEffectSystem(
       instance.timeRemaining.value = Math.max(0, instance.timeRemaining.value - dt);
 
       if (instance.timeRemaining.value <= 0) {
-        def.onExpire?.(instance);
-        handle.emit('expired', instance);
-        removeInstance(instance);
+        expireInstance(instance);
         anyExpired = true;
       }
     }
@@ -356,12 +363,7 @@ export function createTemporaryEffectSystem(
 
   function dispel(defId: string): void {
     const toRemove = instances.value.filter((i) => i.defId === defId);
-    for (const instance of toRemove) {
-      const def = defs.get(instance.defId);
-      def?.onExpire?.(instance);
-      handle.emit('expired', instance);
-      removeInstance(instance);
-    }
+    for (const instance of toRemove) expireInstance(instance);
     if (toRemove.length > 0) {
       handle.emit('dispelled', defId);
       syncSavedState();
@@ -369,13 +371,7 @@ export function createTemporaryEffectSystem(
   }
 
   function dispelAll(): void {
-    const all = [...instances.value];
-    for (const instance of all) {
-      const def = defs.get(instance.defId);
-      def?.onExpire?.(instance);
-      handle.emit('expired', instance);
-      removeInstance(instance);
-    }
+    for (const instance of [...instances.value]) expireInstance(instance);
     syncSavedState();
   }
 

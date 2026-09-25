@@ -12,6 +12,9 @@ import {
   endPersistentContext,
   resetAllPersistentContexts,
 } from '@/core/persistence';
+import { createMemoryStorage, type StorageAdapter } from '@/core/save-manager';
+import { createEngine, type Engine } from '@/engine';
+import type { TemporaryEffectDef, TemporaryEffectSystem } from '@/systems/temporary-effect';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -40,6 +43,28 @@ function createSystem(tm = createTickManager()) {
     registerTick: tm.registerTick,
   });
   return { system, ...tm };
+}
+
+/**
+ * One engine session over `storage`: a module builds the system inside
+ * install, registers `defs`, and ticks through the engine's driver. Two
+ * sessions over the same storage are a real save → load round trip.
+ */
+function startSession(
+  storage: StorageAdapter,
+  defs: TemporaryEffectDef[],
+): { engine: Engine; system: TemporaryEffectSystem } {
+  let system!: TemporaryEffectSystem;
+  const engine = createEngine({ gameId: 'temp-effect-rt', storageAdapter: storage });
+  engine.use({
+    id: 'buffs',
+    install(ctx) {
+      system = createTemporaryEffectSystem({ id: 'buffs', registerTick: (cb) => ctx.onTick(cb) });
+      system.register(defs);
+    },
+  });
+  engine.start();
+  return { engine, system };
 }
 
 // ============================================================================
@@ -486,24 +511,37 @@ describe('persistence', () => {
     expect(onApply).toHaveBeenCalledOnce();
   });
 
-  // Skipped: this test attempted to simulate a save-load restore by creating
-  // two systems with the same id in one process, relying on both calls sharing
-  // an implicit empty `savedState` ref. That made the assertion tautological
-  // pre-rename, and now fails outright because two persistent refs in the same
-  // context can't both claim the `savedState` name. Restoring meaningful
-  // coverage requires exposing a seam to inject savedState entries directly.
-  it.skip('missing def on restore is silently skipped', () => {
-    const tm = createTickManager();
+  it('a live instance survives a save round trip with its remaining time', () => {
+    const storage = createMemoryStorage();
+    const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
+    first.system.apply('haste');
+    for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
+    first.engine.save();
+    first.engine.dispose();
 
-    beginPersistentContext('test-persist-4');
-    const system = createTemporaryEffectSystem({ id: 'persist4', registerTick: tm.registerTick });
-    endPersistentContext();
+    const second = startSession(storage, [{ id: 'haste', duration: 30 }]);
+    second.engine.load();
+    second.system.restore();
+    expect(second.system.getActive().map((i) => i.timeRemaining.value)).toEqual([18]);
+    second.engine.dispose();
+  });
 
-    system.register({ id: 'burn', duration: 10 });
-    system.apply('burn');
+  it('restore skips a saved instance whose def no longer registers', () => {
+    const storage = createMemoryStorage();
+    const first = startSession(storage, [
+      { id: 'burn', duration: 10 },
+      { id: 'haste', duration: 30 },
+    ]);
+    first.system.apply('burn');
+    first.system.apply('haste');
+    first.engine.save();
+    first.engine.dispose();
 
-    const system2 = createTemporaryEffectSystem({ id: 'persist4', registerTick: tm.registerTick });
-    expect(() => system2.restore()).not.toThrow();
+    const second = startSession(storage, [{ id: 'haste', duration: 30 }]);
+    second.engine.load();
+    expect(() => second.system.restore()).not.toThrow();
+    expect(second.system.getActive().map((i) => i.defId)).toEqual(['haste']);
+    second.engine.dispose();
   });
 });
 
