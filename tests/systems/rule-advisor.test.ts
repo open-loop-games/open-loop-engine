@@ -348,6 +348,23 @@ describe('createRuleAdvisor — dismiss + reset', () => {
     advisor.dismiss('a');
     expect(onDismissed).toHaveBeenCalledTimes(1);
   });
+
+  it("fills a dismissed suggestion's cap slot with the next-ranked one", () => {
+    const advisor = createRuleAdvisor({
+      historySource: () => [],
+      aggregate: () => undefined,
+      analyzers: [
+        () => [
+          { key: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
+          { key: 'k2', severity: 'info' as const, summary: '', payload: undefined },
+        ],
+      ],
+      maxSuggestions: 1,
+    });
+    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k1']);
+    advisor.dismiss('k1');
+    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k2']);
+  });
 });
 
 // ============================================================================
@@ -461,6 +478,30 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
 
     expect(onAccepted).toHaveBeenCalledTimes(1);
     expect(onAccepted.mock.calls[0]![0]).toEqual({ keys: ['a', 'b'], trigger: 'cycle' });
+  });
+
+  it('does NOT fire accepted for a key pushed below the cap', () => {
+    let urgent = false;
+    const advisor = createRuleAdvisor({
+      historySource: () => [],
+      aggregate: () => undefined,
+      analyzers: [
+        () => [
+          ...(urgent
+            ? [{ key: 'k0', severity: 'warning' as const, summary: '', payload: undefined }]
+            : []),
+          { key: 'k1', severity: 'info' as const, summary: '', payload: undefined },
+        ],
+      ],
+      maxSuggestions: 1,
+    });
+    advisor.reevaluate();
+
+    const onAccepted = vi.fn();
+    advisor.on('accepted', onAccepted);
+    urgent = true;
+    expect(advisor.reevaluate('edit').map((s) => s.key)).toEqual(['k0']);
+    expect(onAccepted).not.toHaveBeenCalled();
   });
 });
 

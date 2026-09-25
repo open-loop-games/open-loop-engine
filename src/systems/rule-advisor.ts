@@ -193,8 +193,10 @@ export interface RuleAdvisorEvents<TPayload> {
   /** Fired when `dismiss(key)` is called for a key not already dismissed. */
   dismissed: (key: string) => void;
   /**
-   * Fired when a `reevaluate()` removes one or more previously-visible keys
-   * without an explicit `dismiss()` — the inferred-acceptance signal. The
+   * Fired when a `reevaluate()` finds the analyzers no longer produce one or
+   * more previously-visible, undismissed keys — the inferred-acceptance
+   * signal. A key a higher-ranked suggestion pushed below the cap is still
+   * produced, so it doesn't count. The
    * `trigger` value is whatever the caller passed to `reevaluate()` (engine
    * never inspects it), letting consumers distinguish edit-triggered
    * disappearance (often counts as acceptance) from cycle-triggered drop
@@ -206,16 +208,17 @@ export interface RuleAdvisorEvents<TPayload> {
 /** A rule advisor instance, returned by {@link createRuleAdvisor}. */
 export interface RuleAdvisor<TPayload> {
   /**
-   * Currently-visible suggestions: post-rank, post-cap, post-dismissal-filter.
+   * Currently-visible suggestions: ranked, dismissed keys removed, then
+   * capped — a dismissed suggestion's slot goes to the next-ranked one.
    * Plain readonly array; wrap in a Vue ref via the `'suggestions'` event if
    * reactive UI binding is needed.
    */
   readonly suggestions: readonly Suggestion<TPayload>[];
 
   /**
-   * Re-run aggregation + analysis + rank + cap, apply dismissal filter, emit
-   * `'suggestions'`, and fire `'accepted'` for any keys that were visible
-   * before but absent now.
+   * Re-run aggregation + analysis + rank, drop dismissed keys, cap, emit
+   * `'suggestions'`, and fire `'accepted'` for previously-visible keys the
+   * analyzers no longer produce.
    *
    * The optional `trigger` is opaque to the engine — it threads through to
    * the `'accepted'` event payload, letting consumers filter (e.g., only
@@ -264,6 +267,10 @@ function normalizeMaxSuggestions(c: number | (() => number) | undefined): () => 
   if (c == null) return () => Infinity;
   if (typeof c === 'function') return c;
   return () => c;
+}
+
+function capList<T>(list: T[], cap: number): T[] {
+  return cap < list.length ? list.slice(0, cap) : list;
 }
 
 function resolveHistory<TEntry>(source: HistorySource<TEntry>): readonly TEntry[] {
@@ -365,16 +372,19 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     merged.sort(rankFn);
 
     const cap = getMaxSuggestions();
-    const ranked = cap < merged.length ? merged.slice(0, cap) : merged;
+    onAggregate?.(profile, capList(merged, cap));
 
-    onAggregate?.(profile, ranked);
-
-    const next = ranked.filter((s) => !dismissed.has(s.key));
-    const nextKeys = new Set(next.map((s) => s.key));
+    const next = capList(
+      merged.filter((s) => !dismissed.has(s.key)),
+      cap,
+    );
+    // Acceptance means the analyzers stopped producing the key; one a
+    // higher-ranked suggestion pushed below the cap is still being produced.
+    const producedKeys = new Set(merged.map((s) => s.key));
 
     const acceptedKeys: string[] = [];
     for (const key of lastVisibleKeys) {
-      if (!nextKeys.has(key) && !dismissed.has(key)) acceptedKeys.push(key);
+      if (!producedKeys.has(key) && !dismissed.has(key)) acceptedKeys.push(key);
     }
 
     visible = next;
