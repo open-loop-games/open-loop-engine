@@ -133,9 +133,9 @@ export interface DialogRuntime {
   isActive(): boolean;
   /**
    * How many times a node has been entered, across the full persisted history
-   * (survives save/load). Returns 0 for a never-visited node. Read path for the
-   * visit counts `recordVisit` maintains — lets a Gate or authored branch gate
-   * on "first time here" / "seen N times" without consumer-side bookkeeping.
+   * (survives save/load). Returns 0 for a never-visited node. No Gate kind
+   * reads it: a consumer that branches on "first time here" / "seen N times"
+   * reads it here and publishes it through its own accessor or flags.
    */
   getVisitCount(graphId: string, nodeId: string): number;
   /** Return persistable state for save inclusion. */

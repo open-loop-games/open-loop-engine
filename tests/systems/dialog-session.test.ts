@@ -280,6 +280,17 @@ describe('createDialogSession', () => {
     expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], finished: true });
   });
 
+  it('reads visit counts through the session', () => {
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    session.start('rask-greeting');
+    session.finish();
+    session.start('rask-greeting');
+    expect(session.getVisitCount('rask-greeting', 'open')).toBe(2);
+    expect(session.getVisitCount('rask-greeting', 'secret')).toBe(0);
+  });
+
   it('throws when no ambient accessor is available and none was passed', () => {
     expect(() =>
       createDialogSession({

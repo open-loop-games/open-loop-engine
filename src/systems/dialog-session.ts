@@ -106,6 +106,8 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
+  /** How many times a node has been entered across the saved history; 0 for a never-visited node. */
+  getVisitCount(graphId: string, nodeId: string): number;
   /** Release session-held resources — stops the state-sync watcher. Call when discarding a per-conversation session. */
   dispose(): void;
 }
@@ -126,8 +128,8 @@ const defaultNativeFactory: DialogRuntimeFactory = (graphs, accessor, mutator) =
  *   this session, optional `runtimeFactory` for adapter swaps (Ink / Yarn /
  *   Ren'Py), and optional `accessor` override.
  * @returns A {@link DialogSession} with `start` / `present` / `choose` /
- *   `finish` / `isActive` / `dispose` methods and `presented` / `chosen` /
- *   `finished` events.
+ *   `finish` / `isActive` / `getVisitCount` / `dispose` methods and
+ *   `presented` / `chosen` / `finished` events.
  *
  * @example
  * ```ts
@@ -252,6 +254,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     choose,
     finish,
     isActive: () => runtime.isActive(),
+    getVisitCount: (graphId, nodeId) => runtime.getVisitCount(graphId, nodeId),
     on: events.on,
     dispose() {
       // Stop the sync watch on stateRef; without this, a discarded session
