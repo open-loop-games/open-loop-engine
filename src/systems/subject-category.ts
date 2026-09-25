@@ -20,7 +20,13 @@
 
 import { computed } from 'vue';
 import { Decimal } from '@/primitives/decimal';
-import { isAtDefault, persistent, type Persistent } from '@/core/persistence';
+import {
+  isAtDefault,
+  onHydrated,
+  persistent,
+  resetPersistent,
+  type Persistent,
+} from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { GameStateAccessor } from '@/primitives/types';
 import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
@@ -278,18 +284,26 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
 
 // === PRIVATE BUILDERS ===
 
+function clampScalar(schema: ScalarFieldDef, v: number): number {
+  return Math.min(schema.max ?? Infinity, Math.max(schema.min ?? -Infinity, v));
+}
+
+function clampVectorDim(schema: VectorFieldDef, dim: string, v: number): number {
+  const cfg = schema.dimensionConfig?.[dim];
+  return Math.min(cfg?.max ?? Infinity, Math.max(cfg?.min ?? -Infinity, v));
+}
+
+function clampTierIndex(schema: TierFieldDef, i: number): number {
+  return Math.max(0, Math.min(schema.tiers.length - 1, Math.floor(i)));
+}
+
 function buildScalarField(
   fieldName: string,
   schema: ScalarFieldDef,
   override: PerSubjectOverride<ScalarFieldDef> | undefined,
 ): ScalarFieldInstance {
-  const min = schema.min ?? -Infinity;
-  const max = schema.max ?? Infinity;
   const initial = override?.initial ?? schema.initial ?? 0;
-
-  function clamp(v: number): number {
-    return Math.min(max, Math.max(min, v));
-  }
+  const clamp = (v: number): number => clampScalar(schema, v);
   // Clamp the authored initial too — set() clamps, but a raw seed would let a
   // field sit outside its declared [min, max] until the first set().
   const ref = persistent<number>(clamp(initial), { name: fieldName });
@@ -325,12 +339,7 @@ function buildVectorField<Dims extends string>(
 
   const events = createEmitHandle<VectorFieldEvents<Dims>>();
 
-  function clampForDim(dim: Dims, v: number): number {
-    const cfg = schema.dimensionConfig?.[dim];
-    const min = cfg?.min ?? -Infinity;
-    const max = cfg?.max ?? Infinity;
-    return Math.min(max, Math.max(min, v));
-  }
+  const clampForDim = (dim: Dims, v: number): number => clampVectorDim(schema, dim, v);
 
   const refs = new Map<Dims, Persistent<number>>();
   for (const dim of schema.dimensions) {
@@ -371,9 +380,7 @@ function buildTierField(
   const maxIndex = schema.tiers.length - 1;
   const gates = override?.gates ?? schema.gates;
 
-  function clampIndex(i: number): number {
-    return Math.max(0, Math.min(maxIndex, Math.floor(i)));
-  }
+  const clampIndex = (i: number): number => clampTierIndex(schema, i);
   // Clamp the authored initial index into [0, maxIndex] (setIndex clamps; a raw
   // seed would let an out-of-range initial produce an undefined getTier()).
   const ref = persistent<number>(clampIndex(initial), { name: fieldName });
@@ -518,6 +525,39 @@ function buildField(
   }
 }
 
+/**
+ * Bring a field's value back inside its schema: clamp numbers, and reset an
+ * enum value the schema no longer declares to its seed. Writes the ref, not
+ * `set()`, so no event fires; a value already inside is left alone.
+ */
+function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void {
+  switch (schema.kind) {
+    case 'scalar':
+      writeIfChanged((field as ScalarFieldInstance).ref, (v) => clampScalar(schema, v));
+      return;
+    case 'vector':
+      for (const [dim, ref] of (field as VectorFieldInstance).refs) {
+        writeIfChanged(ref, (v) => clampVectorDim(schema, dim, v));
+      }
+      return;
+    case 'tier':
+      writeIfChanged((field as TierFieldInstance).ref, (v) => clampTierIndex(schema, v));
+      return;
+    case 'enum': {
+      const ref = (field as EnumFieldInstance).ref;
+      if (ref.value !== null && !schema.values.includes(ref.value)) resetPersistent(ref);
+      return;
+    }
+    case 'flag':
+      return;
+  }
+}
+
+function writeIfChanged(ref: Persistent<number>, normalize: (v: number) => number): void {
+  const next = normalize(ref.value);
+  if (next !== ref.value) ref.value = next;
+}
+
 // === FACTORIES ===
 
 /**
@@ -603,6 +643,16 @@ export function createSubjectCategory<S extends FieldSchema>(
       return { id: def.id, fields };
     },
     buildSignals: (_def, instance) => buildSubjectSignals(instance),
+  });
+
+  // A save load writes field refs directly, past set()'s clamp and enum check,
+  // and the schema may have narrowed since that save was written.
+  onHydrated(() => {
+    for (const { instance } of base.getAll()) {
+      for (const fieldName of Object.keys(schema)) {
+        normalizeField(instance.fields[fieldName], schema[fieldName]);
+      }
+    }
   });
 
   const category: SubjectCategory<S> = {

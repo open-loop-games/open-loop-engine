@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
-import { resetAllPersistentContexts } from '@/core/persistence';
+import { loadingSave, resetAllPersistentContexts } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, createPurchasableCategory, type EngineModule } from '@/index';
 import { createSubjectCategory } from '@/systems/subject-category';
@@ -441,6 +441,67 @@ describe('createSubjectCategory', () => {
       expect(signals.count.value.toNumber()).toBe(0);
       cat.get('fresh')!.fields.mood.set('calm', 3);
       expect(signals.count.value.toNumber()).toBe(1);
+    });
+  });
+
+  describe('loaded values', () => {
+    function loadInto(write: () => void): void {
+      loadingSave.value = true;
+      try {
+        write();
+      } finally {
+        loadingSave.value = false;
+      }
+    }
+
+    it('normalizes values a save wrote outside the schema, without events', () => {
+      const cat = createSubjectCategory({
+        id: 'npcs',
+        fields: {
+          trust: { kind: 'scalar', min: 0, max: 50 },
+          mood: { kind: 'vector', dimensions: ['calm'], dimensionConfig: { calm: { max: 10 } } },
+          rank: { kind: 'tier', tiers: ['a', 'b', 'c'] },
+          path: { kind: 'enum', values: ['light', 'dark'], initial: 'light' },
+        },
+      });
+      cat.register({ id: 'rask' });
+      const f = cat.get('rask')!.fields;
+      const changed = vi.fn();
+      f.trust.on('change', changed);
+      f.mood.on('change', changed);
+      f.rank.on('advance', changed);
+      f.path.on('change', changed);
+
+      loadInto(() => {
+        f.trust.ref.value = 90;
+        f.mood.refs.get('calm')!.value = 40;
+        f.rank.ref.value = 4;
+        f.path.ref.value = 'grey' as 'light';
+      });
+
+      expect(f.trust.get()).toBe(50);
+      expect(f.mood.get('calm')).toBe(10);
+      expect(f.rank.getTier()).toBe('c');
+      expect(f.path.get()).toBe('light');
+      expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('leaves in-schema loaded values alone', () => {
+      const cat = createSubjectCategory({
+        id: 'npcs',
+        fields: {
+          trust: { kind: 'scalar', min: 0, max: 50 },
+          path: { kind: 'enum', values: ['light', 'dark'] },
+        },
+      });
+      cat.register({ id: 'rask' });
+      const f = cat.get('rask')!.fields;
+      loadInto(() => {
+        f.trust.ref.value = 30;
+        f.path.ref.value = 'dark';
+      });
+      expect(f.trust.get()).toBe(30);
+      expect(f.path.get()).toBe('dark');
     });
   });
 });
