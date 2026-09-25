@@ -13,6 +13,14 @@
  * - Per-execution engine slots → `lifecycle`, `progress`, `attempt`, `error`,
  *   `timing` on item metadata
  *
+ * Resetting: the category's `[Resettable]` (`thingsToReset: [category]`)
+ * yields only per-def state. The player's queue or list, the running item and
+ * its progress all survive it. Restart those explicitly: `replay()` for a list,
+ * `sequencer.clear()` for a queue. A module-scoped reset (`resetModules`)
+ * reaching the category's context is different: it also sweeps the internal
+ * sequencer's saved queue, current item, cursor and pause flag, and fires no
+ * `cancel`, so run it only where losing the queue is intended.
+ *
  * ID-addressed verbs (`setItemState` / `tickItemProgress` / `setItemError` /
  * `patchItemPayload`) target the current item if its defId matches, else
  * linear-scan `sequencer.items.value` for the first match. Queues <~20 per

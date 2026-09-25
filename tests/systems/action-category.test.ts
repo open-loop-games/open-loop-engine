@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { computed, ref } from 'vue';
-import { persistent, resetAllPersistentContexts, type Persistent } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  endPersistentContext,
+  persistent,
+  resetAllPersistentContexts,
+  type Persistent,
+} from '@/core/persistence';
+import { createReset } from '@/systems/reset';
 import {
   createActionCategory,
   type ActionCategory,
@@ -365,6 +372,50 @@ describe('createActionCategory — Resettable', () => {
       }
     }
     expect(Decimal.eq(category.getState('r')!.timesCompleted.value, 0)).toBe(true);
+  });
+
+  it('a reset of the category resets per-def state and leaves the queue and the running item alone', () => {
+    const { category } = makeCategory();
+    category.register([
+      { id: 'a', baseTicks: 10 },
+      { id: 'b', baseTicks: 10 },
+    ]);
+    category.getState('a')!.timesCompleted.value = 5;
+    category.enqueue('a', { payload: { count: 1 } });
+    category.enqueue('b', { payload: { count: 1 } });
+    category.setItemProgress('a', 3);
+
+    createReset({ thingsToReset: [category] }).reset();
+
+    expect(Decimal.eq(category.getState('a')!.timesCompleted.value, 0)).toBe(true);
+    expect(category.currentItem?.defId).toBe('a');
+    expect(category.currentItem?.progress).toBe(3);
+    expect(category.sequencer.items.value.map((i) => i.metadata.defId)).toEqual(['b']);
+  });
+
+  it('a module-scoped reset sweeps the queue too, without a cancel event', () => {
+    const driver = makeTickDriver();
+    beginPersistentContext('act-mod');
+    const category = createActionCategory<ActionDef, void, void>({
+      id: 'acts',
+      registerTick: driver.registerTick,
+      mapAction: () => ({ signals: { unlock: computed(() => true), count: computed(() => 0) } }),
+    });
+    category.register([
+      { id: 'a', baseTicks: 1 },
+      { id: 'b', baseTicks: 1 },
+    ]);
+    endPersistentContext();
+    const cancelled: string[] = [];
+    category.on('cancel', (e) => cancelled.push(e.def.id));
+    category.enqueue('a');
+    category.enqueue('b');
+
+    createReset({ resetModules: ['act-mod'] }).reset();
+
+    expect(category.currentItem).toBeNull();
+    expect(category.sequencer.items.value).toEqual([]);
+    expect(cancelled).toEqual([]);
   });
 });
 
