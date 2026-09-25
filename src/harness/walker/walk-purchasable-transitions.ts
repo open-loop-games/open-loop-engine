@@ -113,7 +113,7 @@ function emitForEntity(
       categoryId,
       entityId,
       'becomes-affordable',
-      purchasable.canPurchase.value,
+      accessor.getResource(costId),
       distance,
     ),
     deps: depsShape(),

@@ -43,8 +43,10 @@ export interface Transition {
   entityId: string;
   /**
    * Snapshot of the value whose transition is being predicted. Shape depends
-   * on `kind`: boolean for visibility / unlock / goal flips, number for
-   * count-based thresholds, `DecimalSource` for resource-magnitude hints.
+   * on `kind`: boolean for visibility / unlock / goal flips, the owned level
+   * or completion count for `*-maxed` thresholds, and for the affordability
+   * kinds the accessor-reported amount of the cost resource the distance is
+   * metered against (the first cost requirement's, on a multi-cost entity).
    */
   currentValue: DecimalSource | boolean | number;
   /** Distance to the predicted transition. See {@link TransitionDistance}. */

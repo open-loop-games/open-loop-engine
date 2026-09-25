@@ -203,6 +203,8 @@ describe('walkProducerTransitions — producer-becomes-affordable (computed)', (
     expect(out).toHaveLength(1);
     expect(out[0].distance.reason).toBe('computed');
     expect(out[0].distance.seconds).toBe(0);
+    // currentValue is the cost resource's amount, not the owned count.
+    expect(out[0].currentValue).toEqual(bn(20));
   });
 
   it('accessor resource/rate drives the distance, not the producer instance ref', () => {

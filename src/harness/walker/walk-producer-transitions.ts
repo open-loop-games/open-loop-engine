@@ -118,7 +118,7 @@ function emitForEntity(
       categoryId,
       entityId,
       'producer-becomes-affordable',
-      producer.count.value,
+      accessor.getResource(costId),
       distance,
     ),
     // `timeUntilResource` reads amount + rate; count/getCost reactivity is

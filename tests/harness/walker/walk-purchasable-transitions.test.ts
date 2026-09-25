@@ -157,7 +157,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     expect(affordable[0].categoryId).toBe('upgrades');
     expect(affordable[0].entityId).toBe('double');
     expect(affordable[0].label).toBe('upgrades.double.becomes-affordable');
-    expect(affordable[0].currentValue).toBe(false);
+    expect(affordable[0].currentValue).toEqual(bn(40));
     expect(affordable[0].distance.reason).toBe('computed');
     expect(affordable[0].distance.seconds).toBe(30);
   });
@@ -186,9 +186,8 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     expect(affordable).toHaveLength(1);
     expect(affordable[0].distance.reason).toBe('computed');
     expect(affordable[0].distance.seconds).toBe(0);
-    // currentValue reflects canPurchase, which is true when fully affordable
-    // and not maxed / visible.
-    expect(affordable[0].currentValue).toBe(true);
+    // currentValue is the cost resource's amount as the accessor reports it.
+    expect(affordable[0].currentValue).toEqual(bn(200));
   });
 
   // Regression: when a resource has distinct `id` and `displayName` (the
