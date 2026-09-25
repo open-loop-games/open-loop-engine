@@ -23,7 +23,7 @@ import { Decimal, format, toNumber } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '../computed';
 import { profile, profileStart, profileEnd } from '../profiler';
-import { computed, ref, unref, type MaybeRef } from 'vue';
+import { computed, unref, type MaybeRef } from 'vue';
 import * as ops from './operations';
 import {
   captureInversionFailures,
@@ -1079,7 +1079,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * When `condition` is true, applies `formulaModifier`. When false, applies
    * `elseFormulaModifier` (or passes through unchanged if omitted).
-   * Invertible when the active branch is invertible.
+   * Invertible when every branch that can be live is — the condition can flip
+   * at any time, so one non-invertible branch makes the chain non-invertible.
    *
    * @param value - The input formula or value
    * @param condition - Reactive boolean controlling which branch applies
@@ -1092,52 +1093,34 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     formulaModifier: (value: InvertibleIntegralFormula) => GenericFormula,
     elseFormulaModifier?: (value: InvertibleIntegralFormula) => GenericFormula,
   ) {
-    const lhsRef = ref<DecimalSource>(0);
-    const variable = Formula.variable(lhsRef);
-    const formula = formulaModifier(variable);
-    const elseFormula = elseFormulaModifier?.(variable);
+    // Branches are built over a placeholder variable and evaluated at the
+    // input, as `step` does. Writing the input into a ref instead would make
+    // evaluation mutate state it reads, leaving every computed over it dirty.
+    const formula = formulaModifier(Formula.variable(0));
+    const elseFormula = elseFormulaModifier?.(Formula.variable(0));
     const processedCondition = processGetter(condition);
+    const live = () => (unref(processedCondition) ? formula : elseFormula);
     function evalStep(lhs: DecimalSource) {
-      if (unref(processedCondition)) {
-        lhsRef.value = lhs;
-        return formula.evaluate();
-      } else if (elseFormula) {
-        lhsRef.value = lhs;
-        return elseFormula.evaluate();
-      } else {
-        return lhs;
-      }
+      return live()?.evaluate(lhs) ?? lhs;
     }
     function invertStep(value: DecimalSource, lhs: FormulaSource) {
-      if (hasVariable(lhs)) {
-        if (unref(processedCondition)) {
-          if (formula.isInvertible()) {
-            return lhs.invert(formula.invert(value));
-          }
-          reportInversionFailure(
-            'not-invertible',
-            'Could not invert due to no input being a variable',
-          );
-          return 0;
-        } else if (elseFormula) {
-          if (elseFormula.isInvertible()) {
-            return lhs.invert(elseFormula.invert(value));
-          }
-          reportInversionFailure(
-            'not-invertible',
-            'Could not invert due to no input being a variable',
-          );
-          return 0;
-        }
-        return lhs.invert(value);
+      if (!hasVariable(lhs)) {
+        reportInversionFailure(
+          'not-invertible',
+          'Could not invert due to no input being a variable',
+        );
+        return 0;
       }
-      reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
-      return 0;
+      const branch = live();
+      return lhs.invert(branch ? branch.invert(value) : value);
     }
+    const invertible = [formula, elseFormula].every(
+      (branch) => branch == null || (branch.isInvertible() && branch.hasVariable()),
+    );
     return new Formula({
       inputs: [value],
       evaluate: evalStep,
-      invert: formula.isInvertible() && formula.hasVariable() ? invertStep : undefined,
+      invert: invertible ? invertStep : undefined,
       description: 'indeterminate',
     });
   }

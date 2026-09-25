@@ -16,7 +16,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { ref, type MaybeRef } from 'vue';
+import { computed, ref, type MaybeRef } from 'vue';
 import '../utils';
 
 type FormulaFunctions = keyof GenericFormula & keyof typeof Formula & keyof typeof Decimal;
@@ -950,6 +950,67 @@ describe('Conditionals', () => {
     expect(Formula.if(constant, true, (value) => Formula.add(value, variable)).hasVariable()).toBe(
       false,
     );
+  });
+
+  test('Invertible only when every branch that can be live is', () => {
+    // The condition is reactive and invertibility is a property of the chain,
+    // so a non-invertible branch that may go live makes the chain
+    // non-invertible whichever branch is live now.
+    const level = Formula.variable(ref(4));
+    const cond = ref(true);
+    expect(
+      Formula.if(
+        level,
+        cond,
+        (v) => v.mul(2),
+        (v) => v.abs(),
+      ).isInvertible(),
+    ).toBe(false);
+    expect(
+      Formula.if(
+        level,
+        cond,
+        (v) => v.abs(),
+        (v) => v.mul(2),
+      ).isInvertible(),
+    ).toBe(false);
+    const both = Formula.if(
+      level,
+      cond,
+      (v) => v.mul(2),
+      (v) => v.add(3),
+    );
+    expect(both.isInvertible()).toBe(true);
+    expect(both.invert(10)).compare_tolerance(5);
+    cond.value = false;
+    expect(both.invert(10)).compare_tolerance(7);
+  });
+
+  test('Evaluating inside a computed leaves it clean', () => {
+    // Evaluation must not write reactive state the evaluation itself reads, or
+    // every computed over it — buy-max included — recomputes on every read.
+    const cond = ref(true);
+    const formula = Formula.if(
+      Formula.variable(ref(3)),
+      cond,
+      (v) => v.mul(2),
+      (v) => v.add(1),
+    );
+    // The shape buy-max has: one computed samples the curve at the current
+    // level, another reads it and then prices a different level.
+    let runs = 0;
+    const current = computed(() => {
+      runs++;
+      return formula.evaluate();
+    });
+    const priced = computed(() => Decimal.add(current.value, formula.evaluate(5)));
+    expect(priced.value).compare_tolerance(16);
+    void priced.value;
+    void priced.value;
+    expect(runs).toBe(1);
+    cond.value = false;
+    expect(priced.value).compare_tolerance(10);
+    expect(runs).toBe(2);
   });
 
   describe('Pass-through with condition false', () => {
