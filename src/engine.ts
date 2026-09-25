@@ -109,9 +109,9 @@ export const TickDriverKey: InjectionKey<TickDriver> = Symbol('engine:tick-drive
 export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 
 // `EngineCategories` and `CategoriesKey` live alongside the category
-// factories in `./systems/engine-categories` and flow through the
-// `export * from './systems'` barrel above. Imported at the top of this
-// file for the `createEngine` self-publish wiring.
+// factories in `./systems/engine-categories` and reach the public surface
+// through the systems barrel. Imported at the top of this file for the
+// `createEngine` self-publish wiring.
 
 /**
  * Per-module collaboration surface, handed to each {@link EngineModule}'s

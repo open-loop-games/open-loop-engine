@@ -71,7 +71,7 @@ export * from './conversion';
 // === DECLARATIVE BINDINGS ===
 // Types used by category `grants` / `restricts` / `rewards` fields and by
 // `ModifierChain.bind` / `bindings()`. Re-exported here so the
-// `open-cycle-engine/systems` entry point is self-contained for API extraction.
+// `@open-loop/engine/systems` entry point is self-contained for API extraction.
 export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 
 // === PURCHASES ===
@@ -146,7 +146,7 @@ export * from './retention';
 export * from './inventory';
 
 // === TIME ===
-// Time tracking, speed multipliers, and calendar/day systems.
+// Time tracking and speed multipliers.
 export * from './time';
 
 // === TIME BANK ===
@@ -246,15 +246,10 @@ export * from './zone';
 // Tiered progressive unlock of automation features (manual → basic → conditional → priority).
 export * from './automation';
 
-// === WORKERS ===
-// Pure identity container binding Sequencer + TimedProgress + task lookup into
-// one addressable unit ("player", "clone-0", "predictor"). No behavior — the
-// struct exposes its inputs plus currentTaskId/currentTask computeds.
-
 // === CROSS-LAYER TYPE RE-EXPORTS ===
 
 // Types from primitives and core that leak through systems' public API.
-// Selective, not broad: `open-cycle-engine/systems` stays focused on
+// Selective, not broad: `@open-loop/engine/systems` stays focused on
 // systems-layer symbols; consumers still import values from the layer that
 // owns them.
 

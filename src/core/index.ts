@@ -340,10 +340,10 @@ export type { MaybeGetter, Computable } from './computed';
 export { processGetter, resolveComputable } from './computed';
 
 // === PERSISTENCE CONTEXT SCOPING ===
-// withPersistentContext is legitimately called by custom category factories
-// (confirmed by incloneution, idle-loops-ng). The deeper persistence machinery
-// (symbols, begin/end, serialize/deserialize) is engine-internal and accessed
-// via direct '@/core/persistence' imports from the systems layer.
+// withPersistentContext is the scoping entry point for custom category
+// factories. The raw begin/end pair and the remaining persistence symbols stay
+// engine-internal, reached by direct '@/core/persistence' imports from the
+// systems layer; withPersistentContext pops its context even when its body throws.
 export { withPersistentContext } from './persistence';
 
 // === TRACE ===
