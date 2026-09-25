@@ -291,6 +291,18 @@ describe('createDialogSession', () => {
     expect(session.getVisitCount('rask-greeting', 'secret')).toBe(0);
   });
 
+  it('releases its saved state on dispose, so the same id can be recreated', () => {
+    const accessor = buildAccessor();
+    const first = createDialogSession({ id: 'per-talk', graphs: [greetingGraph], accessor });
+    first.start('rask-greeting');
+    first.dispose();
+    expect(getAllPersistentRefs().has('dialog-sessions/per-talk.state')).toBe(false);
+
+    const second = createDialogSession({ id: 'per-talk', graphs: [greetingGraph], accessor });
+    expect(second.isActive()).toBe(false);
+    expect(getAllPersistentRefs().has('dialog-sessions/per-talk.state')).toBe(true);
+  });
+
   it('throws when no ambient accessor is available and none was passed', () => {
     expect(() =>
       createDialogSession({

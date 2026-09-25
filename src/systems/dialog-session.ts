@@ -26,6 +26,7 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 import {
   beginPersistentContext,
+  deletePersistent,
   endPersistentContext,
   loadingSave,
   persistent,
@@ -108,7 +109,10 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   isActive(): boolean;
   /** How many times a node has been entered across the saved history; 0 for a never-visited node. */
   getVisitCount(graphId: string, nodeId: string): number;
-  /** Release session-held resources — stops the state-sync watcher. Call when discarding a per-conversation session. */
+  /**
+   * Discard the session: stops the state-sync watcher and drops the session's
+   * saved state, so a later save omits it and the same id can be created again.
+   */
   dispose(): void;
 }
 
@@ -261,6 +265,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
       // leaks a live watcher that re-imports save state into a stale runtime on
       // every subsequent load (the per-conversation lazy-instantiation path).
       stopStateWatch();
+      deletePersistent(stateRef as unknown as Persistent);
     },
   };
 }
