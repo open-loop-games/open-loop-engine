@@ -79,7 +79,7 @@ interface Scope<T> {
  *
  * @typeParam T - Record of named functions (e.g., `{ getSelfCombat: () => number }`)
  */
-export interface OverrideRegistry<T extends Record<string, (...args: never[]) => unknown>> {
+export interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }> {
   /** Human-readable registry name (passed to `createOverrideRegistry`). */
   readonly name: string;
 
@@ -173,7 +173,7 @@ function overridesKey<T>(scope: Scope<T>, key: keyof T & string): boolean {
  *
  * @param name - Human-readable name for error messages (e.g., "game-overrides")
  */
-export function createOverrideRegistry<T extends Record<string, (...args: never[]) => unknown>>(
+export function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }>(
   name: string,
 ): OverrideRegistry<T> {
   const base = new Map<string, (...args: never[]) => unknown>();

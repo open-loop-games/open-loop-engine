@@ -63,7 +63,7 @@ import type { Grant } from '@/core/modifier';
  * @typeParam Overrides - The override registry's type map (e.g., GameOverrides)
  */
 export interface ChallengeDef<
-  Overrides extends Record<string, (...args: never[]) => unknown> = Record<
+  Overrides extends { [K in keyof Overrides]: (...args: never[]) => unknown } = Record<
     string,
     (...args: never[]) => unknown
   >,

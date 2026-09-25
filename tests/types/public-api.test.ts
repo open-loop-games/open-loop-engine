@@ -21,7 +21,9 @@ import type { DecimalSource } from '@/primitives/decimal';
 
 import {
   createActionCategory,
+  createChallengeCategory,
   createEngine,
+  createOverrideRegistry,
   createResource,
   createRuleAdvisor,
   createSkillCategory,
@@ -39,6 +41,7 @@ import {
   type FirstPassageOptions,
   type Passage,
   type Series,
+  tunable,
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
 import type {
@@ -561,6 +564,32 @@ describe('Decimal static signatures', () => {
     expectTypeOf(Decimal.pow).returns.toEqualTypeOf<Decimal>();
     expectTypeOf(Decimal.log).returns.toEqualTypeOf<Decimal>();
     expectTypeOf(Decimal.ln).returns.toEqualTypeOf<Decimal>();
+  });
+});
+
+describe('createOverrideRegistry type map', () => {
+  interface CombatOverrides {
+    getSelfCombat: () => number;
+    calcBonus: (level: number) => number;
+  }
+
+  it('accepts an interface, which carries no index signature', () => {
+    const combat = createOverrideRegistry<CombatOverrides>('combat');
+    combat.setDefault('calcBonus', (level) => level * 2);
+    expectTypeOf(combat.get('calcBonus')).toEqualTypeOf<(level: number) => number>();
+    expectTypeOf(tunable(combat, 'getSelfCombat', () => 1)).toEqualTypeOf<ComputedRef<number>>();
+    createChallengeCategory({ id: 'ch', overrideRegistry: combat });
+  });
+
+  it('still rejects a key the type map does not declare', () => {
+    const combat = createOverrideRegistry<CombatOverrides>('combat');
+    // @ts-expect-error — 'getSelfCombt' is not a CombatOverrides key
+    combat.override('getSelfCombt', () => 1);
+  });
+
+  it('still rejects a type map with a non-function member', () => {
+    // @ts-expect-error — every member must be a function
+    createOverrideRegistry<{ rate: number }>('bad');
   });
 });
 
