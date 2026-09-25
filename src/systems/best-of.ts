@@ -153,6 +153,8 @@ export interface BestOfOptions {
 export interface BestOf {
   /** Reactive map of current best per metric key (null if no best recorded) */
   readonly entries: ComputedRef<Record<string, BestOfEntry | null>>;
+  /** The metric definitions this tracker was created with, by key */
+  readonly metrics: Readonly<Record<string, BestOfMetricDef>>;
   /** Subscribe to BestOf events */
   on: Emittable<BestOfEvents>['on'];
   /** Manually submit a candidate result for comparison */
@@ -419,6 +421,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
   // --- Public API ---
   const bestOf: BestOf = {
     entries,
+    metrics,
     on: handle.on,
     submit: trySubmit,
 

@@ -1,18 +1,16 @@
 /**
  * Built-in recommendation defs — common inter-cycle patterns
  *
- * Sugar factories for the two most common recommendation patterns found
- * across incremental games with cycle mechanics:
+ * Sugar factory for the most common recommendation pattern found across
+ * incremental games with cycle mechanics:
  *
  * - {@link createBestReplayDef} — "replay the best-known config for this metric"
- *   (Cavernous II loadBestRoute, Melvor Idle combat loadouts)
+ *   (Cavernous II loadBestRoute, Melvor Idle combat loadouts), optionally
+ *   gated on a goal threshold (Spell Compiler farming goals)
  *
- * - {@link createGoalDef} — "optimize for a specific metric goal"
- *   (Spell Compiler farming goals, NGU Idle energy allocation)
- *
- * These are thin wrappers over {@link BestOf} data. Games with more complex
- * needs (adaptive responses, trend detection, route generation) implement
- * custom defs against the {@link RecommendationDef} interface.
+ * A thin wrapper over {@link BestOf} data. Games with more complex needs
+ * (adaptive responses, trend detection, route generation) implement custom
+ * defs against the {@link RecommendationDef} interface.
  *
  * @see {@link createRecommendationSystem} for the system these register with
  * @see {@link createBestOf} for the data source these read from
@@ -35,26 +33,9 @@ export interface BestReplayDefOptions {
    * Default: 1 (needs at least one recorded best).
    */
   minCycles?: number;
-}
-
-/** Options for {@link createGoalDef} */
-export interface GoalDefOptions {
-  /** Def id (required — you may register multiple goal defs) */
-  id: string;
-  /** The BestOf metric key to optimize for */
-  metric: string;
   /**
-   * How the metric's best entry is scored. `'maximize'` (default) scores it by
-   * log10 of its value; `'minimize'` scores that same entry by minus its
-   * elapsed seconds. BestOf keeps one entry per metric, ranked by its value
-   * or per-second rate, so `'minimize'` recommends the same snapshot as `'maximize'` and
-   * cannot surface a faster, lower-value config — only the score and the
-   * summary wording change.
-   */
-  prefer?: 'maximize' | 'minimize';
-  /**
-   * Minimum acceptable value for the metric. Def is not applicable
-   * until at least one BestOf entry meets this threshold.
+   * Minimum best value (the metric's observed cycle delta) before this def
+   * becomes applicable — a goal the player must have reached once.
    */
   threshold?: DecimalSource;
 }
@@ -69,24 +50,32 @@ export interface GoalDefOptions {
  * order across the exact range this engine exists to support. `log10` of the
  * magnitude stays finite and monotonic, preserving the ranking.
  */
-function magnitudeScore(x: Decimal): number {
-  return x.max(1).log10().toNumber();
+function magnitudeScore(x: DecimalSource): number {
+  return Decimal.max(x, 1).log10().toNumber();
+}
+
+/** A cycle's per-second rate; a zero-elapsed cycle has none and rates as 0. */
+function ratePerSecond(value: DecimalSource, elapsed: number): Decimal {
+  return elapsed > 0 ? Decimal.div(value, elapsed) : Decimal.dZero;
 }
 
 // === FACTORIES ===
-
-// --- Best replay ---
 
 /**
  * Create a def that replays the configuration that produced the best value
  * for a given metric. The simplest recommendation pattern — just load
  * whatever worked best last time.
  *
+ * Scores the log10 improvement of the metric's best over the last cycle, in
+ * the metric's {@link BestOfMetricDef.mode}: the projected (else observed)
+ * value for `'absolute'`, the per-second rate for `'perSecond'`. A best the
+ * last cycle matched scores 0 and stays applicable.
+ *
  * Requires that {@link BestOf} was created with a `captureStrategy` callback
  * so that strategy snapshots are recorded alongside best entries.
  *
  * @param metricKey - The BestOf metric key to optimize for
- * @param options - Optional id override and minimum cycle count
+ * @param options - Optional id override, minimum cycle count and goal threshold
  * @returns A {@link RecommendationDef} ready to register
  *
  * @example
@@ -96,6 +85,8 @@ function magnitudeScore(x: Decimal): number {
  *   defs: [
  *     createBestReplayDef('gold'),
  *     createBestReplayDef('xp', { minCycles: 3 }),
+ *     // Quiet until the best run has produced 1000 damage.
+ *     createBestReplayDef('damage', { id: 'goal:damage', threshold: 1000 }),
  *   ],
  * });
  * ```
@@ -106,6 +97,7 @@ export function createBestReplayDef(
 ): RecommendationDef {
   const strategyId = options?.id ?? `best-replay:${metricKey}`;
   const minCycles = options?.minCycles ?? 1;
+  const threshold = options?.threshold;
 
   function getValidEntry(ctx: RecommendationContext): BestOfEntry | null {
     const entry = ctx.bestOf.entries.value[metricKey];
@@ -115,28 +107,37 @@ export function createBestReplayDef(
     return entry;
   }
 
+  function getLastCycle(ctx: RecommendationContext): { delta: Decimal; elapsed: number } {
+    const history = ctx.cycleLog.history.value;
+    const lastEntry = history[history.length - 1];
+    const lastDelta = lastEntry?.deltas.find((d) => d.key === metricKey);
+    return { delta: lastDelta?.delta ?? Decimal.dZero, elapsed: lastEntry?.elapsed ?? 0 };
+  }
+
   return {
     id: strategyId,
 
     canApply(ctx: RecommendationContext): boolean {
       if (ctx.cycle.count.value < minCycles) return false;
-      return getValidEntry(ctx) !== null;
+      const entry = getValidEntry(ctx);
+      if (!entry) return false;
+      return threshold == null || Decimal.gte(entry.value, threshold);
     },
 
     score(ctx: RecommendationContext): number {
       const entry = getValidEntry(ctx)!;
-      // Use perSecond when finite for natural efficiency-based arbitration
-      // across multiple BestReplay strategies for different metrics
-      if (entry.perSecond.isFinite()) return magnitudeScore(entry.perSecond);
-      return magnitudeScore(entry.value);
+      const last = getLastCycle(ctx);
+      if (ctx.bestOf.metrics[metricKey]?.mode === 'perSecond') {
+        const best = entry.elapsed > 0 ? entry.perSecond : Decimal.dZero;
+        return magnitudeScore(best) - magnitudeScore(ratePerSecond(last.delta, last.elapsed));
+      }
+      return magnitudeScore(entry.projected ?? entry.value) - magnitudeScore(last.delta);
     },
 
     recommend(ctx: RecommendationContext) {
       const entry = getValidEntry(ctx)!;
 
-      const lastEntry = ctx.cycleLog.history.value[ctx.cycleLog.history.value.length - 1];
-      const lastDelta = lastEntry?.deltas.find((d) => d.key === metricKey);
-      const current = lastDelta?.delta ?? Decimal.dZero;
+      const current = getLastCycle(ctx).delta;
       const projected = entry.projected ?? entry.value;
       const delta = Decimal.sub(projected, current);
 
@@ -152,88 +153,6 @@ export function createBestReplayDef(
             },
           },
           summary: `Replay best ${metricKey} config (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, cycle #${entry.cycleNumber})`,
-        },
-      };
-    },
-  };
-}
-
-// --- Goal ---
-
-// TODO(expansion): zero direct fork adoption; shipped on faith because the
-// goal-directed shape is corpus-validated. Graduate or delete based on real usage.
-
-/**
- * Create a def that selects the configuration optimizing for a specific
- * metric goal. More opinionated than {@link createBestReplayDef} — it adds
- * threshold gating and a choice of score (value or elapsed time) for the
- * metric's best entry.
- *
- * @param options - Goal definition with metric, direction, and optional threshold
- * @returns A {@link RecommendationDef} ready to register
- *
- * @example
- * ```ts
- * const recs = createRecommendationSystem({
- *   // ...
- *   defs: [
- *     createGoalDef({ id: 'farm-gold', metric: 'gold', prefer: 'maximize' }),
- *     createGoalDef({
- *       id: 'speed-clear', metric: 'damage', prefer: 'minimize',
- *       // Applicable once the best run reached 1000 damage; scored by that
- *       // run's elapsed time, not by searching for a faster one.
- *       threshold: 1000,
- *     }),
- *   ],
- * });
- * ```
- */
-export function createGoalDef(options: GoalDefOptions): RecommendationDef {
-  const { id, metric, prefer = 'maximize', threshold } = options;
-
-  function getEntry(ctx: RecommendationContext): BestOfEntry | null {
-    const entry = ctx.bestOf.entries.value[metric];
-    return entry?.status === 'valid' ? entry : null;
-  }
-
-  return {
-    id,
-
-    canApply(ctx: RecommendationContext): boolean {
-      const entry = getEntry(ctx);
-      if (!entry) return false;
-      if (threshold != null && Decimal.lt(entry.value, threshold)) return false;
-      return true;
-    },
-
-    score(ctx: RecommendationContext): number {
-      const entry = getEntry(ctx)!;
-      if (prefer === 'minimize') {
-        // Lower elapsed = better; negate so higher score = better
-        return -entry.elapsed;
-      }
-      return magnitudeScore(entry.value);
-    },
-
-    recommend(ctx: RecommendationContext) {
-      const entry = getEntry(ctx)!;
-      const snapshot = entry.strategySnapshot ?? ctx.currentSnapshot;
-
-      const lastEntry = ctx.cycleLog.history.value[ctx.cycleLog.history.value.length - 1];
-      const lastDelta = lastEntry?.deltas.find((d) => d.key === metric);
-      const current = lastDelta?.delta ?? Decimal.dZero;
-      const projected = entry.projected ?? entry.value;
-      const delta = Decimal.sub(projected, current);
-
-      const direction = prefer === 'maximize' ? 'highest' : 'fastest';
-      return {
-        snapshot,
-        rationale: {
-          strategyId: id,
-          metrics: {
-            [metric]: { current, projected, delta },
-          },
-          summary: `Goal: ${direction} ${metric} (best: ${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s)`,
         },
       };
     },

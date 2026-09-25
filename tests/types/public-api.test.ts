@@ -1336,6 +1336,16 @@ describe('Removed surface stays removed', () => {
     >().toEqualTypeOf<false>();
   });
 
+  it('createGoalDef is gone — createBestReplayDef takes the threshold', () => {
+    type Keys = keyof typeof import('@/index');
+    expectTypeOf<'createGoalDef' extends Keys ? true : false>().toEqualTypeOf<false>();
+    // @ts-expect-error — folded into BestReplayDefOptions.
+    type _GoalDefOptions = import('@/index').GoalDefOptions;
+    expectTypeOf<import('@/index').BestReplayDefOptions['threshold']>().toEqualTypeOf<
+      DecimalSource | undefined
+    >();
+  });
+
   it('IResource and IModifier no longer resolve from the root barrel', () => {
     // @ts-expect-error — IResource was replaced by the Resource union.
     type _IResource = import('@/index').IResource;
