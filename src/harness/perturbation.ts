@@ -45,7 +45,12 @@
 
 import type { Engine } from '@/engine';
 import type { Grant, Modifier, ModifierChain } from '@/core/modifier';
-import { overlayBinding, type ModifierWrap } from '@/systems/binding-slots';
+import {
+  createWrapStack,
+  overlayBinding,
+  type ModifierWrap,
+  type WrapStack,
+} from '@/systems/binding-slots';
 import { flattenGrants } from '@/systems/modifier-binding';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
@@ -202,10 +207,10 @@ function resolveChainTarget(chain: ModifierChain, discovered: Modifier, index: n
   return atIndex;
 }
 
-/** One chain modifier's active perturbations, outermost last. */
+/** One chain modifier's active perturbations. */
 interface ChainOverlay {
   original: Modifier;
-  wraps: ModifierWrap[];
+  wraps: WrapStack;
   /** The object currently standing in the chain for `original`. */
   live: Modifier;
 }
@@ -219,26 +224,25 @@ function overlayChainModifier(
   target: Modifier,
   wrap: ModifierWrap,
 ): () => void {
-  const overlay = chainOverlays.get(target) ?? { original: target, wraps: [], live: target };
-  overlay.wraps.push(wrap);
-  reseatChainOverlay(chain, overlay);
-
-  let cleaned = false;
-  return () => {
-    if (cleaned) return;
-    cleaned = true;
-    overlay.wraps.splice(overlay.wraps.indexOf(wrap), 1);
-    reseatChainOverlay(chain, overlay);
-  };
+  let overlay = chainOverlays.get(target);
+  if (overlay == null) {
+    const created: ChainOverlay = {
+      original: target,
+      wraps: createWrapStack(() => reseatChainOverlay(chain, created)),
+      live: target,
+    };
+    overlay = created;
+  }
+  return overlay.wraps.push(wrap);
 }
 
 /** Swap the overlay's live object for its current composition, in place; a no-op once it has left the chain. */
 function reseatChainOverlay(chain: ModifierChain, overlay: ChainOverlay): void {
-  const next = overlay.wraps.reduce((m, wrap) => wrap(m), overlay.original);
+  const next = overlay.wraps.compose(overlay.original);
   if (!chain.replace(overlay.live, next)) return;
   chainOverlays.delete(overlay.live);
   overlay.live = next;
-  if (overlay.wraps.length > 0) chainOverlays.set(next, overlay);
+  if (overlay.wraps.size > 0) chainOverlays.set(next, overlay);
 }
 
 /**

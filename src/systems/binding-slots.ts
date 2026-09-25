@@ -24,6 +24,23 @@ import { lowerGrants } from './modifier-binding';
 /** A transform over the modifier a binding resolves to. */
 export type ModifierWrap = (modifier: Modifier) => Modifier;
 
+/**
+ * Wraps stacked over one base modifier, each wrapping the ones before it.
+ *
+ * @internal Binding overlays, and the balance harness's chain-modifier overlays.
+ */
+export interface WrapStack {
+  /**
+   * Push `wrap` and reseat. The returned cleanup removes this push and
+   * reseats; it runs once, and one wrap function pushed twice unwinds once
+   * per cleanup.
+   */
+  push(wrap: ModifierWrap): () => void;
+  /** `base` under every wrap on the stack, outermost last. */
+  compose(base: Modifier): Modifier;
+  readonly size: number;
+}
+
 /** One definition's reserved chain positions and live bindings. */
 export interface BindingSlots {
   /**
@@ -60,6 +77,37 @@ interface LiveBinding {
 const seated = new WeakMap<Modifier, number>();
 
 /**
+ * Create an empty wrap stack; `reseat` puts the current composition in place
+ * after every push and every cleanup.
+ *
+ * @internal
+ */
+export function createWrapStack(reseat: () => void): WrapStack {
+  const wraps: ModifierWrap[] = [];
+  return {
+    push(wrap) {
+      // A fresh token per push, so the cleanup removes this push and no other.
+      const token: ModifierWrap = (m) => wrap(m);
+      wraps.push(token);
+      reseat();
+      let removed = false;
+      return () => {
+        if (removed) return;
+        removed = true;
+        wraps.splice(wraps.indexOf(token), 1);
+        reseat();
+      };
+    },
+    compose(base) {
+      return wraps.reduce((m, wrap) => wrap(m), base);
+    },
+    get size() {
+      return wraps.length;
+    },
+  };
+}
+
+/**
  * Create the slot table for one effect definition's `modifiers`.
  *
  * A static list lowers here and claims its chain positions at once, so each
@@ -77,7 +125,7 @@ export function createBindingSlots(
   // A factory-form binding list can aim one index at different chains across
   // activations, so each (index, chain) pair keeps its own slot.
   const byIndex = new Map<number, Map<ModifierChain, ModifierChainSlot>>();
-  const overlays = new Map<number, ModifierWrap[]>();
+  const overlays = new Map<number, WrapStack>();
   // In bind order, which is also each slot's member order.
   const live: LiveBinding[] = [];
 
@@ -100,8 +148,7 @@ export function createBindingSlots(
   for (const [index, binding] of fixed.entries()) slotFor(index, binding.chain);
 
   function seat(binding: LiveBinding): void {
-    const wraps = overlays.get(binding.index) ?? [];
-    const standing = wraps.reduce((m, wrap) => wrap(m), binding.resolved);
+    const standing = overlays.get(binding.index)?.compose(binding.resolved) ?? binding.resolved;
     seated.set(standing, (seated.get(standing) ?? 0) + 1);
     const remove = binding.slot.add(standing);
     binding.remove = () => {
@@ -145,22 +192,12 @@ export function createBindingSlots(
       };
     },
     overlay(index, wrap) {
-      let wraps = overlays.get(index);
-      if (wraps == null) {
-        wraps = [];
-        overlays.set(index, wraps);
+      let stack = overlays.get(index);
+      if (stack == null) {
+        stack = createWrapStack(() => reseat(index));
+        overlays.set(index, stack);
       }
-      // A fresh token per call, so one wrap function overlaid twice unwinds once per cleanup.
-      const token: ModifierWrap = (m) => wrap(m);
-      wraps.push(token);
-      reseat(index);
-      let removed = false;
-      return () => {
-        if (removed) return;
-        removed = true;
-        wraps.splice(wraps.indexOf(token), 1);
-        reseat(index);
-      };
+      return stack.push(wrap);
     },
     release() {
       for (const binding of live) binding.remove();
