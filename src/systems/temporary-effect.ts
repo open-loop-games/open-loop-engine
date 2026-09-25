@@ -9,7 +9,7 @@
  * - Stacking: independent timers or duration refresh per definition
  * - Modifier integration: binds to `ModifierChain`s while active, auto-removes on expiry
  * - Query surface: reactive `isActive` / `activeCount`, tag-based filtering
- * - Persistence: summary-based save/load with explicit `restore()` for reconstruction
+ * - Persistence: summary-based save; every load and reset rebuilds the live instances
  * - Events: applied, expired, dispelled
  *
  * Interactions between effects (e.g., "if Burn and Frost both active, trigger Steam")
@@ -43,9 +43,10 @@
 import { computed, isRef, ref, shallowRef, unref, type ComputedRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
-import { persistent, withPersistentContext } from '@/core/persistence';
+import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
+import { attachContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import type { ModifierBinding } from './modifier-binding';
 import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
@@ -92,8 +93,11 @@ export interface TemporaryEffectDef {
   onTick?: (instance: TemporaryEffectInstance, dt: number) => void;
   /** Called when the effect expires naturally or is dispelled */
   onExpire?: (instance: TemporaryEffectInstance) => void;
-  /** Called instead of onApply when reconstructing from a save. Falls back to onApply if not defined. */
-  onRestore?: (instance: TemporaryEffectInstance) => void;
+  /**
+   * Called instead of onApply for each instance a load rebuilds from the
+   * save. Falls back to onApply if not defined.
+   */
+  onRehydrate?: (instance: TemporaryEffectInstance) => void;
 }
 
 /** A live instance of a temporary effect, created by {@link TemporaryEffectSystem.apply}. */
@@ -109,7 +113,7 @@ export interface TemporaryEffectInstance {
   /**
    * Stack slot (0-based) among live instances of the same def: the lowest
    * index no other live stack holds when this one was applied, so a slot a
-   * stack frees is reused. Not saved; `restore()` reassigns slots from 0.
+   * stack frees is reused. Not saved; a load reassigns slots from 0.
    */
   readonly stackIndex: number;
   /** Remove this instance early (cleans up modifiers, fires onExpire) */
@@ -160,8 +164,6 @@ export interface TemporaryEffectSystem {
   getActive(): TemporaryEffectInstance[];
   /** Active instances whose def has the given tag (reactive) */
   getByTag(tag: string): TemporaryEffectInstance[];
-  /** Reconstruct active instances from saved state. Call after save load. */
-  restore(): void;
   /** Subscribe to system events */
   on: Emittable<TemporaryEffectEvents>['on'];
   /** Unsubscribe tick and clean up all instances */
@@ -227,9 +229,12 @@ export function createTemporaryEffectSystem(
   let instanceCounter = 0;
 
   // Persistence
-  const savedState = withPersistentContext(`temp-effect:${options.id}`, () =>
+  const contextId = `temp-effect:${options.id}`;
+  const savedState = withPersistentContext(contextId, () =>
     persistent<EffectSnapshot[]>([], { name: 'savedState' }),
   );
+  /** The array `syncSavedState` last wrote, so a hydration that left it alone is skipped. */
+  let lastSynced = savedState.value;
 
   // --------------------------------------------------------------------
   // Internal helpers
@@ -254,6 +259,7 @@ export function createTemporaryEffectSystem(
       timeRemaining: i.timeRemaining.value,
       duration: i.duration,
     }));
+    lastSynced = savedState.value;
   }
 
   function createInstance(
@@ -436,8 +442,9 @@ export function createTemporaryEffectSystem(
     });
   }
 
-  function restore(): void {
-    // Clear any existing instances without firing events
+  /** Replace the live instances with the saved ones, firing no expiry. */
+  function rehydrate(): void {
+    lastSynced = savedState.value;
     for (const instance of instances.value) unbindInstance(instance);
     instances.value = [];
 
@@ -451,13 +458,19 @@ export function createTemporaryEffectSystem(
         snap.timeRemaining,
         lowestFreeStackIndex(snap.defId),
       );
-      const restoreHook = def.onRestore ?? def.onApply;
-      restoreHook?.(instance);
+      (def.onRehydrate ?? def.onApply)?.(instance);
     }
   }
 
+  // Every engine's load and reset settles through here, so rebuild only when
+  // the saved array is no longer the one this system wrote.
+  const stopHydrated = onHydrated(() => {
+    if (savedState.value !== lastSynced) rehydrate();
+  });
+
   function dispose(): void {
     unsubscribeTick();
+    stopHydrated();
     // Clean up all instances without firing events
     for (const instance of instances.value) unbindInstance(instance);
     instances.value = [];
@@ -478,7 +491,6 @@ export function createTemporaryEffectSystem(
     activeCount,
     getActive,
     getByTag,
-    restore,
     on: handle.on,
     dispose,
   };
@@ -490,5 +502,5 @@ export function createTemporaryEffectSystem(
   getCurrentEffectSystemRegistry()?.register(system);
   registerBindingSlots(system, (defId) => slotsByDef.get(defId));
 
-  return system;
+  return attachContextReset(system, contextId);
 }

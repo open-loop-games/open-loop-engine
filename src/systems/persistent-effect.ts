@@ -13,7 +13,7 @@
  *
  * Key features:
  * - Declarative condition — bindings track a reactive predicate
- * - Automatic load reconstruction — predicate re-evaluates on rehydrate, no `restore()` needed
+ * - Automatic load reconstruction — predicate re-evaluates on rehydrate
  * - Zero save bloat — state is implicit in the game, nothing duplicated
  *
  * For prestige-style "N copies of an effect" scaling, prefer a single reactive

@@ -8,8 +8,6 @@ import {
   createAdditiveModifier,
 } from '@/core/modifier';
 import {
-  beginPersistentContext,
-  endPersistentContext,
   resetAllPersistentContexts,
   withPersistentContext,
   getAllPersistentRefs,
@@ -17,6 +15,7 @@ import {
 } from '@/core/persistence';
 import { createMemoryStorage, type StorageAdapter } from '@/core/save-manager';
 import { createEngine, type Engine } from '@/engine';
+import { createReset } from '@/systems/reset';
 import type { TemporaryEffectDef, TemporaryEffectSystem } from '@/systems/temporary-effect';
 
 beforeEach(() => {
@@ -56,9 +55,14 @@ function createSystem(tm = createTickManager()) {
 function startSession(
   storage: StorageAdapter,
   defs: TemporaryEffectDef[],
+  persistenceNamespace?: string,
 ): { engine: Engine; system: TemporaryEffectSystem } {
   let system!: TemporaryEffectSystem;
-  const engine = createEngine({ gameId: 'temp-effect-rt', storageAdapter: storage });
+  const engine = createEngine({
+    gameId: 'temp-effect-rt',
+    storageAdapter: storage,
+    persistenceNamespace,
+  });
   engine.use({
     id: 'buffs',
     install(ctx) {
@@ -491,56 +495,76 @@ describe('dispel', () => {
 // ============================================================================
 
 describe('persistence', () => {
-  it('restore reconstructs instances from saved data', () => {
-    const tm = createTickManager();
-    // Create system in a persistent context
-    beginPersistentContext('test-persist');
-    const system = createTemporaryEffectSystem({ id: 'persist', registerTick: tm.registerTick });
-    endPersistentContext();
-
-    system.register({ id: 'burn', duration: 10 });
-    system.apply('burn');
-    tm.tick(3); // 7s remaining
-
-    // Simulate save/load: restore from current state
-    system.restore();
-    expect(system.getActive()).toHaveLength(1);
-    expect(system.getActive()[0]!.timeRemaining.value).toBeCloseTo(7);
-  });
-
-  it('onRestore fires instead of onApply when defined', () => {
-    const tm = createTickManager();
+  it('a load rebuilds instances from the save, firing onRehydrate instead of onApply', () => {
     const onApply = vi.fn();
-    const onRestore = vi.fn();
-
-    beginPersistentContext('test-persist-2');
-    const system = createTemporaryEffectSystem({ id: 'persist2', registerTick: tm.registerTick });
-    endPersistentContext();
-
-    system.register({ id: 'burn', duration: 10, onApply, onRestore });
-    system.apply('burn');
-    expect(onApply).toHaveBeenCalledOnce();
-
+    const onRehydrate = vi.fn();
+    const defs = [{ id: 'burn', duration: 10, onApply, onRehydrate }];
+    const storage = createMemoryStorage();
+    const first = startSession(storage, defs);
+    first.system.apply('burn');
+    first.engine.save();
+    first.engine.dispose();
     onApply.mockClear();
-    system.restore();
-    expect(onRestore).toHaveBeenCalledOnce();
+
+    const second = startSession(storage, defs);
+    second.engine.load();
+    expect(second.system.getActive().map((i) => i.defId)).toEqual(['burn']);
+    expect(onRehydrate).toHaveBeenCalledOnce();
     expect(onApply).not.toHaveBeenCalled();
+    second.engine.dispose();
   });
 
-  it('onApply fires as fallback when onRestore not defined', () => {
-    const tm = createTickManager();
+  it('a load falls back to onApply when the def has no onRehydrate', () => {
     const onApply = vi.fn();
-
-    beginPersistentContext('test-persist-3');
-    const system = createTemporaryEffectSystem({ id: 'persist3', registerTick: tm.registerTick });
-    endPersistentContext();
-
-    system.register({ id: 'burn', duration: 10, onApply });
-    system.apply('burn');
+    const storage = createMemoryStorage();
+    const first = startSession(storage, [{ id: 'burn', duration: 10, onApply }]);
+    first.system.apply('burn');
+    first.engine.save();
+    first.engine.dispose();
     onApply.mockClear();
 
-    system.restore();
+    const second = startSession(storage, [{ id: 'burn', duration: 10, onApply }]);
+    second.engine.load();
     expect(onApply).toHaveBeenCalledOnce();
+    second.engine.dispose();
+  });
+
+  it('a mid-session load replaces the live instances and their modifiers', () => {
+    const chain = createModifierChain('speed');
+    const defs: TemporaryEffectDef[] = [
+      {
+        id: 'haste',
+        duration: 30,
+        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+      },
+      { id: 'burn', duration: 10 },
+    ];
+    const storage = createMemoryStorage();
+    const { engine, system } = startSession(storage, defs);
+    system.apply('burn');
+    engine.save();
+    system.apply('haste');
+    expect(Decimal.eq(chain.apply(10), 20)).toBe(true);
+
+    engine.load();
+    expect(system.getActive().map((i) => i.defId)).toEqual(['burn']);
+    expect(Decimal.eq(chain.apply(10), 10)).toBe(true);
+    engine.dispose();
+  });
+
+  it("another engine's load leaves this engine's instances alone", () => {
+    const onRehydrate = vi.fn();
+    const live = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30, onRehydrate }]);
+    const haste = live.system.apply('haste')!;
+
+    const scratch = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30 }], 'scratch');
+    scratch.engine.save();
+    expect(scratch.engine.load().success).toBe(true);
+
+    expect(onRehydrate).not.toHaveBeenCalled();
+    expect(live.system.getActive()).toEqual([haste]);
+    scratch.engine.dispose();
+    live.engine.dispose();
   });
 
   it('a live instance survives a save round trip with its remaining time', () => {
@@ -553,12 +577,11 @@ describe('persistence', () => {
 
     const second = startSession(storage, [{ id: 'haste', duration: 30 }]);
     second.engine.load();
-    second.system.restore();
     expect(second.system.getActive().map((i) => i.timeRemaining.value)).toEqual([18]);
     second.engine.dispose();
   });
 
-  it('a restored instance keeps the duration it was applied with', () => {
+  it('a rehydrated instance keeps the duration it was applied with', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
     first.system.apply('haste');
@@ -569,14 +592,13 @@ describe('persistence', () => {
     // Rebalanced since the save: the def now lasts 10s.
     const second = startSession(storage, [{ id: 'haste', duration: 10 }]);
     second.engine.load();
-    second.system.restore();
     const [instance] = second.system.getActive();
     expect(instance!.duration).toBe(30);
     expect(instance!.timeRemaining.value).toBe(18);
     second.engine.dispose();
   });
 
-  it('a save without durations restores one no shorter than the time remaining', () => {
+  it('a save without durations rehydrates one no shorter than the time remaining', () => {
     const system = withPersistentContext('legacy', () =>
       createTemporaryEffectSystem({ id: 'legacy', registerTick: () => () => {} }),
     );
@@ -584,13 +606,12 @@ describe('persistence', () => {
     deserializePersistents(getAllPersistentRefs(), {
       'temp-effect:legacy': { savedState: [{ defId: 'haste', timeRemaining: 25 }] },
     });
-    system.restore();
     const [instance] = system.getActive();
     expect(instance!.duration).toBe(25);
     expect(instance!.timeRemaining.value).toBe(25);
   });
 
-  it('restore skips a saved instance whose def no longer registers', () => {
+  it('a load skips a saved instance whose def no longer registers', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [
       { id: 'burn', duration: 10 },
@@ -602,10 +623,46 @@ describe('persistence', () => {
     first.engine.dispose();
 
     const second = startSession(storage, [{ id: 'haste', duration: 30 }]);
-    second.engine.load();
-    expect(() => second.system.restore()).not.toThrow();
+    expect(() => second.engine.load()).not.toThrow();
     expect(second.system.getActive().map((i) => i.defId)).toEqual(['haste']);
     second.engine.dispose();
+  });
+});
+
+describe('resets', () => {
+  function buildHasted() {
+    const chain = createModifierChain('speed');
+    const onExpire = vi.fn();
+    const system = withPersistentContext('run', () =>
+      createTemporaryEffectSystem({ id: 'run-buffs', registerTick: () => () => {} }),
+    );
+    system.register({
+      id: 'haste',
+      duration: 30,
+      onExpire,
+      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+    });
+    system.apply('haste');
+    return { system, chain, onExpire };
+  }
+
+  it('a module reset drops every live instance and its modifiers, without onExpire', () => {
+    const { system, chain, onExpire } = buildHasted();
+
+    createReset({ resetModules: ['run'] }).reset();
+
+    expect(system.getActive()).toEqual([]);
+    expect(Decimal.eq(chain.apply(10), 10)).toBe(true);
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+
+  it('a reset naming the system in thingsToReset drops every live instance', () => {
+    const { system, chain } = buildHasted();
+
+    createReset({ thingsToReset: [system] }).reset();
+
+    expect(system.getActive()).toEqual([]);
+    expect(Decimal.eq(chain.apply(10), 10)).toBe(true);
   });
 });
 
