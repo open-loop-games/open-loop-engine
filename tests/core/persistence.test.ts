@@ -695,6 +695,17 @@ describe('getModulePersistentRefs', () => {
     });
   });
 
+  it('a namespaced lookup never falls through to an unnamespaced module', () => {
+    beginPersistentContext('mod-live-shop');
+    persistent(42);
+    endPersistentContext();
+
+    withPersistenceNamespace('fork-1', () => {
+      expect(getModulePersistentRefs('mod-live-shop').size).toBe(0);
+      expect(getPersistentRefs('mod-live-shop')).toBeUndefined();
+    });
+  });
+
   it('resetAllPersistentContexts clears children', () => {
     beginPersistentContext('mod-cleartest');
     persistent(0);

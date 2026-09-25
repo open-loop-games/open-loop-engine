@@ -723,16 +723,19 @@ export function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, 
 
 // === REGISTRY QUERIES ===
 
+/** A raw context id as registered under the active namespace. */
+function toFullContextId(contextId: string): string {
+  return activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${contextId}` : contextId;
+}
+
 /**
  * Get all persistent refs for a given context.
  *
- * Accepts the raw context id — namespace resolution uses the currently
- * active namespace (if any) so the default/unnamespaced lookup path keeps
- * working for consumers and tests that have no awareness of namespacing.
+ * Accepts the raw context id and resolves it within the active namespace
+ * only, so a forked engine never reads another engine's context.
  */
 export function getPersistentRefs(contextId: string): Set<Persistent> | undefined {
-  const fullId = activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${contextId}` : contextId;
-  return persistentRefs[fullId] ?? persistentRefs[contextId];
+  return persistentRefs[toFullContextId(contextId)];
 }
 
 /**
@@ -747,10 +750,8 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
  * @param moduleId - The raw context id (typically the module's `id` field)
  */
 export function getModulePersistentRefs(moduleId: string): Set<Persistent> {
-  const fullId = activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${moduleId}` : moduleId;
-  const rootId = fullId in persistentRefs ? fullId : moduleId;
   const result = new Set<Persistent>();
-  const stack = [rootId];
+  const stack = [toFullContextId(moduleId)];
   while (stack.length > 0) {
     const ctx = stack.pop()!;
     const refs = persistentRefs[ctx];
