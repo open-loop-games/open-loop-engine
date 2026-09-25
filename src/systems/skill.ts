@@ -49,6 +49,7 @@ import {
   type ModifierChain,
 } from '@/core/modifier';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import { processGetter, type Computable } from '@/core/computed';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
@@ -226,10 +227,15 @@ function toFormula(source: FormulaSource): GenericFormula {
 function buildSkillState(
   id: string,
   isLevelDriven: boolean,
-): { xp: Persistent<DecimalSource>; permanentBonus: Persistent<DecimalSource> | null } {
+): {
+  contextId: string;
+  xp: Persistent<DecimalSource>;
+  permanentBonus: Persistent<DecimalSource> | null;
+} {
   const parent = getCurrentContext();
-  const ctxId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
-  return withPersistentContext(ctxId, () => ({
+  const contextId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
+  return withPersistentContext(contextId, () => ({
+    contextId,
     xp: persistent<DecimalSource>(0, { name: 'xp' }),
     permanentBonus: isLevelDriven
       ? null
@@ -376,7 +382,7 @@ export function createSkill(options: SkillOptions): Skill {
   const { id } = options;
   const isLevelDriven = 'levelToMultiplier' in options && options.levelToMultiplier != null;
 
-  const { xp, permanentBonus } = buildSkillState(id, isLevelDriven);
+  const { contextId, xp, permanentBonus } = buildSkillState(id, isLevelDriven);
 
   const { xpCurve, level, multiplierCurve, retentionCurve, modifier } = buildSkillCurves(
     options,
@@ -411,29 +417,29 @@ export function createSkill(options: SkillOptions): Skill {
   };
 
   if (isLevelDriven) {
-    return {
-      ...base,
-      multiplierCurve: multiplierCurve!,
-    };
+    return attachContextReset({ ...base, multiplierCurve: multiplierCurve! }, contextId);
   }
 
-  return {
-    ...base,
-    permanentBonus: permanentBonus!,
-    retentionCurve: retentionCurve!,
-    accumulateBonus() {
-      const gain = retentionCurve!.evaluate();
-      permanentBonus!.value = Decimal.add(permanentBonus!.value, gain);
+  return attachContextReset(
+    {
+      ...base,
+      permanentBonus: permanentBonus!,
+      retentionCurve: retentionCurve!,
+      accumulateBonus() {
+        const gain = retentionCurve!.evaluate();
+        permanentBonus!.value = Decimal.add(permanentBonus!.value, gain);
+      },
+      projectGain(additionalXP: DecimalSource): DecimalSource {
+        const projectedXP = Decimal.add(xp.value, additionalXP);
+        const projectedLevel = xpCurve.evaluate(projectedXP);
+        const currentRetention = retentionCurve!.evaluate();
+        const projectedRetention = retentionCurve!.evaluate(projectedLevel);
+        const delta = Decimal.sub(projectedRetention, currentRetention);
+        return Decimal.max(delta, 0);
+      },
     },
-    projectGain(additionalXP: DecimalSource): DecimalSource {
-      const projectedXP = Decimal.add(xp.value, additionalXP);
-      const projectedLevel = xpCurve.evaluate(projectedXP);
-      const currentRetention = retentionCurve!.evaluate();
-      const projectedRetention = retentionCurve!.evaluate(projectedLevel);
-      const delta = Decimal.sub(projectedRetention, currentRetention);
-      return Decimal.max(delta, 0);
-    },
-  };
+    contextId,
+  );
 }
 
 // === PUBLIC UTILITIES ===

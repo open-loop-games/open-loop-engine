@@ -3,10 +3,10 @@
  * resettable contents to a reset's `thingsToReset` walk.
  *
  * Lives in core so core primitives and systems alike can implement it
- * without importing the reset system. Categories yield their instances;
- * every system that owns a persistent context yields that context's refs,
+ * without importing the reset system. Every system that owns a persistent
+ * context yields that context's refs, and a category yields each entry's,
  * so passing one to `thingsToReset` resets what a module reset would reset
- * of it.
+ * of it and never a resource or ref it only names.
  */
 
 import {

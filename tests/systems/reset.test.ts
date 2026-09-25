@@ -24,9 +24,11 @@ import { createDialogSession } from '@/systems/dialog-session';
 import { createAchievementCategory } from '@/systems/achievement-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createReset, createResetTimer } from '@/systems/reset';
-import { Resettable } from '@/systems/resettable';
 import { createSkill } from '@/systems/skill';
 import { createSkillCategory } from '@/systems/skill-category';
+import { createPurchasableCategory } from '@/systems/purchasable-category';
+import { createProducerCategory } from '@/systems/producer-category';
+import { createCostRequirement } from '@/core/requirements';
 import Formula from '@/core/formulas/formulas';
 import { fractional } from '@/systems/retention';
 
@@ -491,19 +493,55 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     expect(best.value).toBe(0);
   });
 
-  it('category wrappers expose [Resettable] yielding their instances', () => {
-    const skills = createSkillCategory<{ id: string; xpScale: number }>({
-      id: 'reset-cat-yield',
-      mapSkill: (def) => ({
-        xpToLevel: (xp) => Formula.variable(xp).div(def.xpScale).sqrt().floor(),
-        levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
+  it('a purchasable category resets its purchases and no ref its options name', () => {
+    const gold = createResource(1000, { id: 'reset-cat-gold' });
+    const [maxLevel, shown] = withPersistentContext('reset-cat-elsewhere', () => [
+      persistent(1, { name: 'maxLevel' }),
+      persistent(false, { name: 'shown' }),
+    ]);
+    const upgrades = createPurchasableCategory<{ id: string }>({
+      id: 'reset-cat-upgrades',
+      mapPurchasable: () => ({
+        requirements: createCostRequirement({ resource: gold, cost: 10 }),
+        limit: maxLevel,
+        visibility: shown,
       }),
     });
-    skills.register({ id: 'reset-cat-yield-combat', xpScale: 10 });
+    upgrades.register({ id: 'sharpen' });
+    maxLevel.value = 3;
+    shown.value = true;
+    upgrades.getPurchasable('sharpen')!.purchase(1);
 
-    expect(Resettable in skills).toBe(true);
-    const yielded = Array.from(skills[Resettable]());
-    expect(yielded).toContain(skills.getSkill('reset-cat-yield-combat'));
+    createReset({ thingsToReset: [upgrades] }).reset();
+
+    expect(Decimal.eq(upgrades.getPurchasable('sharpen')!.amount.value, 0)).toBe(true);
+    expect(Decimal.eq(gold.value, 990)).toBe(true);
+    expect(maxLevel.value).toBe(3);
+    expect(shown.value).toBe(true);
+  });
+
+  it('a producer category resets its counts and leaves both of its resources alone', () => {
+    const cookies = createResource(1000, { id: 'reset-cat-cookies' });
+    const flour = createResource(5, { id: 'reset-cat-flour' });
+    const bakeries = createProducerCategory<{ id: string }>({
+      id: 'reset-cat-bakeries',
+      mapProducer: () => ({
+        resource: flour,
+        baseRate: 1,
+        trigger: 'continuous',
+        purchase: { costResource: cookies, baseCost: 10, costScaling: 1 },
+      }),
+      registerTick: () => () => {},
+    });
+    bakeries.register({ id: 'mill' });
+    bakeries.getProducer('mill')!.repeatable!.purchase(2);
+    flour.value = 7;
+
+    createReset({ thingsToReset: [bakeries] }).reset();
+
+    expect(Decimal.eq(bakeries.getProducer('mill')!.ownedCount.value, 0)).toBe(true);
+    expect(Decimal.eq(cookies.value, 980)).toBe(true);
+    expect(Decimal.eq(flour.value, 7)).toBe(true);
   });
 });
 

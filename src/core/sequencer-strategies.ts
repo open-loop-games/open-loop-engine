@@ -25,6 +25,7 @@
  */
 
 import { persistent, withPersistentContext } from './persistence';
+import { attachContextReset } from './resettable';
 import type { FillStrategy, SequencerItem } from './sequencer';
 
 // === CONDITIONAL STRATEGY ===
@@ -121,11 +122,10 @@ export function createRoundRobinStrategy<M = void>(
   id: string,
   getCandidates: () => SequencerItem<M>[],
 ): FillStrategy<M> {
-  const index = withPersistentContext(`strategy:${id}`, () =>
-    persistent<number>(0, { name: 'index' }),
-  );
+  const contextId = `strategy:${id}`;
+  const index = withPersistentContext(contextId, () => persistent<number>(0, { name: 'index' }));
 
-  return {
+  const strategy: FillStrategy<M> = {
     next() {
       const candidates = getCandidates();
       if (candidates.length === 0) return null;
@@ -135,6 +135,7 @@ export function createRoundRobinStrategy<M = void>(
       return item;
     },
   };
+  return attachContextReset(strategy, contextId);
 }
 
 // === COMPOSITE STRATEGY ===

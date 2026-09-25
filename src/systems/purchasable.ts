@@ -40,6 +40,7 @@ import {
 } from '@/core/requirements';
 import type { Resource } from '@/core/resource';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import Formula from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
@@ -659,7 +660,9 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
     },
   };
 
-  return purchasable;
+  // A reset walk stops at the purchasable's own context: a ref passed as
+  // `limit`, `visibility` or `bulkPurchase` belongs to whoever created it.
+  return attachContextReset(purchasable, contextId);
 }
 
 /**

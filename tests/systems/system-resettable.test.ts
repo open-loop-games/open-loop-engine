@@ -10,6 +10,8 @@ import {
 import { bn, Decimal } from '@/primitives/decimal';
 import { createRunPool } from '@/core/run-pool';
 import { createSequencer } from '@/core/sequencer';
+import { createRoundRobinStrategy } from '@/core/sequencer-strategies';
+import Formula from '@/core/formulas/formulas';
 import { Resettable } from '@/core/resettable';
 import { createTimedProgress } from '@/core/timed-progress';
 import { createAchievement } from '@/systems/achievement';
@@ -19,9 +21,12 @@ import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createDialogSession } from '@/systems/dialog-session';
 import { createInventory } from '@/systems/inventory';
+import { createPurchasable } from '@/systems/purchasable';
 import { createRecommendationSystem } from '@/systems/recommendation';
 import { createReset } from '@/systems/reset';
+import { createSkill } from '@/systems/skill';
 import { createSlot } from '@/systems/slot';
+import { createTemporaryEffectSystem } from '@/systems/temporary-effect';
 import { createTimeBank } from '@/systems/time-bank';
 import { createTimeSystem } from '@/systems/time';
 import { createZoneSystem } from '@/systems/zone';
@@ -198,6 +203,42 @@ const cases: Case[] = [
       );
     },
     dirty: (progress: { ticks: ReturnType<typeof manualTicks> }) => progress.ticks.tick(4),
+  },
+  {
+    name: 'temporary effect system',
+    build: () => {
+      const effects = createTemporaryEffectSystem({ id: 'm-buffs', registerTick });
+      effects.register({ id: 'haste', duration: 30 });
+      return effects;
+    },
+    dirty: (effects: ReturnType<typeof createTemporaryEffectSystem>) => void effects.apply('haste'),
+    check: (effects: ReturnType<typeof createTemporaryEffectSystem>) => {
+      expect(effects.getActive()).toEqual([]);
+    },
+  },
+  {
+    name: 'purchasable',
+    build: () => createPurchasable({ id: 'sharpen', requirements: [] }),
+    dirty: (upgrade: ReturnType<typeof createPurchasable>) => void upgrade.purchase(2),
+  },
+  {
+    name: 'skill',
+    build: () =>
+      createSkill({
+        id: 'mining',
+        xpToLevel: (xp) => Formula.variable(xp).sqrt().floor(),
+        levelToMultiplier: (level) => Formula.variable(level).pow_base(1.05),
+      }),
+    dirty: (skill: ReturnType<typeof createSkill>) => skill.addXp(40),
+  },
+  {
+    name: 'round-robin strategy',
+    build: () =>
+      createRoundRobinStrategy('m-rotation', () => [
+        { id: 'a', metadata: undefined },
+        { id: 'b', metadata: undefined },
+      ]),
+    dirty: (strategy: ReturnType<typeof createRoundRobinStrategy>) => void strategy.next(),
   },
 ];
 

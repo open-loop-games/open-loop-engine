@@ -13,7 +13,6 @@ import {
   type ActionCategory,
   type ActionItemState,
 } from '@/systems/action-category';
-import { Resettable } from '@/systems/resettable';
 import { createEngine, type EngineModule } from '@/engine';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import type { RegisterTick } from '@/core/sequencer';
@@ -368,28 +367,6 @@ describe('createActionCategory — payload', () => {
 // ============================================================================
 
 describe('createActionCategory — Resettable', () => {
-  it('exposes [Resettable] forwarding from createCategoryBase', () => {
-    const { category } = makeCategory();
-    category.register({ id: 'r', baseTicks: 1 });
-    // Bump state so reset has something visible to clear.
-    category.getState('r')!.timesCompleted.value = 99;
-
-    // Manually iterate Resettable refs and reset them — exercises the protocol
-    // without depending on createReset's full wiring.
-    const items = Array.from(category[Resettable]() as Iterable<unknown>);
-    for (const item of items) {
-      if (
-        item &&
-        typeof item === 'object' &&
-        'timesCompleted' in (item as Record<string, unknown>)
-      ) {
-        const state = item as ActionState;
-        state.timesCompleted.value = 0;
-      }
-    }
-    expect(Decimal.eq(category.getState('r')!.timesCompleted.value, 0)).toBe(true);
-  });
-
   it('a reset of the category resets per-def state and leaves the queue and the running item alone', () => {
     const { category } = makeCategory();
     category.register([

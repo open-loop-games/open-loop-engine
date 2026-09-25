@@ -32,6 +32,7 @@ import {
 import { processGetter } from '@/core/computed';
 import { isProfilingEnabled, profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
+import { attachContextReset } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 
@@ -188,12 +189,17 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
   // dependency and re-evaluates after registration. Without it, a zero-dep
   // first run freezes the computed at its fallback permanently.
   const entriesVersion = ref(0);
+  // One per entry, yielding the refs of that def's context and its children.
+  // A reset walk stops there rather than walking the instance, whose fields
+  // name resources and refs other code owns.
+  const contextResets: ResettableObject[] = [];
 
   function registerOne(def: Def): void {
+    const contextId = `${categoryId}/${def.id}`;
     // withPersistentContext guarantees the context is popped even if a builder
     // throws — a leaked context silently mis-scopes the save keys of every
     // persistent ref created afterward.
-    const { instance, state, signals } = withPersistentContext(`${categoryId}/${def.id}`, () => {
+    const { instance, state, signals } = withPersistentContext(contextId, () => {
       const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
       const state = buildState ? buildState(def, instance) : (undefined as State);
 
@@ -213,6 +219,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     });
 
     entries.set(def.id, { def, instance, state, signals });
+    contextResets.push(attachContextReset({}, contextId));
     entriesVersion.value++;
   }
 
@@ -257,12 +264,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     },
 
     [Resettable](): Iterable<unknown> {
-      const items: unknown[] = [];
-      for (const entry of entries.values()) {
-        items.push(entry.instance);
-        if (entry.state !== undefined) items.push(entry.state);
-      }
-      return items;
+      return contextResets;
     },
   };
 }
