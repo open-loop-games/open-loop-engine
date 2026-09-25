@@ -184,15 +184,10 @@ export * from './temporary-effect';
 export * from './persistent-effect';
 
 // === MODIFIER BINDING HELPERS ===
-// `ModifierBinding` shape (internal — inferred at consumer call sites) plus
-// public factories that return `ModifierBinding[]` for common patterns.
-// Sibling to temporary-effect / persistent-effect; consumers pass the factory
-// output as the `modifiers` field on a def.
-export {
-  replacementBinding,
-  type ModifierBinding,
-  type ReplacementBindingOptions,
-} from './modifier-binding';
+// Factories that return `Grant[]` for common patterns. Sibling to
+// temporary-effect / persistent-effect; consumers pass the factory output as
+// the `modifiers` field on a def.
+export { replacementBinding, type ReplacementBindingOptions } from './modifier-binding';
 
 // === SLOTS ===
 // Constrained persistent selection from a pool (equipment slots, spell slots, policy picks).

@@ -15,7 +15,7 @@
  */
 
 import type { Modifier, ModifierChain, ModifierChainSlot } from '@/core/modifier';
-import type { ModifierBinding } from './modifier-binding';
+import type { LoweredGrant } from './modifier-binding';
 
 // === TYPES ===
 
@@ -31,7 +31,7 @@ export interface BindingSlots {
    *
    * @returns A function that unbinds exactly this activation's modifiers.
    */
-  bind(bindings: readonly ModifierBinding[]): () => void;
+  bind(bindings: readonly LoweredGrant[]): () => void;
   /**
    * Wrap binding `index` in every activation, live and later, until the
    * returned cleanup runs. Overlays stack: each wraps the ones before it.
@@ -95,12 +95,10 @@ export function createBindingSlots(): BindingSlots {
     bind(bindings) {
       const bound: LiveBinding[] = [];
       for (const [index, binding] of bindings.entries()) {
-        const resolved =
-          typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
         const entry: LiveBinding = {
           index,
           slot: slotFor(index, binding.chain),
-          resolved,
+          resolved: binding.modifier(),
           remove: () => {},
         };
         seat(entry);

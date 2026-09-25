@@ -7,9 +7,9 @@
  * them. No timers, no countdown, no save-state duplication.
  *
  * Symmetric to {@link createTemporaryEffectSystem} with one swap:
- * `duration` → `active: Computable<boolean>`. Same `ModifierBinding[]` shape,
- * so the two systems are drop-in compatible for consumers migrating between
- * time-limited and condition-driven lifecycles.
+ * `duration` → `active: Predicate`. Same `Grant[]` shape, so the two systems
+ * are drop-in compatible for consumers migrating between time-limited and
+ * condition-driven lifecycles.
  *
  * Key features:
  * - Declarative condition — bindings track a reactive predicate
@@ -27,27 +27,25 @@
  * persistent.register({
  *   id: 'belt-maxhealth',
  *   active: computed(() => constructionsCategory.getState(sid(47))?.isFinished.value ?? false),
- *   modifiers: [{
- *     chain: maxHealthChain,
- *     modifier: () => createMultiplicativeModifier({ multiplier: 4, description: 'Belt' }),
- *   }],
+ *   modifiers: [{ chain: maxHealthChain, mult: 4, description: 'Belt' }],
  * });
  * ```
  *
  * @cluster effects
  */
 
-import { computed, ref, watch, unref, type ComputedRef, type WatchStopHandle } from 'vue';
-import { processGetter, type Computable } from '@/core/computed';
+import { computed, ref, watch, type ComputedRef, type WatchStopHandle } from 'vue';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import type { ModifierBinding } from './modifier-binding';
+import type { Grant } from '@/core/modifier';
+import { createPredicateResolver, type Predicate } from './gate';
+import { lowerGrants, type LoweredGrant } from './modifier-binding';
 import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
 
 // TODO(ergonomics): string-keyed effect dict shorthand — Kittens Game-style
-// `effects: { "goldPerTick": 0.01 }` mapped to ModifierBinding[].
+// `effects: { "goldPerTick": 0.01 }` mapped to Grant[].
 // Consumer-side helper first; promote to engine if two consumers converge.
 
 /** Definition for a persistent effect, registered at startup. */
@@ -60,20 +58,23 @@ export interface PersistentEffectDef {
    * When an edge flips the predicate back (an `onActivate` that spends what
    * it reads), the opposite edge follows at once. A predicate that reads a
    * value the effect's own bindings change has no stable state and throws.
+   * A Gate resolves through the runtime captured at
+   * `createPersistentEffectSystem` time.
    */
-  active: Computable<boolean>;
+  active: Predicate;
   /** Tags for query filtering */
   tags?: string[];
   /**
-   * Modifiers to bind to chains while `active` is true.
-   * Can be a static array or a factory evaluated on each activation — use a factory
-   * when bindings depend on runtime state.
+   * Grants to bind while `active` is true — the `grants` vocabulary, with
+   * `when` ANDed onto the effect's own lifecycle. Can be a static array or a
+   * factory evaluated on each activation — use a factory when bindings depend
+   * on runtime state.
    *
    * Each binding evaluates at a fixed place in its chain, however often the
    * effect toggles: a static array claims its places at `register`, a
    * factory on its first activation.
    */
-  modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
+  modifiers?: Grant[] | (() => Grant[]);
   /** Called on the rising edge (`false → true`), including on registration if already active */
   onActivate?: (def: PersistentEffectDef) => void;
   /** Called on the falling edge (`true → false`) */
@@ -125,6 +126,8 @@ interface DefEntry {
   activeRef: ComputedRef<boolean>;
   stopWatch: WatchStopHandle;
   slots: BindingSlots;
+  /** A static `modifiers` list, lowered at register. */
+  lowered: LoweredGrant[] | undefined;
   unbind: () => void;
   isApplied: boolean;
   /** True while {@link settle} runs this entry's edges. */
@@ -151,10 +154,7 @@ const MAX_SETTLE_EDGES = 8;
  * persistent.register({
  *   id: 'library-bonus',
  *   active: computed(() => library.isBuilt.value),
- *   modifiers: [{
- *     chain: xpChain,
- *     modifier: () => createMultiplicativeModifier({ multiplier: 2 }),
- *   }],
+ *   modifiers: [{ chain: xpChain, mult: 2, description: 'Library' }],
  * });
  * ```
  *
@@ -167,10 +167,8 @@ const MAX_SETTLE_EDGES = 8;
  * effects.register({
  *   id: 'affected-by:wander:glasses',
  *   active: computed(() => equipment.has('glasses')),
- *   modifiers: [{
- *     chain: progressChain,  // surface-wide chain from createModifierChain
- *     modifier: () => createMultiplicativeModifier({ multiplier: 1.5 }),
- *   }],
+ *   // surface-wide chain from createModifierChain
+ *   modifiers: [{ chain: progressChain, mult: 1.5, description: 'Glasses' }],
  * });
  *
  * // Balance-sim walks the EffectSystemRegistry for full attribution:
@@ -178,7 +176,7 @@ const MAX_SETTLE_EDGES = 8;
  * for (const sys of registry.all()) {
  *   for (const def of sys.allDefs()) {
  *     // def.id → "affected-by:wander:glasses"
- *     // def.modifiers → [{ chain, modifier }] — full source attribution
+ *     // def.modifiers → [{ chain, mult, description }] — full source attribution
  *   }
  * }
  * ```
@@ -188,13 +186,18 @@ export function createPersistentEffectSystem(
 ): PersistentEffectSystem {
   const entries = new Map<string, DefEntry>();
   const handle = createEmitHandle<PersistentEffectEvents>();
+  const predicates = createPredicateResolver();
   // Bumped on every edge so `getActive` / `getByTag` track the applied set.
   const appliedVersion = ref(0);
 
   function applyBindings(entry: DefEntry): void {
-    const bindings: ModifierBinding[] | undefined =
-      typeof entry.def.modifiers === 'function' ? entry.def.modifiers() : entry.def.modifiers;
-    entry.unbind = entry.slots.bind(bindings ?? []);
+    const { def } = entry;
+    const bindings =
+      entry.lowered ??
+      (typeof def.modifiers === 'function'
+        ? lowerGrants(def.modifiers(), predicates, `persistent effect '${def.id}'`)
+        : []);
+    entry.unbind = entry.slots.bind(bindings);
     entry.isApplied = true;
     appliedVersion.value++;
   }
@@ -245,14 +248,18 @@ export function createPersistentEffectSystem(
         throw new Error(`PersistentEffect: duplicate definition '${d.id}'`);
       }
 
-      const activeSource = processGetter(d.active);
-      const activeRef = computed(() => unref(activeSource));
+      const owner = `persistent effect '${d.id}'`;
+      const activeRef = predicates.adopt(d.active, false, `${owner} active`).holds;
+      const lowered = Array.isArray(d.modifiers)
+        ? lowerGrants(d.modifiers, predicates, owner)
+        : undefined;
 
       const entry: DefEntry = {
         def: d,
         activeRef,
         stopWatch: () => {},
         slots: createBindingSlots(),
+        lowered,
         unbind: () => {},
         isApplied: false,
         settling: false,
@@ -260,10 +267,8 @@ export function createPersistentEffectSystem(
 
       // Claim chain positions now, so a binding evaluates at the same place
       // whenever it activates. A factory-form list claims on first activation.
-      if (Array.isArray(d.modifiers)) {
-        for (const [index, binding] of d.modifiers.entries()) {
-          entry.slots.claim(index, binding.chain);
-        }
+      for (const [index, binding] of (lowered ?? []).entries()) {
+        entry.slots.claim(index, binding.chain);
       }
 
       // flush: 'sync' so a predicate that flips mid-run binds/unbinds its

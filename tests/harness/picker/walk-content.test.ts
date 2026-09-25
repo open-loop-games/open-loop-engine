@@ -163,3 +163,42 @@ describe('walkContent', () => {
     engine.stop();
   });
 });
+
+describe('walkContent — grant chain arrays', () => {
+  it('addresses each chain of a chain-array grant as its own binding', async () => {
+    const { applyPerturbation } = await import('@/harness/perturbation');
+    const speed = createModifierChain('speed');
+    const power = createModifierChain('power');
+    const mod: EngineModule = {
+      id: 'fx',
+      install() {
+        const pers = createPersistentEffectSystem({ id: 'auras' });
+        pers.register({
+          id: 'rage',
+          active: true,
+          modifiers: [{ chain: [speed, power], mult: 2, description: 'Rage' }],
+        });
+      },
+    };
+    const engine = createEngine({
+      gameId: 'wco-grants',
+      persistence: false,
+      persistenceNamespace: `wco-grants-${Math.random().toString(36).slice(2)}`,
+    });
+    engine.use(mod);
+    engine.start();
+
+    const entries = walkContent(engine);
+    expect(entries.map((e) => [e.label, e.chain.id])).toEqual([
+      ['auras.rage[0]', 'speed'],
+      ['auras.rage[1]', 'power'],
+    ]);
+
+    const cleanup = applyPerturbation(engine, entries[1], { kind: 'scalar-multiply', factor: 3 });
+    expect(Number(speed.apply(1))).toBe(2);
+    expect(Number(power.apply(1))).toBe(6);
+    cleanup();
+    expect(Number(power.apply(1))).toBe(2);
+    engine.stop();
+  });
+});

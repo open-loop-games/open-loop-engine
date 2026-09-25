@@ -422,3 +422,51 @@ describe('dispose', () => {
     expect(chain.modifiers.length).toBe(0);
   });
 });
+
+// ============================================================================
+// Grant vocabulary + Predicate active
+// ============================================================================
+
+describe('modifiers take Grants, active takes a Predicate', () => {
+  const value = (chain: ReturnType<typeof createModifierChain>) =>
+    Decimal.fromValue(chain.apply(1)).toNumber();
+
+  it('a shorthand grant binds while active', () => {
+    const system = createSystem();
+    const chain = createModifierChain('xp');
+    const built = ref(false);
+    system.register({
+      id: 'library',
+      active: built,
+      modifiers: [{ chain, mult: 2, description: 'Library' }],
+    });
+
+    expect(value(chain)).toBe(1);
+    built.value = true;
+    expect(value(chain)).toBe(2);
+    built.value = false;
+    expect(value(chain)).toBe(1);
+  });
+
+  it('when ANDs into the grant', () => {
+    const system = createSystem();
+    const chain = createModifierChain('xp');
+    const lit = ref(false);
+    system.register({
+      id: 'library',
+      active: true,
+      modifiers: [{ chain, add: 1, description: 'Lamp', when: () => lit.value }],
+    });
+
+    expect(value(chain)).toBe(1);
+    lit.value = true;
+    expect(value(chain)).toBe(2);
+  });
+
+  it("active as a Gate whose handles the runtime doesn't carry throws at register", () => {
+    const system = createSystem();
+    expect(() => system.register({ id: 'lit', active: { kind: 'flag', id: 'lamp' } })).toThrow(
+      /persistent effect 'lit' active: /,
+    );
+  });
+});

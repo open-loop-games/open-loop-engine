@@ -46,7 +46,7 @@ export type ModifierPickerAddress =
       contentType: string;
       /** Def id within the effect system */
       contentId: string;
-      /** Position of this binding in the def's `modifiers` array */
+      /** Position of this binding in the def's `modifiers`, each grant's chain array flattened */
       bindingIndex: number;
     }
   | {

@@ -801,3 +801,69 @@ describe('reactive duration', () => {
     expect(inst.timeRemaining.value).toBe(5);
   });
 });
+
+// ============================================================================
+// Grant vocabulary
+// ============================================================================
+
+describe('modifiers take Grants', () => {
+  const value = (chain: ReturnType<typeof createModifierChain>) =>
+    Decimal.fromValue(chain.apply(1)).toNumber();
+
+  it('a shorthand builds a fresh modifier per stack', () => {
+    const { system } = createSystem();
+    const chain = createModifierChain('speed');
+    system.register({
+      id: 'haste',
+      duration: 10,
+      maxStacks: 2,
+      modifiers: [{ chain, mult: 1.5, description: 'Haste' }],
+    });
+
+    system.apply('haste');
+    system.apply('haste');
+    expect(value(chain)).toBeCloseTo(2.25);
+  });
+
+  it('a chain array binds on each chain', () => {
+    const { system } = createSystem();
+    const speed = createModifierChain('speed');
+    const power = createModifierChain('power');
+    system.register({
+      id: 'rage',
+      duration: 10,
+      modifiers: [{ chain: [speed, power], add: 2, description: 'Rage' }],
+    });
+
+    system.apply('rage');
+    expect([value(speed), value(power)]).toEqual([3, 3]);
+  });
+
+  it('when gates the grant while the effect runs', () => {
+    const { system } = createSystem();
+    const chain = createModifierChain('speed');
+    const night = ref(false);
+    system.register({
+      id: 'owl',
+      duration: 10,
+      modifiers: [{ chain, mult: 2, description: 'Owl', when: night }],
+    });
+
+    system.apply('owl');
+    expect(value(chain)).toBe(1);
+    night.value = true;
+    expect(value(chain)).toBe(2);
+  });
+
+  it("a Gate when whose handles the runtime doesn't carry throws at register", () => {
+    const { system } = createSystem();
+    const chain = createModifierChain('speed');
+    expect(() =>
+      system.register({
+        id: 'owl',
+        duration: 10,
+        modifiers: [{ chain, mult: 2, description: 'Owl', when: { kind: 'flag', id: 'night' } }],
+      }),
+    ).toThrow(/temporary effect 'owl' grant 'Owl' when: /);
+  });
+});

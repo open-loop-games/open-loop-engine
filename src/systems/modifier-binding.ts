@@ -1,46 +1,43 @@
 /**
- * Modifier-binding contract + helpers.
+ * Modifier binding — how effect systems bind {@link Grant}s, and grant helpers.
  *
- * The `ModifierBinding` interface is the shape both effect systems
- * (`createTemporaryEffectSystem`, `createPersistentEffectSystem`) accept on
- * their `modifiers` field — a chain plus the modifier (or factory) to bind to
- * it while the effect is active. This module also hosts factories that produce
- * `ModifierBinding[]` for common patterns.
+ * Effect systems (`createTemporaryEffectSystem`, `createPersistentEffectSystem`)
+ * take `Grant[]` on their `modifiers` field — the vocabulary category
+ * `grants` / `restricts` / `rewards` use. Categories bind a grant once, gated
+ * on the owning item; effect systems bind it per activation into a reserved
+ * chain slot, so they lower each grant to one factory per chain.
+ * {@link replacementBinding} builds a common grant pair.
  *
  * @cluster effects
  */
 
-import { unref } from 'vue';
+import { computed, unref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
   createAdditiveModifier,
   createExponentialModifier,
   createMultiplicativeModifier,
+  delegateWithEnabled,
   type Grant,
   type Modifier,
   type ModifierChain,
   type ModifierDescription,
 } from '@/core/modifier';
+import type { PredicateResolver } from './gate';
 
 // === TYPES ===
 
 /**
- * Binds a modifier to a `ModifierChain` while an effect-system entry is active.
+ * One chain position an effect definition's grants lower to. Its index in the
+ * lowered list is the binding's slot and its perturbation `bindingIndex`.
  *
- * @internal Structural contract for `PersistentEffectDef.modifiers` /
- * `TemporaryEffectDef.modifiers`. Consumers write object literals into those
- * fields and let inference handle the type; named imports are not part of the
- * public surface.
+ * @internal
  */
-export interface ModifierBinding {
-  /** Which modifier chain to target */
+export interface LoweredGrant {
   chain: ModifierChain;
-  /**
-   * The modifier to add, or a factory that creates one.
-   * A factory is **required** when `maxStacks > 1` (each stack needs its own modifier instance).
-   */
-  modifier: Modifier | (() => Modifier);
+  /** The modifier one activation binds — a fresh one per call for the shorthands. */
+  modifier: () => Modifier;
 }
 
 /** Options for {@link replacementBinding} */
@@ -84,7 +81,7 @@ export interface ReplacementBindingOptions {
  * chain entries.
  *
  * @param options - Cancel/replacement value sources + target chain + description
- * @returns Two binding entries (cancel + replacement) suitable for
+ * @returns Two grants (cancel + replacement) suitable for
  *   `PersistentEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
  *
  * @example
@@ -105,7 +102,7 @@ export interface ReplacementBindingOptions {
  * });
  * ```
  */
-export function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[] {
+export function replacementBinding(options: ReplacementBindingOptions): Grant[] {
   const { chain, cancel, replacement, description } = options;
   const cancelSrc = processGetter(cancel);
   const replacementSrc = processGetter(replacement);
@@ -113,19 +110,13 @@ export function replacementBinding(options: ReplacementBindingOptions): Modifier
   return [
     {
       chain,
-      modifier: () =>
-        createMultiplicativeModifier({
-          multiplier: () => Decimal.recip(unref(cancelSrc)),
-          description: `${description} (cancel)`,
-        }),
+      mult: () => Decimal.recip(unref(cancelSrc)),
+      description: `${description} (cancel)`,
     },
     {
       chain,
-      modifier: () =>
-        createMultiplicativeModifier({
-          multiplier: () => unref(replacementSrc),
-          description: `${description} (replacement)`,
-        }),
+      mult: () => unref(replacementSrc),
+      description: `${description} (replacement)`,
     },
   ];
 }
@@ -160,4 +151,52 @@ export function buildGrantModifier(grant: Grant): Modifier {
     };
   }
   return resolved;
+}
+
+/**
+ * Each grant paired with each chain it targets, in order: a chain array
+ * contributes one entry per chain. The position is a binding's index.
+ *
+ * @internal
+ */
+export function flattenGrants(grants: readonly Grant[]): { grant: Grant; chain: ModifierChain }[] {
+  return grants.flatMap((grant) =>
+    (Array.isArray(grant.chain) ? grant.chain : [grant.chain]).map((chain) => ({ grant, chain })),
+  );
+}
+
+/**
+ * Lower an effect definition's grants to one modifier factory per chain,
+ * with each grant's `when` adopted through `predicates` and ANDed into the
+ * modifier's `enabled`.
+ *
+ * @param owner - names the definition in a `when` Gate's error
+ * @internal
+ */
+export function lowerGrants(
+  grants: readonly Grant[],
+  predicates: PredicateResolver,
+  owner: string,
+): LoweredGrant[] {
+  const whenByGrant = new Map<Grant, { readonly value: boolean }>();
+  for (const [index, grant] of grants.entries()) {
+    if (grant.when == null) continue;
+    const name = grant.description == null ? `${index}` : `'${grant.description}'`;
+    whenByGrant.set(grant, predicates.adopt(grant.when, true, `${owner} grant ${name} when`).holds);
+  }
+  return flattenGrants(grants).map(({ grant, chain }) => {
+    const when = whenByGrant.get(grant);
+    return {
+      chain,
+      modifier: () => {
+        const modifier = buildGrantModifier(grant);
+        if (when == null) return modifier;
+        const own = modifier.enabled;
+        return delegateWithEnabled(
+          modifier,
+          computed(() => unref(own) !== false && when.value),
+        );
+      },
+    };
+  });
 }

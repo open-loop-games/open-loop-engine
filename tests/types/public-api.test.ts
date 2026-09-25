@@ -1530,3 +1530,26 @@ describe('Systems predicate fields take Predicate', () => {
     expectTypeOf<Parameters<typeof import('@/index').evaluatePredicate>[0]>().toEqualTypeOf<P>();
   });
 });
+
+describe('Effect systems take Grants', () => {
+  it('effect defs bind Grant[] or a factory returning one', () => {
+    type Modifiers = Grant[] | (() => Grant[]);
+    expectTypeOf<
+      Exclude<import('@/index').PersistentEffectDef['modifiers'], undefined>
+    >().toEqualTypeOf<Modifiers>();
+    expectTypeOf<
+      Exclude<import('@/index').TemporaryEffectDef['modifiers'], undefined>
+    >().toEqualTypeOf<Modifiers>();
+    expectTypeOf<import('@/index').PersistentEffectDef['active']>().toEqualTypeOf<
+      import('@/index').Predicate
+    >();
+    expectTypeOf<ReturnType<typeof import('@/index').replacementBinding>>().toEqualTypeOf<
+      Grant[]
+    >();
+  });
+
+  it('ModifierBinding no longer resolves from the root barrel', () => {
+    // @ts-expect-error — removed; effect-system modifiers are Grants.
+    type _ModifierBinding = import('@/index').ModifierBinding;
+  });
+});

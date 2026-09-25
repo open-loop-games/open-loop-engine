@@ -28,7 +28,7 @@
  *   id: 'burn',
  *   duration: 4,
  *   tags: ['echo', 'flame'],
- *   modifiers: [{ chain: damageChain, modifier: () => createMultiplicativeModifier({ multiplier: 1.5 }) }],
+ *   modifiers: [{ chain: damageChain, mult: 1.5, description: 'Burn' }],
  *   onTick: (inst, dt) => dealDamage(10 * dt),
  *   onExpire: () => clearBurnVisuals(),
  * });
@@ -48,7 +48,9 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import { attachContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
-import type { ModifierBinding } from './modifier-binding';
+import type { Grant } from '@/core/modifier';
+import { createPredicateResolver } from './gate';
+import { lowerGrants, type LoweredGrant } from './modifier-binding';
 import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
@@ -77,16 +79,19 @@ export interface TemporaryEffectDef {
   /** Tags for query filtering (e.g., `['echo', 'flame']`) */
   tags?: string[];
   /**
-   * Modifiers to bind to chains while this effect is active.
-   * Can be a static array or a factory evaluated at each `apply()` — use a factory
-   * when bindings depend on runtime state (e.g., which chain to target).
+   * Grants to bind while this effect is active — the `grants` vocabulary,
+   * with `when` ANDed onto the effect's own lifetime. Can be a static array
+   * or a factory evaluated at each `apply()` — use a factory when bindings
+   * depend on runtime state (e.g., which chain to target). The shorthands
+   * build a fresh modifier per stack; a hand-built `modifier` must be a
+   * factory when `maxStacks > 1`.
    *
    * Each binding evaluates at a fixed place in its chain, whatever order
    * effects are applied in: a static array claims its places at `register`,
    * a factory on its first apply. Stacks of one def sit together there, in
    * apply order.
    */
-  modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
+  modifiers?: Grant[] | (() => Grant[]);
   /** Called when the effect is applied */
   onApply?: (instance: TemporaryEffectInstance) => void;
   /** Called every tick while the effect is active */
@@ -211,7 +216,7 @@ function toFiniteDuration(defId: string, duration: DecimalSource): number {
  * effects.register({
  *   id: 'haste',
  *   duration: 10,
- *   modifiers: [{ chain: speedChain, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) }],
+ *   modifiers: [{ chain: speedChain, mult: 1.5, description: 'Haste' }],
  * });
  *
  * effects.apply('haste'); // +50% speed for 10 seconds
@@ -222,6 +227,9 @@ export function createTemporaryEffectSystem(
 ): TemporaryEffectSystem {
   const defs = new Map<string, TemporaryEffectDef>();
   const slotsByDef = new Map<string, BindingSlots>();
+  /** Static `modifiers` lists, lowered at register. */
+  const loweredByDef = new Map<string, LoweredGrant[]>();
+  const predicates = createPredicateResolver();
   const instances = shallowRef<TemporaryEffectInstance[]>([]);
   /** Live instance id → the function that unbinds its modifiers. */
   const unbindByInstance = new Map<string, () => void>();
@@ -284,8 +292,12 @@ export function createTemporaryEffectSystem(
       },
     };
 
-    const bindings = typeof def.modifiers === 'function' ? def.modifiers() : def.modifiers;
-    unbindByInstance.set(id, slotsByDef.get(def.id)!.bind(bindings ?? []));
+    const bindings =
+      loweredByDef.get(def.id) ??
+      (typeof def.modifiers === 'function'
+        ? lowerGrants(def.modifiers(), predicates, `temporary effect '${def.id}'`)
+        : []);
+    unbindByInstance.set(id, slotsByDef.get(def.id)!.bind(bindings));
 
     instances.value = [...instances.value, instance];
 
@@ -352,22 +364,26 @@ export function createTemporaryEffectSystem(
       }
       const maxStacks = d.maxStacks ?? 1;
       if (maxStacks > 1 && d.modifiers && typeof d.modifiers !== 'function') {
-        for (const binding of d.modifiers) {
-          if (typeof binding.modifier !== 'function') {
+        for (const grant of d.modifiers) {
+          if ('modifier' in grant && typeof grant.modifier !== 'function') {
             throw new Error(
               `TemporaryEffect '${d.id}': modifier bindings must be factories (functions) when maxStacks > 1`,
             );
           }
         }
       }
+      const lowered = Array.isArray(d.modifiers)
+        ? lowerGrants(d.modifiers, predicates, `temporary effect '${d.id}'`)
+        : undefined;
       defs.set(d.id, d);
 
       // Claim chain positions now, so every stack of this def evaluates at the
       // same place whatever order effects are applied in. A factory-form list
       // claims on first apply.
       const slots = createBindingSlots();
-      if (Array.isArray(d.modifiers)) {
-        for (const [index, binding] of d.modifiers.entries()) slots.claim(index, binding.chain);
+      if (lowered) {
+        for (const [index, binding] of lowered.entries()) slots.claim(index, binding.chain);
+        loweredByDef.set(d.id, lowered);
       }
       slotsByDef.set(d.id, slots);
     }

@@ -44,8 +44,9 @@
  */
 
 import type { Engine } from '@/engine';
-import type { Modifier, ModifierChain } from '@/core/modifier';
+import type { Grant, Modifier, ModifierChain } from '@/core/modifier';
 import { overlayBinding, type ModifierWrap } from '@/systems/binding-slots';
+import { flattenGrants } from '@/systems/modifier-binding';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
 import { TuningRegistriesKey } from '@/core/override-registry';
@@ -166,7 +167,7 @@ function applyModifierPerturbation(
 
       const defs = system.allDefs() as ReadonlyArray<{
         id: string;
-        modifiers?: ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>);
+        modifiers?: readonly Grant[] | (() => readonly Grant[]);
       }>;
       const def = defs.find((d) => d.id === address.contentId);
       if (!def) {
@@ -176,7 +177,7 @@ function applyModifierPerturbation(
       }
       const raw = def.modifiers;
       if (!raw) throw new Error(`def "${address.contentId}" has no modifier bindings`);
-      const bindings = typeof raw === 'function' ? raw() : raw;
+      const bindings = flattenGrants(typeof raw === 'function' ? raw() : raw);
       if (address.bindingIndex >= bindings.length) {
         throw new Error(
           `def "${address.contentId}" has no binding at index ${address.bindingIndex}`,
