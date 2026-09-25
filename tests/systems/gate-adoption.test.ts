@@ -415,6 +415,21 @@ describe('createGateRequirement — no ambient accessor', () => {
     stop();
   });
 
+  it('constructs and evaluates a cumulative-gte gate through the registry alone', () => {
+    const { result, stop } = bootstrapAccessorless(() => {
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+      const req = createGateRequirement({
+        gate: { kind: 'cumulative-gte', resource: 'gold', value: 10 },
+      });
+      return { gold, req };
+    });
+
+    expect(requirementsMet([result.req])).toBe(false);
+    result.gold.value = 10;
+    expect(requirementsMet([result.req])).toBe(true);
+    stop();
+  });
+
   it('throws at construction for an accessor-backed gate, naming the handle', () => {
     expect(() =>
       bootstrapAccessorless(() =>

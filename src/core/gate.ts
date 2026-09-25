@@ -158,9 +158,9 @@ export function isGate(value: unknown): value is Gate {
 }
 
 /**
- * The engine handles a Gate kind reads through at evaluation time. Named here
- * rather than in `systems/gate.ts` so the pure walker below can stay at core
- * layer; `GateRuntime` keys off this union.
+ * The engine handles a Gate kind reads through. Named here rather than in
+ * `systems/gate.ts` so the pure walker below can stay at core layer;
+ * `GateRuntime` keys off this union.
  */
 export type GateHandle = 'accessor' | 'categories' | 'registry';
 
@@ -176,17 +176,22 @@ export type GateHandle = 'accessor' | 'categories' | 'registry';
  * construction call this to fail early and precisely instead of demanding the
  * full triple up front.
  *
- * `cumulative-gte` returns both `registry` (the cumulative slot lives on the
- * registered resource) and `accessor` (`timeUntilGateFlip` projects the
- * cumulative ref through a synthetic accessor to reuse the rate machinery).
+ * @param use `'evaluate'` for the handles `evaluateGate` reads; `'predict'`
+ *   for `timeUntilGateFlip`, which evaluates combinator children too, so it
+ *   needs those handles and more. The two differ only at `cumulative-gte`:
+ *   evaluating it reads the cumulative slot on the registered resource, and
+ *   predicting it also reads the resource's rate through the accessor.
  */
-export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
+export function getRequiredGateHandles(
+  gate: Gate,
+  use: 'evaluate' | 'predict' = 'evaluate',
+): ReadonlySet<GateHandle> {
   const out = new Set<GateHandle>();
-  collectGateHandles(gate, out);
+  collectGateHandles(gate, use, out);
   return out;
 }
 
-function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
+function collectGateHandles(gate: Gate, use: 'evaluate' | 'predict', out: Set<GateHandle>): void {
   switch (gate.kind) {
     case 'resource-gte':
     case 'state':
@@ -195,7 +200,7 @@ function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
       return;
     case 'cumulative-gte':
       out.add('registry');
-      out.add('accessor');
+      if (use === 'predict') out.add('accessor');
       return;
     case 'count-gte':
     case 'unlock':
@@ -203,10 +208,10 @@ function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
       return;
     case 'all':
     case 'any':
-      for (const child of gate.of) collectGateHandles(child, out);
+      for (const child of gate.of) collectGateHandles(child, use, out);
       return;
     case 'not':
-      collectGateHandles(gate.of, out);
+      collectGateHandles(gate.of, use, out);
       return;
   }
 }

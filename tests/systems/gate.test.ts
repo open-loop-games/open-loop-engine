@@ -24,7 +24,12 @@ import {
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
 import { E } from '@/core/effects';
-import { gateToCondition, getAmbientGateRuntime, getRequiredGateHandles } from '@/systems/gate';
+import {
+  assertGateHandles,
+  gateToCondition,
+  getAmbientGateRuntime,
+  getRequiredGateHandles,
+} from '@/systems/gate';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -433,6 +438,7 @@ function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } 
   const game: EngineModule = {
     id: 'game',
     install() {
+      createResource(0, { id: 'points', displayName: 'points' });
       const upgCat = createPurchasableCategory<UpgDef>({
         id: 'upgrades',
         mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 5 }),
@@ -513,6 +519,15 @@ describe('evaluateGate — no ambient accessor', () => {
     f.stop();
   });
 
+  it('cumulative-gte evaluates without an accessor, and asserts one only for prediction', () => {
+    const f = buildAccessorlessFixture();
+    const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 1 };
+    expect(evaluateGate(gate, f.runtime)).toBe(false);
+    expect(() => assertGateHandles(gate, f.runtime, 'site')).not.toThrow();
+    expect(() => assertGateHandles(gate, f.runtime, 'site', 'predict')).toThrow(/site.*accessor/);
+    f.stop();
+  });
+
   it('a combinator throws only when the accessor-backed branch is actually reached', () => {
     const f = buildAccessorlessFixture();
     // `any` short-circuits on the true category leaf — the flag child never runs.
@@ -569,11 +584,10 @@ describe('getRequiredGateHandles', () => {
     ]);
   });
 
-  it('cumulative-gte demands the registry, and the accessor for its rate projection', () => {
-    expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual([
-      'accessor',
-      'registry',
-    ]);
+  it('cumulative-gte evaluates through the registry, and predicts with the accessor too', () => {
+    const gate: Gate = { kind: 'cumulative-gte', resource: 'gold', value: 50 };
+    expect(handles(gate)).toEqual(['registry']);
+    expect([...getRequiredGateHandles(gate, 'predict')].sort()).toEqual(['accessor', 'registry']);
   });
 
   it('combinators union their children, recursing through nesting', () => {
