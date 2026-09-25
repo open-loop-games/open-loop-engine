@@ -302,7 +302,7 @@ grid.neighbors(x, y, DIAGONAL_DELTAS);  // ad-hoc, this call only · inRange(x,y
 grid.bfs({ x, y }, (cell) => cell.type !== 'blocked');   // PassabilityFn → parent-link map
 ```
 
-The `passable` / `explored` / `visible` bitmaps and their `*Count` accessors are for FOV/terrain; write them through `beginFovUpdate()` (or `restore()`), not by hand, or the maintained counts drift.
+The `passable` / `explored` / `visible` bitmaps and their `*Count` accessors are for FOV/terrain. `beginFovUpdate()`'s commit writes `visible` and `explored` and keeps the counts; `passable` is yours to write by hand (map generation, a door opening, a wall going up). Follow each batch of hand writes with `grid.markMaskChanged('passable')`, which re-derives the counts and emits `maskChanged` for the renderer; without it the counts drift and nothing repaints. `restore()` re-derives everything and emits `bulkChanged` plus one `maskChanged` per bitmap.
 
 ### Placement and occupancy (runtime create/destroy)
 

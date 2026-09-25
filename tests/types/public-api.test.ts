@@ -303,6 +303,12 @@ describe('createSpatialGrid type surface', () => {
     expectTypeOf<SpatialGrid<Tile>['exploredPassableCount']>().toEqualTypeOf<number>();
   });
 
+  it('markMaskChanged takes the same mask union maskChanged carries', () => {
+    expectTypeOf<SpatialGrid<Tile>['markMaskChanged']>().toEqualTypeOf<
+      (mask: 'passable' | 'explored' | 'visible') => void
+    >();
+  });
+
   it('on() narrows handler args by event key', () => {
     const grid = createSpatialGrid<Tile>({
       width: 1,

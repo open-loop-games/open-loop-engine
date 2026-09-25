@@ -27,7 +27,8 @@
  * - `bulkChanged()` — one coarse signal per `fill()` or `restore()`.
  * - `fovUpdated(deltaIn, deltaOut)` — one batched event per `commit()`.
  * - `maskChanged(mask)` — coarse signal that a whole bitmap may have
- *   changed outside the FOV path; `restore()` emits one per bitmap.
+ *   changed outside the FOV path: once per `markMaskChanged(mask)`, and once
+ *   per bitmap on `restore()`.
  */
 
 import { toRaw } from 'vue';
@@ -166,27 +167,26 @@ export interface SpatialGrid<T> {
   readonly height: number;
 
   /**
-   * Number of cells whose `explored` bit was set via the FOV commit path
-   * or `restore()`. Maintained incrementally so callers don't pay an
+   * Number of cells whose `explored` bit is set. Maintained incrementally by
+   * the FOV commit path and re-derived by `restore()` and
+   * `markMaskChanged('explored')`, so callers don't pay an
    * O(width × height) scan to check exploration progress.
    *
-   * Direct mutation of the `explored` typed array bypasses this counter
-   * (the engine has no way to observe it). If you write to `explored`
-   * outside the FOV adapter, the count will drift; treat it as
-   * authoritative only when commit/restore are the sole write paths.
-   *
+   * A hand write to the `explored` typed array is invisible to the engine:
+   * follow it with `markMaskChanged('explored')` or the count drifts.
    * During a consumer port, reading this before every legacy write path
-   * routes through the FOV adapter is the classic counter-drift trap.
+   * goes through the FOV adapter or `markMaskChanged` is the classic
+   * counter-drift trap.
    */
   readonly exploredCount: number;
 
   /**
    * Number of cells whose `passable` bit is set. Computed lazily on first
-   * read and cached, recomputed eagerly in `restore()`.
+   * read and cached; `restore()` and `markMaskChanged('passable')` re-derive
+   * it.
    *
-   * Same drift contract as `exploredCount`: direct mutation of the
-   * `passable` typed array bypasses the cache. Treat as authoritative
-   * only when `restore()` is the sole write path.
+   * Same drift contract as `exploredCount`: once cached, a hand write to the
+   * `passable` typed array needs a following `markMaskChanged('passable')`.
    */
   readonly passableCount: number;
 
@@ -194,7 +194,8 @@ export interface SpatialGrid<T> {
    * Number of cells where both `passable === 1` and `explored === 1`.
    * The denominator for exploration-progress UIs that only care about
    * reachable terrain. Maintained incrementally alongside
-   * `exploredCount` on FOV commit and recomputed in `restore()`.
+   * `exploredCount` on FOV commit, and re-derived by `restore()` and by
+   * `markMaskChanged` of either bitmap.
    *
    * Same drift contract as `exploredCount`.
    */
@@ -265,9 +266,12 @@ export interface SpatialGrid<T> {
    */
   readonly cells: readonly T[];
 
-  /** Passability bitmap. Length = width * height. 1 = passable, 0 = blocked. */
+  /**
+   * Passability bitmap. Length = width * height. 1 = passable, 0 = blocked.
+   * Written by hand; follow a batch of writes with `markMaskChanged('passable')`.
+   */
   readonly passable: Uint8Array;
-  /** Explored bitmap. 1 = ever-seen, 0 = unseen. */
+  /** Explored bitmap. 1 = ever-seen, 0 = unseen. Written by the FOV commit. */
   readonly explored: Uint8Array;
   /** Currently-visible bitmap. 1 = visible right now, 0 = hidden. */
   readonly visible: Uint8Array;
@@ -344,6 +348,22 @@ export interface SpatialGrid<T> {
   /** Begin a batched FOV update. See {@link FovUpdateHandle}. */
   beginFovUpdate(): FovUpdateHandle;
 
+  /**
+   * Declare that `mask` was written by hand, outside `beginFovUpdate()` and
+   * `restore()`: re-derives the counts that bitmap feeds and emits
+   * `maskChanged(mask)`. The write path for terrain that changes in play — a
+   * door opening, a wall going up — and for a generator populating
+   * `passable` after construction. Costs one scan of the grid, so call it
+   * once per batch of writes rather than once per cell.
+   *
+   * @example
+   * ```ts
+   * grid.passable[y * grid.width + x] = 1; // the door opens
+   * grid.markMaskChanged('passable');
+   * ```
+   */
+  markMaskChanged(mask: 'passable' | 'explored' | 'visible'): void;
+
   /** Subscribe to a grid event. Returns an unsubscribe function. */
   on<K extends keyof SpatialGridEvents<T>>(event: K, handler: SpatialGridEvents<T>[K]): Unsubscribe;
 
@@ -376,6 +396,7 @@ export interface SpatialGrid<T> {
  *     if (grid.at(x, y).kind === 'floor') grid.passable[y * grid.width + x] = 1;
  *   }
  * }
+ * grid.markMaskChanged('passable');
  * ```
  */
 export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T> {
@@ -424,6 +445,24 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     if (!inBounds(x, y)) {
       throw new RangeError(`SpatialGrid: (${x}, ${y}) out of bounds (${width}×${height})`);
     }
+  }
+
+  // Re-derive every bitmap count with one scan, for the write paths that
+  // replace a bitmap wholesale instead of flipping bits one at a time.
+  function recountMasks(): void {
+    let eCount = 0;
+    let pCount = 0;
+    let epCount = 0;
+    for (let i = 0; i < size; i++) {
+      if (explored[i]) eCount++;
+      if (passable[i]) {
+        pCount++;
+        if (explored[i]) epCount++;
+      }
+    }
+    exploredCount = eCount;
+    passableCountCache = pCount;
+    exploredPassableCount = epCount;
   }
 
   function* neighborsOf(x: number, y: number, deltas: readonly GridDelta[]): Generator<GridCoord> {
@@ -748,6 +787,11 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       };
     },
 
+    markMaskChanged(mask) {
+      if (mask !== 'visible') recountMasks();
+      handle.emit('maskChanged', mask);
+    },
+
     serialize() {
       return {
         version: 1,
@@ -782,22 +826,12 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       passable.set(snapshot.passable);
       explored.set(snapshot.explored);
       visible.set(snapshot.visible);
-      let eCount = 0;
-      let pCount = 0;
-      let epCount = 0;
       for (let i = 0; i < size; i++) {
         // A snapshot read back through a `persistent()` ref yields reactive
         // proxies; the grid holds the raw objects so tick-rate reads skip traps.
         cells[i] = toRaw(snapshot.cells[i]);
-        if (explored[i]) eCount++;
-        if (passable[i]) {
-          pCount++;
-          if (explored[i]) epCount++;
-        }
       }
-      exploredCount = eCount;
-      passableCountCache = pCount;
-      exploredPassableCount = epCount;
+      recountMasks();
       handle.emit('bulkChanged');
       handle.emit('maskChanged', 'passable');
       handle.emit('maskChanged', 'explored');

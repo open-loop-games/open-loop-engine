@@ -690,6 +690,50 @@ describe('createSpatialGrid — passableCount', () => {
   });
 });
 
+describe('createSpatialGrid — markMaskChanged', () => {
+  it('after a hand write to passable, re-derives the passable counts and emits maskChanged', () => {
+    const grid = createSpatialGrid<Tile>({ width: 3, height: 1, initializer: floor });
+    grid.passable[0] = 1;
+    const fov = grid.beginFovUpdate();
+    fov.markVisible(0, 0);
+    fov.markVisible(1, 0);
+    fov.commit();
+    expect(grid.passableCount).toBe(1);
+    expect(grid.exploredPassableCount).toBe(1);
+
+    const masks: string[] = [];
+    grid.on('maskChanged', (mask) => masks.push(mask));
+    // A door at (1, 0) opens.
+    grid.passable[1] = 1;
+    grid.markMaskChanged('passable');
+
+    expect(grid.passableCount).toBe(2);
+    expect(grid.exploredPassableCount).toBe(2);
+    expect(masks).toEqual(['passable']);
+  });
+
+  it('after a hand write to explored, re-derives the explored counts', () => {
+    const grid = createSpatialGrid<Tile>({ width: 3, height: 1, initializer: floor });
+    grid.passable[0] = 1;
+    grid.passable[1] = 1;
+    // A revealed-map scroll marks the whole level explored.
+    grid.explored.fill(1);
+    grid.markMaskChanged('explored');
+    expect(grid.exploredCount).toBe(3);
+    expect(grid.exploredPassableCount).toBe(2);
+  });
+
+  it('for visible, only emits — no count reads it', () => {
+    const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
+    const masks: string[] = [];
+    grid.on('maskChanged', (mask) => masks.push(mask));
+    grid.visible[0] = 1;
+    grid.markMaskChanged('visible');
+    expect(masks).toEqual(['visible']);
+    expect(grid.exploredCount).toBe(0);
+  });
+});
+
 describe('createSpatialGrid — exploredPassableCount', () => {
   it('starts at zero', () => {
     const grid = createSpatialGrid<Tile>({ width: 4, height: 4, initializer: floor });
