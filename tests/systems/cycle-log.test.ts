@@ -258,10 +258,10 @@ describe('createCycleLog', () => {
   });
 
   // ==========================================================================
-  // finalize event
+  // finalized event
   // ==========================================================================
 
-  it('emits finalize event with correct entry', () => {
+  it('emits finalized event with correct entry', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-event');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -271,7 +271,7 @@ describe('createCycleLog', () => {
     const log = createCycleLog({ cycle, metrics: { gold } });
 
     const received: CycleLogEntry[] = [];
-    log.on('finalize', (entry) => received.push(entry));
+    log.on('finalized', (entry) => received.push(entry));
 
     addResource(gold, 42);
     cycle.end();
@@ -281,7 +281,7 @@ describe('createCycleLog', () => {
     expect(received[0].deltas[0].delta.eq(42)).toBe(true);
   });
 
-  it('finalize fires before afterRestart snapshot', () => {
+  it('finalized fires before afterRestart snapshot', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-finalize-order');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -291,7 +291,7 @@ describe('createCycleLog', () => {
     const log = createCycleLog({ cycle, metrics: { gold } });
 
     let goldAtFinalize: Decimal | null = null;
-    log.on('finalize', () => {
+    log.on('finalized', () => {
       // At finalize time, gold hasn't been reset yet (beforeRestart fires before reset)
       goldAtFinalize = new Decimal(gold.value);
     });
@@ -425,10 +425,10 @@ describe('createCycleLog', () => {
   });
 
   // ==========================================================================
-  // Analyzer wiring via log.on('finalize', ...)
+  // Analyzer wiring via log.on('finalized', ...)
   // ==========================================================================
 
-  it('log.on(finalize, ...) delivers one onCycleFinalize call per cycle over a headless run', () => {
+  it('log.on(finalized, ...) delivers one onCycleFinalize call per cycle over a headless run', () => {
     const entries: CycleLogEntry[] = [];
     const loopAnalyzer: Analyzer = {
       name: 'cycle-counter',
@@ -456,7 +456,7 @@ describe('createCycleLog', () => {
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
     const log = createCycleLog({ cycle, metrics: { gold } });
-    log.on('finalize', (entry) => loopAnalyzer.onCycleFinalize?.(entry));
+    log.on('finalized', (entry) => loopAnalyzer.onCycleFinalize?.(entry));
 
     // Drive 3 cycles: each tick adds gold, every 2 ticks end a cycle
     const result = runHeadless({
@@ -476,7 +476,7 @@ describe('createCycleLog', () => {
     expect(result.analyzerResults[1].metrics.ticks).toBe(6);
   });
 
-  it('unsubscribe returned by log.on removes the finalize subscription', () => {
+  it('unsubscribe returned by log.on removes the finalized subscription', () => {
     const entries: CycleLogEntry[] = [];
     const analyzer: Analyzer = {
       name: 'x',
@@ -487,7 +487,7 @@ describe('createCycleLog', () => {
     const { registerTick } = createTickManager();
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
-    const dispose = log.on('finalize', (entry) => analyzer.onCycleFinalize?.(entry));
+    const dispose = log.on('finalized', (entry) => analyzer.onCycleFinalize?.(entry));
 
     cycle.end();
     expect(entries).toHaveLength(1);

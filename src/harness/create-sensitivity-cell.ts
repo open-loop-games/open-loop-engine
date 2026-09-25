@@ -149,7 +149,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     if (log) {
       for (const analyzer of analyzers) {
         const hook = analyzer.onCycleFinalize;
-        if (hook) loopFinalizeUnsubs.push(log.on('finalize', (entry) => hook(entry)));
+        if (hook) loopFinalizeUnsubs.push(log.on('finalized', (entry) => hook(entry)));
       }
     }
     currentEngine = engine;

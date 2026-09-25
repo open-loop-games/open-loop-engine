@@ -19,7 +19,7 @@
  * `sequencer.clear()` for a queue. A module-scoped reset (`resetModules`)
  * reaching the category's context is different: it also sweeps the internal
  * sequencer's saved queue, current item, cursor and pause flag, and fires no
- * `cancel`, so run it only where losing the queue is intended.
+ * `cancelled`, so run it only where losing the queue is intended.
  *
  * ID-addressed verbs (`setItemState` / `tickItemProgress` / `setItemError` /
  * `patchItemPayload`) target the current item if its defId matches, else
@@ -133,15 +133,15 @@ export interface ActionCategoryEvents<Def extends { id: string }, State, Payload
    * Fired once per execution when an item reaches `'completed'`, through
    * `setItemState` or `sequencer.complete()`, whichever comes first.
    */
-  complete: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
+  completed: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
   /** Fired on every lifecycle transition for any item. */
-  itemStateChange: (
+  itemStateChanged: (
     entry: ActionCategoryEntry<Def, State, Payload>,
     from: ActionItemState,
     to: ActionItemState,
   ) => void;
   /** Fired when an item is cancelled via `cancel()` (entry exits the queue). */
-  cancel: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
+  cancelled: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
 }
 
 /** Options for {@link createActionCategory}. */
@@ -202,7 +202,7 @@ export interface ActionCategory<Def extends { id: string }, State = void, Payloa
 
   /**
    * Cancel the current enqueue of `defId` if it's running, else remove the
-   * first matching pending instance. Fires `cancel` event.
+   * first matching pending instance. Fires `cancelled` event.
    */
   cancel(defId: string): void;
 
@@ -493,27 +493,27 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     if (transition.from === undefined || !transition.patched) return;
     const entry = makeEntry(defId, transition.patched);
     if (!entry) return;
-    handle.emit('itemStateChange', entry, transition.from, next);
-    if (next === 'completed') handle.emit('complete', entry);
+    handle.emit('itemStateChanged', entry, transition.from, next);
+    if (next === 'completed') handle.emit('completed', entry);
   }
 
   // --- Wire sequencer events to lifecycle transitions ----------------------
 
-  sequencer.on('start', (item) => {
+  sequencer.on('started', (item) => {
     transitionLifecycle(item.metadata.defId, 'running', () => ({
       timing: { startedAt: Date.now() },
     }));
   });
 
-  sequencer.on('hold', (item) => {
+  sequencer.on('held', (item) => {
     transitionLifecycle(item.metadata.defId, 'waiting');
   });
 
-  sequencer.on('complete', (item) => {
+  sequencer.on('completed', (item) => {
     // The sequencer has already cleared `current` (and popped the item in
     // queue mode), so the verbs can't reach it; build the terminal entry by
     // hand. An item already set 'completed' through `setItemState` has emitted
-    // both events, and `complete` fires once per execution.
+    // both events, and `completed` fires once per execution.
     const meta = item.metadata;
     if (meta.lifecycle === 'completed') {
       fireItemChange(meta.defId);
@@ -532,18 +532,18 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
-    handle.emit('itemStateChange', entry, meta.lifecycle, 'completed');
-    handle.emit('complete', entry);
+    handle.emit('itemStateChanged', entry, meta.lifecycle, 'completed');
+    handle.emit('completed', entry);
     fireItemChange(meta.defId);
   });
 
-  sequencer.on('cancel', (item) => {
+  sequencer.on('cancelled', (item) => {
     const entry = makeEntry(item.metadata.defId, item.metadata);
-    if (entry) handle.emit('cancel', entry);
+    if (entry) handle.emit('cancelled', entry);
     fireItemChange(item.metadata.defId);
   });
 
-  sequencer.on('skip', (item) => {
+  sequencer.on('skipped', (item) => {
     // Skip means canRun returned 'never'. Surface as terminal 'failed' so UI
     // can show the skip in the same channel as explicit setItemError.
     const meta = item.metadata;
@@ -551,7 +551,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
     if (meta.lifecycle !== 'failed') {
-      handle.emit('itemStateChange', entry, meta.lifecycle, 'failed');
+      handle.emit('itemStateChanged', entry, meta.lifecycle, 'failed');
     }
     fireItemChange(meta.defId);
   });
@@ -619,7 +619,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
         const meta = sequencer.items.value[idx].metadata;
         sequencer.remove(idx);
         const entry = makeEntry(defId, meta);
-        if (entry) handle.emit('cancel', entry);
+        if (entry) handle.emit('cancelled', entry);
         fireItemChange(defId);
       }
     },

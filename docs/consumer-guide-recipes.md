@@ -31,7 +31,7 @@ Primitives that compose, per worker:
 - `Sequencer` — the schedule
 - `TimedProgress` (ephemeral) — the execution accumulator
 - `FillStrategy` (e.g. `createRoundRobinStrategy`) closing over a shared `Persistent<TaskId[]>` — the claim
-- `sequencer.on('start', ...)` handler that splices the claimed id from the shared ref — grab-on-claim
+- `sequencer.on('started', ...)` handler that splices the claimed id from the shared ref — grab-on-claim
 
 The per-worker bundle is a plain object the consumer assembles — addressable identity (`id`), the two underlying primitives (`sequencer`, `tracker`), plus the `currentTaskId` / `currentTask` computeds and a `dispose` that tears down the tracker. This is the actual shape consumers use today:
 
@@ -61,7 +61,7 @@ Why no engine helper: the claim axis varies widely across games — round-robin,
 
 ## Pre-completion gating in ActionCategory
 
-ActionCategory's `complete` event is a post-event observer — by the time it fires, the item is already terminal, and it fires once per execution. Consumers that need to gate completion (budget caps, mana / effort ceilings, mid-execution termination conditions) do it inside the `tick` closure, before declaring complete with `sequencer.complete()`:
+ActionCategory's `completed` event is a post-event observer — by the time it fires, the item is already terminal, and it fires once per execution. Consumers that need to gate completion (budget caps, mana / effort ceilings, mid-execution termination conditions) do it inside the `tick` closure, before declaring complete with `sequencer.complete()`:
 
 ```ts
 mapAction: (def) => ({

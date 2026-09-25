@@ -86,10 +86,10 @@ describe('AutomationTiers', () => {
     expect(at.unlocked.value).toEqual(['manual']);
   });
 
-  it('emits unlock event', () => {
+  it('emits unlocked event', () => {
     const at = createAutomationTiers({ tiers: TIERS });
     const events: [string, number][] = [];
-    at.on('unlock', (id, order) => events.push([id, order]));
+    at.on('unlocked', (id, order) => events.push([id, order]));
 
     at.unlock('basic');
     expect(events).toEqual([['basic', 1]]);
@@ -170,7 +170,7 @@ describe('AutomationTiers', () => {
     expect(at.currentTierId.value).toBe('basic');
   });
 
-  it('auto-unlock emits unlock event', async () => {
+  it('auto-unlock emits unlocked event', async () => {
     const flag = ref(false);
     const at = createAutomationTiers({
       tiers: [
@@ -179,7 +179,7 @@ describe('AutomationTiers', () => {
       ],
     });
     const events: string[] = [];
-    at.on('unlock', (id) => events.push(id));
+    at.on('unlocked', (id) => events.push(id));
 
     flag.value = true;
     await nextTick();
@@ -223,7 +223,7 @@ describe('AutomationTiers — a met requirement is a level, not an edge', () => 
           ...tierDefs.map((t) => ({ ...t, requirement: () => gold.value >= 10 })),
         ],
       });
-      tiers.on('unlock', (id) => events.push(id));
+      tiers.on('unlocked', (id) => events.push(id));
       return { gold, tiers, events };
     });
   }

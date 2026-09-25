@@ -305,7 +305,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'a' })],
     });
 
-    recs.on('recommend', (rec) => received.push(rec));
+    recs.on('recommended', (rec) => received.push(rec));
     recs.evaluate();
 
     expect(received).toHaveLength(1);
@@ -326,7 +326,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'skip', canApply: () => false })],
     });
 
-    recs.on('recommend', (rec) => received.push(rec));
+    recs.on('recommended', (rec) => received.push(rec));
     recs.evaluate();
 
     expect(received).toHaveLength(0);
@@ -371,7 +371,7 @@ describe('createRecommendationSystem', () => {
     });
 
     recs.autoApply.value = true;
-    recs.on('apply', (rec) => applyEvents.push(rec));
+    recs.on('applied', (rec) => applyEvents.push(rec));
     recs.evaluate();
 
     expect(applySpy).toHaveBeenCalledOnce();
@@ -395,10 +395,10 @@ describe('createRecommendationSystem', () => {
     });
 
     recs.autoApply.value = true;
-    recs.on('recommend', (rec) => recommendEvents.push(rec));
+    recs.on('recommended', (rec) => recommendEvents.push(rec));
     recs.evaluate();
 
-    // The object handed to 'recommend' listeners must stay applied=false even
+    // The object handed to 'recommended' listeners must stay applied=false even
     // though auto-apply flipped applied=true immediately afterward (auto mode
     // used to mutate the shared object in place; manual apply() clones).
     expect(recommendEvents).toHaveLength(1);
@@ -424,7 +424,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'a' })],
     });
 
-    recs.on('apply', (rec) => applyEvents.push(rec));
+    recs.on('applied', (rec) => applyEvents.push(rec));
     recs.evaluate();
     expect(applySpy).not.toHaveBeenCalled();
 
@@ -491,7 +491,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'a' })],
     });
 
-    recs.on('dismiss', () => {
+    recs.on('dismissed', () => {
       dismissed = true;
     });
     recs.evaluate();
@@ -515,7 +515,7 @@ describe('createRecommendationSystem', () => {
       applySnapshot: () => {},
     });
 
-    recs.on('dismiss', () => {
+    recs.on('dismissed', () => {
       dismissed = true;
     });
     recs.dismiss();
@@ -540,7 +540,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'auto' })],
     });
 
-    recs.on('recommend', (rec) => received.push(rec));
+    recs.on('recommended', (rec) => received.push(rec));
 
     // Run a cycle cycle: start → tick → end
     cycle.run();
@@ -566,7 +566,7 @@ describe('createRecommendationSystem', () => {
       defs: [makeStrategy({ id: 'a' })],
     });
 
-    recs.on('recommend', (rec) => received.push(rec));
+    recs.on('recommended', (rec) => received.push(rec));
     recs.dispose();
 
     cycle.run();

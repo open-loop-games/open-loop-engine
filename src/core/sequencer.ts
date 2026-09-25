@@ -68,12 +68,12 @@ export interface FillStrategy<M = void> {
 
 /** Events emitted during sequencer lifecycle. Subscribe via `sequencer.on()`. */
 export interface SequencerEvents<M = void> {
-  enqueue: (item: SequencerItem<M>) => void;
-  start: (item: SequencerItem<M>) => void;
-  complete: (item: SequencerItem<M>) => void;
-  cancel: (item: SequencerItem<M>) => void;
+  enqueued: (item: SequencerItem<M>) => void;
+  started: (item: SequencerItem<M>) => void;
+  completed: (item: SequencerItem<M>) => void;
+  cancelled: (item: SequencerItem<M>) => void;
   /** Emitted when the current item is re-dispatched via `repeat()` instead of `complete()`. */
-  repeat: (item: SequencerItem<M>) => void;
+  repeated: (item: SequencerItem<M>) => void;
   /**
    * Emitted when an item fails its `canRun` check with `'never'` — either from
    * `dequeueNext` walking the sequence, or from the retry tick when a held
@@ -83,13 +83,13 @@ export interface SequencerEvents<M = void> {
    * queue mode, and in list mode `cursor` has advanced past it. A listener that
    * wants the skipped item's index reads `cursor - 1`.
    */
-  skip: (item: SequencerItem<M>) => void;
+  skipped: (item: SequencerItem<M>) => void;
   /**
    * Emitted when dequeueNext holds on `'notNow'` — the held item stays in
    * `items` and is re-evaluated via the retry tick each subsequent tick,
    * transitioning out when canRun returns `'now'` (dispatch) or `'never'` (skip).
    */
-  hold: (item: SequencerItem<M>) => void;
+  held: (item: SequencerItem<M>) => void;
 }
 
 /** Default maximum advances per tick before the sequencer pauses advancement. */
@@ -134,8 +134,8 @@ export interface SequencerOptions<M = void> {
    * tri-state {@link StartResult}:
    *
    * - `'now'` — dispatch the item
-   * - `'never'` — skip the item (emits `skip`) and try the next one
-   * - `'notNow'` — **hold the slot** (emits `hold`); the item remains in
+   * - `'never'` — skip the item (emits `skipped`) and try the next one
+   * - `'notNow'` — **hold the slot** (emits `held`); the item remains in
    *   place and is re-checked by the retry tick next tick
    *
    * Fill-strategy results are lightly gated: a fill item that returns
@@ -168,7 +168,7 @@ export interface SequencerOptions<M = void> {
 /**
  * Sequencer instance produced by {@link createSequencer}. Holds the current
  * item plus the waiting list, persists across save/load, and emits lifecycle
- * events (`start` / `complete` / `skip` / `hold`) consumers wire to game flow.
+ * events (`started` / `completed` / `skipped` / `held`) consumers wire to game flow.
  */
 export interface Sequencer<M = void> {
   readonly id: string;
@@ -212,7 +212,7 @@ export interface Sequencer<M = void> {
    * Negative `at` throws `RangeError`.
    *
    * Returns `false` when `maxSize` would be exceeded; the item is not inserted
-   * and no event fires. Positional inserts run the same `maxSize`, `enqueue`
+   * and no event fires. Positional inserts run the same `maxSize`, `enqueued`
    * event emit, and auto-start guard as the append path.
    */
   enqueue(item: SequencerItem<M>, options?: { at?: number }): boolean;
@@ -226,9 +226,9 @@ export interface Sequencer<M = void> {
    * afterwards rather than the return value.
    */
   dequeueNext(): SequencerItem<M> | null;
-  /** Mark current as completed, emit 'complete', then dequeueNext. */
+  /** Mark current as completed, emit 'completed', then dequeueNext. */
   complete(): void;
-  /** Re-dispatch the current item without advancing. Emits 'repeat', then dequeueNext. */
+  /** Re-dispatch the current item without advancing. Emits 'repeated', then dequeueNext. */
   repeat(): void;
   /**
    * Patch the metadata of the current item with the result of `patch(currentMetadata)`.
@@ -257,7 +257,7 @@ export interface Sequencer<M = void> {
    */
   patchItem(index: number, patch: (metadata: M) => M): void;
   /**
-   * Abandon the current execution without completing it and emit `cancel`.
+   * Abandon the current execution without completing it and emit `cancelled`.
    * That is the running item or, while {@link holding}, the held one: queue
    * mode drops it, list mode leaves the cursor on it so a later start re-runs
    * it. Execution then stops — nothing dispatches until `start()`, `resume()`
@@ -384,7 +384,7 @@ function deserializeItem<M>(raw: string): SequencerItem<M> {
  *   maxSize: 10,
  * });
  * seq.enqueue({ id: 'slash', metadata: { type: 'melee' } });
- * seq.on('complete', (item) => console.log(`Finished ${item.id}`));
+ * seq.on('completed', (item) => console.log(`Finished ${item.id}`));
  * ```
  */
 export function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M> {
@@ -607,16 +607,16 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         syncItems();
       }
       setCurrentRaw(held);
-      handle.emit('start', held);
+      handle.emit('started', held);
     } else if (result === 'never') {
       clearHold();
       if (isList) {
         rawCursor!.value++;
-        handle.emit('skip', held);
+        handle.emit('skipped', held);
       } else {
         popHead();
         syncItems();
-        handle.emit('skip', held);
+        handle.emit('skipped', held);
       }
       dequeueNext();
     }
@@ -669,7 +669,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     _filling = true;
     try {
       setCurrentRaw(item);
-      handle.emit('start', item);
+      handle.emit('started', item);
       return item;
     } finally {
       _filling = false;
@@ -689,12 +689,12 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // inside the loop) need both.
   const preempted = (): boolean => current.value !== '';
 
-  // An instant-complete listener drives dispatch by recursion: `emit('start')`
-  // → listener → `complete()` → `emit('complete')` → `dequeueNext()` →
-  // `emit('start')`. Left recursive, each item costs a real JS stack level and
+  // An instant-complete listener drives dispatch by recursion: `emit('started')`
+  // → listener → `complete()` → `emit('completed')` → `dequeueNext()` →
+  // `emit('started')`. Left recursive, each item costs a real JS stack level and
   // a level on the emit handle's depth counter, so the emit-depth cap ends the
   // cascade after ten items — mid-dispatch, with `current` already set and its
-  // `start` emit dropped, which is a permanent wedge rather than a pause.
+  // `started` emit dropped, which is a permanent wedge rather than a pause.
   // Trampolining the re-entrant call flattens the chain to constant depth: a
   // listener's `dequeueNext()` records the intent and returns, and the loop
   // below runs the dispatch after the emit unwinds. That keeps depth near 1 for
@@ -754,13 +754,13 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
         if (result === 'now') {
           setCurrentRaw(next);
-          handle.emit('start', next);
+          handle.emit('started', next);
           return next;
         }
 
         if (result === 'never') {
           rawCursor!.value++;
-          handle.emit('skip', next);
+          handle.emit('skipped', next);
           continue;
         }
 
@@ -768,12 +768,12 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         if (registerTick) {
           _holding = true;
           installRetryTick();
-          handle.emit('hold', next);
+          handle.emit('held', next);
           return null;
         }
         // No registerTick → degrade to 'never'
         rawCursor!.value++;
-        handle.emit('skip', next);
+        handle.emit('skipped', next);
       }
 
       // Reached end of list — cursor sits at items.length (done sentinel)
@@ -794,14 +794,14 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
           popHead();
           dirty = true;
           setCurrentRaw(next);
-          handle.emit('start', next);
+          handle.emit('started', next);
           return next;
         }
 
         if (result === 'never') {
           popHead();
           dirty = true;
-          handle.emit('skip', next);
+          handle.emit('skipped', next);
           continue;
         }
 
@@ -809,13 +809,13 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         if (registerTick) {
           _holding = true;
           installRetryTick();
-          handle.emit('hold', next);
+          handle.emit('held', next);
           return null;
         }
         // No registerTick → degrade to 'never'
         popHead();
         dirty = true;
-        handle.emit('skip', next);
+        handle.emit('skipped', next);
       }
     } finally {
       if (dirty) syncItems();
@@ -877,7 +877,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       }
       bumpLive();
       syncItems();
-      handle.emit('enqueue', item);
+      handle.emit('enqueued', item);
 
       if (heldBroken) {
         clearHold();
@@ -902,7 +902,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       if (isList) {
         rawCursor!.value++;
       }
-      handle.emit('complete', completed);
+      handle.emit('completed', completed);
       dequeueNext();
     },
 
@@ -918,7 +918,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         bumpLive();
         syncItems();
       }
-      handle.emit('repeat', captured);
+      handle.emit('repeated', captured);
       dequeueNext();
     },
 
@@ -956,13 +956,13 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
           popHead();
           syncItems();
         }
-        handle.emit('cancel', held);
+        handle.emit('cancelled', held);
         return;
       }
       const cancelled = getCurrentItem();
       if (!cancelled) return;
       current.value = '';
-      handle.emit('cancel', cancelled);
+      handle.emit('cancelled', cancelled);
     },
 
     remove(index: number): void {
@@ -1103,7 +1103,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       const cancelled = getCurrentItem();
       if (cancelled) {
         current.value = '';
-        handle.emit('cancel', cancelled);
+        handle.emit('cancelled', cancelled);
       }
       dequeueNext();
     },

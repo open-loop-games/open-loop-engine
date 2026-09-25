@@ -138,22 +138,22 @@ describe('createModifierChain', () => {
     expect(chain.modifiers.length).toBe(2);
   });
 
-  it('emits change event on add', () => {
+  it('emits changed event on add', () => {
     const chain = createModifierChain('evt-add');
     const changeCb = vi.fn();
-    chain.on('change', changeCb);
+    chain.on('changed', changeCb);
 
     chain.add(createAdditiveModifier({ addend: 1 }));
     expect(changeCb).toHaveBeenCalledOnce();
   });
 
-  it('emits change event on remove', () => {
+  it('emits changed event on remove', () => {
     const chain = createModifierChain('evt-rm');
     const mod = createAdditiveModifier({ addend: 1 });
     chain.add(mod);
 
     const changeCb = vi.fn();
-    chain.on('change', changeCb);
+    chain.on('changed', changeCb);
     chain.remove(mod);
     expect(changeCb).toHaveBeenCalledOnce();
   });

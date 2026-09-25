@@ -10,7 +10,7 @@
  * - Explicit metric registration (Persistent refs or getter functions)
  * - Snapshot at cycle start, delta computed before restart
  * - Ring buffer with configurable capacity and per-entry pinning
- * - `finalize` event for downstream consumers (e.g. best-of tracking)
+ * - `finalized` event for downstream consumers (e.g. best-of tracking)
  *
  * @see {@link createCycle} for the Cycle lifecycle this composes with
  * @see {@link createRetentionPolicy} for a similar snapshot/restore pattern
@@ -82,7 +82,7 @@ export interface CycleLogEntry {
 /** Events emitted by a {@link CycleLog} instance */
 export interface CycleLogEvents {
   /** Fired after deltas are computed and the entry is pushed to history */
-  finalize: (entry: CycleLogEntry) => void;
+  finalized: (entry: CycleLogEntry) => void;
 }
 
 /**
@@ -131,7 +131,7 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  * a negative delta.
  *
  * @param options - Cycle to observe, metrics to track, and optional ring buffer size
- * @returns A CycleLog with reactive history, finalize event, and pin/unpin controls
+ * @returns A CycleLog with reactive history, `finalized` event, and pin/unpin controls
  *
  * @example
  * ```ts
@@ -144,7 +144,7 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  *   maxLogs: 15,
  * });
  *
- * log.on('finalize', (entry) => {
+ * log.on('finalized', (entry) => {
  *   // Feed deltas into best-of tracking, analytics, UI, etc.
  *   for (const d of entry.deltas) console.log(`${d.key}: +${d.delta}`);
  * });
@@ -223,7 +223,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
 
     history.value.push(entry);
     pruneHistory();
-    handle.emit('finalize', entry);
+    handle.emit('finalized', entry);
   });
 
   const unsubAfter = cycle.on('afterRestart', () => {

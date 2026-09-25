@@ -45,7 +45,7 @@ describe('runMatrix composition with direct CycleLog finalize subscription', () 
             const log = createCycleLog({ cycle, metrics: {} });
             for (const analyzer of analyzers) {
               const hook = analyzer.onCycleFinalize;
-              if (hook) log.on('finalize', (entry) => hook(entry));
+              if (hook) log.on('finalized', (entry) => hook(entry));
             }
             cycle.run();
             return analyzers;

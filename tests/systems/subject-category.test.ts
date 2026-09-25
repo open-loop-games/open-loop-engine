@@ -68,7 +68,7 @@ describe('createSubjectCategory', () => {
       expect(rocky.fields.bond.get()).toBe(0);
     });
 
-    it('emits change events on writes (and skips no-ops)', () => {
+    it('emits changed events on writes (and skips no-ops)', () => {
       const cat = createSubjectCategory({
         id: 'bonds',
         fields: { bond: { kind: 'scalar', initial: 0 } },
@@ -76,7 +76,7 @@ describe('createSubjectCategory', () => {
       cat.register({ id: 'fluffy' });
       const fluffy = cat.get('fluffy')!;
       const handler = vi.fn();
-      fluffy.fields.bond.on('change', handler);
+      fluffy.fields.bond.on('changed', handler);
       fluffy.fields.bond.set(5);
       expect(handler).toHaveBeenCalledWith({ old: 0, next: 5 });
       // No-op write doesn't fire.
@@ -219,7 +219,7 @@ describe('createSubjectCategory', () => {
       expect(rask.subject.fields.trust.tryAdvance()).toBe('known');
     });
 
-    it('emits advance events with from/to indices', () => {
+    it('emits advanced events with from/to indices', () => {
       withGameStateAccessor(buildAccessor(), () => {
         const cat = createSubjectCategory({
           id: 'rank',
@@ -228,7 +228,7 @@ describe('createSubjectCategory', () => {
         cat.register({ id: 'mages-guild' });
         const g = cat.get('mages-guild')!;
         const handler = vi.fn();
-        g.fields.rank.on('advance', handler);
+        g.fields.rank.on('advanced', handler);
         g.fields.rank.setIndex(2);
         expect(handler).toHaveBeenCalledWith({ from: 0, to: 2 });
       });
@@ -260,7 +260,7 @@ describe('createSubjectCategory', () => {
   });
 
   describe('flag field', () => {
-    it('round-trips boolean state and emits change', () => {
+    it('round-trips boolean state and emits changed', () => {
       const cat = createSubjectCategory({
         id: 'flags',
         fields: { met: { kind: 'flag' }, hired: { kind: 'flag', initial: true } },
@@ -271,7 +271,7 @@ describe('createSubjectCategory', () => {
       expect(g.fields.hired.get()).toBe(true);
 
       const handler = vi.fn();
-      g.fields.met.on('change', handler);
+      g.fields.met.on('changed', handler);
       g.fields.met.set(true);
       g.fields.met.toggle();
       expect(handler).toHaveBeenCalledTimes(2);
@@ -292,7 +292,7 @@ describe('createSubjectCategory', () => {
       expect(e.fields.pathLocked.get()).toBeNull();
 
       const handler = vi.fn();
-      e.fields.pathLocked.on('change', handler);
+      e.fields.pathLocked.on('changed', handler);
       e.fields.pathLocked.set('scientific');
       expect(handler).toHaveBeenCalledWith({ old: null, next: 'scientific' });
       expect(e.fields.pathLocked.get()).toBe('scientific');
@@ -467,10 +467,10 @@ describe('createSubjectCategory', () => {
       cat.register({ id: 'rask' });
       const f = cat.get('rask')!.fields;
       const changed = vi.fn();
-      f.trust.on('change', changed);
-      f.mood.on('change', changed);
-      f.rank.on('advance', changed);
-      f.path.on('change', changed);
+      f.trust.on('changed', changed);
+      f.mood.on('changed', changed);
+      f.rank.on('advanced', changed);
+      f.path.on('changed', changed);
 
       loadInto(() => {
         f.trust.ref.value = 90;

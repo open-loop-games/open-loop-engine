@@ -13,7 +13,7 @@
  *
  * Auto-bound by {@link createSensitivityCell} when the per-run engine
  * publishes a CycleLog via `CycleLogKey`. Outside a harness cell, subscribe
- * directly: `log.on('finalize', entry => tracker.onCycleFinalize?.(entry))`.
+ * directly: `log.on('finalized', entry => tracker.onCycleFinalize?.(entry))`.
  */
 
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';

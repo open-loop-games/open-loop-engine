@@ -189,7 +189,7 @@ export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undef
 /** Events emitted by a {@link RuleAdvisor} instance. */
 export interface RuleAdvisorEvents<TPayload> {
   /** Fired after each `reevaluate()` with the new visible suggestion list. */
-  suggestions: (suggestions: readonly Suggestion<TPayload>[]) => void;
+  suggestionsUpdated: (suggestions: readonly Suggestion<TPayload>[]) => void;
   /** Fired when `dismiss(key)` is called for a key not already dismissed. */
   dismissed: (key: string) => void;
   /**
@@ -210,14 +210,14 @@ export interface RuleAdvisor<TPayload> {
   /**
    * Currently-visible suggestions: ranked, dismissed keys removed, then
    * capped — a dismissed suggestion's slot goes to the next-ranked one.
-   * Plain readonly array; wrap in a Vue ref via the `'suggestions'` event if
+   * Plain readonly array; wrap in a Vue ref via the `'suggestionsUpdated'` event if
    * reactive UI binding is needed.
    */
   readonly suggestions: readonly Suggestion<TPayload>[];
 
   /**
    * Re-run aggregation + analysis + rank, drop dismissed keys, cap, emit
-   * `'suggestions'`, and fire `'accepted'` for previously-visible keys the
+   * `'suggestionsUpdated'`, and fire `'accepted'` for previously-visible keys the
    * analyzers no longer produce.
    *
    * The optional `trigger` is opaque to the engine — it threads through to
@@ -390,7 +390,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     visible = next;
     lastVisibleKeys = next.map((s) => s.key);
 
-    handle.emit('suggestions', visible);
+    handle.emit('suggestionsUpdated', visible);
     if (acceptedKeys.length > 0) handle.emit('accepted', { keys: acceptedKeys, trigger });
 
     return visible;
@@ -402,7 +402,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     visible = visible.filter((s) => s.key !== key);
     lastVisibleKeys = visible.map((s) => s.key);
     handle.emit('dismissed', key);
-    handle.emit('suggestions', visible);
+    handle.emit('suggestionsUpdated', visible);
   }
 
   function reset(): void {

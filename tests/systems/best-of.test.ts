@@ -62,14 +62,14 @@ describe('createBestOf', () => {
     expect(bestOf.entries.value.gold!.cycleNumber).toBe(0);
   });
 
-  it('higher absolute value replaces best and emits newBest', () => {
+  it('higher absolute value replaces best and emits bestImproved', () => {
     const bestOf = createBestOf({
       id: 'bo-higher',
       metrics: { gold: { mode: 'absolute' } },
     });
 
     const received: { key: string; entry: BestOfEntry }[] = [];
-    bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
+    bestOf.on('bestImproved', (key, entry) => received.push({ key, entry }));
 
     bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
     bestOf.submit({ key: 'gold', value: 200, elapsed: 20, cycleNumber: 1 });
@@ -108,7 +108,7 @@ describe('createBestOf', () => {
   // CycleLog integration
   // ==========================================================================
 
-  it('auto-subscribes to CycleLog finalize events', () => {
+  it('auto-subscribes to CycleLog finalized events', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-auto');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -151,7 +151,7 @@ describe('createBestOf', () => {
     expect(bestOf.entries.value.xp).toBeNull();
   });
 
-  it('tracks multiple metrics from a single CycleLog finalize', () => {
+  it('tracks multiple metrics from a single CycleLog finalized event', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-multi');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -421,14 +421,14 @@ describe('createBestOf', () => {
   // Events
   // ==========================================================================
 
-  it('newBest fires with correct key and entry', () => {
+  it('bestImproved fires with correct key and entry', () => {
     const bestOf = createBestOf({
       id: 'bo-event-fire',
       metrics: { gold: { mode: 'absolute' } },
     });
 
     const received: { key: string; entry: BestOfEntry }[] = [];
-    bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
+    bestOf.on('bestImproved', (key, entry) => received.push({ key, entry }));
 
     bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
@@ -437,7 +437,7 @@ describe('createBestOf', () => {
     expect(received[0].entry.value.eq(100)).toBe(true);
   });
 
-  it('newBest does not fire when submission loses', () => {
+  it('bestImproved does not fire when submission loses', () => {
     const bestOf = createBestOf({
       id: 'bo-event-nofire',
       metrics: { gold: { mode: 'absolute' } },
@@ -446,14 +446,14 @@ describe('createBestOf', () => {
     bestOf.submit({ key: 'gold', value: 100, elapsed: 10, cycleNumber: 0 });
 
     const received: unknown[] = [];
-    bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
+    bestOf.on('bestImproved', (key, entry) => received.push({ key, entry }));
 
     bestOf.submit({ key: 'gold', value: 50, elapsed: 5, cycleNumber: 1 });
 
     expect(received).toHaveLength(0);
   });
 
-  it('newBest fires when replacing a stale entry', () => {
+  it('bestImproved fires when replacing a stale entry', () => {
     const bestOf = createBestOf({
       id: 'bo-event-stale',
       metrics: { gold: { mode: 'absolute' } },
@@ -463,7 +463,7 @@ describe('createBestOf', () => {
     bestOf.invalidate('gold');
 
     const received: unknown[] = [];
-    bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
+    bestOf.on('bestImproved', (key, entry) => received.push({ key, entry }));
 
     bestOf.submit({ key: 'gold', value: 1, elapsed: 10, cycleNumber: 1 });
 
@@ -603,7 +603,7 @@ describe('createBestOf', () => {
     });
 
     const received: unknown[] = [];
-    bestOf.on('newBest', (key, entry) => received.push({ key, entry }));
+    bestOf.on('bestImproved', (key, entry) => received.push({ key, entry }));
 
     bestOf.submit({ key: 'silver', value: 100, elapsed: 10, cycleNumber: 0 });
 

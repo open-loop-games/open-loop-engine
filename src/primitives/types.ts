@@ -175,7 +175,7 @@ export interface Analyzer {
    * whose engine publishes a CycleLog — `createSensitivityCell` discovers the
    * log via `engine.tryInject(CycleLogKey)` and auto-subscribes. The entry
    * shape is structurally compatible with `CycleLogEntry` from the cycle-log
-   * system, so analyzers wired directly to `log.on('finalize', ...)` outside
+   * system, so analyzers wired directly to `log.on('finalized', ...)` outside
    * a harness cell also satisfy this hook.
    */
   onCycleFinalize?(entry: {

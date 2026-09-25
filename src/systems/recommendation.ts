@@ -154,11 +154,11 @@ interface SerializedRecommendation {
 /** Events emitted by a {@link RecommendationSystem} instance */
 export interface RecommendationSystemEvents {
   /** Fired after a new recommendation is produced by `evaluate()` */
-  recommend: (recommendation: Recommendation) => void;
+  recommended: (recommendation: Recommendation) => void;
   /** Fired after a recommendation's snapshot is applied (auto or manual) */
-  apply: (recommendation: Recommendation) => void;
+  applied: (recommendation: Recommendation) => void;
   /** Fired after the last recommendation is dismissed */
-  dismiss: () => void;
+  dismissed: () => void;
 }
 
 /** Configuration for {@link createRecommendationSystem} */
@@ -251,8 +251,8 @@ export interface RecommendationSystem {
    * 2. Filter defs via `canApply`
    * 3. Score and pick highest (ties: first-registered wins)
    * 4. Call `recommend()` on the winner
-   * 5. Store as `lastRecommendation`, emit `'recommend'`
-   * 6. If `autoApply`, call `applySnapshot` + emit `'apply'`
+   * 5. Store as `lastRecommendation`, emit `'recommended'`
+   * 6. If `autoApply`, call `applySnapshot` + emit `'applied'`
    *
    * Returns the produced {@link Recommendation} or `null` if no def applied
    * or the BestOf resolver returned `null` (no active context).
@@ -262,11 +262,11 @@ export interface RecommendationSystem {
 
   /**
    * Apply the `lastRecommendation`'s snapshot manually.
-   * No-op if `lastRecommendation` is null or already applied. Emits `'apply'`.
+   * No-op if `lastRecommendation` is null or already applied. Emits `'applied'`.
    */
   apply(): void;
 
-  /** Clear `lastRecommendation`, emit `'dismiss'`. No-op if already null. */
+  /** Clear `lastRecommendation`, emit `'dismissed'`. No-op if already null. */
   dismiss(): void;
 
   /** Subscribe to recommendation system events */
@@ -360,7 +360,7 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  * });
  *
  * // Advisory mode (T5 Advisor): surface recommendation in UI
- * recs.on('recommend', (rec) => {
+ * recs.on('recommended', (rec) => {
  *   showAdvisorPanel(rec.rationale.summary, rec.rationale.metrics);
  * });
  *
@@ -454,16 +454,16 @@ export function createRecommendationSystem(
     };
 
     storedRecommendation.value = serialize(rec);
-    handle.emit('recommend', rec);
+    handle.emit('recommended', rec);
 
     if (autoApply.value) {
       applySnapshot(rec.snapshot);
-      // Clone rather than mutate: `rec` was already handed to 'recommend'
+      // Clone rather than mutate: `rec` was already handed to 'recommended'
       // listeners, and the manual apply() path clones too. Mutating here would
-      // flip `applied` under a retained 'recommend' payload only in auto mode.
+      // flip `applied` under a retained 'recommended' payload only in auto mode.
       const appliedRec = { ...rec, applied: true };
       storedRecommendation.value = serialize(appliedRec);
-      handle.emit('apply', appliedRec);
+      handle.emit('applied', appliedRec);
       return appliedRec;
     }
 
@@ -501,13 +501,13 @@ export function createRecommendationSystem(
       applySnapshot(rec.snapshot);
       const updated = { ...rec, applied: true };
       storedRecommendation.value = serialize(updated);
-      handle.emit('apply', updated);
+      handle.emit('applied', updated);
     },
 
     dismiss() {
       if (storedRecommendation.value === null) return;
       storedRecommendation.value = null;
-      handle.emit('dismiss');
+      handle.emit('dismissed');
     },
 
     on: handle.on,

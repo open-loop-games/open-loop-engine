@@ -48,7 +48,7 @@ import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 /** Events emitted by a {@link Purchasable} instance */
 export interface PurchasableEvents {
   /** Fired after each purchase, with the number of levels bought in this transaction */
-  purchase: (amount: DecimalSource) => void;
+  purchased: (amount: DecimalSource) => void;
 }
 
 /** UI text for a purchasable. All fields accept refs/getters for dynamic content. */
@@ -658,7 +658,7 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
       payRequirements(allRequirements, toPurchase);
       amount.value = Decimal.add(amount.value, toPurchase);
       onPurchase?.(toPurchase);
-      handle.emit('purchase', toPurchase);
+      handle.emit('purchased', toPurchase);
 
       return toPurchase;
     },

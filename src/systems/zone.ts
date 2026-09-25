@@ -59,9 +59,9 @@ export interface ZoneDef {
 /** Events emitted by a {@link ZoneSystem} instance */
 export interface ZoneSystemEvents {
   /** Fired when a zone is unlocked */
-  unlock: (zoneId: string) => void;
+  unlocked: (zoneId: string) => void;
   /** Fired when the selected zone changes */
-  select: (zoneId: string, previousId: string) => void;
+  selected: (zoneId: string, previousId: string) => void;
 }
 
 /** Options for {@link createZoneSystem} */
@@ -180,7 +180,7 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     unlock(zoneId: string): void {
       if (unlocked.value.includes(zoneId)) return;
       unlocked.value = [...unlocked.value, zoneId];
-      handle.emit('unlock', zoneId);
+      handle.emit('unlocked', zoneId);
     },
 
     isUnlocked(zoneId: string): boolean {
@@ -192,7 +192,7 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
       const prev = current.value;
       if (prev === zoneId) return true;
       current.value = zoneId;
-      handle.emit('select', zoneId, prev);
+      handle.emit('selected', zoneId, prev);
       return true;
     },
 

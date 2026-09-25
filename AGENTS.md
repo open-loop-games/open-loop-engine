@@ -135,6 +135,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 - Files: kebab-case.ts
 - Factories: `create*()` pattern
 - Standard verbs: `getX` aggregator, `isX` type guard, `formatX` formatter, `setupX` wiring. Noun-form (`multiplicativeEffect`, `replacementBinding`, `fractional`) is the carve-out for helpers consumed declaratively as configuration data.
+- Events: a past-tense phrase for what happened (`purchased`, `leveledUp`, `cancelled`); `before*`/`after*` pairs bracket a hook point; a `family:` prefix groups a family (`save:loaded`, `instance:died`). Option callbacks stay `onVerb` (`onPurchase`, `onLevelUp`).
 
 **Code markers:**
 - `TODO(expansion)` — validated pattern, deferred until a consumer needs it. Three lines max, co-located with the code it would change.

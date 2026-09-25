@@ -4,7 +4,7 @@
  * Tracks which cycle run produced the best outcome for each registered metric,
  * with optional strategy snapshot capture for reproducibility.
  *
- * - {@link createBestOf} — sole factory, optionally wires into CycleLog finalize events
+ * - {@link createBestOf} — sole factory, optionally wires into CycleLog `finalized` events
  *
  * Key features:
  * - Declared metrics with configurable comparison mode (absolute or per-second)
@@ -126,7 +126,7 @@ export interface BestOfCandidate {
 /** Events emitted by a {@link BestOf} instance */
 export interface BestOfEvents {
   /** Fired when a metric's best is broken */
-  newBest: (key: string, entry: BestOfEntry) => void;
+  bestImproved: (key: string, entry: BestOfEntry) => void;
 }
 
 /** Configuration for {@link createBestOf} */
@@ -137,7 +137,7 @@ export interface BestOfOptions {
   /** Metric definitions: which keys to track and how to compare them */
   metrics: Record<string, BestOfMetricDef>;
 
-  /** Auto-subscribe to a CycleLog's finalize event for automatic tracking */
+  /** Auto-subscribe to a CycleLog's `finalized` event for automatic tracking */
   cycleLog?: CycleLog;
 
   /** Called to capture the current strategy/config when a new best is recorded */
@@ -233,7 +233,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  * submission for custom metric sources.
  *
  * @param options - Persistence ID, metric definitions, optional CycleLog and strategy capture
- * @returns A BestOf with reactive entries, submit/invalidate/clear API, and newBest event
+ * @returns A BestOf with reactive entries, submit/invalidate/clear API, and `bestImproved` event
  *
  * @example
  * ```ts
@@ -247,7 +247,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  *   captureStrategy: () => ({ queue: actionQueue.serialize() }),
  * });
  *
- * bestOf.on('newBest', (key, entry) => {
+ * bestOf.on('bestImproved', (key, entry) => {
  *   console.log(`New best ${key}: ${entry.value} in ${entry.elapsed}s`);
  * });
  * ```
@@ -398,7 +398,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
     };
 
     store.value = { ...store.value, [candidate.key]: serialize(entry) };
-    handle.emit('newBest', candidate.key, entry);
+    handle.emit('bestImproved', candidate.key, entry);
   }
 
   function handleFinalize(logEntry: CycleLogEntry): void {
@@ -414,7 +414,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
   }
 
   // --- CycleLog integration ---
-  const unsubCycleLog = cycleLog?.on('finalize', handleFinalize);
+  const unsubCycleLog = cycleLog?.on('finalized', handleFinalize);
 
   // --- Public API ---
   const bestOf: BestOf = {

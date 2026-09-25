@@ -375,7 +375,7 @@ export function createSequentialModifier<T extends Modifier>(
  */
 export interface ModifierChainEvents {
   /** Fired when a modifier is added or removed */
-  change: () => void;
+  changed: () => void;
 }
 
 /**
@@ -663,7 +663,7 @@ export function createModifierChain(id: string): ModifierChain {
       items = layout.flatMap((entry) => (entry instanceof ChainSlot ? entry.members : [entry]));
       composed = createSequentialModifier(items);
       itemsVersion.value++;
-      handle.emit('change');
+      handle.emit('changed');
     });
   }
 

@@ -316,7 +316,7 @@ describe('createRuleAdvisor — dismiss + reset', () => {
     const onDismissed = vi.fn();
     const onSuggestions = vi.fn();
     advisor.on('dismissed', onDismissed);
-    advisor.on('suggestions', onSuggestions);
+    advisor.on('suggestionsUpdated', onSuggestions);
 
     advisor.dismiss('a');
 

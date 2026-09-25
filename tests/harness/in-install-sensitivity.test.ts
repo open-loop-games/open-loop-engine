@@ -216,7 +216,7 @@ describe('in-install sensitivity integration', () => {
   it('createSensitivityCell auto-binds onCycleFinalize when the engine publishes a CycleLog', () => {
     // Receipt for the workbench dead-wire fix: defaultAnalyzerPack ships
     // createCycleFinalizeTracker when CycleLogKey is published, and the cell
-    // setup auto-subscribes any onCycleFinalize hook via log.on('finalize', ...).
+    // setup auto-subscribes any onCycleFinalize hook via log.on('finalized', ...).
     // Before the auto-bind, this metric was silently zero in every workbench run.
     const TICKS_PER_LOOP = 5;
     const LOOPS = 3;

@@ -192,7 +192,7 @@ describe('sequencer advance cap', () => {
     endPersistentContext();
 
     const started: string[] = [];
-    q.on('start', (item) => started.push(item.id));
+    q.on('started', (item) => started.push(item.id));
 
     for (let i = 0; i < 20; i++) q.enqueue(qi(`item-${i}`));
 
@@ -211,7 +211,7 @@ describe('sequencer advance cap', () => {
   it('does not interfere with normal sequencer operation within cap', () => {
     const q = makeQueue({ maxAdvancesPerTick: 100 });
     const completed: string[] = [];
-    q.on('complete', (item) => completed.push(item.id));
+    q.on('completed', (item) => completed.push(item.id));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -232,14 +232,14 @@ describe('sequencer advance cap', () => {
 
 // The emit-depth coverage above drives a bare `createEmitHandle`, where a
 // blocked emit is the whole observable outcome. Inside a sequencer it is not:
-// `dequeueNext` sets `current` and *then* emits `start`, so a dropped emit
+// `dequeueNext` sets `current` and *then* emits `started`, so a dropped emit
 // leaves an item dispatched that no listener ever learns about and nothing will
 // ever complete. These drive the real emitter, where that distinction exists.
 
 describe('instant-complete cascades', () => {
-  /** Subscribe a `start` listener that immediately completes — the runaway shape. */
+  /** Subscribe a `started` listener that immediately completes — the runaway shape. */
   function completeOnStart(q: ReturnType<typeof makeQueue>, log?: string[]) {
-    q.on('start', (item) => {
+    q.on('started', (item) => {
       log?.push(item.id);
       q.complete();
     });
@@ -250,7 +250,7 @@ describe('instant-complete cascades', () => {
     const starts: string[] = [];
     const completes: string[] = [];
     completeOnStart(q, starts);
-    q.on('complete', (item) => completes.push(item.id));
+    q.on('completed', (item) => completes.push(item.id));
 
     for (let i = 0; i < 20; i++) q.enqueue(qi(`i${i}`));
     q.start();
@@ -286,12 +286,12 @@ describe('instant-complete cascades', () => {
     const log: string[] = [];
     let spawned = 0;
 
-    a.on('start', (item) => {
+    a.on('started', (item) => {
       log.push(item.id);
       if (spawned < 30) b.enqueue(qi(`b${spawned++}`));
       a.complete();
     });
-    b.on('start', (item) => {
+    b.on('started', (item) => {
       log.push(item.id);
       if (spawned < 30) a.enqueue(qi(`a${spawned++}`));
       b.complete();
@@ -346,7 +346,7 @@ describe('instant-complete cascades', () => {
     // rather than a stack overflow, so the advance cap is what ends it.
     const q = makeQueue({ startOnEnqueue: false, maxAdvancesPerTick: 1000 });
     let starts = 0;
-    q.on('start', () => {
+    q.on('started', () => {
       starts++;
       q.repeat();
     });
@@ -359,13 +359,13 @@ describe('instant-complete cascades', () => {
   });
 
   it("defers a listener's dispatch until the emit unwinds", () => {
-    // The observable edge of flattening: `complete()` inside a `start` listener
+    // The observable edge of flattening: `complete()` inside a `started` listener
     // is a state transition, not a dispatch. Nothing is running when it returns.
     const q = makeQueue({ startOnEnqueue: false });
     const observed: (string | null)[] = [];
     let reentrantReturn: unknown = 'unset';
 
-    q.on('start', (item) => {
+    q.on('started', (item) => {
       if (item.id !== 'first') return;
       q.complete();
       observed.push(q.currentItem?.id ?? null);

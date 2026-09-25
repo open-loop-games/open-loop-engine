@@ -70,7 +70,7 @@ describe('ZoneSystem', () => {
     expect(zs.unlocked.value).toEqual(['town']);
   });
 
-  it('emits unlock event', () => {
+  it('emits unlocked event', () => {
     const zs = createZoneSystem({
       zones: [
         { id: 'town', name: 'Town' },
@@ -78,7 +78,7 @@ describe('ZoneSystem', () => {
       ],
     });
     const unlocked: string[] = [];
-    zs.on('unlock', (id) => unlocked.push(id));
+    zs.on('unlocked', (id) => unlocked.push(id));
 
     zs.unlock('forest');
     expect(unlocked).toEqual(['forest']);
@@ -120,14 +120,14 @@ describe('ZoneSystem', () => {
       zones: [{ id: 'town', name: 'Town' }],
     });
     const selected: string[] = [];
-    zs.on('select', (id) => selected.push(id));
+    zs.on('selected', (id) => selected.push(id));
 
     const result = zs.select('town');
     expect(result).toBe(true);
     expect(selected).toEqual([]);
   });
 
-  it('emits select event with previous zone', () => {
+  it('emits selected event with previous zone', () => {
     const zs = createZoneSystem({
       zones: [
         { id: 'town', name: 'Town' },
@@ -136,7 +136,7 @@ describe('ZoneSystem', () => {
       initiallyUnlocked: ['town', 'forest'],
     });
     const events: [string, string][] = [];
-    zs.on('select', (id, prev) => events.push([id, prev]));
+    zs.on('selected', (id, prev) => events.push([id, prev]));
 
     zs.select('forest');
     expect(events).toEqual([['forest', 'town']]);

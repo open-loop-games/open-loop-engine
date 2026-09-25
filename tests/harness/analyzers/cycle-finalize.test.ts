@@ -6,7 +6,7 @@ import { createCycleLog, type CycleLogEntry } from '@/systems/cycle-log';
 import { createCycleFinalizeTracker } from '@/harness/analyzers/cycle-finalize';
 
 describe('createCycleFinalizeTracker', () => {
-  it('records cycle count + last-cycle deltas when wired via log.on(finalize, ...)', () => {
+  it('records cycle count + last-cycle deltas when wired via log.on(finalized, ...)', () => {
     const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createCycleFinalizeTracker();
 
@@ -27,7 +27,7 @@ describe('createCycleFinalizeTracker', () => {
 
     const result = runHeadless({
       setup: () => {
-        log.on('finalize', (entry) => tracker.onCycleFinalize?.(entry));
+        log.on('finalized', (entry) => tracker.onCycleFinalize?.(entry));
         cycle.run();
         return [tracker];
       },

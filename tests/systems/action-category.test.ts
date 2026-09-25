@@ -181,12 +181,12 @@ describe('createActionCategory — lifecycle state machine', () => {
     category.register({ id: 'fast', baseTicks: 1 });
 
     const transitions: Array<[ActionItemState, ActionItemState]> = [];
-    category.on('itemStateChange', (_e, from, to) => {
+    category.on('itemStateChanged', (_e, from, to) => {
       transitions.push([from, to]);
     });
 
     category.enqueue('fast', { payload: { count: 1 } });
-    // enqueue auto-starts (startOnEnqueue defaults true), so 'start' has fired
+    // enqueue auto-starts (startOnEnqueue defaults true), so 'started' has fired
     // already → lifecycle should be 'running'.
     expect(category.currentItem?.lifecycle).toBe('running');
     expect(transitions[transitions.length - 1]).toEqual(['pending', 'running']);
@@ -196,12 +196,12 @@ describe('createActionCategory — lifecycle state machine', () => {
     expect(transitions.some(([_, to]) => to === 'completed')).toBe(true);
   });
 
-  it('emits itemStateChange after the transition commits, so listeners see and keep new state', () => {
+  it('emits itemStateChanged after the transition commits, so listeners see and keep new state', () => {
     const { category } = makeCategory();
     category.register({ id: 'chop', baseTicks: 10 });
 
     const seen: Array<ActionItemState | undefined> = [];
-    category.on('itemStateChange', (_e, _from, to) => {
+    category.on('itemStateChanged', (_e, _from, to) => {
       seen.push(category.currentItem?.lifecycle);
       if (to === 'running') category.setItemProgress('chop', 0.5);
     });
@@ -212,13 +212,13 @@ describe('createActionCategory — lifecycle state machine', () => {
     expect(category.currentItem?.progress).toBe(0.5);
   });
 
-  it('emits complete once when setItemState(completed) precedes sequencer.complete()', () => {
+  it('emits completed once when setItemState(completed) precedes sequencer.complete()', () => {
     const { category } = makeCategory();
     category.register({ id: 'x', baseTicks: 10 });
     let completes = 0;
     let toCompleted = 0;
-    category.on('complete', () => completes++);
-    category.on('itemStateChange', (_e, _from, to) => {
+    category.on('completed', () => completes++);
+    category.on('itemStateChanged', (_e, _from, to) => {
       if (to === 'completed') toCompleted++;
     });
 
@@ -409,7 +409,7 @@ describe('createActionCategory — Resettable', () => {
     expect(category.sequencer.items.value.map((i) => i.metadata.defId)).toEqual(['b']);
   });
 
-  it('a module-scoped reset sweeps the queue too, without a cancel event', () => {
+  it('a module-scoped reset sweeps the queue too, without a cancelled event', () => {
     const driver = makeTickDriver();
     beginPersistentContext('act-mod');
     const category = createActionCategory<ActionDef, void, void>({
@@ -423,7 +423,7 @@ describe('createActionCategory — Resettable', () => {
     ]);
     endPersistentContext();
     const cancelled: string[] = [];
-    category.on('cancel', (e) => cancelled.push(e.def.id));
+    category.on('cancelled', (e) => cancelled.push(e.def.id));
     category.enqueue('a');
     category.enqueue('b');
 

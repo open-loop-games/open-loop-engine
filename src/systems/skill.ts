@@ -27,7 +27,7 @@
  * - Per-gain ModifierChain: always-created chain (`skill:<id>:gain`) for
  *   cross-cutting XP scaling (global boosts, zone multipliers)
  * - Optional maxXp cap: Computable, applied after gainChain
- * - Event subscription: `skill.on('levelUp', handler)` for post-creation
+ * - Event subscription: `skill.on('leveledUp', handler)` for post-creation
  *   listeners. Optional `onLevelUp` creation-time sugar auto-subscribes.
  *   Events fire only on gameplay XP gain, not on save-load or direct xp mutation
  * - Reset integration: consumer includes skill.xp in thingsToReset or
@@ -61,7 +61,7 @@ import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 export interface SkillEvents {
   /** Fired when the skill's level increases during gameplay XP gain (via `addXp`).
    *  Does NOT fire on save-load rehydration, reset, or direct `xp.value` mutation. */
-  levelUp: (oldLevel: Decimal, newLevel: Decimal) => void;
+  leveledUp: (oldLevel: Decimal, newLevel: Decimal) => void;
 }
 
 /**
@@ -158,7 +158,7 @@ export interface SkillBase {
   /** Add XP to the pool (applies gainChain, then maxXp cap if configured) */
   addXp(amount: DecimalSource): void;
 
-  /** Subscribe to skill events (e.g. `levelUp`). Returns an unsubscribe function. */
+  /** Subscribe to skill events (e.g. `leveledUp`). Returns an unsubscribe function. */
   on: Emittable<SkillEvents>['on'];
 }
 
@@ -301,7 +301,7 @@ function buildAddXp(
   return { addXp, gainInProgress };
 }
 
-/** Wire a sync watcher on `level` that emits `levelUp` only during gameplay XP gain. */
+/** Wire a sync watcher on `level` that emits `leveledUp` only during gameplay XP gain. */
 function buildLevelUpEmitter(
   level: ComputedRef<DecimalSource>,
   gainInProgress: { value: boolean },
@@ -312,7 +312,7 @@ function buildLevelUpEmitter(
     (newLevel, oldLevel) => {
       if (!gainInProgress.value) return;
       if (Decimal.eq(oldLevel, newLevel)) return;
-      handle.emit('levelUp', new Decimal(oldLevel), new Decimal(newLevel));
+      handle.emit('leveledUp', new Decimal(oldLevel), new Decimal(newLevel));
     },
     { flush: 'sync' },
   );
@@ -395,7 +395,7 @@ export function createSkill(options: SkillOptions): Skill {
   const handle = createEmitHandle<SkillEvents>();
   buildLevelUpEmitter(level, gainInProgress, handle);
   if (options.onLevelUp) {
-    handle.on('levelUp', options.onLevelUp);
+    handle.on('leveledUp', options.onLevelUp);
   }
 
   const base: SkillBase = {

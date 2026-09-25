@@ -48,7 +48,7 @@ import { createAmbientScope, createNamedRegistry, type NamedRegistry } from './n
  * Enumerable registry of {@link ModifierChain}s for a single engine.
  *
  * Shape is minimal on purpose: enumerate, look up by id, count. Per-chain
- * reactivity is handled by the chain itself via its `change` event.
+ * reactivity is handled by the chain itself via its `changed` event.
  */
 export type ChainRegistry = NamedRegistry<ModifierChain>;
 

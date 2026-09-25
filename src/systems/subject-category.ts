@@ -98,7 +98,7 @@ export type FieldSchema = Record<string, FieldDef>;
 // -- Field instances --
 
 interface ScalarFieldEvents {
-  change: (info: { old: number; next: number }) => void;
+  changed: (info: { old: number; next: number }) => void;
 }
 
 /** Live scalar accessor built from a {@link ScalarFieldDef}. */
@@ -113,7 +113,7 @@ export interface ScalarFieldInstance extends Emittable<ScalarFieldEvents> {
 }
 
 interface VectorFieldEvents<Dims extends string> {
-  change: (info: { dim: Dims; old: number; next: number }) => void;
+  changed: (info: { dim: Dims; old: number; next: number }) => void;
 }
 
 /** Live vector accessor built from a {@link VectorFieldDef}. */
@@ -132,7 +132,7 @@ interface TierFieldEvents {
    * Fires on any tier-index change via `setIndex` — including regressions
    * (`to < from`), despite the name. Read `from`/`to` to distinguish direction.
    */
-  advance: (info: { from: number; to: number }) => void;
+  advanced: (info: { from: number; to: number }) => void;
 }
 
 /** Live tier-ladder accessor built from a {@link TierFieldDef}. */
@@ -153,7 +153,7 @@ export interface TierFieldInstance extends Emittable<TierFieldEvents> {
 }
 
 interface FlagFieldEvents {
-  change: (info: { value: boolean }) => void;
+  changed: (info: { value: boolean }) => void;
 }
 
 /** Live boolean accessor built from a {@link FlagFieldDef}. */
@@ -166,7 +166,7 @@ export interface FlagFieldInstance extends Emittable<FlagFieldEvents> {
 }
 
 interface EnumFieldEvents<V extends string> {
-  change: (info: { old: V | null; next: V | null }) => void;
+  changed: (info: { old: V | null; next: V | null }) => void;
 }
 
 /** Live nullable-enum accessor built from an {@link EnumFieldDef}. */
@@ -316,7 +316,7 @@ function buildScalarField(
     const old = ref.value;
     if (next === old) return;
     ref.value = next;
-    events.emit('change', { old, next });
+    events.emit('changed', { old, next });
   }
   function add(delta: number): void {
     set(get() + delta);
@@ -358,7 +358,7 @@ function buildVectorField<Dims extends string>(
     const old = r.value;
     if (next === old) return;
     r.value = next;
-    events.emit('change', { dim, old, next });
+    events.emit('changed', { dim, old, next });
   }
   function add(dim: Dims, delta: number): void {
     set(dim, get(dim) + delta);
@@ -396,7 +396,7 @@ function buildTierField(
     const old = ref.value;
     if (next === old) return;
     ref.value = next;
-    events.emit('advance', { from: old, to: next });
+    events.emit('advanced', { from: old, to: next });
   }
   function tryAdvance(accessor?: GameStateAccessor): string | null {
     const current = ref.value;
@@ -437,7 +437,7 @@ function buildFlagField(
   function set(value: boolean): void {
     if (ref.value === value) return;
     ref.value = value;
-    events.emit('change', { value });
+    events.emit('changed', { value });
   }
   function toggle(): void {
     set(!ref.value);
@@ -478,7 +478,7 @@ function buildEnumField<V extends string>(
     const old = ref.value;
     if (value === old) return;
     ref.value = value;
-    events.emit('change', { old, next: value });
+    events.emit('changed', { old, next: value });
   }
 
   return { kind: 'enum', ref, values: schema.values, get, set, on: events.on };

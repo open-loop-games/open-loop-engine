@@ -74,7 +74,7 @@ export interface AutomationTierDef {
 /** Events emitted by an {@link AutomationTiers} instance. */
 export interface AutomationTiersEvents {
   /** Fired when a tier is newly unlocked. A load restoring a tier fires nothing. */
-  unlock: (tierId: string, tierOrder: number) => void;
+  unlocked: (tierId: string, tierOrder: number) => void;
 }
 
 /** Options for {@link createAutomationTiers}. */
@@ -129,7 +129,7 @@ export interface AutomationTiers {
 
   /**
    * Lock all tiers except those in the initially-unlocked set and those whose
-   * `requirement` still holds, which stay unlocked without an `unlock` event.
+   * `requirement` still holds, which stay unlocked without an `unlocked` event.
    * Intended for prestige/reset scenarios.
    */
   resetUnlocks(): void;
@@ -166,7 +166,7 @@ let tierSystemCounter = 0;
  *   ],
  * });
  *
- * auto.on('unlock', (id, order) => {
+ * auto.on('unlocked', (id, order) => {
  *   notify(`Automation unlocked: ${auto.tiers.find(t => t.id === id)?.name}`);
  * });
  * ```
@@ -253,7 +253,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
       const tier = tierMap.get(tierId);
       if (!tier) return;
       unlocked.value = [...unlocked.value, tierId];
-      handle.emit('unlock', tierId, tier.order);
+      handle.emit('unlocked', tierId, tier.order);
     },
 
     resetUnlocks(): void {

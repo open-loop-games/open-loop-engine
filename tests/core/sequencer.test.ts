@@ -126,7 +126,7 @@ describe('Sequencer — list mode', () => {
   it('resetCursor cancels current item', () => {
     const q = makeQueue({ mode: 'list' });
     const cancelled: string[] = [];
-    q.on('cancel', (item) => cancelled.push(item.id));
+    q.on('cancelled', (item) => cancelled.push(item.id));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -145,12 +145,12 @@ describe('Sequencer — list mode', () => {
     expect(q.currentItem).toBeNull();
   });
 
-  it('emits start and complete events like queue mode', () => {
+  it('emits started and completed events like queue mode', () => {
     const q = makeQueue({ mode: 'list' });
     const started: string[] = [];
     const completed: string[] = [];
-    q.on('start', (item) => started.push(item.id));
-    q.on('complete', (item) => completed.push(item.id));
+    q.on('started', (item) => started.push(item.id));
+    q.on('completed', (item) => completed.push(item.id));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -165,7 +165,7 @@ describe('Sequencer — list mode', () => {
     const q = makeQueue({ mode: 'list' });
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const skipped: string[] = [];
-    q.on('skip', (item) => skipped.push(item.id));
+    q.on('skipped', (item) => skipped.push(item.id));
 
     q.enqueue(qi('skip-me'));
     q.enqueue(qi('run-me'));
@@ -497,7 +497,7 @@ describe('Sequencer — canRun tri-state', () => {
       canRun: (item) => (item.id === 'bad' ? 'never' : 'now'),
     });
     endPersistentContext();
-    q.on('skip', (item) => skipped.push(item.id));
+    q.on('skipped', (item) => skipped.push(item.id));
 
     q.enqueue(qi('bad'));
     q.enqueue(qi('good'));
@@ -519,9 +519,9 @@ describe('Sequencer — canRun tri-state', () => {
       canRun: () => 'notNow',
     });
     endPersistentContext();
-    q.on('hold', (item) => events.push(`hold:${item.id}`));
-    q.on('start', (item) => events.push(`start:${item.id}`));
-    q.on('skip', (item) => events.push(`skip:${item.id}`));
+    q.on('held', (item) => events.push(`hold:${item.id}`));
+    q.on('started', (item) => events.push(`start:${item.id}`));
+    q.on('skipped', (item) => events.push(`skip:${item.id}`));
 
     q.enqueue(qi('wait-me'));
 
@@ -546,8 +546,8 @@ describe('Sequencer — canRun tri-state', () => {
       // No registerTick — 'notNow' should fall back to 'never'
     });
     endPersistentContext();
-    q.on('hold', (item) => events.push(`hold:${item.id}`));
-    q.on('skip', (item) => events.push(`skip:${item.id}`));
+    q.on('held', (item) => events.push(`hold:${item.id}`));
+    q.on('skipped', (item) => events.push(`skip:${item.id}`));
 
     q.enqueue(qi('wait-me'));
     q.enqueue(qi('run-me'));
@@ -570,13 +570,13 @@ describe('Sequencer — canRun tri-state', () => {
       canRun: () => gate,
     });
     endPersistentContext();
-    q.on('hold', (item) => events.push(`hold:${item.id}`));
-    q.on('start', (item) => events.push(`start:${item.id}`));
+    q.on('held', (item) => events.push(`hold:${item.id}`));
+    q.on('started', (item) => events.push(`start:${item.id}`));
 
     q.enqueue(qi('wait-me'));
     expect(q.holding).toBe(true);
 
-    // Tick fires while still 'notNow' — should stay held, not re-emit hold
+    // Tick fires while still 'notNow' — should stay held, not re-emit held
     tm.fireTick();
     expect(q.holding).toBe(true);
     expect(events).toEqual(['hold:wait-me']);
@@ -604,9 +604,9 @@ describe('Sequencer — canRun tri-state', () => {
       canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
     });
     endPersistentContext();
-    q.on('hold', (item) => events.push(`hold:${item.id}`));
-    q.on('skip', (item) => events.push(`skip:${item.id}`));
-    q.on('start', (item) => events.push(`start:${item.id}`));
+    q.on('held', (item) => events.push(`hold:${item.id}`));
+    q.on('skipped', (item) => events.push(`skip:${item.id}`));
+    q.on('started', (item) => events.push(`start:${item.id}`));
 
     q.enqueue(qi('wait-me'));
     q.enqueue(qi('run-me'));
@@ -725,7 +725,7 @@ describe('Sequencer — canRun tri-state', () => {
     });
     endPersistentContext();
     const cancelled: string[] = [];
-    q.on('cancel', (item) => cancelled.push(item.id));
+    q.on('cancelled', (item) => cancelled.push(item.id));
 
     q.enqueue(qi('wait-me'));
     q.enqueue(qi('next'));
@@ -758,7 +758,7 @@ describe('Sequencer — canRun tri-state', () => {
     });
     endPersistentContext();
     const cancelled: string[] = [];
-    q.on('cancel', (item) => cancelled.push(item.id));
+    q.on('cancelled', (item) => cancelled.push(item.id));
 
     q.enqueue(qi('a'));
     expect(q.holding).toBe(true);
@@ -1087,7 +1087,7 @@ describe('Sequencer — list-mode cursor & hold invariants', () => {
     expect(q.currentItem?.id).toBe('a');
 
     const cancelled: string[] = [];
-    q.on('cancel', (item) => cancelled.push(item.id));
+    q.on('cancelled', (item) => cancelled.push(item.id));
 
     q.clear();
     expect(cancelled).toEqual(['a']);
@@ -1189,7 +1189,7 @@ describe('Sequencer — enqueue positional `at`', () => {
   it('`at: 0` into an empty sequencer auto-starts the inserted item', () => {
     const q = makeQueue();
     const started: string[] = [];
-    q.on('start', (i) => started.push(i.id));
+    q.on('started', (i) => started.push(i.id));
     expect(q.enqueue(qi('first'), { at: 0 })).toBe(true);
     expect(q.currentItem?.id).toBe('first');
     expect(started).toEqual(['first']);
@@ -1214,10 +1214,10 @@ describe('Sequencer — enqueue positional `at`', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['b', 'tail']);
   });
 
-  it('emits `enqueue` event regardless of position', () => {
+  it('emits `enqueued` event regardless of position', () => {
     const q = makeQueue();
     const events: string[] = [];
-    q.on('enqueue', (i) => events.push(i.id));
+    q.on('enqueued', (i) => events.push(i.id));
     q.enqueue(qi('a'));
     q.enqueue(qi('b'), { at: 0 });
     q.enqueue(qi('c'), { at: 1 });
@@ -1227,7 +1227,7 @@ describe('Sequencer — enqueue positional `at`', () => {
   it('rejects when `maxSize` would be exceeded, no event fires', () => {
     const q = makeQueue({ maxSize: 2 });
     const events: string[] = [];
-    q.on('enqueue', (i) => events.push(i.id));
+    q.on('enqueued', (i) => events.push(i.id));
     q.enqueue(qi('a')); // current
     q.enqueue(qi('b')); // waiting (size 1)
     q.enqueue(qi('c')); // waiting (size 2 = max)
@@ -1354,16 +1354,16 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
 });
 
 describe('Sequencer — repeat()', () => {
-  it('queue mode: re-dispatches the same item and emits repeat, not complete', () => {
+  it('queue mode: re-dispatches the same item and emits repeated, not completed', () => {
     const q = makeQueue();
     const starts: string[] = [];
     const repeats: string[] = [];
     const completes: string[] = [];
     const enqueues: string[] = [];
-    q.on('start', (i) => starts.push(i.id));
-    q.on('repeat', (i) => repeats.push(i.id));
-    q.on('complete', (i) => completes.push(i.id));
-    q.on('enqueue', (i) => enqueues.push(i.id));
+    q.on('started', (i) => starts.push(i.id));
+    q.on('repeated', (i) => repeats.push(i.id));
+    q.on('completed', (i) => completes.push(i.id));
+    q.on('enqueued', (i) => enqueues.push(i.id));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -1375,7 +1375,7 @@ describe('Sequencer — repeat()', () => {
     expect(starts).toEqual(['a', 'a']);
     expect(repeats).toEqual(['a']);
     expect(completes).toEqual([]);
-    // Initial enqueue events fire for the two seed items, but repeat must NOT
+    // Initial enqueued events fire for the two seed items, but repeated must NOT
     // re-fire enqueue for the re-dispatched item.
     expect(enqueues).toEqual(['a', 'b']);
   });
@@ -1383,7 +1383,7 @@ describe('Sequencer — repeat()', () => {
   it('queue mode: no-op when no current item', () => {
     const q = makeQueue();
     const repeats: string[] = [];
-    q.on('repeat', (i) => repeats.push(i.id));
+    q.on('repeated', (i) => repeats.push(i.id));
     expect(() => q.repeat()).not.toThrow();
     expect(repeats).toEqual([]);
     expect(q.currentItem).toBeNull();
@@ -1400,9 +1400,9 @@ describe('Sequencer — repeat()', () => {
     endPersistentContext();
 
     const events: string[] = [];
-    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
-    q.on('skip', (i) => events.push(`skip:${i.id}`));
-    q.on('start', (i) => events.push(`start:${i.id}`));
+    q.on('repeated', (i) => events.push(`repeat:${i.id}`));
+    q.on('skipped', (i) => events.push(`skip:${i.id}`));
+    q.on('started', (i) => events.push(`start:${i.id}`));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -1427,9 +1427,9 @@ describe('Sequencer — repeat()', () => {
     endPersistentContext();
 
     const events: string[] = [];
-    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
-    q.on('hold', (i) => events.push(`hold:${i.id}`));
-    q.on('start', (i) => events.push(`start:${i.id}`));
+    q.on('repeated', (i) => events.push(`repeat:${i.id}`));
+    q.on('held', (i) => events.push(`hold:${i.id}`));
+    q.on('started', (i) => events.push(`start:${i.id}`));
 
     q.enqueue(qi('a'));
     expect(q.currentItem?.id).toBe('a');
@@ -1481,12 +1481,12 @@ describe('Sequencer — repeat()', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['a', 'b']);
   });
 
-  it('list mode: emits repeat not complete; complete still advances after a repeat', () => {
+  it('list mode: emits repeated not completed; complete still advances after a repeat', () => {
     const q = makeQueue({ mode: 'list' });
     const events: string[] = [];
-    q.on('repeat', (i) => events.push(`repeat:${i.id}`));
-    q.on('complete', (i) => events.push(`complete:${i.id}`));
-    q.on('start', (i) => events.push(`start:${i.id}`));
+    q.on('repeated', (i) => events.push(`repeat:${i.id}`));
+    q.on('completed', (i) => events.push(`complete:${i.id}`));
+    q.on('started', (i) => events.push(`start:${i.id}`));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -1542,7 +1542,7 @@ describe('Sequencer — repeat()', () => {
   it('list mode: no-op when no current item', () => {
     const q = makeQueue({ mode: 'list' });
     const repeats: string[] = [];
-    q.on('repeat', (i) => repeats.push(i.id));
+    q.on('repeated', (i) => repeats.push(i.id));
     expect(() => q.repeat()).not.toThrow();
     expect(repeats).toEqual([]);
   });
@@ -1831,7 +1831,7 @@ describe('Sequencer — save/load re-drive', () => {
   });
 });
 
-// The skip contract: by the time `skip` fires, the skip is already committed —
+// The skip contract: by the time `skipped` fires, the skip is already committed —
 // popped in queue mode, cursor past it in list mode. These are the only tests in
 // the file that observe sequencer state from inside a listener.
 describe('Sequencer — skip ordering', () => {
@@ -1840,11 +1840,11 @@ describe('Sequencer — skip ordering', () => {
   }
   const smi = (id: string): SequencerItem<SkipMeta> => ({ id, metadata: { error: null } });
 
-  it('list mode: cursor has advanced past the skipped item when skip fires', () => {
+  it('list mode: cursor has advanced past the skipped item when skipped fires', () => {
     const q = makeQueue({ mode: 'list' });
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen: number[] = [];
-    q.on('skip', () => seen.push(q.cursor));
+    q.on('skipped', () => seen.push(q.cursor));
 
     q.enqueue(qi('skip-me'));
     q.enqueue(qi('run-me'));
@@ -1857,7 +1857,7 @@ describe('Sequencer — skip ordering', () => {
     const q = makeQueue({ mode: 'list' });
     q.canRun = (item) => (item.id === 'wait-me' ? 'notNow' : 'now');
     const seen: number[] = [];
-    q.on('skip', () => seen.push(q.cursor));
+    q.on('skipped', () => seen.push(q.cursor));
 
     q.enqueue(qi('wait-me'));
     q.enqueue(qi('run-me'));
@@ -1879,7 +1879,7 @@ describe('Sequencer — skip ordering', () => {
     });
     endPersistentContext();
     const seen: number[] = [];
-    q.on('skip', () => seen.push(q.cursor));
+    q.on('skipped', () => seen.push(q.cursor));
 
     q.enqueue(qi('wait-me'));
     q.enqueue(qi('run-me'));
@@ -1892,11 +1892,11 @@ describe('Sequencer — skip ordering', () => {
     expect(q.currentItem?.id).toBe('run-me');
   });
 
-  it('queue mode: the skipped item is already gone from items when skip fires', () => {
+  it('queue mode: the skipped item is already gone from items when skipped fires', () => {
     const q = makeQueue();
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen: string[][] = [];
-    q.on('skip', () => seen.push(q.items.value.map((i) => i.id)));
+    q.on('skipped', () => seen.push(q.items.value.map((i) => i.id)));
 
     q.enqueue(qi('skip-me'));
     q.enqueue(qi('run-me'));
@@ -1915,7 +1915,7 @@ describe('Sequencer — skip ordering', () => {
     });
     endPersistentContext();
 
-    q.on('skip', () => {
+    q.on('skipped', () => {
       const priorIdx = q.cursor - 1;
       if (priorIdx < 0) return;
       q.patchItem(priorIdx, (m) => ({ ...m, error: 'Cannot run here' }));
@@ -1934,11 +1934,11 @@ describe('Sequencer — skip ordering', () => {
 
   // The cursor advance is a read-modify-write across the emit; committing it first
   // is what keeps a mutating listener from being overwritten on the way out.
-  it('list mode: clearing from a skip listener leaves the done sentinel intact', () => {
+  it('list mode: clearing from a skipped listener leaves the done sentinel intact', () => {
     const q = makeQueue({ mode: 'list' });
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     let cleared = false;
-    q.on('skip', () => {
+    q.on('skipped', () => {
       if (cleared) return;
       cleared = true;
       q.clear();
@@ -1965,10 +1965,10 @@ describe('Sequencer — listener re-entrancy', () => {
   }) {
     const starts: string[] = [];
     const ended = new Set<string>();
-    q.on('start', (item) => starts.push(item.id));
-    q.on('complete', (item) => ended.add(item.id));
-    q.on('cancel', (item) => ended.add(item.id));
-    q.on('skip', (item) => ended.add(item.id));
+    q.on('started', (item) => starts.push(item.id));
+    q.on('completed', (item) => ended.add(item.id));
+    q.on('cancelled', (item) => ended.add(item.id));
+    q.on('skipped', (item) => ended.add(item.id));
     return {
       starts,
       /** Started but never terminated, excluding whatever is running now. */
@@ -1980,7 +1980,7 @@ describe('Sequencer — listener re-entrancy', () => {
   }
 
   /** Run `fn` on the first emit of `event` only — re-entrancy, not recursion. */
-  function once<E extends 'skip' | 'hold' | 'complete' | 'cancel' | 'repeat' | 'start'>(
+  function once<E extends 'skipped' | 'held' | 'completed' | 'cancelled' | 'repeated' | 'started'>(
     q: Sequencer<void>,
     event: E,
     fn: () => void,
@@ -1993,10 +1993,10 @@ describe('Sequencer — listener re-entrancy', () => {
     });
   }
 
-  it('queue mode: enqueueing from a complete listener does not orphan the next item', () => {
+  it('queue mode: enqueueing from a completed listener does not orphan the next item', () => {
     const q = makeQueue();
     const seen = trackLifecycle(q);
-    once(q, 'complete', () => q.enqueue(qi('c')));
+    once(q, 'completed', () => q.enqueue(qi('c')));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -2008,10 +2008,10 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['c']);
   });
 
-  it('list mode: enqueueing from a complete listener does not re-start the running item', () => {
+  it('list mode: enqueueing from a completed listener does not re-start the running item', () => {
     const q = makeQueue({ mode: 'list' });
     const seen = trackLifecycle(q);
-    once(q, 'complete', () => q.enqueue(qi('c')));
+    once(q, 'completed', () => q.enqueue(qi('c')));
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
@@ -2022,14 +2022,14 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.cursor).toBe(1);
   });
 
-  it('queue mode: enqueueing from a skip listener does not orphan the next item', () => {
+  it('queue mode: enqueueing from a skipped listener does not orphan the next item', () => {
     const q = makeQueue();
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen = trackLifecycle(q);
     q.pause();
     q.enqueue(qi('skip-me'));
     q.enqueue(qi('b'));
-    once(q, 'skip', () => q.enqueue(qi('c')));
+    once(q, 'skipped', () => q.enqueue(qi('c')));
     q.resume();
 
     expect(seen.starts).toEqual(['b']);
@@ -2038,11 +2038,11 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.items.value.map((i) => i.id)).toEqual(['c']);
   });
 
-  it('list mode: enqueueing from a skip listener does not re-start the dispatched item', () => {
+  it('list mode: enqueueing from a skipped listener does not re-start the dispatched item', () => {
     const q = makeQueue({ mode: 'list' });
     q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen = trackLifecycle(q);
-    once(q, 'skip', () => q.enqueue(qi('c')));
+    once(q, 'skipped', () => q.enqueue(qi('c')));
 
     q.enqueue(qi('skip-me'));
 
@@ -2050,7 +2050,7 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.currentItem?.id).toBe('c');
   });
 
-  it('list mode: breaking the hold from a hold listener dispatches once', () => {
+  it('list mode: breaking the hold from a held listener dispatches once', () => {
     const tm = createTickManager();
     const ctxId = `reentry-hold-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
@@ -2063,8 +2063,8 @@ describe('Sequencer — listener re-entrancy', () => {
     endPersistentContext();
     const seen = trackLifecycle(q);
     // Inserting AT the cursor with nothing running breaks the hold, which
-    // re-drives from inside the `hold` emit still on the stack.
-    once(q, 'hold', () => q.enqueue(qi('jump-in'), { at: 0 }));
+    // re-drives from inside the `held` emit still on the stack.
+    once(q, 'held', () => q.enqueue(qi('jump-in'), { at: 0 }));
 
     q.enqueue(qi('wait-me'));
 
@@ -2073,12 +2073,12 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.currentItem?.id).toBe('jump-in');
   });
 
-  it('list mode: enqueueing from resetCursor’s cancel listener does not orphan', () => {
+  it('list mode: enqueueing from resetCursor’s cancelled listener does not orphan', () => {
     const q = makeQueue({ mode: 'list' });
     const seen = trackLifecycle(q);
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
-    once(q, 'cancel', () => q.enqueue(qi('c')));
+    once(q, 'cancelled', () => q.enqueue(qi('c')));
 
     q.resetCursor();
 
@@ -2088,11 +2088,11 @@ describe('Sequencer — listener re-entrancy', () => {
     expect(q.cursor).toBe(0);
   });
 
-  it('queue mode: enqueueing from a repeat listener does not orphan the repeated item', () => {
+  it('queue mode: enqueueing from a repeated listener does not orphan the repeated item', () => {
     const q = makeQueue();
     const seen = trackLifecycle(q);
     q.enqueue(qi('a'));
-    once(q, 'repeat', () => q.enqueue(qi('c')));
+    once(q, 'repeated', () => q.enqueue(qi('c')));
 
     q.repeat();
 
@@ -2102,12 +2102,12 @@ describe('Sequencer — listener re-entrancy', () => {
   });
 
   // The guard refuses a dispatch over a *live* current. `complete()` clears
-  // `current` before it emits, so completing from a start listener is a
+  // `current` before it emits, so completing from a started listener is a
   // legitimate nested call and must still advance.
-  it('queue mode: completing from a start listener still dispatches the next item', () => {
+  it('queue mode: completing from a started listener still dispatches the next item', () => {
     const q = makeQueue();
     const seen = trackLifecycle(q);
-    once(q, 'start', () => q.complete());
+    once(q, 'started', () => q.complete());
 
     q.enqueue(qi('a'));
     q.enqueue(qi('b'));
