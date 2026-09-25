@@ -8,6 +8,11 @@ on:
 env:
   REGISTRY: git.gamebois.lol
   HUSKY: 0
+  # pnpm 12 fails an install on any unapproved build script. esbuild's only
+  # checks its platform binary, which ships as an optional dep; nothing needs it.
+  # The engine can't hold this in a pnpm-workspace.yaml of its own without
+  # leaving the studio workspace, so the approval lives here.
+  pnpm_config_allow_builds: '{"esbuild":false}'
 
 jobs:
   check:
