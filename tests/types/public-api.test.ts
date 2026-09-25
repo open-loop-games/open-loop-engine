@@ -40,7 +40,7 @@ import {
   type Passage,
   type Series,
 } from '@/index';
-import type { Computable } from '@/core/computed';
+import type { Computable, MaybeGetter } from '@/core/computed';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
@@ -74,7 +74,15 @@ import type { ResettableObject } from '@/systems/resettable';
 import type { Purchasable, PurchasableOptions } from '@/systems/purchasable';
 import type { Requirements } from '@/core/requirements';
 import type { TickDriverConfig } from '@/core/tick-driver';
-import type { BindOptions, BindingRecord, Grant, ModifierChain } from '@/core/modifier';
+import type {
+  BindOptions,
+  BindingRecord,
+  Grant,
+  Modifier,
+  ModifierChain,
+  ModifierChainSlot,
+  ModifierDescription,
+} from '@/core/modifier';
 
 describe('createEngine type surface', () => {
   it('returns an Engine with the documented shape', () => {
@@ -1027,5 +1035,107 @@ describe('runUntil type surface', () => {
     expectTypeOf<Result['terminated']>().toEqualTypeOf<
       'predicate' | 'maxSimTime' | 'unreachable'
     >();
+  });
+});
+
+describe('SaveMigration and saveMigrations config (B1)', () => {
+  it('SaveMigration takes and returns Record<string, unknown> — a step must return the object', () => {
+    type Migration = import('@/core/save-manager').SaveMigration;
+    expectTypeOf<Migration>().toEqualTypeOf<
+      (data: Record<string, unknown>) => Record<string, unknown>
+    >();
+  });
+
+  it('EngineConfig.saveMigrations and SaveManagerConfig.migrations key migrations by version', () => {
+    type EngineMigrations = import('@/engine').EngineConfig['saveMigrations'];
+    type ManagerMigrations = import('@/core/save-manager').SaveManagerConfig['migrations'];
+    type Migration = import('@/core/save-manager').SaveMigration;
+    expectTypeOf<EngineMigrations>().toEqualTypeOf<Record<number, Migration> | undefined>();
+    expectTypeOf<ManagerMigrations>().toEqualTypeOf<Record<number, Migration> | undefined>();
+  });
+
+  it('LoadHandler receives the SaveLoadResult, not void', () => {
+    type Handler = import('@/engine').LoadHandler;
+    expectTypeOf<Handler>().toEqualTypeOf<
+      (result: import('@/core/save-manager').SaveLoadResult) => void
+    >();
+  });
+
+  it('SaveManager exposes isSlotProtected / releaseSlot for the protected-slot lifecycle', () => {
+    type Manager = import('@/core/save-manager').SaveManager;
+    expectTypeOf<Manager['isSlotProtected']>().toEqualTypeOf<(slotId: number) => boolean>();
+    expectTypeOf<Manager['releaseSlot']>().toEqualTypeOf<(slotId: number) => void>();
+  });
+});
+
+describe('createTimeSystem type surface (B2)', () => {
+  it('id is optional — defaults to a per-module context', () => {
+    type Options = import('@/systems/time').TimeSystemConfig;
+    expectTypeOf<Options['id']>().toEqualTypeOf<string | undefined>();
+  });
+
+  it('elapsed and totalPlayTime are plain number refs', async () => {
+    const { createTimeSystem } = await import('@/index');
+    const time = createTimeSystem();
+    expectTypeOf(time.elapsed).toEqualTypeOf<Ref<number>>();
+    expectTypeOf(time.totalPlayTime).toEqualTypeOf<Ref<number>>();
+  });
+});
+
+describe('ModifierChain.replace / reserve and slot surface (B5)', () => {
+  it('replace swaps a modifier in place and reports absence via a boolean', () => {
+    expectTypeOf<ModifierChain['replace']>().parameters.toEqualTypeOf<[Modifier, Modifier]>();
+    expectTypeOf<ModifierChain['replace']>().returns.toBeBoolean();
+  });
+
+  it('reserve holds a position that a later add fills at that spot', () => {
+    expectTypeOf<ModifierChain['reserve']>().returns.toEqualTypeOf<ModifierChainSlot>();
+    expectTypeOf<ModifierChainSlot['add']>().returns.toEqualTypeOf<() => void>();
+    expectTypeOf<ModifierChainSlot['release']>().returns.toBeVoid();
+  });
+});
+
+describe('Modifier.description carries multi-line breakdowns (B5)', () => {
+  it('is a MaybeGetter over one or many ModifierDescriptions, not a single line', () => {
+    // A regression that narrowed this back to `MaybeGetter<ModifierDescription>`
+    // would compile at every existing call site (a single description is
+    // still assignable) and only break at the composite-effect flattening
+    // this type exists to support.
+    expectTypeOf<Modifier['description']>().toEqualTypeOf<
+      MaybeGetter<ModifierDescription | ModifierDescription[]> | undefined
+    >();
+  });
+});
+
+describe('ActionCategory.replay (B8)', () => {
+  it('is a no-arg void method — list-mode restart, a no-op in queue mode', () => {
+    interface Def {
+      id: string;
+      baseTicks: number;
+    }
+    type Cat = ActionCategory<Def>;
+    expectTypeOf<Cat['replay']>().toEqualTypeOf<() => void>();
+  });
+});
+
+describe('Removed surface stays removed', () => {
+  it('IResource and IModifier no longer resolve from the root barrel', () => {
+    // @ts-expect-error — IResource was replaced by the Resource union.
+    type _IResource = import('@/index').IResource;
+    // @ts-expect-error — IModifier was replaced by Modifier.
+    type _IModifier = import('@/index').IModifier;
+  });
+
+  it('EngineContext.onReset is gone — resets fire through the Reset system, not the engine context', () => {
+    type Keys = keyof EngineContext;
+    expectTypeOf<'onReset' extends Keys ? true : false>().toEqualTypeOf<false>();
+  });
+
+  it('isMultiBarProgress and progressToDecimal are removed from the barrel', async () => {
+    const mod = await import('@/index');
+    // @ts-expect-error — removed; use `typeof item.progress !== 'number'` at the call site.
+    expectTypeOf(mod.isMultiBarProgress).toBeUndefined();
+    // @ts-expect-error — removed alongside isMultiBarProgress, same replacement.
+    expectTypeOf(mod.progressToDecimal).toBeUndefined();
   });
 });
