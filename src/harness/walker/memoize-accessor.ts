@@ -9,55 +9,28 @@
  */
 
 import type { GameStateAccessor } from '@/primitives/types';
-import type { Decimal } from '@/primitives/decimal';
+
+/** Cache `read` per id; keyed on `has`, so an `undefined` read stays cached. */
+function cached<V>(read: (id: string) => V): (id: string) => V {
+  const cache = new Map<string, V>();
+  return (id) => {
+    if (cache.has(id)) return cache.get(id) as V;
+    const value = read(id);
+    cache.set(id, value);
+    return value;
+  };
+}
 
 export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor {
-  const resourceCache = new Map<string, Decimal>();
-  const rateCache = new Map<string, Decimal>();
-  const unlockCache = new Map<string, boolean>();
-  const stateCache = new Map<string, unknown>();
-
   const memo: GameStateAccessor = {
-    getResource(id) {
-      const hit = resourceCache.get(id);
-      if (hit !== undefined) return hit;
-      const value = accessor.getResource(id);
-      resourceCache.set(id, value);
-      return value;
-    },
-    getRate(id) {
-      const hit = rateCache.get(id);
-      if (hit !== undefined) return hit;
-      const value = accessor.getRate(id);
-      rateCache.set(id, value);
-      return value;
-    },
-    isUnlocked(id) {
-      const hit = unlockCache.get(id);
-      if (hit !== undefined) return hit;
-      const value = accessor.isUnlocked(id);
-      unlockCache.set(id, value);
-      return value;
-    },
-    getState(path) {
-      if (stateCache.has(path)) return stateCache.get(path);
-      const value = accessor.getState(path);
-      stateCache.set(path, value);
-      return value;
-    },
+    getResource: cached((id) => accessor.getResource(id)),
+    getRate: cached((id) => accessor.getRate(id)),
+    isUnlocked: cached((id) => accessor.isUnlocked(id)),
+    getState: cached((path) => accessor.getState(path)),
   };
   // Only where the source serves it: an absent hook is what tells a
   // predictor to fall back to the net rate.
-  const getInflowRate = accessor.getInflowRate?.bind(accessor);
-  if (getInflowRate) {
-    const inflowCache = new Map<string, Decimal>();
-    memo.getInflowRate = (id) => {
-      const hit = inflowCache.get(id);
-      if (hit !== undefined) return hit;
-      const value = getInflowRate(id);
-      inflowCache.set(id, value);
-      return value;
-    };
-  }
+  const { getInflowRate } = accessor;
+  if (getInflowRate) memo.getInflowRate = cached((id) => getInflowRate.call(accessor, id));
   return memo;
 }
