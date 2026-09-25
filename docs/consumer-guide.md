@@ -140,7 +140,7 @@ A custom-predicate Gate kind carrying a closure is deliberately *not* part of th
 
 `engine.start()` does not load the save. Call `engine.load()` explicitly after `start()` — modules must install first so their persistent refs exist to hydrate, and `load()` before `start()` (or after `dispose()`) throws. A game bootstrap is `use(...)` → `start()` → `load()`.
 
-A load that fails for any reason but `not-found` protects its slot: autosave and `save()` skip it until `saveManager.releaseSlot(id)` or `deleteSave()`, and `save:slot-protected` fires for a UI that offers "discard the unreadable save". `ctx.onLoad` fires after every successful load path (`engine.load()`, the save manager's `load` / `importSave`, harness `createEngineFromSave`), and `ctx.onSave` before every serialization, autosave included.
+A load that fails for any reason but `not-found` protects its slot: autosave and `save()` skip it until `saveManager.releaseSlot(id)` or `deleteSave()`, and `save:slot-protected` fires for a UI that offers "discard the unreadable save". `ctx.onLoad` fires after every successful load path (`engine.load()`, the save manager's `load` / `importSave`, harness `createEngineFromSave`), and `ctx.onSave` before every serialization, autosave and `exportSave` included. "Saved" UI keys off `save:written`, not `onSave`: it fires only once `save`, `saveToSlot` or autosave has written the slot.
 
 ### Persistent context
 
@@ -189,7 +189,7 @@ Category factories (`createSkillCategory`, `createChallengeCategory`, `createPur
 
 For challenges that means `active` and `completions` survive every prestige tier (AD canon, TMT convention), and a challenge stays entered through the prestiges played inside it. Naming `'my-challenges/ic1'` in `resetModules` doesn't reset them; to wipe completions, name the refs — `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
 
-A challenge category re-applies an active challenge's overrides and patches after every load and reset itself, so there is no `restore()` to call from `onLoad`. A load restores `earned` without firing `onComplete`, so `onComplete` may grant a reward; and an achievement whose requirement holds once a load settles (one added in a content update, or one a reset wiped by name) latches then. Challenge `onEnter` / `onExit` run only on a player entry or exit, so they may write game state; runtime-only setup that must come back after a load derives from `challenge.active`.
+A challenge category re-applies an active challenge's overrides and patches after every load and reset itself, so there is no `restore()` to call from `onLoad`. These engine reconciles (challenge scopes, achievement and automation latching, slot resync) run after every `ctx.onLoad`: a watcher on what they write sees state `onLoad` rebuilt, while `onLoad` itself sees them unreconciled. A reconcile that throws after a successful load leaves the load standing and fires `save:reconcile-error`. A load restores `earned` without firing `onComplete`, so `onComplete` may grant a reward; and an achievement whose requirement holds once a load settles (one added in a content update, or one a reset wiped by name) latches then. Challenge `onEnter` / `onExit` run only on a player entry or exit, so they may write game state; runtime-only setup that must come back after a load derives from `challenge.active`.
 
 ### Bindings re-hydrate from install, not from save
 
