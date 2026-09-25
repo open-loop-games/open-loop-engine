@@ -772,6 +772,22 @@ describe('createSpatialGrid — events & subscriptions', () => {
 });
 
 describe('createSpatialGrid — serialize / restore', () => {
+  it('stamps its snapshot version 1, and restore reads an unversioned one as version 1', () => {
+    const grid = createSpatialGrid<Tile>({
+      width: 2,
+      height: 1,
+      initializer: () => ({ kind: 'floor' }),
+    });
+    const snapshot = grid.serialize();
+    expect(snapshot.version).toBe(1);
+
+    const { version: _, ...unversioned } = snapshot;
+    expect(() => grid.restore(unversioned)).not.toThrow();
+    expect(() => grid.restore({ ...snapshot, version: 2 as 1 })).toThrow(
+      'unsupported snapshot version 2',
+    );
+  });
+
   it('round-trips cells and all three bitmaps', () => {
     const original = createSpatialGrid<Tile>({
       width: 3,

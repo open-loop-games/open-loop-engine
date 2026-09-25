@@ -119,12 +119,18 @@ export interface SpatialGridEvents<T> {
  * grid after a serialize never corrupts the snapshot.
  */
 export interface SpatialGridSnapshot<T> {
+  /** `serialize()` writes 1; `restore()` reads an absent version as 1. */
+  version?: 1;
   width: number;
   height: number;
   /** Row-major dense cell array, length === width * height. */
   cells: T[];
   passable: number[];
   explored: number[];
+  /**
+   * Last committed FOV. Derivable, but only by a FOV pass the game runs when
+   * its viewpoint moves, so it's kept: a reload shows the view it saved.
+   */
   visible: number[];
 }
 
@@ -333,7 +339,7 @@ export interface SpatialGrid<T> {
 
   /** Capture the grid's current state as a plain-object snapshot. */
   serialize(): SpatialGridSnapshot<T>;
-  /** Replace the grid's state from a snapshot. Width/height must match construction. */
+  /** Replace the grid's state from a snapshot. Width/height must match construction; a version other than 1 throws. */
   restore(snapshot: SpatialGridSnapshot<T>): void;
 }
 
@@ -728,6 +734,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
     serialize() {
       return {
+        version: 1,
         width,
         height,
         cells: cells.slice(),
@@ -738,6 +745,11 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     },
 
     restore(snapshot) {
+      if (snapshot.version !== undefined && snapshot.version !== 1) {
+        throw new Error(
+          `SpatialGrid.restore: unsupported snapshot version ${String(snapshot.version)}`,
+        );
+      }
       if (snapshot.width !== width || snapshot.height !== height) {
         throw new Error(
           `SpatialGrid.restore: snapshot dimensions (${snapshot.width}×${snapshot.height}) do not match grid (${width}×${height})`,
