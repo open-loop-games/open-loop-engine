@@ -15,9 +15,22 @@ import {
   createCycle,
   createCycleLog,
   CycleLogKey,
+  createChallengeCategory,
+  createMemoryStorage,
+  createOverrideRegistry,
+  createSaveManager,
+  effectScope,
+  watch,
 } from '@/index';
-import { getCurrentContext, getPersistentRefs } from '@/core/persistence';
-import type { CycleLog } from '@/index';
+import { createEngineFromSave } from '@/harness/create-engine';
+import {
+  clearPersistentNamespace,
+  getCurrentContext,
+  getPersistentRefs,
+  withPersistenceNamespace,
+  withPersistentContext,
+} from '@/core/persistence';
+import type { ChallengeCategory, CycleLog, Persistent } from '@/index';
 import type { EngineModule, InjectionKey, EngineCategories } from '@/index';
 
 describe('createEngine', () => {
@@ -1385,5 +1398,194 @@ describe('save safety', () => {
     engine.start();
     engine.dispose();
     expect(() => engine.load()).toThrow(/disposed/);
+  });
+});
+
+describe('load order — engine reconcilers run after onLoad', () => {
+  /**
+   * The repro shape: the module rebuilds `derived` from `roster` in onLoad,
+   * and a sync watcher on the override registry's `scopeVersion` reads both.
+   * The save holds roster `['s']` mid-challenge; live state has the
+   * challenge exited, so the load's reconcile pushes its scopes.
+   */
+  function game() {
+    const order: string[] = [];
+    const seen: string[][] = [];
+    const rules = createOverrideRegistry<{ mult: () => number }>('rules');
+    rules.setDefault('mult', () => 1);
+    let roster!: Persistent<string[]>;
+    let derived: string[] = [];
+    let category!: ChallengeCategory;
+    const mod: EngineModule = {
+      id: 'game',
+      install(ctx) {
+        roster = persistent(['a'], { name: 'roster' });
+        derived = [...roster.value];
+        ctx.onLoad(() => {
+          order.push('onLoad');
+          derived = [...roster.value];
+        });
+        category = createChallengeCategory({ id: 'ch', overrideRegistry: rules });
+        category.register([{ id: 'c1', name: 'C1', overrides: { mult: () => 2 } }]);
+      },
+      connect() {
+        watch(
+          rules.scopeVersion,
+          () => {
+            order.push('scopeVersion watcher');
+            seen.push([...derived]);
+            for (const id of derived) {
+              if (!roster.value.includes(id)) throw new Error(`stale derived id ${id}`);
+            }
+          },
+          { flush: 'sync' },
+        );
+      },
+    };
+    return {
+      mod,
+      rules,
+      order,
+      seen,
+      /** Save mid-challenge with roster `['s']`, then leave the challenge and edit the roster. */
+      saveMidChallenge(save: () => void) {
+        roster.value = ['s'];
+        derived = ['s'];
+        category.getChallenge('c1')!.enter();
+        save();
+        category.getChallenge('c1')!.exit();
+        roster.value = ['b'];
+        derived = ['b'];
+        order.length = 0;
+        seen.length = 0;
+      },
+    };
+  }
+
+  function started(g: ReturnType<typeof game>, gameId: string) {
+    const engine = createEngine({ gameId, storageAdapter: createMemoryStorage() });
+    engine.use(g.mod);
+    engine.start();
+    return engine;
+  }
+
+  function expectFreshLoad(g: ReturnType<typeof game>) {
+    expect(g.order).toEqual(['onLoad', 'scopeVersion watcher']);
+    expect(g.seen).toEqual([['s']]);
+    expect(g.rules.get('mult')()).toBe(2);
+  }
+
+  it('engine.load(): the watcher sees onLoad-rebuilt state and the load succeeds', () => {
+    const g = game();
+    const engine = started(g, 'order-load');
+    g.saveMidChallenge(() => engine.save());
+    const failed = vi.fn();
+    engine.saveManager!.on('save:load-failed', failed);
+
+    expect(engine.load().success).toBe(true);
+
+    expect(failed).not.toHaveBeenCalled();
+    expectFreshLoad(g);
+    engine.dispose();
+  });
+
+  it('importSave: the same order', () => {
+    const g = game();
+    const engine = started(g, 'order-import');
+    let blob = '';
+    g.saveMidChallenge(() => (blob = engine.saveManager!.exportSave()));
+
+    expect(engine.saveManager!.importSave(blob).success).toBe(true);
+
+    expectFreshLoad(g);
+    engine.dispose();
+  });
+
+  it('a slot switch: the same order', () => {
+    const g = game();
+    const engine = started(g, 'order-slot');
+    const mgr = engine.saveManager!;
+    const slot = mgr.createSlot('second');
+    g.saveMidChallenge(() => mgr.saveToSlot(slot));
+
+    mgr.selectSlot(slot);
+    expect(mgr.load().success).toBe(true);
+
+    expectFreshLoad(g);
+    engine.dispose();
+  });
+
+  it('createEngineFromSave: the same order, on a fresh engine', () => {
+    const source = game();
+    const engine = started(source, 'order-scratch');
+    let blob = '';
+    source.saveMidChallenge(() => (blob = engine.saveManager!.exportSave()));
+    engine.dispose();
+
+    const g = game();
+    const scratch = createEngineFromSave({ saveBlob: blob, modules: [g.mod] });
+
+    expectFreshLoad(g);
+    scratch.dispose();
+  });
+
+  it('a bare save manager with no engine still reconciles after its load', () => {
+    const rules = createOverrideRegistry<{ mult: () => number }>('rules');
+    rules.setDefault('mult', () => 1);
+    const scope = effectScope();
+    const category = scope.run(() =>
+      withPersistenceNamespace('order-bare', () => {
+        const ch = withPersistentContext('bare', () =>
+          createChallengeCategory({ id: 'ch', overrideRegistry: rules }),
+        );
+        ch.register([{ id: 'c1', name: 'C1', overrides: { mult: () => 2 } }]);
+        return ch;
+      }),
+    )!;
+    const mgr = createSaveManager({
+      gameId: 'order-bare',
+      persistenceNamespace: 'order-bare',
+      storageAdapter: createMemoryStorage(),
+    });
+    category.getChallenge('c1')!.enter();
+    mgr.save();
+    category.getChallenge('c1')!.exit();
+
+    expect(mgr.load().success).toBe(true);
+
+    expect(rules.get('mult')()).toBe(2);
+    scope.stop();
+    clearPersistentNamespace('order-bare');
+  });
+
+  it('a reconcile that throws leaves the load standing and reports save:reconcile-error', () => {
+    const g = game();
+    const engine = started(g, 'order-throw');
+    g.saveMidChallenge(() => engine.save());
+    const boom = new Error('boom');
+    const stop = watch(
+      g.rules.scopeVersion,
+      () => {
+        throw boom;
+      },
+      { flush: 'sync' },
+    );
+    const mgr = engine.saveManager!;
+    const failed = vi.fn();
+    const reconcileErrors: unknown[] = [];
+    mgr.on('save:load-failed', failed);
+    mgr.on('save:reconcile-error', (e) => reconcileErrors.push(e));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(engine.load().success).toBe(true);
+
+    expect(failed).not.toHaveBeenCalled();
+    expect(mgr.isSlotProtected(mgr.activeSlotId)).toBe(false);
+    expect(reconcileErrors).toEqual([{ slotId: mgr.activeSlotId, detail: boom }]);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), boom);
+    expect(g.rules.get('mult')()).toBe(2);
+    logged.mockRestore();
+    stop();
+    engine.dispose();
   });
 });

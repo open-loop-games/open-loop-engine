@@ -27,6 +27,7 @@ import {
   getAllPersistentRefs,
   serializePersistents,
   deserializePersistents,
+  deferHydration,
   filterDefaultedRefs,
   PersistentName,
   DefaultValue,
@@ -209,7 +210,10 @@ export type SaveLoadFailureReason =
  * does not itself write storage until the next `save()`), so it carries that id.
  */
 export interface SaveEvents {
-  /** A save was successfully loaded or imported. */
+  /**
+   * A save was successfully loaded or imported. Engine systems reconcile
+   * their runtime state to it after every handler has run.
+   */
   'save:loaded': (meta: { slotId: number; timestamp: number; version: number }) => void;
   /** A load or import failed. `detail` carries the underlying error when available. */
   'save:load-failed': (err: {
@@ -234,6 +238,15 @@ export interface SaveEvents {
     received: unknown;
     action: 'self-heal' | 'fail';
   }) => void;
+  /**
+   * An engine system's reconcile threw after a load or import succeeded, or a
+   * watcher reacting to one of its writes did. Reconcilers run after
+   * `save:loaded` and every `onLoad` callback; by then the refs hold the save,
+   * so the load stands, the slot stays unprotected, and the remaining
+   * reconcilers still run. `detail` is the thrown error, also logged via
+   * `console.error`.
+   */
+  'save:reconcile-error': (err: { slotId: number; detail: unknown }) => void;
   /** A consumer-provided migration step ran during load. */
   'save:migration-step': (info: { from: number; to: number }) => void;
   /**
@@ -718,6 +731,14 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     deserializePersistents(refs, validation.data);
   }
 
+  /** Report a post-load reconcile's throw without failing the load it followed. */
+  function reportReconcileError(slotId: number): (err: unknown) => void {
+    return (err) => {
+      console.error('A reconcile after a successful save load threw; the load stands.', err);
+      handle.emit('save:reconcile-error', { slotId, detail: err });
+    };
+  }
+
   function peekRaw(key: string): SavePeek | null {
     const raw = storage.getItem(key);
     if (!raw) return null;
@@ -778,14 +799,16 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         return fail('parse-error', parseFailureDetail(err));
       }
       if (e.gameId !== gameId) return fail('wrong-game-id');
-      try {
-        applyEnvelope(e, slotId);
-      } catch (err) {
-        return err instanceof LoadFailure ? fail(err.reason, err.detail) : fail('unknown', err);
-      }
-      _protectedSlots.delete(slotId);
-      handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
-      return { success: true, timestamp: e.timestamp };
+      return deferHydration(() => {
+        try {
+          applyEnvelope(e, slotId);
+        } catch (err) {
+          return err instanceof LoadFailure ? fail(err.reason, err.detail) : fail('unknown', err);
+        }
+        _protectedSlots.delete(slotId);
+        handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
+        return { success: true, timestamp: e.timestamp };
+      }, reportReconcileError(slotId));
     },
 
     exportSave() {
@@ -809,19 +832,21 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         handle.emit('save:load-failed', { slotId, reason: 'wrong-game-id' });
         return { success: false };
       }
-      try {
-        applyEnvelope(e, slotId);
-      } catch (err) {
-        if (err instanceof LoadFailure) {
-          handle.emit('save:load-failed', { slotId, reason: err.reason, detail: err.detail });
-        } else {
-          handle.emit('save:load-failed', { slotId, reason: 'unknown', detail: err });
+      return deferHydration(() => {
+        try {
+          applyEnvelope(e, slotId);
+        } catch (err) {
+          if (err instanceof LoadFailure) {
+            handle.emit('save:load-failed', { slotId, reason: err.reason, detail: err.detail });
+          } else {
+            handle.emit('save:load-failed', { slotId, reason: 'unknown', detail: err });
+          }
+          return { success: false };
         }
-        return { success: false };
-      }
-      _protectedSlots.delete(slotId);
-      handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
-      return { success: true, timestamp: e.timestamp };
+        _protectedSlots.delete(slotId);
+        handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
+        return { success: true, timestamp: e.timestamp };
+      }, reportReconcileError(slotId));
     },
 
     hasSave() {

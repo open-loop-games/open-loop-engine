@@ -13,8 +13,9 @@ import {
   computed,
   isRef,
   watch,
+  getCurrentScope,
+  onScopeDispose,
   type Ref,
-  type WatchStopHandle,
   type WritableComputedRef,
 } from 'vue';
 import { Decimal } from '@/primitives/decimal';
@@ -164,22 +165,75 @@ export type NonPersistent<T = State> = WritableComputedRef<T> & {
  */
 export const loadingSave = ref(false);
 
+const hydratedCallbacks = new Set<() => void>();
+/** Open {@link deferHydration} calls; a settle inside one waits for the last to close. */
+let hydrationDeferrals = 0;
+let hydrationPending = false;
+
 /**
  * Run `callback` each time a save load or a reset finishes writing persistent
- * refs, once the whole state is consistent. The flag is shared by every
- * engine in the process, so the callback also runs after another engine's
- * load and must be idempotent.
+ * refs, once the whole state is consistent. A reset runs it as its writes
+ * settle. A save manager load runs it after `save:loaded`, so after the
+ * engine's `onLoad` callbacks: a watcher that reacts to a reconciler's write
+ * sees the state `onLoad` rebuilt. The flag is shared by every engine in the
+ * process, so the callback also runs after another engine's load and must be
+ * idempotent. Stops with the effect scope it was registered in.
  *
  * @internal
  */
-export function onHydrated(callback: () => void): WatchStopHandle {
-  return watch(
-    loadingSave,
-    (loading, wasLoading) => {
-      if (wasLoading && !loading) callback();
-    },
-    { flush: 'sync' },
-  );
+export function onHydrated(callback: () => void): () => void {
+  hydratedCallbacks.add(callback);
+  const stop = () => void hydratedCallbacks.delete(callback);
+  if (getCurrentScope()) onScopeDispose(stop);
+  return stop;
+}
+
+/** Run every hydration callback, even past a throw; returns what they threw. */
+function runHydrated(): unknown[] {
+  const errors: unknown[] = [];
+  for (const cb of [...hydratedCallbacks]) {
+    try {
+      cb();
+    } catch (err) {
+      errors.push(err);
+    }
+  }
+  return errors;
+}
+
+watch(
+  loadingSave,
+  (loading, wasLoading) => {
+    if (!wasLoading || loading) return;
+    if (hydrationDeferrals > 0) {
+      hydrationPending = true;
+      return;
+    }
+    const errors = runHydrated();
+    if (errors.length > 0) throw errors[0];
+  },
+  { flush: 'sync' },
+);
+
+/**
+ * Run `fn` with {@link onHydrated} callbacks held until it returns or throws,
+ * then run them once if a load or reset settled inside it. A throw from a
+ * held callback goes to `onError` rather than out of this call: the writes
+ * it reconciles have already landed. Nested calls hold until the outermost
+ * closes, and report through its `onError`.
+ *
+ * @internal
+ */
+export function deferHydration<T>(fn: () => T, onError: (err: unknown) => void): T {
+  hydrationDeferrals++;
+  try {
+    return fn();
+  } finally {
+    if (--hydrationDeferrals === 0 && hydrationPending) {
+      hydrationPending = false;
+      for (const err of runHydrated()) onError(err);
+    }
+  }
 }
 
 /** Track if we're currently in a context where persistent creation is expected */

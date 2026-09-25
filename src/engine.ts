@@ -69,6 +69,11 @@ export type SaveHandler = () => void;
  * `engine.load()`, the save manager's `load` / `importSave`, or a harness
  * engine hydrated from a save. Receives the `SaveLoadResult` (always
  * `success: true`, with the save's timestamp) — not the decoded payload.
+ *
+ * Every `onLoad` runs before the engine's own post-load reconciles (a
+ * challenge's scopes, a latching achievement or automation tier, a slot's
+ * resync), so a watcher reacting to their writes sees the state `onLoad`
+ * rebuilt. A reset runs those reconciles and no `onLoad`.
  */
 export type LoadHandler = (result: SaveLoadResult) => void;
 
