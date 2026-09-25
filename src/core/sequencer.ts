@@ -30,7 +30,8 @@ import { reportAdvanceCapTrip } from './safeguards';
 
 /**
  * A sequencer entry: string ID plus typed metadata. `metadata` is required
- * even when `M` is `void` — pass `metadata: undefined`.
+ * even when `M` is `void` — pass `metadata: undefined`. Saves hold metadata as
+ * JSON, so keep it JSON-plain: a `Decimal` in it loads back as its string.
  */
 export interface SequencerItem<M = void> {
   id: string;

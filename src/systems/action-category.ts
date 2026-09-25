@@ -153,7 +153,11 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
    * (looper, etc.), which replay the list with `replay()`.
    */
   mode?: 'queue' | 'list';
-  /** Map a def to its tick/canRun/signals/rateChain configuration. Called at registration time. */
+  /**
+   * Map a def to its tick/canRun/signals/rateChain configuration. Called at
+   * registration time, in the caller's persistent context — unlike `mapState`,
+   * not the def's.
+   */
   mapAction: (def: Def, ctx: ActionCategoryContext) => ActionMapping<Def, State, Payload>;
   /** Optional per-def state factory. Called inside the def's persistent context. */
   mapState?: (def: Def) => State;
@@ -366,10 +370,9 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   function registerWithMapping(defs: Def | Def[]): void {
     const arr = Array.isArray(defs) ? defs : [defs];
     for (const def of arr) {
-      // Build mapping in the def's persistent sub-context so any modifier
-      // chains created inside `mapAction` get auto-attribution paths.
-      // createCategoryBase opens that context during registerOne; we open
-      // a parallel scope here just for the mapping call.
+      // `mapAction` runs in the caller's persistent context, not the def's:
+      // opening the def's here would move the save keys of any refs it
+      // creates.
       const mapping = mapAction(def, mapCtx);
       mappings.set(def.id, mapping);
       if (mapping.rateChain) {

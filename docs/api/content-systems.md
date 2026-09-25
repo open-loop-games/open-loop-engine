@@ -36,7 +36,7 @@ milestone tracking with auto-unlock and tiered rewards
 
 batch-registered ordered-execution queue with per-execution state machine
 
-- `interface ActionCategory<Def extends { id: string; }, State = void, Payload = void> extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>>` — An action category — registered queue with per-execution state machine. `src/systems/action-category.ts:174`
+- `interface ActionCategory<Def extends { id: string; }, State = void, Payload = void> extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>>` — An action category — registered queue with per-execution state machine. `src/systems/action-category.ts:178`
 - `interface ActionCategoryContext` — Context passed to `mapAction` at registration time. `src/systems/action-category.ts:126`
 - `interface ActionCategoryEntry<Def extends { id: string; }, State, Payload>` — A registered entry: definition + per-def state + the current per-execution metadata when this def is the running item. `src/systems/action-category.ts:91`
 - `interface ActionCategoryEvents<Def extends { id: string; }, State, Payload>` — Events emitted by an ActionCategory. `src/systems/action-category.ts:131`
@@ -45,7 +45,7 @@ batch-registered ordered-execution queue with per-execution state machine
 - `type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 'failed'` — Per-execution lifecycle state. `src/systems/action-category.ts:60`
 - `interface ActionMapping<Def extends { id: string; }, State, Payload>` — Return type of the `mapAction` callback. `src/systems/action-category.ts:102`
 - `interface ActionTickContext<Def extends { id: string; }, State, Payload>` — Context passed to a mapping's `tick` closure. `src/systems/action-category.ts:81`
-- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:319`
+- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:323`
 
 ## Automation tiers
 
