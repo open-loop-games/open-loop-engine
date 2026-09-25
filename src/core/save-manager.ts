@@ -190,7 +190,8 @@ export interface SaveSlot {
  * - `not-found`: no envelope exists at the target storage key
  * - `parse-error`: raw data was not valid JSON
  * - `wrong-game-id`: envelope parsed but its `gameId` doesn't match this manager
- * - `future-version`: envelope's version exceeds this manager's current version
+ * - `future-version`: the save was written by a newer build — its game version
+ *   exceeds this manager's, or its engine save version exceeds this engine's
  * - `validation`: runtime Zod validation failed in strict mode
  * - `unknown`: any other thrown error during load/migration/deserialize
  */
@@ -221,9 +222,14 @@ export interface SaveEvents {
     reason: SaveLoadFailureReason;
     detail?: unknown;
   }) => void;
-  /** An envelope's `version` exceeded the current `SaveManagerConfig.version`. */
+  /**
+   * A save was written by a newer build. `kind: 'game'` compares the envelope's
+   * `version` with `SaveManagerConfig.version`; `kind: 'engine'` compares its
+   * engine save version with this engine's, and a game can't migrate that.
+   */
   'save:future-version': (err: {
     slotId: number;
+    kind: 'game' | 'engine';
     saveVersion: number;
     currentVersion: number;
   }) => void;
@@ -689,11 +695,23 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   }
 
   function applyEnvelope(envelope: SaveEnvelope, slotId: number): void {
-    // Future-version guard: if the save was written by a newer build than
-    // this manager knows how to handle, don't run migrations on unknown data.
+    // Future-version guards: if the save was written by a newer build than
+    // this manager knows how to handle, don't read or migrate unknown data.
+    // The engine's comes first, since its format decides how `data` decodes.
+    const engineVersion = envelope._engine?.version ?? 1;
+    if (engineVersion > ENGINE_SAVE_VERSION) {
+      handle.emit('save:future-version', {
+        slotId,
+        kind: 'engine',
+        saveVersion: engineVersion,
+        currentVersion: ENGINE_SAVE_VERSION,
+      });
+      throw new LoadFailure('future-version');
+    }
     if (envelope.version > version) {
       handle.emit('save:future-version', {
         slotId,
+        kind: 'game',
         saveVersion: envelope.version,
         currentVersion: version,
       });
@@ -722,7 +740,6 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // Engine-internal legacy migration: iteration-order keys → stable named keys.
     // Runs after the user migration chain (which reshapes per game version)
     // but before deserialize, since only here do we have the registry context.
-    const engineVersion = envelope._engine?.version ?? 1;
     const refs = getAllPersistentRefs(persistenceNamespace);
     // v2 already wrote named keys, so only a v1 envelope is remapped.
     if (engineVersion < 2) {

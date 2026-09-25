@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
+import { createSaveManager, createMemoryStorage, ENGINE_SAVE_VERSION } from '@/core/save-manager';
 import {
   persistent,
   beginPersistentContext,
@@ -1197,12 +1197,46 @@ describe('SaveManager — events', () => {
       const result = mgr.load();
 
       expect(result.success).toBe(false);
-      expect(fv).toHaveBeenCalledWith({ slotId: 0, saveVersion: 5, currentVersion: 2 });
+      expect(fv).toHaveBeenCalledWith({
+        slotId: 0,
+        kind: 'game',
+        saveVersion: 5,
+        currentVersion: 2,
+      });
       expect(failed).toHaveBeenCalledWith({
         slotId: 0,
         reason: 'future-version',
         detail: undefined,
       });
+    });
+
+    it('refuses a save a newer engine wrote, before reading its data', () => {
+      const storage = createMapStorage();
+      storage.setItem(
+        'evt-efv-slot-0',
+        JSON.stringify({
+          version: 1,
+          gameId: 'evt-efv',
+          timestamp: 1,
+          data: 'written in a format this engine does not know',
+          _engine: { version: ENGINE_SAVE_VERSION + 1, compression: 'zstd' },
+        }),
+      );
+      const mgr = createSaveManager({ gameId: 'evt-efv', version: 1, storageAdapter: storage });
+
+      const fv = vi.fn();
+      const failed = vi.fn();
+      mgr.on('save:future-version', fv);
+      mgr.on('save:load-failed', failed);
+
+      expect(mgr.load().success).toBe(false);
+      expect(fv).toHaveBeenCalledWith({
+        slotId: 0,
+        kind: 'engine',
+        saveVersion: ENGINE_SAVE_VERSION + 1,
+        currentVersion: ENGINE_SAVE_VERSION,
+      });
+      expect(failed.mock.calls[0][0].reason).toBe('future-version');
     });
 
     it('emits save:validation-error and self-heals in non-strict mode', () => {
