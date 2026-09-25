@@ -26,10 +26,9 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  * builds its own engine per run and the aggregate carries
  * `terminationTime` / `terminationCounts`.
  *
- * The runner stops each run's engine but never disposes it, since
- * `onRunComplete` may still read its state. A cell's `teardown` runs after
- * `onRunComplete` (or after a throwing run) — dispose the engine there, or a
- * long sweep holds every engine it built.
+ * The runner stops each run's engine, then disposes it once `onRunComplete`
+ * has read it (or after a throwing run). A cell's `teardown` replaces that
+ * dispose — pass a no-op to keep the engines alive past the sweep.
  *
  * @param config - {@link MatrixUntilConfig} — until-cells, seeds, shared
  *   predicate, max sim-time ceiling, optional callbacks + aggregate opts.
@@ -42,7 +41,6 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  *     {
  *       name: 'meta-cost × 0.85',
  *       buildEngine: () => buildDirectorEngine({ metaCostMul: 0.85 }),
- *       teardown: (engine) => engine.dispose(),
  *     },
  *     {
  *       name: 'meta-cost × 1.15',
@@ -104,7 +102,9 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
       perCellRuns[item.cellIdx].push(result);
       config.onRunComplete?.(item, result);
     } finally {
-      cell.teardown?.(engine, ctx);
+      if (cell.teardown) cell.teardown(engine, ctx);
+      // `dispose?.` tolerates lightweight test fakes.
+      else engine.dispose?.();
     }
 
     if (

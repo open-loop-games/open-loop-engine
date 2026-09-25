@@ -39,14 +39,13 @@ import type { BeatResult, ProbeConfig } from './types';
  *   over predicate-fired seeds, counts split by termination reason, and
  *   `inTuningWindow` when the beat carried a `tuningWindow`.
  *
- * The probe stops each run's engine but never disposes it; pass `teardown`
- * to dispose it, or a wide probe holds every engine it built.
+ * The probe stops and disposes each run's engine; pass a no-op `teardown`
+ * to keep them alive.
  *
  * @example
  * ```ts
  * const results = runProbe({
  *   buildEngine: ({ seed }) => buildProducerSimEngine(overrides, seed),
- *   teardown: (engine) => engine.dispose(),
  *   beats: ARC_BEATS,
  *   seeds: [0, 1, 2, 3, 4],
  *   maxSimTime: hours(2),

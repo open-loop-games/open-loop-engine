@@ -115,6 +115,26 @@ describe('runMatrixUntil', () => {
     ]);
   });
 
+  it('disposes each run engine after onRunComplete when the cell passes no teardown', () => {
+    const events: string[] = [];
+    const cell: UntilCell = {
+      name: 'default-dispose',
+      buildEngine: ({ seed }) =>
+        ({
+          tickDriver: { simulateTick: () => {} },
+          dispose: () => events.push(`dispose:${seed}`),
+        }) as unknown as Engine,
+    };
+    runMatrixUntil({
+      cells: [cell],
+      seeds: [1, 2],
+      until: () => true,
+      maxSimTime: 10,
+      onRunComplete: ({ seed }) => events.push(`complete:${seed}`),
+    });
+    expect(events).toEqual(['complete:1', 'dispose:1', 'complete:2', 'dispose:2']);
+  });
+
   it('runs the cell teardown when a run throws', () => {
     const torn: number[] = [];
     expect(() =>

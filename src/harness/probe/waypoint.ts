@@ -64,8 +64,8 @@ export interface WaypointProbeConfig<T> {
   inspect: (engine: Engine) => T;
   /**
    * Called once per `(waypoint, seed)` run after `inspect`, as
-   * {@link UntilCell.teardown} — release what `buildEngine` built
-   * (typically `engine.dispose()`).
+   * {@link UntilCell.teardown} — release what `buildEngine` built. Defaults
+   * to `engine.dispose()`.
    */
   teardown?: (engine: Engine, ctx: RunContext) => void;
   /** Seeds to run per waypoint. Defaults to `[0]` for deterministic single-engine probes. */
@@ -91,9 +91,8 @@ export interface WaypointProbeConfig<T> {
  * waypoint is a single-cell {@link runMatrixUntil} sweep over `seeds`, so
  * seeding, stopping and `teardown` follow that runner's per-run lifecycle.
  *
- * The probe stops each run's engine but never disposes it; pass `teardown`
- * to dispose it once `inspect` has read it, or a wide probe holds every
- * engine it built.
+ * The probe stops each run's engine and disposes it once `inspect` has read
+ * it; pass a no-op `teardown` to keep them alive.
  *
  * @example
  * ```ts
@@ -101,7 +100,6 @@ export interface WaypointProbeConfig<T> {
  *   buildEngine: ({ seed }) => buildProducerSimEngine(undefined, seed),
  *   waypoints: FLOW_BEATS,
  *   inspect: (engine) => collectProducerPacing(engine),
- *   teardown: (engine) => engine.dispose(),
  *   seeds: [0],
  * });
  * for (const s of snapshots) {
