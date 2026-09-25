@@ -1,10 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { ref } from 'vue';
 import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { walkChallengeTransitions } from '@/harness/walker/walk-challenge-transitions';
+import {
+  emitChallengeTransitionsWithDeps,
+  walkChallengeTransitions,
+} from '@/harness/walker/walk-challenge-transitions';
+import { runUntil } from '@/harness/run-until';
+import { createIncrementalSnapshot } from '@/harness/walker/incremental-snapshot';
+import { createResource, type Resource } from '@/core/resource';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -200,6 +207,72 @@ describe('walkChallengeTransitions — start-unlock', () => {
     expect(unlock[0].currentValue).toBe(false);
   });
 
+  it('skips start-unlock while the challenge is active, even with the gate true', () => {
+    const accessor = mockAccessor({ resources: { gold: 200 }, rates: { gold: -10 } });
+    const engine = buildEngineWithChallenges(
+      'start-active',
+      (c) =>
+        c.register({
+          id: 'c',
+          name: 'C',
+          canStart: { kind: 'resource-gte', resource: 'gold', value: 100 },
+          goal: () => false,
+        }),
+      accessor,
+    );
+    expect(
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+    ).toHaveLength(0);
+
+    engine.tryInject(CategoriesKey)!.challenges![0].getChallenge('c')!.enter();
+    expect(
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+    ).toHaveLength(0);
+  });
+
+  it('skips start-unlock once the challenge is maxed', () => {
+    const accessor = mockAccessor({ resources: { gold: 200 }, rates: { gold: 1 } });
+    const engine = buildEngineWithChallenges(
+      'start-maxed',
+      (c) =>
+        c.register({
+          id: 'c',
+          name: 'C',
+          canStart: { kind: 'resource-gte', resource: 'gold', value: 100 },
+        }),
+      accessor,
+    );
+    const challenge = engine.tryInject(CategoriesKey)!.challenges![0].getChallenge('c')!;
+    challenge.enter();
+    challenge.complete();
+    expect(challenge.maxed.value).toBe(true);
+
+    // The gate is false again, and rising, but a maxed challenge never starts.
+    (accessor as { getResource: GameStateAccessor['getResource'] }).getResource = () => bn(0);
+    expect(
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+    ).toHaveLength(0);
+  });
+
+  it('emits an opaque start-unlock for a category-aware canStart gate', () => {
+    const accessor = mockAccessor();
+    const engine = buildEngineWithChallenges(
+      'start-count',
+      (c) =>
+        c.register({
+          id: 'c',
+          name: 'C',
+          canStart: { kind: 'count-gte', category: 'upgrades', entity: 'farm', value: 3 },
+        }),
+      accessor,
+    );
+    const unlock = walkChallengeTransitions(engine, accessor).filter(
+      (t) => t.kind === 'start-unlock',
+    );
+    expect(unlock).toHaveLength(1);
+    expect(unlock[0].distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
+  });
+
   it('skips start-unlock when boolean canStart', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
@@ -283,7 +356,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
     expect(goal.distance.seconds).toBe(10);
   });
 
-  it('skips goal-complete for closure-form goal even when active', () => {
+  it('emits an opaque goal-complete for a closure-form goal while active', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
       'closure',
@@ -297,8 +370,32 @@ describe('walkChallengeTransitions — goal-complete', () => {
     );
     engine.tryInject(CategoriesKey)!.challenges![0].getChallenge('manual')!.enter();
 
+    const goal = walkChallengeTransitions(engine, accessor).filter(
+      (t) => t.kind === 'goal-complete',
+    );
+    expect(goal).toHaveLength(1);
+    expect(goal[0].distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
+  });
+
+  it('skips goal-complete while the goal already holds', () => {
+    // Without registerTick nothing completes a met goal, so the only flip left
+    // to predict is the goal turning false again, which isn't this transition.
+    const accessor = mockAccessor({ resources: { xp: 200 }, rates: { xp: -1 } });
+    const engine = buildEngineWithChallenges(
+      'goal-met',
+      (c) =>
+        c.register({
+          id: 'done',
+          name: 'Done',
+          goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
+        }),
+      accessor,
+    );
+    engine.tryInject(CategoriesKey)!.challenges![0].getChallenge('done')!.enter();
+
     const out = walkChallengeTransitions(engine, accessor);
     expect(out.filter((t) => t.kind === 'goal-complete')).toHaveLength(0);
+    expect(out.filter((t) => t.kind === 'challenge-maxed')).toHaveLength(0);
   });
 
   it('skips goal-complete when active === false with declarative goal', () => {
@@ -353,5 +450,106 @@ describe('walkChallengeTransitions — challenge-maxed', () => {
     expect(maxed).toBeDefined();
     expect(maxed.distance).toEqual(goal.distance);
     expect(maxed.currentValue).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cumulative-gte
+// ---------------------------------------------------------------------------
+
+describe('walkChallengeTransitions — cumulative-gte', () => {
+  function buildCumulativeEngine() {
+    let fragments!: Resource<number>;
+    const accessor: GameStateAccessor = {
+      getResource: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
+      getRate: (id) => (id === 'fragments' ? bn(1) : bn(0)),
+      isUnlocked: () => false,
+      getState: () => undefined,
+    };
+    const module: EngineModule = {
+      id: 'boards',
+      install() {
+        fragments = createResource(0, { id: 'fragments', displayName: 'fragments' });
+        const boards = createChallengeCategory({ id: 'boards', accessor });
+        boards.register({
+          id: 'b',
+          name: 'B',
+          visible: { kind: 'cumulative-gte', resource: 'fragments', value: 50 },
+        });
+      },
+    };
+    const engine = createEngine({ gameId: 'wct-cumulative', persistence: false });
+    engine.use(module);
+    engine.start();
+    return { engine, accessor, fragments: () => fragments };
+  }
+
+  it('measures the distance on the cumulative total, not the balance', () => {
+    const { engine, accessor, fragments } = buildCumulativeEngine();
+    fragments().value = 30;
+    fragments().value = 10; // spending leaves cumulative at 30
+
+    const [vis] = walkChallengeTransitions(engine, accessor).filter(
+      (t) => t.kind === 'visibility-reveal',
+    );
+    expect(vis.distance).toEqual({ seconds: 20, reason: 'computed' });
+  });
+
+  it('gives the incremental snapshot the same distance', () => {
+    const { engine, accessor, fragments } = buildCumulativeEngine();
+    fragments().value = 30;
+    fragments().value = 10;
+
+    const [vis] = createIncrementalSnapshot(engine, accessor).snapshot.challenges;
+    expect(vis.distance).toEqual({ seconds: 20, reason: 'computed' });
+  });
+
+  it('reports the base resource as the dependency', () => {
+    const { engine, accessor } = buildCumulativeEngine();
+    const [entry] = emitChallengeTransitionsWithDeps(engine, accessor);
+    expect([...entry.deps.resources]).toEqual(['fragments']);
+    expect([...entry.deps.rates]).toEqual(['fragments']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stasis detection over opaque challenge fields
+// ---------------------------------------------------------------------------
+
+describe("runUntil 'stasis-aware-tick' — opaque challenge fields", () => {
+  it('reaches a closure goal that an onTick drives instead of calling it unreachable', () => {
+    const points = ref(0);
+    let completed!: () => boolean;
+    const accessor = mockAccessor({ rates: { points: 1 } });
+    const module: EngineModule = {
+      id: 'trials',
+      install(ctx) {
+        ctx.onTick((dt) => {
+          points.value += dt;
+        });
+        const trials = createChallengeCategory({
+          id: 'trials',
+          accessor,
+          registerTick: (cb) => ctx.onTick(cb),
+        });
+        trials.register({ id: 't', name: 'T', goal: () => points.value >= 5 });
+        const challenge = trials.getChallenge('t')!;
+        challenge.enter();
+        completed = () => challenge.completed.value;
+      },
+    };
+    const engine = createEngine({ gameId: 'wct-stasis', persistence: false });
+    engine.use(module);
+    engine.start();
+
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'stasis-aware-tick',
+      until: completed,
+      maxSimTime: 20,
+      tickDelta: 1,
+    });
+    expect(result.terminated).toBe('predicate');
   });
 });

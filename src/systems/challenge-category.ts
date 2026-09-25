@@ -51,7 +51,7 @@ import type { GameStateMutator } from '@/core/effects';
 import { applyEffect } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentEngineCategories } from './engine-categories';
-import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
+import { bindGateRuntime, evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
 import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
@@ -542,7 +542,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       setupDeclarativeBindings(def.restricts, active);
       setupDeclarativeBindings(def.rewards, completed);
 
-      return {
+      const challenge: Challenge = {
         id: def.id,
         active,
         completions,
@@ -556,6 +556,8 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         complete,
         toggle,
       };
+      bindGateRuntime(challenge, gateRuntime);
+      return challenge;
     },
     buildState: mapState,
     buildSignals: (_def, challenge) => ({

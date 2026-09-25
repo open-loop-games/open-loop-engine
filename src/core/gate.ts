@@ -24,11 +24,10 @@ export interface ResourceGteGate {
 }
 
 /**
- * True when `resource.cumulative.value >= value`. Rate-aware via the
- * underlying cumulative ref (cumulative accumulates strictly; flip distance
- * equals the canonical resource-gte distance over the cumulative ref). The
- * `cumulative` slot is intrinsic to every persistent resource, so no
- * tracker setup is required.
+ * True when `resource.cumulative.value >= value`. The `cumulative` slot is
+ * intrinsic to every persistent resource, so no tracker setup is required.
+ * Read through the resource registry, so it has no {@link gateToCondition}
+ * projection; `timeUntilGateFlip` predicts it from the resource's net rate.
  */
 export interface CumulativeGteGate {
   kind: 'cumulative-gte';
@@ -214,19 +213,17 @@ function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
 
 /**
  * Project a Gate AST to {@link ICondition}. Pure data → data; no runtime
- * needed. Rate-aware kinds map directly; combinators recurse.
+ * needed. Accessor-backed kinds map directly; combinators recurse.
  *
- * **Throws on category kinds** (`count-gte`, `unlock`) and on combinators
- * with any category descendant. The projection is partial by design — there
- * is no `ICondition` equivalent for category-aware predicates, and a
- * synthetic-path encoding would just relocate the consumer-side tax Gate is
- * meant to retire.
+ * **Throws on kinds an `ICondition` can't read** — the category kinds
+ * (`count-gte`, `unlock`) and `cumulative-gte`, whose value lives on the
+ * registered resource rather than behind the accessor — and on combinators
+ * with any such descendant. The projection is partial by design: a
+ * synthetic-path encoding would hand the consumer's accessor an id it
+ * doesn't serve.
  *
- * Used internally by walkers and the predictor that operate on the
- * ICondition IR: for rate-aware Gate fields the projection is the bridge;
- * for fields that mix rate-aware and category leaves, the walker degrades
- * to opaque-predicate semantics on the throw and treats the Gate as it
- * would any other non-projectable predicate.
+ * `E.conditional` embeds the projection, so an unprojectable gate fails when
+ * the effect is built. Predictors read every kind through `timeUntilGateFlip`.
  *
  * @internal
  */
@@ -234,13 +231,6 @@ export function gateToCondition(gate: Gate): ICondition {
   switch (gate.kind) {
     case 'resource-gte':
       return { type: 'resource', target: gate.resource, operator: 'gte', value: gate.value };
-    case 'cumulative-gte':
-      return {
-        type: 'resource',
-        target: `${gate.resource}:cumulative`,
-        operator: 'gte',
-        value: gate.value,
-      };
     case 'state':
       return { type: 'state', target: gate.key, operator: gate.operator, value: gate.value };
     case 'flag':
@@ -253,8 +243,9 @@ export function gateToCondition(gate: Gate): ICondition {
       return { type: 'not', condition: gateToCondition(gate.of) };
     case 'count-gte':
     case 'unlock':
+    case 'cumulative-gte':
       throw new Error(
-        `gateToCondition: ${gate.kind} has no ICondition projection (category-aware kinds only resolve through GateRuntime).`,
+        `gateToCondition: ${gate.kind} has no ICondition projection (it resolves only through a GateRuntime).`,
       );
   }
 }

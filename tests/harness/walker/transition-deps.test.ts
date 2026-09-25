@@ -288,12 +288,12 @@ describe('emitChallengeTransitionsWithDeps', () => {
   });
 
   it('goal condition: NOT over resource keeps the inner target in deps', () => {
-    const accessor = mockAccessor({ resources: { xp: 20 }, rates: { xp: 2 } });
+    const accessor = mockAccessor({ resources: { xp: 200 }, rates: { xp: -2 } });
     const engine = buildEngine((c) => {
       c.register({
         id: 'survive',
         name: 'Survive',
-        // Challenge succeeds when xp is NOT below 100 — i.e. xp >= 100.
+        // Challenge succeeds once xp drops below 100.
         goal: {
           kind: 'not',
           of: { kind: 'resource-gte', resource: 'xp', value: 100 },

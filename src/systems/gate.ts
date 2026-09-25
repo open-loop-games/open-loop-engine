@@ -21,18 +21,18 @@
  * | Kind           | Evaluator                                           | Predictor                                |
  * |----------------|-----------------------------------------------------|------------------------------------------|
  * | resource-gte   | accessor.getResource(id) >= value                   | timeUntilConditionFlip over projection   |
- * | cumulative-gte | registry.findById(id).cumulative.value >= value     | same as resource-gte over cumulative ref |
+ * | cumulative-gte | registry.findById(id).cumulative.value >= value     | net-rate estimate over cumulative ref    |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | unlock         | findCategoryEntrySignals(...).unlock                | 'opaque-predicate'                       |
  * | flag           | accessor.isUnlocked(id)                             | 'opaque-predicate'                       |
  * | state          | compareState(accessor.getState(...), op, val)       | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
- * `gateToCondition` partial-projects rate-aware Gates (and their combinators)
- * to `ICondition` for legacy interop — predictor reuse, walker compatibility,
- * Producer's `specToICondition` retirement. Throws on category descendants:
- * those have no `ICondition` equivalent, and the projection is deliberately
- * partial.
+ * `gateToCondition` partial-projects accessor-backed Gates (and their
+ * combinators) to `ICondition`, the serializable IR `E.conditional` embeds.
+ * Throws on category descendants and on `cumulative-gte`, whose values live
+ * behind the categories and the registry rather than the accessor.
+ * Predictors read every kind through {@link timeUntilGateFlip} instead.
  */
 
 import { computed } from 'vue';
@@ -44,6 +44,7 @@ import {
   combineFlipDistances,
   timeUntilConditionFlip,
   type ChildFlipResult,
+  type TransitionDeps,
   type TransitionDistance,
 } from '@/core/transitions';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
@@ -198,7 +199,12 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
  *
  * - `resource-gte` / `cumulative-gte` — projects to `ResourceCondition` and
  *   delegates to {@link timeUntilConditionFlip}, which owns the rate × operator
- *   truth table.
+ *   truth table. `cumulative-gte` divides the gap in the cumulative total by
+ *   the resource's net rate, the only rate the accessor reports. Cumulative
+ *   counts inflow and ignores drains, so it grows at least that fast: the
+ *   seconds are an upper bound on the time to flip, exact when nothing drains
+ *   the resource, and `'no-rate'` means the net rate isn't positive, not that
+ *   the gate never flips.
  * - `count-gte` / `unlock` / `state` / `flag` — `'opaque-predicate'`. Category
  *   counts advance imperatively (purchases, achievement firings); `state` and
  *   `flag` are consumer-write surfaces. None has a mechanical distance.
@@ -214,9 +220,9 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
         demand(runtime, 'accessor', gate.kind),
       );
     case 'cumulative-gte': {
-      // Cumulative is monotone-increasing; flip distance equals canonical
-      // resource-gte distance over the underlying ref read through a synthetic
-      // accessor that supplies the cumulative ref's value/rate.
+      // Reuse the resource-gte arithmetic over a synthetic accessor that
+      // serves the cumulative ref's value under a private id and the base
+      // resource's rate for it.
       const ref = cumulativeRefFor(gate.resource, runtime, gate.kind);
       const accessor = demand(runtime, 'accessor', gate.kind);
       const cumulativeId = `${gate.resource}:cumulative`;
@@ -247,6 +253,55 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
   }
 }
 
+/**
+ * The accessor slots whose change can move {@link timeUntilGateFlip}'s answer
+ * for `gate`, for caches that re-predict only when one of them moves.
+ * `cumulative-gte` names its base resource: the cumulative total moves only
+ * when that resource's balance does. Category kinds contribute nothing, since
+ * they move without any accessor slot moving.
+ *
+ * @internal
+ */
+export function collectGateDeps(gate: Gate): TransitionDeps {
+  const deps = {
+    resources: new Set<string>(),
+    rates: new Set<string>(),
+    unlocks: new Set<string>(),
+    states: new Set<string>(),
+  };
+  collectGateDepsInto(gate, deps);
+  return deps;
+}
+
+function collectGateDepsInto(
+  gate: Gate,
+  deps: { resources: Set<string>; rates: Set<string>; unlocks: Set<string>; states: Set<string> },
+): void {
+  switch (gate.kind) {
+    case 'resource-gte':
+    case 'cumulative-gte':
+      deps.resources.add(gate.resource);
+      deps.rates.add(gate.resource);
+      return;
+    case 'flag':
+      deps.unlocks.add(gate.id);
+      return;
+    case 'state':
+      deps.states.add(gate.key);
+      return;
+    case 'count-gte':
+    case 'unlock':
+      return;
+    case 'all':
+    case 'any':
+      for (const child of gate.of) collectGateDepsInto(child, deps);
+      return;
+    case 'not':
+      collectGateDepsInto(gate.of, deps);
+      return;
+  }
+}
+
 function combinatorFlip(
   gate: AllGate | AnyGate | NotGate,
   runtime: GateRuntime,
@@ -259,6 +314,30 @@ function combinatorFlip(
     distance: timeUntilGateFlip(child, runtime),
   }));
   return combineFlipDistances(children, gate.kind === 'all' ? 'and' : 'or');
+}
+
+// === RUNTIME BINDING ===
+
+const boundRuntimes = new WeakMap<object, GateRuntime>();
+
+/**
+ * Record the runtime a Gate-holding instance evaluates through, so a harness
+ * predictor reading that instance's gates later resolves the same registry
+ * and categories.
+ *
+ * @internal
+ */
+export function bindGateRuntime(owner: object, runtime: GateRuntime): void {
+  boundRuntimes.set(owner, runtime);
+}
+
+/**
+ * The runtime {@link bindGateRuntime} recorded for `owner`, if any.
+ *
+ * @internal
+ */
+export function getBoundGateRuntime(owner: object): GateRuntime | undefined {
+  return boundRuntimes.get(owner);
 }
 
 // === HANDLE ASSERTION ===

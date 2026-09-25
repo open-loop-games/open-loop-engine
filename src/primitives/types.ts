@@ -135,10 +135,10 @@ export interface NotCondition {
 
 /**
  * Engine-internal IR for declarative predicates. Consumers author {@link Gate}
- * literals on content-def fields; the engine projects rate-aware Gate leaves
- * to ICondition via `gateToCondition` for walker / predictor reuse. Embedded
- * by the internal {@link ConditionalEffect} as the conditional-effect IR
- * (unreachable from the public {@link IEffect} union).
+ * literals on content-def fields; the engine projects accessor-backed Gate
+ * leaves to ICondition via `gateToCondition`. Embedded by the internal
+ * {@link ConditionalEffect} as the conditional-effect IR (unreachable from
+ * the public {@link IEffect} union).
  *
  * Not part of the public surface — kept as a typed interchange shape between
  * the Gate projection and the IEffect / walker machinery that already speaks

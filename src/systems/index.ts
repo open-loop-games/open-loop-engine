@@ -37,7 +37,7 @@ export { CategoriesKey, findCategoryEntrySignals } from './engine-categories';
 // Consumer-facing predicate-spec data shape over CategoryEntrySignals + ResourceRegistry +
 // GameStateAccessor. Authored as plain data in content definitions; evaluated through
 // evaluateGate, predicted through timeUntilGateFlip. `gateToCondition` is engine-internal
-// (projects rate-aware Gate leaves to the ICondition IR for walker / predictor reuse).
+// (projects accessor-backed Gate leaves to the ICondition IR that E.conditional embeds).
 export type {
   Gate,
   ResourceGteGate,

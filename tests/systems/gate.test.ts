@@ -23,6 +23,7 @@ import {
 } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
+import { E } from '@/core/effects';
 import { gateToCondition, getAmbientGateRuntime, getRequiredGateHandles } from '@/systems/gate';
 
 beforeEach(() => {
@@ -621,13 +622,16 @@ describe('gateToCondition — partial projection', () => {
     });
   });
 
-  it('cumulative-gte projects to a ResourceCondition over <id>:cumulative', () => {
-    expect(gateToCondition({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual({
-      type: 'resource',
-      target: 'gold:cumulative',
-      operator: 'gte',
-      value: 50,
-    });
+  it('throws on cumulative-gte (the cumulative slot is read through the registry)', () => {
+    expect(() => gateToCondition({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toThrow(
+      /no ICondition projection/,
+    );
+  });
+
+  it('E.conditional over a cumulative-gte gate fails when the effect is built', () => {
+    expect(() =>
+      E.conditional({ kind: 'cumulative-gte', resource: 'gold', value: 50 }, E.unlock('x')),
+    ).toThrow(/no ICondition projection/);
   });
 
   it('state → StateCondition', () => {

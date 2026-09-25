@@ -174,11 +174,12 @@ export const E = {
    * part of the public union, so consumers can't narrow to it and the
    * embedded ICondition stays unreachable through the public type system.
    *
-   * `gate` must be a rate-aware Gate — category-aware kinds (`count-gte`,
-   * `unlock`) and combinators containing them have no `ICondition`
-   * projection and `gateToCondition` throws. For category-aware conditional
-   * effects, gate the application at the consumer (only build the effect
-   * inside the branch you want), not via `E.conditional`.
+   * `gate` must read only through the accessor — `resource-gte`, `flag`,
+   * `state` and combinators of those. Category-aware kinds (`count-gte`,
+   * `unlock`), `cumulative-gte` and combinators containing them have no
+   * `ICondition` projection, so building the effect throws. For those, gate
+   * the application at the consumer (only build the effect inside the branch
+   * you want), not via `E.conditional`.
    */
   conditional(gate: Gate, then: IEffect, otherwise?: IEffect): IEffect {
     return {

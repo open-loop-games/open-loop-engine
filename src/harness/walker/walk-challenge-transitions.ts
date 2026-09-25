@@ -1,36 +1,38 @@
 /**
  * Content walker — enumerate pending challenge transitions.
  *
- * Challenges are the best case for precise distances: `ChallengeDef` carries
- * `visible`, `canStart`, and `goal` as `boolean | Gate | (() => boolean)`.
- * Gate fields with rate-aware leaves project to {@link ICondition} via
- * {@link gateToCondition} and feed {@link timeUntilConditionFlip}; the
- * closure / boolean / category-aware-Gate branches degrade to no-emission
- * (they can't express "when").
+ * `ChallengeDef` carries `visible`, `canStart` and `goal` as a boolean, a
+ * {@link Gate} or (for `goal`) a closure. A field emits a transition whenever
+ * it could still flip the way the transition names:
+ *
+ * - a Gate predicts its flip through {@link timeUntilGateFlip}, over the
+ *   runtime the challenge category evaluates it with and the walker's
+ *   accessor — a computed distance for resource and cumulative leaves,
+ *   `opaque-predicate` for category, flag and state leaves;
+ * - a closure has no mechanical distance and emits `opaque-predicate`, so
+ *   stasis detection never mistakes it for a field that can't change;
+ * - a constant never flips and emits nothing.
  *
  * Emissions per challenge entity:
  *
- * - `visibility-reveal` — `visible` projects to a rate-aware ICondition and is currently false.
- * - `start-unlock` — `canStart` projects to a rate-aware ICondition and is currently false.
- * - `goal-complete` — `active === true` and `goal` projects to a rate-aware ICondition.
- * - `challenge-maxed` — `active === true`, `goal` projects, and
- *   `completions === completionLimit - 1`. Second emission with the same
- *   distance as `goal-complete`; drops out of the goal math for free.
- *
- * Closure-form `goal`, boolean-form gates, category-aware Gate descendants,
- * and inactive-challenge goals are all intentionally skipped — "no
- * mechanical distance" is cleaner as a missing emission than as a
- * null-distance sentinel for this walker.
+ * - `visibility-reveal` — `visible` is currently false.
+ * - `start-unlock` — the challenge is neither active nor maxed and its
+ *   `canStart` gate is currently false.
+ * - `goal-complete` — the challenge is active and its goal doesn't hold yet.
+ * - `challenge-maxed` — as `goal-complete`, on the last completion
+ *   (`completions === completionLimit - 1`), with the same distance.
  */
 
 import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
-import type { GameStateAccessor, ICondition } from '@/primitives/types';
+import type { GameStateAccessor } from '@/primitives/types';
+import type { TransitionDeps, TransitionDistance } from '@/core/transitions';
 import {
-  collectConditionDeps,
-  timeUntilConditionFlip,
-  type TransitionDeps,
-} from '@/core/transitions';
-import { gateToCondition, isGate } from '@/systems/gate';
+  collectGateDeps,
+  getBoundGateRuntime,
+  isGate,
+  timeUntilGateFlip,
+  type GateRuntime,
+} from '@/systems/gate';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
 import { forEachCategoryEntity } from '../walk';
@@ -46,23 +48,30 @@ interface ChallengeEntity {
   readonly challenge: Challenge;
 }
 
+interface FieldFlip {
+  distance: TransitionDistance;
+  deps: TransitionDeps;
+}
+
 // ============================================================================
 // PRIVATE BUILDERS
 // ============================================================================
 
 /**
- * Project a ChallengeDef field to a rate-aware ICondition for distance/dep
- * extraction, or undefined when the field has no mechanical distance
- * (boolean, closure, category-aware Gate, or undefined).
+ * Predict when a ChallengeDef field flips, or undefined for a constant (or
+ * absent) field, which never does.
  */
-function toRateAwareCondition(value: unknown): ICondition | undefined {
-  if (!isGate(value)) return undefined;
-  try {
-    return gateToCondition(value);
-  } catch {
-    // category-aware Gate (count-gte / unlock) — opaque to this walker.
-    return undefined;
+function predictFieldFlip(value: unknown, runtime: GateRuntime): FieldFlip | undefined {
+  if (isGate(value)) {
+    return { distance: timeUntilGateFlip(value, runtime), deps: collectGateDeps(value) };
   }
+  if (typeof value === 'function') {
+    return {
+      distance: { seconds: null, reason: 'opaque-predicate' },
+      deps: { resources: new Set(), rates: new Set(), unlocks: new Set(), states: new Set() },
+    };
+  }
+  return undefined;
 }
 
 function buildTransition(
@@ -91,70 +100,59 @@ function emitForEntity(
 ): void {
   const { def, challenge } = entity;
   const entityId = def.id;
+  const runtime: GateRuntime = { ...getBoundGateRuntime(challenge), accessor };
 
-  // visibility-reveal: rate-aware `visible` currently false → emit when it flips true.
-  const visibleCond = toRateAwareCondition(def.visible);
-  if (visibleCond && !challenge.visible.value) {
-    out.push({
-      transition: buildTransition(
-        categoryId,
-        entityId,
-        'visibility-reveal',
-        challenge.visible.value,
-        timeUntilConditionFlip(visibleCond, accessor),
-      ),
-      deps: collectConditionDeps(visibleCond),
-    });
-  }
-
-  // start-unlock: rate-aware `canStart` currently false → emit when it flips true.
-  // `Challenge.canStart` also folds in maxed/active guards, so read the raw def
-  // condition via the accessor to keep the emission purely about the gate.
-  const canStartCond = toRateAwareCondition(def.canStart);
-  if (canStartCond && !challenge.canStart.value) {
-    out.push({
-      transition: buildTransition(
-        categoryId,
-        entityId,
-        'start-unlock',
-        challenge.canStart.value,
-        timeUntilConditionFlip(canStartCond, accessor),
-      ),
-      deps: collectConditionDeps(canStartCond),
-    });
-  }
-
-  // goal-complete / challenge-maxed: only meaningful while the challenge is
-  // entered AND the goal projects to a rate-aware ICondition. Closure-form
-  // goals and category-aware Gates are opaque by construction; inactive-challenge
-  // goals have no "next tick" to fire against.
-  const goalCond = toRateAwareCondition(def.goal);
-  if (challenge.active.value && goalCond) {
-    const goalDistance = timeUntilConditionFlip(goalCond, accessor);
-    const goalDeps = collectConditionDeps(goalCond);
-    out.push({
-      transition: buildTransition(
-        categoryId,
-        entityId,
-        'goal-complete',
-        challenge.canComplete.value,
-        goalDistance,
-      ),
-      deps: goalDeps,
-    });
-
-    const limit = def.completionLimit ?? 1;
-    if (challenge.completions.value === limit - 1) {
+  if (!challenge.visible.value) {
+    const flip = predictFieldFlip(def.visible, runtime);
+    if (flip) {
       out.push({
         transition: buildTransition(
           categoryId,
           entityId,
-          'challenge-maxed',
-          challenge.completions.value,
-          goalDistance,
+          'visibility-reveal',
+          false,
+          flip.distance,
         ),
-        deps: goalDeps,
+        deps: flip.deps,
       });
+    }
+  }
+
+  // `Challenge.canStart` is the gate with the active and maxed guards folded
+  // in, so outside those two states it reads the gate's own truth.
+  if (!challenge.active.value && !challenge.maxed.value && !challenge.canStart.value) {
+    const flip = predictFieldFlip(def.canStart, runtime);
+    if (flip) {
+      out.push({
+        transition: buildTransition(categoryId, entityId, 'start-unlock', false, flip.distance),
+        deps: flip.deps,
+      });
+    }
+  }
+
+  // A goal only completes while the challenge is entered; one already met is
+  // waiting on a completer, not on a flip.
+  if (challenge.active.value && !challenge.canComplete.value) {
+    const flip = predictFieldFlip(def.goal, runtime);
+    if (flip) {
+      out.push({
+        transition: buildTransition(categoryId, entityId, 'goal-complete', false, flip.distance),
+        deps: flip.deps,
+      });
+
+      const limit = def.completionLimit ?? 1;
+      if (challenge.completions.value === limit - 1) {
+        out.push({
+          transition: buildTransition(
+            categoryId,
+            entityId,
+            'challenge-maxed',
+            challenge.completions.value,
+            flip.distance,
+          ),
+          deps: flip.deps,
+        });
+      }
     }
   }
 }
@@ -165,14 +163,15 @@ function emitForEntity(
 
 /**
  * Walk every challenge across every `CategoriesKey.challenges` slice and
- * emit one {@link Transition} per declarative gate that currently has a
- * computable flip distance.
+ * emit one {@link Transition} per field that could still flip — with a
+ * computed distance where its gate has one, `opaque-predicate` where not.
  *
  * @param engine - Engine to introspect. Categories are read via
  *   `engine.tryInject(CategoriesKey)`; missing key degrades to `[]`.
- * @param accessor - Read-side accessor used to evaluate conditions and
- *   their flip distances. Explicit rather than ambient so the walker can
- *   be called from non-install contexts (probes, devtools, tests).
+ * @param accessor - Read-side accessor gates read resources, rates, flags
+ *   and state through for their flip distances. Explicit rather than
+ *   ambient so the walker can be called from non-install contexts (probes,
+ *   devtools, tests).
  */
 export function walkChallengeTransitions(
   engine: Engine,
@@ -183,9 +182,9 @@ export function walkChallengeTransitions(
 
 /**
  * Variant of {@link walkChallengeTransitions} that also reports the accessor
- * slots each transition's distance arithmetic reads. Each emission's deps
- * come from {@link collectConditionDeps} called on the ICondition branch
- * that produced it (visible / canStart / goal). Consumed by
+ * slots each transition's distance arithmetic reads: the field's gate
+ * leaves, with `cumulative-gte` named by its base resource, and nothing for
+ * a closure. Consumed by
  * {@link createIncrementalSnapshot} to populate its reverse indices.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
