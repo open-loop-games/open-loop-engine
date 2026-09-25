@@ -122,7 +122,10 @@ export interface ActionCategoryContext {
 
 /** Events emitted by an {@link ActionCategory}. Subscribe via `category.on()`. */
 export interface ActionCategoryEvents<Def extends { id: string }, State, Payload> {
-  /** Fired when an item transitions to `'completed'` (terminal lifecycle for queue mode). */
+  /**
+   * Fired once per execution when an item reaches `'completed'`, through
+   * `setItemState` or `sequencer.complete()`, whichever comes first.
+   */
   complete: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
   /** Fired on every lifecycle transition for any item. */
   itemStateChange: (
@@ -481,12 +484,15 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   });
 
   sequencer.on('complete', (item) => {
-    // `transitionLifecycle` runs the patch + emits 'complete' + 'itemStateChange'.
-    // In queue mode the item is already popped from items.value by complete()
-    // before this event fires; the patch falls back to the current item path,
-    // which has been cleared. Re-construct the entry manually so observers
-    // still see the terminal state.
+    // The sequencer has already cleared `current` (and popped the item in
+    // queue mode), so the verbs can't reach it; build the terminal entry by
+    // hand. An item already set 'completed' through `setItemState` has emitted
+    // both events, and `complete` fires once per execution.
     const meta = item.metadata;
+    if (meta.lifecycle === 'completed') {
+      fireItemChange(meta.defId);
+      return;
+    }
     const terminal: ActionItemMetadata<Payload> = {
       ...meta,
       lifecycle: 'completed',
@@ -494,9 +500,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     };
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
-    if (meta.lifecycle !== 'completed') {
-      handle.emit('itemStateChange', entry, meta.lifecycle, 'completed');
-    }
+    handle.emit('itemStateChange', entry, meta.lifecycle, 'completed');
     handle.emit('complete', entry);
     fireItemChange(meta.defId);
   });

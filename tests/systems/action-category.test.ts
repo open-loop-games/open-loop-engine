@@ -189,6 +189,24 @@ describe('createActionCategory — lifecycle state machine', () => {
     expect(category.currentItem?.progress).toBe(0.5);
   });
 
+  it('emits complete once when setItemState(completed) precedes sequencer.complete()', () => {
+    const { category } = makeCategory();
+    category.register({ id: 'x', baseTicks: 10 });
+    let completes = 0;
+    let toCompleted = 0;
+    category.on('complete', () => completes++);
+    category.on('itemStateChange', (_e, _from, to) => {
+      if (to === 'completed') toCompleted++;
+    });
+
+    category.enqueue('x', { payload: { count: 1 } });
+    category.setItemState('x', 'completed');
+    category.sequencer.complete();
+
+    expect(completes).toBe(1);
+    expect(toCompleted).toBe(1);
+  });
+
   it('setItemError transitions to failed and increments attempt', () => {
     const { category } = makeCategory();
     category.register({ id: 'fragile', baseTicks: 10 });
