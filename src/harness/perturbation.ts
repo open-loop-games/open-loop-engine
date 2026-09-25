@@ -44,18 +44,18 @@
  */
 
 import type { Engine } from '@/engine';
-import type { Grant, Modifier, ModifierChain } from '@/core/modifier';
+import type { Modifier, ModifierChain } from '@/core/modifier';
 import {
   createWrapStack,
   overlayBinding,
   type ModifierWrap,
   type WrapStack,
 } from '@/systems/binding-slots';
-import { flattenGrants } from '@/systems/modifier-binding';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
 import { TuningRegistriesKey } from '@/core/override-registry';
 import type { PickerEntry } from './picker';
+import { effectDefBindings } from './walk';
 
 /** Scalar transform applied on top of an existing modifier or tunable value. */
 export type Perturbation =
@@ -170,20 +170,13 @@ function applyModifierPerturbation(
       const system = registry.get(address.contentType);
       if (!system) throw new Error(`effect system "${address.contentType}" not found`);
 
-      const defs = system.allDefs() as ReadonlyArray<{
-        id: string;
-        modifiers?: readonly Grant[] | (() => readonly Grant[]);
-      }>;
-      const def = defs.find((d) => d.id === address.contentId);
+      const def = system.allDefs().find((d) => d.id === address.contentId);
       if (!def) {
         throw new Error(
           `effect def "${address.contentId}" not found in system "${address.contentType}"`,
         );
       }
-      const raw = def.modifiers;
-      if (!raw) throw new Error(`def "${address.contentId}" has no modifier bindings`);
-      const bindings = flattenGrants(typeof raw === 'function' ? raw() : raw);
-      if (address.bindingIndex >= bindings.length) {
+      if (address.bindingIndex >= effectDefBindings(def).length) {
         throw new Error(
           `def "${address.contentId}" has no binding at index ${address.bindingIndex}`,
         );

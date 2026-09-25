@@ -20,8 +20,9 @@ import type {
   EffectSystemRegistry,
   EnumerableEffectSystem,
 } from '@/core/registries';
-import type { Modifier, ModifierChain } from '@/core/modifier';
+import type { Grant, Modifier, ModifierChain } from '@/core/modifier';
 import type { EngineCategories } from '@/systems/engine-categories';
+import { flattenGrants } from '@/systems/modifier-binding';
 
 // ============================================================================
 // Category traversal
@@ -120,6 +121,16 @@ export function forEachEffectDef(
       visitor({ systemId: system.id, systemKind: system.kind, def });
     }
   }
+}
+
+/**
+ * A def's bindings in `bindingIndex` order — each grant paired with each
+ * chain it targets, calling a factory-form `modifiers` once.
+ */
+export function effectDefBindings(def: EffectDefLike): { grant: Grant; chain: ModifierChain }[] {
+  const raw = def.modifiers;
+  if (raw == null) return [];
+  return flattenGrants(typeof raw === 'function' ? raw() : raw);
 }
 
 // ============================================================================

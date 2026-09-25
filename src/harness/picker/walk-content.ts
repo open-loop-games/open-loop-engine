@@ -6,10 +6,9 @@
  */
 
 import type { Engine } from '@/engine';
-import type { Grant } from '@/core/modifier';
-import { buildGrantModifier, flattenGrants } from '@/systems/modifier-binding';
+import { buildGrantModifier } from '@/systems/modifier-binding';
 import { EffectSystemRegistryKey } from '@/core/registries';
-import { forEachEffectDef } from '../walk';
+import { effectDefBindings, forEachEffectDef } from '../walk';
 import type { ModifierPickerEntry } from './types';
 
 /**
@@ -38,14 +37,7 @@ export function walkContent(engine: Engine): ModifierPickerEntry[] {
   const entries: ModifierPickerEntry[] = [];
 
   forEachEffectDef(registry, ({ systemId, def }) => {
-    // Narrow: EffectDefLike carries `modifiers?: readonly unknown[] | (() => readonly unknown[])`
-    // but the real defs (TemporaryEffectDef / PersistentEffectDef) both
-    // carry `Grant[] | (() => Grant[])`.
-    const raw = (def as { modifiers?: Grant[] | (() => Grant[]) }).modifiers;
-    if (!raw) return;
-    const grants: readonly Grant[] = typeof raw === 'function' ? raw() : raw;
-
-    flattenGrants(grants).forEach(({ grant, chain }, bindingIndex) => {
+    effectDefBindings(def).forEach(({ grant, chain }, bindingIndex) => {
       const modifier = buildGrantModifier(grant);
       entries.push({
         kind: 'modifier',

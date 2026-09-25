@@ -39,7 +39,7 @@
 
 import type { DecimalSource } from '@/primitives/decimal';
 import type { InjectionKey } from '@/primitives/types';
-import type { ModifierChain } from './modifier';
+import type { Grant, ModifierChain } from './modifier';
 import type { Resource } from './resource';
 import { createAmbientScope, createNamedRegistry, type NamedRegistry } from './named-registry';
 
@@ -113,12 +113,12 @@ export interface EnumerableEffectSystem {
 
 /**
  * Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef`
- * that the picker needs. Narrow on purpose — full def types stay in their
- * home system files to avoid a circular import.
+ * that the picker needs. The full def types live in systems, which core
+ * doesn't import.
  */
 export interface EffectDefLike {
   readonly id: string;
-  readonly modifiers?: ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>);
+  readonly modifiers?: readonly Grant[] | (() => readonly Grant[]);
 }
 
 /**
