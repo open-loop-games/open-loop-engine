@@ -183,6 +183,7 @@ export type {
   SaveSlot,
   SaveEvents,
   SaveLoadFailureReason,
+  SaveMigration,
 } from './save-manager';
 export { createSaveManager, createMemoryStorage, ENGINE_SAVE_VERSION } from './save-manager';
 

@@ -1098,6 +1098,34 @@ describe('SaveManager — events', () => {
       expect(handler.mock.calls[1][0]).toEqual({ from: 2, to: 3 });
     });
 
+    it('fails the load when a migration returns no object, naming the step', () => {
+      const storage = createMapStorage();
+      storage.setItem(
+        'evt-mig-void-slot-0',
+        JSON.stringify({ version: 1, gameId: 'evt-mig-void', timestamp: 1, data: {} }),
+      );
+      const mgr = createSaveManager({
+        gameId: 'evt-mig-void',
+        version: 2,
+        storageAdapter: storage,
+        migrations: {
+          // @ts-expect-error a block body without `return` is caught at compile time
+          1: (d) => {
+            d.renamed = true;
+          },
+        },
+      });
+      const failed = vi.fn();
+      const loaded = vi.fn();
+      mgr.on('save:load-failed', failed);
+      mgr.on('save:loaded', loaded);
+
+      expect(mgr.load().success).toBe(false);
+      expect(failed.mock.calls[0][0].reason).toBe('unknown');
+      expect(String(failed.mock.calls[0][0].detail)).toMatch(/migration from version 1/);
+      expect(loaded).not.toHaveBeenCalled();
+    });
+
     // --- Validation layer ---
 
     it('emits save:future-version and fails load when envelope version exceeds current', () => {

@@ -47,7 +47,13 @@ import {
 } from './systems/engine-categories';
 
 import type { TickDriver, TimerProvider } from './core/tick-driver';
-import type { SaveManager, SaveLoadResult, SavePeek, StorageAdapter } from './core/save-manager';
+import type {
+  SaveManager,
+  SaveLoadResult,
+  SaveMigration,
+  SavePeek,
+  StorageAdapter,
+} from './core/save-manager';
 
 /** Callback invoked every game tick with the elapsed delta time in seconds. */
 export type TickHandler = (dt: number) => void;
@@ -243,7 +249,7 @@ export interface EngineConfig {
   /** Save format version number. Passed to the save manager. */
   saveVersion?: number;
   /** Migration functions keyed by source version. Passed to the save manager. */
-  saveMigrations?: Record<number, (data: unknown) => unknown>;
+  saveMigrations?: Record<number, SaveMigration>;
   /** Custom storage backend. Defaults to localStorage. */
   storageAdapter?: StorageAdapter;
   /** Maximum number of save slots. Default: 10 */

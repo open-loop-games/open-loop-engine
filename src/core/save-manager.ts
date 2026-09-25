@@ -97,6 +97,14 @@ export function createMemoryStorage(): StorageAdapter {
   };
 }
 
+/**
+ * One step of a consumer save migration: receives the save data written by
+ * version N and returns it reshaped for version N + 1. Mutating in place is
+ * fine, but the step must still return the object — the migration helpers
+ * (`renameField` and friends) return it for the arrow shorthand.
+ */
+export type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>;
+
 /** Configuration for creating a save manager. */
 export interface SaveManagerConfig {
   /** Unique game identifier — prefixes all storage keys to avoid conflicts. */
@@ -118,10 +126,10 @@ export interface SaveManagerConfig {
   storageAdapter?: StorageAdapter;
   /**
    * Migration functions keyed by the version they migrate FROM.
-   * Each receives the raw data object and should return the transformed data.
-   * Migrations run sequentially up to the current version on every load.
+   * Migrations run sequentially up to the current version on every load. A
+   * step that returns anything but an object fails the load with `unknown`.
    */
-  migrations?: Record<number, (data: unknown) => unknown>;
+  migrations?: Record<number, SaveMigration>;
   /** Display name for the default slot (id 0). Default: 'Autosave' */
   defaultSlotName?: string;
   /** Maximum number of save slots. Default: 10 */
@@ -629,7 +637,16 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     while (v < version) {
       const m = migrations[v];
       if (m) {
-        data = m(data) as Record<string, unknown>;
+        const next: unknown = m(data);
+        if (next === null || typeof next !== 'object' || Array.isArray(next)) {
+          throw new LoadFailure(
+            'unknown',
+            new Error(
+              `save migration from version ${v} returned ${describeType(next)}, not an object`,
+            ),
+          );
+        }
+        data = next as Record<string, unknown>;
         handle.emit('save:migration-step', { from: v, to: v + 1 });
       }
       v++;
