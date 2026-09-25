@@ -333,6 +333,37 @@ describe('createSpatialGraph — serialize / restore', () => {
     expect(restored.nodes.size).toBe(3);
   });
 
+  it('auto-id after a reload stays unique across the whole tree, not just its own level', () => {
+    // Before the save, one shared counter makes ids unique across levels:
+    // root holds "1", "2" and the child of "1" holds "3", "4".
+    const graph = createSpatialGraph<Pkg, Wire>();
+    const owner = graph.addNode(pkg('a'));
+    graph.addNode(pkg('b'));
+    const child = graph.createChildGraph(owner.id);
+    child.addNode(pkg('c'));
+    child.addNode(pkg('d'));
+    const saved = JSON.parse(JSON.stringify(graph.serialize())) as SpatialGraphSnapshot<Pkg, Wire>;
+
+    const restored = createSpatialGraph<Pkg, Wire>();
+    restored.restore(saved);
+    const fresh = restored.addNode(pkg('e'));
+    const freshChild = restored.getChildGraph(owner.id)!.addNode(pkg('f'));
+
+    expect(['1', '2', '3', '4']).not.toContain(fresh.id);
+    expect(['1', '2', '3', '4', fresh.id]).not.toContain(freshChild.id);
+  });
+
+  it('an explicit id repeated across levels stays taken until every holder is gone', () => {
+    const draws = ['x', 'y'];
+    const graph = createSpatialGraph<Pkg, Wire>({ idGenerator: () => draws.shift() ?? 'z' });
+    graph.addNode(pkg('owner'), { id: 'owner' });
+    graph.addNode(pkg('root x'), { id: 'x' });
+    graph.createChildGraph('owner').addNode(pkg('child x'), { id: 'x' });
+    graph.removeNode('x');
+    // The child still holds "x", so the generator's "x" is skipped.
+    expect(graph.addNode(pkg('fresh')).id).toBe('y');
+  });
+
   it('round-trips nested child graphs', () => {
     const graph = createSpatialGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });

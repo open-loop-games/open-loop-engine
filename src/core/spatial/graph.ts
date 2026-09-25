@@ -56,9 +56,13 @@ export interface GraphEdge<E> {
 export interface SpatialGraphOptions {
   /**
    * Stable ID generator used when `addNode` / `addEdge` are called without
-   * an explicit `id`. Defaults to a closure-local monotonic counter. Inject
-   * a seeded counter for deterministic ids across saves. Child graphs
-   * inherit the parent's generator.
+   * an explicit `id`. Defaults to a closure-local monotonic counter. Child
+   * graphs inherit the parent's generator, and a draw already held by any
+   * node or edge anywhere in the tree is skipped, so auto ids stay unique
+   * across levels, a restore included. After a reload the default counter
+   * restarts, so a fresh id can reuse one a removed node or edge once held;
+   * to keep the sequence an uninterrupted session would draw, inject a
+   * counter and persist its position.
    */
   readonly idGenerator?: () => string;
 }
@@ -168,9 +172,9 @@ export interface SpatialGraph<N, E> {
 
   /**
    * Creates a new empty child graph under `nodeId`. The child inherits this
-   * graph's options (notably `idGenerator`, so id sequencing stays shared
-   * across levels). Throws if the node is missing or a child already exists
-   * — use `getChildGraph` for the conditional case.
+   * graph's `idGenerator` and its record of ids in use, so auto ids stay
+   * unique across levels. Throws if the node is missing or a child already
+   * exists — use `getChildGraph` for the conditional case.
    */
   createChildGraph(nodeId: string): SpatialGraph<N, E>;
 
@@ -210,15 +214,26 @@ export interface SpatialGraph<N, E> {
  * ```
  */
 export function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E> {
-  return makeGraph<N, E>(options, null);
+  return makeGraph<N, E>(
+    { idGenerator: options?.idGenerator ?? defaultIdGenerator(), takenIds: new Map() },
+    null,
+  );
 }
 
-function makeGraph<N, E>(
-  options: SpatialGraphOptions | undefined,
-  ownerNodeId: string | null,
-): SpatialGraph<N, E> {
-  const idGenerator = options?.idGenerator ?? defaultIdGenerator();
-  const childOptions: SpatialGraphOptions = { idGenerator };
+/** What every graph in one tree shares: the id source and the ids in use. */
+interface TreeOptions {
+  readonly idGenerator: () => string;
+  /**
+   * Every node and edge id held anywhere in the tree, counted, since an
+   * explicit id may repeat across levels. Auto ids skip these, so they stay
+   * unique tree-wide after a restore reloads ids the generator will produce
+   * again.
+   */
+  readonly takenIds: Map<string, number>;
+}
+
+function makeGraph<N, E>(tree: TreeOptions, ownerNodeId: string | null): SpatialGraph<N, E> {
+  const { idGenerator, takenIds } = tree;
 
   const nodes = new Map<string, GraphNode<N>>();
   const edges = new Map<string, GraphEdge<E>>();
@@ -235,18 +250,39 @@ function makeGraph<N, E>(
   }
 
   // Resolve an id for a new node/edge. An explicit id passes through (the caller
-  // still rejects collisions). An auto id skips values already taken, because
-  // restore() reloads ids the generator will hand out again — the default
-  // counter starts fresh at 0 while the map already holds "1".."N", so the next
-  // draw would clash. Bounded to surface a broken (non-advancing) consumer
-  // idGenerator instead of spinning forever.
-  function resolveId(explicit: string | undefined, taken: (id: string) => boolean): string {
+  // still rejects collisions). An auto id skips every id taken in the tree,
+  // because restore() reloads ids the generator will hand out again — the
+  // default counter starts fresh at 0 while the tree already holds "1".."N", so
+  // the next draw would clash. Bounded to surface a broken (non-advancing)
+  // consumer idGenerator instead of spinning forever.
+  function resolveId(explicit: string | undefined): string {
     if (explicit !== undefined) return explicit;
     for (let attempts = 0; attempts < 1_000_000; attempts++) {
       const candidate = idGenerator();
-      if (!taken(candidate)) return candidate;
+      if (!takenIds.has(candidate)) return candidate;
     }
     throw new Error('SpatialGraph: idGenerator failed to produce a free id after 1e6 attempts');
+  }
+
+  function takeId(id: string): void {
+    takenIds.set(id, (takenIds.get(id) ?? 0) + 1);
+  }
+
+  function releaseId(id: string): void {
+    const n = takenIds.get(id) ?? 0;
+    if (n > 1) takenIds.set(id, n - 1);
+    else takenIds.delete(id);
+  }
+
+  // Release every id this graph and its descendants hold, before a restore
+  // replaces them.
+  function releaseSubtree(g: SpatialGraph<N, E>): void {
+    for (const id of g.edges.keys()) releaseId(id);
+    for (const id of g.nodes.keys()) {
+      releaseId(id);
+      const child = g.getChildGraph(id);
+      if (child) releaseSubtree(child);
+    }
   }
 
   function indexEdge(edge: GraphEdge<E>): void {
@@ -277,6 +313,7 @@ function makeGraph<N, E>(
     const edge = edges.get(id);
     if (!edge) throw new Error(`SpatialGraph: edge '${id}' does not exist`);
     edges.delete(id);
+    releaseId(id);
     unindexEdge(edge);
     handle.emit('edgeRemoved', edge.id, edge.fromId, edge.toId);
   }
@@ -294,12 +331,13 @@ function makeGraph<N, E>(
     edges,
 
     addNode(data, opts) {
-      const id = resolveId(opts?.id, (candidate) => nodes.has(candidate));
+      const id = resolveId(opts?.id);
       if (nodes.has(id)) {
         throw new Error(`SpatialGraph.addNode: node id '${id}' already exists`);
       }
       const node: GraphNode<N> = { id, data, parentId: ownerNodeId };
       nodes.set(id, node);
+      takeId(id);
       handle.emit('nodeAdded', node);
       return node;
     },
@@ -320,6 +358,7 @@ function makeGraph<N, E>(
       }
 
       nodes.delete(id);
+      releaseId(id);
       handle.emit('nodeRemoved', node.id);
     },
 
@@ -330,12 +369,13 @@ function makeGraph<N, E>(
     addEdge(fromId, toId, data, opts) {
       requireNode(fromId);
       requireNode(toId);
-      const id = resolveId(opts?.id, (candidate) => edges.has(candidate));
+      const id = resolveId(opts?.id);
       if (edges.has(id)) {
         throw new Error(`SpatialGraph.addEdge: edge id '${id}' already exists`);
       }
       const edge: GraphEdge<E> = { id, fromId, toId, data };
       edges.set(id, edge);
+      takeId(id);
       indexEdge(edge);
       handle.emit('edgeAdded', edge);
       return edge;
@@ -447,7 +487,7 @@ function makeGraph<N, E>(
           `SpatialGraph.createChildGraph: child graph already exists for '${nodeId}'`,
         );
       }
-      const child = makeGraph<N, E>(childOptions, nodeId);
+      const child = makeGraph<N, E>(tree, nodeId);
       childGraphs.set(nodeId, child);
       handle.emit('childGraphCreated', nodeId, child);
       return child;
@@ -482,6 +522,7 @@ function makeGraph<N, E>(
         );
       }
 
+      releaseSubtree(graph);
       nodes.clear();
       edges.clear();
       adjacency.clear();
@@ -497,6 +538,7 @@ function makeGraph<N, E>(
           throw new Error(`SpatialGraph.restore: duplicate node id '${entry.id}'`);
         }
         nodes.set(entry.id, node);
+        takeId(entry.id);
       }
 
       for (const entry of snapshot.edges) {
@@ -515,6 +557,7 @@ function makeGraph<N, E>(
           data: entry.data,
         };
         edges.set(entry.id, edge);
+        takeId(entry.id);
         indexEdge(edge);
       }
 
@@ -522,7 +565,7 @@ function makeGraph<N, E>(
         if (!nodes.has(ownerId)) {
           throw new Error(`SpatialGraph.restore: child graph keyed on missing node '${ownerId}'`);
         }
-        const child = makeGraph<N, E>(childOptions, ownerId);
+        const child = makeGraph<N, E>(tree, ownerId);
         child.restore(childSnap);
         childGraphs.set(ownerId, child);
       }
