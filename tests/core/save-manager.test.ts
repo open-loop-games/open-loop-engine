@@ -1113,7 +1113,7 @@ describe('SaveManager — events', () => {
       expect(handler.mock.calls[0][0].slotId).toBe(0);
     });
 
-    it('emits save:migration-step for each user migration that runs', () => {
+    it('emits save:migration-applied for each user migration that runs', () => {
       const storage = createMapStorage();
       storage.setItem(
         'evt-mig-slot-0',
@@ -1136,7 +1136,7 @@ describe('SaveManager — events', () => {
       });
 
       const handler = vi.fn();
-      mgr.on('save:migration-step', handler);
+      mgr.on('save:migration-applied', handler);
 
       mgr.load();
 
@@ -1175,7 +1175,7 @@ describe('SaveManager — events', () => {
 
     // --- Validation layer ---
 
-    it('emits save:future-version and fails load when envelope version exceeds current', () => {
+    it('emits save:future-version-refused and fails load when envelope version exceeds current', () => {
       const storage = createMapStorage();
       storage.setItem(
         'evt-fv-slot-0',
@@ -1191,7 +1191,7 @@ describe('SaveManager — events', () => {
 
       const fv = vi.fn();
       const failed = vi.fn();
-      mgr.on('save:future-version', fv);
+      mgr.on('save:future-version-refused', fv);
       mgr.on('save:load-failed', failed);
 
       const result = mgr.load();
@@ -1226,7 +1226,7 @@ describe('SaveManager — events', () => {
 
       const fv = vi.fn();
       const failed = vi.fn();
-      mgr.on('save:future-version', fv);
+      mgr.on('save:future-version-refused', fv);
       mgr.on('save:load-failed', failed);
 
       expect(mgr.load().success).toBe(false);
@@ -1239,7 +1239,7 @@ describe('SaveManager — events', () => {
       expect(failed.mock.calls[0][0].reason).toBe('future-version');
     });
 
-    it('emits save:validation-error and self-heals in non-strict mode', () => {
+    it('emits save:validation-failed and self-heals in non-strict mode', () => {
       const storage = createMapStorage();
       const mgr = createSaveManager({
         gameId: 'evt-val-heal',
@@ -1259,7 +1259,7 @@ describe('SaveManager — events', () => {
       storage.setItem('evt-val-heal-slot-0', JSON.stringify(raw));
 
       const errs = vi.fn();
-      mgr.on('save:validation-error', errs);
+      mgr.on('save:validation-failed', errs);
 
       // Poison the in-memory value so we can see the self-heal reset it
       count.value = 999;
@@ -1275,7 +1275,7 @@ describe('SaveManager — events', () => {
       expect(count.value).toBe(0);
     });
 
-    it('emits save:validation-error and fails load with reason "validation" in strict mode', () => {
+    it('emits save:validation-failed and fails load with reason "validation" in strict mode', () => {
       const storage = createMapStorage();
       const mgr = createSaveManager({
         gameId: 'evt-val-strict',
@@ -1295,7 +1295,7 @@ describe('SaveManager — events', () => {
 
       const errs = vi.fn();
       const failed = vi.fn();
-      mgr.on('save:validation-error', errs);
+      mgr.on('save:validation-failed', errs);
       mgr.on('save:load-failed', failed);
 
       // Pre-load in-memory value stays untouched in strict mode
@@ -1331,7 +1331,7 @@ describe('SaveManager — events', () => {
       count.value = 0;
       label.value = '';
       const errs = vi.fn();
-      mgr.on('save:validation-error', errs);
+      mgr.on('save:validation-failed', errs);
 
       const result = mgr.load();
       expect(result.success).toBe(true);

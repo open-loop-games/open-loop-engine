@@ -143,7 +143,7 @@ export interface SaveManagerConfig {
    * When true, any save validation failure aborts the load with
    * `save:load-failed { reason: 'validation' }`. When false, failing leaves
    * are self-healed to their persistent ref's default value and the load
-   * proceeds. `save:validation-error` is emitted per field in both modes.
+   * proceeds. `save:validation-failed` is emitted per field in both modes.
    *
    * Defaults to dev-mode detection: fail-loud in development (so bugs surface
    * early), self-heal in production (so player saves stay protected).
@@ -228,7 +228,7 @@ export interface SaveEvents {
    * `version` with `SaveManagerConfig.version`; `kind: 'engine'` compares its
    * engine save version with this engine's, and a game can't migrate that.
    */
-  'save:future-version': (err: {
+  'save:future-version-refused': (err: {
     slotId: number;
     kind: 'game' | 'engine';
     saveVersion: number;
@@ -239,7 +239,7 @@ export interface SaveEvents {
    * the policy applied: `self-heal` means the leaf was dropped and the ref
    * will fall back to its default; `fail` means strict mode aborted the load.
    */
-  'save:validation-error': (err: {
+  'save:validation-failed': (err: {
     path: string;
     expected: string;
     received: unknown;
@@ -253,9 +253,9 @@ export interface SaveEvents {
    * reconcilers still run. `detail` is the thrown error, also logged via
    * `console.error`.
    */
-  'save:reconcile-error': (err: { slotId: number; detail: unknown }) => void;
+  'save:reconcile-failed': (err: { slotId: number; detail: unknown }) => void;
   /** A consumer-provided migration step ran during load. */
-  'save:migration-step': (info: { from: number; to: number }) => void;
+  'save:migration-applied': (info: { from: number; to: number }) => void;
   /**
    * Live state is about to be serialized, by `save`, `saveToSlot` or
    * `exportSave`. Handlers run synchronously first, so one that flushes
@@ -520,7 +520,7 @@ function parseFailureDetail(err: unknown): unknown {
  * Storage keys are prefixed with `gameId` (and `persistenceNamespace`, if
  * given), so two engines sharing a runtime never collide. The returned manager
  * emits the {@link SaveEvents} (`save:loaded`, `save:load-failed`,
- * `save:validation-error` and the rest) for instrumentation.
+ * `save:validation-failed` and the rest) for instrumentation.
  *
  * @param config - {@link SaveManagerConfig} carrying `gameId`, version,
  *   migrations, the optional storage adapter, and slot/compression knobs.
@@ -537,7 +537,7 @@ function parseFailureDetail(err: unknown): unknown {
  *     2: (data) => migrateV2toV3(data),
  *   },
  * });
- * saves.on('save:validation-error', (issue) => log('save issue', issue));
+ * saves.on('save:validation-failed', (issue) => log('save issue', issue));
  * ```
  */
 export function createSaveManager(config: SaveManagerConfig): SaveManager {
@@ -701,7 +701,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // The engine's comes first, since its format decides how `data` decodes.
     const engineVersion = envelope._engine?.version ?? 1;
     if (engineVersion > ENGINE_SAVE_VERSION) {
-      handle.emit('save:future-version', {
+      handle.emit('save:future-version-refused', {
         slotId,
         kind: 'engine',
         saveVersion: engineVersion,
@@ -710,7 +710,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       throw new LoadFailure('future-version');
     }
     if (envelope.version > version) {
-      handle.emit('save:future-version', {
+      handle.emit('save:future-version-refused', {
         slotId,
         kind: 'game',
         saveVersion: envelope.version,
@@ -734,7 +734,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
           );
         }
         data = next as Record<string, unknown>;
-        handle.emit('save:migration-step', { from: v, to: v + 1 });
+        handle.emit('save:migration-applied', { from: v, to: v + 1 });
       }
       v++;
     }
@@ -748,13 +748,13 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     }
 
     // Runtime validation: single pass after migrations, before deserialize.
-    // Field-level failures emit save:validation-error; in strict mode the
+    // Field-level failures emit save:validation-failed; in strict mode the
     // first failure aborts via LoadFailure, otherwise the failing leaves
     // are dropped from `data` and deserialize falls back to defaults.
     const validation = validateSaveData(refs, data, {
       strict: strictValidation,
       onIssue: (issue: ValidationIssue) => {
-        handle.emit('save:validation-error', issue);
+        handle.emit('save:validation-failed', issue);
       },
     });
     if (!validation.ok) {
@@ -768,7 +768,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   function reportReconcileError(slotId: number): (err: unknown) => void {
     return (err) => {
       console.error('A reconcile after a successful save load threw; the load stands.', err);
-      handle.emit('save:reconcile-error', { slotId, detail: err });
+      handle.emit('save:reconcile-failed', { slotId, detail: err });
     };
   }
 

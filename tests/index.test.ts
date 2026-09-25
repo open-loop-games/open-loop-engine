@@ -1564,7 +1564,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     clearPersistentNamespace('order-bare');
   });
 
-  it('a reconcile that throws leaves the load standing and reports save:reconcile-error', () => {
+  it('a reconcile that throws leaves the load standing and reports save:reconcile-failed', () => {
     const g = game();
     const engine = started(g, 'order-throw');
     g.saveMidChallenge(() => engine.save());
@@ -1580,7 +1580,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     const failed = vi.fn();
     const reconcileErrors: unknown[] = [];
     mgr.on('save:load-failed', failed);
-    mgr.on('save:reconcile-error', (e) => reconcileErrors.push(e));
+    mgr.on('save:reconcile-failed', (e) => reconcileErrors.push(e));
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(engine.load().success).toBe(true);

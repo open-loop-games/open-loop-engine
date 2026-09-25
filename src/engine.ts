@@ -290,7 +290,7 @@ export interface EngineConfig {
    * When true, any save validation failure aborts the load with
    * `save:load-failed { reason: 'validation' }`. When false, failing leaves
    * are self-healed to their persistent ref's default value and the load
-   * proceeds. `save:validation-error` is emitted per field in both modes.
+   * proceeds. `save:validation-failed` is emitted per field in both modes.
    *
    * Defaults to dev-mode detection in the underlying save manager: fail-loud
    * in development (so bugs surface early), self-heal in production (so

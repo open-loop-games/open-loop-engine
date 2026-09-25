@@ -15,7 +15,7 @@
  * Migrations stay in the existing `migrations` hook; validation runs once,
  * after the full migration chain.
  *
- * Policy: field-level failures always emit `save:validation-error`. In
+ * Policy: field-level failures always emit `save:validation-failed`. In
  * non-strict mode, the failing leaf is dropped from the raw data and
  * `deserializePersistents` falls back to the ref's default (self-heal). In
  * strict mode, validation failure aborts the load and bubbles up as
@@ -69,7 +69,7 @@ export const decimalSchema: ZodType<DecimalSource> = z.custom<DecimalSource>((va
   }
 });
 
-/** A single field-level validation failure, suitable for `save:validation-error`. */
+/** A single field-level validation failure, suitable for `save:validation-failed`. */
 export interface ValidationIssue {
   path: string;
   expected: string;
@@ -146,7 +146,7 @@ export function getSchemaForRef(ref: Persistent): ZodType {
   return deriveSchema(ref[DefaultValue], ref[PersistentDecimal]);
 }
 
-/** Human-readable label for a Zod issue, for `save:validation-error.expected`. */
+/** Human-readable label for a Zod issue, for `save:validation-failed.expected`. */
 function describeIssue(issue: ZodIssue): string {
   if (issue.code === 'invalid_type') {
     return String(issue.expected);
