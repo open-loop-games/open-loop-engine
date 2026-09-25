@@ -56,6 +56,26 @@ function buildAccessor(state: Record<string, unknown> = {}): GameStateAccessorMu
   };
 }
 
+function buildSession(
+  graphs: DialogGraph[],
+  {
+    id = 'main',
+    accessor = buildAccessor(),
+  }: { id?: string; accessor?: GameStateAccessorMutator } = {},
+) {
+  return withEngine(accessor, () => createDialogSession({ id, graphs }));
+}
+
+function savedState(id: string) {
+  return getAllPersistentRefs().get(`dialog-sessions/${id}.state`) as {
+    value: {
+      activeGraphId?: string;
+      activeNodeId?: string;
+      visitCounts: Record<string, Record<string, number>>;
+    };
+  };
+}
+
 const greetingGraph: DialogGraph = {
   id: 'rask-greeting',
   entry: 'open',
@@ -96,9 +116,7 @@ const cycleGraph: DialogGraph = {
 
 describe('createDialogSession', () => {
   it('throws on an authored next-only cycle instead of hanging settle()', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [cycleGraph] }),
-    );
+    const session = buildSession([cycleGraph]);
     expect(() => session.start('loop-graph')).toThrow(/cycle/);
   });
 
@@ -113,22 +131,16 @@ describe('createDialogSession', () => {
         { id: 'b', text: 'B', next: 'a' },
       ],
     };
-    const session = withEngine(accessor, () =>
-      createDialogSession({ id: 'cycle-sync', graphs: [graph] }),
-    );
+    const session = buildSession([graph], { id: 'cycle-sync', accessor });
     expect(() => session.start('loop-with-effect')).toThrow(/cycle/);
     expect(setStateSpy).toHaveBeenCalledTimes(1);
-    const stateRef = getAllPersistentRefs().get('dialog-sessions/cycle-sync.state') as {
-      value: { activeNodeId?: string; visitCounts: Record<string, Record<string, number>> };
-    };
+    const stateRef = savedState('cycle-sync');
     expect(stateRef.value.activeNodeId).toBe(session.present()?.nodeId);
     expect(stateRef.value.visitCounts['loop-with-effect']).toEqual({ a: 1, b: 1 });
   });
 
   it('starts a graph and presents the entry node', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph]);
     session.start('rask-greeting');
     const snap = session.present();
     expect(snap?.nodeId).toBe('open');
@@ -140,18 +152,14 @@ describe('createDialogSession', () => {
   it('reveals gated choices once the gate flips true', () => {
     const accessor = buildAccessor();
     accessor.setUnlocked('knowledge-restricted-tip', true);
-    const session = withEngine(accessor, () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph], { accessor });
     session.start('rask-greeting');
     const snap = session.present();
     expect(snap?.choices.map((c) => c.id)).toEqual(['ask-training', 'ask-secret']);
   });
 
   it('emits presented / chosen / finished events', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph]);
     {
       const presented = vi.fn();
       const chosen = vi.fn();
@@ -184,9 +192,7 @@ describe('createDialogSession', () => {
   it('writes choice outcomes via the mutator', () => {
     const accessor = buildAccessor();
     const setStateSpy = vi.spyOn(accessor, 'setState');
-    const session = withEngine(accessor, () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph], { accessor });
     session.start('rask-greeting');
     session.choose('ask-training');
     // Training node's onEnter fires → state write to rel.npc-trust.rask.tier
@@ -194,9 +200,7 @@ describe('createDialogSession', () => {
   });
 
   it('snapshots runtime state into the persistent ref on every choose', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'snapshot', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph], { id: 'snapshot' });
     session.start('rask-greeting');
     // Pre-choose presentation reflects the entry node.
     expect(session.present()?.nodeId).toBe('open');
@@ -213,26 +217,15 @@ describe('createDialogSession', () => {
     // This test simulates the deserialize step directly: write a non-default
     // state into the ref under the load guard. Without the watcher,
     // session.isActive() would stay false.
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'load-sync', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph], { id: 'load-sync' });
     {
       expect(session.isActive()).toBe(false);
 
-      const refs = getAllPersistentRefs();
-      const stateRef = refs.get('dialog-sessions/load-sync.state') as
-        | {
-            value: {
-              activeGraphId?: string;
-              activeNodeId?: string;
-              visitCounts: Record<string, Record<string, number>>;
-            };
-          }
-        | undefined;
+      const stateRef = savedState('load-sync');
       expect(stateRef).toBeDefined();
 
       withLoadingSave(() => {
-        stateRef!.value = {
+        stateRef.value = {
           activeGraphId: 'rask-greeting',
           activeNodeId: 'training',
           visitCounts: {},
@@ -253,9 +246,7 @@ describe('createDialogSession', () => {
         { id: 'b', text: 'B', condition: { kind: 'flag', id: 'never' } },
       ],
     };
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [graph] }),
-    );
+    const session = buildSession([graph]);
     session.start('optional-follow-up');
     expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: true });
   });
@@ -274,9 +265,7 @@ describe('createDialogSession', () => {
         { id: 'b', text: 'B' },
       ],
     };
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [graph] }),
-    );
+    const session = buildSession([graph]);
     session.start('gated-aside');
     expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], finished: true });
   });
@@ -298,9 +287,7 @@ describe('createDialogSession', () => {
         { id: 'b', text: 'B', onEnter: [{ type: 'state', target: 'met-b', value: 1 }] },
       ],
     };
-    const session = withEngine(accessor, () =>
-      createDialogSession({ id: 'lapsed', graphs: [graph] }),
-    );
+    const session = buildSession([graph], { id: 'lapsed', accessor });
     session.start('lapsed-offer');
     expect(session.present()?.choices.map((c) => c.id)).toEqual(['offer']);
 
@@ -313,16 +300,11 @@ describe('createDialogSession', () => {
     expect(session.present()).toMatchObject({ nodeId: 'b', finished: true });
     expect(presented).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'b' }));
     expect(setStateSpy).toHaveBeenCalledWith('met-b', 1);
-    const stateRef = getAllPersistentRefs().get('dialog-sessions/lapsed.state') as {
-      value: { activeNodeId?: string };
-    };
-    expect(stateRef.value.activeNodeId).toBe('b');
+    expect(savedState('lapsed').value.activeNodeId).toBe('b');
   });
 
   it('refuses to advance a line that offers a choice or is finished', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph]);
     expect(() => session.advance()).toThrow(/start\(\) first/);
     session.start('rask-greeting');
     expect(() => session.advance()).toThrow(/nothing to advance/);
@@ -337,9 +319,7 @@ describe('createDialogSession', () => {
       entry: 'door',
       nodes: [{ id: 'door', text: 'Door', condition: { kind: 'flag', id: 'never' } }],
     };
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph, lockedGraph] }),
-    );
+    const session = buildSession([greetingGraph, lockedGraph]);
     session.start('rask-greeting');
     const presented = vi.fn();
     session.on('presented', presented);
@@ -351,9 +331,7 @@ describe('createDialogSession', () => {
   });
 
   it('reads visit counts through the session', () => {
-    const session = withEngine(buildAccessor(), () =>
-      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
-    );
+    const session = buildSession([greetingGraph]);
     session.start('rask-greeting');
     session.finish();
     session.start('rask-greeting');
