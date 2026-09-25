@@ -6,7 +6,7 @@ No DOM. No rendering. Wire any UI on top — or run it headless for balance simu
 
 ## Status
 
-**Pre-1.0.** Expect breaking changes between minor versions until 1.0. Pin `~0.1.0` for patch-only updates if you need stability for a jam or short project.
+**Pre-1.0.** A breaking change bumps the minor version; features and fixes bump the patch. So `^0.1.0` takes every non-breaking release, and moving to `0.2.0` is always a deliberate specifier change with a migration in `CHANGELOG.md`.
 
 ## Install
 
@@ -65,7 +65,7 @@ The engine carries its own docs — in the repo and in the installed package, un
 - **`docs/consumer-guide-balance.md`** — how numbers get chosen and verified: the closed-form spine, the probe that contradicts it, and the loop between them.
 - **`docs/consumer-guide-balance-agents.md`** — the layer that applies when a policy agent plays the game your probe measures: calibrating the agent, what it can't measure, and the harness checks that keep a bot-driven reading honest.
 
-- **`docs/domain-map.md`** — `ol-domain-map`, the bin that generates a vocabulary map of *your* game's domain types from their structure.
+- **`docs/domain-map.md`** — `ol-domain-map`, the bin that generates a vocabulary map of _your_ game's domain types from their structure.
 
 `docs/api/` is generated from TSDoc, and each entry ends in a `src/…:line` pointer. `src/` ships for exactly that reason, so those pointers resolve in an installed copy — it's reference material, not an import surface, since `exports` admits only the subpaths listed above.
 
