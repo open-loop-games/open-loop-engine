@@ -174,7 +174,17 @@ export interface Sequencer<M = void> {
   // --- Persistent state ---
   /** Raw persistent string for the current item. Prefer currentItem for typed access. */
   readonly current: Persistent<string>;
-  /** Waiting items. */
+  /**
+   * Waiting items (in list mode, the whole list). Reads are reactive, but
+   * `items` is not a Ref: watch it through a getter, `() => seq.items.value`.
+   *
+   * Assigning `items.value = [...]` replaces the list wholesale and saves it.
+   * It is a raw escape hatch: it skips `maxSize`, emits no events, leaves the
+   * running item alone, doesn't move or clamp the list-mode cursor, and doesn't
+   * dispatch. During a hold, the retry tick re-checks whichever item now sits
+   * at the head (or the cursor). Use `enqueue` / `remove` / `reorder` / `clear`
+   * when those guarantees matter.
+   */
   readonly items: { value: SequencerItem<M>[] };
   /** Whether the sequencer is paused. */
   readonly paused: Persistent<boolean>;
