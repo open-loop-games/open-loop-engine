@@ -18,7 +18,7 @@
  * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
  */
 
-import { computed, unref, watch, type ComputedRef, type MaybeRef } from 'vue';
+import { computed, ref, unref, watch, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
@@ -80,8 +80,11 @@ export interface PurchasableDisplay {
  * {@link ScalingPurchasableOptions} on {@link createScalingPurchasable}.
  */
 export interface PurchasableOptions {
-  /** Persistence ID. Auto-generated if omitted, but explicit IDs are safer for save compatibility. */
-  id?: string;
+  /**
+   * Save identity, unique among the purchasables created in the same context.
+   * The owned amount saves under it, so it must not change between builds.
+   */
+  id: string;
   /** UI text — either a full {@link PurchasableDisplay} or a plain string/getter for description-only */
   display: PurchasableDisplay | Computable<string>;
   /**
@@ -176,8 +179,8 @@ export type ScalingPurchasableCost =
  * Cost shape is supplied via the {@link ScalingPurchasableCost} discriminator.
  */
 export type ScalingPurchasableOptions = {
-  /** Persistence ID. Auto-generated if omitted. */
-  id?: string;
+  /** Save identity — see {@link PurchasableOptions.id}. */
+  id: string;
   /** Display title */
   title?: Computable<string>;
   /** Description of what this purchasable does */
@@ -272,10 +275,6 @@ export interface Purchasable {
   /** Subscribe to purchasable lifecycle events */
   on: Emittable<PurchasableEvents>['on'];
 }
-
-// === CONSTANTS ===
-
-let purchasableIdCounter = 0;
 
 // === PRIVATE BUILDERS ===
 
@@ -413,7 +412,7 @@ function buildGetCost(baseReqs: Requirement[]): (purchaseAmount?: DecimalSource)
  */
 function buildScalingCostRequirement(
   options: ScalingPurchasableOptions,
-  scalingAmount: Persistent<DecimalSource>,
+  scalingAmount: Ref<DecimalSource>,
   limit: Computable<DecimalSource> | undefined,
 ): Requirement {
   if ('costFormula' in options) {
@@ -459,7 +458,7 @@ function buildScalingCostRequirement(
  */
 function buildScalingEffect(
   effectOption: ScalingPurchasableOptions['effect'],
-  scalingAmount: Persistent<DecimalSource>,
+  scalingAmount: Ref<DecimalSource>,
 ): {
   effectFn: ((amount: DecimalSource) => DecimalSource) | undefined;
   effectCurve: GenericFormula | undefined;
@@ -512,6 +511,7 @@ function buildScalingEffect(
  * @example Leveled repeatable
  * ```ts
  * const generator = createPurchasable({
+ *   id: 'generator',
  *   display: { description: 'Point Generator' },
  *   // Factory form — `level` is this purchasable's own amount ref, so the
  *   // cost is a Formula and `purchaseMax` walks the curve rung by rung.
@@ -527,8 +527,6 @@ function buildScalingEffect(
  * ```
  */
 export function createPurchasable<T extends PurchasableOptions>(options: T): Purchasable {
-  const purchasableId = `purchasable_${++purchasableIdCounter}`;
-
   const {
     id,
     display,
@@ -541,12 +539,10 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
     bulkPurchase,
   } = options;
 
-  const actualId = id ?? purchasableId;
-
   // Sub-context per purchasable so multiple purchasables grouped under the
   // same outer context (e.g. `layer0`) do not collide on the `amount` name.
-  const parentContext = getCurrentContext() ?? purchasableId;
-  const contextId = `${parentContext}:${actualId}`;
+  const parentContext = getCurrentContext();
+  const contextId = parentContext ? `${parentContext}:${id}` : id;
   const amount = withPersistentContext(contextId, () =>
     persistent<DecimalSource>(0, { name: 'amount' }),
   );
@@ -590,7 +586,7 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
   const handle = createEmitHandle<PurchasableEvents>();
 
   const purchasable: Purchasable = {
-    id: actualId,
+    id,
     amount,
     active,
     canPurchase,
@@ -657,6 +653,7 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
  * @example Geometric (most common)
  * ```ts
  * const pointGen = createScalingPurchasable({
+ *   id: 'pointGen',
  *   description: 'Point Generator',
  *   resource: points,
  *   baseCost: 10,
@@ -668,6 +665,7 @@ export function createPurchasable<T extends PurchasableOptions>(options: T): Pur
  * @example Closure cost (super-exponential, piecewise, factorial-bumped, etc.)
  * ```ts
  * const crystalUpgrade = createScalingPurchasable({
+ *   id: 'crystal',
  *   description: 'Crystal upgrade',
  *   resource: prestigeShards,
  *   costFormula: (level) => Decimal.pow(10,
@@ -692,21 +690,17 @@ export function createScalingPurchasable<T extends ScalingPurchasableOptions>(
     bulkPurchase,
   } = options;
 
-  const scalingId = id ?? `scaling_purchasable_${++purchasableIdCounter}`;
-
-  // Sub-context per scaling purchasable (see createPurchasable for rationale).
-  const parentContext = getCurrentContext() ?? scalingId;
-  const contextId = `${parentContext}:${scalingId}`;
-  const scalingAmount = withPersistentContext(contextId, () =>
-    persistent<DecimalSource>(initialAmount ?? 0, { name: 'scalingAmount' }),
-  );
+  // The cost and effect Formulas read the level before the purchasable (and
+  // its saved `amount`) exists, so they close over this mirror instead. It is
+  // derived state: the watch below keeps it equal to `amount`, load included.
+  const scalingAmount = ref<DecimalSource>(initialAmount ?? 0) as Ref<DecimalSource>;
 
   const costRequirement = buildScalingCostRequirement(options, scalingAmount, limit);
   const { effectFn, effectCurve } = buildScalingEffect(effectOption, scalingAmount);
 
   const purchasable: Purchasable = {
     ...createPurchasable({
-      id: scalingId,
+      id,
       display: {
         title,
         description,

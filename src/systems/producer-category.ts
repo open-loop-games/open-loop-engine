@@ -275,6 +275,7 @@ function buildProducer<Def extends { id: string }, State>(
   if (mapping.purchase) {
     const pc = mapping.purchase;
     repeatable = createScalingPurchasable({
+      id: def.id,
       description: mapping.display ?? def.id,
       resource: pc.costResource,
       baseCost: pc.baseCost,

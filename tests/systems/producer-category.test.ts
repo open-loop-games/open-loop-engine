@@ -4,9 +4,15 @@ import {
   persistent,
   beginPersistentContext,
   endPersistentContext,
+  withPersistentContext,
+  resetAllPersistentContexts,
+  getAllPersistentRefs,
+  serializePersistents,
+  deserializePersistents,
   type Persistent,
   type DecimalSource,
 } from '@/core/persistence';
+import { createScalingPurchasable } from '@/systems/purchasable';
 import { createResource, type Resource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
@@ -1035,5 +1041,46 @@ describe('Producer signed-rate integration', () => {
 
     // -3 is readable by a starvation detector; the clamped variant loses it.
     expect(new Decimal(catnip.value).eq(-3)).toBe(true);
+  });
+});
+
+describe('producer save keys', () => {
+  function build(extraPurchasableFirst: boolean) {
+    resetAllPersistentContexts();
+    const { registerTick } = createTickManager();
+    return withPersistentContext('shop', () => {
+      const cookies = createResource(1e6, { id: 'cookies', displayName: 'Cookies' });
+      if (extraPurchasableFirst) {
+        createScalingPurchasable({
+          id: 'sale',
+          description: 'Sale',
+          resource: cookies,
+          baseCost: 1,
+          costScaling: 2,
+        });
+      }
+      const category = createProducerCategory<BuildingDef>({
+        id: 'buildings',
+        mapProducer: (def) => ({
+          resource: cookies,
+          baseRate: def.baseRate,
+          trigger: 'continuous',
+          purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+        }),
+        registerTick,
+      });
+      category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 });
+      return category;
+    });
+  }
+
+  it('owned counts load back when the build creates another purchasable first', () => {
+    build(false).getProducer('mine')!.repeatable!.purchase(3);
+    const saved = JSON.parse(JSON.stringify(serializePersistents(getAllPersistentRefs())));
+
+    const rebuilt = build(true);
+    deserializePersistents(getAllPersistentRefs(), saved);
+
+    expect(new Decimal(rebuilt.getProducer('mine')!.count.value).eq(3)).toBe(true);
   });
 });
