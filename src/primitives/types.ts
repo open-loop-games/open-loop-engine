@@ -164,12 +164,7 @@ export interface NotCondition {
  * @internal
  */
 export type ICondition =
-  | ResourceCondition
-  | UnlockCondition
-  | StateCondition
-  | AndCondition
-  | OrCondition
-  | NotCondition;
+  ResourceCondition | UnlockCondition | StateCondition | AndCondition | OrCondition | NotCondition;
 
 /** A single step in a modifier chain: transforms a Decimal value and optionally inverts it. */
 export interface IModifier {

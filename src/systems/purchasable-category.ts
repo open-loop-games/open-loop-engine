@@ -216,20 +216,18 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
 
   const purchasedCount = computed(() => list().filter((p) => p.active.value).length);
 
-  const totalAmount = computed(
-    (): DecimalSource =>
-      list().reduce<DecimalSource>(
-        (sum, p) => renormIfLayer0(Decimal.add(sum, p.amount.value)),
-        Decimal.dZero,
-      ),
+  const totalAmount = computed((): DecimalSource =>
+    list().reduce<DecimalSource>(
+      (sum, p) => renormIfLayer0(Decimal.add(sum, p.amount.value)),
+      Decimal.dZero,
+    ),
   );
 
-  const totalEffect = computed(
-    (): DecimalSource =>
-      list().reduce<DecimalSource>(
-        (product, p) => renormIfLayer0(Decimal.mul(product, p.effect.value)),
-        Decimal.dOne,
-      ),
+  const totalEffect = computed((): DecimalSource =>
+    list().reduce<DecimalSource>(
+      (product, p) => renormIfLayer0(Decimal.mul(product, p.effect.value)),
+      Decimal.dOne,
+    ),
   );
 
   const allMaxed = computed(() => {

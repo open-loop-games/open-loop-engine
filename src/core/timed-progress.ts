@@ -103,12 +103,9 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
   // refs. Mirrors category-base's `${parent}/${local}` nesting.
   const parent = getCurrentContext();
   const contextId = parent ? `${parent}/${id}` : id;
-  return withPersistentContext(
-    contextId,
-    (): TimedProgressState => ({
-      progress: persistent<DecimalSource>(0, { name: 'progress' }),
-    }),
-  );
+  return withPersistentContext(contextId, (): TimedProgressState => ({
+    progress: persistent<DecimalSource>(0, { name: 'progress' }),
+  }));
 }
 
 interface ProcessedTimedProgressOptions {

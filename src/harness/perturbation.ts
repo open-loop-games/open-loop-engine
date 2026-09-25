@@ -48,8 +48,7 @@ import type { PickerEntry } from './picker';
 
 /** Scalar transform applied on top of an existing modifier or tunable value. */
 export type Perturbation =
-  | { kind: 'scalar-multiply'; factor: DecimalSource }
-  | { kind: 'scalar-add'; delta: DecimalSource };
+  { kind: 'scalar-multiply'; factor: DecimalSource } | { kind: 'scalar-add'; delta: DecimalSource };
 
 /**
  * Apply `perturbation` to the surface identified by `entry` and return an

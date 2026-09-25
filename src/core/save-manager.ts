@@ -183,12 +183,7 @@ export interface SaveSlot {
  * - `unknown`: any other thrown error during load/migration/deserialize
  */
 export type SaveLoadFailureReason =
-  | 'not-found'
-  | 'parse-error'
-  | 'wrong-game-id'
-  | 'future-version'
-  | 'validation'
-  | 'unknown';
+  'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown';
 
 /**
  * Events emitted by a SaveManager. Subscribe via `mgr.on(event, handler)`.

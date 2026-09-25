@@ -108,9 +108,7 @@ export type GeneralFormulaOptions<T extends [FormulaSource] | FormulaSource[]> =
 
 /** Union of all formula constructor option shapes */
 export type FormulaOptions<T extends [FormulaSource] | FormulaSource[]> =
-  | VariableFormulaOptions
-  | ConstantFormulaOptions
-  | GeneralFormulaOptions<T>;
+  VariableFormulaOptions | ConstantFormulaOptions | GeneralFormulaOptions<T>;
 
 /** @internal Resolved properties stored on a Formula instance */
 export type FormulaProperties<T extends [FormulaSource] | FormulaSource[]> = {

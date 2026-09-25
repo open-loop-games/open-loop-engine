@@ -397,8 +397,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       0,
     );
     const variable = inputs.find((input) => input instanceof Formula && input.hasVariable()) as
-      | GenericFormula
-      | undefined;
+      GenericFormula | undefined;
 
     const innermostVariable = numVariables === 1 ? variable?.innermostVariable : undefined;
 
@@ -461,8 +460,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     // 1/2/3-input fast paths cover every op in the table; the default branch
     // handles the rare >3-input ops (tetrate/iteratedexp/pentate).
     const fn = this.internalEvaluate as
-      | ((...args: DecimalSource[]) => DecimalSource | null | undefined)
-      | undefined;
+      ((...args: DecimalSource[]) => DecimalSource | null | undefined) | undefined;
     const inputs = this.inputs;
     if (fn !== undefined) {
       let result: DecimalSource | null | undefined;
