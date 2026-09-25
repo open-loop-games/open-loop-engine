@@ -103,6 +103,10 @@ export interface CycleOptions {
   /**
    * Post-restart hook, called after all persistent refs have been reset.
    * Use for: swapping action queues, applying meta-progression multipliers.
+   *
+   * It is the Reset's `onReset`, run under the reset's load guard: resource
+   * writes here never reach `cumulative` / `best`. Grant earnings in an
+   * `afterRestart` listener, which runs once the reset has returned.
    */
   onRestart?: () => void;
 

@@ -129,7 +129,12 @@ export interface ResetOptions {
   onBeforeReset?: () => boolean | void;
 
   /**
-   * Called after the reset completes.
+   * Called after the reset has written its refs, before `afterReset` fires.
+   *
+   * Runs under the same load guard as the reset itself, so resource writes
+   * here never reach `cumulative` / `best` (nor a `cumulative-gte` Gate).
+   * That suits scripted setup; grant earnings — prestige currency — after
+   * `reset()` returns instead.
    */
   onReset?: () => void;
 }
@@ -167,7 +172,11 @@ export interface Reset extends ScopedReset {
 export interface ResetEvents {
   /** Fired before this reset executes */
   beforeReset: () => void;
-  /** Fired after this reset completes */
+  /**
+   * Fired after this reset completes, still under its load guard: resource
+   * writes in a listener never reach `cumulative` / `best`. Grant earnings
+   * after `reset()` returns.
+   */
   afterReset: () => void;
 }
 
@@ -211,8 +220,14 @@ function resolveScope(modules: ResetScope[]): Set<Persistent> {
  *   resetModules: ['gathering', 'economy'],
  *   keep: [permanentBonus],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
- *   onReset: () => { prestigePoints.value = Decimal.add(prestigePoints.value, pending.value) }
  * })
+ *
+ * function prestige() {
+ *   const earned = pending.value // read before the reset zeroes its inputs
+ *   if (!prestigeReset.reset()) return
+ *   // Granted after reset() returns, so it counts toward cumulative / best
+ *   prestigePoints.value = Decimal.add(prestigePoints.value, earned)
+ * }
  *
  * // Composable:
  * const outerReset = createReset({

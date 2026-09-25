@@ -43,6 +43,28 @@ describe('Reset', () => {
     expect(level.value).toBe(1);
   });
 
+  it('writes inside onReset and afterReset skip cumulative/best; a grant after reset() counts', () => {
+    beginPersistentContext('reset-hook-grant');
+    const pp = createResource(bn(0), { id: 'Prestige', displayName: 'Prestige' });
+    endPersistentContext();
+    addResource(pp, 1);
+
+    const reset = createReset({
+      thingsToReset: [],
+      onReset: () => addResource(pp, 5),
+    });
+    reset.on('afterReset', () => addResource(pp, 10));
+    reset.reset();
+
+    expect(Decimal.eq(pp.value, 16)).toBe(true);
+    expect(Decimal.eq(pp.cumulative!.value, 1)).toBe(true);
+    expect(Decimal.eq(pp.best!.value, 1)).toBe(true);
+
+    addResource(pp, 5);
+    expect(Decimal.eq(pp.cumulative!.value, 6)).toBe(true);
+    expect(Decimal.eq(pp.best!.value, 21)).toBe(true);
+  });
+
   it('calls onReset callback after reset', () => {
     let called = false;
     beginPersistentContext('reset-test-callback');

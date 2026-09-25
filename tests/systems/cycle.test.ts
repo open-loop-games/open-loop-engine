@@ -37,6 +37,24 @@ describe('createCycle', () => {
     expect(cycle.running.value).toBe(false);
   });
 
+  it('a grant in an afterRestart listener counts toward cumulative; one in onRestart does not', () => {
+    const { registerTick } = createTickManager();
+    beginPersistentContext('cycle-grant');
+    const pp = createResource(bn(0), { id: 'Prestige', displayName: 'Prestige' });
+    endPersistentContext();
+    const cycle = createCycle({
+      thingsToReset: [],
+      onRestart: () => addResource(pp, 5),
+      registerTick,
+    });
+    cycle.on('afterRestart', () => addResource(pp, 10));
+
+    cycle.end();
+
+    expect(Decimal.eq(pp.value, 15)).toBe(true);
+    expect(Decimal.eq(pp.cumulative!.value, 10)).toBe(true);
+  });
+
   it('tracks elapsed time while running', () => {
     const { registerTick, tick } = createTickManager();
     const cycle = createCycle({
