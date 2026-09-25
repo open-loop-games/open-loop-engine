@@ -33,6 +33,7 @@ import {
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import {
   createNativeDialogRuntime,
@@ -161,7 +162,8 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   // --- Persistent state ---
 
-  beginPersistentContext(`dialog-sessions/${options.id}`);
+  const contextId = `dialog-sessions/${options.id}`;
+  beginPersistentContext(contextId);
   const stateRef: Persistent<DialogRuntimeState> = persistent<DialogRuntimeState>(
     { activeGraphId: undefined, activeNodeId: undefined, visitCounts: {} },
     { name: 'state', lifetime: true },
@@ -252,7 +254,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     }
   }
 
-  return {
+  const session: DialogSession = {
     start,
     present: () => runtime.present(),
     choose,
@@ -268,4 +270,5 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
       deletePersistent(stateRef as unknown as Persistent);
     },
   };
+  return attachContextReset(session, contextId);
 }

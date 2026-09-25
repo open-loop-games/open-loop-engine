@@ -26,6 +26,7 @@ import {
   resolveSystemContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
 
@@ -336,5 +337,5 @@ export function createCycle(options: CycleOptions): Cycle {
     },
   };
 
-  return cycle;
+  return attachContextReset(cycle, contextId);
 }

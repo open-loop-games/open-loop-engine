@@ -24,6 +24,7 @@
 import { shallowRef, watch } from 'vue';
 import { createEmitHandle } from './events';
 import { persistent, withPersistentContext, type Persistent } from './persistence';
+import { attachContextReset } from './resettable';
 import { reportAdvanceCapTrip } from './safeguards';
 
 // === TYPES ===
@@ -1130,5 +1131,5 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     });
   }
 
-  return sequencer;
+  return attachContextReset(sequencer, id);
 }

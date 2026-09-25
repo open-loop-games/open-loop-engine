@@ -39,6 +39,7 @@ import {
   resolveSystemContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import { createContentRegistry, type ContentRegistry } from './content-registry';
 
 // === TYPES ===
@@ -205,5 +206,5 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     on: handle.on,
   };
 
-  return zoneSystem;
+  return attachContextReset(zoneSystem, contextId);
 }

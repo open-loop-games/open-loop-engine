@@ -39,6 +39,7 @@ import {
   type State,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import type { Cycle } from './cycle';
 import type { CycleLog } from './cycle-log';
 import type { BestOf } from './best-of';
@@ -475,7 +476,7 @@ export function createRecommendationSystem(
   });
 
   // --- Public API ---
-  return {
+  const system: RecommendationSystem = {
     lastRecommendation,
     autoApply,
     get defs() {
@@ -515,4 +516,5 @@ export function createRecommendationSystem(
       unsubAfterRestart();
     },
   };
+  return attachContextReset(system, contextId);
 }

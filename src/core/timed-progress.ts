@@ -22,6 +22,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from './computed';
 import { persistent, withPersistentContext, getCurrentContext } from './persistence';
+import { attachContextReset } from './resettable';
 import type { RegisterTick } from './sequencer';
 
 // === TYPES ===
@@ -108,6 +109,8 @@ let timedProgressIdCounter = 0;
 // === PRIVATE BUILDERS ===
 interface TimedProgressState {
   progress: Ref<DecimalSource>;
+  /** The persistent context holding `progress`; absent when ephemeral. */
+  contextId?: string;
 }
 
 function buildTimedProgressState(id: string, ephemeral: boolean | undefined): TimedProgressState {
@@ -124,6 +127,7 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
   const contextId = parent ? `${parent}/${id}` : id;
   return withPersistentContext(contextId, (): TimedProgressState => ({
     progress: persistent<DecimalSource>(0, { name: 'progress' }),
+    contextId,
   }));
 }
 
@@ -276,7 +280,7 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
     ),
   );
 
-  return {
+  const timedProgress: TimedProgress = {
     id: actualId,
     progress: state.progress,
     duration: processed.duration,
@@ -290,6 +294,9 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
     },
     dispose: unsubTick,
   };
+  return state.contextId === undefined
+    ? timedProgress
+    : attachContextReset(timedProgress, state.contextId);
 }
 
 // === UTILITIES ===

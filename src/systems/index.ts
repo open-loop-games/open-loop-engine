@@ -6,8 +6,8 @@
  */
 
 // === RESETTABLE PROTOCOL ===
-// Opt-in interface for objects (categories, collections) that yield persistent
-// refs for recursive reset. Used by resetObject in the reset system.
+// Opt-in interface for objects (categories, stateful systems) that yield
+// persistent refs for recursive reset. Used by resetObject in the reset system.
 export * from './resettable';
 
 // === CATEGORY BASE ===

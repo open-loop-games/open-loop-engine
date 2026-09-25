@@ -47,6 +47,7 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 
 // === TYPES ===
 
@@ -189,7 +190,8 @@ export function createSlot(options: SlotOptions): Slot {
   const processedPool = options.pool != null ? processGetter(options.pool) : undefined;
 
   // --- Persistence ---
-  const _selected = withPersistentContext(`slot:${id}`, () =>
+  const contextId = `slot:${id}`;
+  const _selected = withPersistentContext(contextId, () =>
     persistent<string[]>([], { name: 'selected' }),
   );
 
@@ -329,7 +331,7 @@ export function createSlot(options: SlotOptions): Slot {
     resync();
   });
 
-  return {
+  const slot: Slot = {
     id,
     mode,
     selected,
@@ -347,4 +349,5 @@ export function createSlot(options: SlotOptions): Slot {
     resync,
     on: handle.on,
   };
+  return attachContextReset(slot, contextId);
 }

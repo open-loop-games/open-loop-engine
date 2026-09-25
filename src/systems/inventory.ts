@@ -11,6 +11,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
 import { createResource, type Resource } from '@/core/resource';
 import { withPersistentContext } from '@/core/persistence';
+import { attachContextReset } from '@/core/resettable';
 import { createModifierChain, type Modifier } from '@/core/modifier';
 
 // === TYPES ===
@@ -237,5 +238,6 @@ export function createInventory(options: InventoryOptions): Inventory {
     },
   };
 
-  return inventory;
+  // Only known items persist, under the inventory's own context.
+  return items ? attachContextReset(inventory, id) : inventory;
 }

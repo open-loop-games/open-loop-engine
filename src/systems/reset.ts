@@ -66,6 +66,8 @@ export interface ResetOptions {
    * - Objects with persistent refs (recursively searched)
    * - Resources
    * - Individual persistent refs
+   * - Categories and stateful systems, which reset what a module reset
+   *   would reset of their own persistent context
    *
    * The walk skips refs tagged `lifetime` (see `PersistentOptions.lifetime`),
    * as `resetModules` does. A lifetime ref given here as its own entry is

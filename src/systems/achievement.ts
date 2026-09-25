@@ -30,6 +30,7 @@ import {
   onHydrated,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import { evaluateGate, getAmbientGateRuntime, isGate, type Gate, type GateRuntime } from './gate';
 
 // === TYPES ===
@@ -287,7 +288,7 @@ export function createAchievement<T = unknown>(
     });
   }
 
-  return achievement;
+  return attachContextReset(achievement, contextId);
 }
 
 // === PUBLIC UTILITIES ===

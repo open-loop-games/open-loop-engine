@@ -13,6 +13,7 @@
 import { ref } from 'vue';
 import type { Ref } from 'vue';
 import { persistent, resolveSystemContextId, withPersistentContext } from '@/core/persistence';
+import { attachContextReset } from '@/core/resettable';
 import { formatTime } from '@/primitives/decimal';
 
 // === TYPES ===
@@ -83,7 +84,7 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
     totalPlayTime: persistent(0, { name: 'totalPlayTime', lifetime: true }),
   }));
   const speedMultiplier = ref(config.speedMultiplier ?? 1);
-  return {
+  const time: TimeSystem = {
     elapsed,
     totalPlayTime,
     speedMultiplier,
@@ -99,4 +100,5 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
       return formatTime(totalPlayTime.value);
     },
   };
+  return attachContextReset(time, contextId);
 }

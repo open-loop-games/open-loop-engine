@@ -29,6 +29,7 @@
 import { computed, ref, shallowRef, watch, type Ref } from 'vue';
 import { createEmitHandle, type Emittable } from './events';
 import { loadingSave, persistent, withPersistentContext } from './persistence';
+import { attachContextReset } from './resettable';
 
 // === TYPES ===
 /**
@@ -413,5 +414,5 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     on: bus.on,
   };
 
-  return pool;
+  return attachContextReset(pool, poolId);
 }

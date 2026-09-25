@@ -44,6 +44,7 @@ import {
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import { processGetter, type Computable } from '@/core/computed';
 
 // === TYPES ===
@@ -288,5 +289,5 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   }
   if (requirements.length > 0) unsubs.push(onHydrated(() => unlockMet()));
 
-  return automationTiers;
+  return attachContextReset(automationTiers, contextId);
 }

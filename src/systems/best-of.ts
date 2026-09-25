@@ -22,6 +22,7 @@ import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { persistent, withPersistentContext, type State } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import { attachContextReset } from '@/core/resettable';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
 
 // === TYPES ===
@@ -416,7 +417,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
   const unsubCycleLog = cycleLog?.on('finalize', handleFinalize);
 
   // --- Public API ---
-  return {
+  const bestOf: BestOf = {
     entries,
     on: handle.on,
     submit: trySubmit,
@@ -461,4 +462,5 @@ export function createBestOf(options: BestOfOptions): BestOf {
       unsubCycleLog?.();
     },
   };
+  return attachContextReset(bestOf, id);
 }

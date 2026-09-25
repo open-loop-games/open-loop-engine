@@ -32,6 +32,7 @@
 import { ref } from 'vue';
 import type { Ref } from 'vue';
 import { persistent, resolveSystemContextId, withPersistentContext } from '@/core/persistence';
+import { attachContextReset } from '@/core/resettable';
 import { resolveComputable, type Computable } from '@/core/computed';
 import { processOfflineTime, type OfflineProgressOptions } from '@/core/offline';
 import type { TickDriver } from '@/core/tick-driver';
@@ -115,7 +116,7 @@ export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
     persistent<number>(0, { name: 'banked' }),
   );
 
-  return {
+  const bank: TimeBank = {
     banked,
     deposit(seconds) {
       if (!(seconds > 0)) return 0;
@@ -135,6 +136,7 @@ export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
       return taken;
     },
   };
+  return attachContextReset(bank, bankContextId);
 }
 
 // === BANKED ACCELERATION ===
