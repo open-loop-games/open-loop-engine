@@ -345,106 +345,29 @@ function variableLeaf(chain: FormulaSource): GenericFormula {
   return node;
 }
 
-// ∫(f(x) + c) dx = F(x) + c·x. For `lhs` shapes whose antiderivative is K·x²/2
-// (variable or `mul(var, k)`), invert reduces to a quadratic and is closed-form;
-// otherwise fall back to bisection.
+// ∫(s_f·f(x) + s_c·c) dx = s_f·F(x) + s_c·c·x — `add` is (+,+), `sub` with the
+// variable on the left (+,−) and on the right (−,+). For `variableSide` shapes
+// whose antiderivative is K·x²/2 (variable or `mul(var, k)`), invert reduces to
+// a quadratic and is closed-form; otherwise fall back to bisection.
 //
 // The node's input is `x` itself, with `F` evaluated at it, rather than `F(x)`
 // with `x` recovered by inverting `F`: a flat `f` has a flat `F`, which says
 // nothing about where `x` is.
-function buildIntegrateAdd(
-  lhs: FormulaSource,
-  F_integral: GenericFormula,
-  other: FormulaSource,
-): GenericFormula {
-  const slopeSource = quadraticSlopeSource(lhs);
-  const F = F_integral;
-
-  return new Formula({
-    inputs: [variableLeaf(lhs), other],
-    evaluate: (x: DecimalSource, c_val: DecimalSource): DecimalSource =>
-      Decimal.add(F.evaluate(x), Decimal.mul(c_val, x)),
-    invert: !F.isInvertible()
-      ? undefined
-      : (target: DecimalSource, _x: FormulaSource, c_input: FormulaSource): DecimalSource => {
-          const c = unrefFormulaSource(c_input);
-          const slope = quadraticSlope(slopeSource);
-
-          if (slope != null) {
-            // K·x²/2 + c·x = T  →  K·x² + 2c·x - 2T = 0
-            // x = (-c + √(c² + 2KT)) / K  — the positive root for K > 0, and the
-            // smaller of the two for K < 0, which is the first passage either way.
-            const disc = Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
-            // A negative discriminant is a statement about the target, not the
-            // shape: no real pre-image. Fall through and let the generic path
-            // report it rather than rooting a negative and returning NaN.
-            if (Decimal.gte(disc, 0)) {
-              return Decimal.div(Decimal.sub(Decimal.sqrt(disc), c), slope);
-            }
-          }
-
-          // Generic shape (cubic and higher, or a flat slope): solve
-          // F(x) + c·x = target by bisection. F⁻¹(target) is the answer when
-          // c = 0, so it makes a tight starting bracket for the general case.
-          const x = findCrossing((v) => Decimal.add(F.evaluate(v), Decimal.mul(c, v)), target, {
-            upper: F.invert(target),
-          });
-          if (x == null) {
-            reportInversionFailure(
-              'no-solution',
-              'Could not invert integrateAdd: target is out of the search range',
-            );
-            return 0;
-          }
-          return x;
-        },
-  });
-}
-
-export function integrateAdd(stack: SubstitutionStack, lhs: FormulaSource, rhs: FormulaSource) {
-  if (hasVariable(lhs)) {
-    if (!lhs.isIntegrable()) {
-      console.error('Could not integrate due to variable not being integrable');
-      return Formula.constant(0);
-    }
-    return buildIntegrateAdd(lhs, lhs.getIntegralFormula(stack), rhs);
-  }
-  if (hasVariable(rhs)) {
-    if (!rhs.isIntegrable()) {
-      console.error('Could not integrate due to variable not being integrable');
-      return Formula.constant(0);
-    }
-    return buildIntegrateAdd(rhs, rhs.getIntegralFormula(stack), lhs);
-  }
-  console.error('Could not integrate due to no input being a variable');
-  return Formula.constant(0);
-}
-
-export const integrateInnerAdd = makeBinaryIntegrate(
-  (x, other) => Formula.add(x, other),
-  (x, other) => Formula.add(x, other),
-);
-
-export const invertSub = makeBinaryInvert(
-  (value, other) => Decimal.add(value, other),
-  (value, other) => Decimal.sub(other, value),
-);
-
-// ∫(f(x) - c) dx = F(x) - c·x; ∫(c - f(x)) dx = c·x - F(x).
-// Same closed-form-vs-bisection split as integrateAdd, with sign flips, and the
-// same input: `x` itself, with `F` evaluated at it.
-function buildIntegrateSub(
+function buildLinearIntegral(
   variableSide: FormulaSource,
-  F_integral: GenericFormula,
+  F: GenericFormula,
   other: FormulaSource,
-  variableOnLhs: boolean,
+  fSign: 1 | -1,
+  cSign: 1 | -1,
+  label: string,
 ): GenericFormula {
   const slopeSource = quadraticSlopeSource(variableSide);
-  const F = F_integral;
-  const at = (x: DecimalSource, c: DecimalSource): DecimalSource => {
-    const cx = Decimal.mul(c, x);
-    return variableOnLhs ? Decimal.sub(F.evaluate(x), cx) : Decimal.sub(cx, F.evaluate(x));
-  };
+  // Negation is exact in `Decimal`, so each orientation evaluates bit-for-bit
+  // as its own hand-written `F ± c·x` would.
+  const signed = (sign: 1 | -1, v: DecimalSource): DecimalSource =>
+    sign === 1 ? v : Decimal.neg(v);
+  const at = (x: DecimalSource, c: DecimalSource): DecimalSource =>
+    Decimal.add(signed(fSign, F.evaluate(x)), signed(cSign, Decimal.mul(c, x)));
 
   return new Formula({
     inputs: [variableLeaf(variableSide), other],
@@ -456,32 +379,35 @@ function buildIntegrateSub(
           const slope = quadraticSlope(slopeSource);
 
           if (slope != null) {
-            // variableOnLhs:  K·x²/2 - c·x = T  →  K·x² - 2c·x - 2T = 0  →  x = (c + √(c² + 2KT)) / K
-            // !variableOnLhs: c·x - K·x²/2 = T  →  K·x² - 2c·x + 2T = 0  →  x = (c - √(c² - 2KT)) / K
-            // Same discriminant gate as `integrateAdd`, and it fires in both
-            // orientations: `c² + 2KT` goes negative for K < 0, `c² - 2KT` for
-            // K > 0. The second was reachable on an ordinary positive slope and
-            // returned NaN from `√(negative)` without a word.
-            const disc = variableOnLhs
-              ? Decimal.add(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)))
-              : Decimal.sub(Decimal.pow(c, 2), Decimal.mul(2, Decimal.mul(slope, target)));
+            // With K' = s_f·K and c' = s_c·c:
+            // K'·x²/2 + c'·x = T  →  K'·x² + 2c'·x - 2T = 0
+            // x = (-c' + √(c'² + 2K'T)) / K'  — the positive root for K' > 0, and
+            // the smaller of the two for K' < 0, which is the first passage
+            // either way.
+            const k = signed(fSign, slope);
+            const cs = signed(cSign, c);
+            const disc = Decimal.add(Decimal.pow(cs, 2), Decimal.mul(2, Decimal.mul(k, target)));
+            // A negative discriminant is a statement about the target, not the
+            // shape: no real pre-image. Fall through and let the generic path
+            // report it rather than rooting a negative and returning NaN. It
+            // fires on an ordinary positive slope in the (−,+) orientation.
             if (Decimal.gte(disc, 0)) {
-              return variableOnLhs
-                ? Decimal.div(Decimal.add(c, Decimal.sqrt(disc)), slope)
-                : Decimal.div(Decimal.sub(c, Decimal.sqrt(disc)), slope);
+              return Decimal.div(Decimal.sub(Decimal.sqrt(disc), cs), k);
             }
           }
 
-          // `c·x - F(x)` rises then falls, so it is only monotone up to its turning
-          // point. `findCrossing` cannot detect the violation, and this branch keeps
-          // the pre-existing behaviour of taking the first crossing it finds.
+          // Generic shape (cubic and higher, or a flat slope): solve by
+          // bisection. F⁻¹(s_f·target) is the answer when c = 0, so it makes a
+          // tight starting bracket for the general case. `c·x - F(x)` rises then
+          // falls, so it is only monotone up to its turning point; `findCrossing`
+          // cannot detect the violation and takes the first crossing it finds.
           const x = findCrossing((v) => at(v, c), target, {
-            upper: F.invert(variableOnLhs ? target : Decimal.neg(target)),
+            upper: F.invert(signed(fSign, target)),
           });
           if (x == null) {
             reportInversionFailure(
               'no-solution',
-              'Could not invert integrateSub: target is out of the search range',
+              `Could not invert ${label}: target is out of the search range`,
             );
             return 0;
           }
@@ -490,24 +416,25 @@ function buildIntegrateSub(
   });
 }
 
-export function integrateSub(stack: SubstitutionStack, lhs: FormulaSource, rhs: FormulaSource) {
-  if (hasVariable(lhs)) {
-    if (!lhs.isIntegrable()) {
-      console.error('Could not integrate due to variable not being integrable');
-      return Formula.constant(0);
-    }
-    return buildIntegrateSub(lhs, lhs.getIntegralFormula(stack), rhs, true);
-  }
-  if (hasVariable(rhs)) {
-    if (!rhs.isIntegrable()) {
-      console.error('Could not integrate due to variable not being integrable');
-      return Formula.constant(0);
-    }
-    return buildIntegrateSub(rhs, rhs.getIntegralFormula(stack), lhs, false);
-  }
-  console.error('Could not integrate due to no input being a variable');
-  return Formula.constant(0);
-}
+export const integrateAdd = makeBinaryIntegrate(
+  (F, c, v) => buildLinearIntegral(v, F, c, 1, 1, 'integrateAdd'),
+  (F, c, v) => buildLinearIntegral(v, F, c, 1, 1, 'integrateAdd'),
+);
+
+export const integrateInnerAdd = makeBinaryIntegrate(
+  (x, other) => Formula.add(x, other),
+  (x, other) => Formula.add(x, other),
+);
+
+export const invertSub = makeBinaryInvert(
+  (value, other) => Decimal.add(value, other),
+  (value, other) => Decimal.sub(other, value),
+);
+
+export const integrateSub = makeBinaryIntegrate(
+  (F, c, v) => buildLinearIntegral(v, F, c, 1, -1, 'integrateSub'),
+  (F, c, v) => buildLinearIntegral(v, F, c, -1, 1, 'integrateSub'),
+);
 
 export const integrateInnerSub = makeBinaryIntegrate(
   (x, other) => Formula.sub(x, other),
