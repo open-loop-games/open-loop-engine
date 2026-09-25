@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
-import type { Engine } from '@/index';
+import { createEngine, type Engine } from '@/index';
+import { resetAllPersistentContexts } from '@/core/persistence';
 import { runUntil } from '@/harness';
 
 // --- helpers ---
@@ -40,6 +41,25 @@ function createTestEngine(): Engine & {
     readonly tickCount: number;
     readonly lastDt: number;
     readonly dts: readonly number[];
+  };
+}
+
+/** Real engine earning 1 gold per simulated second through `ctx.onTick`. */
+function createGoldEngine(maxDeltaTime?: number): Engine & { readonly gold: number } {
+  resetAllPersistentContexts();
+  let gold = 0;
+  const engine = createEngine({ gameId: 'gold-per-second', persistence: false, maxDeltaTime });
+  engine.use({
+    id: 'gold',
+    install(ctx) {
+      ctx.onTick((dt) => {
+        gold += dt;
+      });
+    },
+  });
+  engine.start();
+  return Object.defineProperty(engine, 'gold', { get: () => gold }) as Engine & {
+    readonly gold: number;
   };
 }
 
@@ -114,6 +134,15 @@ describe('runUntil', () => {
     // Math.floor(1 / 0.1) === 10 ticks, stepped 10 times with sim-time 1.0.
     expect(result.totalTicks).toBe(10);
     expect(result.elapsedSimulated).toBeCloseTo(1.0, 10);
+  });
+
+  it('steps the final tick when maxSimTime / tickDelta lands a hair under an integer', () => {
+    const engine = createTestEngine();
+    // 0.7 / 0.1 is 6.999999999999999 in binary floating point.
+    const result = runUntil({ engine, until: () => false, maxSimTime: 0.7, tickDelta: 0.1 });
+    expect(result.terminated).toBe('maxSimTime');
+    expect(result.totalTicks).toBe(7);
+    expect(result.elapsedSimulated).toBeCloseTo(0.7, 10);
   });
 
   it('defaults tickDelta to 0.05', () => {
@@ -198,5 +227,23 @@ describe('runUntil', () => {
       maxSimTime: 1,
     });
     expect(result.analyzerResults).toEqual([]);
+  });
+
+  it('simulates every second it reports when tickDelta exceeds maxDeltaTime', () => {
+    const engine = createGoldEngine();
+    try {
+      const result = runUntil({
+        engine,
+        until: () => engine.gold >= 100 - 1e-9,
+        maxSimTime: 1000,
+        tickDelta: 5,
+      });
+      expect(result.terminated).toBe('predicate');
+      expect(result.totalTicks).toBe(20);
+      expect(result.elapsedSimulated).toBeCloseTo(100, 9);
+      expect(engine.gold).toBeCloseTo(result.elapsedSimulated, 9);
+    } finally {
+      engine.dispose();
+    }
   });
 });

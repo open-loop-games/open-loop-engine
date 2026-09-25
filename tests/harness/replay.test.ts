@@ -12,6 +12,13 @@ describe('replayLive', () => {
     expect(fn).toHaveBeenCalledTimes(60);
   });
 
+  it('counts the final interval when seconds × tickRate lands a hair under an integer', async () => {
+    // 4.35 * 100 is 434.99999999999994 in binary floating point.
+    const driver = createTickDriver({ tickRate: 100 });
+    const ticks = await replayLive(driver, { seconds: 4.35 });
+    expect(ticks).toBe(435);
+  });
+
   it('clamps negative seconds to zero', async () => {
     const driver = createTickDriver({ tickRate: 20 });
     const fn = vi.fn();

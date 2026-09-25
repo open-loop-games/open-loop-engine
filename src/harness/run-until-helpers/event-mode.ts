@@ -10,14 +10,14 @@
  *
  * 1. {@link createIncrementalSnapshot} each iteration — finite-distance head is
  *    the next walker-visible event.
- * 2. {@link advanceToNextEvent} drives `engine.tickDriver.simulateTick(dt)` with
- *    `dt = smallest finite distance`, floored at `tickDelta` so dense
- *    auto-purchase cadence can't collapse the advance into a per-step
- *    snapshot-rebuild cliff. The engine must be built with `maxDeltaTime`
- *    raised to cover the largest expected advance — otherwise `simulateTick`
- *    clamps and the loop degrades toward fixed-tick.
+ * 2. {@link advanceToNextEvent} advances the engine by the smallest finite
+ *    distance, floored at `tickDelta` so dense auto-purchase cadence can't
+ *    collapse the advance into a per-step snapshot-rebuild cliff, and capped
+ *    at the remaining budget so no advance crosses `maxSimTime`. Every engine
+ *    advance goes through {@link simulateSpan}, so a distance beyond the
+ *    driver's `maxDeltaTime` is simulated in full, not clamped.
  * 3. Refuse handling splits by reason:
- *    - `'opaque-present'` — fall back to `simulateTick(tickDelta)`. Opaque
+ *    - `'opaque-present'` — fall back to a `tickDelta` step. Opaque
  *      transitions could flip after a tick, so we tick and re-resolve.
  *    - `'no-finite-transition'` — enter fast-tick stasis mode. Non-walker
  *      sources (clicks, `ctx.onTick` subscribers, `TimedInput`) may still
@@ -25,11 +25,9 @@
  *      walker each iteration, checking the predicate per tick; every
  *      `stasisProbeInterval` ticks, rebuild once to detect exit-from-stasis.
  *      When the fast-tick loop exhausts `maxSimTime` without exit, the run
- *      terminates with `terminated: 'unreachable'`.
- *    - zero-distance tie (`{ advanced: 0, fired: [...] }`) — enter tie
- *      fast-tick mode. Walker surfaces a finite transition at distance=0 but
- *      the probe cannot execute it (no auto-purchase or equivalent module
- *      registered). Structurally symmetric to stasis fast-tick.
+ *      terminates `'unreachable'` if the walker's tracked dependencies held
+ *      still throughout, and `'maxSimTime'` if something it can't see moved
+ *      them.
  * 4. Predicate re-checked at the top of each iteration; termination as soon
  *    as it fires. Optional sub-advance bisection via `bisectTolSec`.
  *
@@ -41,6 +39,7 @@ import type { GameStateAccessor } from '@/primitives/types';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
 import { getRNGState, setRNGState, type RNGState } from '@/primitives/rng';
 import type { UntilPredicate } from '../types';
+import { simulateSpan } from '../sim-time';
 import {
   createTransitionSnapshot,
   createIncrementalSnapshot,
@@ -58,7 +57,8 @@ export type AdvanceToNextEventResult =
 
 /**
  * Advance `engine` by the smallest finite transition distance in `snapshot`,
- * or refuse if the snapshot cannot be mechanically resolved.
+ * never past `remaining` sim-seconds, or refuse if the snapshot cannot be
+ * mechanically resolved.
  *
  * Refuse reasons:
  *
@@ -78,7 +78,8 @@ export type AdvanceToNextEventResult =
  * tick mode; `fired` still reports only the transitions tied at the raw head
  * distance; the caller's existing bisection (triggered whenever
  * `advanced > bisectTolSec`) covers the case where the floor overshoots the
- * walker-reported fire time.
+ * walker-reported fire time. The `remaining` cap applies after the floor, so
+ * an advance cut short by the budget leaves `fired` unfired.
  *
  * @internal
  */
@@ -86,6 +87,7 @@ export function advanceToNextEvent(
   engine: Engine,
   snapshot: TransitionSnapshot,
   tickDelta: number,
+  remaining: number,
 ): AdvanceToNextEventResult {
   for (const t of snapshot.all) {
     if (t.distance.reason === 'opaque-predicate') {
@@ -99,14 +101,14 @@ export function advanceToNextEvent(
   }
 
   const rawDt = head.distance.seconds;
-  const dt = Math.max(rawDt, tickDelta);
+  const dt = Math.min(Math.max(rawDt, tickDelta), remaining);
   const fired: Transition[] = [];
   for (const t of snapshot.all) {
     if (t.distance.seconds === rawDt) fired.push(t);
     else break;
   }
 
-  engine.tickDriver.simulateTick(dt);
+  simulateSpan(engine.tickDriver, dt);
   return { advanced: dt, fired };
 }
 
@@ -128,14 +130,15 @@ export interface EventModeResult {
  * loop until `predicate(engine)` fires, `maxSimTime` is reached, or the
  * walker confirms stasis cannot be mechanically broken.
  *
- * @param engine - Engine to drive. Caller seeds RNG before this call.
+ * @param engine - Engine to drive. Caller seeds RNG before this call, and
+ *   supplies a `saveManager` whenever `options.bisectTolSec` is set.
  * @param accessor - Read-side accessor matching the engine; used by the
  *   incremental snapshot.
  * @param predicate - Termination predicate. Closes over the engine; returning
  *   `true` ends the run with `terminated: 'predicate'`.
  * @param maxSimTime - Sim-seconds ceiling.
- * @param tickDelta - Fixed-tick fallback delta (used inside fast-tick stasis
- *   and tie loops, and on opaque-present refuses).
+ * @param tickDelta - Advance floor, and the fixed-tick delta of the stasis
+ *   fast-tick and of opaque-present refuses.
  * @param options - {@link EventModeOptions} — bisect tolerance and stasis
  *   probe interval.
  *
@@ -172,14 +175,14 @@ export function runEventModeLoop(
 
     const snapshot = inc.rebuild();
     const checkpoint =
-      bisectTolSec !== undefined && engine.saveManager
-        ? { blob: engine.saveManager.exportSave(), rng: getRNGState() }
+      bisectTolSec !== undefined
+        ? { blob: engine.saveManager!.exportSave(), rng: getRNGState() }
         : null;
     const advanceStart = profileStart();
-    const result = advanceToNextEvent(engine, snapshot, tickDelta);
+    const result = advanceToNextEvent(engine, snapshot, tickDelta, maxSimTime - simTime);
     profileEnd('runUntil.event.advance', advanceStart);
 
-    if ('fired' in result && result.advanced > 0) {
+    if ('fired' in result) {
       if (
         checkpoint !== null &&
         result.advanced > bisectTolSec! &&
@@ -204,37 +207,10 @@ export function runEventModeLoop(
       }
       simTime += result.advanced;
       before = commitDeps(inc, accessor, before);
-    } else if ('fired' in result) {
-      // Zero-distance tie: walker surfaces a finite transition at distance=0
-      // but the probe cannot execute it (no auto-purchase module registered).
-      // Fast-tick at `tickDelta` while the tied set stays shape-stable; exit
-      // when it changes, the predicate fires, or budget runs out.
-      const outcome = profile('runUntil.event.tieFastTick', () =>
-        fastTickDuringTie(
-          engine,
-          accessor,
-          predicate,
-          simTime,
-          steps,
-          maxSimTime,
-          tickDelta,
-          result.fired,
-          stasisProbeInterval,
-        ),
-      );
-      simTime = outcome.simTime;
-      steps += outcome.ticks;
-      inc.invalidateAll();
-      before = sampleDeps(inc, accessor);
-      if (outcome.exit === 'predicate') {
-        terminated = 'predicate';
-        break;
-      }
-      if (outcome.exit === 'maxSimTime') break;
-      // outcome.exit === 'resume' — fall through to the next iteration.
     } else if (result.reason === 'no-finite-transition') {
       // Walker sees nothing advancing. Tick at `tickDelta` without rebuilding
       // the walker until state flips, the predicate fires, or budget runs out.
+      const windowStart = sampleDeps(inc, accessor);
       const outcome = profile('runUntil.event.stasisFastTick', () =>
         fastTickDuringStasis(
           engine,
@@ -256,11 +232,10 @@ export function runEventModeLoop(
         break;
       }
       if (outcome.exit === 'maxSimTime') {
-        // Stasis confirmed for the remainder of the budget — non-walker sources
-        // never broke the wedge. Classify as unreachable rather than
-        // maxSimTime so consumers can distinguish "ran out of time" from
-        // "could not have fired."
-        terminated = 'unreachable';
+        // Budget ran out in stasis. Only a window in which nothing the walker
+        // tracks moved shows the wedge held; if a source it can't see moved
+        // state, a longer budget might still fire, so it's a plain miss.
+        terminated = depsChanged(windowStart, before) ? 'maxSimTime' : 'unreachable';
         break;
       }
       // outcome.exit === 'resume' — fall through.
@@ -271,7 +246,7 @@ export function runEventModeLoop(
       const dt = Math.min(tickDelta, remaining);
       if (dt <= 0) break;
       const opaqueStart = profileStart();
-      engine.tickDriver.simulateTick(dt);
+      simulateSpan(engine.tickDriver, dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
       before = commitDeps(inc, accessor, before);
@@ -305,25 +280,42 @@ function sampleDeps(inc: IncrementalSnapshot, accessor: GameStateAccessor): DepS
   return { resources, rates, unlocks, states };
 }
 
-function diffInto(inc: IncrementalSnapshot, before: DepSnapshot, after: DepSnapshot): void {
+function forEachChangedDep(
+  before: DepSnapshot,
+  after: DepSnapshot,
+  visit: (kind: keyof DepSnapshot, key: string) => void,
+): void {
   for (const [id, afterVal] of after.resources) {
     const beforeVal = before.resources.get(id);
-    if (beforeVal === undefined || !beforeVal.eq(afterVal)) {
-      inc.invalidateResource(id);
-    }
+    if (beforeVal === undefined || !beforeVal.eq(afterVal)) visit('resources', id);
   }
   for (const [id, afterVal] of after.rates) {
     const beforeVal = before.rates.get(id);
-    if (beforeVal === undefined || !beforeVal.eq(afterVal)) {
-      inc.invalidateRate(id);
-    }
+    if (beforeVal === undefined || !beforeVal.eq(afterVal)) visit('rates', id);
   }
   for (const [id, afterVal] of after.unlocks) {
-    if (before.unlocks.get(id) !== afterVal) inc.invalidateUnlock(id);
+    if (before.unlocks.get(id) !== afterVal) visit('unlocks', id);
   }
   for (const [path, afterVal] of after.states) {
-    if (!Object.is(before.states.get(path), afterVal)) inc.invalidateState(path);
+    if (!Object.is(before.states.get(path), afterVal)) visit('states', path);
   }
+}
+
+function diffInto(inc: IncrementalSnapshot, before: DepSnapshot, after: DepSnapshot): void {
+  forEachChangedDep(before, after, (kind, key) => {
+    if (kind === 'resources') inc.invalidateResource(key);
+    else if (kind === 'rates') inc.invalidateRate(key);
+    else if (kind === 'unlocks') inc.invalidateUnlock(key);
+    else inc.invalidateState(key);
+  });
+}
+
+function depsChanged(before: DepSnapshot, after: DepSnapshot): boolean {
+  let changed = false;
+  forEachChangedDep(before, after, () => {
+    changed = true;
+  });
+  return changed;
 }
 
 /**
@@ -365,7 +357,7 @@ function fastTickDuringStasis(
     const remaining = maxSimTime - simTime;
     const dt = Math.min(tickDelta, remaining);
     if (dt <= 0) break;
-    engine.tickDriver.simulateTick(dt);
+    simulateSpan(engine.tickDriver, dt);
     simTime += dt;
     ticks++;
 
@@ -376,87 +368,13 @@ function fastTickDuringStasis(
     }
     if (ticks % stasisProbeInterval === 0) {
       const snapshot = createTransitionSnapshot(engine, accessor);
-      if (!isNoFiniteTransition(snapshot)) {
+      if (!isStasis(snapshot)) {
         return { simTime, ticks, exit: 'resume' };
       }
     }
   }
 
   return { simTime, ticks, exit: 'maxSimTime' };
-}
-
-function fastTickDuringTie(
-  engine: Engine,
-  accessor: GameStateAccessor,
-  predicate: UntilPredicate,
-  startSimTime: number,
-  startSteps: number,
-  maxSimTime: number,
-  tickDelta: number,
-  initialFired: readonly Transition[],
-  stasisProbeInterval: number,
-): FastTickOutcome {
-  const initialKey = tieSetKey(initialFired);
-  let simTime = startSimTime;
-  let ticks = 0;
-
-  while (simTime < maxSimTime) {
-    const remaining = maxSimTime - simTime;
-    const dt = Math.min(tickDelta, remaining);
-    if (dt <= 0) break;
-    engine.tickDriver.simulateTick(dt);
-    simTime += dt;
-    ticks++;
-
-    // `startSteps + ticks` keeps ctx.tick run-absolute — consistent with the
-    // main loop's `steps`, not a per-entry local counter restarting at 1.
-    if (predicate({ tick: startSteps + ticks, simTime })) {
-      return { simTime, ticks, exit: 'predicate' };
-    }
-    if (ticks % stasisProbeInterval === 0) {
-      const snapshot = createTransitionSnapshot(engine, accessor);
-      if (snapshotHasOpaque(snapshot) || currentTieKey(snapshot) !== initialKey) {
-        return { simTime, ticks, exit: 'resume' };
-      }
-    }
-  }
-
-  return { simTime, ticks, exit: 'maxSimTime' };
-}
-
-function isNoFiniteTransition(snapshot: TransitionSnapshot): boolean {
-  for (const t of snapshot.all) {
-    if (t.distance.reason === 'opaque-predicate') return false;
-    if (t.distance.seconds !== null) return false;
-  }
-  return true;
-}
-
-function tieSetKey(transitions: readonly Transition[]): string {
-  const parts: string[] = [];
-  for (const t of transitions) {
-    parts.push(`${t.source}|${t.categoryId}|${t.entityId}|${t.kind}`);
-  }
-  parts.sort();
-  return parts.join(',');
-}
-
-function currentTieKey(snapshot: TransitionSnapshot): string {
-  const parts: string[] = [];
-  for (const t of snapshot.all) {
-    if (t.distance.seconds === 0) {
-      parts.push(`${t.source}|${t.categoryId}|${t.entityId}|${t.kind}`);
-    }
-  }
-  parts.sort();
-  return parts.join(',');
-}
-
-function snapshotHasOpaque(snapshot: TransitionSnapshot): boolean {
-  for (const t of snapshot.all) {
-    if (t.distance.reason === 'opaque-predicate') return true;
-  }
-  return false;
 }
 
 function bisectFireTime(
@@ -468,13 +386,20 @@ function bisectFireTime(
   baseSimTime: number,
   baseSteps: number,
 ): number {
+  const restore = (): void => {
+    if (!engine.saveManager!.importSave(checkpoint.blob).success) {
+      throw new Error(
+        'runUntil: bisectTolSec could not restore the pre-advance checkpoint (importSave failed)',
+      );
+    }
+    setRNGState(checkpoint.rng);
+  };
   let low = 0;
   let high = advanceDt;
   while (high - low > tolSec) {
     const mid = (low + high) / 2;
-    engine.saveManager!.importSave(checkpoint.blob);
-    setRNGState(checkpoint.rng);
-    engine.tickDriver.simulateTick(mid);
+    restore();
+    simulateSpan(engine.tickDriver, mid);
     // `mid` is relative to the checkpoint (the advance's start); the predicate
     // reads run-absolute `simTime`, so feed it `baseSimTime + mid`. Passing the
     // raw `mid` here silently defeats bisection for any simTime-reading
@@ -484,9 +409,8 @@ function bisectFireTime(
   }
   // Leave the engine at the smallest dt for which the predicate is true so
   // the run ends in the fired state rather than a bisect intermediate.
-  engine.saveManager!.importSave(checkpoint.blob);
-  setRNGState(checkpoint.rng);
-  engine.tickDriver.simulateTick(high);
+  restore();
+  simulateSpan(engine.tickDriver, high);
   return high;
 }
 

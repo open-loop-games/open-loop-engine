@@ -17,10 +17,11 @@ import type { Engine } from '@/engine';
  *   evaluated each iteration. Content-blind.
  * - `'event'` — walker-visible event-stepping. Builds an {@link createIncrementalSnapshot}
  *   per iteration, advances by the smallest finite transition distance, falls
- *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`
- *   or zero-distance ties. Predicate fire-time can be resolved within an advance
- *   via {@link RunUntilConfig.bisectTolSec}. Requires an accessor — modes other
- *   than `'tick'` introspect content through the walker.
+ *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`.
+ *   Predicate fire-time can be resolved within an advance via
+ *   {@link RunUntilConfig.bisectTolSec}. Requires an accessor — modes other
+ *   than `'tick'` introspect content through the walker — and takes no
+ *   analyzers, since advances are variable-length.
  * - `'stasis-aware-tick'` — fixed-tick loop with a per-tick stasis check via
  *   {@link createTransitionSnapshot}. When the snapshot reports no finite or
  *   opaque-predicate transition, the run terminates with `terminated: 'unreachable'`.
@@ -371,7 +372,10 @@ export interface SensitivityResult {
  * engine or setup-captured refs.
  */
 export interface UntilContext {
-  /** Number of `engine.tickDriver.simulateTick(tickDelta)` calls completed so far. */
+  /**
+   * Loop iterations completed so far — one per `tickDelta` step in the tick
+   * modes. In event mode it counts advances and fast-ticks, each of any length.
+   */
   tick: number;
   /**
    * Simulated seconds elapsed so far. Equals `tick * tickDelta` in tick mode;
@@ -407,16 +411,19 @@ export interface RunUntilConfig {
   /**
    * Seconds of sim-time per tick. Defaults to `0.05` (matches
    * {@link runHeadless}). The engine advances by exactly this amount per
-   * iteration via `simulateTick` — coarsening it is a real speedup,
-   * independent of the engine's live `tickRate`. Variable-mode engines
-   * process one tick at this dt; fixed-mode engines drain the accumulator
-   * at their internal `stepSize` until `tickDelta` is consumed.
+   * iteration, independent of its live `tickRate`. Variable-mode engines
+   * process one tick at this dt, or equal ticks under `maxDeltaTime` when it
+   * exceeds the cap — so coarsening is a real speedup only up to the cap;
+   * fixed-mode engines drain the accumulator at their internal `stepSize`
+   * until `tickDelta` is consumed. In event mode it is the minimum advance
+   * and the fast-tick step.
    */
   tickDelta?: number;
   /**
-   * Analyzer factory. Called once before the tick loop. Analyzer lifecycle
-   * (`onStart`/`onTick`/`onEnd`) mirrors {@link runHeadless}; `onTick`
-   * receives the tick index that was just stepped.
+   * Analyzer factory. Called once before the tick loop. In the tick modes
+   * the analyzer lifecycle (`onStart`/`onTick`/`onEnd`) mirrors
+   * {@link runHeadless}, and `onTick` receives the tick index that was just
+   * stepped. Event mode throws if it returns any analyzers.
    */
   setup?: () => Analyzer[];
   /** Optional RNG seed; seeds the global Alea instance before `setup`. */
@@ -438,7 +445,8 @@ export interface RunUntilConfig {
    * and RNG state before each advance; if the predicate flips during a
    * single advance, binary-searches `dt` in `[0, advanced]` until
    * `|high - low| <= bisectTolSec`. Requires the engine to have a
-   * `saveManager` (i.e., `persistence !== false`). Without this option,
+   * `saveManager` (i.e., `persistence !== false`); throws at entry otherwise,
+   * and mid-run if a checkpoint fails to restore. Without this option,
    * predicate-fire `simTime` is bounded by the advance distance, which for
    * event-mode runs can be hundreds of seconds. Ignored in other modes.
    */
@@ -458,7 +466,10 @@ export interface RunUntilConfig {
  * predicate satisfaction from hitting the sim-time ceiling.
  */
 export interface RunUntilResult {
-  /** Number of ticks actually stepped (0 when the predicate was true at tick 0). */
+  /**
+   * Number of ticks actually stepped (0 when the predicate was true at tick 0).
+   * In event mode, the count of advances and fast-ticks, which vary in length.
+   */
   totalTicks: number;
   /**
    * The run's sim-time at termination. Equals `totalTicks * tickDelta` in tick
@@ -476,6 +487,9 @@ export interface RunUntilResult {
    *   stasis (no walker-visible transition can mechanically push state
    *   forward) before the predicate fired or the ceiling was reached.
    *   Conservative: opaque-predicate transitions block this classification.
+   *   Event mode reports it when the budget runs out in stasis with every
+   *   dependency the walker tracks unchanged across that stretch; if a source
+   *   the walker can't see moved one, the run is a plain `'maxSimTime'`.
    */
   terminated: 'predicate' | 'maxSimTime' | 'unreachable';
   /** One result object per analyzer, in setup order. */
@@ -507,7 +521,8 @@ export interface UntilCell {
   /**
    * Analyzer factory. Closes over the freshly-built engine so analyzers
    * can read engine state without reaching for module-level refs.
-   * Omit for metric-free cells.
+   * Omit for metric-free cells. Event mode throws if it returns any
+   * analyzers — see {@link RunUntilConfig.setup}.
    */
   analyzers?: (engine: Engine, ctx: RunContext) => Analyzer[];
   /** Optional per-cell tick delta override. Defaults to `0.05`. */

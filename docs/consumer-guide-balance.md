@@ -237,6 +237,8 @@ A two-hour arc at the engine's default tick runs on the order of a hundred thous
 
 Default to `1` for arc probes. Drop lower only when sub-second timing is part of the spec: explicit click cadence, real-time combat resolution, anything resolving faster than a second.
 
+The engine's `maxDeltaTime` (default `1`) bounds the speedup, not the timing. A step larger than the cap reaches the engine as several equal calls under it — every reported second is simulated, but past the cap coarsening stops buying speed. Raise `maxDeltaTime` on the probe engine to coarsen further.
+
 ### `stasis-aware-tick`
 
 `runUntil({ mode: 'stasis-aware-tick' })` short-circuits ticking when the game has stopped progressing, turning a probe that would burn to `maxSimTime` into one that terminates early and honestly.

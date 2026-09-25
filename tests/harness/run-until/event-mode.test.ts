@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   CategoriesKey,
   createEngine,
@@ -14,7 +14,7 @@ import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { runProbe, runUntil } from '@/harness';
+import { runMatrixUntil, runProbe, runUntil } from '@/harness';
 import type { BeatProbe } from '@/harness';
 
 beforeEach(() => {
@@ -217,12 +217,11 @@ describe("runProbe({mode: 'event'})", () => {
     expect(results[0]!.terminationTime).toBeUndefined();
   });
 
-  it('fast-ticks through zero-distance-tie refuses without rebuilding walker', () => {
+  it('steps a persistent zero-distance head at tickDelta through budget', () => {
     // Purchasable is already affordable (gold >= cost), so the walker
     // surfaces the `becomes-affordable` transition at distance=0. The probe
-    // does not execute it (no auto-purchase). Without the tie fast-tick this looped at
-    // full walker cost per iteration; the tie fast-tick carries the run
-    // through budget at tickDelta without rebuilding each iteration.
+    // does not execute it (no auto-purchase); the tickDelta floor carries the
+    // run to the ceiling one tickDelta per advance.
     const accessor = mockAccessor({ resources: { gold: 100 }, rates: { gold: 0 } });
     const beat: BeatProbe = { id: 'never-fires', predicate: () => false };
 
@@ -240,11 +239,10 @@ describe("runProbe({mode: 'event'})", () => {
     expect(results[0]!.terminationTime).toBeUndefined();
   });
 
-  it('tie fast-tick still fires the predicate when a non-walker rate source advances state', () => {
-    // Regression guard: an already-affordable purchase stays tied across
-    // rebuilds, but a non-walker `ctx.onTick` subscriber mutates state that
-    // flips the predicate. Must not false-negate — the fast-tick is allowed
-    // to short-circuit walker rebuilds, never predicate checks.
+  it('a persistent zero-distance head still fires the predicate when a non-walker rate source advances state', () => {
+    // Regression guard: an already-affordable purchase stays at distance 0
+    // across rebuilds, but a non-walker `ctx.onTick` subscriber mutates state
+    // that flips the predicate. Must not false-negate.
     resetAllPersistentContexts();
     let tickCount = 0;
     const fireAt = 3;
@@ -486,5 +484,218 @@ describe("runProbe({mode: 'event'})", () => {
 
     expect(results[0]!.counts).toEqual({ predicate: 0, maxSimTime: 1, unreachable: 0 });
     expect(results[0]!.terminationTime).toBeUndefined();
+  });
+});
+
+/**
+ * Real engine earning 1 gold per simulated second through `ctx.onTick`, with a
+ * cost-100 purchasable so the walker has a head. The accessor reads the live
+ * gold amount and reports `rate` — 1 matches the real income, 0 hides it.
+ */
+function buildGoldEngine(
+  options: { maxDeltaTime?: number; persistence?: boolean; rate?: number } = {},
+): { engine: Engine; accessor: GameStateAccessor; gold: () => number } {
+  resetAllPersistentContexts();
+  let goldRef: ReturnType<typeof createResource<number>> | null = null;
+  const module: EngineModule = {
+    id: 'gold-income',
+    install(ctx) {
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+      goldRef = gold;
+      const upgrades = createPurchasableCategory<UpgradeDef>({
+        id: 'upgrades',
+        mapPurchasable: (def) => ({
+          display: { description: def.id },
+          requirements: [createCostRequirement({ resource: gold, cost: def.cost })],
+          limit: 1,
+        }),
+      });
+      upgrades.register([{ id: 'big', cost: 100 }]);
+      ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
+      ctx.onTick((dt) => {
+        addResource(gold, dt);
+      });
+    },
+  };
+  const engine = createEngine({
+    gameId: 'gold-income',
+    maxDeltaTime: options.maxDeltaTime,
+    ...(options.persistence === false
+      ? { persistence: false }
+      : { storageAdapter: createMemoryStorage() }),
+  });
+  engine.use(module);
+  engine.start();
+  const gold = () => bn(goldRef!.value).toNumber();
+  const accessor: GameStateAccessor = {
+    getResource: () => bn(goldRef!.value),
+    isUnlocked: () => false,
+    getState: () => undefined,
+    getRate: () => bn(options.rate ?? 1),
+  };
+  return { engine, accessor, gold };
+}
+
+describe("runUntil({mode: 'event'}) time accounting", () => {
+  it('simulates every second it reports on an engine with the default maxDeltaTime', () => {
+    const { engine, accessor, gold } = buildGoldEngine();
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: () => gold() >= 100 - 1e-9,
+      maxSimTime: 10_000,
+      tickDelta: 0.5,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('predicate');
+    expect(result.elapsedSimulated).toBeCloseTo(100, 6);
+    expect(gold()).toBeCloseTo(result.elapsedSimulated, 6);
+  });
+
+  it('ends as maxSimTime when the next event lies past the ceiling', () => {
+    const { engine, accessor, gold } = buildGoldEngine({ maxDeltaTime: 1e6 });
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: () => gold() >= 100 - 1e-9,
+      maxSimTime: 50,
+      tickDelta: 1,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('maxSimTime');
+    expect(result.elapsedSimulated).toBeCloseTo(50, 6);
+    expect(gold()).toBeCloseTo(50, 6);
+  });
+
+  it('never bisects to a fire time past the ceiling', () => {
+    const { engine, accessor, gold } = buildGoldEngine({ maxDeltaTime: 1e6 });
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: () => gold() >= 100 - 1e-9,
+      maxSimTime: 50,
+      tickDelta: 1,
+      bisectTolSec: 1,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('maxSimTime');
+    expect(gold()).toBeCloseTo(50, 6);
+  });
+
+  it('reports maxSimTime, not unreachable, when income the walker cannot see moves its tracked state', () => {
+    // The accessor reports rate 0, so every snapshot is no-finite-transition
+    // stasis — but the onTick income keeps raising the gold the walker tracks.
+    const { engine, accessor, gold } = buildGoldEngine({ rate: 0 });
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: () => gold() >= 100 - 1e-9,
+      maxSimTime: 50,
+      tickDelta: 1,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('maxSimTime');
+    expect(result.elapsedSimulated).toBeCloseTo(50, 6);
+  });
+});
+
+describe("runUntil({mode: 'event'}) guards", () => {
+  const trackerAnalyzer = () => ({
+    name: 'tracker',
+    summarize: () => ({ name: 'tracker', metrics: {} }),
+  });
+
+  it('throws when setup returns analyzers', () => {
+    const { engine, accessor } = buildGoldEngine();
+    expect(() =>
+      runUntil({
+        engine,
+        accessor,
+        mode: 'event',
+        until: () => false,
+        maxSimTime: 10,
+        setup: () => [trackerAnalyzer()],
+      }),
+    ).toThrow(/analyzers/);
+    engine.stop();
+  });
+
+  it('runs when setup returns no analyzers', () => {
+    const { engine, accessor } = buildGoldEngine();
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: () => false,
+      maxSimTime: 10,
+      setup: () => [],
+    });
+    engine.stop();
+    expect(result.analyzerResults).toEqual([]);
+  });
+
+  it('throws from runMatrixUntil when an event-mode cell carries analyzers', () => {
+    let built: Engine | undefined;
+    expect(() =>
+      runMatrixUntil({
+        mode: 'event',
+        cells: [
+          {
+            name: 'with-analyzers',
+            buildEngine: () => {
+              const { engine } = buildGoldEngine();
+              built = engine;
+              return engine;
+            },
+            buildAccessor: () => mockAccessor(),
+            analyzers: () => [trackerAnalyzer()],
+          },
+        ],
+        seeds: [1],
+        until: () => false,
+        maxSimTime: 10,
+      }),
+    ).toThrow(/analyzers/);
+    built?.stop();
+  });
+
+  it('throws when bisectTolSec is set on an engine without a saveManager', () => {
+    const { engine, accessor } = buildGoldEngine({ persistence: false });
+    expect(() =>
+      runUntil({
+        engine,
+        accessor,
+        mode: 'event',
+        until: () => false,
+        maxSimTime: 10,
+        bisectTolSec: 0.5,
+      }),
+    ).toThrow(/saveManager/);
+    engine.stop();
+  });
+
+  it('throws when a bisect restore fails to import', () => {
+    const { engine, accessor, gold } = buildGoldEngine({ maxDeltaTime: 1e6 });
+    vi.spyOn(engine.saveManager!, 'importSave').mockReturnValue({ success: false });
+    expect(() =>
+      runUntil({
+        engine,
+        accessor,
+        mode: 'event',
+        until: () => gold() >= 10,
+        maxSimTime: 200,
+        tickDelta: 1,
+        bisectTolSec: 0.5,
+      }),
+    ).toThrow(/import/);
+    engine.stop();
   });
 });

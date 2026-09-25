@@ -25,6 +25,7 @@
  */
 
 import type { TickDriver } from '@/core/tick-driver';
+import { floorSteps } from './sim-time';
 
 /** Options for {@link replayLive}. */
 export interface ReplayLiveOptions {
@@ -58,7 +59,7 @@ export async function replayLive(driver: TickDriver, options: ReplayLiveOptions)
   const speed = options.speed ?? 1;
   const tickRate = driver.tickRate;
   const tickInterval = 1 / tickRate;
-  const intervalTicks = Math.max(0, Math.floor(options.seconds * tickRate));
+  const intervalTicks = Math.max(0, floorSteps(options.seconds, tickInterval));
 
   const prevSpeed = driver.speedMultiplier;
   driver.speedMultiplier = speed;

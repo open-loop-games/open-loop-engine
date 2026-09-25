@@ -11,11 +11,14 @@
  *
  * tickDelta is caller-authoritative: each iteration advances the engine by
  * exactly `tickDelta` seconds via `simulateTick`, which respects fixed-mode
- * accumulator semantics for source-faithful ports. This decouples the
- * harness from the engine's live `tickRate` — coarsening tickDelta at the
- * harness level is a real speedup, not a reporting phantom. (`stepOnce()`
- * exists for deterministic-replay paths that want the engine's own stepSize
- * regardless of caller dt; `runUntil` deliberately does not call it.)
+ * accumulator semantics for source-faithful ports. A `tickDelta` above the
+ * driver's `maxDeltaTime` is split into equal calls under the cap rather
+ * than clamped, so reported sim-time is always simulated sim-time. This
+ * decouples the harness from the engine's live `tickRate` — coarsening
+ * tickDelta at the harness level is a real speedup, not a reporting phantom,
+ * up to the cap. (`stepOnce()` exists for deterministic-replay paths that
+ * want the engine's own stepSize regardless of caller dt; `runUntil`
+ * deliberately does not call it.)
  *
  * The predicate receives an {@link UntilContext} snapshot (`tick`,
  * `simTime`) and reads game state via closure over the caller's engine.
@@ -27,8 +30,8 @@
  *
  * - `'tick'` (default) — fixed-tick loop above. Content-blind.
  * - `'event'` — walker-visible event-stepping with fast-tick fallbacks.
- *   Requires `config.accessor`. Predicate fire-time can be resolved within
- *   an advance via `config.bisectTolSec`.
+ *   Requires `config.accessor`, and takes no analyzers. Predicate fire-time
+ *   can be resolved within an advance via `config.bisectTolSec`.
  * - `'stasis-aware-tick'` — fixed-tick loop with a per-tick stasis check.
  *   When the walker reports no finite or opaque-predicate transition,
  *   terminates with `terminated: 'unreachable'`. Requires `config.accessor`.
@@ -41,6 +44,7 @@
 import { seedRNG } from '@/primitives/rng';
 import { createTransitionSnapshot } from './walker';
 import { runEventModeLoop, isStasis } from './run-until-helpers/event-mode';
+import { floorSteps, simulateSpan } from './sim-time';
 import type { RunUntilConfig, RunUntilResult } from './types';
 
 /**
@@ -74,29 +78,34 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   if (mode !== 'tick' && !config.accessor) {
     throw new Error(`runUntil: mode "${mode}" requires config.accessor`);
   }
+  if (mode === 'event' && config.bisectTolSec !== undefined && !engine.saveManager) {
+    throw new Error(
+      'runUntil: bisectTolSec restores save checkpoints and requires an engine with a saveManager (persistence enabled)',
+    );
+  }
   if (config.seed !== undefined) seedRNG(config.seed);
   const analyzers = config.setup?.() ?? [];
-  for (const a of analyzers) a.onStart?.();
+  if (mode === 'event' && analyzers.length > 0) {
+    throw new Error(
+      'runUntil: mode "event" steps variable distances and cannot drive the analyzer tick lifecycle — use mode "tick" for analyzers',
+    );
+  }
 
   if (mode === 'event') {
-    // Event mode bypasses analyzers — the inner loop does not invoke onTick
-    // per fixed-tick step (advances are variable-distance), and the existing
-    // event-driven tests don't exercise analyzers. Preserve the
-    // construct-and-finalize contract so consumers don't see a leak.
     const out = runEventModeLoop(engine, config.accessor!, until, maxSimTime, tickDelta, {
       bisectTolSec: config.bisectTolSec,
       stasisProbeInterval: config.stasisProbeInterval,
     });
-    for (const a of analyzers) a.onEnd?.();
     return {
       totalTicks: out.totalTicks,
       elapsedSimulated: out.elapsedSimulated,
       terminated: out.terminated,
-      analyzerResults: analyzers.map((a) => a.summarize()),
+      analyzerResults: [],
     };
   }
 
-  const maxTicks = Math.floor(maxSimTime / tickDelta);
+  for (const a of analyzers) a.onStart?.();
+  const maxTicks = floorSteps(maxSimTime, tickDelta);
   let tick = 0;
   let terminated: 'predicate' | 'maxSimTime' | 'unreachable' = 'maxSimTime';
   const accessor = config.accessor;
@@ -114,7 +123,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
       }
     }
     if (tick === maxTicks) break;
-    engine.tickDriver.simulateTick(tickDelta);
+    simulateSpan(engine.tickDriver, tickDelta);
     tick++;
     for (const a of analyzers) a.onTick?.(tick - 1);
   }
