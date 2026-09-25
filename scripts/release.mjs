@@ -29,7 +29,7 @@ let lastTag;
 try {
   lastTag = run('git', ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*']);
 } catch {
-  fail('no v* tag yet — the first cut is a hand tag (AGENTS.md § Commits).');
+  fail('no v* tag to measure the next version from.');
 }
 
 const next = run('git-cliff', ['--bumped-version']);
