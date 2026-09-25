@@ -9,11 +9,7 @@
  * of it and never a resource or ref it only names.
  */
 
-import {
-  getModulePersistentRefs,
-  getPersistenceNamespace,
-  withPersistenceNamespace,
-} from './persistence';
+import { bindPersistenceNamespace, getModulePersistentRefs } from './persistence';
 
 /**
  * Symbol key for the Resettable protocol. Objects that implement this
@@ -45,11 +41,7 @@ export function attachContextReset<T extends object>(
   target: T,
   contextId: string,
 ): T & ResettableObject {
-  // A reset runs after install has closed the ambient namespace, so resolve
-  // the context in the engine that built it.
-  const namespace = getPersistenceNamespace();
   return Object.assign(target, {
-    [Resettable]: () =>
-      withPersistenceNamespace(namespace, () => getModulePersistentRefs(contextId)),
+    [Resettable]: bindPersistenceNamespace(() => getModulePersistentRefs(contextId)),
   });
 }

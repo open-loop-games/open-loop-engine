@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEngine, persistent, type Engine, type EngineModule } from '@/index';
-import { getAllPersistentRefs, getPersistenceNamespace } from '@/core/persistence';
+import { bindPersistenceNamespace, getPersistentRefs } from '@/core/persistence';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import { createSensitivityCell, runMatrix, runSensitivity, type RunContext } from '@/harness';
 
@@ -250,7 +250,8 @@ describe('createSensitivityCell', () => {
 
   it("disposes each run's engine when the next run sets up", () => {
     const blob = makeLiveSave(5);
-    const namespaces: string[] = [];
+    // Each counts the refs its run's engine still holds under `economy`.
+    const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
       name: 'disposal',
       saveBlob: blob,
@@ -258,7 +259,7 @@ describe('createSensitivityCell', () => {
         {
           id: 'economy',
           install() {
-            namespaces.push(getPersistenceNamespace()!);
+            heldRefs.push(bindPersistenceNamespace(() => getPersistentRefs('economy')?.size ?? 0));
             persistent(0, { name: 'gold' });
           },
         },
@@ -268,16 +269,16 @@ describe('createSensitivityCell', () => {
     });
     for (const seed of [1, 2, 3]) cell.setup({ seed });
 
-    expect(namespaces).toHaveLength(3);
-    expect(getAllPersistentRefs(namespaces[0]).size).toBe(0);
-    expect(getAllPersistentRefs(namespaces[1]).size).toBe(0);
+    expect(heldRefs).toHaveLength(3);
+    expect(heldRefs[0]()).toBe(0);
+    expect(heldRefs[1]()).toBe(0);
     // The last run's engine stays live until the cell sets up again.
-    expect(getAllPersistentRefs(namespaces[2]).size).toBeGreaterThan(0);
+    expect(heldRefs[2]()).toBeGreaterThan(0);
   });
 
   it('a matrix run leaves no engine live behind it', () => {
     const blob = makeLiveSave(5);
-    const namespaces: string[] = [];
+    const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
       name: 'teardown',
       saveBlob: blob,
@@ -285,7 +286,7 @@ describe('createSensitivityCell', () => {
         {
           id: 'economy',
           install() {
-            namespaces.push(getPersistenceNamespace()!);
+            heldRefs.push(bindPersistenceNamespace(() => getPersistentRefs('economy')?.size ?? 0));
             persistent(0, { name: 'gold' });
           },
         },
@@ -295,7 +296,7 @@ describe('createSensitivityCell', () => {
     });
     runMatrix({ cells: [cell], seeds: [1, 2] });
 
-    expect(namespaces).toHaveLength(2);
-    for (const ns of namespaces) expect(getAllPersistentRefs(ns).size).toBe(0);
+    expect(heldRefs).toHaveLength(2);
+    for (const held of heldRefs) expect(held()).toBe(0);
   });
 });

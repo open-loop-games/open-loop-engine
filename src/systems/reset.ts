@@ -30,8 +30,7 @@ import {
   loadingSave,
   getModulePersistentRefs,
   getPersistentRefs,
-  getPersistenceNamespace,
-  withPersistenceNamespace,
+  bindPersistenceNamespace,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
@@ -270,9 +269,6 @@ export function createReset(options: ResetOptions): Reset {
   const hasRetention = (keep && keep.length > 0) || (retain && retain.size > 0);
   const retention = hasRetention ? createRetentionPolicy({ keep, retain }) : undefined;
 
-  // Module ids resolve at reset time, long after install closed the ambient
-  // namespace, so capture it here to resolve in the engine that built this.
-  const namespace = getPersistenceNamespace();
   const warnedModules = new Set<string>();
   function warnUnknownModule(moduleId: string): void {
     if (warnedModules.has(moduleId)) return;
@@ -282,10 +278,10 @@ export function createReset(options: ResetOptions): Reset {
         `context — nothing under that id is reset. Check the id.`,
     );
   }
-  function resolveModules(onUnknown?: (moduleId: string) => void): Set<Persistent> {
-    if (!resetModules) return new Set();
-    return withPersistenceNamespace(namespace, () => resolveScope(resetModules, onUnknown));
-  }
+  const resolveModules = bindPersistenceNamespace(
+    (onUnknown?: (moduleId: string) => void): Set<Persistent> =>
+      resetModules ? resolveScope(resetModules, onUnknown) : new Set(),
+  );
 
   // Refs to skip during module-scoped reset (kept or retained refs)
   const retainedRefs = new Set<Persistent>([...(keep ?? []), ...(retain ? retain.keys() : [])]);

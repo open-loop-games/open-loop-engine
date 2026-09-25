@@ -404,14 +404,17 @@ export function withPersistenceNamespace<T>(namespace: string | undefined, fn: (
 }
 
 /**
- * The persistence namespace active right now, for code that must later
- * re-enter it with {@link withPersistenceNamespace} (a reset resolving its
- * module scope after install has closed).
+ * Bind `fn` to the persistence namespace active now, so a call made after
+ * install has closed it (a reset resolving its scope) still resolves context
+ * ids in the engine that built the caller.
  *
  * @internal
  */
-export function getPersistenceNamespace(): string | undefined {
-  return activeNamespace;
+export function bindPersistenceNamespace<A extends unknown[], R>(
+  fn: (...args: A) => R,
+): (...args: A) => R {
+  const namespace = activeNamespace;
+  return (...args) => withPersistenceNamespace(namespace, () => fn(...args));
 }
 
 /**
