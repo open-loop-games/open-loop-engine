@@ -343,10 +343,10 @@ export interface SensitivityVariantResult {
   name: string;
   cell: CellResult;
   /**
-   * Per-metric deltas vs the baseline cell, keyed by the same
-   * `${analyzerName}.${metricKey}` namespace as {@link CellAggregate.metrics}.
-   * A predicate-bounded sweep adds `'termination.time'`, the delta of the
-   * mean predicate fire time, when both cells have one.
+   * Per-metric deltas vs the baseline cell, from {@link diffAggregates}:
+   * keyed by the same `${analyzerName}.${metricKey}` namespace as
+   * {@link CellAggregate.metrics}, plus `'termination.time'` in a
+   * predicate-bounded sweep.
    */
   deltas: Record<string, MetricDelta>;
 }

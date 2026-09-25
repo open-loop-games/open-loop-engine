@@ -196,14 +196,7 @@ function runUntilPath<C extends Cell | UntilCell>(
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
     const cell = matrix.cells[i + 1];
-    const deltas = diffAggregates(cell.aggregate, baselineResult.aggregate);
-    const time = cell.aggregate.terminationTime?.avg;
-    const baseTime = baselineResult.aggregate.terminationTime?.avg;
-    if (time !== undefined && baseTime !== undefined) {
-      const absolute = time - baseTime;
-      deltas['termination.time'] = { absolute, relative: baseTime === 0 ? 0 : absolute / baseTime };
-    }
-    return { name: v.name, cell, deltas };
+    return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
   });
   return { baseline: baselineResult, variants: variantResults };
 }

@@ -216,12 +216,20 @@ export function aggregateUntilCell(
   return base;
 }
 
+/** `cell.avg − baseline.avg`, and that over `baseline.avg` (`0` for a zero baseline). */
+function metricDelta(cell: MetricStats, baseline: MetricStats): MetricDelta {
+  const absolute = cell.avg - baseline.avg;
+  return { absolute, relative: baseline.avg === 0 ? 0 : absolute / baseline.avg };
+}
+
 /**
  * Per-metric delta between a variant cell aggregate and the baseline.
  * Compares on `avg`; `relative` is `absolute / baseline.avg`, or `0` when
  * the baseline average is zero (avoids `±Infinity` without hiding the
  * sign of `absolute`). Metrics present on only one side are skipped —
  * callers that need the union shape can walk both aggregates directly.
+ * Two until-aggregates that both carry a `terminationTime` add
+ * `'termination.time'`, the delta of the mean predicate fire time.
  *
  * Used both internally by {@link runSensitivity} and directly by consumers
  * composing custom sensitivity-shape sweeps over `runMatrix` or
@@ -246,10 +254,10 @@ export function diffAggregates(
   const out: Record<string, MetricDelta> = {};
   for (const [key, cellStats] of Object.entries(cell.metrics)) {
     const baseStats = baseline.metrics[key];
-    if (!baseStats) continue;
-    const absolute = cellStats.avg - baseStats.avg;
-    const relative = baseStats.avg === 0 ? 0 : absolute / baseStats.avg;
-    out[key] = { absolute, relative };
+    if (baseStats) out[key] = metricDelta(cellStats, baseStats);
+  }
+  if (cell.terminationTime && baseline.terminationTime) {
+    out['termination.time'] = metricDelta(cell.terminationTime, baseline.terminationTime);
   }
   return out;
 }

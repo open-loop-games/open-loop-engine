@@ -199,6 +199,14 @@ describe('diffAggregates', () => {
     const variant = aggregateCell([runWithMetric('a', { y: 5 })]);
     expect(diffAggregates(variant, baseline)).toEqual({});
   });
+  it('adds the mean fire-time delta as termination.time when both sides carry one', () => {
+    const baseline = { metrics: {}, terminationTime: computeMetricStats([8, 12]) };
+    const variant = { metrics: {}, terminationTime: computeMetricStats([15]) };
+    expect(diffAggregates(variant, baseline)).toEqual({
+      'termination.time': { absolute: 5, relative: 0.5 },
+    });
+    expect(diffAggregates({ metrics: {} }, baseline)).toEqual({});
+  });
 });
 
 // --- runMatrix ---
