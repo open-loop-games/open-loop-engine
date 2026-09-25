@@ -64,7 +64,7 @@ When the closed form is worth executing — it predicts a run length, sizes a pa
 
 The probe constructs the real engine with the real modules and plays the game headless. Real automation policies, never a re-implementation — the moment a probe re-implements a mechanic to measure it, it measures the re-implementation.
 
-A game that ships player-facing automation writes each policy as a pure function over game state gated by `AutomationTiers`, and the probe force-unlocks the tier — bank a save, toggle the tier state, run — rather than modelling what the policy does. The sim then exercises the code the player runs, and the two cannot drift; the policy's parameters double as the sweep axis and, later, as the player-facing tuning surface. A thin runner works only the manual openers a player would work.
+A game that ships player-facing automation writes each policy as a pure function over game state gated by `AutomationTiers`, and the probe force-unlocks the tier — bank a save, toggle the tier state, run — rather than modelling what the policy does. Forcing a tier *off* takes one more step: a load re-unlocks any tier whose requirement holds, so write `tiers.unlocked` after the load returns. The requirement fires again only on a change or at the next load or reset, so the forced state holds for the run. The sim then exercises the code the player runs, and the two cannot drift; the policy's parameters double as the sweep axis and, later, as the player-facing tuning surface. A thin runner works only the manual openers a player would work.
 
 The exception is deliberate: behavior that exists *only* to perturb the game — full-auto session drivers, optimal-play enumeration — is harness tooling, not a mechanic, and stays probe-side. The test is whether the behavior is also a real mechanic. If it is, it's game code; if it only ever runs under a probe, it isn't.
 
@@ -194,11 +194,11 @@ The unifying rule: **your prediction never re-implements game mechanics.** The m
 
 There are two query modes against the same instance:
 
-**Frozen-state queries.** Build the engine, mutate persistent refs into a hypothetical state, and *don't tick*. Read `Producer.getTotalRate(resource)` for aggregate per-resource rate, `Purchasable.amount` / `.active` for purchase state, `Purchasable.calculateMaxAffordable()` and `Producer.calculateMaxAffordable()` for cost inversion, `Formula.calculateCost` / `Formula.calculateMaxAffordable` at the core formula layer, and `ModifierChain` bindings with per-link contributions for attribution. The engine answers "what would cost and rate be at this state" without running gameplay — which is how a walker steps a schedule without simulating it.
+**Frozen-state queries.** Build the engine, mutate persistent refs into a hypothetical state, and *don't tick*. Read `ProducerCategory.getTotalRate(resource)` for aggregate per-resource rate, `Purchasable.amount` / `.active` for purchase state, `Purchasable.amountToPurchase` and `getCost(n)` for what a buy would take and cost (a producer's purchasable is `producer.repeatable`), the free functions `calculateCost` / `calculateMaxAffordable` over a cost `Formula` at the core layer, and `ModifierChain` bindings with per-link contributions for attribution. The engine answers "what would cost and rate be at this state" without running gameplay — which is how a walker steps a schedule without simulating it.
 
 **Ticking runs.** Install the game's automation, then `runUntil` a beat predicate fires. The engine plays; the script times the beats.
 
-These are probe-lane tools, not spine tools — both construct an engine. The spine stays pure; the probe is where the engine answers.
+These are probe-lane tools, not spine tools — both construct an engine.
 
 **Ceremony that is load-bearing.** `pushScope` + `importSave` + a `scopeDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination — the engine-level instance of restore parity (§ When an agent is the instrument), which is the same failure wherever a state is stood up rather than played into.
 
@@ -211,7 +211,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 | `runUntil` | Predicate-bounded single-engine run. The workhorse. Dispatches on `RunMode` (`'tick'`, `'event'`, `'stasis-aware-tick'`). |
 | `runProbe` | Per-beat termination-time distributions from a seed sweep. |
 | `runWaypointProbe` | Snapshot-at-time across an arc per seed × waypoint; band occupation reads off the snapshot series. |
-| `runHeadless` | Fixed-tick-count deterministic run. |
+| `runHeadless` | Fixed-tick-count run. Replayable only when you pass `seed`: the module-global RNG is entropy-seeded otherwise. |
 | `runMatrix` / `runMatrixUntil` | Cartesian runs over a parameter grid, when you want many configurations at once. |
 | `runSensitivity` | One parameter swept across a range with per-variant deltas against baseline. Generic over `Cell` and `UntilCell` via `config.until`. |
 | `bisectTuner` | 1-D bisection against a predicate, when a spec gives you a shape and you want the scalar. |
@@ -268,7 +268,7 @@ Two rules follow, both load-bearing:
 
 The spine stays plain arithmetic. But when a spine-derived constant is wired into a live purchasable's cost or a skill's XP curve, **express the curve as a `Formula` rather than a hand-rolled closure** — `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costScaling` shorthands that are Formula-backed underneath.
 
-This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is invertibility, and with it the engine's bulk-purchase math: `calculateMaxAffordable` needs an invertible `Formula`, so a non-Formula cost silently restricts you to single purchases and loses the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
+This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is invertibility, and with it the engine's bulk-purchase math: `calculateMaxAffordable` needs an invertible `Formula`. At the default `maxBulkAmount` a non-Formula cost is single-purchase only; raise it and bulk is priced linearly off the current rung, which undercharges any ladder (`CostRequirementOptions.cost`). Either way you lose the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
 
 The rule of thumb: if a number only ever feeds a prediction, plain arithmetic. If it becomes a cost the player pays repeatedly, `Formula`.
 
