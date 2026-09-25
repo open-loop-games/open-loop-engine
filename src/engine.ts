@@ -321,7 +321,10 @@ export interface Engine {
   dispose(): void;
   /** Save game state, firing all onSave callbacks first. */
   save(): void;
-  /** Load game state, firing all onLoad callbacks after. */
+  /**
+   * Load the active slot, firing all onLoad callbacks after.
+   * @throws Before `start()` (no module has created its refs yet) or after `dispose()`.
+   */
   load(): SaveLoadResult;
   readonly tickDriver: TickDriver;
   readonly saveManager: SaveManager | undefined;
@@ -509,6 +512,10 @@ export function createEngine(config: EngineConfig): Engine {
       performSave();
     },
     load() {
+      // Before start() no persistent ref exists to hydrate, so the load would
+      // report success, change nothing, and let the next save overwrite it.
+      if (disposed) throw new Error('Cannot load into a disposed engine');
+      if (!installed) throw new Error('Call start() before load(): modules must install first');
       return performLoad();
     },
     use(module) {

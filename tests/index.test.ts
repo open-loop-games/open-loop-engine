@@ -1272,4 +1272,17 @@ describe('save safety', () => {
     expect(storage.getItem('safe-slot-0')).toBe(newer);
     engine.dispose();
   });
+
+  it('load() before start() throws instead of reporting a load that hydrated nothing', () => {
+    const engine = createEngine({ gameId: 'early', storageAdapter: mapStorage() });
+    engine.use({ id: 'early-mod', install: () => void persistent(0, { name: 'gold' }) });
+    expect(() => engine.load()).toThrow(/start\(\)/);
+  });
+
+  it('load() after dispose() throws', () => {
+    const engine = createEngine({ gameId: 'late', storageAdapter: mapStorage() });
+    engine.start();
+    engine.dispose();
+    expect(() => engine.load()).toThrow(/disposed/);
+  });
 });
