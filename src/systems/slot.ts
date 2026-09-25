@@ -13,6 +13,7 @@
  * - `onSelect`/`onDeselect` hooks for wiring modifiers, VFX, or side effects
  * - Insertion-order preservation (matters for queue-ordered systems)
  * - Snapshot/restore for loadout saving
+ * - Loads and resets revalidate the selection and bring the hooks in line
  *
  * The slot manages **selection state only**. It does not know what the selected
  * items *are* — consumers map item IDs to definitions, modifiers, and effects.
@@ -28,9 +29,6 @@
  *   onDeselect: (id) => housingModifiers.get(id)!.disable(),
  * });
  * housing.select('cabin'); // auto-deselects previous
- * // onSelect side effects are runtime-only: the persistent selection reloads
- * // without firing the hooks, so re-establish them after a save loads.
- * ctx.onLoad(() => housing.resync());
  *
  * // Multi-select: support spell slots with growing capacity
  * const supportSlots = createSlot({
@@ -47,7 +45,7 @@
 import { computed, unref, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
-import { persistent, withPersistentContext } from '@/core/persistence';
+import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 
 // === TYPES ===
@@ -76,13 +74,16 @@ export interface SlotOptions {
   /** Additional constraint beyond pool membership and capacity */
   canSelect?: (itemId: string) => boolean;
   /**
-   * Called after an item is successfully selected. Use for modifier wiring,
-   * VFX, etc. These side effects are runtime-only — a loaded save rehydrates
-   * the selection without firing this hook, so wire {@link Slot.resync} on load
-   * (or derive the effect reactively from {@link Slot.selected}).
+   * Called after an item is successfully selected. Use for runtime-only side
+   * effects — modifier wiring, VFX: once a load or reset settles, the slot
+   * calls it for each restored item whose effect isn't applied yet (see
+   * {@link Slot.resync}), so it must not grant game state.
    */
   onSelect?: (itemId: string) => void;
-  /** Called after an item is successfully deselected. Use for modifier teardown. */
+  /**
+   * Called after an item is successfully deselected, and for an applied item
+   * a load or reset removed. Use for modifier teardown.
+   */
   onDeselect?: (itemId: string) => void;
 }
 
@@ -140,18 +141,19 @@ export interface Slot {
 
   /** Copy of current selections for loadout saving */
   snapshot(): string[];
-  /** Bulk-replace selections from a save. Silently skips invalid IDs and truncates to capacity. No events fired. */
+  /**
+   * Bulk-replace selections from a loadout. Silently skips invalid IDs and
+   * truncates to capacity. Fires no events or hooks; call {@link resync} to
+   * bring the hooks in line.
+   */
   restore(ids: string[]): void;
   /**
-   * Re-invoke `onSelect` for every currently-selected item. Call after loading
-   * a game save (e.g. from `ctx.onLoad`): the persistent selection rehydrates
-   * directly without firing the hooks, so side effects wired through `onSelect`
-   * — enabled modifiers, VFX — would otherwise be silently lost. Fires no
-   * `selected` events (state restoration, not a user action), mirroring
-   * {@link ChallengeCategory.restore}.
-   *
-   * Not needed when the side effect is derived reactively from {@link selected}
-   * (a `watch`/`computed` re-runs on rehydration on its own).
+   * Bring the hooks' side effects in line with the selection: `onDeselect` for
+   * each applied item no longer selected, then `onSelect` for each selected
+   * item not yet applied. Fires no events (state restoration, not a user
+   * action). Runs on its own once a load or reset settles, after the loaded
+   * selection is filtered through the pool and capacity; call it after
+   * {@link restore}.
    */
   resync(): void;
 
@@ -210,12 +212,17 @@ export function createSlot(options: SlotOptions): Slot {
     return pool == null || pool.includes(itemId);
   }
 
+  // Items whose onSelect side effect is in place, so resync can undo exactly
+  // those a load or reset removed.
+  const applied = new Set<string>();
+
   function internalDeselect(itemId: string): boolean {
     const idx = _selected.value.indexOf(itemId);
     if (idx === -1) return false;
     const next = [..._selected.value];
     next.splice(idx, 1);
     _selected.value = next;
+    applied.delete(itemId);
     options.onDeselect?.(itemId);
     handle.emit('deselected', itemId);
     return true;
@@ -256,6 +263,7 @@ export function createSlot(options: SlotOptions): Slot {
     }
 
     _selected.value = [..._selected.value, itemId];
+    applied.add(itemId);
     options.onSelect?.(itemId);
     handle.emit('selected', itemId);
     return true;
@@ -268,11 +276,12 @@ export function createSlot(options: SlotOptions): Slot {
   function deselectAll(): void {
     if (_selected.value.length === 0) return;
     const old = [..._selected.value];
+    _selected.value = [];
     for (const itemId of old) {
+      applied.delete(itemId);
       options.onDeselect?.(itemId);
       handle.emit('deselected', itemId);
     }
-    _selected.value = [];
     handle.emit('cleared');
   }
 
@@ -289,17 +298,36 @@ export function createSlot(options: SlotOptions): Slot {
     return [..._selected.value];
   }
 
-  function restore(ids: string[]): void {
+  function validSelection(ids: readonly string[]): string[] {
     const pool = resolvedPool();
-    const max = resolvedMax();
     const valid = pool != null ? ids.filter((id) => pool.includes(id)) : [...ids];
-    _selected.value = valid.slice(0, max);
+    return valid.slice(0, resolvedMax());
+  }
+
+  function restore(ids: string[]): void {
+    _selected.value = validSelection(ids);
   }
 
   function resync(): void {
-    if (!options.onSelect) return;
-    for (const itemId of _selected.value) options.onSelect(itemId);
+    for (const itemId of [...applied]) {
+      if (_selected.value.includes(itemId)) continue;
+      applied.delete(itemId);
+      options.onDeselect?.(itemId);
+    }
+    for (const itemId of _selected.value) {
+      if (applied.has(itemId)) continue;
+      applied.add(itemId);
+      options.onSelect?.(itemId);
+    }
   }
+
+  // A load writes the selection straight into the ref, past the pool and
+  // capacity checks; a reset clears it past onDeselect.
+  onHydrated(() => {
+    const valid = validSelection(_selected.value);
+    if (valid.length !== _selected.value.length) _selected.value = valid;
+    resync();
+  });
 
   return {
     id,

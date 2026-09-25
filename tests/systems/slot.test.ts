@@ -7,7 +7,9 @@ import {
   resetAllPersistentContexts,
   deserializePersistents,
   getAllPersistentRefs,
+  withPersistentContext,
 } from '@/core/persistence';
+import { createReset } from '@/systems/reset';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -356,21 +358,33 @@ describe('callbacks', () => {
 // ============================================================================
 
 describe('resync', () => {
-  it('re-invokes onSelect for the rehydrated selection after a save loads', () => {
+  it('invokes onSelect once for the rehydrated selection after a save loads', () => {
     const onSelect = vi.fn();
     resetAllPersistentContexts();
     const slot = createSlot({ id: 'hz', mode: 'single', onSelect });
 
-    // Load a save the way the engine does: the persistent selection rehydrates
-    // directly through the save-restore path, bypassing select() — so onSelect
-    // never fires and side effects wired through it (enabled modifiers) are lost.
+    // The save-restore path writes the selection straight into the ref,
+    // bypassing select(); the slot re-establishes the side effect once the
+    // load settles, and a later resync finds nothing left to apply.
     deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
     expect(slot.selected.value).toEqual(['cabin']);
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith('cabin');
 
     slot.resync();
-    expect(onSelect).toHaveBeenCalledWith('cabin');
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the hooks to a selection restore() wrote', () => {
+    const onSelect = vi.fn();
+    const onDeselect = vi.fn();
+    const slot = createTestSlot({ id: 'lo', mode: 'multi', onSelect, onDeselect });
+    slot.select('a');
+
+    slot.restore(['b']);
+    slot.resync();
+
+    expect(onDeselect).toHaveBeenCalledWith('a');
+    expect(onSelect).toHaveBeenLastCalledWith('b');
   });
 
   it('fires no selected events on resync', () => {
@@ -472,5 +486,75 @@ describe('events', () => {
     unsub();
     slot.select('b');
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ============================================================================
+// Loads and resets — the selection is revalidated and the hooks follow it
+// ============================================================================
+
+describe('loads and resets', () => {
+  /** A slot whose hooks record which items have their side effect applied. */
+  function buildHooked(options: Partial<Parameters<typeof createSlot>[0]> = {}) {
+    const applied = new Set<string>();
+    const slot = withPersistentContext('run', () =>
+      createSlot({
+        id: 'gear',
+        mode: 'single',
+        onSelect: (id) => applied.add(id),
+        onDeselect: (id) => applied.delete(id),
+        ...options,
+      }),
+    );
+    return { slot, applied };
+  }
+
+  it('a load drops ids outside the pool and truncates to capacity', () => {
+    const { slot } = buildHooked({ pool: ['a', 'b'] });
+
+    deserializePersistents(getAllPersistentRefs(), {
+      'slot:gear': { selected: ['a', 'b', 'removed-in-patch'] },
+    });
+
+    expect(slot.selected.value).toEqual(['a']);
+    expect(slot.isFull.value).toBe(true);
+  });
+
+  it("a mid-session load undoes the previous selection's side effects", () => {
+    const { slot, applied } = buildHooked();
+    slot.select('x');
+
+    deserializePersistents(getAllPersistentRefs(), { 'slot:gear': { selected: ['y'] } });
+
+    expect([...applied]).toEqual(['y']);
+  });
+
+  it('a reset that clears the selection undoes its side effects', () => {
+    const { slot, applied } = buildHooked();
+    slot.select('sword');
+
+    createReset({ resetModules: ['run'] }).reset();
+
+    expect(slot.selected.value).toEqual([]);
+    expect([...applied]).toEqual([]);
+  });
+
+  it('deselectAll calls onDeselect after the item leaves the selection, as deselect does', () => {
+    const seen: [string, boolean][] = [];
+    const slot = createTestSlot({
+      id: 'order',
+      mode: 'multi',
+      onDeselect: (id) => seen.push([id, slot.isSelected(id)]),
+    });
+    slot.select('x');
+    slot.select('y');
+
+    slot.deselect('x');
+    slot.deselectAll();
+
+    expect(seen).toEqual([
+      ['x', false],
+      ['y', false],
+    ]);
   });
 });
