@@ -11,14 +11,14 @@
  * @cluster effects
  */
 
-import { computed, unref } from 'vue';
+import { unref, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
   createAdditiveModifier,
   createExponentialModifier,
   createMultiplicativeModifier,
-  delegateWithEnabled,
+  gateModifier,
   type Grant,
   type Modifier,
   type ModifierChain,
@@ -178,7 +178,7 @@ export function lowerGrants(
   predicates: PredicateResolver,
   owner: string,
 ): LoweredGrant[] {
-  const whenByGrant = new Map<Grant, { readonly value: boolean }>();
+  const whenByGrant = new Map<Grant, ComputedRef<boolean>>();
   for (const [index, grant] of grants.entries()) {
     if (grant.when == null) continue;
     const name = grant.description == null ? `${index}` : `'${grant.description}'`;
@@ -190,12 +190,7 @@ export function lowerGrants(
       chain,
       modifier: () => {
         const modifier = buildGrantModifier(grant);
-        if (when == null) return modifier;
-        const own = modifier.enabled;
-        return delegateWithEnabled(
-          modifier,
-          computed(() => unref(own) !== false && when.value),
-        );
+        return when == null ? modifier : gateModifier(modifier, when);
       },
     };
   });

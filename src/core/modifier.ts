@@ -703,18 +703,8 @@ export function createModifierChain(id: string): ModifierChain {
     bind(opts: BindOptions): () => void {
       const rawModifier = typeof opts.modifier === 'function' ? opts.modifier() : opts.modifier;
 
-      // Compose active predicate with any existing enabled on the modifier.
-      let modifier: Modifier = rawModifier;
-      let activeRef: MaybeRef<boolean> | undefined;
-      if (opts.active != null) {
-        activeRef = processGetter(opts.active);
-        const existingEnabled = rawModifier.enabled;
-        const composedEnabled: MaybeRef<boolean> =
-          existingEnabled == null
-            ? activeRef
-            : computed(() => unref(existingEnabled) !== false && unref(activeRef!) !== false);
-        modifier = delegateWithEnabled(rawModifier, composedEnabled);
-      }
+      const activeRef = opts.active == null ? undefined : processGetter(opts.active);
+      const modifier = activeRef == null ? rawModifier : gateModifier(rawModifier, activeRef);
 
       // Resolve id — explicit override wins, then explicit attribution text,
       // then (fallback) the modifier's own description getter. The fallback
@@ -827,13 +817,17 @@ class ChainSlot {
 }
 
 /**
- * A modifier that forwards every call to `raw` and carries its own `enabled`.
- * Forwarding per call (rather than copying `raw`'s properties) keeps class
- * methods and a chain's live `apply` / `invert` / `description` getters.
+ * A modifier that forwards every call to `raw`, enabled only while `raw`'s own
+ * `enabled` and `gate` both allow it. Forwarding per call (rather than copying
+ * `raw`'s properties) keeps class methods and a chain's live `apply` /
+ * `invert` / `description` getters.
  *
  * @internal
  */
-export function delegateWithEnabled(raw: Modifier, enabled: MaybeRef<boolean>): Modifier {
+export function gateModifier(raw: Modifier, gate: MaybeRef<boolean>): Modifier {
+  const own = raw.enabled;
+  const enabled =
+    own == null ? gate : computed(() => unref(own) !== false && unref(gate) !== false);
   return {
     apply: (gain) => raw.apply(gain),
     get invert() {
