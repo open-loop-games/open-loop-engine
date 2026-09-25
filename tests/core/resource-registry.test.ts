@@ -102,6 +102,19 @@ describe('engine-scoped resource registry', () => {
     engine.stop();
   });
 
+  it('list() is a snapshot that a later registration does not grow', () => {
+    const engine = testEngine('reg-list-snapshot');
+    engine.use(goldModule('gold'));
+    engine.start();
+
+    const registry = engine.tryInject(ResourceRegistryKey)!;
+    const held = registry.list();
+    registry.register({ resource: createResource(0, { id: 'gems' }), context: undefined });
+    expect(held.map((e) => e.resource.id)).toEqual(['gold']);
+
+    engine.stop();
+  });
+
   it('does not leak registrations between independent engines', () => {
     const a = testEngine('reg-iso-a');
     a.use(goldModule('gold'));

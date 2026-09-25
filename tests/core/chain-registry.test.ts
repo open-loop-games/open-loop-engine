@@ -33,6 +33,14 @@ describe('ChainRegistry', () => {
     expect(registry.all().map((c) => c.id)).toEqual(['one', 'two', 'three']);
   });
 
+  it('all() is a snapshot that a later registration does not grow', () => {
+    const registry = createChainRegistry();
+    withChainRegistry(registry, () => createModifierChain('one'));
+    const held = registry.all();
+    withChainRegistry(registry, () => createModifierChain('two'));
+    expect(held.map((c) => c.id)).toEqual(['one']);
+  });
+
   it('throws on duplicate id within the same registry', () => {
     const registry = createChainRegistry();
     expect(() =>

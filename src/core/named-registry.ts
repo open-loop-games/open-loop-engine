@@ -106,7 +106,7 @@ export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): 
       return byId.has(id);
     },
     all() {
-      return order;
+      return order.slice();
     },
     get size() {
       return order.length;
