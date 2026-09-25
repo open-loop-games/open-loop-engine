@@ -293,7 +293,13 @@ export interface ChallengeCategory<
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
-  /** The content registry for challenge definitions */
+  /**
+   * The content registry. `registry.patch()` / `pushPatches()` change the def;
+   * a challenge sees the change only through a getter that reads `getDef(id)`
+   * or `registry.get(id)`, since value fields and closures over `def` are
+   * copied or frozen at register. The view has no `register`: add defs with the
+   * category's `register`, which builds each def's challenge and state.
+   */
   readonly registry: ContentRegistryView<Def>;
 
   /** Register challenge definitions. Can be called multiple times. */

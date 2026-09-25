@@ -178,6 +178,13 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
 export interface ActionCategory<Def extends { id: string }, State = void, Payload = void>
   extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>> {
   readonly id: string;
+  /**
+   * The content registry. `registry.patch()` / `pushPatches()` change the def;
+   * a mapping sees the change only through a getter that reads `getDef(id)`
+   * or `registry.get(id)`, since value fields and closures over `def` are
+   * copied or frozen at register. The view has no `register`: add defs with the
+   * category's `register`, which runs `mapAction` and builds each def's state.
+   */
   readonly registry: ContentRegistryView<Def>;
 
   // --- Registration ---
