@@ -1208,3 +1208,46 @@ describe('EngineConfig.strictValidation', () => {
     engine.dispose();
   });
 });
+
+describe('save safety', () => {
+  function mapStorage() {
+    const m = new Map<string, string>();
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+    };
+  }
+  function capturingTimers() {
+    const callbacks = new Map<number, () => void>();
+    let nextId = 1;
+    return {
+      setInterval: vi.fn((cb: () => void, ms: number) => {
+        callbacks.set(ms, cb);
+        return nextId++;
+      }),
+      clearInterval: vi.fn(),
+      fire: (ms: number) => callbacks.get(ms)!(),
+    };
+  }
+
+  it('the autosave does not overwrite a save the load refused', () => {
+    const storage = mapStorage();
+    const newer = JSON.stringify({ version: 2, gameId: 'safe', timestamp: 1, data: {} });
+    storage.setItem('safe-slot-0', newer);
+    const timers = capturingTimers();
+    const engine = createEngine({
+      gameId: 'safe',
+      saveVersion: 1,
+      autoSaveInterval: 30000,
+      storageAdapter: storage,
+      timerProvider: timers,
+    });
+    engine.use({ id: 'safe-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    expect(engine.load().success).toBe(false);
+    timers.fire(30000);
+    expect(storage.getItem('safe-slot-0')).toBe(newer);
+    engine.dispose();
+  });
+});

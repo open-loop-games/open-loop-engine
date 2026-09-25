@@ -1249,6 +1249,80 @@ describe('SaveManager — events', () => {
   });
 });
 
+describe('SaveManager — failed-load slot protection', () => {
+  function futureSlot(gameId: string, storage: ReturnType<typeof createMapStorage>): string {
+    const raw = JSON.stringify({ version: 2, gameId, timestamp: 1, data: { x: { n: 5 } } });
+    storage.setItem(`${gameId}-slot-0`, raw);
+    return raw;
+  }
+
+  it('a slot whose load failed is not overwritten by save() or saveToSlot()', () => {
+    const storage = createMapStorage();
+    const raw = futureSlot('prot', storage);
+    const mgr = createSaveManager({ gameId: 'prot', storageAdapter: storage });
+    beginPersistentContext('prot-ctx');
+    const gold = persistent(0, { name: 'gold' });
+    endPersistentContext();
+
+    const protectedEvt = vi.fn();
+    mgr.on('save:slot-protected', protectedEvt);
+    expect(mgr.load().success).toBe(false);
+    expect(protectedEvt).toHaveBeenCalledWith({ slotId: 0, reason: 'future-version' });
+    expect(mgr.isSlotProtected(0)).toBe(true);
+
+    gold.value = 3;
+    mgr.save();
+    mgr.saveToSlot(0);
+    expect(storage.getItem('prot-slot-0')).toBe(raw);
+  });
+
+  it('releaseSlot() lifts the protection so the next save writes', () => {
+    const storage = createMapStorage();
+    const raw = futureSlot('prot-rel', storage);
+    const mgr = createSaveManager({ gameId: 'prot-rel', storageAdapter: storage });
+    mgr.load();
+    mgr.releaseSlot(0);
+    expect(mgr.isSlotProtected(0)).toBe(false);
+    mgr.save();
+    expect(storage.getItem('prot-rel-slot-0')).not.toBe(raw);
+  });
+
+  it('deleteSave() and a later successful load or import lift the protection', () => {
+    const storage = createMapStorage();
+    futureSlot('prot-clr', storage);
+    const mgr = createSaveManager({ gameId: 'prot-clr', storageAdapter: storage });
+    mgr.load();
+    mgr.deleteSave();
+    expect(mgr.isSlotProtected(0)).toBe(false);
+
+    futureSlot('prot-clr', storage);
+    mgr.load();
+    const good = JSON.stringify({ version: 1, gameId: 'prot-clr', timestamp: 2, data: {} });
+    expect(mgr.importSave(good).success).toBe(true);
+    expect(mgr.isSlotProtected(0)).toBe(false);
+  });
+
+  it('a missing save does not protect the slot', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'prot-nf', storageAdapter: storage });
+    const protectedEvt = vi.fn();
+    mgr.on('save:slot-protected', protectedEvt);
+    mgr.load();
+    expect(protectedEvt).not.toHaveBeenCalled();
+    mgr.save();
+    expect(storage.getItem('prot-nf-slot-0')).not.toBeNull();
+  });
+
+  it('protects on parse errors too', () => {
+    const storage = createMapStorage();
+    storage.setItem('prot-pe-slot-0', '{broken');
+    const mgr = createSaveManager({ gameId: 'prot-pe', storageAdapter: storage });
+    mgr.load();
+    mgr.save();
+    expect(storage.getItem('prot-pe-slot-0')).toBe('{broken');
+  });
+});
+
 describe('createMemoryStorage', () => {
   it('round-trips set/get/remove with localStorage-compatible semantics', () => {
     const storage = createMemoryStorage();

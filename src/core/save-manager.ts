@@ -225,16 +225,31 @@ export interface SaveEvents {
   }) => void;
   /** A consumer-provided migration step ran during load. */
   'save:migration-step': (info: { from: number; to: number }) => void;
+  /**
+   * `load()` refused a slot for a reason other than `not-found`, so the slot
+   * still holds a save the live state doesn't reflect. `save()` and
+   * `saveToSlot()` skip it until {@link SaveManager.releaseSlot}, `deleteSave`,
+   * a raw write (`importSlot` / `replaceSlot`) or a successful `load` /
+   * `importSave` on it — otherwise the next autosave would overwrite the save
+   * the load just refused.
+   */
+  'save:slot-protected': (info: { slotId: number; reason: SaveLoadFailureReason }) => void;
 }
 
 /** Multi-slot save manager: persists, loads, imports, and exports versioned game state. */
 export interface SaveManager extends Emittable<SaveEvents> {
   // --- Active slot operations ---
+  /** Write live state to the active slot. Skipped while the slot is protected. */
   save(): void;
+  /**
+   * Load the active slot into live state. A failure other than `not-found`
+   * protects the slot (see `save:slot-protected`).
+   */
   load(): SaveLoadResult;
   exportSave(): string;
   importSave(data: string): SaveLoadResult;
   hasSave(): boolean;
+  /** Remove the active slot's save, lifting its protection. */
   deleteSave(): void;
   /** Peek the active slot's metadata */
   peek(): SavePeek | null;
@@ -256,8 +271,22 @@ export interface SaveManager extends Emittable<SaveEvents> {
   selectSlot(slotId: number): void;
   /** Peek any slot's metadata without switching or deserializing */
   peekSlot(slotId: number): SavePeek | null;
-  /** Save current state to a specific slot without changing the active slot */
+  /**
+   * Save current state to a specific slot without changing the active slot.
+   * Skipped while that slot is protected.
+   */
   saveToSlot(slotId: number): void;
+  /**
+   * Whether a failed load has protected `slotId` from writes of live state.
+   * See `save:slot-protected`.
+   */
+  isSlotProtected(slotId: number): boolean;
+  /**
+   * Lift a failed load's protection from `slotId`, so the next `save()` or
+   * `saveToSlot()` overwrites the save it refused. Call once the player has
+   * chosen to discard that save.
+   */
+  releaseSlot(slotId: number): void;
   /** Find a slot by name. Returns the slot or undefined if not found. */
   findSlotByName(name: string): SaveSlot | undefined;
   /** Set a callback that provides metadata to include in save envelopes. */
@@ -472,6 +501,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   let _activeSlotId = 0;
   const _slots: SaveSlot[] = [];
   let _metadataProvider: (() => Record<string, unknown>) | null = null;
+  // Slots whose load failed on a save that still sits in storage.
+  const _protectedSlots = new Set<number>();
 
   // === SLOT INDEX PERSISTENCE ===
 
@@ -665,6 +696,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // === ACTIVE SLOT OPERATIONS ===
 
     save() {
+      if (_protectedSlots.has(_activeSlotId)) return;
       storage.setItem(activeStorageKey(), JSON.stringify(buildEnvelope()));
     },
 
@@ -675,27 +707,25 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         handle.emit('save:load-failed', { slotId, reason: 'not-found' });
         return { success: false };
       }
+      const fail = (reason: SaveLoadFailureReason, detail?: unknown): SaveLoadResult => {
+        handle.emit('save:load-failed', { slotId, reason, detail });
+        _protectedSlots.add(slotId);
+        handle.emit('save:slot-protected', { slotId, reason });
+        return { success: false };
+      };
       let e: SaveEnvelope;
       try {
         e = JSON.parse(raw) as SaveEnvelope;
       } catch (detail) {
-        handle.emit('save:load-failed', { slotId, reason: 'parse-error', detail });
-        return { success: false };
+        return fail('parse-error', detail);
       }
-      if (e.gameId !== gameId) {
-        handle.emit('save:load-failed', { slotId, reason: 'wrong-game-id' });
-        return { success: false };
-      }
+      if (e.gameId !== gameId) return fail('wrong-game-id');
       try {
         applyEnvelope(e, slotId);
       } catch (err) {
-        if (err instanceof LoadFailure) {
-          handle.emit('save:load-failed', { slotId, reason: err.reason, detail: err.detail });
-        } else {
-          handle.emit('save:load-failed', { slotId, reason: 'unknown', detail: err });
-        }
-        return { success: false };
+        return err instanceof LoadFailure ? fail(err.reason, err.detail) : fail('unknown', err);
       }
+      _protectedSlots.delete(slotId);
       handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
       return { success: true, timestamp: e.timestamp };
     },
@@ -727,6 +757,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         }
         return { success: false };
       }
+      _protectedSlots.delete(slotId);
       handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
       return { success: true, timestamp: e.timestamp };
     },
@@ -737,6 +768,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
 
     deleteSave() {
       storage.removeItem(activeStorageKey());
+      _protectedSlots.delete(_activeSlotId);
     },
 
     peek(): SavePeek | null {
@@ -772,6 +804,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       if (idx === -1) throw new Error(`Save slot ${slotId} not found`);
       _slots.splice(idx, 1);
       storage.removeItem(slotStorageKey(slotId));
+      _protectedSlots.delete(slotId);
       saveSlotIndex();
     },
 
@@ -795,7 +828,16 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     saveToSlot(slotId: number): void {
       const slot = _slots.find((s) => s.id === slotId);
       if (!slot) throw new Error(`Save slot ${slotId} not found`);
+      if (_protectedSlots.has(slotId)) return;
       storage.setItem(slotStorageKey(slotId), JSON.stringify(buildEnvelope()));
+    },
+
+    isSlotProtected(slotId: number): boolean {
+      return _protectedSlots.has(slotId);
+    },
+
+    releaseSlot(slotId: number): void {
+      _protectedSlots.delete(slotId);
     },
 
     findSlotByName(name: string): SaveSlot | undefined {
@@ -831,6 +873,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       } else {
         storage.removeItem(slotStorageKey(destId));
       }
+      _protectedSlots.delete(destId);
     },
 
     exportSlot(slotId: number): string | null {
@@ -864,6 +907,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         targetId = slotId;
       }
       storage.setItem(slotStorageKey(targetId), data);
+      _protectedSlots.delete(targetId);
       return { success: true, timestamp: envelope.timestamp, slotId: targetId };
     },
   };
