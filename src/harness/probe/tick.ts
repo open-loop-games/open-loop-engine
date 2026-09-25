@@ -38,10 +38,15 @@ import type { BeatResult, ProbeConfig } from './types';
  * @returns one {@link BeatResult} per beat, with termination-time stats
  *   over predicate-fired seeds, counts split by termination reason, and
  *   `inTuningWindow` when the beat carried a `tuningWindow`.
+ *
+ * The probe stops each run's engine but never disposes it; pass `teardown`
+ * to dispose it, or a wide probe holds every engine it built.
+ *
  * @example
  * ```ts
  * const results = runProbe({
  *   buildEngine: ({ seed }) => buildProducerSimEngine(overrides, seed),
+ *   teardown: (engine) => engine.dispose(),
  *   beats: ARC_BEATS,
  *   seeds: [0, 1, 2, 3, 4],
  *   maxSimTime: hours(2),
@@ -71,6 +76,7 @@ export function runProbe(config: ProbeConfig): BeatResult[] {
         return engine;
       },
       buildAccessor: config.buildAccessor ? (engine) => config.buildAccessor!(engine) : undefined,
+      teardown: config.teardown,
     };
 
     const until: UntilPredicate = () => {

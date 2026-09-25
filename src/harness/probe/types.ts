@@ -79,6 +79,11 @@ export interface ProbeConfig {
    * against.
    */
   buildAccessor?: (engine: Engine) => GameStateAccessor;
+  /**
+   * Called once per `(beat, seed)` run as {@link UntilCell.teardown} —
+   * release what `buildEngine` built (typically `engine.dispose()`).
+   */
+  teardown?: (engine: Engine, ctx: RunContext) => void;
   beats: BeatProbe[];
   /** Seeds to run per beat. */
   seeds: number[];

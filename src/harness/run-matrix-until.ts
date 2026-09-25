@@ -26,6 +26,11 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  * builds its own engine per run and the aggregate carries
  * `terminationTime` / `terminationCounts`.
  *
+ * The runner stops each run's engine but never disposes it, since
+ * `onRunComplete` may still read its state. A cell's `teardown` runs after
+ * `onRunComplete` (or after a throwing run) — dispose the engine there, or a
+ * long sweep holds every engine it built.
+ *
  * @param config - {@link MatrixUntilConfig} — until-cells, seeds, shared
  *   predicate, max sim-time ceiling, optional callbacks + aggregate opts.
  * @returns {@link MatrixUntilResult} with per-cell {@link CellResult}.
@@ -37,6 +42,7 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  *     {
  *       name: 'meta-cost × 0.85',
  *       buildEngine: () => buildDirectorEngine({ metaCostMul: 0.85 }),
+ *       teardown: (engine) => engine.dispose(),
  *     },
  *     {
  *       name: 'meta-cost × 1.15',
@@ -69,32 +75,37 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
   for (const item of plan) {
     const { cell, seed } = item;
     seedRNG(seed);
-    const engine = cell.buildEngine({ seed });
-    const analyzers = cell.analyzers;
-    const accessor = cell.buildAccessor?.(engine);
-    let result: RunUntilResult;
+    const ctx = { seed };
+    const engine = cell.buildEngine(ctx);
     try {
-      result = runUntil({
-        engine,
-        until: config.until,
-        maxSimTime: config.maxSimTime,
-        tickDelta: cell.tickDelta,
-        setup: analyzers ? () => analyzers(engine, { seed }) : undefined,
-        seed,
-        mode,
-        accessor,
-        bisectTolSec: config.bisectTolSec,
-        stasisProbeInterval: config.stasisProbeInterval,
-      });
+      const analyzers = cell.analyzers;
+      const accessor = cell.buildAccessor?.(engine);
+      let result: RunUntilResult;
+      try {
+        result = runUntil({
+          engine,
+          until: config.until,
+          maxSimTime: config.maxSimTime,
+          tickDelta: cell.tickDelta,
+          setup: analyzers ? () => analyzers(engine, ctx) : undefined,
+          seed,
+          mode,
+          accessor,
+          bisectTolSec: config.bisectTolSec,
+          stasisProbeInterval: config.stasisProbeInterval,
+        });
+      } finally {
+        // buildEngine returns a *started* engine (contract); with the default
+        // TickDriver that is a live setInterval. Stop each run's engine or the
+        // sweep leaks one ticking engine per (cell × seed) that keeps the Node
+        // process alive. `stop?.` tolerates lightweight test fakes.
+        engine.stop?.();
+      }
+      perCellRuns[item.cellIdx].push(result);
+      config.onRunComplete?.(item, result);
     } finally {
-      // buildEngine returns a *started* engine (contract); with the default
-      // TickDriver that is a live setInterval. Stop each run's engine or the
-      // sweep leaks one ticking engine per (cell × seed) that keeps the Node
-      // process alive. `stop?.` tolerates lightweight test fakes.
-      engine.stop?.();
+      cell.teardown?.(engine, ctx);
     }
-    perCellRuns[item.cellIdx].push(result);
-    config.onRunComplete?.(item, result);
 
     if (
       cellResults[item.cellIdx] === null &&

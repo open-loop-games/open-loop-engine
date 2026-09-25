@@ -54,12 +54,20 @@ export interface WaypointProbeConfig<T> {
   /**
    * Build a fresh, started engine for each `(waypoint × seed)` run. The
    * global RNG is seeded with `ctx.seed` just before the call, and again
-   * before the first tick; the probe stops the engine after `inspect`.
+   * before the first tick; the probe stops the engine after `inspect`, and
+   * `teardown` disposes it.
    */
   buildEngine: (ctx: RunContext) => Engine;
   waypoints: Waypoint[];
   /** Extract a consumer-shaped snapshot from the engine at the waypoint time. */
   inspect: (engine: Engine) => T;
+  /**
+   * Called once per run after `inspect`, and after a run that throws —
+   * release what `buildEngine` built (typically `engine.dispose()`). The
+   * probe only stops the engine, so without this every engine it builds
+   * stays reachable until the probe returns.
+   */
+  teardown?: (engine: Engine, ctx: RunContext) => void;
   /** Seeds to run per waypoint. Defaults to `[0]` for deterministic single-engine probes. */
   seeds?: number[];
   /**
@@ -82,12 +90,17 @@ export interface WaypointProbeConfig<T> {
  * return one {@link WaypointSnapshot} per `(waypoint, seed)` in iteration
  * order.
  *
+ * The probe stops each run's engine but never disposes it; pass `teardown`
+ * to dispose it once `inspect` has read it, or a wide probe holds every
+ * engine it built.
+ *
  * @example
  * ```ts
  * const snapshots = runWaypointProbe({
  *   buildEngine: ({ seed }) => buildProducerSimEngine(undefined, seed),
  *   waypoints: FLOW_BEATS,
  *   inspect: (engine) => collectProducerPacing(engine),
+ *   teardown: (engine) => engine.dispose(),
  *   seeds: [0],
  * });
  * for (const s of snapshots) {
@@ -102,7 +115,8 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
   for (const waypoint of config.waypoints) {
     for (const seed of seeds) {
       seedRNG(seed);
-      const engine = config.buildEngine({ seed });
+      const ctx = { seed };
+      const engine = config.buildEngine(ctx);
       try {
         const result = runUntil({
           engine,
@@ -122,6 +136,7 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
         // buildEngine returns a started engine; stop it or its live timer
         // outlives the probe. `stop?.` tolerates lightweight test fakes.
         engine.stop?.();
+        config.teardown?.(engine, ctx);
       }
     }
   }

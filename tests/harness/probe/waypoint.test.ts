@@ -91,6 +91,48 @@ describe('runWaypointProbe', () => {
     expect(draws[1]).toBe(draws[0]);
   });
 
+  it('runs teardown once per run, after inspect, even when inspect throws', () => {
+    const events: string[] = [];
+    let built = 0;
+    const buildEngine = () => {
+      const id = built++;
+      return {
+        id,
+        tickDriver: { simulateTick: () => {} },
+        stop: () => events.push(`stop:${id}`),
+      } as unknown as Engine;
+    };
+    const idOf = (engine: Engine) => (engine as unknown as { id: number }).id;
+    runWaypointProbe({
+      buildEngine,
+      waypoints: [{ id: 'w1', snapshotAtSec: 1 }],
+      inspect: (engine) => events.push(`inspect:${idOf(engine)}`),
+      teardown: (engine, { seed }) => events.push(`teardown:${idOf(engine)}:${seed}`),
+      seeds: [1, 2],
+    });
+    expect(events).toEqual([
+      'inspect:0',
+      'stop:0',
+      'teardown:0:1',
+      'inspect:1',
+      'stop:1',
+      'teardown:1:2',
+    ]);
+
+    events.length = 0;
+    expect(() =>
+      runWaypointProbe({
+        buildEngine,
+        waypoints: [{ id: 'w2', snapshotAtSec: 1 }],
+        inspect: () => {
+          throw new Error('inspect failed');
+        },
+        teardown: (engine) => events.push(`teardown:${idOf(engine)}`),
+      }),
+    ).toThrow('inspect failed');
+    expect(events).toEqual(['stop:2', 'teardown:2']);
+  });
+
   it('stops every engine it builds, even when inspect throws', () => {
     const stops: number[] = [];
     let built = 0;

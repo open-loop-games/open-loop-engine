@@ -517,7 +517,7 @@ export interface UntilCell {
    * started (the helper or consumer calls `engine.start()`). The global RNG
    * is seeded with `ctx.seed` just before the call, so construction draws
    * don't depend on sweep order, and reseeded before the first tick. The
-   * runner stops the engine after its run.
+   * runner stops the engine after its run; disposing it is `teardown`'s job.
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**
@@ -538,6 +538,13 @@ export interface UntilCell {
   analyzers?: (engine: Engine, ctx: RunContext) => Analyzer[];
   /** Optional per-cell tick delta override. Defaults to `0.05`. */
   tickDelta?: number;
+  /**
+   * Called once per run after `onRunComplete`, and after a run that throws —
+   * release what `buildEngine` built (typically `engine.dispose()`). The
+   * runner only stops the engine, so without this every engine a sweep
+   * builds stays reachable until the sweep returns.
+   */
+  teardown?: (engine: Engine, ctx: RunContext) => void;
 }
 
 /** One unit of work in a flat `cells × seeds` until-sweep. */

@@ -83,6 +83,64 @@ describe('runMatrixUntil', () => {
     expect(built).toBe(3);
   });
 
+  it('runs the cell teardown once per run, after onRunComplete, on the run it built', () => {
+    const events: string[] = [];
+    const cell: UntilCell = {
+      name: 'disposable',
+      buildEngine: ({ seed }) => {
+        const engine = {
+          id: seed,
+          tickDriver: { simulateTick: () => {} },
+          stop: () => events.push(`stop:${seed}`),
+        };
+        return engine as unknown as Engine;
+      },
+      teardown: (engine, { seed }) =>
+        events.push(`teardown:${seed}:${(engine as unknown as { id: number }).id}`),
+    };
+    runMatrixUntil({
+      cells: [cell],
+      seeds: [1, 2],
+      until: () => true,
+      maxSimTime: 10,
+      onRunComplete: ({ seed }) => events.push(`complete:${seed}`),
+    });
+    expect(events).toEqual([
+      'stop:1',
+      'complete:1',
+      'teardown:1:1',
+      'stop:2',
+      'complete:2',
+      'teardown:2:2',
+    ]);
+  });
+
+  it('runs the cell teardown when a run throws', () => {
+    const torn: number[] = [];
+    expect(() =>
+      runMatrixUntil({
+        cells: [
+          {
+            name: 'throws',
+            buildEngine: () =>
+              ({
+                tickDriver: {
+                  simulateTick: () => {
+                    throw new Error('tick failed');
+                  },
+                },
+              }) as unknown as Engine,
+            teardown: (_engine, { seed }) => torn.push(seed),
+          },
+        ],
+        seeds: [7],
+        until: () => false,
+        maxSimTime: 10,
+      }),
+    ).toThrow('tick failed');
+    expect(torn).toEqual([7]);
+  });
+
   it('seeds the RNG before buildEngine, so construction draws are independent of sweep order', () => {
     const sweep = (seeds: number[]): Map<number, number> => {
       const draws = new Map<number, number>();

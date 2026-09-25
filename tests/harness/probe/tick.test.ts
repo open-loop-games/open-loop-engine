@@ -46,6 +46,31 @@ describe('runProbe', () => {
     expect(r.terminationTime!.p50).toBeCloseTo(5, 5);
   });
 
+  it('runs teardown once per (beat × seed) on the engine it built', () => {
+    const built: Engine[] = [];
+    const torn: [Engine, number][] = [];
+    runProbe({
+      buildEngine: () => {
+        const engine = buildTickCounterEngine({ tick: 0 });
+        built.push(engine);
+        return engine;
+      },
+      teardown: (engine, { seed }) => torn.push([engine, seed]),
+      beats: [
+        { id: 'a', predicate: () => true },
+        { id: 'b', predicate: () => true },
+      ],
+      seeds: [1, 2],
+      maxSimTime: 10,
+    });
+    expect(torn).toEqual([
+      [built[0], 1],
+      [built[1], 2],
+      [built[2], 1],
+      [built[3], 2],
+    ]);
+  });
+
   it('preserves beat order and counts runs that hit maxSimTime', () => {
     const neverFires: BeatProbe = { id: 'never', predicate: () => false };
     const firesAt3: BeatProbe = {
