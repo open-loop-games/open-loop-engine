@@ -771,6 +771,33 @@ describe('Sequencer — canRun tri-state', () => {
     expect(q.currentItem?.id).toBe('a');
   });
 
+  it('list mode: resetCursor() while holding cancels the held item, then replays', () => {
+    const tm = createTickManager();
+    const ctxId = `tri-list-reset-${Math.random().toString(36).slice(2, 8)}`;
+
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      mode: 'list',
+      registerTick: tm.registerTick,
+      canRun: (item) => (item.id === 'b' ? 'notNow' : 'now'),
+    });
+    endPersistentContext();
+    const cancelled: Array<[string, number]> = [];
+    q.on('cancelled', (item) => cancelled.push([item.id, q.cursor]));
+
+    q.enqueue(qi('a'));
+    q.enqueue(qi('b'));
+    q.complete(); // a done, b held at cursor 1
+    expect(q.holding).toBe(true);
+
+    q.resetCursor();
+    expect(cancelled).toEqual([['b', 1]]);
+    expect(q.holding).toBe(false);
+    expect(q.cursor).toBe(0);
+    expect(q.currentItem?.id).toBe('a');
+  });
+
   it('list mode: "notNow" holds at cursor position without advancing', () => {
     const tm = createTickManager();
     const ctxId = `tri-list-hold-${Math.random().toString(36).slice(2, 8)}`;

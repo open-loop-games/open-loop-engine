@@ -319,8 +319,9 @@ export interface Sequencer<M = void> {
    */
   readonly cursor: number;
   /**
-   * Reset the cursor to 0 and cancel the current item (list mode only).
-   * If not paused, auto-starts from the beginning.
+   * Cancel the current execution as {@link cancel} does, running or held,
+   * then reset the cursor to 0 (list mode only). If not paused, auto-starts
+   * from the beginning.
    * No-op in queue mode. Item metadata is left as it is, so per-run state kept
    * there (progress, say) must be reset before replaying.
    */
@@ -1097,14 +1098,9 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
     resetCursor(): void {
       if (!isList) return;
-      if (_holding) clearHold();
+      // List mode's cancel() never pops, so the cursor can move after it.
+      sequencer.cancel();
       rawCursor!.value = 0;
-      // Cancel current item so replay starts fresh
-      const cancelled = getCurrentItem();
-      if (cancelled) {
-        current.value = '';
-        handle.emit('cancelled', cancelled);
-      }
       dequeueNext();
     },
 
