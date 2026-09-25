@@ -166,6 +166,11 @@ export type ScalingPurchasableCost =
        *   Single-purchase only (bulk-purchase math is unavailable for non-Formula costs).
        *   Use for cost shapes that aren't expressible as engine Formulas
        *   (super-exponential, piecewise, factorial-bumped).
+       *
+       * The two shapes are told apart by calling the function once at creation
+       * with the level **ref**, so an opaque function sees one call whose
+       * argument is a `Ref`, not a `DecimalSource`. Its result is discarded, and
+       * a throw from it is caught; every later call gets the plain level.
        */
       costFormula:
         | ((amount: MaybeRef<DecimalSource>) => FormulaSource)
@@ -199,6 +204,11 @@ export type ScalingPurchasableOptions = {
    *   soft-capped) that still need invertibility.
    * - `(amount: DecimalSource) => DecimalSource` — opaque escape hatch for
    *   genuinely custom logic. Forward evaluation only; `effectCurve` is undefined.
+   *
+   * Function shapes are told apart the same way as
+   * {@link ScalingPurchasableCost}'s `costFormula`: one call at creation with
+   * the level ref, so an opaque function sees a `Ref` once. That call's
+   * result and any throw from it are discarded.
    */
   effect?:
     | DecimalSource
@@ -416,9 +426,16 @@ function buildScalingCostRequirement(
   limit: Computable<DecimalSource> | undefined,
 ): Requirement {
   if ('costFormula' in options) {
-    const factoryResult = (options.costFormula as (a: MaybeRef<DecimalSource>) => FormulaSource)(
-      scalingAmount,
-    );
+    // Try as Formula factory first; a throw means an opaque value function
+    // that can't take the level ref (a table lookup, a branch on the level).
+    let factoryResult: unknown;
+    try {
+      factoryResult = (options.costFormula as (a: MaybeRef<DecimalSource>) => FormulaSource)(
+        scalingAmount,
+      );
+    } catch {
+      factoryResult = undefined;
+    }
 
     if (factoryResult instanceof Formula) {
       return createCostRequirement({

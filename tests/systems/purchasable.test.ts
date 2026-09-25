@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Decimal } from '@/primitives/decimal';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
@@ -391,6 +391,24 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
     expect(Decimal.eq(p.getCost(1), 101)).toBe(true); // 1²+100 at level 1
     p.purchase(1);
     expect(Decimal.eq(p.getCost(1), 104)).toBe(true); // 2²+100 at level 2
+  });
+
+  it('opaque closure that indexes a table by level builds and prices each rung', () => {
+    const r = createResource(1000, { id: 'r', displayName: 'r' });
+    const COSTS = [{ cost: 10 }, { cost: 25 }, { cost: 70 }];
+    const p = createScalingPurchasable({
+      id: 'closure-table',
+      description: 'table',
+      resource: r,
+      costFormula: (level: DecimalSource) => COSTS[Number(level)]!.cost,
+      limit: COSTS.length,
+    });
+
+    expect(Decimal.eq(p.getCost(1), 10)).toBe(true);
+    p.purchase();
+    expect(Decimal.eq(p.getCost(1), 25)).toBe(true);
+    p.purchase();
+    expect(Decimal.eq(r.value, 965)).toBe(true);
   });
 
   it('opaque closure disables bulk purchase (maxBulkAmount = 1)', () => {
