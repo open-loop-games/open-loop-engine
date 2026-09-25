@@ -133,7 +133,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 
 **Naming:**
 - Functions: `verbNoun` — `createResource`, `evaluateCondition`
-- Types: PascalCase — `IResource`, `GameStateAccessor`
+- Types: PascalCase — `IEffect`, `GameStateAccessor`
 - Files: kebab-case.ts
 - Factories: `create*()` pattern
 - Standard verbs: `getX` aggregator, `isX` type guard, `formatX` formatter, `setupX` wiring. Noun-form (`multiplicativeEffect`, `replacementBinding`, `fractional`) is the carve-out for helpers consumed declaratively as configuration data.
@@ -143,7 +143,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 - `TODO(ergonomics)` — working but verbose path; simplify when the pattern recurs in two+ consumers.
 - See `PROCESS.md` § Parked patterns for rationale and graduation rules.
 
-**Save identity:** a save key is derived from ids the consumer chose, never from creation order or display text — either shifts with a content update, and every player's value under it loads as the default. A factory a module builds several of (purchasables, timed-progress trackers) requires `id` and nests under the ambient context. A system a module builds once takes `id?: string` and resolves it through `resolveSystemContextId`: explicit id, else `${ambient}/${kind}`, else an auto-counter that only a build outside any module (tests) reaches.
+**Save identity:** a save key is derived from ids the consumer chose, never from creation order or display text — either shifts with a content update, and every player's value under it loads as the default. A per-item factory a module builds several of (purchasables, achievements, timed-progress trackers) requires `id` and nests under the ambient context. A system a module builds once takes `id?: string` and resolves it through `resolveSystemContextId`: explicit id, else `${ambient}/${kind}`, else an auto-counter that only a build outside any module (tests) reaches. An id that names a whole context — an explicit system id, and the required id of a category, Slot, BestOf, RunPool or Sequencer — is flat: it doesn't nest under the module, and an explicit system id drops the kind, so it must be unique across the game, and a collision on a ref name throws at install.
 
 **Section banners:** `// === UPPERCASE ===` short-form, one line per section. Inner factory-body sub-sections use the same form at deeper indent. Skip banners on files small enough that scrolling isn't an issue.
 
