@@ -31,15 +31,10 @@ import type { Resource } from '@/core/resource';
 import type { RegisterTick } from '@/core/sequencer';
 import { isCostRequirement, type CostRequirement, type Requirement } from '@/core/requirements';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
+import { countAffordable } from '@/core/formulas/affordability';
 import type { Purchasable } from './purchasable';
 import type { PurchasableCategory } from './purchasable-category';
 import type { Producer, ProducerCategory } from './producer-category';
-
-// Iteration bound on the reserve clamp's binary search. Exact for ceilings up
-// to 2^64; past that the search returns its current lower bound — an
-// under-buy, never a floor breach — and the residual is picked up by the next
-// beat, so the clamp converges rather than stalling.
-const MAX_RESERVE_CLAMP_STEPS = 64;
 
 // Default policy: cheapest by `repeatable.getCost(1)`. Module-level singleton
 // so identity is stable across `processGetter` calls when `options.policy`
@@ -55,13 +50,12 @@ const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Produ
  * Largest `n` in `[1, ceiling]` whose total cost fits in `available`, or `0`
  * when even a single unit doesn't.
  *
- * Total cost is non-decreasing in `n`, so "fits" is a monotone predicate and a
- * binary search finds its boundary. Callers reach this through
- * {@link reserveClampedAmount}, which passes an `available` already reduced by
- * the floor, so the result is the most that can be bought without breaching it.
- *
- * A `ceiling` of 1 needs no search, and a non-finite one means this cost can't
- * bind (free or unbounded) — both return `ceiling` unchanged.
+ * Total cost is non-decreasing in `n`, so "fits" is a monotone predicate and
+ * the formula layer's whole-count search finds its boundary. Callers reach this
+ * through {@link reserveClampedAmount}, which passes an `available` already
+ * reduced by the floor, so the result is the most that can be bought without
+ * breaching it. A fractional `ceiling` admits the whole counts below it, and
+ * an unbounded one is searched like any other: every count returned is priced.
  *
  * @internal
  */
@@ -70,17 +64,9 @@ function largestAffordable(
   available: Decimal,
   ceiling: DecimalSource,
 ): DecimalSource {
+  // Without a seed the search would bisect all the way down to find this.
   if (Decimal.lt(available, getCost(1))) return Decimal.dZero;
-  if (Decimal.lte(ceiling, 1) || !Decimal.isFinite(ceiling)) return ceiling;
-
-  let lo: DecimalSource = 1;
-  let hi: DecimalSource = ceiling;
-  for (let step = 0; step < MAX_RESERVE_CLAMP_STEPS && Decimal.lt(lo, hi); step++) {
-    const mid = Decimal.add(lo, hi).add(1).div(2).floor();
-    if (Decimal.lte(getCost(mid), available)) lo = mid;
-    else hi = Decimal.sub(mid, 1);
-  }
-  return lo;
+  return countAffordable((n) => Decimal.lte(getCost(n), available), Decimal.floor(ceiling), null);
 }
 
 /**

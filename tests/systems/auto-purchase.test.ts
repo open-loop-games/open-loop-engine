@@ -21,6 +21,7 @@ import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createCostRequirement } from '@/core/requirements';
+import { F } from '@/core/formulas/formulas';
 
 // ============================================================================
 // Helpers
@@ -266,6 +267,33 @@ describe('setupSweepAutoPurchase', () => {
     tick(0.1);
     expect(combo.active.value).toBe(false);
     expect(Decimal.eq(cookies.value, 1_000)).toBe(true);
+  });
+
+  it('prices an unbounded buy against the floor rather than passing it through', () => {
+    const cookies = createTestResource('cookies', 10);
+    const { registerTick, tick } = createTickManager();
+
+    // A single payment that saturates toward 10: level n costs 10 - 5/(n+1).
+    // A bank of 10 covers every level, so buy-max is unbounded, but under a 2
+    // floor only 8 is spendable, and that reaches the first level (7.5), not
+    // the second (8.33).
+    const saturating = createPurchasable({
+      id: 'saturating',
+      requirements: (level) =>
+        createCostRequirement({
+          resource: cookies,
+          cost: F.sub(10, F.div(5, F.variable(level).add(1))),
+          cumulativeCost: false,
+          maxBulkAmount: Decimal.dInf,
+        }),
+    });
+    expect(Decimal.isFinite(saturating.amountToPurchase.value)).toBe(false);
+
+    setupSweepAutoPurchase([saturating], { enabled: true, reserve: 2 }, registerTick);
+
+    tick(0.1);
+    expect(Decimal.eq(saturating.amount.value, 1)).toBe(true);
+    expect(Decimal.gte(cookies.value, 2)).toBe(true);
   });
 
   it('throttles on interval and does not replay elapsed beats', () => {

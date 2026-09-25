@@ -325,7 +325,7 @@ const SEARCH_LIMIT = 256;
  *
  * @internal
  */
-function countAffordable(
+export function countAffordable(
   canAfford: (n: DecimalSource) => boolean,
   cap: DecimalSource,
   seed: DecimalSource | null,

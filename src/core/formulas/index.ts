@@ -21,4 +21,4 @@ export type { FirstPassageOptions, Passage } from './passage';
 export type { Series } from './series';
 export { arithmeticSeries, geometricSeries, powerSeries } from './series';
 export * from './formulas';
-export * from './affordability';
+export { calculateMaxAffordable, calculateCost } from './affordability';
