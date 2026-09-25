@@ -133,7 +133,7 @@ export interface PurchasableOptions {
   /** Callback fired after each purchase with the number of levels bought */
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
-  visibility?: Predicate;
+  visible?: Predicate;
   /**
    * Whether bulk purchasing (buy-max) is enabled.
    * Default: `false` when limit is 1, `true` otherwise.
@@ -249,7 +249,7 @@ export type ScalingPurchasableOptions = {
   /** Callback fired after each purchase */
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this purchasable is visible. Default: `true` */
-  visibility?: Predicate;
+  visible?: Predicate;
   /** Whether bulk purchasing is enabled. Default: `true` */
   bulkPurchase?: Computable<boolean>;
 } & ScalingPurchasableCost &
@@ -299,7 +299,7 @@ export interface Purchasable {
    */
   effectCurve?: GenericFormula;
   /** Whether this purchasable is currently visible */
-  visibility: MaybeRef<boolean>;
+  visible: ComputedRef<boolean>;
   /** Whether bulk purchasing is enabled */
   bulkPurchase: MaybeRef<boolean>;
   /**
@@ -379,7 +379,7 @@ function buildLimitRequirement(
 function buildPurchasableComputeds(
   amount: Persistent<DecimalSource>,
   processedLimit: MaybeRef<DecimalSource>,
-  processedVisibility: MaybeRef<boolean>,
+  visible: ComputedRef<boolean>,
   processedBulkPurchase: MaybeRef<boolean>,
   allRequirements: Requirements,
 ): {
@@ -397,7 +397,7 @@ function buildPurchasableComputeds(
 
   const canPurchase = computed((): boolean => {
     if (maxed.value) return false;
-    if (!unref(processedVisibility)) return false;
+    if (!visible.value) return false;
     return requirementsMet(allRequirements);
   });
 
@@ -532,7 +532,7 @@ function toFormula(source: FormulaSource): GenericFormula {
  *
  * @internal
  * @param options - Configuration for the purchasable
- * @param predicates - resolver `visibility` adopts through; a category passes
+ * @param predicates - resolver `visible` adopts through; a category passes
  *   its own, so content registered after install still resolves
  * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
  *
@@ -566,7 +566,7 @@ export function createPurchasable(
     initialAmount,
     effect,
     onPurchase,
-    visibility,
+    visible,
     bulkPurchase,
   } = options;
 
@@ -587,11 +587,7 @@ export function createPurchasable(
 
   const processedLimit = limit != null ? processGetter(limit) : Decimal.dInf;
   const isOneShot = Decimal.eq(unref(processedLimit), 1);
-  const processedVisibility = predicates.adopt(
-    visibility,
-    true,
-    `purchasable '${id}' visibility`,
-  ).holds;
+  const processedVisible = predicates.adopt(visible, true, `purchasable '${id}' visible`).holds;
   const processedBulkPurchase = bulkPurchase != null ? processGetter(bulkPurchase) : !isOneShot;
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
@@ -611,7 +607,7 @@ export function createPurchasable(
   const { active, maxed, canPurchase, amountToPurchase } = buildPurchasableComputeds(
     amount,
     processedLimit,
-    processedVisibility,
+    processedVisible,
     processedBulkPurchase,
     allRequirements,
   );
@@ -631,7 +627,7 @@ export function createPurchasable(
     requirements: allRequirements,
     display: resolvedDisplay,
     effect: effectComputed,
-    visibility: processedVisibility,
+    visible: processedVisible,
     bulkPurchase: processedBulkPurchase,
     onPurchase,
     on: handle.on,
@@ -688,9 +684,9 @@ export function createPurchasable(
  * Defaults to `limit: Infinity`.
  *
  * @param options - Shorthand configuration with resource and a cost shape
- * @param predicates - resolver `visibility` adopts through. Defaults to one
+ * @param predicates - resolver `visible` adopts through. Defaults to one
  *   over the ambient runtime, so build inside engine install/connect when
- *   `visibility` is a Gate
+ *   `visible` is a Gate
  * @returns A {@link Purchasable} (same return type as createPurchasable)
  *
  * @example Geometric (most common)
@@ -741,7 +737,7 @@ export function createScalingPurchasable(
     limit,
     initialAmount,
     onPurchase,
-    visibility,
+    visible,
     bulkPurchase,
   } = options;
 
@@ -771,7 +767,7 @@ export function createScalingPurchasable(
         initialAmount,
         effect: effectFn,
         onPurchase,
-        visibility,
+        visible,
         bulkPurchase,
       },
       predicates,

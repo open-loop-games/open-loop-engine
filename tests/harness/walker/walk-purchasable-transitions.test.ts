@@ -53,7 +53,7 @@ function buildEngineWithPurchasables(
   resourceInitial: number,
   defs: UpgradeDef[],
   extra?: {
-    visibility?: (def: UpgradeDef) => boolean;
+    visible?: (def: UpgradeDef) => boolean;
     extraRequirements?: (
       def: UpgradeDef,
       resource: ReturnType<typeof createResource>,
@@ -81,7 +81,7 @@ function buildEngineWithPurchasables(
             ...(extra?.extraRequirements?.(def, resource) ?? []),
           ],
           limit: def.limit ?? 1,
-          visibility: extra?.visibility?.(def) ?? true,
+          visible: extra?.visible?.(def) ?? true,
         }),
       });
       handle.category = category;
@@ -202,7 +202,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
             display: { description: def.id },
             requirements: [createCostRequirement({ resource, cost: def.cost })],
             limit: def.limit ?? 1,
-            visibility: true,
+            visible: true,
           }),
         });
         category.register([{ id: 'double', cost: 100 }]);
@@ -350,7 +350,7 @@ describe('walkPurchasableTransitions — purchasable-maxed', () => {
 
 describe('walkPurchasableTransitions — visibility is opaque', () => {
   it('emits becomes-affordable even when the purchasable is currently hidden', () => {
-    // visibility: Computable<boolean> has no mechanical flip distance, so the
+    // visible: a getter has no mechanical flip distance, so the
     // walker neither blocks nor annotates on it — hidden purchasables still
     // surface via their cost transition.
     const accessor = mockAccessor({ resources: { gold: 40 }, rates: { gold: 2 } });
@@ -360,7 +360,7 @@ describe('walkPurchasableTransitions — visibility is opaque', () => {
       'gold',
       40,
       [{ id: 'double', cost: 100 }],
-      { visibility: () => false },
+      { visible: () => false },
     );
 
     const out = walkPurchasableTransitions(engine, accessor);

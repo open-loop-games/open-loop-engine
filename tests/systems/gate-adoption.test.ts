@@ -788,11 +788,11 @@ describe('Predicate fields — every arm reaches the system', () => {
     stop();
   });
 
-  it('purchasable and producer visibility take a Gate', () => {
+  it('purchasable and producer visible take a Gate', () => {
     const { result, stop } = bootstrap((api) => {
       const upgrades = createPurchasableCategory<{ id: string }>({
         id: 'upgrades',
-        mapPurchasable: () => ({ display: {}, requirements: [], visibility: pointsGte(2) }),
+        mapPurchasable: () => ({ display: {}, requirements: [], visible: pointsGte(2) }),
       });
       upgrades.register({ id: 'u' });
       const producers = createProducerCategory<{ id: string }>({
@@ -805,7 +805,7 @@ describe('Predicate fields — every arm reaches the system', () => {
             costResource: api.points,
             baseCost: 0,
             costScaling: 1,
-            visibility: pointsGte(2),
+            visible: pointsGte(2),
           },
         }),
         registerTick: () => () => {},
@@ -818,11 +818,11 @@ describe('Predicate fields — every arm reaches the system', () => {
       };
     });
 
-    expect(unref(result.upgrade.visibility)).toBe(false);
-    expect(unref(result.farm.visibility)).toBe(false);
+    expect(unref(result.upgrade.visible)).toBe(false);
+    expect(unref(result.farm.visible)).toBe(false);
     result.api.points.value = 2;
-    expect(unref(result.upgrade.visibility)).toBe(true);
-    expect(unref(result.farm.visibility)).toBe(true);
+    expect(unref(result.upgrade.visible)).toBe(true);
+    expect(unref(result.farm.visible)).toBe(true);
     stop();
   });
 
@@ -909,13 +909,13 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     ).toThrow(/gate: /);
   });
 
-  it('purchasable visibility and grant when', () => {
+  it('purchasable visible and grant when', () => {
     const chain = createModifierChain('rate');
     const hidden = createPurchasableCategory<{ id: string }>({
       id: 'hidden',
-      mapPurchasable: () => ({ display: {}, requirements: [], visibility: unwiredFlag }),
+      mapPurchasable: () => ({ display: {}, requirements: [], visible: unwiredFlag }),
     });
-    expect(() => hidden.register({ id: 'u' })).toThrow(/purchasable 'u' visibility: /);
+    expect(() => hidden.register({ id: 'u' })).toThrow(/purchasable 'u' visible: /);
 
     const granted = createPurchasableCategory<{ id: string }>({
       id: 'granted',

@@ -69,7 +69,7 @@ const engine = createEngine({
 });
 ```
 
-A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it, where you authored it: at construction for `createGateRequirement`, and when the definition registers for a system's predicate field. Every systems-layer predicate field — challenge `visible` / `canStart` / `goal`, achievement `requirement` / `visible` / `hidden`, purchasable and producer visibility, automation tiers, cycle `endCondition`, reset `canReset`, a grant's `when` — takes a `Predicate`: a boolean, ref, getter or Gate. Code that reads one back off a definition evaluates it with `evaluatePredicate(def.goal, runtime)`, or reads the instance's reactive field instead.
+A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it, where you authored it: at construction for `createGateRequirement`, and when the definition registers for a system's predicate field. Every systems-layer predicate field — challenge `visible` / `canStart` / `goal`, achievement `requirement` / `visible` / `hidden`, purchasable and producer `visible`, automation tiers, cycle `endCondition`, reset `canReset`, a grant's `when` — takes a `Predicate`: a boolean, ref, getter or Gate. Code that reads one back off a definition evaluates it with `evaluatePredicate(def.goal, runtime)`, or reads the instance's reactive field instead.
 
 ```ts
 const unlocks = createPurchasableCategory<UnlockDef>({

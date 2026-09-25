@@ -55,7 +55,7 @@ export interface ProducerPurchaseConfig {
   /** Called after each purchase */
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this producer is visible in the UI. Default: `true` */
-  visibility?: Predicate;
+  visible?: Predicate;
   /**
    * Whether a bare `repeatable.purchase()` buys as many as affordable rather
    * than one; `purchase(1)` buys one either way. Default: `true`
@@ -318,7 +318,7 @@ function buildProducer<Def extends { id: string }>(
         limit: pc.limit,
         initialAmount: pc.initialAmount,
         onPurchase: pc.onPurchase,
-        visibility: pc.visibility,
+        visible: pc.visible,
         bulkPurchase: pc.bulkPurchase,
       },
       predicates,

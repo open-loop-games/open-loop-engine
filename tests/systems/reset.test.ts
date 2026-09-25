@@ -504,7 +504,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
       mapPurchasable: () => ({
         requirements: createCostRequirement({ resource: gold, cost: 10 }),
         limit: maxLevel,
-        visibility: shown,
+        visible: shown,
       }),
     });
     upgrades.register({ id: 'sharpen' });

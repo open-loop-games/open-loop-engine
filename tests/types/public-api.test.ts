@@ -1497,8 +1497,8 @@ describe('Systems predicate fields take Predicate', () => {
     expectTypeOf<Opt<import('@/index').CycleOptions['endCondition']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').ResetOptions['canReset']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').BankedAccelerationConfig['gate']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<PurchasableOptions['visibility']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').ProducerPurchaseConfig['visibility']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<PurchasableOptions['visible']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').ProducerPurchaseConfig['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['requirement']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['hidden']>>().toEqualTypeOf<P>();
@@ -1506,6 +1506,14 @@ describe('Systems predicate fields take Predicate', () => {
       ReadonlyArray<P | undefined>
     >();
     expectTypeOf<Opt<Grant['when']>>().toEqualTypeOf<P>();
+  });
+
+  it('purchasables name their visibility `visible`, like achievements and challenges', () => {
+    expectTypeOf<Purchasable['visible']>().toEqualTypeOf<ComputedRef<boolean>>();
+    expectTypeOf<'visibility' extends keyof Purchasable ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      'visibility' extends keyof PurchasableOptions ? true : false
+    >().toEqualTypeOf<false>();
   });
 
   it('dialog conditions stay Gate-only', () => {
