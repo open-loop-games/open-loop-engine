@@ -38,6 +38,20 @@ describe('Seeded RNG', () => {
       expect(new Set(draws).size).toBe(draws.length);
     }
   });
+  it('seeded streams reproduce pinned values', () => {
+    // Recorded seeds and replays depend on these exact streams (canonical Alea).
+    const golden: Record<number, number[]> = {
+      0: [0.5945264333859086, 0.8065849216654897, 0.12979769078083336, 0.6747123580425978],
+      42: [0.6848634963389486, 0.5463244677521288, 0.8455933185759932, 0.19908552314154804],
+      12345: [0.27138191112317145, 0.19615925149992108, 0.6810678059700876, 0.9894359013997018],
+    };
+    for (const [seed, values] of Object.entries(golden)) {
+      const rng = createSeededRNG(Number(seed));
+      expect([rng(), rng(), rng(), rng()]).toEqual(values);
+      seedRNG(Number(seed));
+      expect([random(), random(), random(), random()]).toEqual(values);
+    }
+  });
   it('getSeed() returns current seed', () => {
     seedRNG(123);
     expect(getSeed()).toBe(123);
