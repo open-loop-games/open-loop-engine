@@ -1,5 +1,8 @@
 /**
  * RNG — seedable pseudo-random number generator and weighted-item picker
+ *
+ * The module-global stream starts from an entropy seed, so every session draws
+ * differently until {@link seedRNG} makes it replayable.
  */
 
 import type { WeightedItem } from './types';
@@ -59,9 +62,11 @@ function nextAlea(state: AleaState): number {
 // Module-global RNG state. Held as a mutable object (not a closure) so
 // `getRNGState`/`setRNGState` can snapshot and restore it — required for
 // deterministic bisect in event-driven probes, where fire-time
-// resolution replays a sub-advance from a checkpoint.
-let currentSeed = 0;
-const globalAlea: AleaState = initAleaState(0);
+// resolution replays a sub-advance from a checkpoint. Seeded from entropy so an
+// unseeded game doesn't replay one fixed sequence every session; determinism
+// is opt-in through seedRNG.
+let currentSeed = Math.floor(Math.random() * 2 ** 32);
+const globalAlea: AleaState = initAleaState(currentSeed);
 
 function assignState(target: AleaState, source: AleaState): void {
   target.s0 = source.s0;
@@ -73,8 +78,10 @@ function assignState(target: AleaState, source: AleaState): void {
 /**
  * Reseed the module-global RNG. Resets the Alea state so subsequent
  * `random()` / `randomInt()` / etc. calls produce a deterministic stream
- * for the given seed. Does not affect closures returned by
- * {@link createSeededRNG}.
+ * for the given seed. Without a call, the stream starts from an entropy seed.
+ * A game that wants its draws to continue across reloads persists
+ * {@link getRNGState} and restores it with {@link setRNGState}. Does not
+ * affect closures returned by {@link createSeededRNG}.
  */
 export function seedRNG(seed: number): void {
   currentSeed = seed;
@@ -132,12 +139,19 @@ export function createSeededRNG(seed: number): () => number {
   const state = initAleaState(seed);
   return () => nextAlea(state);
 }
-/** Return the seed last passed to {@link seedRNG} (0 before any call). */
+/**
+ * Return the seed last passed to {@link seedRNG}, or the entropy seed the
+ * stream started from before any call. Passing it back to `seedRNG` replays
+ * the stream from its start.
+ */
 export function getSeed(): number {
   return currentSeed;
 }
 
-/** Draw the next value in [0, 1) from the module-global RNG. */
+/**
+ * Draw the next value in [0, 1) from the module-global RNG, which is
+ * entropy-seeded until {@link seedRNG} is called.
+ */
 export function random(): number {
   return nextAlea(globalAlea);
 }

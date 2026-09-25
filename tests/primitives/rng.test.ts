@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   seedRNG,
   getSeed,
@@ -101,6 +101,28 @@ describe('Seeded RNG', () => {
       expect(chance(1)).toBe(true);
       expect(chance(0)).toBe(false);
     }
+  });
+});
+
+describe('Unseeded module-global RNG', () => {
+  async function freshRNG() {
+    vi.resetModules();
+    return import('@/primitives/rng');
+  }
+
+  it('starts each load from a different entropy seed', async () => {
+    const a = await freshRNG();
+    const b = await freshRNG();
+    expect(a.getSeed()).not.toBe(b.getSeed());
+    expect(a.random()).not.toBe(b.random());
+  });
+
+  it('reports the seed it started from, so the stream can be replayed', async () => {
+    const rng = await freshRNG();
+    const seed = rng.getSeed();
+    const draws = [rng.random(), rng.random()];
+    rng.seedRNG(seed);
+    expect([rng.random(), rng.random()]).toEqual(draws);
   });
 });
 
