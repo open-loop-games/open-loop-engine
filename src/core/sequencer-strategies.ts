@@ -62,8 +62,8 @@ export interface ConditionalRule<M = void> {
  * @example
  * ```ts
  * const strategy = createConditionalStrategy(() => [
- *   { condition: () => health.value.lt(20), item: { id: 'heal' } },
- *   { condition: () => mana.value.gt(50), item: { id: 'fireball' } },
+ *   { condition: () => health.value.lt(20), item: { id: 'heal', metadata: undefined } },
+ *   { condition: () => mana.value.gt(50), item: { id: 'fireball', metadata: undefined } },
  * ]);
  * sequencer.fillStrategy = strategy;
  * ```

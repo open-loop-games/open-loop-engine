@@ -12,8 +12,9 @@
  * - **list** — items persist, a cursor advances through them. Call
  *   `resetCursor()` to replay from the start (e.g., on loop restart).
  *
- * Generic over metadata type M. When M = void, items carry no metadata
- * and the sequencer behaves like a simple string-ID queue.
+ * Generic over metadata type M. When M = void the sequencer behaves like a
+ * simple string-ID queue, but `metadata` is still a required field: write
+ * items as `{ id, metadata: undefined }`.
  *
  * @cluster sequencer
  */
@@ -25,7 +26,10 @@ import { reportAdvanceCapTrip } from './safeguards';
 
 // === TYPES ===
 
-/** A sequencer entry: string ID plus optional typed metadata. */
+/**
+ * A sequencer entry: string ID plus typed metadata. `metadata` is required
+ * even when `M` is `void` — pass `metadata: undefined`.
+ */
 export interface SequencerItem<M = void> {
   id: string;
   metadata: M;
