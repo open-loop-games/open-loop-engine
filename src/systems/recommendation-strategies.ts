@@ -185,7 +185,8 @@ export function createGoalDef(options: GoalDefOptions): RecommendationDef {
   const { id, metric, prefer = 'maximize', threshold } = options;
 
   function getEntry(ctx: RecommendationContext): BestOfEntry | null {
-    return ctx.bestOf.entries.value[metric] ?? null;
+    const entry = ctx.bestOf.entries.value[metric];
+    return entry?.status === 'valid' ? entry : null;
   }
 
   return {

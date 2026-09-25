@@ -267,6 +267,16 @@ describe('createGoalDef', () => {
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
+  it('canApply returns false when entry status is stale', () => {
+    const { runCycle, bestOf, buildContext } = createPopulatedStack('gs-stale');
+
+    runCycle(100, 5);
+    bestOf.invalidate('gold');
+
+    const strategy = createGoalDef({ id: 'goal', metric: 'gold' });
+    expect(strategy.canApply(buildContext())).toBe(false);
+  });
+
   // ==========================================================================
   // score
   // ==========================================================================
