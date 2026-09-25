@@ -14,14 +14,7 @@ import type { Engine, EngineConfig, EngineModule } from '@/engine';
 import type { TimerProvider } from '@/core/tick-driver';
 import { createMemoryStorage } from '@/core/save-manager';
 
-/**
- * No-op timer for scratch engines. The workbench drives every tick manually
- * (`cell.tick` → `tickDriver.stepOnce()`), so a live `setInterval` from
- * `engine.start()` is pure liability: it would race the manual stepping and,
- * because the harness never sees the per-run engine, leak on the final run —
- * ticking the imported save after the sweep returns. Defaulting the scratch
- * engine here means no real OS timer is ever armed, so nothing can leak.
- */
+/** `start()` arms no OS timer; callers step the scratch engine by hand. */
 const NOOP_TIMER_PROVIDER: TimerProvider = {
   setInterval: () => 0,
   clearInterval: () => {},
