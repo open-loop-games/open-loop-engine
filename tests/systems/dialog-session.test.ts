@@ -330,6 +330,25 @@ describe('createDialogSession', () => {
     expect(session.present()?.nodeId).toBe('training');
   });
 
+  it('keeps an active conversation silent when a start fails its entry gate', () => {
+    const lockedGraph: DialogGraph = {
+      id: 'locked',
+      entry: 'door',
+      nodes: [{ id: 'door', text: 'Door', condition: { kind: 'flag', id: 'never' } }],
+    };
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph, lockedGraph] }),
+    );
+    session.start('rask-greeting');
+    const presented = vi.fn();
+    session.on('presented', presented);
+    session.start('locked');
+    expect(presented).not.toHaveBeenCalled();
+    expect(session.present()?.nodeId).toBe('open');
+    session.start('rask-greeting');
+    expect(presented).toHaveBeenCalledTimes(1);
+  });
+
   it('reads visit counts through the session', () => {
     const session = withEngine(buildAccessor(), () =>
       createDialogSession({ id: 'main', graphs: [greetingGraph] }),

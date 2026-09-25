@@ -124,9 +124,10 @@ export interface DialogRuntime {
    * Activate a graph at its entry node (or an explicit node), running onEnter
    * effects and falling through `next` until a node presents. Replaces an
    * active conversation without finishing it. Does nothing when the entry
-   * node's condition fails.
+   * node's condition fails, and returns `false` to say so; a return of
+   * nothing reads as started, so adapters written before it still conform.
    */
-  start(graphId: string, entryNode?: string): void;
+  start(graphId: string, entryNode?: string): boolean | void;
   /** Return the current presentation snapshot, or null when no graph is active. */
   present(): DialogPresentation | null;
   /** Apply the chosen choice's outcomes and advance the pointer. */
@@ -323,17 +324,15 @@ export function createNativeDialogRuntime(
     if (snap) events.emit('presented', snap);
   }
 
-  function start(graphId: string, entryNode?: string): void {
+  function start(graphId: string, entryNode?: string): boolean {
     const graph = lookupGraph(graphId);
     const targetId = entryNode ?? graph.entry;
     const targetNode = lookupNode(graphId, targetId);
-    if (targetNode.condition && !holds(targetNode.condition)) {
-      // Entry-node condition fails — conversation cannot start.
-      return;
-    }
+    if (targetNode.condition && !holds(targetNode.condition)) return false;
     activate(graphId, targetId);
     settle();
     emitPresented();
+    return true;
   }
 
   function present(): DialogPresentation | null {

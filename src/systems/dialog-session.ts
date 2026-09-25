@@ -98,7 +98,8 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /**
    * Activate a graph at its entry node (or an explicit node id). Replaces an
    * active conversation without emitting `finished` for it. When the entry
-   * node's condition fails, no conversation starts and an active one continues.
+   * node's condition fails, no conversation starts and an active one
+   * continues without presenting again.
    */
   start(graphId: string, entryNode?: string): void;
   /** Return the current presentation snapshot, or null when no graph is active. */
@@ -220,12 +221,13 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // applied and the pointer has moved, so the snapshot runs regardless and the
   // saved state never disagrees with the runtime.
   function start(graphId: string, entryNode?: string): void {
+    let started: boolean | void;
     try {
-      runtime.start(graphId, entryNode);
+      started = runtime.start(graphId, entryNode);
     } finally {
       snapshot();
     }
-    emitPresentedIfActive();
+    if (started !== false) emitPresentedIfActive();
   }
 
   function choose(choiceId: string): void {
