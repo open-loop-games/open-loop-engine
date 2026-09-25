@@ -78,8 +78,8 @@ export interface Inventory {
   readonly resources: ReadonlyMap<string, Resource<DecimalSource>>;
   /** Manual serialization — only needed when NOT using items-based persistence */
   serialize(): Record<string, string>;
-  /** Manual deserialization — only needed when NOT using items-based persistence */
-  deserialize(data: Record<string, string>): void;
+  /** Write back a {@link serialize} record — only needed when NOT using items-based persistence */
+  restore(data: Record<string, string>): void;
 }
 
 // === FACTORIES ===
@@ -233,8 +233,8 @@ export function createInventory(options: InventoryOptions): Inventory {
       return bag.serialize();
     },
 
-    deserialize(data: Record<string, string>): void {
-      bag.deserialize(data);
+    restore(data: Record<string, string>): void {
+      bag.restore(data);
     },
   };
 

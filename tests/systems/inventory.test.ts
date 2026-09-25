@@ -254,7 +254,7 @@ describe('Inventory', () => {
   });
 
   describe('persistence', () => {
-    it('serialize and deserialize round-trips', () => {
+    it('serialize and restore round-trip', () => {
       const inv = createInventory({
         id: 'inv',
         baseCapacity: 100,
@@ -265,7 +265,7 @@ describe('Inventory', () => {
       expect(data.iron).toBe('7');
 
       const inv2 = createInventory({ id: 'inv2', baseCapacity: 100 });
-      inv2.deserialize(data);
+      inv2.restore(data);
       expect(inv2.get('wood').eq(42)).toBe(true);
       expect(inv2.get('iron').eq(7)).toBe(true);
     });

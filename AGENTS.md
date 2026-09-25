@@ -135,6 +135,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 - Files: kebab-case.ts
 - Factories: `create*()` pattern
 - Standard verbs: `getX` aggregator, `isX` type guard, `formatX` formatter, `setupX` wiring. Noun-form (`multiplicativeEffect`, `replacementBinding`, `fractional`) is the carve-out for helpers consumed declaratively as configuration data.
+- `restore(x)` writes back only what the same object's `snapshot()`/`serialize()` produced. Rebuilding runtime from persisted refs is hydration: it runs on its own through `onHydrated` and is never a public method.
 - Events: a past-tense phrase for what happened (`purchased`, `leveledUp`, `cancelled`); `before*`/`after*` pairs bracket a hook point; a `family:` prefix groups a family (`save:loaded`, `instance:died`). Option callbacks stay `onVerb` (`onPurchase`, `onLevelUp`).
 
 **Code markers:**

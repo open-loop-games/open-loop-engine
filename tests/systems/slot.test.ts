@@ -332,32 +332,13 @@ describe('callbacks', () => {
     expect(onDeselect).toHaveBeenCalledWith('a');
     expect(onDeselect).toHaveBeenCalledTimes(1);
   });
-
-  it('callbacks do NOT fire on restore', () => {
-    const onSelect = vi.fn();
-    const onDeselect = vi.fn();
-    const slot = createTestSlot({
-      id: 'cb',
-      mode: 'multi',
-      maxSelections: 5,
-      onSelect,
-      onDeselect,
-    });
-    slot.select('a');
-    onSelect.mockClear();
-    onDeselect.mockClear();
-
-    slot.restore(['b', 'c']);
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onDeselect).not.toHaveBeenCalled();
-  });
 });
 
 // ============================================================================
-// resync — re-establish onSelect side effects after a save loads
+// Hook resync — onSelect side effects follow a load and a restore
 // ============================================================================
 
-describe('resync', () => {
+describe('hook resync', () => {
   it('invokes onSelect once for the rehydrated selection after a save loads', () => {
     const onSelect = vi.fn();
     resetAllPersistentContexts();
@@ -365,44 +346,48 @@ describe('resync', () => {
 
     // The save-restore path writes the selection straight into the ref,
     // bypassing select(); the slot re-establishes the side effect once the
-    // load settles, and a later resync finds nothing left to apply.
+    // load settles, and a second load of the same selection finds nothing
+    // left to apply.
     deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
     expect(slot.selected.value).toEqual(['cabin']);
     expect(onSelect).toHaveBeenCalledWith('cabin');
 
-    slot.resync();
+    deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('applies the hooks to a selection restore() wrote', () => {
+  it('restore() runs the hooks for the selection it writes, firing no events', () => {
     const onSelect = vi.fn();
     const onDeselect = vi.fn();
+    const onEvent = vi.fn();
     const slot = createTestSlot({ id: 'lo', mode: 'multi', onSelect, onDeselect });
     slot.select('a');
+    slot.select('c');
+    slot.on('selected', onEvent);
+    slot.on('deselected', onEvent);
 
-    slot.restore(['b']);
-    slot.resync();
+    slot.restore(['b', 'c']);
 
-    expect(onDeselect).toHaveBeenCalledWith('a');
+    expect(onDeselect.mock.calls).toEqual([['a']]);
     expect(onSelect).toHaveBeenLastCalledWith('b');
+    expect(onSelect).toHaveBeenCalledTimes(3);
+    expect(onEvent).not.toHaveBeenCalled();
   });
 
-  it('fires no selected events on resync', () => {
+  it('fires no selected events on a load', () => {
     const onSelected = vi.fn();
     resetAllPersistentContexts();
     const slot = createSlot({ id: 'ev', mode: 'multi', maxSelections: 5, onSelect: vi.fn() });
     slot.on('selected', onSelected);
 
     deserializePersistents(getAllPersistentRefs(), { 'slot:ev': { selected: ['a', 'b'] } });
-    slot.resync();
     expect(onSelected).not.toHaveBeenCalled();
   });
 
-  it('is a no-op when no onSelect is configured', () => {
+  it('a load with no onSelect configured keeps the selection', () => {
     resetAllPersistentContexts();
     const slot = createSlot({ id: 'noop', mode: 'single' });
     deserializePersistents(getAllPersistentRefs(), { 'slot:noop': { selected: ['x'] } });
-    expect(() => slot.resync()).not.toThrow();
     expect(slot.selected.value).toEqual(['x']);
   });
 });

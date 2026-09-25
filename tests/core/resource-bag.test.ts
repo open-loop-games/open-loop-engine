@@ -131,7 +131,7 @@ describe('ResourceBag', () => {
       expect(bag.amounts).toBe(ref);
       expect(ref.size).toBe(0);
 
-      bag.deserialize({ stone: '3' });
+      bag.restore({ stone: '3' });
       expect(bag.amounts).toBe(ref);
       expect(ref.get('stone')?.eq(3)).toBe(true);
     });
@@ -548,28 +548,28 @@ describe('ResourceBag', () => {
       expect('iron' in serialized).toBe(false);
     });
 
-    it('deserializes from record of strings', () => {
+    it('restores from a record of strings', () => {
       const bag = createResourceBag();
-      bag.deserialize({ wood: '10', iron: '5' });
+      bag.restore({ wood: '10', iron: '5' });
       expect(bag.get('wood').eq(10)).toBe(true);
       expect(bag.get('iron').eq(5)).toBe(true);
     });
 
-    it('deserialize clears types not in save data', () => {
+    it('restore clears types not in save data', () => {
       const bag = createResourceBag({ initial: { wood: 10, iron: 5 } });
-      bag.deserialize({ gold: '99' });
+      bag.restore({ gold: '99' });
       expect(bag.get('wood').eq(0)).toBe(true);
       expect(bag.get('iron').eq(0)).toBe(true);
       expect(bag.get('gold').eq(99)).toBe(true);
     });
 
-    it('round-trip serialize/deserialize preserves state', () => {
+    it('round-trip serialize/restore preserves state', () => {
       const bag = createResourceBag({ initial: { wood: 10, iron: 5, gold: 0 } });
       bag.add('gold', 3);
       const serialized = bag.serialize();
 
       const bag2 = createResourceBag();
-      bag2.deserialize(serialized);
+      bag2.restore(serialized);
       expect(bag2.get('wood').eq(10)).toBe(true);
       expect(bag2.get('iron').eq(5)).toBe(true);
       expect(bag2.get('gold').eq(3)).toBe(true);
@@ -596,9 +596,9 @@ describe('ResourceBag', () => {
       expect(bag.total().eq(3)).toBe(true);
     });
 
-    it('total() is correct after deserialize() replaces contents', () => {
+    it('total() is correct after restore() replaces contents', () => {
       const bag = createResourceBag({ initial: { a: 10, b: 20 } });
-      bag.deserialize({ x: '100', y: '50' });
+      bag.restore({ x: '100', y: '50' });
       expect(bag.total().eq(150)).toBe(true);
       bag.add('x', 5);
       expect(bag.total().eq(155)).toBe(true);

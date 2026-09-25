@@ -99,7 +99,7 @@ export interface ResourceBag {
    * iterate all holdings every tick and cannot afford the per-call
    * allocation of `types()` / `entries()`, which each build a fresh array.
    *
-   * The map reference is stable across `clear()` and `deserialize()` —
+   * The map reference is stable across `clear()` and `restore()` —
    * entries are rewritten in place. The bag's mutation funnel deletes any
    * entry whose amount reaches zero, so iterating this map visits only
    * non-zero types (matching `entries()` semantics) without the per-call
@@ -130,8 +130,8 @@ export interface ResourceBag {
   link(typeId: string, resource: Resource<DecimalSource>): () => void;
   /** Serialize all non-zero amounts to a plain string-keyed record for persistence. */
   serialize(): Record<string, string>;
-  /** Restore amounts from a serialized record, replacing all current amounts. */
-  deserialize(data: Record<string, string>): void;
+  /** Replace all current amounts with a record {@link serialize} produced. */
+  restore(data: Record<string, string>): void;
   /** Human-readable label used by UIs and debug output. */
   displayName: string;
 }
@@ -418,7 +418,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       return result;
     },
 
-    deserialize(data: Record<string, string>): void {
+    restore(data: Record<string, string>): void {
       amounts.clear();
       cachedTotal = Decimal.dZero;
       for (const [typeId, valStr] of Object.entries(data)) {

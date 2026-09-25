@@ -335,15 +335,6 @@ export interface ChallengeCategory<
   readonly size: number;
 
   /**
-   * Bring the runtime-only overrides and content patches in line with each
-   * challenge's `active`: push them for an active challenge, pop them for an
-   * inactive one. Runs on its own after every save load and every reset, so
-   * a consumer need not call it. Calls no `onEnter`/`onExit`: a restored
-   * `active` is state, not an entry.
-   */
-  restore(): void;
-
-  /**
    * Release runtime state: pop every pushed override and patch and stop the
    * goal tick. `active` and the hooks are left alone, so a save taken after
    * teardown keeps the challenge.
@@ -636,8 +627,6 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     get size(): number {
       return base.size;
     },
-
-    restore: reconcileScopes,
 
     dispose(): void {
       unregisterTick?.();

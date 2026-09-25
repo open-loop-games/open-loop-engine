@@ -219,14 +219,14 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     expect(combat()).toBe(10);
   });
 
-  it('restore() after the load adds no second scope', () => {
+  it('a second load of the same save adds no second scope', () => {
     build().zombie.enter();
     const midChallenge = save();
     resetAllPersistentContexts();
 
-    const { challenges, rules, log } = build();
+    const { rules, log } = build();
     deserializePersistents(getAllPersistentRefs(), midChallenge);
-    challenges.restore();
+    deserializePersistents(getAllPersistentRefs(), midChallenge);
 
     expect(rules.scopeDepth).toBe(1);
     expect(log).toEqual([]);

@@ -13,7 +13,7 @@
  * - `onSelect`/`onDeselect` hooks for wiring modifiers, VFX, or side effects
  * - Insertion-order preservation (matters for queue-ordered systems)
  * - Snapshot/restore for loadout saving
- * - Loads and resets revalidate the selection and bring the hooks in line
+ * - Restores, loads and resets revalidate the selection and bring the hooks in line
  *
  * The slot manages **selection state only**. It does not know what the selected
  * items *are* — consumers map item IDs to definitions, modifiers, and effects.
@@ -76,14 +76,14 @@ export interface SlotOptions {
   canSelect?: (itemId: string) => boolean;
   /**
    * Called after an item is successfully selected. Use for runtime-only side
-   * effects — modifier wiring, VFX: once a load or reset settles, the slot
-   * calls it for each restored item whose effect isn't applied yet (see
-   * {@link Slot.resync}), so it must not grant game state.
+   * effects — modifier wiring, VFX: once a load or reset settles, and after
+   * {@link Slot.restore}, the slot calls it for each selected item whose
+   * effect isn't applied yet, so it must not grant game state.
    */
   onSelect?: (itemId: string) => void;
   /**
    * Called after an item is successfully deselected, and for an applied item
-   * a load or reset removed. Use for modifier teardown.
+   * a load, reset or restore removed. Use for modifier teardown.
    */
   onDeselect?: (itemId: string) => void;
 }
@@ -143,20 +143,13 @@ export interface Slot {
   /** Copy of current selections for loadout saving */
   snapshot(): string[];
   /**
-   * Bulk-replace selections from a loadout. Silently skips invalid IDs and
-   * truncates to capacity. Fires no events or hooks; call {@link resync} to
-   * bring the hooks in line.
+   * Bulk-replace selections from a {@link snapshot}. Silently skips invalid
+   * IDs and truncates to capacity. Brings the hooks in line — `onDeselect`
+   * for each applied item no longer selected, then `onSelect` for each
+   * selected item not yet applied — and fires no events: a restored loadout
+   * is state, not a player action. Loads and resets do the same on their own.
    */
   restore(ids: string[]): void;
-  /**
-   * Bring the hooks' side effects in line with the selection: `onDeselect` for
-   * each applied item no longer selected, then `onSelect` for each selected
-   * item not yet applied. Fires no events (state restoration, not a user
-   * action). Runs on its own once a load or reset settles, after the loaded
-   * selection is filtered through the pool and capacity; call it after
-   * {@link restore}.
-   */
-  resync(): void;
 
   on: Emittable<SlotEvents>['on'];
 }
@@ -215,7 +208,7 @@ export function createSlot(options: SlotOptions): Slot {
   }
 
   // Items whose onSelect side effect is in place, so resync can undo exactly
-  // those a load or reset removed.
+  // those a load, reset or restore removed.
   const applied = new Set<string>();
 
   function internalDeselect(itemId: string): boolean {
@@ -308,8 +301,10 @@ export function createSlot(options: SlotOptions): Slot {
 
   function restore(ids: string[]): void {
     _selected.value = validSelection(ids);
+    resync();
   }
 
+  /** Run the hooks that bring the applied side effects in line with the selection. */
   function resync(): void {
     for (const itemId of [...applied]) {
       if (_selected.value.includes(itemId)) continue;
@@ -346,7 +341,6 @@ export function createSlot(options: SlotOptions): Slot {
     toggle,
     snapshot,
     restore,
-    resync,
     on: handle.on,
   };
   return attachContextReset(slot, contextId);
