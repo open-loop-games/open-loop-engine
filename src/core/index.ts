@@ -44,6 +44,7 @@ export type {
   ExponentialModifierOptions,
   ModifierChainEvents,
   ModifierChain,
+  ModifierChainSlot,
   BindOptions,
   BindingRecord,
   Grant,

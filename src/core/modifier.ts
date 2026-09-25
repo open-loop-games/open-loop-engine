@@ -489,6 +489,13 @@ export type Grant =
  * The chain composes them internally via {@link createSequentialModifier}
  * and exposes `apply` / `invert` / `description`.
  *
+ * Evaluation follows insertion order, so a chain mixing `+10` and `×2`
+ * gives a different value depending on which went in first. A contribution
+ * that comes and goes keeps its place by staying in the chain: `bind` with
+ * `active` gates it where it sits, {@link ModifierChain.reserve} holds an
+ * empty position for it, and {@link ModifierChain.replace} swaps it in
+ * place. Removing and re-adding moves it to the end.
+ *
  * Implements the {@link Modifier} interface so it can be used anywhere a modifier is expected.
  */
 export interface ModifierChain extends Modifier {
@@ -518,9 +525,23 @@ export interface ModifierChain extends Modifier {
    * @returns A function that removes the binding (modifier + attribution record) from the chain.
    */
   bind(opts: BindOptions): () => void;
-  /** Remove a previously added modifier */
+  /** Remove a previously added modifier (its first occurrence, slots included) */
   remove(modifier: Modifier): void;
-  /** Read-only snapshot of the current modifiers in the chain */
+  /**
+   * Swap `current` for `next` at `current`'s position, recomposing once.
+   * Use it to substitute a modifier without moving it to the end.
+   *
+   * @returns `false`, changing nothing, when `current` isn't in the chain.
+   */
+  replace(current: Modifier, next: Modifier): boolean;
+  /**
+   * Reserve a position at the end of the chain for modifiers added later.
+   * Whatever goes through the slot evaluates at that position, however long
+   * it was empty, so a contribution that toggles, or that registers before
+   * it first applies, lands in the same place every time.
+   */
+  reserve(): ModifierChainSlot;
+  /** Read-only snapshot of the current modifiers in the chain, in evaluation order */
   readonly modifiers: readonly Modifier[];
   /**
    * Attribution records for every modifier added via {@link bind} (modifiers
@@ -531,6 +552,18 @@ export interface ModifierChain extends Modifier {
   bindings(): readonly BindingRecord[];
   /** Subscribe to chain events */
   on: Emittable<ModifierChainEvents>['on'];
+}
+
+/** A position reserved in a {@link ModifierChain} by {@link ModifierChain.reserve}. */
+export interface ModifierChainSlot {
+  /**
+   * Add a modifier at the slot's position, after any already in the slot.
+   *
+   * @returns A function that removes it again.
+   */
+  add(modifier: Modifier): () => void;
+  /** Give the position up, removing any modifiers still in the slot. */
+  release(): void;
 }
 
 /**
@@ -586,7 +619,10 @@ export interface ModifierChain extends Modifier {
  * can trace every modifier to its source for balance-sim attribution.
  */
 export function createModifierChain(id: string): ModifierChain {
-  const items: Modifier[] = [];
+  // `layout` is the chain in evaluation order, with reserved slots inline;
+  // `items` is its flattening, rebuilt on every recompose.
+  const layout: (Modifier | ChainSlot)[] = [];
+  let items: Modifier[] = [];
   const bindingsById = new Map<string, BindingRecord>();
   const handle = createEmitHandle<ModifierChainEvents>();
 
@@ -606,8 +642,23 @@ export function createModifierChain(id: string): ModifierChain {
 
   let composed = createSequentialModifier(items);
 
+  /** Where `modifier` first occurs in evaluation order: the list holding it and its index there. */
+  function locate(
+    modifier: Modifier,
+  ): { list: (Modifier | ChainSlot)[]; index: number } | undefined {
+    for (const [index, entry] of layout.entries()) {
+      if (entry === modifier) return { list: layout, index };
+      if (entry instanceof ChainSlot) {
+        const inSlot = entry.members.indexOf(modifier);
+        if (inSlot >= 0) return { list: entry.members, index: inSlot };
+      }
+    }
+    return undefined;
+  }
+
   function recompose(): void {
     profile('modifier.chain.recompose', () => {
+      items = layout.flatMap((entry) => (entry instanceof ChainSlot ? entry.members : [entry]));
       composed = createSequentialModifier(items);
       itemsVersion.value++;
       handle.emit('change');
@@ -638,7 +689,7 @@ export function createModifierChain(id: string): ModifierChain {
     },
 
     add(modifier: Modifier): () => void {
-      items.push(modifier);
+      layout.push(modifier);
       recompose();
       return () => chain.remove(modifier);
     },
@@ -707,11 +758,42 @@ export function createModifierChain(id: string): ModifierChain {
     },
 
     remove(modifier: Modifier): void {
-      const idx = items.indexOf(modifier);
-      if (idx >= 0) {
-        items.splice(idx, 1);
+      const found = locate(modifier);
+      if (found) {
+        found.list.splice(found.index, 1);
         recompose();
       }
+    },
+
+    replace(current: Modifier, next: Modifier): boolean {
+      const found = locate(current);
+      if (!found) return false;
+      found.list[found.index] = next;
+      recompose();
+      return true;
+    },
+
+    reserve(): ModifierChainSlot {
+      const slot = new ChainSlot();
+      layout.push(slot);
+      return {
+        add(modifier: Modifier): () => void {
+          slot.members.push(modifier);
+          recompose();
+          return () => {
+            const index = slot.members.indexOf(modifier);
+            if (index < 0) return;
+            slot.members.splice(index, 1);
+            recompose();
+          };
+        },
+        release(): void {
+          const index = layout.indexOf(slot);
+          if (index < 0) return;
+          layout.splice(index, 1);
+          if (slot.members.length > 0) recompose();
+        },
+      };
     },
 
     get modifiers(): readonly Modifier[] {
@@ -731,6 +813,11 @@ export function createModifierChain(id: string): ModifierChain {
   getCurrentChainRegistry()?.register(chain);
 
   return chain;
+}
+
+/** A reserved position in a chain's layout; its members evaluate there, in add order. */
+class ChainSlot {
+  readonly members: Modifier[] = [];
 }
 
 /**

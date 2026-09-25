@@ -254,6 +254,79 @@ describe('createModifierChain', () => {
   });
 });
 
+describe('chain order', () => {
+  const plus10 = () => createAdditiveModifier({ addend: 10 });
+  const times2 = () => createMultiplicativeModifier({ multiplier: 2 });
+
+  it('evaluates modifiers in the order they were added', () => {
+    const a = createModifierChain('order-a');
+    a.add(plus10());
+    a.add(times2());
+    const b = createModifierChain('order-b');
+    b.add(times2());
+    b.add(plus10());
+    expect(new Decimal(a.apply(1)).toNumber()).toBe(22);
+    expect(new Decimal(b.apply(1)).toNumber()).toBe(12);
+  });
+
+  it('replace swaps a modifier in place', () => {
+    const chain = createModifierChain('replace');
+    const flat = plus10();
+    const double = times2();
+    chain.add(flat);
+    chain.add(double);
+    const bigger = createAdditiveModifier({ addend: 20 });
+    expect(chain.replace(flat, bigger)).toBe(true);
+    expect(chain.modifiers).toEqual([bigger, double]);
+    expect(new Decimal(chain.apply(1)).toNumber()).toBe(42);
+    expect(chain.replace(flat, bigger)).toBe(false);
+  });
+
+  it('a reserved slot holds its place while it is empty', () => {
+    const chain = createModifierChain('slot');
+    const slot = chain.reserve();
+    chain.add(times2());
+    expect(chain.modifiers).toHaveLength(1);
+
+    const flat = plus10();
+    const removeFlat = slot.add(flat);
+    expect(chain.modifiers[0]).toBe(flat);
+    expect(new Decimal(chain.apply(1)).toNumber()).toBe(22);
+
+    removeFlat();
+    expect(new Decimal(chain.apply(1)).toNumber()).toBe(2);
+    slot.add(plus10());
+    expect(new Decimal(chain.apply(1)).toNumber()).toBe(22);
+  });
+
+  it('modifiers in one slot keep their add order, and release empties the slot', () => {
+    const chain = createModifierChain('slot-release');
+    const slot = chain.reserve();
+    chain.add(times2());
+    const first = plus10();
+    const second = createAdditiveModifier({ addend: 5 });
+    slot.add(first);
+    slot.add(second);
+    expect(chain.modifiers.slice(0, 2)).toEqual([first, second]);
+
+    chain.remove(first);
+    expect(chain.modifiers).toHaveLength(2);
+    slot.release();
+    expect(new Decimal(chain.apply(1)).toNumber()).toBe(2);
+  });
+
+  it('a computed over the chain tracks slot changes', () => {
+    const chain = createModifierChain('slot-reactive');
+    const slot = chain.reserve();
+    const value = computed(() => new Decimal(chain.apply(1)).toNumber());
+    expect(value.value).toBe(1);
+    const remove = slot.add(times2());
+    expect(value.value).toBe(2);
+    remove();
+    expect(value.value).toBe(1);
+  });
+});
+
 describe('nested chains', () => {
   it('a chain describes itself as one flat line per described child', () => {
     const inner = createModifierChain('desc-inner');
