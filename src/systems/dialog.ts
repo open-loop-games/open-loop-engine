@@ -37,11 +37,17 @@ export interface DialogNode {
    * through the ambient Gate runtime — typed predicate spec, no closures.
    */
   condition?: Gate;
-  /** Player-facing choices. Empty (or omitted) = terminal node. */
+  /**
+   * Player-facing choices. A node with none visible falls through to `next`,
+   * and is terminal without one.
+   */
   choices?: DialogChoice[];
   /** Effects emitted on node entry, before choice presentation. */
   onEnter?: IEffect[];
-  /** Explicit fall-through pointer for non-choice advancement. */
+  /**
+   * Fall-through target, entered when this node has no visible choice. When
+   * the target's condition fails, the conversation stops at this node.
+   */
   next?: string;
 }
 
@@ -75,7 +81,10 @@ export interface DialogPresentation {
   text: string;
   /** Choices already filtered by condition evaluation. */
   choices: ReadonlyArray<{ id: string; text: string }>;
-  /** True when the conversation has reached a terminal node (no further choices or fall-through). */
+  /**
+   * True when the line offers no visible choice and no enterable `next`. The
+   * conversation stays active until the UI calls `finish()`.
+   */
   finished: boolean;
 }
 
@@ -108,7 +117,12 @@ export interface DialogRuntimeState {
  * option without consumer changes.
  */
 export interface DialogRuntime {
-  /** Activate a graph at its entry node (or an explicit node). Runs onEnter outcomes. */
+  /**
+   * Activate a graph at its entry node (or an explicit node), running onEnter
+   * effects and falling through `next` until a node presents. Replaces an
+   * active conversation without finishing it. Does nothing when the entry
+   * node's condition fails.
+   */
   start(graphId: string, entryNode?: string): void;
   /** Return the current presentation snapshot, or null when no graph is active. */
   present(): DialogPresentation | null;
@@ -136,7 +150,11 @@ export interface DialogRuntimeEvents {
   presented: (snapshot: DialogPresentation) => void;
   /** Fired immediately after a choice's outcomes apply, before pointer advancement. */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
-  /** Fired when the runtime clears its active pointer (terminal node, finish(), or condition failure). */
+  /**
+   * Fired when the runtime clears its active pointer: `finish()`, or a choice
+   * with no `next` or whose `next` is gated off. Landing on a line presented
+   * with `finished: true` does not fire it.
+   */
   finished: (info: { graphId: string }) => void;
 }
 
@@ -242,31 +260,36 @@ export function createNativeDialogRuntime(
     }
   }
 
+  /** Whether a node's fall-through `next` exists and its gate passes. */
+  function canEnterNext(graphId: string, node: DialogNode): boolean {
+    if (!node.next) return false;
+    const nextNode = lookupNode(graphId, node.next);
+    return !nextNode.condition || holds(nextNode.condition);
+  }
+
   /**
-   * Auto-advance through `next`-only fall-through nodes until landing on a
-   * node with at least one (gated) choice or one with no `next` (terminal).
-   * Each visited node fires its onEnter and increments its visit count.
-   *
-   * If a fall-through target's condition evaluates falsy, treat the chain as
-   * ending at the current node (don't enter the gated node).
+   * Auto-advance through fall-through nodes — no visible choices and an
+   * enterable `next` — until landing on a node with a visible choice or one
+   * whose `next` is absent or gated off. Each entered node fires its onEnter
+   * and increments its visit count.
    */
   function settle(): void {
+    const graphId = state.activeGraphId;
+    let nodeId = state.activeNodeId;
+    if (!graphId || !nodeId) return;
     // Guard against an authored next-only cycle (a → b → a): without it the
-    // fall-through walk spins forever, hanging the game and inflating visitCounts.
-    const seen = new Set<string>();
-    while (state.activeGraphId && state.activeNodeId) {
-      if (seen.has(state.activeNodeId)) {
-        throw new Error(
-          `Dialog graph "${state.activeGraphId}" has a next-only cycle through node "${state.activeNodeId}"`,
-        );
+    // fall-through walk spins forever. Checked before entering, so no node's
+    // onEnter runs twice on the way to the throw.
+    const seen = new Set<string>([nodeId]);
+    for (;;) {
+      const node = lookupNode(graphId, nodeId);
+      if (gatedChoices(node).length > 0 || !canEnterNext(graphId, node)) return;
+      nodeId = node.next!;
+      if (seen.has(nodeId)) {
+        throw new Error(`Dialog graph "${graphId}" has a next-only cycle through node "${nodeId}"`);
       }
-      seen.add(state.activeNodeId);
-      const node = lookupNode(state.activeGraphId, state.activeNodeId);
-      const hasChoices = (node.choices?.length ?? 0) > 0;
-      if (hasChoices || !node.next) return;
-      const nextNode = lookupNode(state.activeGraphId, node.next);
-      if (nextNode.condition && !holds(nextNode.condition)) return;
-      activate(state.activeGraphId, node.next);
+      seen.add(nodeId);
+      activate(graphId, nodeId);
     }
   }
 
@@ -300,7 +323,7 @@ export function createNativeDialogRuntime(
       nodeId: node.id,
       text: node.text,
       choices: choices.map((c) => ({ id: c.id, text: c.text })),
-      finished: choices.length === 0 && !node.next,
+      finished: choices.length === 0 && !canEnterNext(state.activeGraphId, node),
     };
   }
 

@@ -98,6 +98,29 @@ describe('createDialogSession', () => {
     expect(() => session.start('loop-graph')).toThrow(/cycle/);
   });
 
+  it('throws on a cycle before re-entering a node, leaving the saved state in step', () => {
+    const accessor = buildAccessor();
+    const setStateSpy = vi.spyOn(accessor, 'setState');
+    const graph: DialogGraph = {
+      id: 'loop-with-effect',
+      entry: 'a',
+      nodes: [
+        { id: 'a', text: 'A', next: 'b', onEnter: [{ type: 'state', target: 'met', value: 1 }] },
+        { id: 'b', text: 'B', next: 'a' },
+      ],
+    };
+    const session = withEngine(accessor, () =>
+      createDialogSession({ id: 'cycle-sync', graphs: [graph] }),
+    );
+    expect(() => session.start('loop-with-effect')).toThrow(/cycle/);
+    expect(setStateSpy).toHaveBeenCalledTimes(1);
+    const stateRef = getAllPersistentRefs().get('dialog-sessions/cycle-sync.state') as {
+      value: { activeNodeId?: string; visitCounts: Record<string, Record<string, number>> };
+    };
+    expect(stateRef.value.activeNodeId).toBe(session.present()?.nodeId);
+    expect(stateRef.value.visitCounts['loop-with-effect']).toEqual({ a: 1, b: 1 });
+  });
+
   it('starts a graph and presents the entry node', () => {
     const session = withEngine(buildAccessor(), () =>
       createDialogSession({ id: 'main', graphs: [greetingGraph] }),
@@ -218,6 +241,43 @@ describe('createDialogSession', () => {
       expect(session.isActive()).toBe(true);
       expect(session.present()?.nodeId).toBe('training');
     }
+  });
+
+  it('reports finished when a fall-through target is gated off', () => {
+    const graph: DialogGraph = {
+      id: 'optional-follow-up',
+      entry: 'a',
+      nodes: [
+        { id: 'a', text: 'A', next: 'b' },
+        { id: 'b', text: 'B', condition: { kind: 'flag', id: 'never' } },
+      ],
+    };
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [graph] }),
+    );
+    session.start('optional-follow-up');
+    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: true });
+  });
+
+  it('falls through a node whose choices are all gated off', () => {
+    const graph: DialogGraph = {
+      id: 'gated-aside',
+      entry: 'a',
+      nodes: [
+        {
+          id: 'a',
+          text: 'A',
+          choices: [{ id: 'aside', text: 'Aside', condition: { kind: 'flag', id: 'never' } }],
+          next: 'b',
+        },
+        { id: 'b', text: 'B' },
+      ],
+    };
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [graph] }),
+    );
+    session.start('gated-aside');
+    expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], finished: true });
   });
 
   it('throws when no ambient accessor is available and none was passed', () => {

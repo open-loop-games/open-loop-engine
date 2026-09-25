@@ -47,9 +47,17 @@ import {
 export interface DialogSessionEvents {
   /** Fired after each landing on a presentable node (post-start, post-choose). */
   presented: (snapshot: DialogPresentation) => void;
-  /** Fired immediately after a choice's outcomes apply, before pointer advancement. */
+  /**
+   * Fired once a choice has fully resolved: its outcomes have applied, the
+   * pointer has advanced, and every node it entered has run its onEnter.
+   * Precedes the `presented` or `finished` that choice leads to.
+   */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
-  /** Fired when the conversation ends — terminal node, finish(), or gate failure on next. */
+  /**
+   * Fired when the conversation ends: `finish()`, or a choice with no `next`
+   * or whose `next` is gated off. Landing on a line presented with
+   * `finished: true` does not fire it — the UI calls `finish()` to close it.
+   */
   finished: (info: { graphId: string }) => void;
 }
 
@@ -85,7 +93,11 @@ export interface DialogSessionOptions {
 
 /** A dialog session — the public surface for driving conversations from a UI / module. */
 export interface DialogSession extends Emittable<DialogSessionEvents> {
-  /** Activate a graph at its entry node (or an explicit node id). */
+  /**
+   * Activate a graph at its entry node (or an explicit node id). Replaces an
+   * active conversation without emitting `finished` for it. When the entry
+   * node's condition fails, no conversation starts and an active one continues.
+   */
   start(graphId: string, entryNode?: string): void;
   /** Return the current presentation snapshot, or null when no graph is active. */
   present(): DialogPresentation | null;
@@ -124,6 +136,7 @@ const defaultNativeFactory: DialogRuntimeFactory = (graphs, accessor, mutator) =
  *   graphs: dialogCategory.getAll().flatMap((e) => e.graphs),
  * });
  *
+ * // A line presented with `finished: true` waits for the UI's session.finish().
  * session.on('presented', (snap) => renderDialog(snap));
  * session.on('finished', ({ graphId }) => closeDialogUI(graphId));
  *
@@ -189,9 +202,15 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   // --- Public methods ---
 
+  // A runtime throw (an authored next-only cycle) can land after effects have
+  // applied and the pointer has moved, so the snapshot runs regardless and the
+  // saved state never disagrees with the runtime.
   function start(graphId: string, entryNode?: string): void {
-    runtime.start(graphId, entryNode);
-    snapshot();
+    try {
+      runtime.start(graphId, entryNode);
+    } finally {
+      snapshot();
+    }
     emitPresentedIfActive();
   }
 
@@ -199,8 +218,11 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     // Capture the active context *before* delegating — runtime.choose advances
     // the pointer (or finishes), so post-call state would lose the source nodeId.
     const before = runtime.exportState();
-    runtime.choose(choiceId);
-    snapshot();
+    try {
+      runtime.choose(choiceId);
+    } finally {
+      snapshot();
+    }
     if (before.activeGraphId && before.activeNodeId) {
       events.emit('chosen', {
         graphId: before.activeGraphId,
