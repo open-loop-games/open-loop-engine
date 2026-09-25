@@ -13,19 +13,12 @@ import {
   type DecimalSource,
 } from '@/core/persistence';
 import { createScalingPurchasable } from '@/systems/purchasable';
-import { createResource, type Resource } from '@/core/resource';
+import { createResource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
 import { ref } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function createTestResource(name: string, initial: DecimalSource = 0): Resource {
-  return createResource(initial, { id: name, displayName: name });
-}
+import { createTestResource } from '../helpers/test-resource';
 
 // ============================================================================
 // Types for tests

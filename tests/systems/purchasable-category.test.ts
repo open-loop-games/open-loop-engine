@@ -8,19 +8,11 @@ import {
   type Persistent,
   type DecimalSource,
 } from '@/core/persistence';
-import { createResource } from '@/core/resource';
 import { createCostRequirement, createBooleanRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createModifierChain } from '@/core/modifier';
 import Formula from '@/core/formulas/formulas';
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function createTestResource(name: string, initial: DecimalSource = 0) {
-  return createResource(initial, { id: name, displayName: name });
-}
+import { createTestResource } from '../helpers/test-resource';
 
 // ============================================================================
 // Test types — one-shot upgrades

@@ -23,14 +23,11 @@ import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createCostRequirement } from '@/core/requirements';
 import { F } from '@/core/formulas/formulas';
 import { createManualTicks } from '../helpers/manual-ticks';
+import { createTestResource } from '../helpers/test-resource';
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function createTestResource(name: string, initial: DecimalSource = 0): Resource {
-  return createResource(initial, { id: name, displayName: name });
-}
 
 interface BuildingDef {
   id: string;
