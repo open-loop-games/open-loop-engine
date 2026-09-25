@@ -365,6 +365,28 @@ describe('createRuleAdvisor — dismiss + reset', () => {
     advisor.dismiss('k1');
     expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k2']);
   });
+
+  it('backfills the dismissed slot at once, without waiting for reevaluate', () => {
+    const advisor = createRuleAdvisor({
+      historySource: () => [],
+      aggregate: () => undefined,
+      analyzers: [
+        () => [
+          { key: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
+          { key: 'k2', severity: 'info' as const, summary: '', payload: undefined },
+        ],
+      ],
+      maxSuggestions: 1,
+    });
+    advisor.reevaluate();
+
+    const onSuggestions = vi.fn();
+    advisor.on('suggestionsUpdated', onSuggestions);
+    advisor.dismiss('k1');
+
+    expect(advisor.suggestions.map((s) => s.key)).toEqual(['k2']);
+    expect(onSuggestions).toHaveBeenCalledWith([expect.objectContaining({ key: 'k2' })]);
+  });
 });
 
 // ============================================================================

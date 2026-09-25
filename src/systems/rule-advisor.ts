@@ -234,7 +234,8 @@ export interface RuleAdvisor<TPayload> {
   /**
    * Hide a suggestion until {@link reset} is called. No-op if `key` is
    * already dismissed. Removes the key from the live `suggestions` view
-   * immediately and emits `'dismissed'`.
+   * immediately — the next-ranked suggestion from the last `reevaluate`
+   * takes its slot — and emits `'dismissed'`.
    */
   dismiss(key: string): void;
 
@@ -357,6 +358,17 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
   let dismissed = new Set<string>();
   let lastVisibleKeys: string[] = [];
   let visible: readonly Suggestion<TPayload>[] = [];
+  // The last reevaluate's ranked, uncapped output, so a dismissal re-projects
+  // it and the next-ranked suggestion takes the freed slot.
+  let ranked: readonly Suggestion<TPayload>[] = [];
+
+  function project(cap: number): void {
+    visible = capList(
+      ranked.filter((s) => !dismissed.has(s.key)),
+      cap,
+    );
+    lastVisibleKeys = visible.map((s) => s.key);
+  }
 
   function reevaluate(trigger?: string): readonly Suggestion<TPayload>[] {
     const history = resolveHistory<TEntry>(historySource);
@@ -374,10 +386,6 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     const cap = getMaxSuggestions();
     onAggregate?.(profile, capList(merged, cap));
 
-    const next = capList(
-      merged.filter((s) => !dismissed.has(s.key)),
-      cap,
-    );
     // Acceptance means the analyzers stopped producing the key; one a
     // higher-ranked suggestion pushed below the cap is still being produced.
     const producedKeys = new Set(merged.map((s) => s.key));
@@ -387,8 +395,8 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
       if (!producedKeys.has(key) && !dismissed.has(key)) acceptedKeys.push(key);
     }
 
-    visible = next;
-    lastVisibleKeys = next.map((s) => s.key);
+    ranked = merged;
+    project(cap);
 
     handle.emit('suggestionsUpdated', visible);
     if (acceptedKeys.length > 0) handle.emit('accepted', { keys: acceptedKeys, trigger });
@@ -399,8 +407,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
   function dismiss(key: string): void {
     if (dismissed.has(key)) return;
     dismissed.add(key);
-    visible = visible.filter((s) => s.key !== key);
-    lastVisibleKeys = visible.map((s) => s.key);
+    project(getMaxSuggestions());
     handle.emit('dismissed', key);
     handle.emit('suggestionsUpdated', visible);
   }
