@@ -2,6 +2,47 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.1.3 (2026-09-25)
+
+### Features
+
+* **systems:** createScalingPurchasable takes an effectDisplay override (cc12fed)
+* **core:** SpatialGrid.markMaskChanged, the write path for hand-written bitmaps (7f682ed)
+* **systems:** DialogSession reads visit counts (27fd649)
+
+### Fixes
+
+* **systems:** an opaque costFormula that can't take the level ref no longer throws at construction (5e93352)
+* **systems:** PurchasableCategory.totalEffect leaves out upgrades nobody has bought (2dddc01)
+* **systems:** a throw during Skill.addXp no longer leaves levelUp armed for load writes (b86a61d)
+* **systems:** a content registry's reads track register and patch (50f0a5f)
+* **systems:** pushPatches scopes revert correctly in any order (0b2d535)
+* **systems:** a builder throw mid-batch leaves a category's registry and entries in step (397222d)
+* **core:** SpatialGrid.restore stores raw cells, not reactive proxies (5d19396)
+* **core:** SpatialGrid.restore emits bulkChanged and maskChanged (7160512)
+* **core:** distanceField throws on a negative step cost (a93f7e5)
+* **core:** composed influence sum() counts only in-bounds cells (be556fb)
+* **core:** influence update() skips sources that have left the grid's cells (e6d85b0)
+* **core:** SpatialGraph auto ids stay unique across the tree after a restore (ff0e281)
+* **core:** registry all() and list() return a snapshot, not the live array (24e7c33)
+* **core:** override registry re-resolves tunables on override and ignores unset scope entries (838d0f6)
+* **core:** override registries accept an interface type map (d16992f)
+* **primitives:** Decimal constructs and stays typed under nodenext (688bedb)
+* **systems:** a dialog node with nowhere to go presents as finished (94604f3)
+* **systems:** disposing a dialog session releases its saved state (9b76fc6)
+* **systems:** subject signals compare against the clamped seed (6d1b028)
+* **systems:** subject values loaded from a save stay inside the schema (a78638c)
+* **systems:** a goal def skips a stale BestOf entry (c292e90)
+* **systems:** RuleAdvisor fills dismissed slots and infers acceptance from the analyzers (a48e55a)
+
+### Performance
+
+* hot profiler wrap sites allocate nothing while profiling is off (f9dc5ed)
+
+### Refactors
+
+* **systems:** CycleOptions.registerTick uses the shared RegisterTick type (9010720)
+
 ## 0.1.2 (2026-09-25)
 
 ### Fixes
