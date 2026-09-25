@@ -297,6 +297,11 @@ export function cloneDefault<T>(value: T): T {
   return out as T;
 }
 
+/** A raw context id as registered under the active namespace. */
+function toFullContextId(contextId: string): string {
+  return activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${contextId}` : contextId;
+}
+
 /**
  * Get a stack trace for debugging purposes
  */
@@ -346,7 +351,7 @@ export function beginPersistentContext(id: string): void {
   if (id.includes('.')) {
     throw new Error(`Persistent context id "${id}" contains ".", which save paths split on.`);
   }
-  const fullId = activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${id}` : id;
+  const fullId = toFullContextId(id);
   const parent = addingContexts[addingContexts.length - 1];
   addingContexts.push(fullId);
   if (!(fullId in persistentRefs)) {
@@ -826,11 +831,6 @@ export function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, 
 }
 
 // === REGISTRY QUERIES ===
-
-/** A raw context id as registered under the active namespace. */
-function toFullContextId(contextId: string): string {
-  return activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${contextId}` : contextId;
-}
 
 /**
  * Get all persistent refs for a given context.
