@@ -143,8 +143,9 @@ export interface InfluenceLayerReader {
   at(x: number, y: number): number;
   /**
    * Sum influence over a Chebyshev region centered at `(x, y)` with the
-   * given radius. Out-of-bounds cells contribute 0. Composed readers walk
-   * the same Chebyshev box; bounds are inferred from `at()` returning 0.
+   * given radius. Only in-bounds cells contribute, and an out-of-bounds
+   * center sums to 0. Composed readers walk the same box under the first
+   * reader's `inBounds`.
    */
   sum(x: number, y: number, radius: number): number;
   /**
@@ -156,8 +157,8 @@ export interface InfluenceLayerReader {
   /**
    * Whether `(x, y)` falls within the reader's domain. Composed readers defer
    * to their first underlying reader (all are assumed to share a grid, as
-   * `cells()` also relies on). Lets `peak()` honour its in-bounds/null contract
-   * without every consumer re-deriving grid dimensions.
+   * `cells()` also relies on). Lets `sum()` and `peak()` honour their bounds
+   * contract without every consumer re-deriving grid dimensions.
    */
   inBounds(x: number, y: number): boolean;
   /**
@@ -478,20 +479,25 @@ export function composeInfluenceLayers(
 
   return {
     at: combinedAt,
+    // sum() and peak() match the single-layer contract: an out-of-bounds
+    // center yields 0 / null, and only in-bounds cells are visited. An
+    // out-of-bounds coordinate reads a fabricated 0 from each layer, which a
+    // combine need not map to 0, so visiting it would skew the result.
     sum(x, y, radius) {
+      if (!readers[0].inBounds(x, y)) return 0;
       const r = Math.max(0, Math.floor(radius));
       let total = 0;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
-          total += combinedAt(x + dx, y + dy);
+          const cx = x + dx;
+          const cy = y + dy;
+          if (!readers[0].inBounds(cx, cy)) continue;
+          total += combinedAt(cx, cy);
         }
       }
       return total;
     },
     peak(x, y, radius) {
-      // Match the single-layer contract: null for an out-of-bounds center, and
-      // only in-bounds cells considered — otherwise an out-of-bounds coordinate
-      // (whose combined value is a fabricated 0) can win and be returned.
       if (!readers[0].inBounds(x, y)) return null;
       const r = Math.max(0, Math.floor(radius));
       let bestX = -Infinity;

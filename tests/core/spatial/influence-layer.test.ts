@@ -454,7 +454,7 @@ describe('composeInfluenceLayers', () => {
     expect(composed.at(1, 1)).toBeCloseTo(9);
   });
 
-  it('sum and peak walk a Chebyshev box and tolerate OOB via at()=0', () => {
+  it('sum and peak walk a Chebyshev box clipped to the grid', () => {
     const grid = numericGrid(3, 3);
     const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
     layer.addSource({ id: 'a', x: 1, y: 1, strength: 4 });
@@ -467,6 +467,18 @@ describe('composeInfluenceLayers', () => {
     const peak = reader.peak(1, 1, 1);
     expect(peak).not.toBeNull();
     expect(peak!.value).toBeCloseTo(4);
+  });
+
+  it('composed sum counts only in-bounds cells, even under a combine that maps 0 to non-zero', () => {
+    const grid = numericGrid(3, 3);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    layer.update();
+    // An inverse "safety" map: every zero-threat cell scores 1.
+    const safety = composeInfluenceLayers([layer.read()], (vs) => 1 / (1 + vs[0]));
+    expect(safety.sum(0, 0, 1)).toBe(4);
+    expect(safety.sum(1, 1, 1)).toBe(9);
+    expect(safety.sum(100, 100, 1)).toBe(0);
+    expect(layer.read().sum(100, 100, 1)).toBe(0);
   });
 
   it('composed peak returns null when the center is outside the grid', () => {
