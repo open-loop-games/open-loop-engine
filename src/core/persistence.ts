@@ -113,19 +113,7 @@ export const PersistentDecimal = Symbol('PersistentDecimal');
 /** Symbol to skip persistence checks on an object */
 export const SkipPersistence = Symbol('SkipPersistence');
 
-/**
- * Marks a persistent ref as "lifetime" — outside the reach of any reset
- * that doesn't name the ref itself. {@link getModulePersistentRefs} drops it
- * from a module's scope, and a reset's `thingsToReset` walk passes over it
- * wherever it sits inside a walked object or category.
- *
- * Default: absent / falsy. Set via `persistent(default, { lifetime: true })`
- * for trackers that model "full-life" state (cumulative gain, high-water
- * marks, lifetime statistics) rather than per-run state. Without the flag,
- * a tracker registered inside a module's persistent context would be
- * caught by every reset that names that module — silently zeroing the
- * "lifetime" field on every prestige.
- */
+/** Marks a persistent ref as lifetime — see {@link PersistentOptions.lifetime}. */
 export const Lifetime = Symbol('Lifetime');
 
 // === REF TYPES ===
@@ -538,31 +526,21 @@ export interface PersistentOptions<T = unknown> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema?: unknown extends T ? any : unknown;
   /**
-   * Mark the ref as "lifetime" — invisible to module-scoped resets.
-   *
-   * `getModulePersistentRefs` (the sole scope-resolver for {@link createReset})
-   * filters out lifetime refs while walking a module's persistent context
-   * tree, so any reset declared via `resetModules: [moduleId]` will skip
-   * lifetime refs registered under that module — even without an explicit
-   * `keep:` exemption. Save / load and `engine.dispose()` paths ignore the
-   * flag and serialize the ref as normal.
-   *
-   * Use this for trackers that model the resource's full life (cumulative
-   * gain, high-water mark, lifetime counters) rather than per-run state.
-   * The flag is the default for the trackers `Resource.cumulative` and
-   * `Resource.best` — see {@link createResource}.
+   * Mark the ref as lifetime: state that outlives a run, such as cumulative
+   * gain, a high-water mark or a lifetime counter. Only a reset that names
+   * the ref itself writes it. A `resetModules` scope drops it, even with no
+   * `keep:` entry, and a `thingsToReset` walk passes over it inside any
+   * object or category it walks. Save, load and `engine.dispose()` ignore
+   * the flag.
    *
    * The rule for engine systems: system-owned cross-run state is lifetime
    * (cycle stats, best-of records, run-pool aliveness, automation unlocks,
-   * total play time and the like). Wipe it with `thingsToReset: [ref]` or the
-   * system's own reset verb, never as a side effect of resetting its module.
+   * total play time and the like). `Resource.cumulative` and `Resource.best`
+   * carry it too — see {@link createResource}.
    *
-   * A `thingsToReset` walk skips the flag the same way: a lifetime ref found
-   * inside an object or category it walks is left alone.
-   *
-   * Opt-out for a specific reset: pass the lifetime ref itself as a
-   * top-level entry, `createReset({ thingsToReset: [resource.cumulative] })`.
-   * A ref named directly is reset whatever its flag.
+   * To wipe a lifetime ref, name it as a top-level entry,
+   * `createReset({ thingsToReset: [resource.cumulative] })`, or call the
+   * owning system's own reset verb.
    *
    * Default: `false`.
    */
@@ -875,23 +853,15 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
  *
  * Unlike {@link getPersistentRefs} which returns only refs in one context,
  * this walks the parent→child context tree rooted at `moduleId` and collects
- * every ref reachable from that root. Used by the reset system to resolve
- * `resetModules` scope.
+ * every non-lifetime ref reachable from that root. Used by the reset system
+ * to resolve `resetModules` scope.
  *
  * @param moduleId - The raw context id (typically the module's `id` field)
  */
 export function getModulePersistentRefs(moduleId: string): Set<Persistent> {
   const result = new Set<Persistent>();
   for (const r of walkContextTree(moduleId)) {
-    // Lifetime refs (cumulative trackers, high-water marks, anything
-    // tagged `{ lifetime: true }`) sit inside a module's persistent
-    // context tree but model state that should outlive any
-    // module-scoped reset. They drop out of the scope walk so resets
-    // with `resetModules: [moduleId]` don't sweep them — consumers can
-    // still target one explicitly via `thingsToReset` when a hard
-    // wipe is intentional.
-    if (r[Lifetime]) continue;
-    result.add(r);
+    if (!r[Lifetime]) result.add(r);
   }
   return result;
 }

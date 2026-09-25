@@ -67,9 +67,8 @@ export interface ResetOptions {
    * - Categories and stateful systems, which reset what a module reset
    *   would reset of their own persistent context
    *
-   * The walk skips refs tagged `lifetime` (see `PersistentOptions.lifetime`),
-   * as `resetModules` does. A lifetime ref given here as its own entry is
-   * reset — that is the hard-wipe path for lifetime state.
+   * The walk skips lifetime refs, and a lifetime ref given here as its own
+   * entry is reset (see `PersistentOptions.lifetime`).
    *
    * Optional when {@link resetModules} is provided.
    */
@@ -363,9 +362,8 @@ export function createReset(options: ResetOptions): Reset {
 // === RESET IMPLEMENTATION ===
 
 /**
- * Recursively reset the persistent refs in an object tree, skipping any
- * tagged `lifetime` — the same refs a module-scoped reset skips. A lifetime
- * ref is reset only when it is itself a top-level `thingsToReset` entry.
+ * Recursively reset the persistent refs in an object tree, skipping lifetime
+ * refs.
  *
  * Supports the {@link Resettable} protocol: objects implementing
  * `[Resettable]()` yield their resettable contents for recursive walking.

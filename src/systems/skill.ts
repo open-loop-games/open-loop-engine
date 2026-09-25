@@ -178,9 +178,8 @@ export interface LevelDrivenSkill extends SkillBase {
 /** Accumulator skill — modifier = 1 + permanentBonus */
 export interface AccumulatorSkill extends SkillBase {
   /**
-   * Permanent bonus — tagged `lifetime`, so module-scoped resets
-   * (`resetModules`) skip it. To wipe it in a hard reset, pass it through
-   * `thingsToReset` explicitly.
+   * Permanent bonus — tagged `lifetime`, so any reset that doesn't name it
+   * skips it. To wipe it in a hard reset, pass it to `thingsToReset` itself.
    */
   readonly permanentBonus: Persistent<DecimalSource>;
   /**
