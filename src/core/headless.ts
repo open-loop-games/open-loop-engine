@@ -24,6 +24,11 @@ export interface HeadlessConfig {
   seed?: number;
   /** Seconds of simulated time per tick (default 0.05, i.e. 20 TPS). */
   tickDelta?: number;
+  /**
+   * Called once the analyzers have summarized — release what `setup` built
+   * (e.g. dispose the run's engine).
+   */
+  teardown?: () => void;
 }
 
 /** Results returned after a completed headless simulation run. */
@@ -40,7 +45,8 @@ export interface HeadlessResult {
  * Run a fixed-tick-count headless simulation, threading each analyzer's
  * `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick`
  * function. Seeds the RNG when `seed` is set, runs the trace and profile
- * buffers per tick, and returns each analyzer's summary at the end.
+ * buffers per tick, and returns each analyzer's summary at the end, after
+ * which `teardown` runs.
  */
 export function runHeadless(config: HeadlessConfig): HeadlessResult {
   const { setup, tick, ticks } = config;
@@ -57,9 +63,11 @@ export function runHeadless(config: HeadlessConfig): HeadlessResult {
     for (const a of analyzers) a.onTick?.(i);
   }
   for (const a of analyzers) a.onEnd?.();
+  const analyzerResults = analyzers.map((a) => a.summarize());
+  config.teardown?.();
   return {
     totalTicks: ticks,
     elapsedSimulated: ticks * tickDelta,
-    analyzerResults: analyzers.map((a) => a.summarize()),
+    analyzerResults,
   };
 }

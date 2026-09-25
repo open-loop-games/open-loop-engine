@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createEngine, persistent, type Engine, type EngineModule } from '@/index';
 import { getAllPersistentRefs, getPersistenceNamespace } from '@/core/persistence';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
-import { createSensitivityCell, runSensitivity, type RunContext } from '@/harness';
+import { createSensitivityCell, runMatrix, runSensitivity, type RunContext } from '@/harness';
 
 // A minimal module that holds a single `gold` persistent ref and ticks it.
 // The closure captures the ref so perturbs + analyzers can reach it, but
@@ -273,5 +273,29 @@ describe('createSensitivityCell', () => {
     expect(getAllPersistentRefs(namespaces[1]).size).toBe(0);
     // The last run's engine stays live until the cell sets up again.
     expect(getAllPersistentRefs(namespaces[2]).size).toBeGreaterThan(0);
+  });
+
+  it('a matrix run leaves no engine live behind it', () => {
+    const blob = makeLiveSave(5);
+    const namespaces: string[] = [];
+    const cell = createSensitivityCell({
+      name: 'teardown',
+      saveBlob: blob,
+      modules: () => [
+        {
+          id: 'economy',
+          install() {
+            namespaces.push(getPersistenceNamespace()!);
+            persistent(0, { name: 'gold' });
+          },
+        },
+      ],
+      tick: (engine) => engine.tickDriver.stepOnce(),
+      ticks: 1,
+    });
+    runMatrix({ cells: [cell], seeds: [1, 2] });
+
+    expect(namespaces).toHaveLength(2);
+    for (const ns of namespaces) expect(getAllPersistentRefs(ns).size).toBe(0);
   });
 });

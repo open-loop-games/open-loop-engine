@@ -55,6 +55,7 @@ export function runMatrix(config: MatrixConfig): MatrixResult {
       ticks: cell.ticks,
       tickDelta: cell.tickDelta,
       seed,
+      teardown: cell.teardown,
     });
     perCellRuns[item.cellIdx].push(result);
     config.onRunComplete?.(item, result);

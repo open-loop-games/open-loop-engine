@@ -52,6 +52,11 @@ export interface Cell {
   ticks: number;
   /** Seconds of simulated time per tick (default 0.05, i.e. 20 TPS). */
   tickDelta?: number;
+  /**
+   * Called after each run's analyzers have summarized, before the next run
+   * sets up — release what `setup` built (e.g. dispose the run's engine).
+   */
+  teardown?: () => void;
 }
 
 /**

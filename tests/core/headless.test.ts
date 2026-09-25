@@ -108,4 +108,16 @@ describe('Headless Runner', () => {
     expect(r.totalTicks).toBe(100);
     expect(r.elapsedSimulated).toBeCloseTo(5, 5);
   });
+  it('runs teardown once the analyzers have summarized', () => {
+    const calls: string[] = [];
+    runHeadless({
+      setup: () => [
+        { name: 'a', summarize: () => (calls.push('summarize'), { name: 'a', metrics: {} }) },
+      ],
+      tick: () => {},
+      ticks: 1,
+      teardown: () => calls.push('teardown'),
+    });
+    expect(calls).toEqual(['summarize', 'teardown']);
+  });
 });

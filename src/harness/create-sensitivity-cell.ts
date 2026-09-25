@@ -85,18 +85,18 @@ let runCounter = 0;
  * save blob. Composable with {@link runMatrix}, {@link runBatch}, and
  * {@link runSensitivity}.
  *
- * The returned cell holds the current run's engine in closure; setup
- * disposes it and builds the next on each re-entry, so runs execute
- * correctly in the harness's sync sequential cycle. `Cell` has no teardown
- * hook, so the last run's engine — and its persistent refs — stays live
- * until the cell sets up again: at most one retained engine per cell.
+ * The returned cell holds the current run's engine in closure and its
+ * `teardown` disposes it, so a matrix runner leaves no engine live behind a
+ * run. A caller driving `setup` by hand gets the same through re-entry:
+ * setup disposes the previous run's engine before building the next.
  * Multiple concurrent invocations of a single cell are not supported —
  * matrix execution is sync-sequential by design.
  *
  * @param options - {@link CreateSensitivityCellOptions} — save blob, module
  *   factory, tick handler, optional perturb / analyzer hooks.
  * @returns A harness {@link Cell} whose `setup` rebuilds a fresh engine
- *   per run and whose `tick` drives that engine. Caller passes this into
+ *   per run, whose `tick` drives that engine and whose `teardown`
+ *   disposes it. Caller passes this into
  *   any matrix runner.
  *
  * @example
@@ -128,10 +128,15 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
   let currentEngine: Engine | undefined;
   let loopFinalizeUnsubs: (() => void)[] = [];
 
-  const setup = (ctx: RunContext): Analyzer[] => {
+  const teardown = (): void => {
     for (const unsub of loopFinalizeUnsubs) unsub();
     loopFinalizeUnsubs = [];
     currentEngine?.dispose();
+    currentEngine = undefined;
+  };
+
+  const setup = (ctx: RunContext): Analyzer[] => {
+    teardown();
     const engine = createEngineFromSave({
       saveBlob,
       modules: modules(),
@@ -164,6 +169,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     name,
     setup,
     tick: tickAdapter,
+    teardown,
     ticks,
     ...(tickDelta !== undefined && { tickDelta }),
   };

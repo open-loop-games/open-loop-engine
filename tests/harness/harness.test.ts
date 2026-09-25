@@ -284,6 +284,20 @@ describe('runMatrix', () => {
       { name: 'counter', seed: 200 },
     ]);
   });
+  it('tears each run down before the next sets up', () => {
+    const events: string[] = [];
+    runMatrix({
+      cells: [
+        {
+          ...fixedMetricCell('a', 1),
+          setup: () => (events.push('setup'), []),
+          teardown: () => events.push('teardown'),
+        },
+      ],
+      seeds: [1, 2],
+    });
+    expect(events).toEqual(['setup', 'teardown', 'setup', 'teardown']);
+  });
 });
 
 // --- runBatch ---
