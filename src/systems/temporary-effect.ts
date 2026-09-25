@@ -40,9 +40,9 @@
  * @cluster effects
  */
 
-import { computed, isRef, ref, shallowRef, unref, type ComputedRef, type Ref } from 'vue';
+import { computed, isRef, ref, shallowRef, type ComputedRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from '@/core/computed';
+import { resolveComputable, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
@@ -246,7 +246,7 @@ export function createTemporaryEffectSystem(
   // --------------------------------------------------------------------
 
   function resolveDuration(def: TemporaryEffectDef): number {
-    return toFiniteDuration(def.id, unref(processGetter(def.duration)));
+    return toFiniteDuration(def.id, resolveComputable(def.duration));
   }
 
   function lowestFreeStackIndex(defId: string): number {
