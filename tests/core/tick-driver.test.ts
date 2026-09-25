@@ -26,6 +26,18 @@ describe('TickDriver', () => {
     tickDriver.simulateTick(0.05);
     expect(order).toEqual([1, 2]);
   });
+  it('a callback that unsubscribes itself does not skip the next callback', () => {
+    const tickDriver = createTickDriver({ tickRate: 20 });
+    const log: string[] = [];
+    const unsubA = tickDriver.onTick(() => {
+      log.push('A');
+      unsubA();
+    });
+    tickDriver.onTick(() => log.push('B'));
+    tickDriver.stepOnce();
+    tickDriver.stepOnce();
+    expect(log).toEqual(['A', 'B', 'B']);
+  });
   it('simulateTick clamps delta to maxDeltaTime', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
     const fn = vi.fn();

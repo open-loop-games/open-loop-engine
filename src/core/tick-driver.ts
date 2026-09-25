@@ -267,18 +267,29 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   let lastTime = 0;
   let deltaMean = 0;
 
+  // Index of the callback processTick is running, or -1 between ticks. A
+  // callback that unsubscribes itself (or an earlier one) mid-tick shifts the
+  // rest down a slot; the unsubscribe steps this back so none is skipped.
+  let tickIndex = -1;
+
   function onTick(callback: TickCallback): () => void {
     callbacks.push(callback);
     return () => {
       const idx = callbacks.indexOf(callback);
-      if (idx !== -1) callbacks.splice(idx, 1);
+      if (idx === -1) return;
+      callbacks.splice(idx, 1);
+      if (idx <= tickIndex) tickIndex--;
     };
   }
 
   function processTick(dt: number): void {
     beginTraceTick();
     beginProfileTick();
-    for (const cb of callbacks) cb(dt);
+    try {
+      for (tickIndex = 0; tickIndex < callbacks.length; tickIndex++) callbacks[tickIndex](dt);
+    } finally {
+      tickIndex = -1;
+    }
     for (const name of activePhases) phases.get(name)?.onTick?.(dt);
     endProfileTick();
     endTraceTick();
