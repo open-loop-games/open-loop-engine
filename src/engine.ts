@@ -13,6 +13,7 @@
 
 // === MODULE SYSTEM ===
 
+import { effectScope } from 'vue';
 import { createTickDriver } from './core/tick-driver';
 import { createSaveManager } from './core/save-manager';
 import {
@@ -124,8 +125,8 @@ export interface EngineContext {
   /**
    * Subscribe to an engine-wide event. Returns an unsubscribe function.
    *
-   * Subscriptions made during `install()` are automatically cleaned up
-   * if the module is ever torn down.
+   * Subscriptions made during `install()` / `connect()` are released by
+   * `engine.dispose()`.
    *
    * @example
    * ```ts
@@ -309,9 +310,12 @@ export interface Engine {
   start(): void;
   stop(): void;
   /**
-   * Tear down the engine: stop the TickDriver and release every persistent context
-   * this engine registered under its `persistenceNamespace`. Required when a
-   * fresh engine sharing the same module ids will be constructed in the same
+   * Tear down the engine: stop the TickDriver, stop every watcher and computed
+   * modules created during `install()` / `connect()`, drop their tick
+   * handlers, event subscriptions and save/load hooks, and release every
+   * persistent context this engine registered under its
+   * `persistenceNamespace`. Safe to pass detached, as in
+   * `onUnmounted(engine.dispose)`. Required when a fresh engine sharing the same module ids will be constructed in the same
    * page-lifetime — e.g. the gallery sandbox remounting an archetype. Save
    * storage (keyed by `gameId`, plus `persistenceNamespace` when set) is
    * untouched, so a subsequent engine loads the same on-disk save.
@@ -457,7 +461,9 @@ export function createEngine(config: EngineConfig): Engine {
       autoSaveTimer = timers.setInterval(() => performSave(), autoSaveInterval);
     }
   }
-  const moduleCleanups = new Map<string, (() => void)[]>();
+  // Every subscription and effect made on the engine's behalf, released by dispose().
+  const cleanups: (() => void)[] = [];
+  const moduleScope = effectScope(true);
   // Populated at start() with the per-engine injection map built from
   // install() / connect() `provide()` calls. Exposed via engine.tryInject
   // for external introspection tools.
@@ -465,16 +471,25 @@ export function createEngine(config: EngineConfig): Engine {
 
   // The hooks ride the save manager's own events so every entry point runs
   // them — consumers wire the manager's import/export/save/load to their UI.
-  saveManager?.on('save:before-serialize', () =>
-    withPersistenceNamespace(config.persistenceNamespace, () => {
-      for (const cb of saveCallbacks) cb();
-    }),
-  );
-  saveManager?.on('save:loaded', ({ timestamp }) =>
-    withPersistenceNamespace(config.persistenceNamespace, () => {
-      for (const cb of loadCallbacks) cb({ success: true, timestamp });
-    }),
-  );
+  if (saveManager) {
+    cleanups.push(
+      saveManager.on('save:before-serialize', () =>
+        withPersistenceNamespace(config.persistenceNamespace, () => {
+          for (const cb of saveCallbacks) cb();
+        }),
+      ),
+      saveManager.on('save:loaded', ({ timestamp }) =>
+        withPersistenceNamespace(config.persistenceNamespace, () => {
+          for (const cb of loadCallbacks) cb({ success: true, timestamp });
+        }),
+      ),
+    );
+  }
+
+  function track(unsub: () => void): () => void {
+    cleanups.push(unsub);
+    return unsub;
+  }
 
   function performSave(): void {
     withPersistenceNamespace(config.persistenceNamespace, () => saveManager?.save());
@@ -538,10 +553,10 @@ export function createEngine(config: EngineConfig): Engine {
         const eventBus = createEmitHandle<EngineEvents>();
 
         const sharedContext: EngineContext = {
-          onTick: (cb) => tickDriver.onTick(cb),
+          onTick: (cb) => track(tickDriver.onTick(cb)),
           onSave: (cb) => saveCallbacks.push(cb),
           onLoad: (cb) => loadCallbacks.push(cb),
-          on: (event, handler) => eventBus.on(event, handler),
+          on: (event, handler) => track(eventBus.on(event, handler)),
           emit: (event, ...args) => eventBus.emit(event, ...args),
           provide<T>(key: InjectionKey<T>, value: T) {
             injections.set(key, value);
@@ -595,45 +610,28 @@ export function createEngine(config: EngineConfig): Engine {
         // under the engine's chain / effect-system / resource / categories
         // ambient targets so every primitive call auto-registers into this
         // engine's registries specifically.
-        withChainRegistry(chainRegistry, () =>
-          withEffectSystemRegistry(effectSystemRegistry, () =>
-            withResourceRegistry(resourceRegistry, () =>
-              withEngineCategories(engineCategories, () =>
-                withTuningRegistries(tuningRegistries, () =>
-                  withGameStateAccessor(config.accessor, () =>
-                    withPersistenceNamespace(config.persistenceNamespace, () => {
-                      for (const mod of sorted) {
-                        // Per-module context tracks event subscriptions for auto-cleanup
-                        const unsubs: (() => void)[] = [];
-                        const moduleContext: EngineContext = {
-                          ...sharedContext,
-                          on(event, handler) {
-                            const unsub = eventBus.on(event, handler);
-                            unsubs.push(unsub);
-                            return unsub;
-                          },
-                        };
-
-                        withPersistentContext(mod.id, () => mod.install(moduleContext));
-                        moduleCleanups.set(mod.id, unsubs);
-                      }
-
-                      // Connect phase: all modules installed, now wire cross-module refs
-                      for (const mod of sorted) {
-                        if (mod.connect) {
-                          const unsubs = moduleCleanups.get(mod.id)!;
-                          const connectContext: EngineContext = {
-                            ...sharedContext,
-                            on(event, handler) {
-                              const unsub = eventBus.on(event, handler);
-                              unsubs.push(unsub);
-                              return unsub;
-                            },
-                          };
-                          withPersistentContext(mod.id, () => mod.connect!(connectContext));
+        // The effect scope owns every watcher and computed a module creates,
+        // so dispose() can stop them even when they watch state outliving
+        // the engine.
+        moduleScope.run(() =>
+          withChainRegistry(chainRegistry, () =>
+            withEffectSystemRegistry(effectSystemRegistry, () =>
+              withResourceRegistry(resourceRegistry, () =>
+                withEngineCategories(engineCategories, () =>
+                  withTuningRegistries(tuningRegistries, () =>
+                    withGameStateAccessor(config.accessor, () =>
+                      withPersistenceNamespace(config.persistenceNamespace, () => {
+                        for (const mod of sorted) {
+                          withPersistentContext(mod.id, () => mod.install(sharedContext));
                         }
-                      }
-                    }),
+                        // Connect phase: all modules installed, now wire cross-module refs
+                        for (const mod of sorted) {
+                          if (mod.connect) {
+                            withPersistentContext(mod.id, () => mod.connect!(sharedContext));
+                          }
+                        }
+                      }),
+                    ),
                   ),
                 ),
               ),
@@ -653,7 +651,9 @@ export function createEngine(config: EngineConfig): Engine {
     },
     dispose() {
       if (disposed) return;
-      this.stop();
+      engine.stop();
+      moduleScope.stop();
+      for (const unsub of cleanups.splice(0)) unsub();
       // Drop the in-memory persistent-context registry for this engine's
       // namespace so a fresh engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.

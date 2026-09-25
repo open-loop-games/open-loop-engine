@@ -286,6 +286,9 @@ describe('engine event bus — per-module auto-cleanup', () => {
     emitFn!('testPing');
     expect(handler1).toHaveBeenCalledOnce();
     expect(handler2).toHaveBeenCalledOnce();
-    engine.stop();
+    engine.dispose();
+    emitFn!('testPing');
+    expect(handler1).toHaveBeenCalledOnce();
+    expect(handler2).toHaveBeenCalledOnce();
   });
 });

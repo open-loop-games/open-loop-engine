@@ -291,6 +291,43 @@ describe('dispose() — persistent-context teardown', () => {
     expect(() => engine.start()).toThrow(/disposed/);
   });
 
+  it('dispose works detached from the engine, e.g. passed to onUnmounted', () => {
+    const engine = createEngine({ gameId: 'g', persistence: false });
+    engine.start();
+    const { dispose } = engine;
+    expect(() => dispose()).not.toThrow();
+    expect(() => engine.start()).toThrow(/disposed/);
+  });
+
+  it("dispose silences modules' watchers, tick handlers, event and load subscriptions", async () => {
+    const { ref: vueRef, watch } = await import('@/index');
+    const outside = vueRef(0);
+    const calls = { watch: 0, tick: 0, event: 0, load: 0 };
+    let emitFromOutside: (() => void) | undefined;
+    const engine = createEngine({ gameId: 'disp', storageAdapter: createMapStorage() });
+    engine.use({
+      id: 'disp-mod',
+      install(ctx) {
+        persistent(0, { name: 'n' });
+        watch(outside, () => calls.watch++, { flush: 'sync' });
+        ctx.onTick(() => calls.tick++);
+        ctx.on('testPing', () => calls.event++);
+        ctx.onLoad(() => calls.load++);
+        emitFromOutside = () => ctx.emit('testPing');
+      },
+    });
+    engine.start();
+    engine.save();
+    const mgr = engine.saveManager!;
+    engine.dispose();
+
+    outside.value++;
+    engine.tickDriver.stepOnce();
+    emitFromOutside!();
+    mgr.load();
+    expect(calls).toEqual({ watch: 0, tick: 0, event: 0, load: 0 });
+  });
+
   it('dispose is idempotent', () => {
     const m = makeNamedModule();
     const engine = createEngine({ gameId: 'g', persistence: false });
@@ -785,7 +822,9 @@ describe('connect() lifecycle', () => {
     engine.start();
     emitFn!();
     expect(calls).toEqual(['fired']);
-    engine.stop();
+    engine.dispose();
+    emitFn!();
+    expect(calls).toEqual(['fired']);
   });
 });
 
