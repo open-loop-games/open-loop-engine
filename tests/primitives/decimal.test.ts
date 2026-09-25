@@ -551,6 +551,16 @@ describe('formatTime()', () => {
   it('handles negatives', () => {
     expect(formatTime(-30)).toBe('-30.00s');
   });
+
+  it('carries a seconds field that rounds up to 60 into the next unit', () => {
+    expect(formatTime(59.999)).toBe('1m 0.00s');
+    expect(formatTime(119.999)).toBe('2m 0.00s');
+    expect(formatTime(3599.999)).toBe('1h 00m 00s');
+  });
+
+  it('renders NaN as NaN', () => {
+    expect(formatTime(NaN)).toBe('NaN');
+  });
 });
 
 describe('notation switching via notationManager', () => {

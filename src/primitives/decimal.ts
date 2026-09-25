@@ -645,6 +645,8 @@ export function formatWhole(num: DecimalSource): string {
 export function formatTime(seconds: DecimalSource): string {
   const d = new OrigDecimal(seconds);
 
+  if (d.isNan()) return 'NaN';
+
   if (d.lt(0)) {
     return '-' + formatTime(d.neg());
   }
@@ -653,7 +655,9 @@ export function formatTime(seconds: DecimalSource): string {
     return format(d.div(31536000)) + 'y';
   }
 
-  const s = d.toNumber();
+  // Round to the displayed centiseconds before splitting into units, so a
+  // seconds field can't round up to "60.00" instead of carrying.
+  const s = Math.round(d.toNumber() * 100) / 100;
 
   if (s < 60) {
     return format(s) + 's';
