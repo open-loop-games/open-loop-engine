@@ -6,7 +6,15 @@ import {
   createAchievementCategory,
   type BaseTieredAchievementDef,
 } from '@/systems/achievement-category';
-import { resetAllPersistentContexts } from '@/core/persistence';
+import {
+  deserializePersistents,
+  getAllPersistentRefs,
+  persistent,
+  resetAllPersistentContexts,
+  serializePersistents,
+  withPersistentContext,
+} from '@/core/persistence';
+import { createReset } from '@/systems/reset';
 import Formula from '@/core/formulas/formulas';
 
 beforeEach(() => {
@@ -147,5 +155,71 @@ describe('AchievementCategory.registerTiered', () => {
     gold.value = 250;
     await nextTick();
     expect(ach!.earned.value).toBe(true);
+  });
+});
+
+describe('Achievement — a load restores state, it does not earn', () => {
+  /** One session: gold registers before the achievements, as a module's resources do. */
+  function buildSession(ids: string[]) {
+    const log: string[] = [];
+    return withPersistentContext('m', () => {
+      const gold = persistent(0, { name: 'gold' });
+      const achievements = createAchievementCategory<{ id: string }>({
+        id: 'ach',
+        mapAchievement: (def) => ({
+          display: { title: def.id },
+          requirement: () => gold.value >= 10,
+          onComplete: () => log.push(`onComplete ${def.id}`),
+        }),
+      });
+      achievements.register(ids.map((id) => ({ id })));
+      for (const { achievement } of achievements.getAll()) {
+        achievement.on('earned', () => log.push(`earned ${achievement.id}`));
+      }
+      return { gold, achievements, log };
+    });
+  }
+
+  function saveSession(gold: { value: number }): Record<string, unknown> {
+    gold.value = 20;
+    const save = serializePersistents(getAllPersistentRefs());
+    resetAllPersistentContexts();
+    return save;
+  }
+
+  it('fires no onComplete or earned for an achievement the save already holds', () => {
+    const first = buildSession(['rich']);
+    const earnedAt = first.achievements.getAchievement('rich')!.earnedAt;
+    const save = saveSession(first.gold);
+    const savedAt = earnedAt.value;
+
+    const second = buildSession(['rich']);
+    deserializePersistents(getAllPersistentRefs(), save);
+
+    expect(second.log).toEqual([]);
+    const rich = second.achievements.getAchievement('rich')!;
+    expect(rich.earned.value).toBe(true);
+    expect(rich.earnedAt.value).toBe(savedAt);
+  });
+
+  it('earns once on load an achievement added since the save whose requirement holds', () => {
+    const save = saveSession(buildSession(['rich']).gold);
+
+    const second = buildSession(['rich', 'added']);
+    deserializePersistents(getAllPersistentRefs(), save);
+
+    expect(second.log).toEqual(['onComplete added', 'earned added']);
+  });
+
+  it('re-earns after a reset that names its refs when the requirement still holds', () => {
+    const { achievements, gold, log } = buildSession(['rich']);
+    gold.value = 20;
+    const rich = achievements.getAchievement('rich')!;
+    log.length = 0;
+
+    createReset({ thingsToReset: [rich.earned, rich.earnedAt] }).reset();
+
+    expect(rich.earned.value).toBe(true);
+    expect(log).toEqual(['onComplete rich', 'earned rich']);
   });
 });

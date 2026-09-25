@@ -39,6 +39,8 @@ import {
   persistent,
   withPersistentContext,
   resolveSystemContextId,
+  loadingSave,
+  onHydrated,
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
@@ -58,9 +60,10 @@ export interface AutomationTierDef {
    */
   order: number;
   /**
-   * Condition for auto-unlock. When it becomes `true`, the tier unlocks
-   * automatically (like achievements). Omit for tiers unlocked imperatively
-   * via {@link AutomationTiers.unlock}.
+   * Condition for auto-unlock. Whenever it holds, the tier unlocks
+   * automatically (like achievements): as it turns `true`, once a load or
+   * reset settles, and through {@link AutomationTiers.resetUnlocks}. Omit for
+   * tiers unlocked imperatively via {@link AutomationTiers.unlock}.
    *
    * Can be a static boolean, Vue ref, or getter for reactive evaluation.
    */
@@ -69,7 +72,7 @@ export interface AutomationTierDef {
 
 /** Events emitted by an {@link AutomationTiers} instance. */
 export interface AutomationTiersEvents {
-  /** Fired when a tier is newly unlocked. */
+  /** Fired when a tier is newly unlocked. A load restoring a tier fires nothing. */
   unlock: (tierId: string, tierOrder: number) => void;
 }
 
@@ -124,7 +127,8 @@ export interface AutomationTiers {
   unlock(tierId: string): void;
 
   /**
-   * Lock all tiers except those in the initially-unlocked set.
+   * Lock all tiers except those in the initially-unlocked set and those whose
+   * `requirement` still holds, which stay unlocked without an `unlock` event.
    * Intended for prestige/reset scenarios.
    */
   resetUnlocks(): void;
@@ -213,6 +217,19 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   const unsubs: WatchStopHandle[] = [];
 
+  const requirements = tiers.flatMap((tier) =>
+    tier.requirement === undefined ? [] : [{ tier, met: processGetter(tier.requirement) }],
+  );
+
+  /** Unlock every tier whose requirement holds; tiers in `silent` skip the event. */
+  function unlockMet(silent?: ReadonlySet<string>): void {
+    for (const { tier, met } of requirements) {
+      if (!unref(met) || unlocked.value.includes(tier.id)) continue;
+      if (silent?.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
+      else automationTiers.unlock(tier.id);
+    }
+  }
+
   // --- Public API ---
   const automationTiers: AutomationTiers = {
     tiers,
@@ -239,7 +256,9 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     },
 
     resetUnlocks(): void {
+      const before = new Set(unlocked.value);
       unlocked.value = [...defaultUnlocked];
+      unlockMet(before);
     },
 
     on: handle.on,
@@ -251,25 +270,23 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   };
 
   // --- Auto-unlock watchers for tiers with requirements ---
-  for (const tier of tiers) {
-    if (tier.requirement !== undefined) {
-      const processed = processGetter(tier.requirement);
-      unsubs.push(
-        watch(
-          () => unref(processed),
-          (met) => {
-            if (met && !unlocked.value.includes(tier.id)) {
-              automationTiers.unlock(tier.id);
-            }
-          },
-          // flush:'sync' so a tier unlocks the same synchronous tick its
-          // requirement flips — a sim harness driving stepOnce() in a tight loop
-          // would otherwise see unlocks lag or bunch (mirrors achievement.ts).
-          { immediate: true, flush: 'sync' },
-        ),
-      );
-    }
+  for (const { tier, met } of requirements) {
+    unsubs.push(
+      watch(
+        () => unref(met),
+        (isMet) => {
+          // Mid-load, a requirement can hold before `unlocked` is restored;
+          // the settled state decides, once hydration ends.
+          if (isMet && !loadingSave.value) automationTiers.unlock(tier.id);
+        },
+        // flush:'sync' so a tier unlocks the same synchronous tick its
+        // requirement flips — a sim harness driving stepOnce() in a tight loop
+        // would otherwise see unlocks lag or bunch (mirrors achievement.ts).
+        { immediate: true, flush: 'sync' },
+      ),
+    );
   }
+  if (requirements.length > 0) unsubs.push(onHydrated(() => unlockMet()));
 
   return automationTiers;
 }

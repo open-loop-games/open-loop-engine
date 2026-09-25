@@ -8,7 +8,15 @@
  * - Deleted flag for conditional persistence
  */
 
-import { ref, computed, isRef, type Ref, type WritableComputedRef } from 'vue';
+import {
+  ref,
+  computed,
+  isRef,
+  watch,
+  type Ref,
+  type WatchStopHandle,
+  type WritableComputedRef,
+} from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { isTracing, recordTrace } from './trace';
@@ -149,8 +157,30 @@ export type NonPersistent<T = State> = WritableComputedRef<T> & {
 
 // === MODULE STATE ===
 
-/** Flag to prevent watchers from triggering during save load */
+/**
+ * True while a save load or a reset writes persistent refs. Watchers that
+ * react to player actions skip these writes: they restore state, they don't
+ * change it.
+ */
 export const loadingSave = ref(false);
+
+/**
+ * Run `callback` each time a save load or a reset finishes writing persistent
+ * refs, once the whole state is consistent. The flag is shared by every
+ * engine in the process, so the callback also runs after another engine's
+ * load and must be idempotent.
+ *
+ * @internal
+ */
+export function onHydrated(callback: () => void): WatchStopHandle {
+  return watch(
+    loadingSave,
+    (loading, wasLoading) => {
+      if (wasLoading && !loading) callback();
+    },
+    { flush: 'sync' },
+  );
+}
 
 /** Track if we're currently in a context where persistent creation is expected */
 const addingContexts: string[] = [];

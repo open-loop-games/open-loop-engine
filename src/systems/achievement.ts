@@ -4,7 +4,8 @@
  * Achievements record once-and-stay-earned progress markers. Each instance
  * carries persistent `earned` + `earnedAt` state, an optional reactive
  * `effect` value granted while earned, and a `requirement` watch that
- * auto-completes the achievement the moment the requirement first holds.
+ * auto-completes the achievement whenever the requirement holds and it isn't
+ * earned. A save load restores `earned` as state: it fires no `onComplete`.
  *
  * The category factory {@link createAchievementCategory} is the consumer
  * front door for batch-registering achievements; its `registerTiered`
@@ -21,7 +22,13 @@
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { computed, type Ref, unref, watch } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
-import { persistent, withPersistentContext, getCurrentContext } from '@/core/persistence';
+import {
+  persistent,
+  withPersistentContext,
+  getCurrentContext,
+  loadingSave,
+  onHydrated,
+} from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
 
@@ -40,9 +47,10 @@ export interface AchievementDisplay {
  * Configuration for {@link createAchievement}.
  *
  * `requirement` and `effect` accept refs/getters and so participate in Vue
- * reactivity — when the requirement transitions to `true` the achievement
- * auto-completes on the next sync flush. If `requirement` is omitted the
- * achievement only earns via an explicit {@link Achievement.complete} call.
+ * reactivity — while the requirement holds the achievement auto-completes on
+ * the next sync flush, or once a load or reset settles. If `requirement` is
+ * omitted the achievement only earns via an explicit
+ * {@link Achievement.complete} call.
  *
  * @typeParam T - Type of the reactive `effect` value exposed once earned
  */
@@ -84,7 +92,10 @@ export interface AchievementOptions<T = unknown> {
   /** Use smaller display variant */
   small?: Computable<boolean>;
 
-  /** Callback when achievement is earned */
+  /**
+   * Callback when the achievement is earned. Never fires for an achievement a
+   * load restores as earned, so it can grant a reward.
+   */
   onComplete?: () => void;
 
   /** Whether to show a popup notification when earned. Defaults to true. */
@@ -256,12 +267,17 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
     watch(
       canComplete,
       (canNow) => {
-        if (canNow && !earned.value) {
-          achievement.complete();
-        }
+        // Mid-load, a requirement can hold before `earned` is restored; the
+        // settled state decides, once hydration ends.
+        if (canNow && !loadingSave.value) achievement.complete();
       },
       { immediate: true, flush: 'sync' },
     );
+    // A requirement that holds when a load or reset settles earns here: one
+    // added since the save, or one whose `earned` a reset wiped.
+    onHydrated(() => {
+      if (canComplete.value) achievement.complete();
+    });
   }
 
   return achievement;

@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { createAutomationTiers } from '@/systems/automation';
+import {
+  deserializePersistents,
+  getAllPersistentRefs,
+  persistent,
+  resetAllPersistentContexts,
+  serializePersistents,
+  withPersistentContext,
+} from '@/core/persistence';
 
 const TIERS = [
   { id: 'manual', name: 'Manual', order: 0 },
@@ -198,4 +206,63 @@ describe('AutomationTiers', () => {
   });
 
   // --- Type guard ---
+});
+
+describe('AutomationTiers — a met requirement is a level, not an edge', () => {
+  const BASIC = { id: 'basic', name: 'Basic', order: 1 };
+  const EXTRA = { id: 'extra', name: 'Extra', order: 2 };
+
+  /** One session: gold registers before the tiers, as a module's resources do. */
+  function buildSession(tierDefs: { id: string; name: string; order: number }[]) {
+    const events: string[] = [];
+    return withPersistentContext('m', () => {
+      const gold = persistent(0, { name: 'gold' });
+      const tiers = createAutomationTiers({
+        tiers: [
+          { id: 'manual', name: 'Manual', order: 0 },
+          ...tierDefs.map((t) => ({ ...t, requirement: () => gold.value >= 10 })),
+        ],
+      });
+      tiers.on('unlock', (id) => events.push(id));
+      return { gold, tiers, events };
+    });
+  }
+
+  function saveSession(gold: { value: number }): Record<string, unknown> {
+    gold.value = 20;
+    const save = serializePersistents(getAllPersistentRefs());
+    resetAllPersistentContexts();
+    return save;
+  }
+
+  it('a load emits no unlock for a tier the save already holds', () => {
+    const save = saveSession(buildSession([BASIC]).gold);
+
+    const { tiers, events } = buildSession([BASIC]);
+    deserializePersistents(getAllPersistentRefs(), save);
+
+    expect(tiers.unlocked.value).toEqual(['manual', 'basic']);
+    expect(events).toEqual([]);
+  });
+
+  it('a load unlocks a tier added since the save whose requirement holds', () => {
+    const save = saveSession(buildSession([BASIC]).gold);
+
+    const { tiers, events } = buildSession([BASIC, EXTRA]);
+    deserializePersistents(getAllPersistentRefs(), save);
+
+    expect(tiers.hasReached('extra')).toBe(true);
+    expect(events).toEqual(['extra']);
+  });
+
+  it('resetUnlocks keeps a tier whose requirement still holds, without an event', () => {
+    const { gold, tiers, events } = buildSession([BASIC]);
+    gold.value = 20;
+    events.length = 0;
+
+    tiers.resetUnlocks();
+
+    expect(tiers.unlocked.value).toEqual(['manual', 'basic']);
+    expect(events).toEqual([]);
+  });
 });
