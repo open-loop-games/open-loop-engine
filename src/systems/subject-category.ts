@@ -549,21 +549,25 @@ function buildField(
 /**
  * Bring a field's value back inside its schema: clamp numbers, and reset an
  * enum value the schema no longer declares to its seed. Writes the ref, not
- * `set()`, so no event fires; a value already inside is left alone.
+ * `set()`, so no event fires, and Vue skips a write that changes nothing.
  */
 function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void {
   switch (schema.kind) {
-    case 'scalar':
-      writeIfChanged((field as ScalarFieldInstance).ref, (v) => clampScalar(schema, v));
+    case 'scalar': {
+      const ref = (field as ScalarFieldInstance).ref;
+      ref.value = clampScalar(schema, ref.value);
       return;
+    }
     case 'vector':
       for (const [dim, ref] of (field as VectorFieldInstance).refs) {
-        writeIfChanged(ref, (v) => clampVectorDim(schema, dim, v));
+        ref.value = clampVectorDim(schema, dim, ref.value);
       }
       return;
-    case 'tier':
-      writeIfChanged((field as TierFieldInstance).ref, (v) => clampTierIndex(schema, v));
+    case 'tier': {
+      const ref = (field as TierFieldInstance).ref;
+      ref.value = clampTierIndex(schema, ref.value);
       return;
+    }
     case 'enum': {
       const ref = (field as EnumFieldInstance).ref;
       if (ref.value !== null && !schema.values.includes(ref.value)) resetPersistent(ref);
@@ -572,11 +576,6 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
     case 'flag':
       return;
   }
-}
-
-function writeIfChanged(ref: Persistent<number>, normalize: (v: number) => number): void {
-  const next = normalize(ref.value);
-  if (next !== ref.value) ref.value = next;
 }
 
 // === FACTORIES ===
