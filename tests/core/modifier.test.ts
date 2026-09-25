@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { computed, ref, unref } from 'vue';
-import { Decimal, bn } from '@/primitives/decimal';
+import { Decimal, bn, type DecimalSource } from '@/primitives/decimal';
 import {
   createAdditiveModifier,
   createMultiplicativeModifier,
@@ -286,6 +286,19 @@ describe('createModifierChain', () => {
   });
 });
 
+describe('nested chains', () => {
+  it('an outer chain drops invert once an added inner chain loses it', () => {
+    const inner = createModifierChain('nest-inner');
+    const outer = createModifierChain('nest-outer');
+    inner.add(createMultiplicativeModifier({ multiplier: 2 }));
+    outer.add(inner);
+    expect(outer.invert).toBeTypeOf('function');
+
+    inner.add({ apply: (x) => Decimal.add(x, 1) });
+    expect(outer.invert).toBeUndefined();
+  });
+});
+
 describe('chain.bind', () => {
   it('adds a modifier with auto-derived id from context and description', () => {
     const chain = createModifierChain('bind-basic');
@@ -415,6 +428,37 @@ describe('chain.bind', () => {
     remove();
     expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
     expect(chain.bindings()).toHaveLength(0);
+  });
+
+  it('binding with active delegates to a class-based modifier', () => {
+    class Doubler {
+      description = { text: 'Doubler', formattedValue: '×2' };
+      apply(x: DecimalSource) {
+        return Decimal.times(x, 2);
+      }
+      invert(x: DecimalSource) {
+        return Decimal.div(x, 2);
+      }
+    }
+    const chain = createModifierChain('bind-class');
+    chain.bind({ id: 'doubler', active: ref(true), modifier: new Doubler() });
+    expect(Decimal.eq(chain.apply(5), 10)).toBe(true);
+    expect(Decimal.eq(chain.invert!(10), 5)).toBe(true);
+  });
+
+  it('a chain bound with active stays live as the inner chain changes', () => {
+    const inner = createModifierChain('bind-inner');
+    const outer = createModifierChain('bind-outer');
+    outer.bind({ id: 'inner', active: ref(true), modifier: inner });
+    const value = computed(() => new Decimal(outer.apply(1)).toNumber());
+    expect(value.value).toBe(1);
+
+    inner.add(createMultiplicativeModifier({ multiplier: 3, description: 'Triple' }));
+    expect(value.value).toBe(3);
+    expect(outer.description).toBeTypeOf('function');
+
+    inner.add({ apply: (x) => Decimal.add(x, 1) });
+    expect(outer.invert).toBeUndefined();
   });
 
   it('records tags on the binding', () => {

@@ -317,6 +317,21 @@ export function createSequentialModifier<T extends Modifier>(
 ): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
   readonly children: readonly T[];
 } {
+  const invertAll = (gain: DecimalSource): Decimal =>
+    toFinalDecimal(
+      modifiers
+        .filter((m) => unref(m.enabled) !== false)
+        .reduceRight<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.invert!(acc)), gain),
+    );
+
+  const describeAll = (): ModifierDescription[] =>
+    modifiers
+      .filter((m) => unref(m.enabled) !== false && m.description != null)
+      .map((m) => {
+        const desc = m.description!;
+        return typeof desc === 'function' ? desc() : desc;
+      });
+
   return {
     // Reduce body keeps the accumulator renormalized so each modifier's
     // typeof fast path can fire; the final return wraps once to Decimal so
@@ -331,31 +346,19 @@ export function createSequentialModifier<T extends Modifier>(
         ),
       ),
 
-    invert: modifiers.every((m) => m.invert != null)
-      ? (gain: DecimalSource) =>
-          toFinalDecimal(
-            modifiers
-              .filter((m) => unref(m.enabled) !== false)
-              .reduceRight<DecimalSource>(
-                (acc, modifier) => renormIfLayer0(modifier.invert!(acc)),
-                gain,
-              ),
-          )
-      : undefined,
+    // Getters, so a child that gains or loses `invert` / `description` after
+    // composition (a nested chain, say) is seen on the next read.
+    get invert() {
+      return modifiers.every((m) => m.invert != null) ? invertAll : undefined;
+    },
 
     enabled: modifiers.some((m) => m.enabled != null)
       ? computed(() => modifiers.filter((m) => unref(m.enabled) !== false).length > 0)
       : undefined,
 
-    description: modifiers.some((m) => m.description != null)
-      ? (): ModifierDescription[] =>
-          modifiers
-            .filter((m) => unref(m.enabled) !== false && m.description != null)
-            .map((m) => {
-              const desc = m.description!;
-              return typeof desc === 'function' ? desc() : desc;
-            })
-      : undefined,
+    get description() {
+      return modifiers.some((m) => m.description != null) ? describeAll : undefined;
+    },
 
     /** Read-only access to the component modifiers in this chain */
     children: modifiers as readonly T[],
@@ -652,7 +655,7 @@ export function createModifierChain(id: string): ModifierChain {
           existingEnabled == null
             ? activeRef
             : computed(() => unref(existingEnabled) !== false && unref(activeRef!) !== false);
-        modifier = { ...rawModifier, enabled: composedEnabled };
+        modifier = delegateWithEnabled(rawModifier, composedEnabled);
       }
 
       // Resolve id — explicit override wins, then explicit attribution text,
@@ -727,6 +730,27 @@ export function createModifierChain(id: string): ModifierChain {
   getCurrentChainRegistry()?.register(chain);
 
   return chain;
+}
+
+/**
+ * A modifier that forwards every call to `raw` and carries its own `enabled`.
+ * Forwarding per call (rather than copying `raw`'s properties) keeps class
+ * methods and a chain's live `apply` / `invert` / `description` getters.
+ */
+function delegateWithEnabled(raw: Modifier, enabled: MaybeRef<boolean>): Modifier {
+  return {
+    apply: (gain) => raw.apply(gain),
+    get invert() {
+      return raw.invert == null ? undefined : (gain: DecimalSource) => raw.invert!(gain);
+    },
+    get description() {
+      const desc = raw.description;
+      return typeof desc === 'function'
+        ? () => (raw.description as () => ModifierDescription)()
+        : desc;
+    },
+    enabled,
+  };
 }
 
 /**
