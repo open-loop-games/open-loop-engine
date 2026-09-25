@@ -418,6 +418,19 @@ describe('createSpatialGrid — distanceField', () => {
       RangeError,
     );
   });
+
+  it('rejects a negative step cost instead of relaxing a negative cycle forever', () => {
+    const grid = createSpatialGrid<Tile>({ width: 3, height: 1, initializer: floor });
+    let calls = 0;
+    // The guard turns a regression into a failure rather than a hung run.
+    const roadBonus = (): number => {
+      if (++calls > 10_000) throw new Error('distanceField did not terminate');
+      return -0.5;
+    };
+    expect(() => grid.distanceField([{ x: 0, y: 0 }], roadBonus)).toThrow(
+      /distanceField: cost at \(1, 0\) is negative/,
+    );
+  });
 });
 
 describe('createSpatialGrid — flood & findOpen', () => {

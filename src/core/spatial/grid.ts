@@ -313,9 +313,10 @@ export interface SpatialGrid<T> {
    *
    * @param sources - Seed cells, all at distance 0. A single-source query is
    *   a one-element set.
-   * @param cost - Cost to enter each cell; `Infinity` means impassable. Must
-   *   not call `distanceField` on this grid — the query reuses a per-grid
-   *   scratch queue.
+   * @param cost - Cost to enter each cell, ≥ 0; `Infinity` means impassable,
+   *   and a negative cost throws a `RangeError`. Must not call
+   *   `distanceField` on this grid — the query reuses a per-grid scratch
+   *   queue.
    * @param into - Optional destination array of length `width * height`,
    *   filled in place and returned. For tick-rate callers that keep a
    *   retained field buffer instead of allocating one per recompute.
@@ -678,6 +679,12 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
           const ni = ny * width + nx;
           const step = cost(cells[ni], nx, ny);
           if (!Number.isFinite(step)) continue;
+          // A negative step makes a cycle that relaxes forever.
+          if (step < 0) {
+            throw new RangeError(
+              `SpatialGrid.distanceField: cost at (${nx}, ${ny}) is negative (${step}); costs must be ≥ 0`,
+            );
+          }
           const nd = d + step;
           if (nd < dist[ni]) {
             dist[ni] = nd;

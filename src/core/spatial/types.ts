@@ -39,7 +39,9 @@ export type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean;
  * Caller-supplied cost to *enter* a cell, for weighted traversal queries
  * (`distanceField`). Receives the cell value and its coordinates; returns the
  * cost of stepping into it, or `Infinity` for impassable — the passability
- * gate folds into the weight rather than riding a second predicate.
+ * gate folds into the weight rather than riding a second predicate. Costs
+ * are ≥ 0: a bonus terrain is a cost below the base, never below zero, since
+ * a negative cost has no shortest path.
  *
  * Cost is per entered cell, not per step, so every delta in the grid's
  * `neighborhood` costs the same regardless of its length — 8-connected
