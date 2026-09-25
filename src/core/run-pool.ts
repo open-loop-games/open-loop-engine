@@ -212,16 +212,24 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates', lifetime: true }),
   }));
 
-  // In-memory collection state. `handleArray` + `handleMap` is the canonical
-  // form.
+  // In-memory collection state: `handleArray` holds insertion order, and
+  // `entries` everything else about a handle in the pool. A handle is in the
+  // pool while `entries` maps its id to its own entry; after it leaves, the
+  // id may be reused by a new handle.
+  interface Entry {
+    readonly handle: RunHandle<Id>;
+    step: RunStep;
+    readonly onDeath: (() => RunDeathOutcome) | undefined;
+    /** Stops the handle's `aliveStates` watchers, which would otherwise outlive it. */
+    readonly stop: () => void;
+  }
   const handleArray: RunHandle<Id>[] = [];
-  const handleMap = new Map<Id, RunHandle<Id>>();
-  const stepMap = new Map<Id, RunStep>();
-  const onDeathMap = new Map<Id, (() => RunDeathOutcome) | undefined>();
-  const aliveMap = new Map<Id, Ref<boolean>>();
-  // Each handle's two `aliveStates` watchers. Stopped when the handle leaves
-  // the pool, or a later load would write a reused id's value into it.
-  const stopWatchesMap = new Map<Id, () => void>();
+  const entries = new Map<Id, Entry>();
+
+  function entryOf(h: RunHandle<Id>): Entry | undefined {
+    const entry = entries.get(h.id);
+    return entry?.handle === h ? entry : undefined;
+  }
 
   // Versioned view-cache for referentially-stable `instances.value` reads.
   // Pattern cribbed verbatim from sequencer.ts — reads return the same slice
@@ -262,60 +270,55 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     return n;
   });
 
-  function removeFromCollection(id: Id): void {
-    handleMap.delete(id);
-    const idx = handleArray.findIndex((h) => h.id === id);
-    if (idx !== -1) handleArray.splice(idx, 1);
-    stepMap.delete(id);
-    onDeathMap.delete(id);
-    aliveMap.delete(id);
-    stopWatchesMap.get(id)?.();
-    stopWatchesMap.delete(id);
-    delete aliveStates.value[String(id)];
+  function removeFromCollection(entry: Entry): void {
+    const { handle } = entry;
+    entry.stop();
+    entries.delete(handle.id);
+    handleArray.splice(handleArray.indexOf(handle), 1);
+    delete aliveStates.value[String(handle.id)];
     bumpLive();
   }
 
-  function resolveOutcome(id: Id): RunDeathOutcome {
-    const onDeath = onDeathMap.get(id);
-    if (onDeath) return onDeath();
+  function resolveOutcome(entry: Entry): RunDeathOutcome {
+    if (entry.onDeath) return entry.onDeath();
     return deathPolicy === 'destroy' ? 'destroyed' : 'parked';
   }
 
   function dispatchDeath(h: RunHandle<Id>, outcome: RunDeathOutcome): void {
-    const alive = aliveMap.get(h.id);
-    if (!alive) return; // handle was already torn down
+    const entry = entryOf(h);
+    if (!entry) return; // handle was already torn down
 
     if (outcome === 'destroyed') {
-      alive.value = false;
+      h.alive.value = false;
       bus.emit('instance:died', h, 'destroyed');
-      removeFromCollection(h.id);
+      removeFromCollection(entry);
       bus.emit('instance:removed', h);
       return;
     }
 
     if (outcome === 'parked') {
-      alive.value = false;
+      h.alive.value = false;
       bus.emit('instance:died', h, 'parked');
       return;
     }
 
     // { restartedWith } — swap step in-place, alive stays true.
-    stepMap.set(h.id, outcome.restartedWith);
+    entry.step = outcome.restartedWith;
     bus.emit('instance:died', h, outcome);
     bus.emit('instance:restarted', h);
   }
 
   function forceDestroy(h: RunHandle<Id>): void {
-    if (!handleMap.has(h.id)) return; // idempotent
-    const alive = aliveMap.get(h.id);
-    if (alive) alive.value = false;
+    const entry = entryOf(h);
+    if (!entry) return; // idempotent
+    h.alive.value = false;
     bus.emit('instance:died', h, 'destroyed');
-    removeFromCollection(h.id);
+    removeFromCollection(entry);
     bus.emit('instance:removed', h);
   }
 
   function addInstance(reg: RunRegistration<Id>): RunHandle<Id> {
-    if (handleMap.has(reg.id)) {
+    if (entries.has(reg.id)) {
       throw new Error(`RunPool(${poolId}): duplicate instance id ${String(reg.id)}`);
     }
     if (handleArray.length >= maxInstances) {
@@ -358,20 +361,19 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       alive,
       step(): boolean {
         if (!alive.value) return false;
-        const fn = stepMap.get(reg.id);
-        if (!fn) return false;
-        const stillAlive = fn();
-        if (stillAlive) return true;
-        const outcome = resolveOutcome(reg.id);
-        dispatchDeath(handle, outcome);
+        const entry = entryOf(handle);
+        if (!entry) return false;
+        const fn = entry.step;
+        if (fn()) return true;
+        dispatchDeath(handle, resolveOutcome(entry));
         return false;
       },
       restart(nextStep: RunStep): void {
         // Only parked handles re-arm. Live handles ignore; destroyed
-        // handles (not in map) can't be reached via the reference anyway.
-        if (!handleMap.has(reg.id)) return;
-        if (alive.value) return;
-        stepMap.set(reg.id, nextStep);
+        // handles are out of the pool.
+        const entry = entryOf(handle);
+        if (!entry || alive.value) return;
+        entry.step = nextStep;
         alive.value = true;
         bus.emit('instance:restarted', handle);
       },
@@ -380,15 +382,16 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       },
     };
 
-    stepMap.set(reg.id, reg.step);
-    onDeathMap.set(reg.id, reg.onDeath);
-    aliveMap.set(reg.id, alive);
-    stopWatchesMap.set(reg.id, () => {
-      stopForward();
-      stopReverse();
+    entries.set(reg.id, {
+      handle,
+      step: reg.step,
+      onDeath: reg.onDeath,
+      stop: () => {
+        stopForward();
+        stopReverse();
+      },
     });
     handleArray.push(handle);
-    handleMap.set(reg.id, handle);
     bumpLive();
 
     bus.emit('instance:added', handle);
@@ -402,11 +405,11 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     liveCount,
     addInstance,
     getInstance(id: Id): RunHandle<Id> | undefined {
-      return handleMap.get(id);
+      return entries.get(id)?.handle;
     },
     removeInstance(id: Id): void {
-      const h = handleMap.get(id);
-      if (h) forceDestroy(h);
+      const entry = entries.get(id);
+      if (entry) forceDestroy(entry.handle);
     },
     reset(): void {
       bus.emit('pool:reset');

@@ -526,6 +526,18 @@ describe('RunPool — edge cases', () => {
     handle.destroy(); // second call
     expect(fired).toBe(0);
   });
+
+  it('a destroyed handle leaves alone the new handle that reuses its id', () => {
+    const pool = makePool({ deathPolicy: 'destroy' });
+    const old = pool.addInstance({ id: 'x', step: aliveStep });
+    old.destroy();
+    const next = pool.addInstance({ id: 'x', step: aliveStep });
+    old.destroy();
+    old.restart(aliveStep);
+    expect(old.alive.value).toBe(false);
+    expect(pool.getInstance('x')).toBe(next);
+    expect(next.alive.value).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
