@@ -611,6 +611,32 @@ describe('createPurchasableCategory (leveled)', () => {
     expect(Decimal.eq(category.totalEffect.value, 6)).toBe(true);
   });
 
+  it('totalEffect counts a one-shot upgrade only once it is bought', () => {
+    const gold = createTestResource('gold', 10000);
+
+    const category = createPurchasableCategory<PerkDef>({
+      id: 'pcl-test15b',
+      mapPurchasable: (def) => ({
+        display: { description: def.name },
+        requirements: createCostRequirement({ resource: gold, cost: def.baseCost }),
+        limit: 1,
+        effect: def.effectPerLevel,
+      }),
+    });
+
+    category.register([
+      { id: 'a', name: 'A', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 2 },
+      { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 3 },
+    ]);
+
+    expect(Decimal.eq(category.totalEffect.value, 1)).toBe(true);
+
+    category.getPurchasable('b')!.purchase();
+    expect(Decimal.eq(category.totalEffect.value, 3)).toBe(true);
+    // An unbought upgrade still reports its bonus, for previews.
+    expect(Decimal.eq(category.getPurchasable('a')!.effect.value, 2)).toBe(true);
+  });
+
   it('allMaxed tracks when every purchasable is at limit', () => {
     const gold = createTestResource('gold', 10000);
 

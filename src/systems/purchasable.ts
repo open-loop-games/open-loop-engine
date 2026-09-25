@@ -119,7 +119,10 @@ export interface PurchasableOptions {
   /**
    * Effect value or function.
    *
-   * - `Computable<DecimalSource>` — static/reactive value (typical for one-shot). Exposed directly.
+   * - `Computable<DecimalSource>` — static/reactive value (typical for one-shot).
+   *   Exposed directly and ungated: it reports the full bonus before the
+   *   upgrade is bought, so read it behind `active` (or through `grants`,
+   *   which gate) wherever it applies rather than previews.
    * - `(amount: DecimalSource) => DecimalSource` — computed from amount (typical for leveled).
    *
    * If omitted, effect defaults to `1` (identity for multiplication).

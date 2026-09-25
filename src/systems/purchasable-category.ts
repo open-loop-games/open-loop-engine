@@ -152,7 +152,7 @@ export interface PurchasableCategory<
   /** Reactive sum of all purchasables' amounts (total levels across all) */
   readonly totalAmount: ComputedRef<DecimalSource>;
 
-  /** Reactive product of all purchasables' effects */
+  /** Reactive product of the effects of every purchasable bought at least once */
   readonly totalEffect: ComputedRef<DecimalSource>;
 
   /** True when every registered purchasable has reached its limit */
@@ -223,9 +223,12 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     ),
   );
 
+  // Gated here rather than on `Purchasable.effect`, which a UI reads unbought
+  // to preview an upgrade's bonus.
   const totalEffect = computed((): DecimalSource =>
     list().reduce<DecimalSource>(
-      (product, p) => renormIfLayer0(Decimal.mul(product, p.effect.value)),
+      (product, p) =>
+        p.active.value ? renormIfLayer0(Decimal.mul(product, p.effect.value)) : product,
       Decimal.dOne,
     ),
   );
