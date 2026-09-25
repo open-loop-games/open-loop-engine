@@ -32,7 +32,7 @@ import {
 import { processGetter } from '@/core/computed';
 import { profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
-import { createContentRegistry, type ContentRegistry } from './content-registry';
+import { createContentRegistryHandle, type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
@@ -126,8 +126,10 @@ export interface CategoryBase<
   readonly registry: ContentRegistry<Def>;
 
   /**
-   * Register definitions: validate via registry, then build instances.
-   * Can be called multiple times (base game + mods).
+   * Register definitions: validate the whole batch, then build instances.
+   * Can be called multiple times (base game + mods). A builder that throws
+   * stops the batch at its def: the defs before it stay registered, and it
+   * and the ones after it are not.
    */
   register(defs: Def | Def[]): void;
 
@@ -172,7 +174,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
 ): CategoryBase<Def, Instance, State> {
   const { id: categoryId, buildInstance, buildState, buildSignals } = options;
 
-  const registry = createContentRegistry<Def>(categoryId);
+  const { registry, assertRegistrable, remove } = createContentRegistryHandle<Def>(categoryId);
   const entries = new Map<string, CategoryEntry<Def, Instance, State>>();
   // Registration-reactive read barrier for the plain Map: accessors read this
   // ref so a computed whose first evaluation misses the map (e.g. a grants
@@ -214,11 +216,18 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
 
     register(defs: Def | Def[]): void {
       const arr = Array.isArray(defs) ? defs : [defs];
-      // Register in content registry first (validates uniqueness)
-      registry.register(arr);
-      // Then build instances
+      assertRegistrable(arr);
+      // Each def enters the registry before its build, so builders can read it
+      // back through getDef; one whose build throws leaves again, and the defs
+      // after it stay unregistered, so registry and entries never disagree.
       for (const def of arr) {
-        registerOne(def);
+        registry.register(def);
+        try {
+          registerOne(def);
+        } catch (error) {
+          remove(def.id);
+          throw error;
+        }
       }
     },
 

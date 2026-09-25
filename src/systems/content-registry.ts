@@ -94,6 +94,20 @@ export interface ContentRegistry<T extends { id: string }> {
   readonly size: number;
 }
 
+/**
+ * A content registry plus the hooks an owner needs to keep it in step with
+ * what it builds per entry.
+ *
+ * @internal
+ */
+export interface ContentRegistryHandle<T extends { id: string }> {
+  readonly registry: ContentRegistry<T>;
+  /** Throw exactly as `register(entries)` would, without adding anything. */
+  assertRegistrable(entries: T[]): void;
+  /** Drop an entry, for undoing a registration its owner failed to build. */
+  remove(id: string): void;
+}
+
 // === CONSTANTS ===
 
 /** Base-value marker for a key the entry didn't have before a scope set it. */
@@ -115,6 +129,17 @@ const ABSENT: unique symbol = Symbol('absent');
  * ```
  */
 export function createContentRegistry<T extends { id: string }>(name: string): ContentRegistry<T> {
+  return createContentRegistryHandle<T>(name).registry;
+}
+
+/**
+ * Create a content registry together with its owner-side hooks.
+ *
+ * @internal
+ */
+export function createContentRegistryHandle<T extends { id: string }>(
+  name: string,
+): ContentRegistryHandle<T> {
   const store = new Map<string, T>();
   // Read barrier for the plain store: every read touches it, every write bumps it.
   const version = ref(0);
@@ -145,27 +170,35 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
     if (base.size === 0) bases.delete(id);
   }
 
+  function assertRegistrable(entries: T[]): void {
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      if (entry.id === '') {
+        throw new Error(`[${name}] Cannot register entry with empty id`);
+      }
+      if (seen.has(entry.id)) {
+        throw new Error(`[${name}] Duplicate entry id in batch: "${entry.id}"`);
+      }
+      if (store.has(entry.id)) {
+        throw new Error(`[${name}] Duplicate entry id: "${entry.id}"`);
+      }
+      seen.add(entry.id);
+    }
+  }
+
+  function remove(id: string): void {
+    if (!store.delete(id)) return;
+    bases.delete(id);
+    version.value++;
+  }
+
   const registry: ContentRegistry<T> = {
     name,
 
     register(entryOrEntries: T | T[]): void {
       const entries = Array.isArray(entryOrEntries) ? entryOrEntries : [entryOrEntries];
-
       // Validate all before inserting any (atomic batch)
-      const seen = new Set<string>();
-      for (const entry of entries) {
-        if (entry.id === '') {
-          throw new Error(`[${name}] Cannot register entry with empty id`);
-        }
-        if (seen.has(entry.id)) {
-          throw new Error(`[${name}] Duplicate entry id in batch: "${entry.id}"`);
-        }
-        if (store.has(entry.id)) {
-          throw new Error(`[${name}] Duplicate entry id: "${entry.id}"`);
-        }
-        seen.add(entry.id);
-      }
-
+      assertRegistrable(entries);
       for (const entry of entries) {
         store.set(entry.id, entry);
       }
@@ -239,5 +272,5 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
     },
   };
 
-  return registry;
+  return { registry, assertRegistrable, remove };
 }

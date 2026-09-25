@@ -30,3 +30,32 @@ describe('createCategoryBase — persistent-context safety', () => {
     expect(getCurrentFullContext()).toBeUndefined();
   });
 });
+
+describe('createCategoryBase — batch registration', () => {
+  function makeThrowingOn(badId: string) {
+    return createCategoryBase<
+      ThingDef,
+      void,
+      { count: ReturnType<typeof persistent<DecimalSource>> }
+    >({
+      id: `batch-${badId}`,
+      buildState: (def) => {
+        if (def.id === badId) throw new Error('builder blew up');
+        return { count: persistent<DecimalSource>(0) };
+      },
+    });
+  }
+
+  it('a builder throw mid-batch leaves registry and entries in step', () => {
+    const cat = makeThrowingOn('b');
+    expect(() => cat.register([{ id: 'a' }, { id: 'b' }, { id: 'c' }])).toThrow('builder blew up');
+
+    expect(cat.getAll().map((e) => e.def.id)).toEqual(['a']);
+    expect(cat.registry.getAll().map((d) => d.id)).toEqual(['a']);
+    expect(cat.getDef('b')).toBeUndefined();
+
+    cat.register({ id: 'c' });
+    expect(cat.getEntry('c')).toBeDefined();
+    expect(cat.registry.size).toBe(2);
+  });
+});
