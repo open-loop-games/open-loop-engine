@@ -13,7 +13,15 @@
 import { unref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
-import { createMultiplicativeModifier, type Modifier, type ModifierChain } from '@/core/modifier';
+import {
+  createAdditiveModifier,
+  createExponentialModifier,
+  createMultiplicativeModifier,
+  type Grant,
+  type Modifier,
+  type ModifierChain,
+  type ModifierDescription,
+} from '@/core/modifier';
 
 // === TYPES ===
 
@@ -120,4 +128,36 @@ export function replacementBinding(options: ReplacementBindingOptions): Modifier
         }),
     },
   ];
+}
+
+// === GRANT LOWERING ===
+
+/**
+ * Build the Modifier a {@link Grant} describes: a fresh one for the
+ * `mult` / `add` / `exp` shorthands, the resolved hand-built one otherwise.
+ *
+ * @internal
+ */
+export function buildGrantModifier(grant: Grant): Modifier {
+  if ('mult' in grant) {
+    return createMultiplicativeModifier({ multiplier: grant.mult, description: grant.description });
+  }
+  if ('add' in grant) {
+    return createAdditiveModifier({ addend: grant.add, description: grant.description });
+  }
+  if ('exp' in grant) {
+    return createExponentialModifier({ exponent: grant.exp, description: grant.description });
+  }
+  const resolved = typeof grant.modifier === 'function' ? grant.modifier() : grant.modifier;
+  // Overlay an inline description onto a modifier that doesn't already carry
+  // one — keeps `chain.bind` auto-id derivation working for the escape-hatch
+  // variant without forcing consumers to wrap the modifier themselves.
+  if (grant.description != null && resolved.description == null) {
+    const text = grant.description;
+    return {
+      ...resolved,
+      description: (): ModifierDescription => ({ text, formattedValue: '' }),
+    };
+  }
+  return resolved;
 }

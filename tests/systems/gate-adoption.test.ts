@@ -16,10 +16,12 @@ import {
   createChallengeCategory,
   createEngine,
   createGateRequirement,
+  createPredicateResolver,
   createPurchasableCategory,
   createReset,
   createResource,
   createCostRequirement,
+  evaluatePredicate,
   requirementsMet,
   type EngineModule,
   type GameStateAccessor,
@@ -525,5 +527,118 @@ describe('Gate-accepting categories — content registered after start()', () =>
     expect(result.achievements.getAchievement('flagged')!.earned.value).toBe(true);
     expect(result.subjects.get('rask')!.fields.trust.tryAdvance()).toBe('friend');
     stop();
+  });
+});
+
+// ============================================================================
+// Predicate resolver — the one adoption path every predicate field goes through
+// ============================================================================
+
+describe('createPredicateResolver', () => {
+  const categoryOnly = {
+    kind: 'count-gte',
+    category: 'producers',
+    entity: 'farm',
+    value: 1,
+  } as const;
+
+  it('adopts every arm to the same reactive holds', () => {
+    const { result, stop } = bootstrap((api) => {
+      const predicates = createPredicateResolver();
+      const flag = ref(false);
+      return {
+        api,
+        flag,
+        constant: predicates.adopt(true, false, 'constant'),
+        viaRef: predicates.adopt(flag, true, 'ref'),
+        viaGetter: predicates.adopt(() => flag.value, true, 'getter'),
+        viaGate: predicates.adopt(
+          { kind: 'resource-gte', resource: 'points', value: 5 },
+          true,
+          'gate',
+        ),
+        absent: predicates.adopt(undefined, true, 'absent'),
+      };
+    });
+
+    expect(result.constant.holds.value).toBe(true);
+    expect(result.viaRef.holds.value).toBe(false);
+    expect(result.viaGetter.holds.value).toBe(false);
+    expect(result.viaGate.holds.value).toBe(false);
+    expect(result.absent.holds.value).toBe(true);
+
+    result.flag.value = true;
+    result.api.points.value = 5;
+    expect(result.viaRef.holds.value).toBe(true);
+    expect(result.viaGetter.holds.value).toBe(true);
+    expect(result.viaGate.holds.value).toBe(true);
+    stop();
+  });
+
+  it('keeps the Gate for predictors and drops closures', () => {
+    const gate = { kind: 'resource-gte', resource: 'points', value: 5 } as const;
+    const { result, stop } = bootstrap(() => {
+      const predicates = createPredicateResolver();
+      return {
+        gate: predicates.adopt(gate, false, 'gate'),
+        getter: predicates.adopt(() => true, false, 'getter'),
+      };
+    });
+
+    expect(result.gate.gate).toBe(gate);
+    expect(result.getter.gate).toBeUndefined();
+    stop();
+  });
+
+  it('read() evaluates a closure afresh on every call', () => {
+    let open = false;
+    const predicates = createPredicateResolver({});
+    const adopted = predicates.adopt(() => open, false, 'polled');
+
+    expect(adopted.read()).toBe(false);
+    open = true;
+    expect(adopted.read()).toBe(true);
+  });
+
+  it("throws at adopt for a Gate whose handles the runtime doesn't carry", () => {
+    const predicates = createPredicateResolver({});
+    expect(() => predicates.adopt({ kind: 'flag', id: 'seen' }, false, 'cutscene')).toThrow(
+      /^cutscene: .*accessor/,
+    );
+  });
+
+  it('resolves the runtime once, so adoption after start() still reads the handles', () => {
+    const { result, stop } = bootstrapAccessorless(() => createPredicateResolver());
+    expect(() => result.adopt(categoryOnly, false, 'late')).not.toThrow();
+    expect(result.adopt(categoryOnly, false, 'late').holds.value).toBe(true);
+    stop();
+  });
+
+  it('assert checks a Gate held elsewhere without adopting it', () => {
+    const predicates = createPredicateResolver({});
+    expect(() =>
+      predicates.assert({ kind: 'state', key: 'k', operator: 'eq', value: 1 }, 'node'),
+    ).toThrow(/^node: .*state/);
+    expect(() =>
+      predicates.assert({ kind: 'not', of: { kind: 'all', of: [] } }, 'node'),
+    ).not.toThrow();
+  });
+});
+
+describe('evaluatePredicate', () => {
+  it('evaluates each arm against a runtime', () => {
+    const accessor: GameStateAccessor = {
+      getResource: () => new Decimal(10),
+      getRate: () => Decimal.dZero,
+      isUnlocked: (id) => id === 'seen',
+      getState: () => undefined,
+    };
+    expect(evaluatePredicate(true, {})).toBe(true);
+    expect(evaluatePredicate(ref(false), {})).toBe(false);
+    expect(evaluatePredicate(() => true, {})).toBe(true);
+    expect(evaluatePredicate({ kind: 'flag', id: 'seen' }, { accessor })).toBe(true);
+    expect(
+      evaluatePredicate({ kind: 'resource-gte', resource: 'x', value: 11 }, { accessor }),
+    ).toBe(false);
   });
 });

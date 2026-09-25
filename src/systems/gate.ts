@@ -33,13 +33,26 @@
  * Throws on category descendants and on `cumulative-gte`, whose values live
  * behind the categories and the registry rather than the accessor.
  * Predictors read every kind through {@link timeUntilGateFlip} instead.
+ *
+ * Predicate fields — where a Gate is one authoring form among several:
+ * - Systems-layer predicate fields take {@link Predicate} (a boolean, ref,
+ *   getter or Gate) and adopt it through a {@link PredicateResolver} the
+ *   system builds once, at construction. A Gate's handles are asserted when
+ *   the definition registers, so an unwired accessor fails at the authoring
+ *   site rather than at first evaluation.
+ * - Core-layer fields stay `Computable<boolean>`: core can name a Gate but
+ *   cannot evaluate one.
+ * - Dialog `condition` fields stay Gate-only, since a dialog graph is pure
+ *   data; the runtime asserts their handles when it's built.
+ * - The `requirement` an achievement category synthesizes for a tiered
+ *   achievement stays a closure; the engine builds it, no author writes it.
  */
 
-import { computed } from 'vue';
+import { computed, unref, type ComputedRef } from 'vue';
 import { Decimal, toNumber } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { compareState } from '@/core/conditions';
-import { type Computable } from '@/core/computed';
+import { processGetter, resolveComputable, type Computable } from '@/core/computed';
 import {
   combineFlipDistances,
   timeUntilConditionFlip,
@@ -52,12 +65,14 @@ import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/regist
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
 import {
   getRequiredGateHandles,
+  isGate,
   type AllGate,
   type AnyGate,
   type CumulativeGteGate,
   type Gate,
   type GateHandle,
   type NotGate,
+  type Predicate,
 } from '@/core/gate';
 import {
   findCategoryEntrySignals,
@@ -82,6 +97,7 @@ export type {
   NotGate,
   Gate,
   GateHandle,
+  Predicate,
 } from '@/core/gate';
 export { isGate, gateToCondition, getRequiredGateHandles } from '@/core/gate';
 
@@ -389,6 +405,99 @@ function collectKinds(gate: Gate, out = new Set<Gate['kind']>()): ReadonlySet<Ga
     out.add(gate.kind);
   }
   return out;
+}
+
+// === PREDICATE ADOPTION ===
+
+/** A {@link Predicate} adopted by a system at its register site. */
+export interface AdoptedPredicate {
+  /** The Gate, when the predicate was authored as one — what a predictor reads. */
+  readonly gate: Gate | undefined;
+  /** Whether the predicate holds, reactively; the fallback when none was authored. */
+  readonly holds: ComputedRef<boolean>;
+  /**
+   * Whether the predicate holds, evaluated afresh. For sites that poll per
+   * tick or per call, where a getter may read state Vue doesn't track.
+   */
+  read(): boolean;
+}
+
+/** Adopts a system's predicate fields against one captured {@link GateRuntime}. */
+export interface PredicateResolver {
+  /** The handles every adopted Gate evaluates through. */
+  readonly runtime: GateRuntime;
+  /**
+   * Adopt one predicate field. A Gate's handles are asserted now, so an
+   * unwired handle throws here, labelled, instead of at first evaluation.
+   *
+   * @param predicate - the authored field, or `undefined` when omitted
+   * @param fallback - what an omitted field holds
+   * @param label - names the field in the error, e.g. `"challenge 'ic1' goal"`
+   */
+  adopt(predicate: Predicate | undefined, fallback: boolean, label: string): AdoptedPredicate;
+  /** Assert a Gate held outside a Predicate field — a dialog graph's conditions. */
+  assert(gate: Gate, label: string): void;
+}
+
+/**
+ * Build the resolver a system adopts its predicate fields through.
+ *
+ * Captures the runtime once, from the ambient handles `createEngine` wires
+ * during install/connect plus any `override`, so definitions registered
+ * after that scope closes (late content, mods) still resolve.
+ *
+ * @param override - handles that win over the ambient ones, typically a
+ *   system's `accessor` option
+ * @returns A {@link PredicateResolver} whose `adopt` turns each field into a
+ *   reactive `holds`, keeping the Gate for predictors
+ *
+ * @example
+ * ```ts
+ * const predicates = createPredicateResolver(accessor ? { accessor } : undefined);
+ * // per definition, at register:
+ * const goal = predicates.adopt(def.goal, false, `challenge '${def.id}' goal`);
+ * const canComplete = computed(() => active.value && goal.holds.value);
+ * ```
+ */
+export function createPredicateResolver(override?: GateRuntime): PredicateResolver {
+  const runtime = getAmbientGateRuntime(override);
+  return {
+    runtime,
+    assert: (gate, label) => assertGateHandles(gate, runtime, label),
+    adopt(predicate, fallback, label) {
+      if (predicate === undefined) {
+        return { gate: undefined, holds: computed(() => fallback), read: () => fallback };
+      }
+      if (isGate(predicate)) {
+        assertGateHandles(predicate, runtime, label);
+        return {
+          gate: predicate,
+          holds: computed(() => evaluateGate(predicate, runtime)),
+          read: () => evaluateGate(predicate, runtime),
+        };
+      }
+      const source = processGetter(predicate);
+      return {
+        gate: undefined,
+        holds: computed(() => unref(source)),
+        read: () => resolveComputable(predicate),
+      };
+    },
+  };
+}
+
+/**
+ * Evaluate a {@link Predicate} once against `runtime` — for consumer code
+ * that reads a predicate field back off a definition.
+ *
+ * @example
+ * ```ts
+ * const runtime = getAmbientGateRuntime(); // inside install/connect
+ * if (evaluatePredicate(def.goal, runtime)) celebrate();
+ * ```
+ */
+export function evaluatePredicate(predicate: Predicate, runtime: GateRuntime): boolean {
+  return isGate(predicate) ? evaluateGate(predicate, runtime) : resolveComputable(predicate);
 }
 
 // === REQUIREMENT ADAPTER ===

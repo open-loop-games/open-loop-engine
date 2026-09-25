@@ -21,19 +21,13 @@ import {
   setPersistentName,
   PersistentName,
 } from '@/core/persistence';
-import {
-  createAdditiveModifier,
-  createExponentialModifier,
-  createMultiplicativeModifier,
-  type Grant,
-  type Modifier,
-  type ModifierDescription,
-} from '@/core/modifier';
+import type { Grant } from '@/core/modifier';
 import { processGetter } from '@/core/computed';
 import { isProfilingEnabled, profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
+import { buildGrantModifier } from './modifier-binding';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
@@ -389,29 +383,4 @@ export function setupCategoryTick<Def extends { id: string }, Instance, State>(
       walk(dt);
     }
   });
-}
-
-/** Build a Modifier from a Grant shorthand (mult/add/exp/modifier). */
-function buildGrantModifier(grant: Grant): Modifier {
-  if ('mult' in grant) {
-    return createMultiplicativeModifier({ multiplier: grant.mult, description: grant.description });
-  }
-  if ('add' in grant) {
-    return createAdditiveModifier({ addend: grant.add, description: grant.description });
-  }
-  if ('exp' in grant) {
-    return createExponentialModifier({ exponent: grant.exp, description: grant.description });
-  }
-  const resolved = typeof grant.modifier === 'function' ? grant.modifier() : grant.modifier;
-  // Overlay an inline description onto a modifier that doesn't already carry
-  // one — keeps `chain.bind` auto-id derivation working for the escape-hatch
-  // variant without forcing consumers to wrap the modifier themselves.
-  if (grant.description != null && resolved.description == null) {
-    const text = grant.description;
-    return {
-      ...resolved,
-      description: (): ModifierDescription => ({ text, formattedValue: '' }),
-    };
-  }
-  return resolved;
 }

@@ -52,6 +52,9 @@ export type {
   GateRuntime,
   GateHandle,
   GateRequirementOptions,
+  Predicate,
+  AdoptedPredicate,
+  PredicateResolver,
 } from './gate';
 export {
   evaluateGate,
@@ -61,6 +64,8 @@ export {
   assertGateHandles,
   isGate,
   createGateRequirement,
+  createPredicateResolver,
+  evaluatePredicate,
 } from './gate';
 
 // === PRESTIGE & RESET ===
@@ -183,7 +188,11 @@ export * from './persistent-effect';
 // public factories that return `ModifierBinding[]` for common patterns.
 // Sibling to temporary-effect / persistent-effect; consumers pass the factory
 // output as the `modifiers` field on a def.
-export * from './modifier-binding';
+export {
+  replacementBinding,
+  type ModifierBinding,
+  type ReplacementBindingOptions,
+} from './modifier-binding';
 
 // === SLOTS ===
 // Constrained persistent selection from a pool (equipment slots, spell slots, policy picks).

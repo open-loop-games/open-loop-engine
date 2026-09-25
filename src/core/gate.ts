@@ -13,6 +13,7 @@
 
 import type { DecimalSource } from '@/primitives/decimal';
 import type { ICondition, ResourceCondition, StateCondition } from '@/primitives/types';
+import type { Computable } from './computed';
 
 // === GATE TYPE UNION ===
 
@@ -127,6 +128,14 @@ export type Gate =
   | AllGate
   | AnyGate
   | NotGate;
+
+/**
+ * A yes/no condition in any authoring form: a constant, a ref or getter over
+ * state in scope, or a {@link Gate} the engine can introspect and predict.
+ * Systems-layer predicate fields take this; the Gate arm is only evaluable
+ * there, so core fields stay `Computable<boolean>`.
+ */
+export type Predicate = Computable<boolean> | Gate;
 
 // === GUARDS / PROJECTIONS ===
 

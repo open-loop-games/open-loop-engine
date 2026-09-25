@@ -826,8 +826,10 @@ class ChainSlot {
  * A modifier that forwards every call to `raw` and carries its own `enabled`.
  * Forwarding per call (rather than copying `raw`'s properties) keeps class
  * methods and a chain's live `apply` / `invert` / `description` getters.
+ *
+ * @internal
  */
-function delegateWithEnabled(raw: Modifier, enabled: MaybeRef<boolean>): Modifier {
+export function delegateWithEnabled(raw: Modifier, enabled: MaybeRef<boolean>): Modifier {
   return {
     apply: (gain) => raw.apply(gain),
     get invert() {
