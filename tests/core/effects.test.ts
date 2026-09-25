@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import type { IEffect, IEffectInternal, GameStateAccessor } from '@/primitives/types';
-import { resolveEffect, applyEffect, type GameStateMutator } from '@/core/effects';
+import { resolveEffect, applyEffect, E, type GameStateMutator } from '@/core/effects';
 
 function mockAccessor(): GameStateAccessor {
   return {
@@ -167,6 +167,33 @@ describe('applyEffect', () => {
     );
     expect(mutator.calls).toHaveLength(1);
     expect(mutator.calls[0].args[0]).toBe('gems');
+  });
+
+  it('a composite step sees the state the steps before it wrote', () => {
+    const gold = { amount: bn(0) };
+    const unlocked = new Set<string>();
+    const accessor: GameStateAccessor = {
+      getResource: (id) => (id === 'gold' ? gold.amount : bn(0)),
+      isUnlocked: (id) => unlocked.has(id),
+      getState: () => undefined,
+      getRate: () => Decimal.dZero,
+    };
+    const mutator: GameStateMutator = {
+      applyResourceOp: (_id, _op, value) => {
+        gold.amount = gold.amount.add(value);
+      },
+      setUnlocked: (id) => unlocked.add(id),
+      setState: () => {},
+    };
+    applyEffect(
+      E.composite(
+        E.resource('gold', 'add', 100),
+        E.conditional({ kind: 'resource-gte', resource: 'gold', value: 100 }, E.unlock('rich')),
+      ),
+      accessor,
+      mutator,
+    );
+    expect(unlocked.has('rich')).toBe(true);
   });
 
   it('evaluates formula values before applying', () => {

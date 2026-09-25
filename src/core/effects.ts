@@ -51,6 +51,11 @@ function isEvaluable(v: unknown): v is { evaluate(): DecimalSource } {
  * nodes (evaluating gates via the supplied accessor); evaluates
  * {@link Evaluable} value sources at resolution time.
  *
+ * Every condition and value reads the state as it is when `resolveEffect`
+ * runs, so a conditional inside a composite doesn't see what the steps
+ * before it would write. {@link applyEffect} is the one that applies steps
+ * in order.
+ *
  * Accepts the full internal IR including {@link ConditionalEffect}; the
  * narrower public {@link IEffect} is a structural subtype and assigns freely.
  */
@@ -84,19 +89,28 @@ export function resolveEffect(
 }
 
 /**
- * Resolve an effect and apply it to game state via the mutator.
+ * Apply an effect to game state via the mutator.
  *
- * Layers cleanly: `resolveEffect` handles structural recursion (composite,
- * conditional) and formula evaluation → `ResolvedEffect[]` with concrete values.
- * `applyEffect` handles mutation via the mutator interface.
+ * Steps apply in order: each composite child, conditional and formula value
+ * is resolved just before it applies, so it reads what the steps before it
+ * wrote. Leaves resolve through {@link resolveEffect}.
  */
 export function applyEffect(
   effect: IEffectInternal,
   accessor: GameStateAccessor,
   mutator: GameStateMutator,
 ): void {
-  const resolved = resolveEffect(effect, accessor);
-  for (const r of resolved) {
+  switch (effect.type) {
+    case 'composite':
+      for (const child of effect.effects) applyEffect(child, accessor, mutator);
+      return;
+    case 'conditional': {
+      const branch = evaluateCondition(effect.condition, accessor) ? effect.then : effect.else;
+      if (branch) applyEffect(branch, accessor, mutator);
+      return;
+    }
+  }
+  for (const r of resolveEffect(effect, accessor)) {
     switch (r.type) {
       case 'resource':
         mutator.applyResourceOp(
