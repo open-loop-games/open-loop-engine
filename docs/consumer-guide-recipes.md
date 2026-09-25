@@ -78,6 +78,7 @@ mapAction: (def) => ({
       category.sequencer.complete();
     }
   },
+  signals: { /* … */ },
 }),
 ```
 
@@ -102,6 +103,7 @@ mapAction: (def) => ({
       category.sequencer.complete();
     }
   },
+  signals: { /* … */ },
 }),
 ```
 

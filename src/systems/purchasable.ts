@@ -283,7 +283,12 @@ export interface Purchasable {
   visibility: MaybeRef<boolean>;
   /** Whether bulk purchasing is enabled */
   bulkPurchase: MaybeRef<boolean>;
-  /** Buy levels. Pass an amount to cap, or omit to use bulk/single logic. Returns levels bought. */
+  /**
+   * Buy levels. Pass an amount to cap the purchase. Omitted, it buys as many
+   * as are affordable when `bulkPurchase` is on (the default for anything but
+   * a one-shot), up to the cost's `maxBulkAmount`, and one when it's off.
+   * Returns levels bought.
+   */
   purchase: (amount?: DecimalSource) => DecimalSource;
   /** Buy as many levels as affordable. Returns total levels bought. */
   purchaseMax: () => DecimalSource;
@@ -694,10 +699,10 @@ export function createPurchasable(options: PurchasableOptions): Purchasable {
  *   id: 'crystal',
  *   description: 'Crystal upgrade',
  *   resource: prestigeShards,
- *   costFormula: (level) => Decimal.pow(10,
+ *   costFormula: (level: DecimalSource) => Decimal.pow(10,
  *     baseLogCost + costIncrement * (0.5 * Math.pow(Decimal.sub(level, 0.5).toNumber(), 2) - 1/8)
  *   ),
- *   effect: (level) => Decimal.pow(2, level),
+ *   effect: (level: DecimalSource) => Decimal.pow(2, level),
  * });
  * ```
  */

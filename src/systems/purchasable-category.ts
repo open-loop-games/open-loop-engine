@@ -31,7 +31,8 @@
  *
  * // Access
  * perks.getPurchasable('dmgReduce');               // Purchasable instance
- * perks.getPurchasable('dmgReduce')!.purchase();   // buy a level
+ * perks.getPurchasable('dmgReduce')!.purchase(1);  // buy one level
+ * // (a bare `purchase()` buys as many as are affordable, up to `maxBulkAmount`)
  * perks.purchasedCount.value;                      // how many have been bought at least once
  * perks.totalAmount.value;                         // sum of all levels
  * perks.purchaseAffordable();                      // buy-max on every affordable
