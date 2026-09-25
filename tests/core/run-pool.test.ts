@@ -120,6 +120,23 @@ describe('RunPool — construction', () => {
     expect(pool.getInstance('a')!.alive.value).toBe(true);
     expect(pool.getInstance('b')!.alive.value).toBe(false);
   });
+
+  it('a destroyed handle stays dead through a later load that revives its id', () => {
+    const ctxId = `destroyed-load-${Math.random().toString(36).slice(2, 8)}`;
+    beginPersistentContext(ctxId);
+    const pool = createRunPool({ id: ctxId, deathPolicy: 'destroy' });
+    endPersistentContext();
+
+    const clone = pool.addInstance({ id: 'clone-1', step: deadStep });
+    clone.step();
+    expect(pool.getInstance('clone-1')).toBeUndefined();
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { instanceIds: ['clone-1'], aliveStates: { 'clone-1': true } },
+    });
+
+    expect(clone.alive.value).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -218,6 +218,9 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
   const stepMap = new Map<Id, RunStep>();
   const onDeathMap = new Map<Id, (() => RunDeathOutcome) | undefined>();
   const aliveMap = new Map<Id, Ref<boolean>>();
+  // Each handle's two `aliveStates` watchers. Stopped when the handle leaves
+  // the pool, or a later load would write a reused id's value into it.
+  const stopWatchesMap = new Map<Id, () => void>();
 
   // Versioned view-cache for referentially-stable `instances.value` reads.
   // Pattern cribbed verbatim from sequencer.ts — reads return the same slice
@@ -271,6 +274,8 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     stepMap.delete(id);
     onDeathMap.delete(id);
     aliveMap.delete(id);
+    stopWatchesMap.get(id)?.();
+    stopWatchesMap.delete(id);
     delete aliveStates.value[String(id)];
     bumpLive();
     syncInstanceIds();
@@ -337,14 +342,14 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     const initialAlive = aliveStates.value[idKey] ?? true;
     aliveStates.value[idKey] = initialAlive;
     const alive = ref(initialAlive);
-    watch(
+    const stopForward = watch(
       alive,
       (v) => {
         aliveStates.value[idKey] = v;
       },
       { flush: 'sync' },
     );
-    watch(
+    const stopReverse = watch(
       () => aliveStates.value[idKey],
       (v) => {
         if (loadingSave.value && v !== undefined && v !== alive.value) {
@@ -384,6 +389,10 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     stepMap.set(reg.id, reg.step);
     onDeathMap.set(reg.id, reg.onDeath);
     aliveMap.set(reg.id, alive);
+    stopWatchesMap.set(reg.id, () => {
+      stopForward();
+      stopReverse();
+    });
     handleArray.push(handle);
     handleMap.set(reg.id, handle);
     bumpLive();
