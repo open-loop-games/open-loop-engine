@@ -15,17 +15,17 @@ The validated incremental primitives, each a typed registration surface over the
 
 milestone tracking with auto-unlock and tiered rewards
 
-- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:107`
+- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:108`
 - `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:220`
 - `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:102`
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:62`
-- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:38`
-- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:151`
-- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
+- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:39`
+- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:152`
+- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:58`
 - `interface BaseTieredAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:117`
 - `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:309`
-- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:302`
-- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:318`
+- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:303`
+- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:319`
 - `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:153`
 - `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:185`
 - `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:170`
@@ -51,26 +51,26 @@ batch-registered ordered-execution queue with per-execution state machine
 
 progressive unlock of automation features
 
-- `interface AutomationTierDef` — Definition for a single automation tier. `src/systems/automation.ts:52`
-- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:101`
-- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:74`
-- `interface AutomationTiersOptions` `src/systems/automation.ts:80`
-- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:173`
+- `interface AutomationTierDef` — Definition for a single automation tier. `src/systems/automation.ts:53`
+- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:102`
+- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:75`
+- `interface AutomationTiersOptions` `src/systems/automation.ts:81`
+- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:174`
 
 ## BestOf tracker
 
 per-metric best-of-run recording
 
-- `interface BestOf` — A BestOf instance — the returned object from createBestOf. `src/systems/best-of.ts:152`
-- `interface BestOfCandidate` — A candidate submission for best-of comparison. `src/systems/best-of.ts:112`
-- `interface BestOfEntry` — A single metric's best recorded outcome. `src/systems/best-of.ts:80`
-- `interface BestOfEvents` — Events emitted by a BestOf instance. `src/systems/best-of.ts:126`
-- `interface BestOfMetricDef` — Per-metric configuration for createBestOf. `src/systems/best-of.ts:40`
-- `interface BestOfOptions` — Configuration for createBestOf. `src/systems/best-of.ts:132`
-- `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:77`
-- `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:37`
-- `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:34`
-- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best cycle outcome per metric. `src/systems/best-of.ts:254`
+- `interface BestOf` — A BestOf instance — the returned object from createBestOf. `src/systems/best-of.ts:153`
+- `interface BestOfCandidate` — A candidate submission for best-of comparison. `src/systems/best-of.ts:113`
+- `interface BestOfEntry` — A single metric's best recorded outcome. `src/systems/best-of.ts:81`
+- `interface BestOfEvents` — Events emitted by a BestOf instance. `src/systems/best-of.ts:127`
+- `interface BestOfMetricDef` — Per-metric configuration for createBestOf. `src/systems/best-of.ts:41`
+- `interface BestOfOptions` — Configuration for createBestOf. `src/systems/best-of.ts:133`
+- `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:78`
+- `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:38`
+- `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:35`
+- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best cycle outcome per metric. `src/systems/best-of.ts:255`
 
 ## Challenge Category
 
@@ -87,10 +87,10 @@ batch-create Challenges from content definitions
 
 a bounded run that ends, resets a scope, and replays
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:227`
-- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:129`
-- `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:35`
-- `interface CycleOptions` `src/systems/cycle.ts:43`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:228`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:130`
+- `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:36`
+- `interface CycleOptions` `src/systems/cycle.ts:44`
 
 ## CycleLog
 
@@ -108,19 +108,19 @@ per-cycle metric delta recording
 
 game-dev-friendly wrapper over ResourceBag
 
-- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional auto-persistence. `src/systems/inventory.ts:106`
-- `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:46`
-- `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:19`
+- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional auto-persistence. `src/systems/inventory.ts:107`
+- `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:47`
+- `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:20`
 
 ## Producer Category
 
 batch-create Producers from content definitions
 
-- `function createProducerCategory<Def extends { id: string; }, State = void>(options: ProducerCategoryOptions<Def, State>): ProducerCategory<Def, State>` — Create a producer category — batch registration of Producers from definitions. `src/systems/producer-category.ts:430`
+- `function createProducerCategory<Def extends { id: string; }, State = void>(options: ProducerCategoryOptions<Def, State>): ProducerCategory<Def, State>` — Create a producer category — batch registration of Producers from definitions. `src/systems/producer-category.ts:433`
 - `interface Producer` — A producer instance — generates resources continuously or on demand. `src/systems/producer-category.ts:152`
-- `interface ProducerCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:238`
+- `interface ProducerCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:240`
 - `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:34`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Producer instance + optional state + introspection signals. `src/systems/producer-category.ts:225`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Producer instance + optional state + introspection signals. `src/systems/producer-category.ts:227`
 - `interface ProducerCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/producer-category.ts:122`
 - `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:69`
 - `interface ProducerPurchaseConfig` — Purchase configuration for producers that can be bought multiple times. `src/systems/producer-category.ts:43`
@@ -132,8 +132,8 @@ unified purchase primitives for incremental games
 Two consumer entry points: `createPurchasableCategory` batch-registers from content definitions and is the default; `createScalingPurchasable` is the per-instance escape hatch for leveled costs. `createPurchasable` is the raw factory both lower into. A cost that scales on the item's own level goes through the factory form of `requirements`, which receives the live level ref — a getter reading the level back out misprices bulk purchases. See consumer-guide.md §Choosing among purchasable primitives.
 
 - `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:202`
-- `function createScalingPurchasable(options: ScalingPurchasableOptions): Purchasable` — Create a purchasable with leveled cost scaling — the L3 escape hatch for per-instance customized leveled purchases. `src/systems/purchasable.ts:709`
-- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:244`
+- `function createScalingPurchasable(options: ScalingPurchasableOptions): Purchasable` — Create a purchasable with leveled cost scaling — the L3 escape hatch for per-instance customized leveled purchases. `src/systems/purchasable.ts:714`
+- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:247`
 - `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:120`
 - `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:107`
 - `interface PurchasableCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/purchasable-category.ts:67`
@@ -141,24 +141,24 @@ Two consumer entry points: `createPurchasableCategory` batch-registers from cont
 - `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:49`
 - `interface PurchasableOptions` — Full options for createPurchasable — the engine-internal raw factory. `src/systems/purchasable.ts:82`
 - `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:154`
-- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:189`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:427`
-- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:306`
-- `function setupSweepAutoPurchase(purchasables: Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:226`
-- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:94`
+- `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:192`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:480`
+- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:352`
+- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:266`
+- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:125`
 
 ## RunPool
 
 core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state
 
-- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:202`
-- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:46`
-- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:52`
-- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:149`
-- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:97`
-- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:125`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:86`
-- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:39`
+- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:203`
+- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:47`
+- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:53`
+- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:150`
+- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:98`
+- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:126`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:87`
+- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:40`
 
 ## Skill
 
@@ -187,17 +187,17 @@ Skill helper for dual-tier loop incremental skills
 
 constrained persistent selection from a pool
 
-- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:184`
-- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:106`
-- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:91`
-- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:54`
+- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:185`
+- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:107`
+- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:92`
+- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:55`
 
 ## Zone
 
 named content groupings with progressive unlock
 
-- `function createZoneSystem(options?: ZoneSystemOptions): ZoneSystem` — Create a zone system — content groupings with progressive unlock. `src/systems/zone.ts:145`
-- `interface ZoneDef` — Definition for a zone in the content registry. `src/systems/zone.ts:47`
-- `interface ZoneSystem` — A zone system instance — the returned object from createZoneSystem. `src/systems/zone.ts:88`
-- `interface ZoneSystemEvents` — Events emitted by a ZoneSystem instance. `src/systems/zone.ts:59`
-- `interface ZoneSystemOptions` `src/systems/zone.ts:67`
+- `function createZoneSystem(options?: ZoneSystemOptions): ZoneSystem` — Create a zone system — content groupings with progressive unlock. `src/systems/zone.ts:146`
+- `interface ZoneDef` — Definition for a zone in the content registry. `src/systems/zone.ts:48`
+- `interface ZoneSystem` — A zone system instance — the returned object from createZoneSystem. `src/systems/zone.ts:89`
+- `interface ZoneSystemEvents` — Events emitted by a ZoneSystem instance. `src/systems/zone.ts:60`
+- `interface ZoneSystemOptions` `src/systems/zone.ts:68`

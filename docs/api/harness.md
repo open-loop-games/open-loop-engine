@@ -34,8 +34,8 @@ maps beat duration to Csikszentmihalyi's Flow Theory engagement bands. Opinionat
 synchronous tick loop for deterministic simulation and tests
 
 - `interface HeadlessConfig` — Configuration for a synchronous headless simulation run. `src/core/headless.ts:11`
-- `interface HeadlessResult` — Results returned after a completed headless simulation run. `src/core/headless.ts:30`
-- `function runHeadless(config: HeadlessConfig): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:45`
+- `interface HeadlessResult` — Results returned after a completed headless simulation run. `src/core/headless.ts:35`
+- `function runHeadless(config: HeadlessConfig): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:51`
 
 ## Perturbation applier
 
@@ -105,39 +105,39 @@ Tune a parameter to satisfy a predicate (bisection, etc.).
 
 cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run results and producing namespaced numeric aggregates
 
-- `interface AggregateOptions` — Options threaded through MatrixConfig (and the batch/sensitivity wrappers) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:128`
-- `interface BatchConfig` — N configurations × M seeds with no variant semantics. `src/harness/types.ts:222`
+- `interface AggregateOptions` — Options threaded through MatrixConfig (and the batch/sensitivity wrappers) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:133`
+- `interface BatchConfig` — N configurations × M seeds with no variant semantics. `src/harness/types.ts:227`
 - `interface Cell` — One named configuration in a matrix. `src/harness/types.ts:47`
-- `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerName}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:157`
-- `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:188`
-- `interface HistogramSpec` — Consumer-supplied histogram spec for one metric. `src/harness/types.ts:117`
-- `interface MatrixConfig` — Top-level matrix runner config — N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:201`
-- `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:213`
-- `interface MatrixUntilConfig` — Configuration for runMatrixUntil — `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:546`
-- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:572`
-- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:539`
-- `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:326`
-- `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:105`
-- `interface MetricStats` — Numeric summary of one metric across a cell's runs. `src/harness/types.ts:85`
+- `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerName}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:162`
+- `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:193`
+- `interface HistogramSpec` — Consumer-supplied histogram spec for one metric. `src/harness/types.ts:122`
+- `interface MatrixConfig` — Top-level matrix runner config — N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:206`
+- `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:218`
+- `interface MatrixUntilConfig` — Configuration for runMatrixUntil — `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:551`
+- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:577`
+- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:544`
+- `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:331`
+- `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:110`
+- `interface MetricStats` — Numeric summary of one metric across a cell's runs. `src/harness/types.ts:90`
 - `interface RunContext` — Context passed to a Cell's `setup` function. `src/harness/types.ts:37`
 - `type RunMode = 'tick' | 'event' | 'stasis-aware-tick'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
-- `interface RunUntilConfig` — Configuration for a single predicate-bounded run. `src/harness/types.ts:403`
-- `interface RunUntilResult` — Result of a predicate-bounded run. `src/harness/types.ts:471`
-- `interface SensitivityConfig<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:283`
-- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityConfig.variants. `src/harness/types.ts:355`
-- `interface SensitivityVariantResult` — One variant's contribution to a SensitivityResult. `src/harness/types.ts:337`
-- `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One axis in a cartesian sensitivity sweep — a label, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:256`
-- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:507`
-- `interface UntilContext` — Snapshot passed to an `until` predicate each time it's evaluated. `src/harness/types.ts:377`
-- `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each tick in a runUntil loop. `src/harness/types.ts:395`
-- `interface Variant<C extends Cell | UntilCell = Cell>` — A named config patch — the generic equivalent of borglike's domain- specific `excludeUpgrades` axis. `src/harness/types.ts:241`
-- `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:64`
+- `interface RunUntilConfig` — Configuration for a single predicate-bounded run. `src/harness/types.ts:408`
+- `interface RunUntilResult` — Result of a predicate-bounded run. `src/harness/types.ts:476`
+- `interface SensitivityConfig<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:288`
+- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityConfig.variants. `src/harness/types.ts:360`
+- `interface SensitivityVariantResult` — One variant's contribution to a SensitivityResult. `src/harness/types.ts:342`
+- `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One axis in a cartesian sensitivity sweep — a label, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:261`
+- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:512`
+- `interface UntilContext` — Snapshot passed to an `until` predicate each time it's evaluated. `src/harness/types.ts:382`
+- `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each tick in a runUntil loop. `src/harness/types.ts:400`
+- `interface Variant<C extends Cell | UntilCell = Cell>` — A named config patch — the generic equivalent of borglike's domain- specific `excludeUpgrades` axis. `src/harness/types.ts:246`
+- `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:69`
 - `interface Analyzer` — Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. `src/primitives/types.ts:165`
 - `interface AnalyzerResult` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:158`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:30`
 - `interface GameStateAccessor` — Read-only view of game state used when evaluating conditions and resolving effects. `src/primitives/types.ts:205`
 - `type IEffect = ResourceEffect | UnlockEffect | StateEffect | CompositeEffect` — Tagged-union root for declarative effects — the data shape content authors hand to category factories. `src/primitives/types.ts:63`
-- `type InjectionKey<T>` — Typed symbol key for module provide/inject — mirrors Vue's InjectionKey pattern. `src/primitives/types.ts:234`
+- `type InjectionKey<T>` — Typed symbol key for module provide/inject — mirrors Vue's InjectionKey pattern. `src/primitives/types.ts:243`
 - `interface ResourceEffect` — Modifies a numeric resource by adding, subtracting, multiplying, or setting its value. `src/primitives/types.ts:4`
 - `interface StateEffect` — Writes an arbitrary value to a dot-path in game state (e.g. `src/primitives/types.ts:22`
 - `interface UnlockEffect` — Sets an unlock flag to true or false, controlling feature/content visibility. `src/primitives/types.ts:14`
@@ -147,7 +147,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 
 Enumerate purchasables, producers, and challenges with their next-transition timing.
 
-- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:242`
+- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:246`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:89`
 - `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:92`
 - `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:81`

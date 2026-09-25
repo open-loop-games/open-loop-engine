@@ -13,7 +13,7 @@ Coordinate primitives for adjacency-driven games — grid, graph, scope stack, i
 
 Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:403`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:408`
 - `const DIAGONAL_DELTAS: readonly GridDelta[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:71`
 - `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:154`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
@@ -55,7 +55,7 @@ Stack navigator over a recursive `SpatialGraph` — tracks which nested child gr
 
 Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric grid into an influence map.
 
-- `function composeInfluenceLayers(readers: readonly InfluenceLayerReader[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerReader` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:476`
+- `function composeInfluenceLayers(readers: readonly InfluenceLayerReader[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerReader` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:474`
 - `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Wrap a `SpatialGrid<number>` with an influence-map lifecycle. `src/core/spatial/influence-layer.ts:288`
 - `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:250`
 - `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff curve applied per cell during accumulation. `src/core/spatial/influence-layer.ts:99`

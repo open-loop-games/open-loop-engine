@@ -72,20 +72,20 @@ lightweight tick-callback rate limiter
 
 persistent elapsed/total play time and reactive speed multiplier
 
-- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:79`
-- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:38`
-- `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:21`
+- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:80`
+- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:39`
+- `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:22`
 
 ## Transition-distance primitives
 
 "when does X happen?" math over current engine state
 
-- `interface AffordableLike` — Minimal shape satisfied by Purchasable. `src/core/transitions.ts:75`
-- `interface ChildFlipResult` — One child's contribution to a combinator flip-distance calculation: its current truth value plus its individual flip distance. `src/core/transitions.ts:263`
-- `function collectConditionDeps(condition: ICondition): TransitionDeps` — Collect every accessor slot read by `condition`'s truth evaluation and flip-distance arithmetic. `src/core/transitions.ts:219`
-- `function combineFlipDistances(children: ChildFlipResult[], kind: 'and' | 'or'): TransitionDistance` — Truth-table dispatch over `{ currentlyTrue, distance }` tuples for `and` / `or` combinators. `src/core/transitions.ts:283`
-- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until the next level of a purchasable becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:125`
-- `function timeUntilConditionFlip(condition: ICondition, accessor: GameStateAccessor): TransitionDistance` — Distance until `condition` changes truth value, assuming current rates hold. `src/core/transitions.ts:150`
-- `function timeUntilResource(resourceId: string, target: DecimalSource, accessor: GameStateAccessor): TransitionDistance` — Distance until `resource` reaches `target`, in seconds, assuming current rate holds. `src/core/transitions.ts:96`
-- `interface TransitionDeps` — Accessor slots a transition's distance arithmetic reads. `src/core/transitions.ts:60`
-- `type TransitionDistance` — Distance until a state transition occurs, with a reason when the distance is uncomputable. `src/core/transitions.ts:42`
+- `interface AffordableLike` — Minimal shape satisfied by Purchasable. `src/core/transitions.ts:82`
+- `interface ChildFlipResult` — One child's contribution to a combinator flip-distance calculation: its current truth value plus its individual flip distance. `src/core/transitions.ts:271`
+- `function collectConditionDeps(condition: ICondition): TransitionDeps` — Collect every accessor slot read by `condition`'s truth evaluation and flip-distance arithmetic. `src/core/transitions.ts:227`
+- `function combineFlipDistances(children: ChildFlipResult[], kind: 'and' | 'or'): TransitionDistance` — Truth-table dispatch over `{ currentlyTrue, distance }` tuples for `and` / `or` combinators. `src/core/transitions.ts:296`
+- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until the next level of a purchasable becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:132`
+- `function timeUntilConditionFlip(condition: ICondition, accessor: GameStateAccessor): TransitionDistance` — Distance until `condition` changes truth value, assuming current rates hold. `src/core/transitions.ts:158`
+- `function timeUntilResource(resourceId: string, target: DecimalSource, accessor: GameStateAccessor): TransitionDistance` — Distance until `resource` reaches `target`, in seconds, assuming current rate holds. `src/core/transitions.ts:103`
+- `interface TransitionDeps` — Accessor slots a transition's distance arithmetic reads. `src/core/transitions.ts:61`
+- `type TransitionDistance` — Distance until a state transition occurs, with a reason when the distance is uncomputable. `src/core/transitions.ts:43`

@@ -34,11 +34,11 @@ core primitive for ordered execution of items with optional metadata
 - `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:71`
 - `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:95`
 - `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:120`
-- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:389`
-- `interface FillStrategy<M = void>` — Strategy for automatically filling the sequencer when it runs dry. `src/core/sequencer.ts:63`
-- `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration function — matches `EngineContext.onTick` signature. `src/core/sequencer.ts:56`
-- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:172`
-- `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:69`
-- `interface SequencerItem<M = void>` — A sequencer entry: string ID plus typed metadata. `src/core/sequencer.ts:36`
-- `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:103`
-- `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canRun check. `src/core/sequencer.ts:53`
+- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:390`
+- `interface FillStrategy<M = void>` — Strategy for automatically filling the sequencer when it runs dry. `src/core/sequencer.ts:64`
+- `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration function — matches `EngineContext.onTick` signature. `src/core/sequencer.ts:57`
+- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:173`
+- `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:70`
+- `interface SequencerItem<M = void>` — A sequencer entry: string ID plus typed metadata. `src/core/sequencer.ts:37`
+- `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:104`
+- `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canRun check. `src/core/sequencer.ts:54`

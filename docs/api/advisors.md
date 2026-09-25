@@ -24,12 +24,12 @@ weighted-goal selection over a candidate pool
 
 score-and-pick over a candidate list
 
-- `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:95`
+- `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:96`
 - `interface HybridPaybackOptions<T>` — Options for selectionHybridPayback. `src/core/policy.ts:61`
-- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:119`
-- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:255`
-- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:203`
-- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:153`
+- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:120`
+- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:252`
+- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:202`
+- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:154`
 - `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:46`
 
 ## Recommendation
@@ -39,17 +39,17 @@ inter-cycle arbitration across registered defs
 - `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:30`
 - `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:103`
 - `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:191`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:370`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:371`
 - `interface GoalDefOptions` `src/systems/recommendation-strategies.ts:41`
-- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:127`
-- `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:52`
-- `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:97`
-- `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:66`
-- `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:73`
-- `interface RecommendationResult` — The output of a def's `recommend()` method. `src/systems/recommendation.ts:83`
-- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:220`
-- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:154`
-- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:164`
+- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:128`
+- `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:53`
+- `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:98`
+- `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:67`
+- `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:74`
+- `interface RecommendationResult` — The output of a def's `recommend()` method. `src/systems/recommendation.ts:84`
+- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:221`
+- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:155`
+- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:165`
 
 ## Rule advisor
 

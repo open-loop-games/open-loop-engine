@@ -95,26 +95,26 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
-- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:94`
-- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:100`
-- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:44`
-- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:32`
-- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:88`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:119`
-- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through at evaluation time. `src/core/gate.ts:165`
-- `function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:183`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:141`
-- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:106`
+- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:95`
+- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:101`
+- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:45`
+- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:33`
+- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:89`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:120`
+- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:166`
+- `function getRequiredGateHandles(gate: Gate, use?: 'evaluate' | 'predict'): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:186`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:142`
+- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:107`
 - `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:20`
-- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:68`
-- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:56`
-- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle `gate` will read. `src/systems/gate.ts:362`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:419`
-- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:156`
-- `interface GateRequirementOptions` `src/systems/gate.ts:386`
-- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:105`
-- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:130`
-- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:215`
+- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:69`
+- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:57`
+- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string, use?: 'evaluate' | 'predict'): void` — Throw unless `runtime` carries every handle `gate` will read for `use`. `src/systems/gate.ts:368`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:430`
+- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:157`
+- `interface GateRequirementOptions` `src/systems/gate.ts:397`
+- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:106`
+- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:131`
+- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:219`
 
 ## Modifier
 
@@ -168,14 +168,14 @@ Requirements system for gating purchases, unlocks, and actions
 
 stateless tickable progress accumulator
 
-- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates a stateless progress accumulator that ticks on every registered tick, advancing `progress` by `speed * dt` each time. `src/core/timed-progress.ts:256`
-- `interface ProgressiveCostEntry` — One progressive-cost entry — amount total across a full run, plus a live balance getter the primitive calls to decide affordability. `src/core/timed-progress.ts:331`
-- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:339`
-- `function resourceConsumedAt(progress: DecimalSource, duration: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units should be consumed at a given progress level. `src/core/timed-progress.ts:302`
-- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; duration: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:424`
-- `interface TimedProgress` — A stateless ticking progress accumulator created by createTimedProgress. `src/core/timed-progress.ts:82`
-- `interface TimedProgressBaseOptions` — Options every createTimedProgress tracker shares. `src/core/timed-progress.ts:52`
-- `type TimedProgressOptions` `src/core/timed-progress.ts:37`
+- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates a stateless progress accumulator that ticks on every registered tick, advancing `progress` by `speed * dt` each time. `src/core/timed-progress.ts:260`
+- `interface ProgressiveCostEntry` — One progressive-cost entry — amount total across a full run, plus a live balance getter the primitive calls to decide affordability. `src/core/timed-progress.ts:338`
+- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:346`
+- `function resourceConsumedAt(progress: DecimalSource, duration: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units should be consumed at a given progress level. `src/core/timed-progress.ts:309`
+- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; duration: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:431`
+- `interface TimedProgress` — A stateless ticking progress accumulator created by createTimedProgress. `src/core/timed-progress.ts:83`
+- `interface TimedProgressBaseOptions` — Options every createTimedProgress tracker shares. `src/core/timed-progress.ts:53`
+- `type TimedProgressOptions` `src/core/timed-progress.ts:38`
 
 ## Trace
 
