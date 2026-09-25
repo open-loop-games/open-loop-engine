@@ -760,3 +760,97 @@ describe('PurchasableOptions.requirements — factory arm', () => {
     >();
   });
 });
+
+// The factories below broke since the July review (verify/public-surface.md
+// item 3) and had no pin at all. Each covers the options shape a regression
+// would silently widen — required vs optional `id` above all — and the
+// return's key literal/generic types.
+
+describe('Purchasable factories — id and options shape', () => {
+  it('createPurchasable requires id/display/requirements; effect/limit/bulkPurchase default', async () => {
+    const { createPurchasable } = await import('@/systems/purchasable');
+    type Options = Parameters<typeof createPurchasable>[0];
+    // id is the save key for `amount` — widening it to optional would silently
+    // collide every purchasable built without one.
+    expectTypeOf<Options['id']>().toEqualTypeOf<string>();
+    const p = createPurchasable({ id: 'test', display: 'test', requirements: [] });
+    expectTypeOf(p).toEqualTypeOf<Purchasable>();
+  });
+
+  it('createScalingPurchasable accepts the geometric cost arm and returns a Purchasable', async () => {
+    const { createScalingPurchasable } = await import('@/index');
+    const resource = createResource(0, { id: 'scaling-gold', displayName: 'gold' });
+    const p = createScalingPurchasable({
+      id: 'upgrade',
+      description: 'test',
+      resource,
+      baseCost: 10,
+      costScaling: 1.15,
+    });
+    expectTypeOf(p).toEqualTypeOf<Purchasable>();
+  });
+
+  it('the closure cost arm accepts a Formula factory or an opaque amount function', async () => {
+    const { createScalingPurchasable } = await import('@/index');
+    const { F } = await import('@/core/formulas/formulas');
+    const resource = createResource(0, { id: 'closure-gold', displayName: 'gold' });
+    // Formula-factory form — bulk-purchase math works through inversion.
+    createScalingPurchasable({
+      id: 'closure-formula',
+      description: 'test',
+      resource,
+      costFormula: (amount: MaybeRef<DecimalSource>) => F.variable(amount).mul(10),
+    });
+    // Opaque value-function form — single-purchase only, no Formula required.
+    createScalingPurchasable({
+      id: 'closure-opaque',
+      description: 'test',
+      resource,
+      costFormula: (amount: DecimalSource) => amount,
+    });
+  });
+});
+
+describe('createTimedProgress — id required unless ephemeral', () => {
+  it('requires id unless ephemeral: true', async () => {
+    const { createTimedProgress } = await import('@/index');
+    const registerTick = (_cb: (dt: number) => void) => () => {};
+    // @ts-expect-error — id is required once `ephemeral` is absent or false;
+    // an untagged tracker has nowhere to save `progress`.
+    createTimedProgress({ duration: 10, registerTick });
+    const tp = createTimedProgress({ duration: 10, registerTick, ephemeral: true });
+    expectTypeOf(tp).toEqualTypeOf<import('@/core/timed-progress').TimedProgress>();
+  });
+});
+
+describe('createCycle / createTimeBank / createSequencer type surface', () => {
+  it('createCycle: id stays optional (per-module default); registerTick is required', async () => {
+    const { createCycle } = await import('@/index');
+    type Options = import('@/systems/cycle').CycleOptions;
+    expectTypeOf<Options['id']>().toEqualTypeOf<string | undefined>();
+    const registerTick = (_cb: (dt: number) => void) => () => {};
+    const cycle = createCycle({ registerTick });
+    expectTypeOf(cycle).toMatchTypeOf<import('@/systems/cycle').Cycle>();
+  });
+
+  it('createTimeBank: the whole config is optional — id/earnEfficiency/cap all default', async () => {
+    const { createTimeBank } = await import('@/index');
+    const bank = createTimeBank();
+    expectTypeOf(bank).toEqualTypeOf<import('@/systems/time-bank').TimeBank>();
+  });
+
+  it('createSequencer requires id and is generic over metadata M, defaulting to void', async () => {
+    const { createSequencer } = await import('@/index');
+    type Options = import('@/core/sequencer').SequencerOptions<void>;
+    expectTypeOf<Options['id']>().toEqualTypeOf<string>();
+    const seq = createSequencer({ id: 'queue' });
+    expectTypeOf(seq.currentItem).toEqualTypeOf<
+      import('@/core/sequencer').SequencerItem<void> | null
+    >();
+    interface JobMeta {
+      kind: string;
+    }
+    const jobs = createSequencer<JobMeta>({ id: 'jobs' });
+    expectTypeOf(jobs.currentMetadata).toEqualTypeOf<JobMeta | undefined>();
+  });
+});
