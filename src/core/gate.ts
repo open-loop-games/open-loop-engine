@@ -185,22 +185,17 @@ export type GateHandle = 'accessor' | 'categories' | 'registry';
  * construction call this to fail early and precisely instead of demanding the
  * full triple up front.
  *
- * @param use `'evaluate'` for the handles `evaluateGate` reads; `'predict'`
- *   for `timeUntilGateFlip`, which evaluates combinator children too, so it
- *   needs those handles and more. The two differ only at `cumulative-gte`:
- *   evaluating it reads the cumulative slot on the registered resource, and
- *   predicting it also reads the resource's rate through the accessor.
+ * These are the handles `evaluateGate` reads. `timeUntilGateFlip` reads more
+ * for `cumulative-gte`, the resource's rate through the accessor, and demands
+ * it when it runs.
  */
-export function getRequiredGateHandles(
-  gate: Gate,
-  use: 'evaluate' | 'predict' = 'evaluate',
-): ReadonlySet<GateHandle> {
+export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
   const out = new Set<GateHandle>();
-  collectGateHandles(gate, use, out);
+  collectGateHandles(gate, out);
   return out;
 }
 
-function collectGateHandles(gate: Gate, use: 'evaluate' | 'predict', out: Set<GateHandle>): void {
+function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
   switch (gate.kind) {
     case 'resource-gte':
     case 'state':
@@ -209,7 +204,6 @@ function collectGateHandles(gate: Gate, use: 'evaluate' | 'predict', out: Set<Ga
       return;
     case 'cumulative-gte':
       out.add('registry');
-      if (use === 'predict') out.add('accessor');
       return;
     case 'count-gte':
     case 'unlock':
@@ -217,10 +211,10 @@ function collectGateHandles(gate: Gate, use: 'evaluate' | 'predict', out: Set<Ga
       return;
     case 'all':
     case 'any':
-      for (const child of gate.of) collectGateHandles(child, use, out);
+      for (const child of gate.of) collectGateHandles(child, out);
       return;
     case 'not':
-      collectGateHandles(gate.of, use, out);
+      collectGateHandles(gate.of, out);
       return;
   }
 }

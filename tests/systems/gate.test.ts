@@ -639,12 +639,12 @@ describe('evaluateGate — no ambient accessor', () => {
     f.stop();
   });
 
-  it('cumulative-gte evaluates without an accessor, and asserts one only for prediction', () => {
+  it('cumulative-gte evaluates without an accessor, and predicting it demands one', () => {
     const f = buildAccessorlessFixture();
     const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 1 };
     expect(evaluateGate(gate, f.runtime)).toBe(false);
     expect(() => assertGateHandles(gate, f.runtime, 'site')).not.toThrow();
-    expect(() => assertGateHandles(gate, f.runtime, 'site', 'predict')).toThrow(/site.*accessor/);
+    expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(/cumulative-gte.*accessor/);
     f.stop();
   });
 
@@ -704,10 +704,8 @@ describe('getRequiredGateHandles', () => {
     ]);
   });
 
-  it('cumulative-gte evaluates through the registry, and predicts with the accessor too', () => {
-    const gate: Gate = { kind: 'cumulative-gte', resource: 'gold', value: 50 };
-    expect(handles(gate)).toEqual(['registry']);
-    expect([...getRequiredGateHandles(gate, 'predict')].sort()).toEqual(['accessor', 'registry']);
+  it('cumulative-gte evaluates through the registry', () => {
+    expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual(['registry']);
   });
 
   it('combinators union their children, recursing through nesting', () => {
