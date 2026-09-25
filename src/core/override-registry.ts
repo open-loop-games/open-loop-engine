@@ -315,6 +315,18 @@ export function getCurrentTuningRegistries(): Set<TuningRegistry> | undefined {
   return _currentTuningRegistries;
 }
 
+/** Keys of `T` whose function takes no arguments — the ones a `tunable` default can fill. */
+type NullaryKeys<T> = { [P in keyof T]: T[P] extends () => unknown ? P : never }[keyof T] & string;
+
+/** A literal return widened to its primitive, so a `let` holding a `tunable` stays reassignable. */
+type Widen<R> = R extends number
+  ? number
+  : R extends string
+    ? string
+    : R extends boolean
+      ? boolean
+      : R;
+
 /**
  * Bind a default implementation to `key` on `registry` and return a
  * reactive `ComputedRef` that re-evaluates when the scope stack changes
@@ -363,12 +375,14 @@ export function getCurrentTuningRegistries(): Set<TuningRegistry> | undefined {
  *   the value should surface in the picker.
  * @param key - Unique key within the registry (convention: namespaced
  *   path like `"upgrades/double-gold/effect"` so grep surfaces the
- *   category and the field together).
+ *   category and the field together). A typed registry accepts only its
+ *   zero-arg keys.
  * @param defaultFn - Default zero-arg reader. Typically a closure over
  *   the underlying persistent/computed state. Reads inside this function
  *   register their own reactive deps, so the returned computed also
- *   reacts to changes in the underlying state.
- * @returns A `ComputedRef<R>` that reads through the registry's scope
+ *   reacts to changes in the underlying state. Must fit the registry's
+ *   type for `key`; its return type, with literals widened, types the result.
+ * @returns A `ComputedRef` that reads through the registry's scope
  *   stack.
  *
  * @example
@@ -388,16 +402,16 @@ export function getCurrentTuningRegistries(): Set<TuningRegistry> | undefined {
  * // effect.value falls back to the closure over baseEffect + amount.
  * ```
  */
-export function tunable<R>(
-  registry: OverrideRegistry<Record<string, (...args: never[]) => unknown>>,
-  key: string,
-  defaultFn: () => R,
-): ComputedRef<R> {
+export function tunable<
+  T extends { [P in keyof T]: (...args: never[]) => unknown },
+  K extends NullaryKeys<T>,
+  F extends T[K] & (() => unknown),
+>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>> {
   registry.setDefault(key, defaultFn);
   return computed(() => {
     // Register a reactive dep on the registry so push/cleanup/override retriggers.
     // The default fn's own reads register deps on the underlying state.
     void registry.scopeVersion.value;
-    return (registry.get(key) as () => R)();
+    return (registry.get(key) as () => Widen<ReturnType<F>>)();
   });
 }

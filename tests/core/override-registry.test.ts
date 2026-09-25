@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computed, ref } from 'vue';
+import { computed, ref, type ComputedRef } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import {
   createOverrideRegistry,
@@ -235,7 +235,7 @@ describe('tunable pilot: Skill-style multiplier lookup', () => {
       ['combat', { value: 10 }],
       ['magic', { value: 5 }],
     ]);
-    const boosts = new Map<string, ReturnType<typeof tunable<Decimal>>>();
+    const boosts = new Map<string, ComputedRef<Decimal>>();
     for (const [id, lvl] of levels) {
       boosts.set(
         id,

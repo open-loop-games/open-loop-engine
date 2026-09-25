@@ -28,6 +28,7 @@ import {
   createRuleAdvisor,
   createSkillCategory,
   createSpatialGrid,
+  createTuningRegistry,
   Formula,
   type Engine,
   type EngineContext,
@@ -642,6 +643,46 @@ describe('createOverrideRegistry type map', () => {
   it('still rejects a type map with a non-function member', () => {
     // @ts-expect-error — every member must be a function
     createOverrideRegistry<{ rate: number }>('bad');
+  });
+});
+
+describe('tunable checks the key and the default against the registry', () => {
+  interface GameRules {
+    pullsEnabled: () => boolean;
+    scale: () => number;
+    shape: (d: string) => string;
+  }
+
+  it('a typed registry infers the return type from the default', () => {
+    const rules = createOverrideRegistry<GameRules>('rules');
+    expectTypeOf(tunable(rules, 'pullsEnabled', () => true)).toEqualTypeOf<ComputedRef<boolean>>();
+    expectTypeOf(tunable(rules, 'scale', () => 2)).toEqualTypeOf<ComputedRef<number>>();
+  });
+
+  it('a typed registry rejects an undeclared key, a wrong return and a key that takes arguments', () => {
+    const rules = createOverrideRegistry<GameRules>('rules');
+    // @ts-expect-error — 'pullEnabled' is not a GameRules key
+    tunable(rules, 'pullEnabled', () => true);
+    // @ts-expect-error — 'scale' returns a number
+    tunable(rules, 'scale', () => 'fast');
+    // @ts-expect-error — 'shape' takes an argument, so no zero-arg default fits it
+    tunable(rules, 'shape', () => 'x');
+  });
+
+  it('a tuning registry widens a literal default, so a let stays reassignable', () => {
+    const tuning = createTuningRegistry('t');
+    let rate = tunable(tuning, 'rate', () => 25);
+    rate = tunable(tuning, 'rate-2', () => 3);
+    expectTypeOf(rate).toEqualTypeOf<ComputedRef<number>>();
+    expectTypeOf(tunable(tuning, 'mult', () => Decimal.dOne)).toEqualTypeOf<ComputedRef<Decimal>>();
+    // @ts-expect-error — a tuning registry holds DecimalSource readers
+    tunable(tuning, 'flag', () => true);
+  });
+
+  it('takes no explicit type argument for the return type', () => {
+    const tuning = createTuningRegistry('t');
+    // @ts-expect-error — the return type comes from the default, not a type argument
+    tunable<DecimalSource>(tuning, 'rate', () => 1);
   });
 });
 
