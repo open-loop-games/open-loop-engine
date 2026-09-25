@@ -155,7 +155,13 @@ export interface ChallengeDef<
 export interface Challenge {
   readonly id: string;
 
-  /** Whether this challenge is currently active (persistent) */
+  /**
+   * Whether this challenge is currently active (persistent). Tagged
+   * `lifetime` with `completions`: a challenge run spans the prestiges played
+   * inside it, and completions outlive every prestige tier, so no module reset
+   * or category walk touches either. A hard wipe names the refs in
+   * `thingsToReset`.
+   */
   readonly active: Persistent<boolean>;
 
   /** Number of times this challenge has been completed (persistent) */
@@ -401,8 +407,8 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   const base: CategoryBase<Def, Challenge, State> = createCategoryBase({
     id: categoryId,
     buildInstance(def: Def): Challenge {
-      const active = persistent<boolean>(false, { name: 'active' });
-      const completions = persistent<number>(0, { name: 'completions' });
+      const active = persistent<boolean>(false, { name: 'active', lifetime: true });
+      const completions = persistent<number>(0, { name: 'completions', lifetime: true });
       const limit = def.completionLimit ?? 1;
 
       const completed = computed(() => completions.value > 0);

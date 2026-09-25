@@ -21,6 +21,8 @@ import { createBestOf } from '@/systems/best-of';
 import { createAutomationTiers } from '@/systems/automation';
 import { createRecommendationSystem } from '@/systems/recommendation';
 import { createDialogSession } from '@/systems/dialog-session';
+import { createAchievementCategory } from '@/systems/achievement-category';
+import { createChallengeCategory } from '@/systems/challenge-category';
 import { createReset, createResetTimer } from '@/systems/reset';
 import { Resettable } from '@/systems/resettable';
 import { createSkill } from '@/systems/skill';
@@ -606,7 +608,14 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
           setState: () => {},
         },
       });
-      return { cycle, time, bank, bestOf, pool, tiers, recs, dialog };
+      const achievements = createAchievementCategory<{ id: string }>({
+        id: 'm-achievements',
+        mapAchievement: (def) => ({ display: { title: def.id } }),
+      });
+      achievements.register({ id: 'first' });
+      const challenges = createChallengeCategory({ id: 'm-challenges' });
+      challenges.register({ id: 'hard', name: 'Hard' });
+      return { cycle, time, bank, bestOf, pool, tiers, recs, dialog, achievements, challenges };
     });
   }
 
@@ -630,6 +639,10 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       'm/recommendation.storedRecommendation': true,
       'm/recommendation.autoApply': true,
       'dialog-sessions/m-dialog.state': true,
+      'm-achievements/first/achievement:first.earned': true,
+      'm-achievements/first/achievement:first.earnedAt': true,
+      'm-challenges/hard.active': true,
+      'm-challenges/hard.completions': true,
     });
   });
 
@@ -642,7 +655,13 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
   });
 
   it('keeps lifetime state through a module reset', () => {
-    const { time, pool, tiers, recs, bestOf } = buildSystems();
+    const { time, pool, tiers, recs, bestOf, achievements, challenges } = buildSystems();
+    const first = achievements.getAchievement('first')!;
+    const hard = challenges.getChallenge('hard')!;
+    first.complete();
+    const earnedAt = first.earnedAt.value;
+    hard.enter();
+    hard.complete(true);
     time.tick(50);
     const run = pool.addInstance({ id: 'a', step: () => false });
     run.step();
@@ -661,6 +680,32 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     expect(tiers.hasReached('basic')).toBe(true);
     expect(recs.autoApply.value).toBe(true);
     expect(bestOf.entries.value.gold).not.toBeNull();
+    expect(first.earned.value).toBe(true);
+    expect(first.earnedAt.value).toBe(earnedAt);
+    expect(hard.completions.value).toBe(1);
+    expect(hard.active.value).toBe(true);
+  });
+
+  it('a module reset re-fires no achievement whose requirement still holds', () => {
+    let rewards = 0;
+    const lifetimeGold = persistent(100, { lifetime: true });
+    withPersistentContext('m', () => {
+      const achievements = createAchievementCategory<{ id: string }>({
+        id: 'm-achievements',
+        mapAchievement: () => ({
+          display: { title: 'Rich' },
+          requirement: () => lifetimeGold.value >= 100,
+          onComplete: () => rewards++,
+        }),
+      });
+      achievements.register({ id: 'rich' });
+    });
+    expect(rewards).toBe(1);
+
+    createReset({ resetModules: ['m'] }).reset();
+    createReset({ resetModules: ['m'] }).reset();
+
+    expect(rewards).toBe(1);
   });
 
   it('a thingsToReset walk over a system agrees with the module reset', () => {

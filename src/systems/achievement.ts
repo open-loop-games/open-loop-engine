@@ -103,7 +103,11 @@ export interface Achievement<T = unknown> {
    * remaining distance.
    */
   gate: Gate | undefined;
-  /** Whether the achievement has been earned (persistent) */
+  /**
+   * Whether the achievement has been earned (persistent). Tagged `lifetime`
+   * with `earnedAt`, so no module reset or category walk un-earns it; a hard
+   * wipe names both refs in `thingsToReset`.
+   */
   earned: Ref<boolean>;
   /** Unix timestamp (ms) when the achievement was earned, or null if not yet earned */
   earnedAt: Ref<number | null>;
@@ -172,8 +176,8 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
   const parent = getCurrentContext();
   const contextId = parent ? `${parent}/achievement:${id}` : `achievement:${id}`;
   const { earned, earnedAt } = withPersistentContext(contextId, () => ({
-    earned: persistent<boolean>(false, { name: 'earned' }),
-    earnedAt: persistent<number | null>(null, { name: 'earnedAt' }),
+    earned: persistent<boolean>(false, { name: 'earned', lifetime: true }),
+    earnedAt: persistent<number | null>(null, { name: 'earnedAt', lifetime: true }),
   }));
 
   const processedHidden = hidden !== undefined ? processGetter(hidden) : undefined;
