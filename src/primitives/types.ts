@@ -214,7 +214,7 @@ export interface GameStateAccessor {
    *
    * Games implement this in terms of their own economy — gross production, net of drains,
    * tunable overrides, or any mix. The transition-distance primitives
-   * (`timeUntilResource`, `timeUntilAffordable`, `timeUntilConditionFlip`) call this to
+   * (`timeUntilResource`, `timeUntilAffordable`, `timeUntilGateFlip`) call this to
    * compute "when does X happen" without owning rate semantics themselves.
    *
    * Accessors without a rate concept should return `Decimal.dZero` — transition helpers

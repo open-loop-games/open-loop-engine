@@ -1411,4 +1411,31 @@ describe('Removed surface stays removed', () => {
     // @ts-expect-error — removed alongside isMultiBarProgress, same replacement.
     expectTypeOf(mod.progressToDecimal).toBeUndefined();
   });
+
+  it('engine-internal registry factories and flip-distance helpers are off every barrel', () => {
+    type Trimmed =
+      | 'createChainRegistry'
+      | 'createEffectSystemRegistry'
+      | 'createResourceRegistry'
+      | 'timeUntilConditionFlip'
+      | 'collectConditionDeps'
+      | 'combineFlipDistances'
+      | 'ChildFlipResult'
+      | 'IncrementalSnapshotEntityRef';
+    type Root = typeof import('@/index');
+    type Core = typeof import('@/core');
+    type Harness = typeof import('@/harness');
+    expectTypeOf<
+      Extract<keyof Root | keyof Core | keyof Harness, Trimmed>
+    >().toEqualTypeOf<never>();
+    // Type-only exports have no key on the module value, so probe each in type position.
+    // @ts-expect-error — internal to the Gate flip-distance walk.
+    expectTypeOf<import('@/index').ChildFlipResult>();
+    // @ts-expect-error — same, from the core barrel.
+    expectTypeOf<import('@/core').ChildFlipResult>();
+    // @ts-expect-error — the incremental snapshot's private dirty-set key.
+    expectTypeOf<import('@/index').IncrementalSnapshotEntityRef>();
+    // @ts-expect-error — same, from the harness barrel.
+    expectTypeOf<import('@/harness').IncrementalSnapshotEntityRef>();
+  });
 });

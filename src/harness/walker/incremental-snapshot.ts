@@ -78,7 +78,7 @@ import { forEachCategoryEntity } from '../walk';
  * `purchasables` / `producers`); `source` is the narrower tag already on
  * `Transition.source`.
  */
-export interface IncrementalSnapshotEntityRef {
+interface IncrementalSnapshotEntityRef {
   source: TransitionSource;
   categoryKey: keyof EngineCategories;
   categoryId: string;

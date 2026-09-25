@@ -49,7 +49,6 @@ export type {
   TransitionSource,
   TransitionSnapshot,
   IncrementalSnapshot,
-  IncrementalSnapshotEntityRef,
 } from './walker';
 
 // === CROSS-LAYER TYPE RE-EXPORTS ===

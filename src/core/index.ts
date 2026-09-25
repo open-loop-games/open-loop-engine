@@ -70,14 +70,7 @@ export type {
   ResourceRegistry,
   ResourceRegistryEntry,
 } from './registries';
-export {
-  ChainRegistryKey,
-  EffectSystemRegistryKey,
-  ResourceRegistryKey,
-  createChainRegistry,
-  createEffectSystemRegistry,
-  createResourceRegistry,
-} from './registries';
+export { ChainRegistryKey, EffectSystemRegistryKey, ResourceRegistryKey } from './registries';
 
 // === REQUIREMENTS ===
 export type {
@@ -142,19 +135,8 @@ export type { ResolvedEffect, GameStateMutator } from './effects';
 export { resolveEffect, applyEffect, E } from './effects';
 
 // === TRANSITIONS ===
-export type {
-  TransitionDistance,
-  TransitionDeps,
-  AffordableLike,
-  ChildFlipResult,
-} from './transitions';
-export {
-  timeUntilResource,
-  timeUntilAffordable,
-  timeUntilConditionFlip,
-  collectConditionDeps,
-  combineFlipDistances,
-} from './transitions';
+export type { TransitionDistance, TransitionDeps, AffordableLike } from './transitions';
+export { timeUntilResource, timeUntilAffordable } from './transitions';
 
 // === GAME STATE ACCESSOR ===
 export type { GameStateAccessorMutator } from './game-state-accessor';

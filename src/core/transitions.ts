@@ -154,6 +154,8 @@ export function timeUntilAffordable(
  *     children as a floor) is a separate candidate primitive.
  * - `not` — recurse on the inner condition (NOT flips iff inner flips).
  * - `unlock`, `state` — always `'opaque-predicate'` (no mechanical distance).
+ *
+ * @internal Consumers ask `timeUntilGateFlip`, which answers the same question over a Gate.
  */
 export function timeUntilConditionFlip(
   condition: ICondition,
@@ -223,6 +225,8 @@ function timeUntilResourceFlip(
  *
  * @param condition - Root condition to walk.
  * @returns Flat {@link TransitionDeps} — one set per accessor axis, deduped via `Set`.
+ *
+ * @internal Dependency projection matching {@link timeUntilConditionFlip}'s reads.
  */
 export function collectConditionDeps(condition: ICondition): TransitionDeps {
   const resources = new Set<string>();
@@ -267,6 +271,8 @@ function collectDepsInto(
  * One child's contribution to a combinator flip-distance calculation: its
  * current truth value plus its individual flip distance. Callers build these
  * tuples per child and hand them to {@link combineFlipDistances}.
+ *
+ * @internal Used by the Gate flip-distance walk.
  */
 export interface ChildFlipResult {
   currentlyTrue: boolean;
@@ -292,6 +298,8 @@ export interface ChildFlipResult {
  *   such a child may flip at any time, and `'no-rate'` under `max`, since the
  *   combinator waits on a child that never flips.
  * - Empty `children` or no actionable subset → `'uncomputable'`.
+ *
+ * @internal Used by the Gate flip-distance walk.
  */
 export function combineFlipDistances(
   children: ChildFlipResult[],

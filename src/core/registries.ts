@@ -63,6 +63,8 @@ export const ChainRegistryKey: InjectionKey<ChainRegistry> = Symbol('engine:chai
 /**
  * Create a fresh, empty chain registry. Called once per engine instance in
  * {@link createEngine}.
+ *
+ * @internal Read the engine's registry via `ChainRegistryKey`.
  */
 export function createChainRegistry(): ChainRegistry {
   return createNamedRegistry<ModifierChain>({
@@ -133,6 +135,8 @@ export const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry> = Symbo
 /**
  * Create a fresh, empty effect-system registry. Called once per engine
  * instance in {@link createEngine}.
+ *
+ * @internal Read the engine's registry via `EffectSystemRegistryKey`.
  */
 export function createEffectSystemRegistry(): EffectSystemRegistry {
   return createNamedRegistry<EnumerableEffectSystem>({
@@ -214,6 +218,8 @@ export const ResourceRegistryKey: InjectionKey<ResourceRegistry> = Symbol(
 /**
  * Create a fresh, empty resource registry. Called once per engine instance
  * in {@link createEngine}.
+ *
+ * @internal Read the engine's registry via `ResourceRegistryKey`.
  */
 export function createResourceRegistry(): ResourceRegistry {
   const inner = createNamedRegistry<ResourceRegistryEntry>({

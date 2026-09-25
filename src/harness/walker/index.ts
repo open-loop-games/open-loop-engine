@@ -34,11 +34,7 @@ import { compareTransitions } from './compare-transitions';
 import { profile } from '@/core/profiler';
 
 export type { Transition, TransitionSource } from './types';
-export {
-  createIncrementalSnapshot,
-  type IncrementalSnapshot,
-  type IncrementalSnapshotEntityRef,
-} from './incremental-snapshot';
+export { createIncrementalSnapshot, type IncrementalSnapshot } from './incremental-snapshot';
 
 /**
  * Merged output of {@link createTransitionSnapshot}.
