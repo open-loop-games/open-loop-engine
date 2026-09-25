@@ -2,6 +2,197 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.2.0 (2026-09-25)
+
+### ⚠ Breaking changes
+
+* system events are named in the past tense (d1f6fe8)
+
+  Engine event names are past-tense phrases. Option
+  callbacks (`onPurchase`, `onLevelUp`, ...), `before*`/`after*` hooks and
+  the `instance:*`, `pool:reset` and `scope:*` families are unchanged; the
+  `save:*` renames are their own entry below. No aliases: an old name fails
+  to typecheck at `.on()`.
+
+  Migration (old→new (System)):
+    unlock→unlocked (Zone, AutomationTiers)
+    select→selected (Zone)
+    recommend→recommended, apply→applied, dismiss→dismissed (Recommendation)
+    purchase→purchased (Purchasable)
+    finalize→finalized (CycleLog)
+    levelUp→leveledUp (Skill)
+    newBest→bestImproved (BestOf)
+    suggestions→suggestionsUpdated (RuleAdvisor)
+    complete→completed, cancel→cancelled, itemStateChange→itemStateChanged (ActionCategory)
+    change→changed (ModifierChain; Subject scalar/vector/flag/enum fields)
+    advance→advanced (Subject tier fields)
+    enqueue→enqueued, start→started, complete→completed, cancel→cancelled,
+      repeat→repeated, skip→skipped, hold→held (Sequencer)
+
+* **systems:** mapSkill returns exactly one skill mode (2d570bd)
+
+  `mapSkill` must return exactly one of
+  `retentionFormula` / `levelToMultiplier`; a return with neither or both
+  no longer compiles.
+
+* **systems:** a scaling purchasable takes each cost and effect shape under its own key (ac1528a)
+
+  A Formula-factory effect moves from `effect` to
+  `effectFormula`; a plain cost function moves from `costFormula` to
+  `cost`; `costFormula` takes only a Formula factory, and at most one
+  cost shape is allowed.
+
+  Migration:
+    // before
+    costFormula: (level) => Decimal.pow(10, Decimal.pow(level, 2)),
+    effect: (level) => Formula.variable(level).mul(0.5).add(1),
+    // after
+    cost: (level) => Decimal.pow(10, Decimal.pow(level, 2)),
+    effectFormula: (level) => Formula.variable(level).mul(0.5).add(1),
+
+* **systems:** a manual producer yields rate × count and stays out of the policy buyer (00935ab)
+
+  A manual producer with a purchase config or
+  `extraCount` now yields `computedRate × count` per `activate()`, and
+  `setupPolicyAutoPurchase` no longer buys it.
+
+* **systems:** built-in recommendation defs score improvement in the metric's mode; createGoalDef folds into createBestReplayDef (3c3ca36)
+
+  Built-in recommendation defs score log10 improvement of
+  the metric's best over the last cycle, in the metric's BestOf mode;
+  custom defs sharing a system should score on that scale. `createGoalDef`
+  is removed — use `createBestReplayDef(metric, { id, threshold })`.
+  `prefer` has no replacement.
+
+  Migration:
+    // before
+    createGoalDef({ id: 'goal:peak-data', metric: 'data', prefer: 'maximize', threshold: 10 })
+    // after
+    createBestReplayDef('data', { id: 'goal:peak-data', threshold: 10 })
+
+  A replay def needs a strategy snapshot on the best entry, where the goal
+  def fell back to the current snapshot, so the BestOf needs a
+  `captureStrategy`.
+
+* **systems:** a temporary effect rebuilds from its save on its own (6f2f63f)
+
+  TemporaryEffectSystem.restore() is removed — instances
+  rebuild after every load, import and reset. Delete `onLoad(() => effects.restore())`.
+  TemporaryEffectDef.onRestore is renamed onRehydrate.
+
+* **systems:** restore writes back a snapshot (e1c24e5)
+
+  ChallengeCategory.restore() and Slot.resync() are removed;
+  both run after every load and reset. Slot.restore(ids) now re-runs onSelect/
+  onDeselect itself. ResourceBag/Inventory deserialize(data) → restore(data).
+
+* **systems:** resetting a category resets only what its entries own (dda7672)
+
+  A category, purchasable or skill in `thingsToReset` resets
+  only its own persistent state; list a cost or produced resource, or a ref
+  passed as an option, explicitly if the reset should clear it.
+
+* **core:** a resource id is unique per engine (ef6631b)
+
+  A resource id is unique per engine; `createResource`
+  throws on a repeat. Give per-layer resources distinct ids. Renaming a
+  persistent id changes its save key, so migrate the save. A wrapped ref
+  created without an `id` takes its displayName, so two id-less wrapped
+  refs sharing a displayName throw too; pass one an `id`.
+
+* **harness:** resource trackers key metrics by id (037cd23)
+
+  Tracker metric keys use `resource.id`:
+  `resource-peak:gold.peak`, `series:gold.t3`. Label via
+  `ResourceRegistry.findById(id).displayName`.
+
+* **systems:** a category's registry is a read-and-patch view (e146874)
+
+  `<category>.registry` is a `ContentRegistryView` (no
+  `register`); add defs with `category.register`. Retype variables holding
+  it.
+
+* engine-owned injection keys can't be re-provided (788918e)
+
+  Engine-owned keys can't be re-provided. Delete
+  `ctx.provide(CategoriesKey, …)`; categories self-register.
+  `EngineCategories.resources` is removed; read `ResourceRegistryKey`.
+
+* trim internal factories and flip-distance helpers from the barrels (0616b46)
+
+  `createChainRegistry`, `createEffectSystemRegistry`,
+  `createResourceRegistry`, `timeUntilConditionFlip`,
+  `collectConditionDeps`, `combineFlipDistances`, `ChildFlipResult` and
+  `IncrementalSnapshotEntityRef` are no longer exported. Use
+  `ChainRegistryKey` / `EffectSystemRegistryKey` / `ResourceRegistryKey`
+  via `tryInject`, and `timeUntilGateFlip`.
+
+* **core:** tunable checks the key and the default's return type (b0f20a4)
+
+  Drop explicit `tunable<…>` type arguments; a typed
+  override registry now checks the key and the default's return type.
+
+* **systems:** a repeated id throws in every registry (a2032e9)
+
+  Recommendation defs, automation tier ids and dialog
+  graph ids throw on a repeat. Replace a recommendation def with
+  `unregister(id)` then `register(def)`; give each automation tier and
+  each dialog graph (across every def of a category) its own id.
+
+* **systems:** every systems predicate field takes Predicate, asserted at register (d084ad9)
+
+  Systems predicate fields take `Predicate` (boolean | Ref | () => boolean | Gate):
+  automation tier `requirement`, challenge `visible` / `canStart` / `goal`, cycle `endCondition`,
+  reset `canReset`, time-bank `gate`, purchasable/producer `visibility`, achievement `visible` /
+  `hidden` (and `requirement`, which already took a Gate), subject tier `gates`, `Grant.when`.
+  A Gate's handles are checked when the definition registers, not at first evaluation.
+
+  Migration: writers change nothing. Code that reads a field back off a def and calls it
+  (`def.goal()`, `options.endCondition()`) reads the instance's reactive field instead, or
+  calls `evaluatePredicate(def.goal, runtime)`. A Gate needing the accessor now throws at
+  register when none is wired: pass `accessor` to the category or to `createEngine`.
+
+* **systems:** purchasables and producers take visible, like achievements and challenges (4ebe9d8)
+
+  The purchasable visibility field is named `visible`, matching achievements
+  and challenges: the `PurchasableOptions` / `ScalingPurchasableOptions` option, the producer
+  mapping's `purchase.visible`, and the `Purchasable.visible` instance property, now a
+  `ComputedRef<boolean>`.
+
+  Migration: `visibility:` → `visible:` in purchasable options and producer mappings;
+  `.visibility` → `.visible` on purchasable instances (`unref(p.visibility)` → `p.visible.value`).
+
+* **systems:** effect systems take Grant; ModifierBinding removed (b380922)
+
+  `ModifierBinding` is removed. Effect-system `modifiers` take `Grant[]`
+  (or a factory returning one), the vocabulary of category grants/restricts/rewards;
+  `replacementBinding` returns `Grant[]`. `PersistentEffectDef.active` takes `Predicate`.
+  A chain array in a grant binds on each chain, and each chain is its own binding index
+  for the harness picker and perturbation.
+
+  Migration: `{ chain, modifier }` literals are already Grants — no edit. Replace a
+  `ModifierBinding` annotation with `Grant`. Shorthands now work on effects and build a
+  fresh modifier per stack: `modifiers: [{ chain, mult: 1.5, description: 'Haste' }]`.
+
+* **core:** save events are named in the past tense (4e64a67)
+
+  Four save events are renamed.
+
+  Migration:
+    save:validation-error → save:validation-failed
+    save:reconcile-error  → save:reconcile-failed
+    save:migration-step   → save:migration-applied
+    save:future-version   → save:future-version-refused
+  Payloads are unchanged, and the `'future-version'` load-failure reason keeps its name.
+
+### Features
+
+* **systems:** Predicate type and createPredicateResolver (aa84eb5)
+
+### Fixes
+
+* **systems:** temporary-effect dispose drops the lowered grant lists (fdaf6d9)
+
 ## 0.1.4 (2026-09-25)
 
 ### Features
