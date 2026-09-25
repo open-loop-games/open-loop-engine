@@ -3,6 +3,8 @@ import { nextTick } from 'vue';
 import { createInventory } from '@/systems/inventory';
 import { createAdditiveModifier, createMultiplicativeModifier } from '@/core/modifier';
 import type { Modifier } from '@/core/modifier';
+import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
+import { Decimal } from '@/primitives/decimal';
 
 describe('Inventory', () => {
   describe('basic operations', () => {
@@ -266,6 +268,30 @@ describe('Inventory', () => {
       inv2.deserialize(data);
       expect(inv2.get('wood').eq(42)).toBe(true);
       expect(inv2.get('iron').eq(7)).toBe(true);
+    });
+
+    it('items persist through the save manager, seeded from initial', () => {
+      const mgr = createSaveManager({ gameId: 'inv-items', storageAdapter: createMemoryStorage() });
+      const inv = createInventory({
+        id: 'storage',
+        baseCapacity: 100,
+        totalCapacity: 50,
+        initial: { wood: 5 },
+        items: ['wood', 'stone'],
+      });
+      expect(new Decimal(inv.resources.get('wood')!.value).toNumber()).toBe(5);
+      expect(inv.get('wood').toNumber()).toBe(5);
+
+      inv.add('wood', 35);
+      inv.add('stone', 10);
+      const snapshot = mgr.exportSave();
+      inv.clear();
+      inv.add('stone', 50);
+
+      expect(mgr.importSave(snapshot).success).toBe(true);
+      expect(inv.get('wood').toNumber()).toBe(40);
+      expect(inv.get('stone').toNumber()).toBe(10);
+      expect(new Decimal(inv.resources.get('stone')!.value).toNumber()).toBe(10);
     });
   });
 
