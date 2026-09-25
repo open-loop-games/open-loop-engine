@@ -36,20 +36,20 @@ score-and-pick over a candidate list
 
 inter-cycle arbitration across registered defs
 
-- `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:30`
-- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:103`
-- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts:191`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:371`
-- `interface GoalDefOptions` `src/systems/recommendation-strategies.ts:41`
-- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:128`
+- `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:28`
+- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:94`
+- `function createGoalDef(options: GoalDefOptions): RecommendationDef` — Create a def that selects the configuration optimizing for a specific metric goal. `src/systems/recommendation-strategies.ts`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:370`
+- `interface GoalDefOptions` `src/systems/recommendation-strategies.ts`
+- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:126`
 - `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:53`
 - `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:98`
 - `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:67`
 - `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:74`
 - `interface RecommendationResult` — The output of a def's `recommend()` method. `src/systems/recommendation.ts:84`
-- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:221`
-- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:155`
-- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:165`
+- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:219`
+- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:153`
+- `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:163`
 
 ## Rule advisor
 

@@ -34,19 +34,19 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface GameStateMutator` — Mutation interface for applying resolved effects to game state. `src/core/effects.ts:32`
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
 - `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:62`
-- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:186`
-- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:218`
-- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:54`
-- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:84`
-- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:98`
-- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:92`
-- `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:100`
-- `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:39`
-- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:56`
-- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:120`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:100`
-- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:138`
-- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:130`
+- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:184`
+- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:225`
+- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:52`
+- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:85`
+- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:99`
+- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:93`
+- `function replacementBinding(options: ReplacementBindingOptions): ModifierBinding[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:105`
+- `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:44`
+- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:59`
+- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:129`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:109`
+- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:147`
+- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:139`
 
 ## Formulas
 
@@ -95,52 +95,52 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
-- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:95`
-- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:101`
-- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:45`
-- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:33`
-- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:89`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:120`
-- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:166`
-- `function getRequiredGateHandles(gate: Gate, use?: 'evaluate' | 'predict'): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:186`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:142`
-- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:107`
-- `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:20`
-- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:69`
-- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:57`
-- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string, use?: 'evaluate' | 'predict'): void` — Throw unless `runtime` carries every handle `gate` will read for `use`. `src/systems/gate.ts:368`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:430`
-- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:157`
-- `interface GateRequirementOptions` `src/systems/gate.ts:397`
-- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:106`
-- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:131`
-- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:219`
+- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:96`
+- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:102`
+- `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:46`
+- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:34`
+- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:90`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:121`
+- `type GateHandle = 'accessor' | 'categories' | 'registry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:174`
+- `function getRequiredGateHandles(gate: Gate, use?: 'evaluate' | 'predict'): ReadonlySet<GateHandle>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:194`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:150`
+- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:108`
+- `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:21`
+- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:70`
+- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:58`
+- `function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string, use?: 'evaluate' | 'predict'): void` — Throw unless `runtime` carries every handle `gate` will read for `use`. `src/systems/gate.ts:383`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:538`
+- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:173`
+- `interface GateRequirementOptions` `src/systems/gate.ts:505`
+- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:122`
+- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:147`
+- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:235`
 
 ## Modifier
 
 composable value calculation chains
 
-- `interface AdditiveModifierOptions` `src/core/modifier.ts:68`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:873`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:887`
-- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:427`
-- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:389`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:926`
-- `function createAdditiveModifier<T extends AdditiveModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that adds a value to the input. `src/core/modifier.ts:98`
-- `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:235`
-- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:623`
-- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:170`
-- `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:316`
-- `interface ExponentialModifierOptions` `src/core/modifier.ts:199`
-- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:455`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:900`
-- `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:32`
-- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:503`
-- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:376`
-- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:560`
-- `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:48`
-- `interface MultiplicativeModifierOptions` `src/core/modifier.ts:128`
-- `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:60`
+- `interface AdditiveModifierOptions` `src/core/modifier.ts:69`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:879`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:893`
+- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:428`
+- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:390`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:932`
+- `function createAdditiveModifier<T extends AdditiveModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that adds a value to the input. `src/core/modifier.ts:99`
+- `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:236`
+- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:627`
+- `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:171`
+- `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:317`
+- `interface ExponentialModifierOptions` `src/core/modifier.ts:200`
+- `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:456`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:906`
+- `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:33`
+- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:507`
+- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:377`
+- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:564`
+- `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:49`
+- `interface MultiplicativeModifierOptions` `src/core/modifier.ts:129`
+- `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:61`
 
 ## Requirements
 

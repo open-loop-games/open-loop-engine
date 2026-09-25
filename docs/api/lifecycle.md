@@ -52,7 +52,7 @@ auto-saved refs with context-scoped registration
 prestige and layer mechanics
 
 - `function createReset(options: ResetOptions): Reset` — Create a reset mechanic. `src/systems/reset.ts:260`
-- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:458`
+- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:454`
 - `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:156`
 - `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:184`
 - `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:63`
@@ -111,11 +111,11 @@ persistent game state with multi-slot support
 
 banked-time reservoir with acceleration and burst spend surfaces
 
-- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:180`
-- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:145`
-- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:344`
-- `interface BurstDischargeOptions` `src/systems/time-bank.ts:304`
-- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:222`
-- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:108`
-- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:70`
-- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:49`
+- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:182`
+- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:146`
+- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:347`
+- `interface BurstDischargeOptions` `src/systems/time-bank.ts:307`
+- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:224`
+- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:109`
+- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:71`
+- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:50`
