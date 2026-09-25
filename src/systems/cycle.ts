@@ -26,6 +26,7 @@ import {
   resolveSystemContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
+import type { RegisterTick } from '@/core/sequencer';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
 
 // === TYPES ===
@@ -114,7 +115,7 @@ export interface CycleOptions {
   onRestart?: () => void;
 
   /** Function to register a per-tick callback with the game loop (e.g., `ctx.onTick`) */
-  registerTick: (callback: (dt: number) => void) => () => void;
+  registerTick: RegisterTick;
 }
 
 /**
