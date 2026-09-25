@@ -15,13 +15,14 @@
  * - `{ restartedWith: step }` — swaps the step in-place; alive stays true
  *   (borglike's in-flight auto-restart shape).
  *
- * Pool persists its instance-id list and per-id aliveness map under
- * context `${poolId}`. Consumers recreate instances post-load via
- * `addInstance` — the saved aliveness map is consulted so previously-dead
+ * Pool persists its per-id aliveness map under context `${poolId}`, not
+ * which ids exist: step closures can't be saved, so the game keeps its own
+ * record of its runs and recreates them post-load via `addInstance` — the
+ * saved aliveness map is consulted so previously-dead
  * instances stay dead across save/load regardless of when they're
  * recreated, fixing the lazy-context gap an earlier per-instance layout
  * had with dynamically-spawned runs (borglike clones, Cavernous loops).
- * Both refs are tagged `lifetime`: the in-memory handles are the authority,
+ * The map is tagged `lifetime`: the in-memory handles are the authority,
  * so a module reset leaves them alone and `pool.reset()` stays the seam.
  */
 
@@ -201,18 +202,17 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
   const { id: poolId, deathPolicy, maxInstances = Infinity } = options;
 
-  // Pool-level persistence: instance-id list + per-id aliveness map. Both
-  // live in the pool's own context so they're in the registry at save-load
-  // time — `addInstance` is consulted against the saved `aliveStates`
-  // regardless of when it runs, so dynamic instances created post-load
-  // pick up their saved alive state (no resurrection of dead clones).
-  const { instanceIds, aliveStates } = withPersistentContext(poolId, () => ({
-    instanceIds: persistent<string[]>([], { name: 'instanceIds', lifetime: true }),
+  // Pool-level persistence: the per-id aliveness map, in the pool's own
+  // context so it's in the registry at save-load time — `addInstance` is
+  // consulted against the saved `aliveStates` regardless of when it runs, so
+  // dynamic instances created post-load pick up their saved alive state (no
+  // resurrection of dead clones).
+  const { aliveStates } = withPersistentContext(poolId, () => ({
     aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates', lifetime: true }),
   }));
 
   // In-memory collection state. `handleArray` + `handleMap` is the canonical
-  // form; `instanceIds` mirrors it for save/load.
+  // form.
   const handleArray: RunHandle<Id>[] = [];
   const handleMap = new Map<Id, RunHandle<Id>>();
   const stepMap = new Map<Id, RunStep>();
@@ -261,12 +261,6 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     return n;
   });
 
-  function syncInstanceIds(): void {
-    const next: string[] = [];
-    for (const h of handleArray) next.push(String(h.id));
-    instanceIds.value = next;
-  }
-
   function removeFromCollection(id: Id): void {
     handleMap.delete(id);
     const idx = handleArray.findIndex((h) => h.id === id);
@@ -278,7 +272,6 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     stopWatchesMap.delete(id);
     delete aliveStates.value[String(id)];
     bumpLive();
-    syncInstanceIds();
   }
 
   function resolveOutcome(id: Id): RunDeathOutcome {
@@ -396,7 +389,6 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     handleArray.push(handle);
     handleMap.set(reg.id, handle);
     bumpLive();
-    syncInstanceIds();
 
     bus.emit('instance:added', handle);
     return handle;

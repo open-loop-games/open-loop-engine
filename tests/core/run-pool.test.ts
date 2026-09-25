@@ -5,6 +5,8 @@ import {
   endPersistentContext,
   getAllPersistentRefs,
   deserializePersistents,
+  serializePersistents,
+  withPersistentContext,
 } from '@/core/persistence';
 import {
   createRunPool,
@@ -70,9 +72,9 @@ describe('RunPool — construction', () => {
     expect(c.alive.value).toBe(false);
 
     // Simulate fresh-session load: seed a new pool, then deserialize a save
-    // shaped to match the pool's persisted layout (instanceIds + aliveStates
-    // both under `${ctxId2}`). Instances are added *after* deserialize to
-    // exercise the post-load addInstance path that motivated the refactor.
+    // under `${ctxId2}` that still carries the `instanceIds` key older builds
+    // wrote. Instances are added *after* deserialize to exercise the post-load
+    // addInstance path that motivated the refactor.
     const ctxId2 = `round-trip-2-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId2);
     const pool2 = createRunPool({ id: ctxId2, deathPolicy: 'park' });
@@ -93,6 +95,17 @@ describe('RunPool — construction', () => {
     expect(pool2.getInstance('b')!.alive.value).toBe(true);
     expect(pool2.getInstance('c')!.alive.value).toBe(false);
     expect(pool2.liveCount.value).toBe(2);
+  });
+
+  it('saves only the aliveness of each id; the game re-adds its handles after a load', () => {
+    const ctxId = `saved-shape-${Math.random().toString(36).slice(2, 8)}`;
+    const pool = withPersistentContext(ctxId, () =>
+      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+    );
+    pool.addInstance({ id: 'a', step: aliveStep });
+    expect(serializePersistents(getAllPersistentRefs())[ctxId]).toEqual({
+      aliveStates: { a: true },
+    });
   });
 
   it('saved alive=false survives a mid-session reload that replaces aliveStates', () => {

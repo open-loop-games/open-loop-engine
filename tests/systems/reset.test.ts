@@ -636,7 +636,6 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       // by default, `keep: [bank.banked]` carries it.
       'm/time-bank.banked': false,
       'm-best.store': true,
-      'm-pool.instanceIds': true,
       'm-pool.aliveStates': true,
       'm/automation.unlocked': true,
       'm/recommendation.storedRecommendation': true,
