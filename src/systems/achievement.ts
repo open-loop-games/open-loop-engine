@@ -30,7 +30,7 @@ import {
   onHydrated,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { evaluateGate, getAmbientGateRuntime, isGate, type Gate } from './gate';
+import { evaluateGate, getAmbientGateRuntime, isGate, type Gate, type GateRuntime } from './gate';
 
 // === TYPES ===
 
@@ -68,9 +68,10 @@ export interface AchievementOptions<T = unknown> {
    * - `Computable<boolean>` — boolean / ref / getter. Closes over scope refs;
    *   opaque to the predictor.
    * - {@link Gate} — declarative typed predicate spec. Resolved through the
-   *   ambient {@link GateRuntime} (categories + registry + accessor wired by
-   *   `createEngine`). Predictor consumers read `Achievement.gate` to call
-   *   `timeUntilGateFlip` for distance projection.
+   *   {@link GateRuntime} the achievement category captured at construction
+   *   (categories + registry + accessor wired by `createEngine`). Predictor
+   *   consumers read `Achievement.gate` to call `timeUntilGateFlip` for
+   *   distance projection.
    *
    * If omitted, the achievement only earns via an explicit
    * {@link Achievement.complete} call.
@@ -162,9 +163,16 @@ export interface AchievementEvents {
  * A once-and-stay-earned milestone with optional reactive effect and
  * auto-completing requirement watch.
  *
+ * @param gateRuntime - handles a Gate-form requirement evaluates through; the
+ *   category passes the one it captured, so content registered after install
+ *   still resolves. Defaults to the ambient runtime.
+ *
  * @internal
  */
-export function createAchievement<T = unknown>(options: AchievementOptions<T>): Achievement<T> {
+export function createAchievement<T = unknown>(
+  options: AchievementOptions<T>,
+  gateRuntime?: GateRuntime,
+): Achievement<T> {
   const {
     id,
     display,
@@ -198,15 +206,14 @@ export function createAchievement<T = unknown>(options: AchievementOptions<T>): 
   const processedEffect = effect !== undefined ? processGetter(effect) : undefined;
 
   // Gate-form requirements: capture the spec on the instance for predictor use,
-  // and project to a reactive boolean via evaluateGate over the ambient runtime
-  // (resolved at construction time so the watcher's later fires don't rely on
-  // ambient still being set).
+  // and project to a reactive boolean via evaluateGate over a runtime resolved
+  // now, so the watcher's later fires don't rely on ambient still being set.
   let gateField: Gate | undefined;
   let processedRequirement: ReturnType<typeof processGetter<boolean>> | undefined;
   if (requirement !== undefined) {
     if (isGate(requirement)) {
       gateField = requirement;
-      const runtime = getAmbientGateRuntime();
+      const runtime = gateRuntime ?? getAmbientGateRuntime();
       processedRequirement = computed(() => evaluateGate(requirement, runtime));
     } else {
       processedRequirement = processGetter(requirement);

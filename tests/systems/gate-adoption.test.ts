@@ -26,6 +26,8 @@ import {
   type Resource,
 } from '@/index';
 import { createAchievement } from '@/systems/achievement';
+import { createAchievementCategory } from '@/systems/achievement-category';
+import { createSubjectCategory } from '@/systems/subject-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 
 beforeEach(() => {
@@ -435,5 +437,78 @@ describe('createGateRequirement — no ambient accessor', () => {
         }),
       ),
     ).toThrow(/state/);
+  });
+});
+
+// ============================================================================
+// Registration after start() — the runtime is the category's, not the register call's
+// ============================================================================
+
+describe('Gate-accepting categories — content registered after start()', () => {
+  it('an achievement registered after start() evaluates its gate', () => {
+    const { result, stop } = bootstrap(() =>
+      createAchievementCategory<{ id: string }>({
+        id: 'milestones',
+        mapAchievement: () => ({
+          display: { title: 'Rich' },
+          requirement: { kind: 'resource-gte', resource: 'points', value: 10 },
+        }),
+      }),
+    );
+
+    expect(() => result.register({ id: 'late' })).not.toThrow();
+    expect(result.getAchievement('late')!.canComplete.value).toBe(false);
+    stop();
+  });
+
+  it('a subject registered after start() advances through its tier gate', () => {
+    const { result, stop } = bootstrap((api) => {
+      api.points.value = 10;
+      return createSubjectCategory({
+        id: 'npcs',
+        fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'] } },
+      });
+    });
+
+    result.register({
+      id: 'late',
+      fields: { trust: { gates: [{ kind: 'resource-gte', resource: 'points', value: 10 }] } },
+    });
+    expect(result.get('late')!.fields.trust.tryAdvance()).toBe('friend');
+    stop();
+  });
+
+  it('an explicit accessor overrides the ambient one on both categories', () => {
+    const override: GameStateAccessor = {
+      getResource: () => new Decimal(1000),
+      getRate: () => Decimal.dZero,
+      isUnlocked: () => true,
+      getState: () => undefined,
+    };
+    const { result, stop } = bootstrap(() => {
+      const achievements = createAchievementCategory<{ id: string }>({
+        id: 'milestones',
+        accessor: override,
+        mapAchievement: () => ({
+          display: { title: 'Flagged' },
+          requirement: { kind: 'flag', id: 'anything' },
+        }),
+      });
+      achievements.register({ id: 'flagged' });
+      const subjects = createSubjectCategory({
+        id: 'npcs',
+        accessor: override,
+        fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'] } },
+      });
+      subjects.register({
+        id: 'rask',
+        fields: { trust: { gates: [{ kind: 'resource-gte', resource: 'points', value: 500 }] } },
+      });
+      return { achievements, subjects };
+    });
+
+    expect(result.achievements.getAchievement('flagged')!.earned.value).toBe(true);
+    expect(result.subjects.get('rask')!.fields.trust.tryAdvance()).toBe('friend');
+    stop();
   });
 });

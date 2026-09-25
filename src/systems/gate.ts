@@ -31,8 +31,8 @@
  * `gateToCondition` partial-projects rate-aware Gates (and their combinators)
  * to `ICondition` for legacy interop — predictor reuse, walker compatibility,
  * Producer's `specToICondition` retirement. Throws on category descendants:
- * those have no `ICondition` equivalent under (D) and the projection is
- * deliberately partial.
+ * those have no `ICondition` equivalent, and the projection is deliberately
+ * partial.
  */
 
 import { computed } from 'vue';
@@ -199,9 +199,9 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
  * - `resource-gte` / `cumulative-gte` — projects to `ResourceCondition` and
  *   delegates to {@link timeUntilConditionFlip}, which owns the rate × operator
  *   truth table.
- * - `count-gte` / `unlock` / `state` — `'opaque-predicate'`. Category counts
- *   advance imperatively (purchases, achievement firings); `state` is a
- *   consumer-write surface. Neither has a mechanical distance.
+ * - `count-gte` / `unlock` / `state` / `flag` — `'opaque-predicate'`. Category
+ *   counts advance imperatively (purchases, achievement firings); `state` and
+ *   `flag` are consumer-write surfaces. None has a mechanical distance.
  * - `all` / `any` / `not` — builds `{ currentlyTrue, distance }` per child via
  *   {@link evaluateGate} + recursive {@link timeUntilGateFlip}, then delegates
  *   to {@link combineFlipDistances} for the combinator truth-table dispatch.
@@ -285,9 +285,8 @@ export function assertGateHandles(gate: Gate, runtime: GateRuntime, label: strin
   if (missing.length === 0) return;
   const kinds = [...collectKinds(gate)].join(', ');
   throw new Error(
-    `${label}: this gate reads the ${missing.join(' and ')}, which the ambient runtime doesn't carry. ` +
-      `Gate kinds in play: ${kinds}. Wire the missing handle via createEngine({ accessor }) — ` +
-      `category-only gates ('count-gte', 'unlock') need no accessor — and construct inside engine install/connect.`,
+    `${label}: this gate reads the ${missing.join(' and ')}, which the runtime doesn't carry. ` +
+      `Gate kinds in play: ${kinds}. ${missing.map(handleRemedy).join(' ')}`,
   );
 }
 
@@ -364,10 +363,17 @@ function demand<K extends GateHandle>(
   if (!value) {
     throw new Error(
       `evaluateGate: '${kind}' gate needs the ${handle}, which was not available on the GateRuntime. ` +
-        `Wire it via createEngine({ ${handle === 'accessor' ? 'accessor' : handle} }) and resolve the runtime inside engine install/connect, or pass an explicit override.`,
+        handleRemedy(handle),
     );
   }
   return value;
+}
+
+/** Where an author gets a missing handle from, for the error messages. */
+function handleRemedy(handle: GateHandle): string {
+  return handle === 'accessor'
+    ? 'Wire the accessor via createEngine({ accessor }) or pass one explicitly, and resolve the runtime inside engine install/connect.'
+    : `The ${handle} resolves only inside engine install/connect; build the runtime there.`;
 }
 
 function cumulativeRefFor(resourceId: string, runtime: GateRuntime, kind: Gate['kind']) {

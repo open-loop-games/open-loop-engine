@@ -46,7 +46,9 @@ import { type ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { createAchievement, type Achievement, type AchievementOptions } from './achievement';
 import { getCurrentEngineCategories } from './engine-categories';
+import { getAmbientGateRuntime } from './gate';
 import type { Grant } from '@/core/modifier';
+import type { GameStateAccessor } from '@/primitives/types';
 
 // === TYPES ===
 
@@ -60,6 +62,14 @@ import type { Grant } from '@/core/modifier';
 export interface AchievementCategoryOptions<Def extends { id: string }, State = void> {
   /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
   id: string;
+
+  /**
+   * Accessor Gate-form requirements read through. Falls back to the ambient
+   * accessor wired by `createEngine`. The category captures the Gate runtime
+   * (accessor + categories + registry) once, at construction, so
+   * achievements registered after install evaluate against it too.
+   */
+  accessor?: GameStateAccessor;
 
   /**
    * Map a content definition to AchievementOptions.
@@ -293,13 +303,14 @@ export interface AchievementCategory<
 export function createAchievementCategory<Def extends { id: string }, State = void>(
   options: AchievementCategoryOptions<Def, State>,
 ): AchievementCategory<Def, State> {
-  const { id, mapAchievement, mapState } = options;
+  const { id, accessor, mapAchievement, mapState } = options;
+  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
 
   const base: CategoryBase<Def, Achievement, State> = createCategoryBase({
     id,
     buildInstance: (def) => {
       const { grants, ...opts } = mapAchievement(def);
-      const achievement = createAchievement({ ...opts, id: def.id });
+      const achievement = createAchievement({ ...opts, id: def.id }, gateRuntime);
       setupDeclarativeBindings(grants, achievement.earned);
       return achievement;
     },

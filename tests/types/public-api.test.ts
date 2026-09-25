@@ -970,12 +970,12 @@ describe('Achievement and challenge categories — required options and generics
     [K in keyof T]-?: object extends Pick<T, K> ? K : never;
   }[keyof T];
 
-  it('createAchievementCategory requires id/mapAchievement; mapState defaults', () => {
+  it('createAchievementCategory requires id/mapAchievement; accessor and mapState default', () => {
     interface Def {
       id: string;
     }
     type Options = import('@/systems/achievement-category').AchievementCategoryOptions<Def>;
-    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'mapState'>();
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'accessor' | 'mapState'>();
   });
 
   it('registerTiered returns Achievement<T>[], T defaulting to number', async () => {

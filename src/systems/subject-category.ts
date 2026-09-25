@@ -23,7 +23,7 @@ import { Decimal } from '@/primitives/decimal';
 import { persistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { GameStateAccessor } from '@/primitives/types';
-import { evaluateGate, getAmbientGateRuntime, type Gate } from './gate';
+import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
 import type { ContentRegistry } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
@@ -234,6 +234,13 @@ export interface SubjectCategoryOptions<S extends FieldSchema> {
   id: string;
   /** Shared field schema applied to every registered subject. */
   fields: S;
+  /**
+   * Accessor tier gates read through. Falls back to the ambient accessor
+   * wired by `createEngine`. The category captures the Gate runtime
+   * (accessor + categories + registry) once, at construction, so subjects
+   * registered after install advance against it too.
+   */
+  accessor?: GameStateAccessor;
 }
 
 /**
@@ -349,6 +356,7 @@ function buildTierField(
   fieldName: string,
   schema: TierFieldDef,
   override: PerSubjectOverride<TierFieldDef> | undefined,
+  gateRuntime: GateRuntime,
 ): TierFieldInstance {
   if (schema.tiers.length === 0) {
     throw new Error(`Subject tier field "${fieldName}" must declare at least one tier`);
@@ -356,10 +364,6 @@ function buildTierField(
   const initial = override?.initial ?? schema.initial ?? 0;
   const maxIndex = schema.tiers.length - 1;
   const gates = override?.gates ?? schema.gates;
-  // Capture the Gate runtime at registration, not inside tryAdvance: subjects
-  // register during install but advance from gameplay, long after the ambient
-  // scope closes. `tryAdvance(accessor)` still layers a per-call override on top.
-  const gateRuntime = getAmbientGateRuntime();
 
   function clampIndex(i: number): number {
     return Math.max(0, Math.min(maxIndex, Math.floor(i)));
@@ -471,6 +475,7 @@ function buildField(
   fieldName: string,
   schema: FieldDef,
   override: unknown,
+  gateRuntime: GateRuntime,
 ): FieldInstance<FieldDef> {
   switch (schema.kind) {
     case 'scalar':
@@ -490,6 +495,7 @@ function buildField(
         fieldName,
         schema,
         override as PerSubjectOverride<TierFieldDef> | undefined,
+        gateRuntime,
       );
     case 'flag':
       return buildFlagField(
@@ -564,7 +570,11 @@ function buildField(
 export function createSubjectCategory<S extends FieldSchema>(
   options: SubjectCategoryOptions<S>,
 ): SubjectCategory<S> {
-  const { id: categoryId, fields: schema } = options;
+  const { id: categoryId, fields: schema, accessor } = options;
+  // Captured here, not per register: subjects registered after install (late
+  // content, mods) never see the ambient scope. `tryAdvance(accessor)` still
+  // layers a per-call override on top.
+  const gateRuntime = getAmbientGateRuntime(accessor ? { accessor } : undefined);
 
   const base: CategoryBase<SubjectDef<S>, SubjectInstance<S>, void> = createCategoryBase<
     SubjectDef<S>,
@@ -577,9 +587,12 @@ export function createSubjectCategory<S extends FieldSchema>(
       for (const fieldName of Object.keys(schema) as (keyof S & string)[]) {
         const fieldSchema = schema[fieldName];
         const override = def.fields?.[fieldName];
-        fields[fieldName] = buildField(fieldName, fieldSchema, override) as FieldInstance<
-          S[typeof fieldName]
-        >;
+        fields[fieldName] = buildField(
+          fieldName,
+          fieldSchema,
+          override,
+          gateRuntime,
+        ) as FieldInstance<S[typeof fieldName]>;
       }
       return { id: def.id, fields };
     },
