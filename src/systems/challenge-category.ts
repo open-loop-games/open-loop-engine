@@ -34,7 +34,8 @@
 
 import { computed, type ComputedRef } from 'vue';
 import type { Persistent } from '@/core/persistence';
-import { persistent } from '@/core/persistence';
+import { onHydrated, persistent } from '@/core/persistence';
+import type { RegisterTick } from '@/core/sequencer';
 import {
   setupDeclarativeBindings,
   createCategoryBase,
@@ -101,7 +102,9 @@ export interface ChallengeDef<
   contentPatches?: Record<string, Record<string, Partial<Record<string, unknown>>>>;
 
   /**
-   * Completion goal — auto-completes when met while active.
+   * Completion goal — auto-completes when met while active, checked each tick
+   * the category's `registerTick` drives. A category without `registerTick`
+   * never checks it; call {@link Challenge.complete} instead.
    *
    * Two forms:
    * - {@link Gate} — declarative typed predicate spec. Resolved through the
@@ -141,10 +144,17 @@ export interface ChallengeDef<
    */
   rewards?: Grant[];
 
-  /** Called after overrides are pushed and challenge becomes active */
+  /**
+   * Called after overrides are pushed and the player enters the challenge.
+   * A load or reset that restores `active` doesn't call it, so it may write
+   * game state; runtime-only setup belongs in state derived from `active`.
+   */
   onEnter?: () => void;
 
-  /** Called after overrides are popped and challenge becomes inactive */
+  /**
+   * Called after overrides are popped and the player leaves the challenge.
+   * A load or reset that clears `active` doesn't call it.
+   */
   onExit?: () => void;
 
   /** Called when goal is met (before exit, if auto-exiting) */
@@ -183,8 +193,11 @@ export interface Challenge {
   readonly visible: ComputedRef<boolean>;
 
   /**
-   * Enter this challenge. Pushes overrides, applies patches, calls onEnter.
-   * @returns true if entered, false if blocked (already active, maxed, etc.)
+   * Enter this challenge. Pushes overrides, applies patches, runs the
+   * category's `reset`, calls onEnter.
+   * @returns true if entered; false if blocked (already active, maxed, etc.)
+   *   or if the `reset` declines, by which point a mutually exclusive
+   *   challenge has already been exited
    */
   enter(): boolean;
 
@@ -261,10 +274,10 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
   mutator?: GameStateMutator;
 
   /**
-   * Register a per-tick callback for auto-completion checking.
-   * If provided and defs have `goal`, the category checks goals each tick.
+   * Drives `goal` auto-completion: the category checks every active
+   * challenge's goal each tick. Without it, goals are never checked.
    */
-  registerTick?: (callback: (dt: number) => void) => () => void;
+  registerTick?: RegisterTick;
 
   /**
    * Create per-instance state alongside each Challenge.
@@ -319,13 +332,19 @@ export interface ChallengeCategory<
   readonly size: number;
 
   /**
-   * Re-push scoped overrides for any challenge that was active at save time.
-   * Call this after save data is loaded (e.g., in module connect phase).
-   * Scoped overrides are runtime-only — they don't survive serialization.
+   * Bring the runtime-only overrides and content patches in line with each
+   * challenge's `active`: push them for an active challenge, pop them for an
+   * inactive one. Runs on its own after every save load and every reset, so
+   * a consumer need not call it. Calls no `onEnter`/`onExit`: a restored
+   * `active` is state, not an entry.
    */
   restore(): void;
 
-  /** Clean up: exit active challenges, unregister tick callback */
+  /**
+   * Release runtime state: pop every pushed override and patch and stop the
+   * goal tick. `active` and the hooks are left alone, so a save taken after
+   * teardown keeps the challenge.
+   */
   dispose(): void;
 }
 
@@ -365,6 +384,9 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
   // Track cleanup functions for each active challenge's scoped overrides/patches
   const activeCleanups = new Map<string, Array<() => void>>();
+  // The challenge whose enter() has pushed its scopes but not yet set `active`
+  // — its entry reset settles in between, and must not pop them.
+  let entering: string | undefined;
 
   /** Evaluate a boolean / Gate field, defaulting to fallback if undefined. */
   function evalCondition(cond: boolean | Gate | undefined, fallback: boolean): boolean {
@@ -401,6 +423,17 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         cleanups[i]();
       }
       activeCleanups.delete(challengeId);
+    }
+  }
+
+  /** Push or pop each challenge's scopes to match its `active`. */
+  function reconcileScopes(): void {
+    for (const entry of base.getAll()) {
+      const id = entry.def.id;
+      if (id === entering) continue;
+      const pushed = activeCleanups.has(id);
+      if (entry.instance.active.value && !pushed) activeCleanups.set(id, pushScopes(entry.def));
+      else if (!entry.instance.active.value && pushed) popScopes(id);
     }
   }
 
@@ -441,11 +474,16 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
           }
         }
 
-        const cleanups = pushScopes(def);
-        activeCleanups.set(def.id, cleanups);
-
-        if (reset) {
-          reset.reset();
+        popScopes(def.id);
+        entering = def.id;
+        try {
+          activeCleanups.set(def.id, pushScopes(def));
+          if (reset && !reset.reset()) {
+            popScopes(def.id);
+            return false;
+          }
+        } finally {
+          entering = undefined;
         }
 
         active.value = true;
@@ -518,6 +556,8 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     }),
   });
 
+  const stopHydrated = onHydrated(reconcileScopes);
+
   let unregisterTick: (() => void) | undefined;
   if (registerTick) {
     unregisterTick = registerTick(() => {
@@ -585,25 +625,12 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       return base.size;
     },
 
-    restore(): void {
-      for (const entry of base.getAll()) {
-        if (entry.instance.active.value && !activeCleanups.has(entry.def.id)) {
-          // Re-push scopes without triggering reset or callbacks
-          const cleanups = pushScopes(entry.def);
-          activeCleanups.set(entry.def.id, cleanups);
-          // Re-call onEnter so the challenge can restore runtime state
-          entry.def.onEnter?.();
-        }
-      }
-    },
+    restore: reconcileScopes,
 
     dispose(): void {
       unregisterTick?.();
-      for (const entry of base.getAll()) {
-        if (entry.instance.active.value) {
-          entry.instance.exit();
-        }
-      }
+      stopHydrated();
+      for (const id of [...activeCleanups.keys()]) popScopes(id);
     },
 
     [Resettable]: base[Resettable],

@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref } from 'vue';
-import { resetAllPersistentContexts } from '@/core/persistence';
+import {
+  deserializePersistents,
+  getAllPersistentRefs,
+  resetAllPersistentContexts,
+  serializePersistents,
+  withPersistentContext,
+} from '@/core/persistence';
+import { createOverrideRegistry } from '@/core/override-registry';
 import { createChallengeCategory } from '@/systems/challenge-category';
+import { createContentRegistry } from '@/systems/content-registry';
+import { createReset, type Reset } from '@/systems/reset';
 import { createModifierChain } from '@/core/modifier';
 import { Decimal } from '@/primitives/decimal';
 
@@ -113,5 +122,155 @@ describe('ChallengeDef declarative bindings', () => {
     ch.enter();
     expect(() => ch.complete()).not.toThrow();
     expect(ch.completions.value).toBe(1);
+  });
+});
+
+describe('ChallengeCategory — scopes follow `active` through every load and reset', () => {
+  interface Rules extends Record<string, (...args: never[]) => unknown> {
+    combat: () => number;
+  }
+
+  /** A category in module `m` whose `zombie` challenge overrides combat and patches a cost. */
+  function build(reset?: Reset) {
+    const log: string[] = [];
+    const rules = createOverrideRegistry<Rules>('rules');
+    rules.setDefault('combat', () => 10);
+    const actions = createContentRegistry<{ id: string; cost: number }>('actions');
+    actions.register({ id: 'buy', cost: 5 });
+    const challenges = withPersistentContext('m', () =>
+      createChallengeCategory({
+        id: 'ch',
+        overrideRegistry: rules,
+        contentRegistries: { actions },
+        reset,
+      }),
+    );
+    const hooks = (id: string) => ({
+      onEnter: () => log.push(`enter ${id}`),
+      onExit: () => log.push(`exit ${id}`),
+    });
+    challenges.register([
+      {
+        id: 'zombie',
+        name: 'Zombie',
+        overrides: { combat: () => 0 },
+        contentPatches: { actions: { buy: { cost: 1 } } },
+        ...hooks('zombie'),
+      },
+      { id: 'other', name: 'Other', overrides: { combat: () => 5 }, ...hooks('other') },
+    ]);
+    return {
+      challenges,
+      log,
+      rules,
+      zombie: challenges.getChallenge('zombie')!,
+      combat: () => rules.get('combat')(),
+      cost: () => actions.get('buy')!.cost,
+    };
+  }
+
+  function save(): Record<string, unknown> {
+    return serializePersistents(getAllPersistentRefs());
+  }
+
+  it('a load of a mid-challenge save pushes its scopes without calling onEnter', () => {
+    build().zombie.enter();
+    const midChallenge = save();
+    resetAllPersistentContexts();
+
+    const { combat, cost, log, zombie } = build();
+    deserializePersistents(getAllPersistentRefs(), midChallenge);
+
+    expect(zombie.active.value).toBe(true);
+    expect(combat()).toBe(0);
+    expect(cost()).toBe(1);
+    expect(log).toEqual([]);
+  });
+
+  it('a load of a save with no challenge active pops the scopes, and re-entry leaks none', () => {
+    const { combat, cost, log, zombie } = build();
+    const idle = save();
+    zombie.enter();
+    log.length = 0;
+
+    deserializePersistents(getAllPersistentRefs(), idle);
+    expect(zombie.active.value).toBe(false);
+    expect(combat()).toBe(10);
+    expect(cost()).toBe(5);
+    expect(log).toEqual([]);
+
+    zombie.enter();
+    zombie.exit();
+    expect(combat()).toBe(10);
+    expect(cost()).toBe(5);
+  });
+
+  it('a reset that names `active` pops the scopes, and re-entry leaks none', () => {
+    const { combat, zombie } = build();
+    zombie.enter();
+
+    createReset({ thingsToReset: [zombie.active] }).reset();
+    expect(zombie.active.value).toBe(false);
+    expect(combat()).toBe(10);
+
+    zombie.enter();
+    zombie.exit();
+    expect(combat()).toBe(10);
+  });
+
+  it('restore() after the load adds no second scope', () => {
+    build().zombie.enter();
+    const midChallenge = save();
+    resetAllPersistentContexts();
+
+    const { challenges, rules, log } = build();
+    deserializePersistents(getAllPersistentRefs(), midChallenge);
+    challenges.restore();
+
+    expect(rules.scopeDepth).toBe(1);
+    expect(log).toEqual([]);
+  });
+
+  it("an entry reset over the category's own module keeps the challenge entered", () => {
+    const { combat, zombie, log } = build(createReset({ resetModules: ['m'] }));
+
+    expect(zombie.enter()).toBe(true);
+
+    expect(zombie.active.value).toBe(true);
+    expect(combat()).toBe(0);
+    expect(log).toEqual(['enter zombie']);
+  });
+
+  it('entering a declined reset does not enter', () => {
+    const { combat, zombie, log } = build(createReset({ onBeforeReset: () => false }));
+
+    expect(zombie.enter()).toBe(false);
+
+    expect(zombie.active.value).toBe(false);
+    expect(combat()).toBe(10);
+    expect(log).toEqual([]);
+  });
+
+  it('entering one challenge exits the other', () => {
+    const { challenges, combat, zombie, log } = build();
+    zombie.enter();
+
+    challenges.getChallenge('other')!.enter();
+
+    expect(zombie.active.value).toBe(false);
+    expect(combat()).toBe(5);
+    expect(log).toEqual(['enter zombie', 'exit zombie', 'enter other']);
+  });
+
+  it('dispose releases the scopes and leaves `active` and the hooks alone', () => {
+    const { challenges, combat, cost, zombie, log } = build();
+    zombie.enter();
+
+    challenges.dispose();
+
+    expect(zombie.active.value).toBe(true);
+    expect(combat()).toBe(10);
+    expect(cost()).toBe(5);
+    expect(log).toEqual(['enter zombie']);
   });
 });
