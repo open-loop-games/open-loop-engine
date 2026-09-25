@@ -422,4 +422,42 @@ describe('createActionCategory — list mode', () => {
     category.setItemProgress('first', 42);
     expect(category.sequencer.items.value[0].metadata.progress).toBe(42);
   });
+
+  it('replay() re-runs the list from fresh execution slots, duplicate defs included', () => {
+    const { category, driver } = makeCategory({ mode: 'list' });
+    category.register([
+      { id: 'walk', baseTicks: 1 },
+      { id: 'dig', baseTicks: 2 },
+    ]);
+    for (const id of ['walk', 'dig', 'walk']) category.enqueue(id, { payload: { count: 1 } });
+
+    const runTicks = () => {
+      let ticks = 0;
+      while (category.currentItem && ticks < 100) {
+        driver.tick(0.25);
+        ticks++;
+      }
+      return ticks;
+    };
+
+    const first = runTicks();
+    expect(first).toBe(16);
+    expect(category.sequencer.items.value.map((i) => i.metadata.lifecycle)).toEqual([
+      'completed',
+      'completed',
+      'completed',
+    ]);
+
+    category.replay();
+    expect(category.sequencer.cursor).toBe(0);
+    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(
+      category.sequencer.items.value.map((i) => [i.metadata.progress, i.metadata.lifecycle]),
+    ).toEqual([
+      [0, 'running'],
+      [0, 'pending'],
+      [0, 'pending'],
+    ]);
+    expect(runTicks()).toBe(first);
+  });
 });

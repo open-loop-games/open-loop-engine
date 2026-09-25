@@ -10,7 +10,9 @@
  * Two modes:
  * - **queue** (default) — items are consumed on completion (pop from front)
  * - **list** — items persist, a cursor advances through them. Call
- *   `resetCursor()` to replay from the start (e.g., on loop restart).
+ *   `resetCursor()` to replay from the start (e.g., on loop restart). It moves
+ *   only the cursor: per-run state kept in item metadata carries over unless
+ *   the consumer resets it first.
  *
  * Generic over metadata type M. When M = void the sequencer behaves like a
  * simple string-ID queue, but `metadata` is still a required field: write
@@ -317,7 +319,8 @@ export interface Sequencer<M = void> {
   /**
    * Reset the cursor to 0 and cancel the current item (list mode only).
    * If not paused, auto-starts from the beginning.
-   * No-op in queue mode.
+   * No-op in queue mode. Item metadata is left as it is, so per-run state kept
+   * there (progress, say) must be reset before replaying.
    */
   // TODO(ergonomics): accept optional `toIndex: number` for arbitrary-position
   // cursor jumps (e.g. Cavernous II's `<` repeat-from-marker). Deferred until

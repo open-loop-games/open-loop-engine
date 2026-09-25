@@ -141,7 +141,10 @@ export interface ActionCategoryEvents<Def extends { id: string }, State, Payload
 export interface ActionCategoryOptions<Def extends { id: string }, State = void, Payload = void> {
   /** Persistence context id. Each def gets `{id}/{def.id}` via createCategoryBase. */
   id: string;
-  /** Sequencer mode. Default `'queue'`; `'list'` for cursor-walks-list shapes (looper, etc.). */
+  /**
+   * Sequencer mode. Default `'queue'`; `'list'` for cursor-walks-list shapes
+   * (looper, etc.), which replay the list with `replay()`.
+   */
   mode?: 'queue' | 'list';
   /** Map a def to its tick/canRun/signals/rateChain configuration. Called at registration time. */
   mapAction: (def: Def, ctx: ActionCategoryContext) => ActionMapping<Def, State, Payload>;
@@ -191,6 +194,16 @@ export interface ActionCategory<Def extends { id: string }, State = void, Payloa
    * first matching pending instance. Fires `cancel` event.
    */
   cancel(defId: string): void;
+
+  /**
+   * List mode: replay the list from the start, as a looper does on restart.
+   * Resets every item's execution slots (`lifecycle` to `'pending'`,
+   * `progress`, `attempt`, `error`, `timing`) while keeping its payload,
+   * cancels the running item, and dispatches from the first. A bare
+   * `sequencer.resetCursor()` leaves the slots from the last run, so every
+   * replayed item would finish on its first tick. No-op in queue mode.
+   */
+  replay(): void;
 
   /** Current per-execution metadata if any def is running, else null. */
   readonly currentItem: ActionItemMetadata<Payload> | null;
@@ -498,6 +511,12 @@ export function createActionCategory<Def extends { id: string }, State = void, P
       lifecycle: 'completed',
       timing: { ...meta.timing, completedAt: Date.now() },
     };
+    // A list keeps the item, one slot behind the advanced cursor: record the
+    // terminal state there too, or the slot reads 'running' until replayed.
+    if (mode === 'list') {
+      const slot = sequencer.cursor - 1;
+      if (sequencer.items.value[slot]?.id === item.id) sequencer.patchItem(slot, () => terminal);
+    }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
     handle.emit('itemStateChange', entry, meta.lifecycle, 'completed');
@@ -582,6 +601,20 @@ export function createActionCategory<Def extends { id: string }, State = void, P
         sequencer.remove(idx);
         const entry = makeEntry(defId, meta);
         if (entry) handle.emit('cancel', entry);
+        fireItemChange(defId);
+      }
+    },
+
+    replay() {
+      if (mode !== 'list') return;
+      // Every slot, not the first match per defId: a list may hold one def twice.
+      const items = sequencer.items.value;
+      sequencer.items.value = items.map((item) => ({
+        id: item.id,
+        metadata: buildInitialMetadata(item.metadata.defId, item.metadata.payload, 0),
+      }));
+      sequencer.resetCursor();
+      for (const defId of new Set(items.map((item) => item.metadata.defId))) {
         fireItemChange(defId);
       }
     },
