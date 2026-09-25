@@ -32,6 +32,7 @@ import type { RegisterTick } from '@/core/sequencer';
 import { isCostRequirement, type CostRequirement, type Requirement } from '@/core/requirements';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
 import type { Purchasable } from './purchasable';
+import type { PurchasableCategory } from './purchasable-category';
 import type { Producer, ProducerCategory } from './producer-category';
 
 // Iteration bound on the reserve clamp's binary search. Exact for ceilings up
@@ -82,6 +83,36 @@ function largestAffordable(
   return lo;
 }
 
+/**
+ * Read a category's candidates lazily, so late registrations (mods, delayed
+ * content unlocks) join the helper. Registration is additive-only, so `size`
+ * is a sound cache key: while it holds, the entries are unchanged and the
+ * previous list is reused rather than reallocated.
+ */
+function cachedCategoryList<E, T>(
+  category: { readonly size: number; getAll(): E[] },
+  pick: (entry: E) => T,
+): () => T[] {
+  let cachedList: T[] = [];
+  let cachedSize = -1;
+  return () => {
+    if (category.size !== cachedSize) {
+      cachedList = category.getAll().map(pick);
+      cachedSize = category.size;
+    }
+    return cachedList;
+  };
+}
+
+/**
+ * Save name for a helper's interval accumulator: the explicit id, else the
+ * category it drives, else the bare kind inside the ambient context.
+ */
+function accumulatorName(kind: string, id: string | undefined, category?: { id: string }): string {
+  const suffix = id ?? category?.id;
+  return suffix === undefined ? kind : `${kind}:${suffix}`;
+}
+
 // === SWEEP AUTO-PURCHASE ===
 
 /**
@@ -92,6 +123,14 @@ function largestAffordable(
  * {@link SetupSweepAutoPurchaseOptions.interval}.
  */
 export interface SetupSweepAutoPurchaseOptions {
+  /**
+   * Names the interval accumulator this helper saves, so it must be unique
+   * among sweep auto-buyers in one persistent context. Defaults to the
+   * category's id, or to the bare kind for a `Purchasable[]` — a second
+   * unnamed array-form sweep with an `interval` in the same context then
+   * throws a name collision. Unused without an `interval`.
+   */
+  id?: string;
   /** Reactive toggle for the whole sweep */
   enabled: Computable<boolean>;
   /**
@@ -196,7 +235,8 @@ function reserveClampedAmount(
  * candidates. For producer chains where costs grow into each other, see
  * {@link setupPolicyAutoPurchase} instead.
  *
- * @param purchasables - Purchasable list to auto-buy from
+ * @param purchasables - A {@link PurchasableCategory}, whose later
+ *   registrations join the sweep, or a fixed `Purchasable[]`
  * @param options - Toggle, throttle, and reserve knobs
  * @param registerTick - Tick registration (typically `ctx.onTick`)
  * @returns Cleanup function that unregisters the tick handler
@@ -213,7 +253,7 @@ function reserveClampedAmount(
  * // Buy upgrades once a second, holding 20% of the live bank back for the
  * // producer auto-buyer to accumulate against
  * setupSweepAutoPurchase(
- *   upgrades.getAll().map((entry) => entry.purchasable),
+ *   upgrades,
  *   {
  *     enabled: () => autoBuyUnlocked.value,
  *     interval: 1,
@@ -224,7 +264,7 @@ function reserveClampedAmount(
  * ```
  */
 export function setupSweepAutoPurchase(
-  purchasables: Purchasable[],
+  purchasables: PurchasableCategory<{ id: string }, unknown> | Purchasable[],
   options: SetupSweepAutoPurchaseOptions,
   registerTick: RegisterTick,
 ): () => void {
@@ -232,8 +272,12 @@ export function setupSweepAutoPurchase(
   const hasReserve = options.reserve !== undefined;
   const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
 
+  const getList: () => Purchasable[] = Array.isArray(purchasables)
+    ? () => purchasables
+    : cachedCategoryList(purchasables, (e) => e.purchasable);
+
   const runSweep = (): void => {
-    for (const p of purchasables) {
+    for (const p of getList()) {
       if (!p.canPurchase.value) continue;
 
       if (!hasReserve) {
@@ -268,9 +312,11 @@ export function setupSweepAutoPurchase(
   // mid-run `importSave` would otherwise leave the throttle phase out of sync
   // with the resources and purchase counts it was just restored alongside.
   const accumulator = persistent<number>(0, {
-    // Named by what it drives, so two setups in one module don't collide and
-    // the key holds across builds.
-    name: `sweepAutoPurchaseAccumulator:${purchasables.map((p) => p.id).join('+')}`,
+    name: accumulatorName(
+      'sweepAutoPurchaseAccumulator',
+      options.id,
+      Array.isArray(purchasables) ? undefined : purchasables,
+    ),
   });
 
   return registerTick((dt: number) => {
@@ -304,6 +350,13 @@ export function setupSweepAutoPurchase(
  * automation tiers, or player settings refs directly.
  */
 export interface SetupPolicyAutoPurchaseOptions {
+  /**
+   * Names the interval accumulator this helper saves, so it must be unique
+   * among policy auto-buyers in one persistent context. Defaults to the
+   * category's id, or to the bare kind for a `Producer[]` — a second unnamed
+   * array-form buyer in the same context then throws a name collision.
+   */
+  id?: string;
   /** Reactive toggle for the whole loop */
   enabled: Computable<boolean>;
   /**
@@ -439,11 +492,6 @@ export function setupPolicyAutoPurchase(
   const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
   const onIterationsOverflow = options.onIterationsOverflow;
 
-  // Resolve the producer list lazily on each tick so late-registered
-  // producers (mods, delayed content unlocks) participate automatically.
-  // Category registration is additive-only, so `category.size` is a sound
-  // cache key: when it matches the cached length, the underlying entries
-  // are unchanged and we can skip allocating a fresh wrapper array.
   let getList: () => Producer[];
   let aggregateRate: (resource: Resource) => DecimalSource;
   if (Array.isArray(producers)) {
@@ -459,15 +507,7 @@ export function setupPolicyAutoPurchase(
     };
   } else {
     const category = producers;
-    let cachedList: Producer[] = [];
-    let cachedSize = -1;
-    getList = () => {
-      if (category.size !== cachedSize) {
-        cachedList = category.getAll().map((e) => e.producer);
-        cachedSize = category.size;
-      }
-      return cachedList;
-    };
+    getList = cachedCategoryList(category, (e) => e.producer);
     aggregateRate = (resource) => category.getTotalRate(resource);
   }
 
@@ -478,10 +518,11 @@ export function setupPolicyAutoPurchase(
   // replay) would leave the accumulator out of sync with the resources and
   // purchase counts that were just restored.
   const accumulator = persistent<number>(0, {
-    // Named by what it drives — see the sweep helper's accumulator.
-    name: `policyAutoPurchaseAccumulator:${
-      Array.isArray(producers) ? producers.map((p) => p.rateChain.id).join('+') : producers.id
-    }`,
+    name: accumulatorName(
+      'policyAutoPurchaseAccumulator',
+      options.id,
+      Array.isArray(producers) ? undefined : producers,
+    ),
   });
 
   // Per-slot headline-rate cache, keyed by Resource identity. Lives outside

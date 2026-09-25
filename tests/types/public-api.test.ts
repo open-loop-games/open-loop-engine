@@ -223,6 +223,29 @@ describe('Producer type surface', () => {
     // it required and silently breaks click-style producers.
     expectTypeOf<Producer['repeatable']>().toEqualTypeOf<Purchasable | undefined>();
   });
+
+  it('carries the definition id it was registered from', () => {
+    expectTypeOf<Producer['id']>().toEqualTypeOf<string>();
+  });
+});
+
+describe('auto-purchase helper type surface', () => {
+  it('both helpers take an optional id and a category or a fixed list', async () => {
+    const { setupSweepAutoPurchase, setupPolicyAutoPurchase } = await import('@/index');
+    type Sweep = import('@/systems/auto-purchase').SetupSweepAutoPurchaseOptions;
+    type Policy = import('@/systems/auto-purchase').SetupPolicyAutoPurchaseOptions;
+    expectTypeOf<Sweep['id']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Policy['id']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf(setupSweepAutoPurchase)
+      .parameter(0)
+      .toEqualTypeOf<
+        | import('@/systems/purchasable-category').PurchasableCategory<{ id: string }, unknown>
+        | Purchasable[]
+      >();
+    expectTypeOf(setupPolicyAutoPurchase)
+      .parameter(0)
+      .toEqualTypeOf<ProducerCategory<{ id: string }, unknown> | Producer[]>();
+  });
 });
 
 describe('TickDriverConfig type surface', () => {

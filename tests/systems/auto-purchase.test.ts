@@ -19,6 +19,7 @@ import {
 import { createProducerCategory, type Producer } from '@/systems/producer-category';
 import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-purchase';
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
+import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createCostRequirement } from '@/core/requirements';
 
 // ============================================================================
@@ -101,6 +102,28 @@ describe('setupSweepAutoPurchase', () => {
     tick(0.1);
     expect(cheap.active.value).toBe(true);
     expect(dear.active.value).toBe(true);
+  });
+
+  it('sweeps a category, including purchasables registered after setup', () => {
+    const cookies = createTestResource('cookies', 1_000);
+    const { registerTick, tick } = createTickManager();
+    const upgrades = createPurchasableCategory<{ id: string; cost: number }>({
+      id: 'upgrades',
+      mapPurchasable: (def) => ({
+        display: def.id,
+        requirements: createCostRequirement({ resource: cookies, cost: def.cost }),
+        limit: 1,
+      }),
+    });
+    upgrades.register({ id: 'early', cost: 10 });
+
+    setupSweepAutoPurchase(upgrades, { enabled: true }, registerTick);
+    tick(0.1);
+    expect(upgrades.getPurchasable('early')!.active.value).toBe(true);
+
+    upgrades.register({ id: 'late', cost: 10 });
+    tick(0.1);
+    expect(upgrades.getPurchasable('late')!.active.value).toBe(true);
   });
 
   it('skips purchasing while disabled and resumes when enabled', () => {
@@ -839,7 +862,7 @@ describe('setupPolicyAutoPurchase', () => {
     const first = build();
     expect(first).toEqual([
       'shop.policyAutoPurchaseAccumulator:buildings',
-      'shop.sweepAutoPurchaseAccumulator:sale',
+      'shop.sweepAutoPurchaseAccumulator',
     ]);
     expect(build()).toEqual(first);
   });

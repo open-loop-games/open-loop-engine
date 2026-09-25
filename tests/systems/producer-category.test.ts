@@ -99,6 +99,7 @@ describe('createProducerCategory', () => {
     expect(category.getProducer('cursor')).toBeDefined();
     expect(category.getProducer('grandma')).toBeDefined();
     expect(category.getProducer('unknown')).toBeUndefined();
+    expect(category.getProducer('grandma')!.id).toBe('grandma');
   });
 
   it('continuous producers have correct initial computedRate', () => {

@@ -150,6 +150,8 @@ export interface ProducerCategoryOptions<Def extends { id: string }, State = voi
  * add modifiers here to boost production.
  */
 export interface Producer {
+  /** The id of the definition this producer was registered from */
+  readonly id: string;
   /**
    * Modifier chain for this producer's rate — the seam where upgrades,
    * synergies and headline multipliers reach its output. A shared chain
@@ -352,6 +354,7 @@ function buildProducer<Def extends { id: string }>(
   });
 
   return {
+    id: def.id,
     rateChain,
     computedRate,
     resource: mapping.resource,
