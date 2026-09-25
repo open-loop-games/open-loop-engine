@@ -76,7 +76,8 @@ export interface HybridPaybackOptions<T> {
   /**
    * Aggregate production rate of `t`'s cost-resource across the whole
    * economy. The wait term divides the unaffordable gap by this value to
-   * estimate "seconds until I can afford it."
+   * estimate "seconds until I can afford it"; it is only read for a
+   * candidate with a gap.
    *
    * Driver helpers (e.g. `setupPolicyAutoPurchase`) may pass their own
    * cached version via {@link HybridPaybackContext.getHeadlineRate} on the
@@ -178,13 +179,11 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  * handing the decision to the pure payback term. Sourced from Cookie
  * Monster's `pp` formula and Frozen Cookies' `purchaseEfficiency`.
  *
- * Cold-start fallback: a candidate whose headline rate is ≤ 0 (no passive
- * production yet) would blow up the wait term, so it scores `cost`
- * (cheapest-affordable) and relies on the caller's affordability filter to
- * gate "wait until first purchase becomes possible." The fallback is chosen
- * per candidate, and `cost` is currency where the blended score is seconds:
- * keep one pick to candidates that share a headline rate or cost resource.
- * Candidates with `Δrate ≤ 0` are skipped — they have no payback term.
+ * Both terms are seconds, so any mix of candidates ranks on one scale. With
+ * no income yet (headline rate ≤ 0) an affordable candidate still waits
+ * zero and ranks by payback alone, while an unaffordable one would wait
+ * forever and is skipped. Candidates with `Δrate ≤ 0` are skipped too —
+ * they have no payback term.
  *
  * @param opts - Per-candidate getters for cost / rate / resource +
  *   reserve floor + headline-rate aggregator. See {@link HybridPaybackOptions}.
@@ -212,18 +211,16 @@ export function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): Select
         const deltaRate = Decimal.fromValue(opts.getRate(c));
         if (!deltaRate.gt(0)) continue;
         const cost = Decimal.fromValue(opts.getCost(c));
-        const headlineRate = Decimal.fromValue(getHeadlineRate(c));
-        let score: Decimal;
-        if (!headlineRate.gt(0)) {
-          score = cost;
-        } else {
-          const resource = Decimal.fromValue(opts.getResource(c));
-          const effectiveResource = Decimal.sub(resource, reserve);
-          const unaffordable = Decimal.max(Decimal.sub(cost, effectiveResource), 0);
-          const waitTerm = Decimal.fromValue(unaffordable).div(headlineRate);
-          const paybackTerm = cost.div(deltaRate);
-          score = Decimal.fromValue(waitTerm).add(paybackTerm);
+        const effectiveResource = Decimal.sub(opts.getResource(c), reserve);
+        const unaffordable = Decimal.max(Decimal.sub(cost, effectiveResource), 0);
+        let waitTerm: Decimal = Decimal.dZero;
+        if (unaffordable.gt(0)) {
+          const headlineRate = Decimal.fromValue(getHeadlineRate(c));
+          // No income means the gap never closes: no finite wait to score.
+          if (!headlineRate.gt(0)) continue;
+          waitTerm = unaffordable.div(headlineRate);
         }
+        const score = waitTerm.add(cost.div(deltaRate));
         if (bestScore === undefined || score.lt(bestScore)) {
           best = c;
           bestScore = score;

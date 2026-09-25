@@ -473,17 +473,15 @@ describe('setupPolicyAutoPurchase', () => {
     );
   });
 
-  it('hybrid-payback falls back to cheapest affordable when headline rate is zero', () => {
-    // At t=0 with no owned producers, headline rate is 0 → hybrid-payback's
-    // wait term would blow up. Expected behavior: degrade to cheapest among
-    // affordable, letting the canPurchase filter handle "wait until first
-    // purchase becomes possible."
+  it('hybrid-payback ranks affordable producers by payback when headline rate is zero', () => {
+    // No owned producers, so no income: both are affordable and there is no
+    // wait, leaving payback alone — farm's 5.5s beats the cheaper cursor's 10s.
     const cookies = createTestResource('cookies', 200);
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
       { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costScaling: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 20, baseCost: 110, costScaling: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(
@@ -493,10 +491,10 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(0.1);
+    expect(new Decimal(category.getProducer('farm')!.repeatable!.amount.value).toNumber()).toBe(1);
     expect(new Decimal(category.getProducer('cursor')!.repeatable!.amount.value).toNumber()).toBe(
-      1,
+      0,
     );
-    expect(new Decimal(category.getProducer('farm')!.repeatable!.amount.value).toNumber()).toBe(0);
   });
 
   it('hybrid-payback prefers higher-payback producers once headline rate is positive', () => {

@@ -13,11 +13,11 @@ interface Candidate {
   rate: number;
 }
 
-function hybridOptions(headline = 1000): HybridPaybackOptions<Candidate> {
+function hybridOptions(headline = 1000, resource = 0): HybridPaybackOptions<Candidate> {
   return {
     getCost: (c) => c.cost,
     getRate: (c) => c.rate,
-    getResource: () => 0,
+    getResource: () => resource,
     getReserve: () => 0,
     getHeadlineRate: () => headline,
   };
@@ -85,9 +85,15 @@ describe('selectionHybridPayback', () => {
     expect(policy.pick([free])).toBeUndefined();
   });
 
-  it('scores by cost when the headline rate is zero (cold start)', () => {
-    const policy = selectionHybridPayback(hybridOptions(0));
-    // Payback alone would pick quick; with no income the cheaper one wins.
-    expect(policy.pick([quick, slow])).toBe(slow);
+  it('ranks affordable candidates by payback when the headline rate is zero', () => {
+    const policy = selectionHybridPayback(hybridOptions(0, 1000));
+    // Both affordable, so no wait: quick pays back in 100s, slow in 200s.
+    expect(policy.pick([quick, slow])).toBe(quick);
+  });
+
+  it('skips unaffordable candidates when the headline rate is zero', () => {
+    // 50 in the bank covers slow (10) but not quick (100), and nothing earns.
+    expect(selectionHybridPayback(hybridOptions(0, 50)).pick([quick, slow])).toBe(slow);
+    expect(selectionHybridPayback(hybridOptions(0, 5)).pick([quick, slow])).toBeUndefined();
   });
 });
