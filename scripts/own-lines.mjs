@@ -76,7 +76,13 @@ for (const sourceFile of project.getSourceFiles()) {
       node.getSymbol?.()?.getName?.() ||
       (node.getKind() === SyntaxKind.ArrowFunction ? '<arrow>' : '<anon>');
     const own = total - nested;
-    rows.push({ own, total, ratio: own / total, name, where: `${path}:${node.getStartLineNumber()}` });
+    rows.push({
+      own,
+      total,
+      ratio: own / total,
+      name,
+      where: `${path}:${node.getStartLineNumber()}`,
+    });
   });
 }
 

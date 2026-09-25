@@ -372,7 +372,8 @@ function exactIntegerRoot(value: Decimal, root: Decimal, degree: number): Decima
  * there but you should know something about it".
  */
 export type IntegerRoot =
-  { value: Decimal; reason: 'exact' } | { value: Decimal; reason: 'ambiguous'; width: Decimal };
+  | { value: Decimal; reason: 'exact' }
+  | { value: Decimal; reason: 'ambiguous'; width: Decimal };
 
 /**
  * The floored integer `degree`-th root of `x`, **graded** — the same answer

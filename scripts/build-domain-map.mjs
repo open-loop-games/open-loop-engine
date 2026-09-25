@@ -34,46 +34,46 @@
  * @property {string} [output]      Map path relative to the config dir. Default
  *   `domain-map.md`.
  */
-import { writeFileSync } from 'node:fs'
-import { dirname, resolve, basename } from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { extractDomain } from './lib/domain-extract.mjs'
-import { renderDomainMap } from './lib/domain-render.mjs'
+import { writeFileSync } from 'node:fs';
+import { dirname, resolve, basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { extractDomain } from './lib/domain-extract.mjs';
+import { renderDomainMap } from './lib/domain-render.mjs';
 
 /** Load, extract, render, and write one config's map. Returns a summary line. */
 async function buildOne(configPath) {
-  const abs = resolve(configPath)
-  const rootDir = dirname(abs)
-  const mod = await import(pathToFileURL(abs).href)
-  const config = mod.default ?? mod.config
+  const abs = resolve(configPath);
+  const rootDir = dirname(abs);
+  const mod = await import(pathToFileURL(abs).href);
+  const config = mod.default ?? mod.config;
   if (!config || !Array.isArray(config.scope)) {
-    throw new Error(`${configPath}: config must default-export an object with a \`scope\` array`)
+    throw new Error(`${configPath}: config must default-export an object with a \`scope\` array`);
   }
 
-  const result = extractDomain(config, { rootDir })
-  const markdown = renderDomainMap(result, config)
-  const outPath = resolve(rootDir, config.output ?? 'domain-map.md')
-  writeFileSync(outPath, markdown)
+  const result = extractDomain(config, { rootDir });
+  const markdown = renderDomainMap(result, config);
+  const outPath = resolve(rootDir, config.output ?? 'domain-map.md');
+  writeFileSync(outPath, markdown);
 
-  const isa = result.vocabulary.reduce((a, v) => a + v.arms.length, 0)
-  return `${basename(rootDir)}: ${result.defs.length} defs, ${isa} is-a, ${result.edges.length} edges → ${outPath.replace(process.cwd() + '/', '')}`
+  const isa = result.vocabulary.reduce((a, v) => a + v.arms.length, 0);
+  return `${basename(rootDir)}: ${result.defs.length} defs, ${isa} is-a, ${result.edges.length} edges → ${outPath.replace(process.cwd() + '/', '')}`;
 }
 
 // === CLI ===
 
-const configs = process.argv.slice(2)
+const configs = process.argv.slice(2);
 if (configs.length === 0) {
-  console.error('usage: ol-domain-map <config.mjs> [<config.mjs> ...]')
-  process.exit(1)
+  console.error('usage: ol-domain-map <config.mjs> [<config.mjs> ...]');
+  process.exit(1);
 }
 
-let failed = false
+let failed = false;
 for (const c of configs) {
   try {
-    console.log(await buildOne(c))
+    console.log(await buildOne(c));
   } catch (err) {
-    failed = true
-    console.error(`✗ ${c}: ${err.message}`)
+    failed = true;
+    console.error(`✗ ${c}: ${err.message}`);
   }
 }
-process.exit(failed ? 1 : 0)
+process.exit(failed ? 1 : 0);

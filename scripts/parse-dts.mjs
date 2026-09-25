@@ -21,20 +21,20 @@
  *
  * Run: `node scripts/parse-dts.mjs`
  */
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
-import { join, dirname, sep } from 'node:path'
-import ts from 'typescript'
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join, dirname, sep } from 'node:path';
+import ts from 'typescript';
 import {
   ROOT,
   findDeclarationLine,
   parseFileHeader,
   clusterFor,
   stripTsdocLinks,
-} from './lib/source-meta.mjs'
+} from './lib/source-meta.mjs';
 
-const ENGINE_ROOT_DTS = join(ROOT, 'dist', 'index.d.ts')
-const ENGINE_OUT_DIR = join(ROOT, 'temp', 'api')
-const ENGINE_OUT_FILE = join(ENGINE_OUT_DIR, 'symbols.json')
+const ENGINE_ROOT_DTS = join(ROOT, 'dist', 'index.d.ts');
+const ENGINE_OUT_DIR = join(ROOT, 'temp', 'api');
+const ENGINE_OUT_FILE = join(ENGINE_OUT_DIR, 'symbols.json');
 
 /**
  * Build the "in-project" predicate for a given dist root. External package
@@ -42,8 +42,8 @@ const ENGINE_OUT_FILE = join(ENGINE_OUT_DIR, 'symbols.json')
  * resolver anchors them at the engine-side re-export point instead.
  */
 function makeIsInProject(rootDts) {
-  const distRoot = dirname(rootDts)
-  return (filename) => filename.startsWith(distRoot + sep) || filename === rootDts
+  const distRoot = dirname(rootDts);
+  return (filename) => filename.startsWith(distRoot + sep) || filename === rootDts;
 }
 
 const KIND_FROM_NODE = new Map([
@@ -51,7 +51,7 @@ const KIND_FROM_NODE = new Map([
   [ts.SyntaxKind.InterfaceDeclaration, 'interface'],
   [ts.SyntaxKind.TypeAliasDeclaration, 'type'],
   [ts.SyntaxKind.EnumDeclaration, 'enum'],
-])
+]);
 
 /**
  * Resolve an exported symbol to two declarations:
@@ -67,8 +67,8 @@ const KIND_FROM_NODE = new Map([
  * declaration upstream.
  */
 function resolveDeclaration(symbol, checker, isInProject) {
-  let sym = symbol
-  let anchorDecl = null
+  let sym = symbol;
+  let anchorDecl = null;
 
   // Walk one alias hop at a time (not `getAliasedSymbol` which collapses the
   // whole chain). Stepwise traversal lets us pin the anchor to the deepest
@@ -76,25 +76,23 @@ function resolveDeclaration(symbol, checker, isInProject) {
   // `eternal_notations`, that's the re-exporting file (e.g.
   // `src/primitives/notations.ts`), not the top-level barrel.
   while (sym) {
-    const inProjectDecl = sym.declarations?.find((d) =>
-      isInProject(d.getSourceFile().fileName)
-    )
-    if (inProjectDecl) anchorDecl = inProjectDecl
+    const inProjectDecl = sym.declarations?.find((d) => isInProject(d.getSourceFile().fileName));
+    if (inProjectDecl) anchorDecl = inProjectDecl;
 
-    if (!(sym.flags & ts.SymbolFlags.Alias)) break
-    const next = checker.getImmediateAliasedSymbol(sym)
-    if (!next || next === sym) break
-    sym = next
+    if (!(sym.flags & ts.SymbolFlags.Alias)) break;
+    const next = checker.getImmediateAliasedSymbol(sym);
+    if (!next || next === sym) break;
+    sym = next;
   }
 
-  const terminalDecl = sym?.declarations?.[0]
-  if (!terminalDecl) return null
+  const terminalDecl = sym?.declarations?.[0];
+  if (!terminalDecl) return null;
 
   return {
     symbol: sym,
     terminal: terminalDecl,
     anchor: anchorDecl || terminalDecl,
-  }
+  };
 }
 
 /**
@@ -103,21 +101,21 @@ function resolveDeclaration(symbol, checker, isInProject) {
  * exported values declared via `VariableStatement`.
  */
 function kindFromDeclaration(decl) {
-  if (KIND_FROM_NODE.has(decl.kind)) return KIND_FROM_NODE.get(decl.kind)
+  if (KIND_FROM_NODE.has(decl.kind)) return KIND_FROM_NODE.get(decl.kind);
 
   if (ts.isClassDeclaration(decl)) {
-    const isAbstract = ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Abstract
-    return isAbstract ? 'abstract-class' : 'class'
+    const isAbstract = ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Abstract;
+    return isAbstract ? 'abstract-class' : 'class';
   }
 
   // `export const foo = ...` → VariableDeclaration nested under VariableStatement
-  if (ts.isVariableDeclaration(decl)) return 'const'
-  if (ts.isVariableStatement(decl)) return 'const'
+  if (ts.isVariableDeclaration(decl)) return 'const';
+  if (ts.isVariableStatement(decl)) return 'const';
 
   // Function overloads can present as multiple FunctionDeclarations; the loop
   // in KIND_FROM_NODE already handles that. Method/property signatures inside
   // interfaces shouldn't reach here — we only inspect top-level exports.
-  return null
+  return null;
 }
 
 /**
@@ -129,36 +127,40 @@ function kindFromDeclaration(decl) {
  * generator (OL-929) treats that as a coverage gap.
  */
 function extractTsdocSummary(declaration) {
-  const jsDoc = ts.getJSDocCommentsAndTags(declaration).find((d) => ts.isJSDoc(d))
-  if (!jsDoc) return ''
+  const jsDoc = ts.getJSDocCommentsAndTags(declaration).find((d) => ts.isJSDoc(d));
+  if (!jsDoc) return '';
 
-  const comment = jsDoc.comment
-  if (!comment) return ''
+  const comment = jsDoc.comment;
+  if (!comment) return '';
 
-  let text
+  let text;
   if (typeof comment === 'string') {
-    text = comment
+    text = comment;
   } else {
     // NodeArray<JSDocComment> — concatenate text spans, expanding {@link} nodes
     text = comment
       .map((c) => {
-        if (c.kind === ts.SyntaxKind.JSDocLink || c.kind === ts.SyntaxKind.JSDocLinkCode || c.kind === ts.SyntaxKind.JSDocLinkPlain) {
-          const name = c.name ? c.name.getText() : ''
-          return c.text ? c.text.trim() : name
+        if (
+          c.kind === ts.SyntaxKind.JSDocLink ||
+          c.kind === ts.SyntaxKind.JSDocLinkCode ||
+          c.kind === ts.SyntaxKind.JSDocLinkPlain
+        ) {
+          const name = c.name ? c.name.getText() : '';
+          return c.text ? c.text.trim() : name;
         }
-        return c.text || ''
+        return c.text || '';
       })
-      .join('')
+      .join('');
   }
 
   // First sentence: up to the first `. ` or end of paragraph (blank line).
-  const paragraphEnd = text.search(/\n\s*\n/)
-  if (paragraphEnd !== -1) text = text.slice(0, paragraphEnd)
+  const paragraphEnd = text.search(/\n\s*\n/);
+  if (paragraphEnd !== -1) text = text.slice(0, paragraphEnd);
 
-  const sentenceEnd = text.search(/\.(?:\s|$)/)
-  if (sentenceEnd !== -1) text = text.slice(0, sentenceEnd + 1)
+  const sentenceEnd = text.search(/\.(?:\s|$)/);
+  if (sentenceEnd !== -1) text = text.slice(0, sentenceEnd + 1);
 
-  return stripTsdocLinks(text).replace(/\s+/g, ' ').trim()
+  return stripTsdocLinks(text).replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -167,7 +169,7 @@ function extractTsdocSummary(declaration) {
  * pipeline (consumers may need to read them) but get tagged for filtering.
  */
 function hasInternalTag(declaration) {
-  return ts.getJSDocTags(declaration).some((tag) => tag.tagName.text === 'internal')
+  return ts.getJSDocTags(declaration).some((tag) => tag.tagName.text === 'internal');
 }
 
 /**
@@ -180,11 +182,11 @@ function extractSignature(declaration) {
   // VariableDeclaration loses its `export declare const` wrapper when
   // `getText()`'d alone — climb to the enclosing VariableStatement so the
   // signature includes the modifiers, matching how the symbol appears in .d.ts.
-  let node = declaration
+  let node = declaration;
   if (ts.isVariableDeclaration(node)) {
-    let p = node.parent
-    while (p && !ts.isVariableStatement(p)) p = p.parent
-    if (p) node = p
+    let p = node.parent;
+    while (p && !ts.isVariableStatement(p)) p = p.parent;
+    if (p) node = p;
   }
 
   // For interfaces/classes, `getText()` includes the body — fine for short
@@ -192,17 +194,17 @@ function extractSignature(declaration) {
   // balloons to hundreds of chars and breaks the tier file's scan pattern.
   // Truncate at the body's opening brace so the signature is just the header.
   if (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) {
-    const openBrace = node.getChildren().find((c) => c.kind === ts.SyntaxKind.OpenBraceToken)
+    const openBrace = node.getChildren().find((c) => c.kind === ts.SyntaxKind.OpenBraceToken);
     if (openBrace) {
-      const sourceText = node.getSourceFile().text
-      const header = sourceText.slice(node.getStart(), openBrace.getStart())
-      return header.replace(/\s+/g, ' ').trim()
+      const sourceText = node.getSourceFile().text;
+      const header = sourceText.slice(node.getStart(), openBrace.getStart());
+      return header.replace(/\s+/g, ' ').trim();
     }
   }
 
-  let text = node.getText()
-  text = text.replace(/^\s*\/\*\*[\s\S]*?\*\/\s*/, '')
-  return text.replace(/\s+/g, ' ').trim()
+  let text = node.getText();
+  text = text.replace(/^\s*\/\*\*[\s\S]*?\*\/\s*/, '');
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -210,16 +212,16 @@ function extractSignature(declaration) {
  * isn't under `dist/` (shouldn't happen in normal runs).
  */
 function distToSrc(distPath) {
-  const norm = distPath.split(sep).join('/')
-  const distIdx = norm.lastIndexOf('/dist/')
+  const norm = distPath.split(sep).join('/');
+  const distIdx = norm.lastIndexOf('/dist/');
   if (distIdx === -1) {
     // Possibly already a src path, or running from a tarball — pass through.
-    return norm.replace(/^.*\/(src\/.*)$/, '$1').replace(/\.d\.ts$/, '.ts')
+    return norm.replace(/^.*\/(src\/.*)$/, '$1').replace(/\.d\.ts$/, '.ts');
   }
   return norm
     .slice(distIdx + 1)
     .replace(/^dist\//, 'src/')
-    .replace(/\.d\.ts$/, '.ts')
+    .replace(/\.d\.ts$/, '.ts');
 }
 
 /**
@@ -229,12 +231,12 @@ function distToSrc(distPath) {
  * four real layers.
  */
 function layerFromSrcPath(srcPath) {
-  const m = srcPath.match(/^src\/([^/]+)(?:\/|$)/)
-  if (!m) return 'unknown'
-  const top = m[1]
-  if (top === 'index.ts') return 'engine'
-  if (['primitives', 'core', 'systems', 'harness'].includes(top)) return top
-  return top
+  const m = srcPath.match(/^src\/([^/]+)(?:\/|$)/);
+  if (!m) return 'unknown';
+  const top = m[1];
+  if (top === 'index.ts') return 'engine';
+  if (['primitives', 'core', 'systems', 'harness'].includes(top)) return top;
+  return top;
 }
 
 /**
@@ -247,8 +249,8 @@ function layerFromSrcPath(srcPath) {
  * @returns {{ records: object[], unresolved: string[] }}
  */
 export function parseEntrypoint(rootDts, opts = {}) {
-  const projectRoot = opts.projectRoot ?? ROOT
-  const isInProject = makeIsInProject(rootDts)
+  const projectRoot = opts.projectRoot ?? ROOT;
+  const isInProject = makeIsInProject(rootDts);
 
   const program = ts.createProgram({
     rootNames: [rootDts],
@@ -261,63 +263,63 @@ export function parseEntrypoint(rootDts, opts = {}) {
       noEmit: true,
       skipLibCheck: true,
     },
-  })
+  });
 
-  const checker = program.getTypeChecker()
-  const rootSource = program.getSourceFile(rootDts)
-  if (!rootSource) throw new Error(`TS could not load ${rootDts}`)
+  const checker = program.getTypeChecker();
+  const rootSource = program.getSourceFile(rootDts);
+  if (!rootSource) throw new Error(`TS could not load ${rootDts}`);
 
-  const moduleSymbol = checker.getSymbolAtLocation(rootSource)
-  if (!moduleSymbol) throw new Error(`Could not resolve module symbol for ${rootDts}`)
+  const moduleSymbol = checker.getSymbolAtLocation(rootSource);
+  if (!moduleSymbol) throw new Error(`Could not resolve module symbol for ${rootDts}`);
 
-  const exports = checker.getExportsOfModule(moduleSymbol)
+  const exports = checker.getExportsOfModule(moduleSymbol);
 
-  const headerCache = new Map()
+  const headerCache = new Map();
   const getHeader = (srcPath) => {
-    if (headerCache.has(srcPath)) return headerCache.get(srcPath)
-    const abs = join(projectRoot, srcPath)
-    const h = existsSync(abs) ? parseFileHeader(abs) : {}
-    headerCache.set(srcPath, h)
-    return h
-  }
+    if (headerCache.has(srcPath)) return headerCache.get(srcPath);
+    const abs = join(projectRoot, srcPath);
+    const h = existsSync(abs) ? parseFileHeader(abs) : {};
+    headerCache.set(srcPath, h);
+    return h;
+  };
 
-  const records = []
-  const unresolved = []
+  const records = [];
+  const unresolved = [];
 
   for (const exp of exports) {
-    const resolved = resolveDeclaration(exp, checker, isInProject)
+    const resolved = resolveDeclaration(exp, checker, isInProject);
     if (!resolved) {
-      unresolved.push(exp.name)
-      continue
+      unresolved.push(exp.name);
+      continue;
     }
 
-    const { terminal, anchor, symbol } = resolved
-    const kind = kindFromDeclaration(terminal)
-    if (!kind) continue
+    const { terminal, anchor, symbol } = resolved;
+    const kind = kindFromDeclaration(terminal);
+    if (!kind) continue;
 
-    const declName = terminal.name?.getText?.()
-    const name = symbol.name === 'default' && declName ? declName : symbol.name
+    const declName = terminal.name?.getText?.();
+    const name = symbol.name === 'default' && declName ? declName : symbol.name;
 
-    const srcPath = distToSrc(anchor.getSourceFile().fileName)
-    const layer = layerFromSrcPath(srcPath)
-    const header = getHeader(srcPath)
-    const cluster = clusterFor(srcPath, header)
+    const srcPath = distToSrc(anchor.getSourceFile().fileName);
+    const layer = layerFromSrcPath(srcPath);
+    const header = getHeader(srcPath);
+    const cluster = clusterFor(srcPath, header);
 
     // Overloaded functions emit one record per overload declaration, so every
     // shape is visible in the tier files. Only in-project same-file
     // FunctionDeclaration sets qualify — external re-exports (Vue's `ref`,
     // `watch`, …) and mixed declaration lists collapse to the terminal as
     // before; their overload detail belongs to the upstream package.
-    const terminalFile = terminal.getSourceFile()
+    const terminalFile = terminal.getSourceFile();
     const overloadDecls =
       kind === 'function' &&
       symbol.declarations?.length > 1 &&
       isInProject(terminalFile.fileName) &&
       symbol.declarations.every(
-        (d) => ts.isFunctionDeclaration(d) && d.getSourceFile() === terminalFile
+        (d) => ts.isFunctionDeclaration(d) && d.getSourceFile() === terminalFile,
       )
         ? symbol.declarations
-        : [terminal]
+        : [terminal];
 
     for (const [i, decl] of overloadDecls.entries()) {
       records.push({
@@ -331,60 +333,60 @@ export function parseEntrypoint(rootDts, opts = {}) {
         cluster,
         tag: hasInternalTag(terminal) ? 'internal' : 'public',
         ...(overloadDecls.length > 1 ? { overloadIndex: i } : {}),
-      })
+      });
     }
   }
 
   records.sort((a, b) => {
-    if (a.layer !== b.layer) return a.layer.localeCompare(b.layer)
-    if (a.cluster !== b.cluster) return a.cluster.localeCompare(b.cluster)
-    return a.name.localeCompare(b.name)
-  })
+    if (a.layer !== b.layer) return a.layer.localeCompare(b.layer);
+    if (a.cluster !== b.cluster) return a.cluster.localeCompare(b.cluster);
+    return a.name.localeCompare(b.name);
+  });
 
-  return { records, unresolved }
+  return { records, unresolved };
 }
 
 // --- CLI ---
 
-const isCLI = import.meta.url === `file://${process.argv[1]}`
+const isCLI = import.meta.url === `file://${process.argv[1]}`;
 if (isCLI) {
   if (!existsSync(ENGINE_ROOT_DTS)) {
-    console.error(`Missing ${ENGINE_ROOT_DTS} — run \`pnpm build\` first`)
-    process.exit(1)
+    console.error(`Missing ${ENGINE_ROOT_DTS} — run \`pnpm build\` first`);
+    process.exit(1);
   }
 
-  const { records, unresolved } = parseEntrypoint(ENGINE_ROOT_DTS)
+  const { records, unresolved } = parseEntrypoint(ENGINE_ROOT_DTS);
 
-  mkdirSync(ENGINE_OUT_DIR, { recursive: true })
-  writeFileSync(ENGINE_OUT_FILE, JSON.stringify(records, null, 2) + '\n')
+  mkdirSync(ENGINE_OUT_DIR, { recursive: true });
+  writeFileSync(ENGINE_OUT_FILE, JSON.stringify(records, null, 2) + '\n');
 
-  const byLayer = new Map()
-  let publicCount = 0
-  let internalCount = 0
-  let missingLine = 0
-  let missingSummary = 0
+  const byLayer = new Map();
+  let publicCount = 0;
+  let internalCount = 0;
+  let missingLine = 0;
+  let missingSummary = 0;
   for (const r of records) {
-    byLayer.set(r.layer, (byLayer.get(r.layer) || 0) + 1)
-    if (r.tag === 'internal') internalCount++
-    else publicCount++
-    if (r.line == null) missingLine++
+    byLayer.set(r.layer, (byLayer.get(r.layer) || 0) + 1);
+    if (r.tag === 'internal') internalCount++;
+    else publicCount++;
+    if (r.line == null) missingLine++;
     // Overload continuations may lean on the first declaration's doc — only
     // the set's lead record counts toward summary coverage.
-    if (!r.tsdocSummary && !(r.overloadIndex > 0)) missingSummary++
+    if (!r.tsdocSummary && !(r.overloadIndex > 0)) missingSummary++;
   }
 
-  console.log(`Parsed ${records.length} symbols from dist/index.d.ts`)
-  console.log(`  public:   ${publicCount}`)
-  console.log(`  internal: ${internalCount}`)
+  console.log(`Parsed ${records.length} symbols from dist/index.d.ts`);
+  console.log(`  public:   ${publicCount}`);
+  console.log(`  internal: ${internalCount}`);
   for (const [layer, count] of [...byLayer.entries()].sort()) {
-    console.log(`  ${layer.padEnd(11)} ${count}`)
+    console.log(`  ${layer.padEnd(11)} ${count}`);
   }
-  if (missingLine > 0) console.log(`  ${missingLine} without resolved src line`)
-  if (missingSummary > 0) console.log(`  ${missingSummary} without TSDoc summary`)
+  if (missingLine > 0) console.log(`  ${missingLine} without resolved src line`);
+  if (missingSummary > 0) console.log(`  ${missingSummary} without TSDoc summary`);
   if (unresolved.length > 0) {
     console.log(
-      `  ${unresolved.length} unresolved aliases: ${unresolved.slice(0, 5).join(', ')}${unresolved.length > 5 ? '…' : ''}`
-    )
+      `  ${unresolved.length} unresolved aliases: ${unresolved.slice(0, 5).join(', ')}${unresolved.length > 5 ? '…' : ''}`,
+    );
   }
-  console.log(`→ ${ENGINE_OUT_FILE.replace(ROOT + '/', '')}`)
+  console.log(`→ ${ENGINE_OUT_FILE.replace(ROOT + '/', '')}`);
 }

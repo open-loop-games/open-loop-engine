@@ -25,7 +25,12 @@
  * Maps beat duration to a player engagement band.
  */
 export type FlowChannel =
-  'arousal' | 'flow' | 'flow-upper' | 'boredom' | 'frustration' | 'breakdown';
+  | 'arousal'
+  | 'flow'
+  | 'flow-upper'
+  | 'boredom'
+  | 'frustration'
+  | 'breakdown';
 
 /**
  * Classify a beat duration (in seconds) into its flow channel.
