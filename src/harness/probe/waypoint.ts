@@ -16,6 +16,7 @@
 
 import { seedRNG } from '@/primitives/rng';
 import { runUntil } from '../run-until';
+import { reachedTime } from '../sim-time';
 import type { Engine } from '@/engine';
 import type { RunContext } from '../types';
 
@@ -32,9 +33,9 @@ export interface WaypointSnapshot<T> {
   /** Seed that produced this snapshot. */
   seed: number;
   /**
-   * Actual sim-time at snapshot: the first tick at or past `snapshotAtSec`,
-   * so it overshoots by less than `tickDelta` when `tickDelta` doesn't
-   * divide the waypoint time.
+   * Actual sim-time at snapshot: the first tick at or past `snapshotAtSec`
+   * (a tick that lands on it within rounding counts), so it overshoots by
+   * less than `tickDelta` when `tickDelta` doesn't divide the waypoint time.
    */
   snapshotSimTime: number;
   /**
@@ -105,7 +106,7 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
       try {
         const result = runUntil({
           engine,
-          until: (ctx) => ctx.simTime >= waypoint.snapshotAtSec,
+          until: (ctx) => reachedTime(ctx.simTime, waypoint.snapshotAtSec),
           maxSimTime: waypoint.snapshotAtSec + pad,
           tickDelta: config.tickDelta,
           seed,

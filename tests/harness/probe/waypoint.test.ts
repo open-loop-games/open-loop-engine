@@ -43,6 +43,19 @@ describe('runWaypointProbe', () => {
     expect(snapshots[1]!.snapshot.tick).toBeGreaterThan(snapshots[0]!.snapshot.tick);
   });
 
+  it('snapshots on the tick that lands on the waypoint, not the one after', () => {
+    // 3 × 0.3 accumulates to 0.8999999999999999, a rounding error short of 0.9.
+    const snapshots = runWaypointProbe({
+      buildEngine: () => buildTickCounterEngine({ tick: 0, simTime: 0 }),
+      waypoints: [{ id: 'on-tick', snapshotAtSec: 0.9 }],
+      inspect: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick,
+      tickDelta: 0.3,
+    });
+    expect(snapshots[0]!.snapshot).toBe(3);
+    expect(snapshots[0]!.snapshotSimTime).toBeCloseTo(0.9, 12);
+    expect(snapshots[0]!.reachedTarget).toBe(true);
+  });
+
   it('honors a custom seeds list, emitting one snapshot per (waypoint × seed)', () => {
     const seenSeeds: number[] = [];
     const snapshots = runWaypointProbe({

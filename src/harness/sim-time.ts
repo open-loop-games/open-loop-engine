@@ -6,6 +6,8 @@
  *   it under `maxDeltaTime` so variable-mode `simulateTick` never clamps.
  * - {@link floorSteps} counts whole steps in a span without losing the last
  *   one to floating-point quotient error.
+ * - {@link reachedTime} compares an accumulated sim-time against a target
+ *   with the same tolerance, so a step that lands on the target counts.
  *
  * @cluster runners
  * @internal
@@ -46,4 +48,14 @@ export function simulateSpan(driver: TickDriver, dt: number): void {
 export function floorSteps(span: number, step: number): number {
   const q = span / step;
   return Math.floor(q + Math.abs(q) * STEP_QUOTIENT_EPSILON);
+}
+
+/**
+ * Whether `simTime` has reached `target`, counting a sum of steps that lands
+ * a rounding error short (`3 × 0.3` is `0.8999…`) as there.
+ *
+ * @internal
+ */
+export function reachedTime(simTime: number, target: number): boolean {
+  return simTime + Math.abs(target) * STEP_QUOTIENT_EPSILON >= target;
 }
