@@ -35,7 +35,6 @@
  * @cluster action-category
  */
 
-import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
 import { profile } from '@/core/profiler';
@@ -714,32 +713,4 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   }
 
   return category;
-}
-
-// === PUBLIC UTILITIES ===
-
-/**
- * Type guard: a Decimal-ish accumulator on a multi-bar progress slot.
- * Helper for consumers that mix engine-managed progress (plain number) with
- * sibling Decimal accumulators in `entry.state`. Not used internally.
- *
- * @internal
- */
-export function isMultiBarProgress(
-  progress: number | Record<string, number>,
-): progress is Record<string, number> {
-  return typeof progress !== 'number';
-}
-
-/** Coerce a plain progress value to Decimal for downstream rate-math composition. */
-export function progressToDecimal(
-  progress: number | Record<string, number>,
-  key?: string,
-): DecimalSource {
-  if (typeof progress === 'number') return progress;
-  if (key !== undefined) return progress[key] ?? 0;
-  // Sum named bars when no key specified.
-  let total: DecimalSource = 0;
-  for (const v of Object.values(progress)) total = Decimal.add(total, v);
-  return total;
 }
