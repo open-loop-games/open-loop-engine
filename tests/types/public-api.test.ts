@@ -41,7 +41,13 @@ import {
   type Series,
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
-import type { RunContext, UntilCell } from '@/harness';
+import type {
+  MatrixUntilConfig,
+  MatrixUntilResult,
+  RunContext,
+  RunUntilResult,
+  UntilCell,
+} from '@/harness';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
@@ -590,6 +596,15 @@ describe('runSensitivity', () => {
       baseline: { aggregate: { metrics: Record<string, unknown> } };
       variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
     }>();
+  });
+
+  it('types until-sweep runs as RunUntilResult', () => {
+    expectTypeOf<
+      MatrixUntilResult['cells'][number]['runs'][number]
+    >().toEqualTypeOf<RunUntilResult>();
+    expectTypeOf<
+      Parameters<NonNullable<MatrixUntilConfig['onCellComplete']>>[0]['runs'][number]['terminated']
+    >().toEqualTypeOf<RunUntilResult['terminated']>();
   });
 
   it('takes an inline predicate-bounded baseline once the cell shape is named', async () => {

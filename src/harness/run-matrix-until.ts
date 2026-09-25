@@ -64,7 +64,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
   }
   const plan = createWorkPlan(config);
   const perCellRuns: RunUntilResult[][] = config.cells.map(() => []);
-  const cellResults: (CellResult | null)[] = config.cells.map(() => null);
+  const cellResults: (CellResult<RunUntilResult> | null)[] = config.cells.map(() => null);
 
   for (const item of plan) {
     const { cell, seed } = item;
@@ -101,7 +101,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
       perCellRuns[item.cellIdx].length === config.seeds.length
     ) {
       const runs = perCellRuns[item.cellIdx];
-      const cellResult: CellResult = {
+      const cellResult: CellResult<RunUntilResult> = {
         name: cell.name,
         runs,
         aggregate: aggregateUntilCell(runs, config.aggregate),
@@ -113,7 +113,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
 
   // Cells with zero seeds never fire onCellComplete — synthesize an empty
   // result so the MatrixUntilResult shape stays predictable.
-  const cells: CellResult[] = config.cells.map(
+  const cells: CellResult<RunUntilResult>[] = config.cells.map(
     (cell, i) =>
       cellResults[i] ?? {
         name: cell.name,

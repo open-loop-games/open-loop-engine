@@ -70,7 +70,7 @@ import type {
  *   until: (ctx) => ctx.simTime >= minutes(120),
  *   maxSimTime: minutes(150),
  * });
- * result.variants[0].cell.aggregate.terminationTime!.avg;
+ * result.variants[0].deltas['termination.time'].relative; // e.g. -0.08, fires 8% sooner
  * ```
  */
 export function runSensitivity<C extends Cell | UntilCell = Cell>(
@@ -196,7 +196,14 @@ function runUntilPath<C extends Cell | UntilCell>(
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
     const cell = matrix.cells[i + 1];
-    return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
+    const deltas = diffAggregates(cell.aggregate, baselineResult.aggregate);
+    const time = cell.aggregate.terminationTime?.avg;
+    const baseTime = baselineResult.aggregate.terminationTime?.avg;
+    if (time !== undefined && baseTime !== undefined) {
+      const absolute = time - baseTime;
+      deltas['termination.time'] = { absolute, relative: baseTime === 0 ? 0 : absolute / baseTime };
+    }
+    return { name: v.name, cell, deltas };
   });
   return { baseline: baselineResult, variants: variantResults };
 }

@@ -430,6 +430,10 @@ describe('runSensitivity', () => {
     const baseTT = result.baseline.aggregate.terminationTime!.avg;
     const fastTT = result.variants[0]!.cell.aggregate.terminationTime!.avg;
     expect(fastTT).toBeLessThan(baseTT);
+    expect(result.variants[0]!.deltas['termination.time']).toEqual({
+      absolute: fastTT - baseTT,
+      relative: (fastTT - baseTT) / baseTT,
+    });
   });
 
   it('throws when maxSimTime is given without until', () => {

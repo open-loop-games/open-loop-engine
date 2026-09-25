@@ -182,11 +182,12 @@ export interface CellAggregate {
 /**
  * A completed cell's output. Raw per-run results are preserved — consumers
  * that need medians, filtering, or per-run end-reason access read `runs`
- * directly; `aggregate` is a convenience layer.
+ * directly; `aggregate` is a convenience layer. `R` is the per-run result:
+ * {@link RunUntilResult} from the until-runners, which carries `terminated`.
  */
-export interface CellResult {
+export interface CellResult<R extends HeadlessResult = HeadlessResult> {
   name: string;
-  runs: HeadlessResult[];
+  runs: R[];
   aggregate: CellAggregate;
 }
 
@@ -339,6 +340,8 @@ export interface SensitivityVariantResult {
   /**
    * Per-metric deltas vs the baseline cell, keyed by the same
    * `${analyzerName}.${metricKey}` namespace as {@link CellAggregate.metrics}.
+   * A predicate-bounded sweep adds `'termination.time'`, the delta of the
+   * mean predicate fire time, when both cells have one.
    */
   deltas: Record<string, MetricDelta>;
 }
@@ -550,7 +553,7 @@ export interface MatrixUntilConfig {
   /** Fires after each individual `(cell, seed)` run completes, in deterministic order. */
   onRunComplete?: (item: MatrixUntilWorkItem, result: RunUntilResult) => void;
   /** Fires once a cell's full seed sweep is complete, in deterministic order. */
-  onCellComplete?: (cell: CellResult) => void;
+  onCellComplete?: (cell: CellResult<RunUntilResult>) => void;
   aggregate?: AggregateOptions;
   /**
    * Run mode applied uniformly to every cell. Defaults to `'tick'`. When
@@ -567,5 +570,5 @@ export interface MatrixUntilConfig {
 
 /** Output of a {@link runMatrixUntil} sweep — one {@link CellResult} per input cell. */
 export interface MatrixUntilResult {
-  cells: CellResult[];
+  cells: CellResult<RunUntilResult>[];
 }
