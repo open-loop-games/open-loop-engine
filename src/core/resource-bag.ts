@@ -340,16 +340,24 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
       let syncing = false;
 
-      // Initial sync: resource → bag. This runs before either watcher installs,
-      // so if the bag clamps the value to capacity we must reconcile the
-      // resource here too — nothing else will, and the two would diverge with
-      // the resource reading over-cap forever (mirrors the steady-state
-      // resource → bag clamp-back below).
-      setAmount(typeId, resource.value);
-      const afterInitial = getAmount(typeId);
-      if (!Decimal.eq(afterInitial, resource.value)) {
-        resource.value = afterInitial;
+      // Resource → bag, clamped to capacity, with any clamp written back so
+      // the two can't diverge with the resource reading over-cap. A save load
+      // (or reset) writes linked refs one at a time, so clamping then would
+      // measure each slot against the other slots' pre-load amounts, or
+      // against a capacity whose inputs haven't loaded yet. The loaded state
+      // was valid when saved: take it unclamped.
+      function syncFromResource(value: DecimalSource): void {
+        syncing = true;
+        const next = loadingSave.value
+          ? toDecimal(value)
+          : clampToCapacity(typeId, toDecimal(value));
+        writeAmount(typeId, next);
+        if (!Decimal.eq(next, value)) resource.value = next;
+        syncing = false;
       }
+
+      // Initial sync, before either watcher installs.
+      syncFromResource(resource.value);
 
       // Watch bag → resource. `flush: 'sync'` fires on every ref mutation
       // instead of coalescing via microtask. Required under the fixed-step
@@ -370,30 +378,11 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         { flush: 'sync' },
       );
 
-      // Watch resource → bag. A save load (or reset) writes linked refs one
-      // at a time, so clamping here would measure each slot against the other
-      // slots' pre-load amounts, or against a capacity whose inputs haven't
-      // loaded yet. The loaded state was valid when saved: take it unclamped.
       const stopResourceWatch = watch(
         () => resource.value,
         (newVal) => {
-          if (syncing) return;
-          const current = getAmount(typeId);
-          if (!Decimal.eq(current, newVal)) {
-            syncing = true;
-            if (loadingSave.value) {
-              writeAmount(typeId, toDecimal(newVal));
-              syncing = false;
-              return;
-            }
-            setAmount(typeId, newVal);
-            // If bag clamped the value, sync back to resource
-            const afterSet = getAmount(typeId);
-            if (!Decimal.eq(afterSet, newVal)) {
-              resource.value = afterSet;
-            }
-            syncing = false;
-          }
+          if (syncing || Decimal.eq(getAmount(typeId), newVal)) return;
+          syncFromResource(newVal);
         },
         { flush: 'sync' },
       );
