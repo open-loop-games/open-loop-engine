@@ -45,7 +45,8 @@ export interface DialogNode {
   /** Effects emitted on node entry, before choice presentation. */
   onEnter?: IEffect[];
   /**
-   * Fall-through target, entered when this node has no visible choice. When
+   * Fall-through target, entered when this node has no visible choice — on
+   * arrival, or through `advance()` once its presented choices gate off. When
    * the target's condition fails, the conversation stops at this node.
    */
   next?: string;
@@ -83,7 +84,9 @@ export interface DialogPresentation {
   choices: ReadonlyArray<{ id: string; text: string }>;
   /**
    * True when the line offers no visible choice and no enterable `next`. The
-   * conversation stays active until the UI calls `finish()`.
+   * conversation stays active until the UI calls `finish()`. False with no
+   * visible choice means the choices gated off after the line presented and
+   * `next` can be entered: the UI offers a continue that calls `advance()`.
    */
   finished: boolean;
 }
@@ -128,6 +131,13 @@ export interface DialogRuntime {
   present(): DialogPresentation | null;
   /** Apply the chosen choice's outcomes and advance the pointer. */
   choose(choiceId: string): void;
+  /**
+   * Fall through `next` from a line that presents no visible choice and isn't
+   * finished — its choices gated off after it presented them. Throws on any
+   * other line. Optional so adapters written before it still conform; a
+   * session over one without it throws from its own `advance()`.
+   */
+  advance?(): void;
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
@@ -146,7 +156,7 @@ export interface DialogRuntime {
 
 /** Lifecycle events emitted by a {@link NativeDialogRuntime} instance. */
 export interface DialogRuntimeEvents {
-  /** Fired whenever the runtime lands on a presentable node (after start, after choose). */
+  /** Fired whenever the runtime lands on a presentable node (after start, choose or advance). */
   presented: (snapshot: DialogPresentation) => void;
   /** Fired immediately after a choice's outcomes apply, before pointer advancement. */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
@@ -371,6 +381,16 @@ export function createNativeDialogRuntime(
     emitPresented();
   }
 
+  function advance(): void {
+    const snap = present();
+    if (!snap) throw new Error('No active dialog node — call start() first');
+    if (snap.choices.length > 0 || snap.finished) {
+      throw new Error(`Dialog node ${snap.nodeId} has nothing to advance through`);
+    }
+    settle();
+    emitPresented();
+  }
+
   function finish(): void {
     const graphId = state.activeGraphId;
     state.activeGraphId = undefined;
@@ -403,6 +423,7 @@ export function createNativeDialogRuntime(
     start,
     present,
     choose,
+    advance,
     finish,
     isActive,
     getVisitCount,

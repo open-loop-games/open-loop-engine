@@ -280,6 +280,56 @@ describe('createDialogSession', () => {
     expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], finished: true });
   });
 
+  it('advances a node whose choices were gated off after it presented them', () => {
+    const accessor = buildAccessor();
+    accessor.setUnlocked('offer-open', true);
+    const setStateSpy = vi.spyOn(accessor, 'setState');
+    const graph: DialogGraph = {
+      id: 'lapsed-offer',
+      entry: 'a',
+      nodes: [
+        {
+          id: 'a',
+          text: 'A',
+          choices: [{ id: 'offer', text: 'Offer', condition: { kind: 'flag', id: 'offer-open' } }],
+          next: 'b',
+        },
+        { id: 'b', text: 'B', onEnter: [{ type: 'state', target: 'met-b', value: 1 }] },
+      ],
+    };
+    const session = withEngine(accessor, () =>
+      createDialogSession({ id: 'lapsed', graphs: [graph] }),
+    );
+    session.start('lapsed-offer');
+    expect(session.present()?.choices.map((c) => c.id)).toEqual(['offer']);
+
+    accessor.setUnlocked('offer-open', false);
+    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: false });
+
+    const presented = vi.fn();
+    session.on('presented', presented);
+    session.advance();
+    expect(session.present()).toMatchObject({ nodeId: 'b', finished: true });
+    expect(presented).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'b' }));
+    expect(setStateSpy).toHaveBeenCalledWith('met-b', 1);
+    const stateRef = getAllPersistentRefs().get('dialog-sessions/lapsed.state') as {
+      value: { activeNodeId?: string };
+    };
+    expect(stateRef.value.activeNodeId).toBe('b');
+  });
+
+  it('refuses to advance a line that offers a choice or is finished', () => {
+    const session = withEngine(buildAccessor(), () =>
+      createDialogSession({ id: 'main', graphs: [greetingGraph] }),
+    );
+    expect(() => session.advance()).toThrow(/start\(\) first/);
+    session.start('rask-greeting');
+    expect(() => session.advance()).toThrow(/nothing to advance/);
+    session.choose('ask-training');
+    expect(() => session.advance()).toThrow(/nothing to advance/);
+    expect(session.present()?.nodeId).toBe('training');
+  });
+
   it('reads visit counts through the session', () => {
     const session = withEngine(buildAccessor(), () =>
       createDialogSession({ id: 'main', graphs: [greetingGraph] }),

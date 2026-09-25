@@ -47,7 +47,7 @@ import {
 
 /** Lifecycle events emitted by a {@link DialogSession}. */
 export interface DialogSessionEvents {
-  /** Fired after each landing on a presentable node (post-start, post-choose). */
+  /** Fired after each landing on a presentable node (post-start, post-choose, post-advance). */
   presented: (snapshot: DialogPresentation) => void;
   /**
    * Fired once a choice has fully resolved: its outcomes have applied, the
@@ -105,6 +105,12 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   present(): DialogPresentation | null;
   /** Apply the chosen choice's outcomes and advance the pointer. */
   choose(choiceId: string): void;
+  /**
+   * Continue past a line whose choices gated off after it presented them —
+   * the one `present()` reports with no choices and `finished: false`.
+   * Enters `next` and presents where it lands; throws on any other line.
+   */
+  advance(): void;
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
@@ -133,7 +139,7 @@ const defaultNativeFactory: DialogRuntimeFactory = (graphs, accessor, mutator) =
  *   this session, optional `runtimeFactory` for adapter swaps (Ink / Yarn /
  *   Ren'Py), and optional `accessor` override.
  * @returns A {@link DialogSession} with `start` / `present` / `choose` /
- *   `finish` / `isActive` / `getVisitCount` / `dispose` methods and
+ *   `advance` / `finish` / `isActive` / `getVisitCount` / `dispose` methods and
  *   `presented` / `chosen` / `finished` events.
  *
  * @example
@@ -245,6 +251,18 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     }
   }
 
+  function advance(): void {
+    if (!runtime.advance) {
+      throw new Error(`Dialog session ${options.id}: its runtime does not implement advance()`);
+    }
+    try {
+      runtime.advance();
+    } finally {
+      snapshot();
+    }
+    emitPresentedIfActive();
+  }
+
   function finish(): void {
     const before = runtime.exportState();
     runtime.finish();
@@ -258,6 +276,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     start,
     present: () => runtime.present(),
     choose,
+    advance,
     finish,
     isActive: () => runtime.isActive(),
     getVisitCount: (graphId, nodeId) => runtime.getVisitCount(graphId, nodeId),

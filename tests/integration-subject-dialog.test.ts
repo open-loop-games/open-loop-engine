@@ -270,6 +270,8 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
       session.choose('next');
       expect(session.present()?.nodeId).toBe('b');
       expect(session.present()?.finished).toBe(true);
+      // `advance` is optional on the contract; the session names the gap.
+      expect(() => session.advance()).toThrow(/does not implement advance/);
 
       session.finish();
       expect(session.isActive()).toBe(false);
