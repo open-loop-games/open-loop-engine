@@ -41,8 +41,8 @@ export type TimedProgressOptions = TimedProgressBaseOptions &
         id?: string;
         /**
          * `progress` is a plain Vue ref instead of a persistent one: the
-         * tracker works the same but never appears in save data. Mirrors
-         * {@link Action}'s ephemeral mode for predictors and headless simulation.
+         * tracker works the same but never appears in save data — for
+         * predictors and headless simulation.
          */
         ephemeral: true;
       }
@@ -57,9 +57,10 @@ export interface TimedProgressBaseOptions {
   /** Tick registration function — tracker self-wires its tick. */
   registerTick: RegisterTick;
   /**
-   * Called after each tick that advanced progress. `delta` is the amount
-   * progress moved this tick (may be capped to the duration boundary on the
-   * completing tick).
+   * Called after each tick that advanced progress. `delta` is the full
+   * `speed * dt` progress moved this tick. It is never capped at the duration
+   * boundary, so the deltas of one completion sum to `duration + overflow`,
+   * not `duration`.
    */
   onProgress?: (delta: DecimalSource) => void;
   /**
@@ -86,7 +87,10 @@ export interface TimedProgress {
   duration: MaybeRef<DecimalSource>;
   /** Progress gained per second. */
   speed: MaybeRef<DecimalSource>;
-  /** Progress actually advanced in the last tick. Zero between ticks. */
+  /**
+   * Progress advanced by the most recent tick, held until the next one. Zero
+   * after a tick that didn't advance (speed or dt ≤ 0) and after `reset()`.
+   */
   readonly tickProgressDelta: Ref<DecimalSource>;
   /** Progress as a fraction [0, 1] of duration. */
   percentComplete: ComputedRef<number>;
