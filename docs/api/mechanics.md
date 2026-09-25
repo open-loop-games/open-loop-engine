@@ -156,9 +156,9 @@ Requirements system for gating purchases, unlocks, and actions
 - `interface CostRequirementOptions` `src/core/requirements.ts:76`
 - `function createBooleanRequirement(options: BooleanRequirementOptions): Requirement` — Create a simple true/false requirement. `src/core/requirements.ts:280`
 - `function createCostRequirement(options: CostRequirementOptions): CostRequirement` — Create a requirement based on spending a resource. `src/core/requirements.ts:172`
-- `function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void` — Create a pay function that resets to default. `src/core/requirements.ts:506`
+- `function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void` — Create a pay function that resets to default. `src/core/requirements.ts:508`
 - `function getRequirementDescriptions(requirements: Requirements): string[]` — Get descriptions for all requirements. `src/core/requirements.ts:478`
-- `function isCostRequirement(req: Requirement): req is CostRequirement` — Check if a requirement is a cost requirement. `src/core/requirements.ts:517`
+- `function isCostRequirement(req: Requirement): req is CostRequirement` — Check if a requirement is a cost requirement. `src/core/requirements.ts:519`
 - `function maxRequirementsMet(requirements: Requirements): DecimalSource` — Calculate the maximum number of times requirements can be met. `src/core/requirements.ts:426`
 - `function payByDivision(requirement: CostRequirement, amount?: DecimalSource): void` — Pay strategy: divide resource instead of subtract. `src/core/requirements.ts:489`
 - `function payByReset(requirement: CostRequirement, overrideValue?: DecimalSource): void` — Pay strategy: reset resource to default value. `src/core/requirements.ts:498`
