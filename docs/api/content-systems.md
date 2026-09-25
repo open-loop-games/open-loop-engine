@@ -15,22 +15,22 @@ The validated incremental primitives, each a typed registration surface over the
 
 milestone tracking with auto-unlock and tiered rewards
 
-- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:95`
-- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:205`
+- `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:106`
+- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:210`
 - `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:92`
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:60`
-- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:31`
-- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:135`
-- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:49`
-- `interface BaseTieredAchievementDef` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:105`
-- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:286`
-- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:275`
-- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:291`
-- `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:138`
-- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:170`
-- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:155`
-- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:192`
-- `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:116`
+- `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:38`
+- `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:150`
+- `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
+- `interface BaseTieredAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:107`
+- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:293`
+- `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:295`
+- `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:311`
+- `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:143`
+- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:175`
+- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:160`
+- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef<T> extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:197`
+- `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:120`
 
 ## Action Category
 
@@ -51,11 +51,11 @@ batch-registered ordered-execution queue with per-execution state machine
 
 progressive unlock of automation features
 
-- `interface AutomationTierDef` — Definition for a single automation tier. `src/systems/automation.ts:50`
-- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:98`
-- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:71`
-- `interface AutomationTiersOptions` `src/systems/automation.ts:77`
-- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:169`
+- `interface AutomationTierDef` — Definition for a single automation tier. `src/systems/automation.ts:52`
+- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:101`
+- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:74`
+- `interface AutomationTiersOptions` `src/systems/automation.ts:80`
+- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:173`
 
 ## BestOf tracker
 
@@ -76,12 +76,12 @@ per-metric best-of-run recording
 
 batch-create Challenges from content definitions
 
-- `interface Challenge` — A challenge instance with persistent state and lifecycle methods. `src/systems/challenge-category.ts:155`
-- `interface ChallengeCategory<Def extends ChallengeDef, State = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:276`
-- `interface ChallengeCategoryEntry<Def extends ChallengeDef, State = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:199`
-- `interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void>` `src/systems/challenge-category.ts:212`
-- `interface ChallengeDef<Overrides extends Record<string, (...args: never[]) => unknown> = Record<string, (...args: never[]) => unknown>>` — Definition for a challenge. `src/systems/challenge-category.ts:64`
-- `function createChallengeCategory<Def extends ChallengeDef, State = void>(options: ChallengeCategoryOptions<Def, State>): ChallengeCategory<Def, State>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:334`
+- `interface Challenge` — A challenge instance with persistent state and lifecycle methods. `src/systems/challenge-category.ts:165`
+- `interface ChallengeCategory<Def extends ChallengeDef, State = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:296`
+- `interface ChallengeCategoryEntry<Def extends ChallengeDef, State = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:218`
+- `interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void>` `src/systems/challenge-category.ts:231`
+- `interface ChallengeDef<Overrides extends Record<string, (...args: never[]) => unknown> = Record<string, (...args: never[]) => unknown>>` — Definition for a challenge. `src/systems/challenge-category.ts:65`
+- `function createChallengeCategory<Def extends ChallengeDef, State = void>(options: ChallengeCategoryOptions<Def, State>): ChallengeCategory<Def, State>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:360`
 
 ## Cycle
 
@@ -96,7 +96,7 @@ a bounded run that ends, resets a scope, and replays
 
 per-cycle metric delta recording
 
-- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:148`
+- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:153`
 - `interface CycleLog` — A CycleLog instance — the returned object from createCycleLog. `src/systems/cycle-log.ts:94`
 - `interface CycleLogDelta` — Per-metric change recorded during a single cycle. `src/systems/cycle-log.ts:61`
 - `interface CycleLogEntry` — A single cycle's recorded outcome. `src/systems/cycle-log.ts:70`
@@ -187,10 +187,10 @@ Skill helper for dual-tier loop incremental skills
 
 constrained persistent selection from a pool
 
-- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:182`
-- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:105`
-- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:90`
-- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:56`
+- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:184`
+- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:106`
+- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:91`
+- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:54`
 
 ## Zone
 
