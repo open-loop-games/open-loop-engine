@@ -19,8 +19,8 @@
  * pushing the whole burden to the caller this module probes the two places a
  * violation produces a *plausible* answer — see {@link findFirstPassage}. For a
  * curve that falls to its target (a drain, a decay) the question is a downward
- * crossing; negate the chain, or use `timeUntilConditionFlip` when the quantity
- * is a live resource rather than a formula.
+ * crossing; negate the chain, or use `timeUntilGateFlip` over a `resource-gte`
+ * gate when the quantity is a live resource rather than a formula.
  *
  * Accuracy above layer 0 is floored by the representation, not the search: a
  * value is stored as its base-10 logarithm in a float64, so a passage computed

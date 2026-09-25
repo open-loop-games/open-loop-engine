@@ -8,9 +8,14 @@
  * sub-tick time through {@link profile} or {@link profileStart}/
  * {@link profileEnd}.
  *
- * Per-label per-tick self-times are retained per tick so {@link getProfileReport}
+ * Per-label per-tick times are retained per tick so {@link getProfileReport}
  * yields p50/p95/p99 per label — profiling max times, not just averages,
  * which is what surfaces tail spikes over multi-thousand-tick runs.
+ *
+ * Every time is inclusive wall clock: a label's time includes any labels
+ * nested inside it (a category tick wraps the chain applies its entities
+ * make, and a chain apply wraps its nested chains). Nested labels overlap,
+ * so the `pct` column sums past 100%.
  */
 
 interface Timing {
@@ -18,7 +23,7 @@ interface Timing {
   calls: number;
   min: number;
   max: number;
-  /** Per-tick accumulated self-time for this label. One entry per tick the label fired. */
+  /** Per-tick accumulated inclusive time for this label. One entry per tick the label fired. */
   perTick: number[];
 }
 
@@ -34,7 +39,8 @@ let tickDeltas: Map<string, number> | null = null;
  * tick-lifecycle hooks short-circuit — zero allocation, one branch.
  *
  * Intended for benchmark runners and perf consumers: call once before the
- * measurement window, dispose after.
+ * measurement window, and read {@link getProfileReport} before disposing —
+ * the last disposer clears every accumulated timing.
  */
 export function enableProfiling(): () => void {
   refcount++;
@@ -145,23 +151,26 @@ export function endProfileTick(): void {
 export interface ProfileEntry {
   /** Label passed to {@link profile} or {@link profileEnd}. */
   name: string;
-  /** Percentage of aggregate `tick.total` time (or of summed totals if tick.total missing). */
+  /**
+   * Percentage of aggregate `tick.total` time (or of summed totals if
+   * tick.total missing). Nested labels overlap, so rows sum past 100.
+   */
   pct: number;
-  /** Aggregate self-time in milliseconds across all calls. */
+  /** Aggregate inclusive time in milliseconds across all calls. */
   totalMs: number;
   /** Number of {@link profile} / {@link profileEnd} calls contributing to this label. */
   calls: number;
-  /** Mean self-time per call, in microseconds. */
+  /** Mean inclusive time per call, in microseconds. */
   avgUs: number;
   /** Fastest single call, in milliseconds. */
   minMs: number;
   /** Slowest single call, in milliseconds. */
   maxMs: number;
-  /** p50 per-tick self-time in microseconds (over ticks where the label fired). */
+  /** p50 per-tick inclusive time in microseconds (over ticks where the label fired). */
   p50Us: number;
-  /** p95 per-tick self-time in microseconds. */
+  /** p95 per-tick inclusive time in microseconds. */
   p95Us: number;
-  /** p99 per-tick self-time in microseconds. */
+  /** p99 per-tick inclusive time in microseconds. */
   p99Us: number;
   /** Number of ticks the label was touched. */
   ticks: number;

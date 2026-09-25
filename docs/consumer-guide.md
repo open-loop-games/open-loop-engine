@@ -337,7 +337,7 @@ const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
 export const prestigeEligibleThreshold = 1_000_000;
 ```
 
-The wrap returns a `ComputedRef` that reads registry-then-default; `pushScope` / `restore` install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
+The wrap returns a `ComputedRef` that reads registry-then-default; `pushScope` and the cleanup it returns install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
 
 Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
 

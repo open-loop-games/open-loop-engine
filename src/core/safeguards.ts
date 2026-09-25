@@ -5,13 +5,16 @@
  * in event emission, sequencer advancement, and other engine internals.
  *
  * - Guards are always active (cheap enough for production)
- * - Diagnostics (counters, logging, stack traces) gate behind dev mode
+ * - Diagnostic counters always run; dev mode adds a console warning per trip
  */
 
 // === DEV MODE ===
 let _devMode = false;
 
-/** Enable dev-mode diagnostics (counters, console warnings with stack traces). */
+/**
+ * Enable dev-mode diagnostics: a console warning on every safeguard trip.
+ * The counters {@link getDiagnostics} reads run whether or not dev mode is on.
+ */
 export function enableDevMode(): void {
   _devMode = true;
 }

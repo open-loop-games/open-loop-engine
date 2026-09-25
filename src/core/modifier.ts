@@ -576,8 +576,8 @@ export interface ModifierChainSlot {
  * `Modifier` so it can be used directly in {@link computeModifiedValue} or
  * other consumers of the `Modifier` shape.
  *
- * Share chains across modules either explicitly via `engine.provide()` /
- * `engine.inject()`, or implicitly via the engine-wide chain registry:
+ * Share chains across modules either explicitly via `ctx.provide()` /
+ * `ctx.inject()`, or implicitly via the engine-wide chain registry:
  * every chain constructed inside a module's `install()` or `connect()`
  * auto-registers under {@link ChainRegistryKey}, so balance workbenches and
  * devtools can enumerate all chains without any per-chain publication.
@@ -613,7 +613,7 @@ export interface ModifierChainSlot {
  * });
  *
  * // Balance tool enumerates all chains
- * const registry = engine.inject(ChainRegistryKey);
+ * const registry = engine.tryInject(ChainRegistryKey)!;
  * for (const chain of registry.all()) console.log(chain.id);
  * ```
  * Prefer binding through {@link createPersistentEffectSystem} over raw

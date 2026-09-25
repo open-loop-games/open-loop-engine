@@ -19,9 +19,13 @@
  * throwaway scripts) silently skip registration — the primitive still
  * works, just isn't discoverable via `tryInject`.
  *
- * Consumer-side `engine.provide(CategoriesKey, ...)` continues to work via
- * the underlying `Map.set` overwrite — back-compat for archetypes that
- * still hand-publish.
+ * A consumer-side `ctx.provide(CategoriesKey, ...)` replaces only the
+ * discovery view that `tryInject(CategoriesKey)` returns — harness walkers,
+ * picker and perturbation read that one. Category factories keep appending
+ * to the engine's accumulator, and Gates keep resolving against it, so the
+ * two views diverge from the first category built after the provide. Use
+ * the provide only to narrow what tooling walks, and never spread-merge the
+ * previous value into it: the copy stops receiving new slots.
  */
 
 import type { InjectionKey } from '@/primitives/types';
@@ -48,7 +52,9 @@ import type { CategoryEntrySignals } from './category-base';
  * categories sees an empty object.
  *
  * Extend via declaration merging when shipping custom category types
- * that shouldn't hide behind `any`:
+ * that shouldn't hide behind `any`. A merged slot is for tooling only:
+ * {@link findCategoryEntrySignals} walks the built-in slots, so `count-gte`
+ * and `unlock` Gates never see a category held in a merged one.
  * ```ts
  * declare module '@open-loop/engine' {
  *   interface EngineCategories {
@@ -97,10 +103,12 @@ export interface EngineCategories {
  * key and self-populates it as category factories run during `install()`
  * and `connect()`. Consume via `engine.tryInject(CategoriesKey)`.
  *
- * Consumer-side `engine.provide(CategoriesKey, value)` is supported as a
- * back-compat hatch — the underlying `Map.set` overwrites the engine's
- * pre-provide. Archetypes migrating off hand-rolled `categories.ts`
- * aggregators don't need to publish at all.
+ * A consumer-side `ctx.provide(CategoriesKey, value)` replaces the
+ * discovery view only: Gates and later category factories keep the engine's
+ * full accumulator, so the provided value never sees categories built after
+ * it. Use it to narrow what tooling walks, never spread-merge the previous
+ * value into it, and don't publish at all just to expose categories — the
+ * engine already does.
  *
  * @see {@link EngineCategories} — the published shape
  */
@@ -157,9 +165,11 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
  * primitive (or walker, devtool, UI hint) can read "is this entity active /
  * how many do I have" without consumer-side path conventions.
  *
- * Walks the seven typed slots in order (`purchasables`, `skills`,
+ * Walks the seven built-in slots in order (`purchasables`, `skills`,
  * `achievements`, `challenges`, `producers`, `subjects`, `actions`); the
- * first category whose `id` matches `categoryId` is consulted. Returns
+ * first category whose `id` matches `categoryId` is consulted. Slots added
+ * by declaration merging aren't walked, so their categories aren't
+ * gate-visible. Returns
  * `undefined` if no matching category is registered, or if the matching
  * category has no entry under `entityId`.
  *

@@ -80,7 +80,7 @@ export type ModifierPickerAddress =
  * Address of a `TunablePickerEntry`. Carries `registryName` (string) rather
  * than a direct registry reference — perturbation resolves the registry
  * against whichever engine it's called on via
- * `engine.inject(TuningRegistriesKey)`, so a perturbation discovered against
+ * `engine.tryInject(TuningRegistriesKey)`, so a perturbation discovered against
  * the live engine and applied to a scratch sensitivity-fork doesn't stomp
  * the live registry. Mirrors the `chainId` precedent in
  * `ModifierPickerAddress` (chain-registry source).

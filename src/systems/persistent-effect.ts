@@ -174,7 +174,7 @@ const MAX_SETTLE_EDGES = 8;
  * });
  *
  * // Balance-sim walks the EffectSystemRegistry for full attribution:
- * const registry = engine.inject(EffectSystemRegistryKey);
+ * const registry = engine.tryInject(EffectSystemRegistryKey)!;
  * for (const sys of registry.all()) {
  *   for (const def of sys.allDefs()) {
  *     // def.id → "affected-by:wander:glasses"

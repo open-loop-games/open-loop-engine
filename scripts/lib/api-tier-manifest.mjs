@@ -130,7 +130,7 @@ export const TIER_MANIFEST = [
       '`EngineModule` / `EngineContext` — install/connect game content and share engine services.',
       '`createTickDriver` — standalone tick scheduler when not using the full engine facade.',
       '`createEmitHandle` — typed per-instance events for systems and categories.',
-      '`timeUntilResource` / `timeUntilConditionFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
+      '`timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
       "`ref` / `computed` / `watch` / `effect` (re-exported from Vue) — reactivity API; import via the engine, not directly from `vue`, so subscriptions share the engine's `activeEffect` scope.",
     ],
     clusters: [
@@ -152,7 +152,7 @@ export const TIER_MANIFEST = [
     entrypoints: [
       '`EngineCategories` / `CategoriesKey` — discover auto-registered content categories.',
       '`createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.',
-      '`createChainRegistry`, `createResourceRegistry`, `createEffectSystemRegistry` — per-engine enumerable surfaces for tools.',
+      '`ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — per-engine enumerable surfaces for tools, read through `engine.tryInject` or `ctx.inject`.',
       '`enableProfiling` / `getProfileReport` — runtime timing instrumentation.',
       '`enableDevMode` / `getDiagnostics` — development safeguards and diagnostics.',
     ],

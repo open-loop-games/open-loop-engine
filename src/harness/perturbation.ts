@@ -25,7 +25,7 @@
  *   capture the current resolved value at apply time, then
  *   `registry.pushScope('perturbation', { [key]: () => transformed })`.
  *   Cleanup is the scope's idempotent cleanup function. Registry lookup
- *   happens at apply time via `engine.inject(TuningRegistriesKey)` — the
+ *   happens at apply time via `engine.tryInject(TuningRegistriesKey)` — the
  *   entry carries `registryName: string`, not a registry reference, so
  *   perturbing a scratch sensitivity-fork doesn't stomp the live engine.
  *

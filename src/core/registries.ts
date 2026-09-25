@@ -20,9 +20,11 @@
  * Scratch-engine forks each build their own registries at `start()` time,
  * so two engines in the same runtime never cross-contaminate.
  *
- * Consumers read the registries via the typed injection keys:
+ * Consumers read the registries via the typed injection keys — `ctx.inject`
+ * inside a module, `engine.tryInject` from outside once the engine has
+ * started:
  * ```ts
- * const chains = engine.inject(ChainRegistryKey);
+ * const chains = engine.tryInject(ChainRegistryKey)!;
  * for (const chain of chains.all()) { ... }
  * ```
  *
@@ -53,8 +55,8 @@ export type ChainRegistry = NamedRegistry<ModifierChain>;
 /**
  * Injection key for the per-engine {@link ChainRegistry}. The engine pre-
  * provides the registry under this key before any module installs, so
- * modules can look it up via `engine.inject(ChainRegistryKey)` or
- * `engine.tryInject(ChainRegistryKey)`.
+ * modules can look it up via `ctx.inject(ChainRegistryKey)`, and external
+ * tools via `engine.tryInject(ChainRegistryKey)` after `start()`.
  */
 export const ChainRegistryKey: InjectionKey<ChainRegistry> = Symbol('engine:chain-registry');
 

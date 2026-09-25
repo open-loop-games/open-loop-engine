@@ -610,7 +610,7 @@ export function createEngine(config: EngineConfig): Engine {
         // global registry so per-run / scratch engines never cross-
         // contaminate each other's resource discovery.
         const resourceRegistry = createResourceRegistry();
-        // Per-engine categories accumulator — auto-populated by the five
+        // Per-engine categories accumulator — auto-populated by the
         // category factories (createProducerCategory etc.) via the ambient
         // set below. Pre-provided under CategoriesKey so harness tooling
         // and external consumers get the inventory without any
