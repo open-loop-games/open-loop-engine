@@ -582,6 +582,37 @@ describe('offline', () => {
 });
 
 // ============================================================================
+// Chain order
+// ============================================================================
+
+describe('chain order', () => {
+  it('the chain value follows registration order, not apply order', () => {
+    const { system } = createSystem();
+    const chain = createModifierChain('dmg');
+    system.register([
+      {
+        id: 'flat',
+        duration: 10,
+        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+      },
+      {
+        id: 'double',
+        duration: 10,
+        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+      },
+    ]);
+
+    system.apply('double');
+    system.apply('flat');
+    expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
+
+    system.dispel('flat');
+    system.apply('flat');
+    expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
+  });
+});
+
+// ============================================================================
 // Events
 // ============================================================================
 

@@ -43,6 +43,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Modifier } from '@/core/modifier';
 import type { ModifierBinding } from './modifier-binding';
+import { createBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
 
@@ -65,6 +66,10 @@ export interface PersistentEffectDef {
    * Modifiers to bind to chains while `active` is true.
    * Can be a static array or a factory evaluated on each activation — use a factory
    * when bindings depend on runtime state.
+   *
+   * Each binding evaluates at a fixed place in its chain, however often the
+   * effect toggles: a static array claims its places at `register`, a
+   * factory on its first activation.
    */
   modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
   /** Called on the rising edge (`false → true`), including on registration if already active */
@@ -117,6 +122,7 @@ interface DefEntry {
   def: PersistentEffectDef;
   activeRef: ComputedRef<boolean>;
   stopWatch: WatchStopHandle;
+  slots: BindingSlots;
   modifierRemovers: (() => void)[];
   isApplied: boolean;
 }
@@ -182,9 +188,9 @@ export function createPersistentEffectSystem(
     const bindings =
       typeof entry.def.modifiers === 'function' ? entry.def.modifiers() : entry.def.modifiers;
     if (bindings) {
-      for (const binding of bindings) {
-        const modifier = resolveModifier(binding);
-        entry.modifierRemovers.push(binding.chain.add(modifier));
+      for (const [index, binding] of bindings.entries()) {
+        const slot = entry.slots.slotFor(index, binding.chain);
+        entry.modifierRemovers.push(slot.add(resolveModifier(binding)));
       }
     }
     entry.isApplied = true;
@@ -210,9 +216,18 @@ export function createPersistentEffectSystem(
         def: d,
         activeRef,
         stopWatch: () => {},
+        slots: createBindingSlots(),
         modifierRemovers: [],
         isApplied: false,
       };
+
+      // Claim chain positions now, so a binding evaluates at the same place
+      // whenever it activates. A factory-form list claims on first activation.
+      if (Array.isArray(d.modifiers)) {
+        for (const [index, binding] of d.modifiers.entries()) {
+          entry.slots.slotFor(index, binding.chain);
+        }
+      }
 
       // flush: 'sync' so a predicate that flips mid-run binds/unbinds its
       // modifiers on the same synchronous step. Headless sims drive stepOnce()
@@ -269,6 +284,7 @@ export function createPersistentEffectSystem(
     for (const entry of entries.values()) {
       entry.stopWatch();
       if (entry.isApplied) removeBindings(entry);
+      entry.slots.release();
     }
     entries.clear();
   }

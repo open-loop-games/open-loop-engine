@@ -49,6 +49,7 @@ import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Modifier } from '@/core/modifier';
 import type { RegisterTick } from '@/core/sequencer';
 import type { ModifierBinding } from './modifier-binding';
+import { createBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
 
@@ -79,6 +80,11 @@ export interface TemporaryEffectDef {
    * Modifiers to bind to chains while this effect is active.
    * Can be a static array or a factory evaluated at each `apply()` — use a factory
    * when bindings depend on runtime state (e.g., which chain to target).
+   *
+   * Each binding evaluates at a fixed place in its chain, whatever order
+   * effects are applied in: a static array claims its places at `register`,
+   * a factory on its first apply. Stacks of one def sit together there, in
+   * apply order.
    */
   modifiers?: ModifierBinding[] | (() => ModifierBinding[]);
   /** Called when the effect is applied */
@@ -218,6 +224,7 @@ export function createTemporaryEffectSystem(
   options: TemporaryEffectSystemOptions,
 ): TemporaryEffectSystem {
   const defs = new Map<string, TemporaryEffectDef>();
+  const slotsByDef = new Map<string, BindingSlots>();
   const instances = shallowRef<TemporaryEffectInstance[]>([]);
   const cleanupMap = new Map<string, InstanceCleanup>();
   const handle = createEmitHandle<TemporaryEffectEvents>();
@@ -281,9 +288,10 @@ export function createTemporaryEffectSystem(
     const modifierRemovers: (() => void)[] = [];
     const bindings = typeof def.modifiers === 'function' ? def.modifiers() : def.modifiers;
     if (bindings) {
-      for (const binding of bindings) {
-        const modifier = resolveModifier(binding);
-        modifierRemovers.push(binding.chain.add(modifier));
+      const slots = slotsByDef.get(def.id)!;
+      for (const [index, binding] of bindings.entries()) {
+        const slot = slots.slotFor(index, binding.chain);
+        modifierRemovers.push(slot.add(resolveModifier(binding)));
       }
     }
     cleanupMap.set(id, { modifierRemovers });
@@ -361,6 +369,15 @@ export function createTemporaryEffectSystem(
         }
       }
       defs.set(d.id, d);
+
+      // Claim chain positions now, so every stack of this def evaluates at the
+      // same place whatever order effects are applied in. A factory-form list
+      // claims on first apply.
+      const slots = createBindingSlots();
+      if (Array.isArray(d.modifiers)) {
+        for (const [index, binding] of d.modifiers.entries()) slots.slotFor(index, binding.chain);
+      }
+      slotsByDef.set(d.id, slots);
     }
   }
 
@@ -471,6 +488,8 @@ export function createTemporaryEffectSystem(
       }
     }
     instances.value = [];
+    for (const slots of slotsByDef.values()) slots.release();
+    slotsByDef.clear();
   }
 
   const system: TemporaryEffectSystem = {

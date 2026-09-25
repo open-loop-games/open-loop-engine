@@ -231,6 +231,42 @@ describe('binding isolation', () => {
 // Load-time reconstruction
 // ============================================================================
 
+describe('chain order', () => {
+  function registerFlatAndDouble(flatActive: boolean) {
+    const system = createSystem();
+    const chain = createModifierChain('dmg');
+    const flat = ref(flatActive);
+    system.register([
+      {
+        id: 'flat',
+        active: flat,
+        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+      },
+      {
+        id: 'double',
+        active: ref(true),
+        modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      },
+    ]);
+    return { chain, flat };
+  }
+
+  it('a binding that toggles off and on keeps its place in the chain', () => {
+    const { chain, flat } = registerFlatAndDouble(true);
+    expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
+    flat.value = false;
+    expect(Decimal.eq(chain.apply(1), 2)).toBe(true);
+    flat.value = true;
+    expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
+  });
+
+  it('the chain value follows registration order, not activation order', () => {
+    const { chain, flat } = registerFlatAndDouble(false);
+    flat.value = true;
+    expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
+  });
+});
+
 describe('load-time reconstruction', () => {
   it('immediate watch applies bindings for defs already active at registration', () => {
     // Simulates saved state: the game state ref is "already true" at engine boot.
