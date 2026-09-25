@@ -188,6 +188,33 @@ export function onHydrated(callback: () => void): () => void {
   return stop;
 }
 
+/**
+ * Call `fire` whenever `holds` is true outside a load or reset, and again as
+ * each one settles if it holds then. Mid-load, a condition can hold before
+ * the state `fire` writes is restored, so the settled state decides. The
+ * watch is sync so `fire` lands on the tick `holds` turns true, even under a
+ * sim driving `stepOnce()` in a tight loop. `fire` must be idempotent.
+ *
+ * @returns A stop for both the watch and the hydration callback
+ * @internal
+ */
+export function latchWhenSettled(holds: Readonly<Ref<boolean>>, fire: () => void): () => void {
+  const stopWatch = watch(
+    holds,
+    (held) => {
+      if (held && !loadingSave.value) fire();
+    },
+    { immediate: true, flush: 'sync' },
+  );
+  const stopHydrated = onHydrated(() => {
+    if (holds.value) fire();
+  });
+  return () => {
+    stopWatch();
+    stopHydrated();
+  };
+}
+
 /** Run every hydration callback, even past a throw; returns what they threw. */
 function runHydrated(): unknown[] {
   const errors: unknown[] = [];

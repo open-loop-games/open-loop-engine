@@ -20,14 +20,13 @@
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { computed, type Ref, unref, watch } from 'vue';
+import { computed, type Ref, unref } from 'vue';
 import { processGetter, type Computable } from '@/core/computed';
 import {
   persistent,
   withPersistentContext,
   getCurrentContext,
-  loadingSave,
-  onHydrated,
+  latchWhenSettled,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
@@ -239,25 +238,9 @@ export function createAchievement<T = unknown>(
     },
   };
 
-  if (requirement !== undefined) {
-    // flush: 'sync' so achievements earn on the same tick their requirement
-    // first holds true, even under sim harnesses driving stepOnce() in a
-    // tight loop where Vue's async scheduler never flushes.
-    watch(
-      canComplete,
-      (canNow) => {
-        // Mid-load, a requirement can hold before `earned` is restored; the
-        // settled state decides, once hydration ends.
-        if (canNow && !loadingSave.value) achievement.complete();
-      },
-      { immediate: true, flush: 'sync' },
-    );
-    // A requirement that holds when a load or reset settles earns here: one
-    // added since the save, or one whose `earned` a reset wiped.
-    onHydrated(() => {
-      if (canComplete.value) achievement.complete();
-    });
-  }
+  // A requirement that holds when a load or reset settles earns too: one
+  // added since the save, or one whose `earned` a reset wiped.
+  if (requirement !== undefined) latchWhenSettled(canComplete, () => achievement.complete());
 
   return attachContextReset(achievement, contextId);
 }

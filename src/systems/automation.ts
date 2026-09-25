@@ -34,13 +34,12 @@
  * ```
  */
 
-import { computed, watch, type ComputedRef, type WatchStopHandle } from 'vue';
+import { computed, type ComputedRef, type WatchStopHandle } from 'vue';
 import {
   persistent,
   withPersistentContext,
   resolveSystemContextId,
-  loadingSave,
-  onHydrated,
+  latchWhenSettled,
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
@@ -244,10 +243,10 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   );
 
   /** Unlock every tier whose requirement holds; tiers in `silent` skip the event. */
-  function unlockMet(silent?: ReadonlySet<string>): void {
+  function unlockMet(silent: ReadonlySet<string>): void {
     for (const { tier, met } of requirements) {
       if (!met.value || unlocked.value.includes(tier.id)) continue;
-      if (silent?.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
+      if (silent.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
       else automationTiers.unlock(tier.id);
     }
   }
@@ -291,24 +290,10 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     },
   };
 
-  // --- Auto-unlock watchers for tiers with requirements ---
+  // --- Auto-unlock latches for tiers with requirements ---
   for (const { tier, met } of requirements) {
-    unsubs.push(
-      watch(
-        met,
-        (isMet) => {
-          // Mid-load, a requirement can hold before `unlocked` is restored;
-          // the settled state decides, once hydration ends.
-          if (isMet && !loadingSave.value) automationTiers.unlock(tier.id);
-        },
-        // flush:'sync' so a tier unlocks the same synchronous tick its
-        // requirement flips — a sim harness driving stepOnce() in a tight loop
-        // would otherwise see unlocks lag or bunch (mirrors achievement.ts).
-        { immediate: true, flush: 'sync' },
-      ),
-    );
+    unsubs.push(latchWhenSettled(met, () => automationTiers.unlock(tier.id)));
   }
-  if (requirements.length > 0) unsubs.push(onHydrated(() => unlockMet()));
 
   return attachContextReset(automationTiers, contextId);
 }
