@@ -165,6 +165,33 @@ describe('ZoneSystem', () => {
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['first', 'no-order']);
   });
 
+  it('ordered picks up a zone registered or patched after its first read', () => {
+    const zs = createZoneSystem({
+      zones: [
+        { id: 'town', name: 'Town', order: 0 },
+        { id: 'wild', name: 'Wild', order: 1 },
+      ],
+    });
+    expect(zs.ordered.value.map((z) => z.id)).toEqual(['town', 'wild']);
+
+    zs.registry.register({ id: 'volcano', name: 'Volcano', order: -1 });
+    expect(zs.ordered.value.map((z) => z.id)).toEqual(['volcano', 'town', 'wild']);
+
+    zs.registry.patch('wild', { order: -5 });
+    expect(zs.ordered.value.map((z) => z.id)).toEqual(['wild', 'volcano', 'town']);
+  });
+
+  it('zones without order keep registration order among themselves', () => {
+    const zs = createZoneSystem({
+      zones: [
+        { id: 'b', name: 'B' },
+        { id: 'a', name: 'A' },
+        { id: 'first', name: 'First', order: 0 },
+      ],
+    });
+    expect(zs.ordered.value.map((z) => z.id)).toEqual(['first', 'b', 'a']);
+  });
+
   // --- resetUnlocks ---
 
   it('resets unlocked zones to initial set', () => {

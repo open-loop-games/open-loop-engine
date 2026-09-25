@@ -28,13 +28,18 @@
  * ```
  */
 
+import { ref } from 'vue';
+
 // === TYPES ===
 
 /**
  * A typed, Map-backed registry for game content definitions.
  *
- * Content is static after module installation — no Vue reactivity.
- * Entries are stored by `id` and returned by reference (no cloning).
+ * Entries are stored by `id` and returned by reference (no cloning); the
+ * entries themselves are plain objects, not reactive. The registry's reads
+ * (`get`, `getAll`, `has`, `size`) are: a computed that reads an entry
+ * through them re-evaluates after any `register`, `patch` or `pushPatches`.
+ * A value copied out of an entry, or read off a held entry reference, does not.
  */
 export interface ContentRegistry<T extends { id: string }> {
   /** Human-readable name, included in error messages */
@@ -102,6 +107,8 @@ export interface ContentRegistry<T extends { id: string }> {
  */
 export function createContentRegistry<T extends { id: string }>(name: string): ContentRegistry<T> {
   const store = new Map<string, T>();
+  // Read barrier for the plain store: every read touches it, every write bumps it.
+  const version = ref(0);
 
   const registry: ContentRegistry<T> = {
     name,
@@ -127,6 +134,7 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
       for (const entry of entries) {
         store.set(entry.id, entry);
       }
+      version.value++;
     },
 
     patch(id: string, partial: Partial<Omit<T, 'id'>>): void {
@@ -135,17 +143,21 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
         throw new Error(`[${name}] Cannot patch unknown id: "${id}"`);
       }
       Object.assign(existing, partial);
+      version.value++;
     },
 
     get(id: string): T | undefined {
+      void version.value;
       return store.get(id);
     },
 
     getAll(): T[] {
+      void version.value;
       return Array.from(store.values());
     },
 
     has(id: string): boolean {
+      void version.value;
       return store.has(id);
     },
 
@@ -168,6 +180,7 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
         snapshots.set(id, snapshot);
         Object.assign(entry, partial);
       }
+      version.value++;
 
       let reverted = false;
       return () => {
@@ -177,10 +190,12 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
           const entry = store.get(id);
           if (entry) Object.assign(entry, snapshot);
         }
+        version.value++;
       };
     },
 
     get size(): number {
+      void version.value;
       return store.size;
     },
   };

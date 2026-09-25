@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { computed } from 'vue';
 import { createContentRegistry } from '@/systems/content-registry';
 
 interface TestItem {
@@ -174,5 +175,38 @@ describe('ContentRegistry', () => {
       { id: 'c', name: 'C', value: 3 },
     ]);
     expect(reg.size).toBe(3);
+  });
+
+  // --- reactivity ---
+
+  it('a computed reading an entry through get() re-evaluates after patch()', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const value = computed(() => reg.get('a')!.value);
+    expect(value.value).toBe(1);
+    reg.patch('a', { value: 5 });
+    expect(value.value).toBe(5);
+  });
+
+  it('a computed over getAll() / size / has() re-evaluates after register()', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const ids = computed(() => reg.getAll().map((e) => e.id));
+    const size = computed(() => reg.size);
+    const hasB = computed(() => reg.has('b'));
+    expect([ids.value, size.value, hasB.value]).toEqual([['a'], 1, false]);
+    reg.register({ id: 'b', name: 'B', value: 2 });
+    expect([ids.value, size.value, hasB.value]).toEqual([['a', 'b'], 2, true]);
+  });
+
+  it('a computed reading through get() tracks pushPatches() and its revert', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const value = computed(() => reg.get('a')!.value);
+    expect(value.value).toBe(1);
+    const revert = reg.pushPatches({ a: { value: 9 } });
+    expect(value.value).toBe(9);
+    revert();
+    expect(value.value).toBe(1);
   });
 });

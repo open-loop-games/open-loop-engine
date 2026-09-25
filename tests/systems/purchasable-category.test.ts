@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { unref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import {
   persistent,
@@ -902,5 +903,42 @@ describe('PurchasableCategory — invertible leveled costs', () => {
     expect(
       Decimal.eq_tolerance(forge.getCost(1), Decimal.mul(10, Decimal.pow(1.15, 5)), 1e-9),
     ).toBe(true);
+  });
+});
+
+// ============================================================================
+// Registry patches
+// ============================================================================
+
+describe('createPurchasableCategory — registry patches', () => {
+  it('a mapping getter that reads through getDef tracks a registry patch', () => {
+    const gold = createTestResource('gold', 1000);
+    const category = createPurchasableCategory<PerkDef>({
+      id: 'patched-perks',
+      mapPurchasable: (def) => ({
+        display: { description: def.name },
+        requirements: createCostRequirement({ resource: gold, cost: def.baseCost }),
+        limit: () => category.getDef(def.id)!.maxLevel,
+      }),
+    });
+    category.register({
+      id: 'p',
+      name: 'P',
+      baseCost: 1,
+      costScaling: 1,
+      maxLevel: 1,
+      effectPerLevel: 1,
+    });
+
+    const perk = category.getPurchasable('p')!;
+    expect(new Decimal(unref(perk.limit)).toNumber()).toBe(1);
+
+    category.registry.patch('p', { maxLevel: 5 });
+    expect(new Decimal(unref(perk.limit)).toNumber()).toBe(5);
+
+    const revert = category.registry.pushPatches({ p: { maxLevel: 9 } });
+    expect(new Decimal(unref(perk.limit)).toNumber()).toBe(9);
+    revert();
+    expect(new Decimal(unref(perk.limit)).toNumber()).toBe(5);
   });
 });

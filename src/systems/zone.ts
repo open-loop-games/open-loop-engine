@@ -27,7 +27,7 @@
  *
  * zones.unlock('forest');
  * zones.select('forest');
- * zones.getOrdered(); // all zones sorted by order
+ * zones.ordered.value; // all zones sorted by order
  * ```
  */
 
@@ -48,7 +48,10 @@ export interface ZoneDef {
   id: string;
   /** Display name */
   name: string;
-  /** Sort order for display (lower = first). Defaults to registration order. */
+  /**
+   * Sort order for display (lower = first). Zones without one sort after every
+   * zone that has one; ties keep registration order.
+   */
   order?: number;
 }
 
@@ -161,9 +164,10 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
   const handle = createEmitHandle<ZoneSystemEvents>();
 
   // --- Computed ordered list ---
+  // `|| 0` keeps two order-less zones (Infinity - Infinity = NaN) a tie.
   const ordered = computed(() => {
     const all = registry.getAll();
-    return all.slice().sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+    return all.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || 0);
   });
 
   const zoneSystem: ZoneSystem = {
