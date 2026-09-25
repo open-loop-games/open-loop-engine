@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createCategoryBase } from '@/systems/category-base';
-import { persistent, getCurrentFullContext, type DecimalSource } from '@/core/persistence';
+import {
+  persistent,
+  getCurrentFullContext,
+  getModulePersistentRefs,
+  withPersistentContext,
+  type DecimalSource,
+} from '@/core/persistence';
 
 interface ThingDef {
   id: string;
@@ -57,5 +63,33 @@ describe('createCategoryBase — batch registration', () => {
     cat.register({ id: 'c' });
     expect(cat.getEntry('c')).toBeDefined();
     expect(cat.registry.size).toBe(2);
+  });
+
+  it('a def whose build throws after creating refs can be registered again', () => {
+    // The first attempt creates its named refs, one of them lifetime-tagged
+    // and one in a nested context, then throws; none of them may survive to
+    // collide with the retry's refs or be saved under the def's context.
+    let attempts = 0;
+    const cat = createCategoryBase<
+      ThingDef,
+      void,
+      { count: ReturnType<typeof persistent<DecimalSource>> }
+    >({
+      id: 'retry',
+      buildState: () => {
+        const count = persistent<DecimalSource>(0, { name: 'count' });
+        persistent<DecimalSource>(0, { name: 'best', lifetime: true });
+        withPersistentContext('retry/a/inner', () => persistent(0, { name: 'progress' }));
+        if (attempts++ === 0) throw new Error('builder blew up');
+        return { count };
+      },
+    });
+
+    expect(() => cat.register({ id: 'a' })).toThrow('builder blew up');
+    expect(getModulePersistentRefs('retry/a').size).toBe(0);
+
+    cat.register({ id: 'a' });
+    expect(cat.getEntry('a')).toBeDefined();
+    expect(getModulePersistentRefs('retry/a').size).toBe(2);
   });
 });

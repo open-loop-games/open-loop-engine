@@ -852,29 +852,44 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
  */
 export function getModulePersistentRefs(moduleId: string): Set<Persistent> {
   const result = new Set<Persistent>();
-  const stack = [toFullContextId(moduleId)];
+  for (const r of walkContextTree(moduleId)) {
+    // Lifetime refs (cumulative trackers, high-water marks, anything
+    // tagged `{ lifetime: true }`) sit inside a module's persistent
+    // context tree but model state that should outlive any
+    // module-scoped reset. They drop out of the scope walk so resets
+    // with `resetModules: [moduleId]` don't sweep them — consumers can
+    // still target one explicitly via `thingsToReset` when a hard
+    // wipe is intentional.
+    if (r[Lifetime]) continue;
+    result.add(r);
+  }
+  return result;
+}
+
+/**
+ * Delete every ref in a context and in the contexts opened inside it,
+ * lifetime refs included, so a build that failed partway leaves no refs to be
+ * saved or to collide with a retry's names.
+ *
+ * @param contextId - The raw context id, resolved in the active namespace
+ * @internal
+ */
+export function deletePersistentContextRefs(contextId: string): void {
+  for (const r of [...walkContextTree(contextId)]) deletePersistent(r);
+}
+
+/** Every ref reachable from a context through the parent→child context tree. */
+function* walkContextTree(contextId: string): Generator<Persistent> {
+  const stack = [toFullContextId(contextId)];
   while (stack.length > 0) {
     const ctx = stack.pop()!;
     const refs = persistentRefs[ctx];
-    if (refs) {
-      // Lifetime refs (cumulative trackers, high-water marks, anything
-      // tagged `{ lifetime: true }`) sit inside a module's persistent
-      // context tree but model state that should outlive any
-      // module-scoped reset. They drop out of the scope walk so resets
-      // with `resetModules: [moduleId]` don't sweep them — consumers can
-      // still target one explicitly via `thingsToReset` when a hard
-      // wipe is intentional.
-      for (const r of refs) {
-        if (r[Lifetime]) continue;
-        result.add(r);
-      }
-    }
+    if (refs) yield* refs;
     const children = contextChildren[ctx];
     if (children) {
       for (const child of children) stack.push(child);
     }
   }
-  return result;
 }
 
 /**

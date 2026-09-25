@@ -17,6 +17,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import type { DecimalSource } from '@/primitives/decimal';
 import {
   withPersistentContext,
+  deletePersistentContextRefs,
   isPersistent,
   setPersistentName,
   PersistentName,
@@ -130,7 +131,8 @@ export interface CategoryBase<
    * Register definitions: validate the whole batch, then build instances.
    * Can be called multiple times (base game + mods). A builder that throws
    * stops the batch at its def: the defs before it stay registered, and it
-   * and the ones after it are not.
+   * and the ones after it are not. The refs its build created are deleted,
+   * so the same def can be registered again.
    */
   register(defs: Def | Def[]): void;
 
@@ -225,14 +227,16 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
       const arr = Array.isArray(defs) ? defs : [defs];
       assertRegistrable(arr);
       // Each def enters the registry before its build, so builders can read it
-      // back through getDef; one whose build throws leaves again, and the defs
-      // after it stay unregistered, so registry and entries never disagree.
+      // back through getDef; one whose build throws leaves again with the refs
+      // it created, and the defs after it stay unregistered, so registry and
+      // entries never disagree and the def can be registered again.
       for (const def of arr) {
         registry.register(def);
         try {
           registerOne(def);
         } catch (error) {
           remove(def.id);
+          deletePersistentContextRefs(`${categoryId}/${def.id}`);
           throw error;
         }
       }
