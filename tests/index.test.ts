@@ -73,6 +73,17 @@ describe('createEngine', () => {
     expect(installs).toBe(1);
     engine.dispose();
   });
+  it('forwards onDeltaOverflow to the tick driver', () => {
+    const dropped: number[] = [];
+    const engine = createEngine({
+      gameId: 'test',
+      persistence: false,
+      maxDeltaTime: 1,
+      onDeltaOverflow: (s) => dropped.push(s),
+    });
+    engine.tickDriver.tickRaw(3);
+    expect(dropped).toEqual([2]);
+  });
   it('validates module dependencies', () => {
     const mod: EngineModule = { id: 'needs-base', dependencies: ['base'], install() {} };
     const engine = createEngine({ gameId: 'test' });

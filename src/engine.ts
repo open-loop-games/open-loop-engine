@@ -239,6 +239,11 @@ export interface EngineConfig {
   /** Diagnostic callback when fixed-mode `intervalTick` drops sub-steps. */
   onStepsOverflow?: (droppedSteps: number) => void;
   /**
+   * Diagnostic callback when a variable-mode tick's raw dt exceeds
+   * `maxDeltaTime`; receives the dropped seconds, for banking them.
+   */
+  onDeltaOverflow?: (droppedSeconds: number) => void;
+  /**
    * Custom timer functions for scheduling the TickDriver and autosave.
    * Pass `worker-timers` functions for background-tab immunity.
    * Defaults to native setInterval/clearInterval.
@@ -433,6 +438,7 @@ export function createEngine(config: EngineConfig): Engine {
       stepSize: config.stepSize,
       maxStepsPerTick: config.maxStepsPerTick,
       onStepsOverflow: config.onStepsOverflow,
+      onDeltaOverflow: config.onDeltaOverflow,
       timerProvider: config.timerProvider,
       persistentContextId: 'tick-driver',
     }),
