@@ -58,8 +58,6 @@ export interface TimeSystem {
 
 // === FACTORIES ===
 
-let timeSystemCounter = 0;
-
 /**
  * Creates a time tracking system with persistent elapsed/total play time,
  * speed multiplier, and formatted display.
@@ -78,7 +76,7 @@ let timeSystemCounter = 0;
  * ```
  */
 export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
-  const contextId = resolveSystemContextId(config.id, 'time', () => `time_${timeSystemCounter++}`);
+  const contextId = resolveSystemContextId(config.id, 'time');
   const { elapsed, totalPlayTime } = withPersistentContext(contextId, () => ({
     elapsed: persistent(0, { name: 'elapsed' }),
     totalPlayTime: persistent(0, { name: 'totalPlayTime', lifetime: true }),

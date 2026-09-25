@@ -20,6 +20,13 @@ const TIERS = [
 describe('AutomationTiers', () => {
   // --- Factory ---
 
+  it('built outside any module, saves under a context named for its kind', () => {
+    createAutomationTiers({ tiers: TIERS });
+    expect([...getAllPersistentRefs().keys()]).toContainEqual(
+      expect.stringMatching(/^automation_\d+\.unlocked$/),
+    );
+  });
+
   it('creates with tiers sorted by order', () => {
     const at = createAutomationTiers({
       tiers: [

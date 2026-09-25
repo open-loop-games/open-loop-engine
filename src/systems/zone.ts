@@ -120,8 +120,6 @@ export interface ZoneSystem {
 
 // === FACTORIES ===
 
-let zoneCounter = 0;
-
 /**
  * Create a zone system — content groupings with progressive unlock.
  *
@@ -156,7 +154,7 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     initiallyUnlocked ?? (initialZones.length > 0 ? [initialZones[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = resolveSystemContextId(id, 'zone', () => `zone_${zoneCounter++}`);
+  const contextId = resolveSystemContextId(id, 'zone');
   const { unlocked, current } = withPersistentContext(contextId, () => ({
     unlocked: persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
     current: persistent<string>(defaultUnlocked[0] ?? '', { name: 'current' }),

@@ -39,11 +39,6 @@ import type { TickDriver } from '@/core/tick-driver';
 import type { Persistent } from '@/core/persistence';
 import { createPredicateResolver, type Predicate } from './gate';
 
-// Counter fallback for bank persistent-context ids — same shape as
-// TickDriver's: collision-free for multiple banks in one runtime, but
-// order-dependent; supply an explicit id for cross-session determinism.
-let timeBankCounter = 0;
-
 // === TIME BANK ===
 
 /** Configuration for {@link createTimeBank}. */
@@ -108,11 +103,7 @@ export interface TimeBank {
  */
 export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
   const { earnEfficiency = 1, cap } = config;
-  const bankContextId = resolveSystemContextId(
-    config.id,
-    'time-bank',
-    () => `time-bank_${++timeBankCounter}`,
-  );
+  const bankContextId = resolveSystemContextId(config.id, 'time-bank');
   const banked = withPersistentContext(bankContextId, () =>
     persistent<number>(0, { name: 'banked' }),
   );

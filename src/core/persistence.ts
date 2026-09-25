@@ -488,22 +488,25 @@ export function getCurrentContext(): string | undefined {
   return top === undefined ? undefined : stripNamespace(top);
 }
 
+/** Per-kind counters behind {@link resolveSystemContextId}'s fallback. */
+const systemFallbackCounts = new Map<string, number>();
+
 /**
  * Context id for a system a module usually builds once: the explicit `id` as
- * given, else `${ambient}/${kind}`, else `fallback()` (a build outside any
- * module — tests). The kind keeps two systems in one module from sharing a
- * context and colliding on common ref names like `unlocked`.
+ * given, else `${ambient}/${kind}`, else `${kind}_${n}` from a per-kind
+ * counter (a build outside any module — tests). The kind keeps two systems in
+ * one module from sharing a context and colliding on common ref names like
+ * `unlocked`.
  *
  * @internal
  */
-export function resolveSystemContextId(
-  id: string | undefined,
-  kind: string,
-  fallback: () => string,
-): string {
+export function resolveSystemContextId(id: string | undefined, kind: string): string {
   if (id !== undefined) return id;
   const ambient = getCurrentContext();
-  return ambient !== undefined ? `${ambient}/${kind}` : fallback();
+  if (ambient !== undefined) return `${ambient}/${kind}`;
+  const n = systemFallbackCounts.get(kind) ?? 0;
+  systemFallbackCounts.set(kind, n + 1);
+  return `${kind}_${n}`;
 }
 
 /**

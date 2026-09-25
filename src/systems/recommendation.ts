@@ -274,10 +274,6 @@ export interface RecommendationSystem {
   dispose(): void;
 }
 
-// === CONSTANTS ===
-
-let recSystemCounter = 0;
-
 // === PRIVATE BUILDERS ===
 
 function serialize(rec: Recommendation): SerializedRecommendation {
@@ -382,11 +378,7 @@ export function createRecommendationSystem(
   } = options;
 
   // --- Persistence ---
-  const contextId = resolveSystemContextId(
-    id,
-    'recommendation',
-    () => `recSystem_${recSystemCounter++}`,
-  );
+  const contextId = resolveSystemContextId(id, 'recommendation');
   const { storedRecommendation, autoApply } = withPersistentContext(contextId, () => ({
     storedRecommendation: persistent<SerializedRecommendation | null>(null, {
       name: 'storedRecommendation',

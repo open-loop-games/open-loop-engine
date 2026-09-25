@@ -197,8 +197,6 @@ export interface Cycle extends ScopedReset {
 
 // === FACTORIES ===
 
-let cycleCounter = 0;
-
 /**
  * Create a cycle — a bounded run that ends, resets a scope, and replays.
  *
@@ -242,7 +240,7 @@ export function createCycle(options: CycleOptions): Cycle {
     registerTick,
   } = options;
 
-  const contextId = resolveSystemContextId(id, 'cycle', () => `cycle_${cycleCounter++}`);
+  const contextId = resolveSystemContextId(id, 'cycle');
   const { count, bestTime, elapsed } = withPersistentContext(contextId, () => ({
     count: persistent(0, { name: 'count', lifetime: true }),
     bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),

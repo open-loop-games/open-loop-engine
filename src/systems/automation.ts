@@ -141,10 +141,6 @@ export interface AutomationTiers {
   dispose(): void;
 }
 
-// === CONSTANTS ===
-
-let tierSystemCounter = 0;
-
 // === FACTORIES ===
 
 /**
@@ -190,11 +186,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   const defaultUnlocked = initiallyUnlocked ?? (tiers.length > 0 ? [tiers[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = resolveSystemContextId(
-    id,
-    'automation',
-    () => `autoTiers_${tierSystemCounter++}`,
-  );
+  const contextId = resolveSystemContextId(id, 'automation');
   const unlocked = withPersistentContext(contextId, () =>
     persistent<string[]>([...defaultUnlocked], { name: 'unlocked', lifetime: true }),
   );
