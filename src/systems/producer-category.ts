@@ -245,10 +245,12 @@ export interface ProducerCategory<
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /**
-   * The content registry. `registry.patch()` / `pushPatches()` change the def;
-   * an instance sees the change only through a getter that reads `getDef(id)`
-   * or `registry.get(id)`, since value fields and closures over `def` are
-   * copied or frozen at register. The view has no `register`: add defs with the
+   * The content registry. `registry.patch()` / `pushPatches()` change the def
+   * in place, so code reading `def.x` when it runs sees the change. Defs aren't
+   * reactive, though: a computed reading `def.x` directly isn't re-run by a
+   * patch, one reading through `getDef(id)` or `registry.get(id)` is, and a
+   * field given as a value is copied at register and keeps its old one. The
+   * view has no `register`: add defs with the
    * category's `register`, which builds each def's instance and state.
    */
   readonly registry: ContentRegistryView<Def>;
