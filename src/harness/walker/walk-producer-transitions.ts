@@ -43,14 +43,13 @@
  */
 
 import type { Producer } from '@/systems/producer-category';
-import type { Requirement } from '@/core/requirements';
-import { isCostRequirement } from '@/core/requirements';
 import type { GameStateAccessor } from '@/primitives/types';
-import { timeUntilResource, type TransitionDeps } from '@/core/transitions';
+import type { TransitionDeps } from '@/core/transitions';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
 import { forEachCategoryEntity } from '../walk';
 import type { Transition } from './types';
+import { predictAffordable } from './walk-purchasable-transitions';
 
 // ============================================================================
 // TYPES (private)
@@ -65,14 +64,6 @@ interface ProducerEntity {
 // ============================================================================
 // PRIVATE BUILDERS
 // ============================================================================
-
-// TODO(expansion): multi-cost producer repeatables. When a repeatable has
-// N>1 cost requirements, emit one becomes-affordable per resource (or the
-// slowest)? Today we pick the first, mirroring walk-purchasable-transitions.
-// Promote on the first consumer that notices.
-function firstCostRequirement(requirements: Requirement[]): Requirement | undefined {
-  return requirements.find(isCostRequirement);
-}
 
 function buildTransition(
   categoryId: string,
@@ -104,32 +95,18 @@ function emitForEntity(
   // Manual producers with no `repeatable` have no "next purchase" transition
   // to describe — skip entirely rather than emit a null/no-rate placeholder.
   if (!producer.repeatable) return;
-  if (producer.repeatable.maxed.value) return;
-
-  const reqs = producer.repeatable.requirements;
-  const costReq = firstCostRequirement(Array.isArray(reqs) ? reqs : [reqs]);
-  if (!costReq || !isCostRequirement(costReq)) return;
-
-  const costId = costReq.resource.id;
-  const distance = timeUntilResource(costId, producer.repeatable.getCost(1), accessor);
+  const affordable = predictAffordable(producer.repeatable, accessor);
+  if (!affordable) return;
 
   out.push({
     transition: buildTransition(
       categoryId,
       entityId,
       'producer-becomes-affordable',
-      accessor.getResource(costId),
-      distance,
+      affordable.currentValue,
+      affordable.distance,
     ),
-    // `timeUntilResource` reads amount + rate; count/getCost reactivity is
-    // gating-only and invalidates transitively through the purchase that
-    // writes them — deliberately excluded from the narrow dep set.
-    deps: {
-      resources: new Set([costId]),
-      rates: new Set([costId]),
-      unlocks: new Set(),
-      states: new Set(),
-    },
+    deps: affordable.deps,
   });
 }
 

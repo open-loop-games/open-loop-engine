@@ -25,7 +25,6 @@
  */
 
 import type { Purchasable } from '@/systems/purchasable';
-import type { Requirement } from '@/core/requirements';
 import { isCostRequirement } from '@/core/requirements';
 import type { GameStateAccessor } from '@/primitives/types';
 import { Decimal } from '@/primitives/decimal';
@@ -50,11 +49,46 @@ interface PurchasableEntity {
 // PRIVATE BUILDERS
 // ============================================================================
 
-// TODO(expansion): multi-cost purchasables. When a purchasable has N>1 cost
-// requirements, emit one becomes-affordable per resource (or the slowest)?
-// Today we pick the first. Promote on the first consumer that notices.
-function firstCostRequirement(requirements: Requirement[]): Requirement | undefined {
-  return requirements.find(isCostRequirement);
+/**
+ * The affordability emission's shared parts for a purchasable (a producer's
+ * `repeatable` included), or undefined when it's maxed or has no cost
+ * resource to meter against.
+ *
+ * @internal
+ */
+export function predictAffordable(
+  purchasable: Purchasable,
+  accessor: GameStateAccessor,
+):
+  | {
+      distance: Transition['distance'];
+      deps: TransitionDeps;
+      currentValue: Transition['currentValue'];
+    }
+  | undefined {
+  if (purchasable.maxed.value) return undefined;
+
+  // TODO(expansion): multi-cost purchasables. When a purchasable has N>1 cost
+  // requirements, emit one becomes-affordable per resource (or the slowest)?
+  // Today we pick the first. Promote on the first consumer that notices.
+  const reqs = purchasable.requirements;
+  const costReq = (Array.isArray(reqs) ? reqs : [reqs]).find(isCostRequirement);
+  if (!costReq) return undefined;
+
+  const costId = costReq.resource.id;
+  return {
+    distance: timeUntilResource(costId, purchasable.getCost(1), accessor),
+    // `timeUntilResource` reads amount + rate of the cost resource. Amount,
+    // limit and cost are gating state, which the incremental snapshot's gate
+    // signature covers, so they stay out of the dep set.
+    deps: {
+      resources: new Set([costId]),
+      rates: new Set([costId]),
+      unlocks: new Set(),
+      states: new Set(),
+    },
+    currentValue: accessor.getResource(costId),
+  };
 }
 
 function buildTransition(
@@ -84,38 +118,21 @@ function emitForEntity(
   const { def, purchasable } = entity;
   const entityId = def.id;
 
-  // Skip if already at the limit — nothing to become affordable.
-  if (purchasable.maxed.value) return;
-
-  // Skip if there's no cost resource to run distance math against. Boolean-
-  // only gates and unlock/state predicates are opaque to the walker.
-  const costReq = firstCostRequirement(
-    Array.isArray(purchasable.requirements) ? purchasable.requirements : [purchasable.requirements],
-  );
-  if (!costReq || !isCostRequirement(costReq)) return;
-
-  const costId = costReq.resource.id;
-  const distance = timeUntilResource(costId, purchasable.getCost(1), accessor);
-
-  // `timeUntilResource` reads amount + rate of the cost resource; limit /
-  // amount / maxed reactivity is gating-only and invalidates transitively
-  // through the purchase that writes them — intentionally not in the dep set.
-  const depsShape = (): TransitionDeps => ({
-    resources: new Set([costId]),
-    rates: new Set([costId]),
-    unlocks: new Set(),
-    states: new Set(),
-  });
+  // Maxed, or boolean-only gates and unlock/state predicates with no cost
+  // resource to run distance math against.
+  const affordable = predictAffordable(purchasable, accessor);
+  if (!affordable) return;
+  const { distance, deps } = affordable;
 
   out.push({
     transition: buildTransition(
       categoryId,
       entityId,
       'becomes-affordable',
-      accessor.getResource(costId),
+      affordable.currentValue,
       distance,
     ),
-    deps: depsShape(),
+    deps,
   });
 
   // purchasable-maxed: when the next purchase caps the level. Only meaningful
@@ -131,7 +148,7 @@ function emitForEntity(
         purchasable.amount.value,
         distance,
       ),
-      deps: depsShape(),
+      deps,
     });
   }
 }
