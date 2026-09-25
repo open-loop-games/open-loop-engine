@@ -93,23 +93,31 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
 export function createDialogCategory<Def extends { id: string }>(
   options: DialogCategoryOptions<Def>,
 ): DialogCategory<Def> {
+  // Graph id → the def that maps to it. Committed only once a def's graphs all
+  // pass, and buildInstance is the last builder that can throw, so a rejected
+  // def leaves no owner behind.
+  const graphOwners = new Map<string, string>();
   const base: CategoryBase<Def, DialogGraph[], void> = createCategoryBase<Def, DialogGraph[], void>(
     {
       id: options.id,
       buildInstance: (def) => {
         const out = options.mapDialog(def);
         const graphs = Array.isArray(out) ? out : [out];
-        for (const [i, graph] of graphs.entries()) {
-          const prior = base.getAll().find((e) => e.instance.some((g) => g.id === graph.id));
-          const clash = graphs.slice(0, i).some((g) => g.id === graph.id)
-            ? `def "${def.id}" maps to it twice`
-            : prior && `def "${prior.def.id}" and def "${def.id}" both map to it`;
-          if (clash) {
+        const seen = new Set<string>();
+        for (const graph of graphs) {
+          const owner = seen.has(graph.id) ? def.id : graphOwners.get(graph.id);
+          if (owner !== undefined) {
+            const clash =
+              owner === def.id
+                ? `def "${def.id}" maps to it twice`
+                : `def "${owner}" and def "${def.id}" both map to it`;
             throw new Error(
               `DialogCategory "${options.id}": duplicate dialog graph id "${graph.id}" — ${clash}. Graph ids are unique across a category.`,
             );
           }
+          seen.add(graph.id);
         }
+        for (const id of seen) graphOwners.set(id, def.id);
         return graphs;
       },
     },
