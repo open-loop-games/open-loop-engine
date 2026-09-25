@@ -6,8 +6,8 @@
  * converting prestige currency. This module provides:
  *
  * - {@link createResource} — create a named value with auto-persistence,
- *   engine-scoped registration, and the always-present `cumulative` / `best`
- *   trackers
+ *   engine-scoped registration, and the lifetime `cumulative` / `best`
+ *   trackers (built when the resource is created inside a persistent context)
  * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic helpers
  * - {@link displayResource} — formatted string using the resource's precision settings
  * - {@link unwrapResource} — dereference a `Resource | Ref<Resource>` to the underlying Resource
@@ -63,8 +63,10 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
   /**
    * Cumulative-gain accumulator — sums every strictly-increasing motion of
    * the resource over its full life. Decreases don't subtract; refunds
-   * (a decrease followed by a re-increase) count as new gain. Always present
-   * for persistent resources; absent for derived/computed resources created
+   * (a decrease followed by a re-increase) count as new gain. Starts at the
+   * resource's default, so a starting balance counts as earned. Present on a
+   * persistent resource created inside a persistent context (any engine
+   * module); absent outside one, and for derived/computed resources created
    * via the {@link createResource} ref-wrapping overload.
    *
    * Persistent under a per-resource sub-context, so two resources in the
@@ -78,9 +80,8 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
   cumulative?: Ref<DecimalSource> & Persistent<DecimalSource>;
   /**
    * High-water mark. Monotonically non-decreasing over the resource's full
-   * life. Always present for persistent resources; absent for derived/
-   * computed resources created via the {@link createResource} ref-wrapping
-   * overload. Persistent under a per-resource sub-context, tagged
+   * life. Present and absent exactly as {@link Resource.cumulative} is.
+   * Persistent under a per-resource sub-context, tagged
    * `lifetime: true` so module-scoped resets pass it over (same opt-out
    * shape as {@link Resource.cumulative}).
    */

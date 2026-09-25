@@ -31,7 +31,7 @@ import { notationManager } from './notation-manager';
 // below is the same class that break_eternity default-exports; the `type`
 // namespace points at the instance type so `const d: Decimal = new Decimal(…)`
 // and `x instanceof Decimal` both read naturally.
-/** Anything {@link toDecimal} accepts — a live `Decimal`, a `number`, or a numeric string. */
+/** Anything {@link bn} accepts — a live `Decimal`, a `number`, or a numeric string. */
 export type DecimalSource = OrigDecimal | number | string;
 /** Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. */
 export type Decimal = OrigDecimal;
@@ -250,8 +250,9 @@ export function bn(x: DecimalSource): Decimal {
 /**
  * Coerce a DecimalSource to a native number. Fast path for `number` inputs
  * (identity); slow path routes through a Decimal for strings and instances.
- * Use at the JS-iteration / native-math boundary where chain-calling
- * `.toNumber()` on a widened arithmetic return would be a type error.
+ * Use at the JS-iteration / native-math boundary, where a value typed
+ * `DecimalSource` (a resource's value, a config field) has no `.toNumber()`
+ * to call until it is known to be a Decimal.
  */
 export function toNumber(x: DecimalSource): number {
   return typeof x === 'number' ? x : new OrigDecimal(x).toNumber();

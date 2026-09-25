@@ -26,19 +26,10 @@ export interface UnlockEffect {
   value: boolean;
 }
 
-/**
- * Writes an arbitrary value to a dot-path in game state (e.g. `"player.phase"`).
- *
- * **Reserved path conventions** (used by core/systems modules):
- * - `dialog.{graphId}.activeNode` — current node id (string | undefined)
- * - `dialog.{graphId}.visits.{nodeId}` — visit count (number)
- * - `rel.{categoryId}.{actor}.{dim}` — scalar / vector dim value (number)
- * - `rel.{categoryId}.{actor}.tier` — tier index (number)
- * - `rel.{categoryId}.{actor}.flags.{name}` — boolean flag
- */
+/** Writes an arbitrary value to a dot-path in game state (e.g. `"player.phase"`). */
 export interface StateEffect {
   type: 'state';
-  /** Dot-separated path into game state (e.g. `"player.phase"`). See StateEffect doc for reserved-path conventions. */
+  /** Dot-separated path into game state (e.g. `"player.phase"`). */
   target: string;
   value: unknown;
 }
