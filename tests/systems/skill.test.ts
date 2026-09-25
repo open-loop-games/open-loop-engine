@@ -594,6 +594,24 @@ describe('onLevelUp', () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
+  it('a handler that throws during addXp leaves later direct writes silent', () => {
+    const callback = vi.fn().mockImplementationOnce(() => {
+      throw new Error('handler failed');
+    });
+    const skill = createSkill({
+      id: 'levelup-throw',
+      xpToLevel: quadraticXpToLevel,
+      levelToMultiplier: expMultiplier(1.05),
+      onLevelUp: callback,
+    });
+
+    expect(() => skill.addXp(200)).toThrow('handler failed'); // level 0→2
+    callback.mockClear();
+
+    skill.xp.value = 5000; // save-load rehydration: level 2→10
+    expect(callback).not.toHaveBeenCalled();
+  });
+
   it('fires multiple times across separate addXp calls', () => {
     const callback = vi.fn();
     const skill = createSkill({

@@ -288,11 +288,14 @@ function buildAddXp(
 
   function addXp(amount: DecimalSource) {
     gainInProgress.value = true;
-    const gained = gainChain.apply(amount);
-    const newXp = Decimal.add(xp.value, gained);
-    const cap = processedMaxXp != null ? unref(processedMaxXp) : undefined;
-    xp.value = cap != null ? Decimal.min(newXp, cap) : newXp;
-    gainInProgress.value = false;
+    try {
+      const gained = gainChain.apply(amount);
+      const newXp = Decimal.add(xp.value, gained);
+      const cap = processedMaxXp != null ? unref(processedMaxXp) : undefined;
+      xp.value = cap != null ? Decimal.min(newXp, cap) : newXp;
+    } finally {
+      gainInProgress.value = false;
+    }
   }
 
   return { addXp, gainInProgress };
