@@ -1,12 +1,13 @@
 /**
  * Property test for {@link createIncrementalSnapshot}.
  *
- * A seeded RNG generates random mutation sequences against a shared mixed
- * engine fixture (one purchasable category, one producer category, one
- * challenge category — exercises all three dep axes plus state). After each
- * mutation, the incremental cache receives a targeted `invalidate*` call
- * matching the axis that changed, and `inc.rebuild()` is asserted
- * deep-equal to a fresh `createTransitionSnapshot(...)` call.
+ * A seeded RNG generates random mutation sequences against the shared mixed
+ * engine fixture (one category per walker leaf, challenge gates on every dep
+ * axis). Accessor mutations are followed by a targeted `invalidate*` call on
+ * the axis that changed; entity mutations (levels, resets, challenge entry
+ * and completions) by none, since the cache reads gating state itself. After
+ * each step `inc.rebuild()` is asserted deep-equal to a fresh
+ * `createTransitionSnapshot(...)` call.
  *
  * Catches invalidation gaps the scripted equivalence suite misses: scripted
  * sequences can only probe shapes the author thought of, whereas random
@@ -15,136 +16,33 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
-import { createResource } from '@/core/resource';
-import { createCostRequirement } from '@/core/requirements';
-import { createPurchasableCategory } from '@/systems/purchasable-category';
-import { createProducerCategory } from '@/systems/producer-category';
-import { createChallengeCategory } from '@/systems/challenge-category';
-import { C } from '@/core/conditions';
 import { resetAllPersistentContexts } from '@/core/persistence';
-import { bn } from '@/primitives/decimal';
 import { createSeededRNG } from '@/primitives/rng';
-import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot, createIncrementalSnapshot } from '@/harness/walker';
+import {
+  buildMixedEngine,
+  expectSnapshotsEquivalent,
+  mutableAccessor,
+  type MutableAccessorConfig,
+} from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
 
-interface MutableAccessorConfig {
-  resources: Record<string, number>;
-  rates: Record<string, number>;
-  unlocks: Record<string, boolean>;
-  state: Record<string, unknown>;
-}
+type Fixture = ReturnType<typeof buildMixedEngine>;
 
-function mutableAccessor(config: MutableAccessorConfig): {
-  accessor: GameStateAccessor;
-  config: MutableAccessorConfig;
-} {
-  return {
-    accessor: {
-      getResource: (id) => bn(config.resources[id] ?? 0),
-      isUnlocked: (id) => config.unlocks[id] ?? false,
-      getState: (path) => config.state[path],
-      getRate: (id) => bn(config.rates[id] ?? 0),
-    },
-    config,
-  };
-}
-
-interface UpgradeDef {
-  id: string;
-  cost: number;
-}
-
-interface BuildingDef {
-  id: string;
-  baseRate: number;
-  baseCost: number;
-}
-
-function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
-  const module: EngineModule = {
-    id: `inc-property-${gameId}`,
-    install(ctx) {
-      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-      const gems = createResource(0, { id: 'gems', displayName: 'gems' });
-
-      const upgrades = createPurchasableCategory<UpgradeDef>({
-        id: 'upgrades',
-        mapPurchasable: (def) => ({
-          display: { description: def.id },
-          requirements: [createCostRequirement({ resource: gold, cost: def.cost })],
-          limit: 1,
-        }),
-      });
-      upgrades.register([
-        { id: 'slow', cost: 200 },
-        { id: 'fast', cost: 20 },
-      ]);
-
-      const buildings = createProducerCategory<BuildingDef>({
-        id: 'farms',
-        mapProducer: (def) => ({
-          resource: gems,
-          baseRate: def.baseRate,
-          trigger: 'continuous',
-          purchase: {
-            costResource: gold,
-            baseCost: def.baseCost,
-            costScaling: 1.15,
-          },
-        }),
-        registerTick: ctx.onTick,
-      });
-      buildings.register([
-        { id: 'wheat', baseRate: 1, baseCost: 50 },
-        { id: 'fallow', baseRate: 0, baseCost: 150 },
-      ]);
-
-      const challenges = createChallengeCategory({
-        id: 'trials',
-        accessor,
-      });
-      challenges.register({
-        id: 'bronze',
-        name: 'Bronze',
-        canStart: C.and(
-          C.resource('gems', 'gte', 5),
-          C.unlock('bronze-unlock'),
-          C.state('trial.seen', 'eq', true),
-        ),
-        goal: C.resource('gems', 'gte', 10),
-      });
-
-      ctx.provide(CategoriesKey, {
-        purchasables: [upgrades],
-        producers: [buildings],
-        challenges: [challenges],
-      } as EngineCategories);
-    },
-  };
-
-  const engine = createEngine({ gameId, persistence: false });
-  engine.use(module);
-  engine.start();
-  return { engine };
-}
-
-type MutationAxis = 'resource' | 'rate' | 'unlock' | 'state';
+type MutationAxis = 'resource' | 'rate' | 'unlock' | 'state' | 'entity';
 
 interface Mutation {
   axis: MutationAxis;
   key: string;
-  apply: (config: MutableAccessorConfig) => void;
+  apply: (config: MutableAccessorConfig, fixture: Fixture) => void;
 }
 
-// Candidate mutations — keys chosen to span tracked-axis ids that the
-// mixed engine actually reads (cost resources: `gold`; tracked state path:
-// `trial.seen`). Random values cover both equal-to-last (no-op invalidation)
-// and strictly-different.
+// Candidate mutations. Accessor keys span every id the fixture's gates and
+// costs read; entity mutations move each leaf's gating state. Random values
+// cover both equal-to-last (no-op) and strictly-different.
 function makeMutationPool(rng: () => number): Mutation[] {
   const resourceKeys = ['gold', 'gems'];
   const rateKeys = ['gold', 'gems'];
@@ -187,15 +85,58 @@ function makeMutationPool(rng: () => number): Mutation[] {
       },
     });
   }
+  for (const id of ['slow', 'fast']) {
+    pool.push({
+      axis: 'entity',
+      key: `upgrades.${id}`,
+      apply: (_c, f) => {
+        f.upgrades.getPurchasable(id)!.amount.value = rng() < 0.5 ? 0 : 1;
+      },
+    });
+  }
+  pool.push({
+    axis: 'entity',
+    key: 'upgrades.limit',
+    apply: (_c, f) => {
+      f.upgradeLimit.value = 1 + Math.floor(rng() * 3);
+    },
+  });
+  for (const id of ['wheat', 'mill']) {
+    pool.push({
+      axis: 'entity',
+      key: `farms.${id}`,
+      apply: (_c, f) => {
+        f.buildings.getProducer(id)!.repeatable!.amount.value = Math.floor(rng() * 3);
+      },
+    });
+  }
+  for (const id of ['bronze', 'silver']) {
+    pool.push({
+      axis: 'entity',
+      key: `trials.${id}.active`,
+      apply: (_c, f) => {
+        const challenge = f.trials.getChallenge(id)!;
+        challenge.active.value = !challenge.active.value;
+      },
+    });
+    pool.push({
+      axis: 'entity',
+      key: `trials.${id}.completions`,
+      apply: (_c, f) => {
+        f.trials.getChallenge(id)!.completions.value = Math.floor(rng() * 3);
+      },
+    });
+  }
   return pool;
 }
 
 function applyMutation(
   mutation: Mutation,
   config: MutableAccessorConfig,
+  fixture: Fixture,
   inc: ReturnType<typeof createIncrementalSnapshot>,
 ): void {
-  mutation.apply(config);
+  mutation.apply(config, fixture);
   switch (mutation.axis) {
     case 'resource':
       inc.invalidateResource(mutation.key);
@@ -209,21 +150,9 @@ function applyMutation(
     case 'state':
       inc.invalidateState(mutation.key);
       break;
+    case 'entity':
+      break;
   }
-}
-
-function expectEquivalent(
-  inc: ReturnType<typeof createIncrementalSnapshot>,
-  engine: ReturnType<typeof buildMixedEngine>['engine'],
-  accessor: GameStateAccessor,
-  label: string,
-): void {
-  const direct = createTransitionSnapshot(engine, accessor);
-  const cached = inc.rebuild();
-  expect(cached.all, `${label}: .all mismatch`).toEqual(direct.all);
-  expect(cached.challenges, `${label}: .challenges mismatch`).toEqual(direct.challenges);
-  expect(cached.purchasables, `${label}: .purchasables mismatch`).toEqual(direct.purchasables);
-  expect(cached.producers, `${label}: .producers mismatch`).toEqual(direct.producers);
 }
 
 describe('createIncrementalSnapshot — random-mutation equivalence', () => {
@@ -242,16 +171,17 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
         unlocks: { 'bronze-unlock': false, 'silver-unlock': false },
         state: { 'trial.seen': false, 'trial.retired': false },
       });
-      const { engine } = buildMixedEngine(`inc-property-${seed}`, accessor);
+      const fixture = buildMixedEngine(`inc-property-${seed}`, accessor);
+      const { engine } = fixture;
       const inc = createIncrementalSnapshot(engine, accessor);
       const pool = makeMutationPool(rng);
 
-      expectEquivalent(inc, engine, accessor, `seed ${seed} initial`);
+      expectSnapshotsEquivalent(inc, engine, accessor, `seed ${seed} initial`);
 
       for (let step = 0; step < STEPS_PER_SEED; step++) {
         const mutation = pool[Math.floor(rng() * pool.length)]!;
-        applyMutation(mutation, config, inc);
-        expectEquivalent(
+        applyMutation(mutation, config, fixture, inc);
+        expectSnapshotsEquivalent(
           inc,
           engine,
           accessor,
@@ -261,12 +191,7 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
     });
   }
 
-  it('targeted invalidation recovers after a mutation axis was missed', () => {
-    // Simulates a bug where the caller mutates state but forgets to
-    // invalidate; the next full-rebuild (via invalidateAll) must still
-    // recover. Selective rebuild under *stale* dirty state would diverge
-    // silently, so this guards against regressions.
-    const rng = createSeededRNG(1234);
+  it('a missed invalidation stays stale until invalidateAll recovers it', () => {
     const { accessor, config } = mutableAccessor({
       resources: { gold: 0, gems: 0 },
       rates: { gold: 2, gems: 1 },
@@ -275,24 +200,19 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
     });
     const { engine } = buildMixedEngine('inc-property-recovery', accessor);
     const inc = createIncrementalSnapshot(engine, accessor);
+    const before = inc.rebuild();
 
-    // Silent mutation (no invalidation) — cache is now stale relative to accessor.
-    config.resources.gold = Math.floor(rng() * 1000);
-    config.unlocks['bronze-unlock'] = true;
-    config.state['trial.seen'] = true;
-
-    // Targeted invalidate on one axis. Selective rebuild will miss the
-    // silent mutations — that's expected, that's the whole point of the
-    // "must invalidate or invalidateAll" contract. So we assert divergence
-    // first, then recover via invalidateAll.
-    inc.invalidateResource('gems'); // unrelated axis, mutation wasn't here
+    // Dep-slot moves that flip no gate: the rates feed every distance, but
+    // only an unrelated id is invalidated, so the selective path keeps the
+    // cached entries.
+    config.rates.gold = 7;
+    config.rates.gems = 3;
+    inc.invalidateUnlock('silver-unlock');
     const stale = inc.rebuild();
-    // (We don't assert stale !== direct here — on some mutation subsets
-    //  selective may happen to coincide with direct. The point is that
-    //  invalidateAll guarantees recovery regardless.)
-    void stale;
+    expect(stale.all).toEqual(before.all);
+    expect(stale.all).not.toEqual(createTransitionSnapshot(engine, accessor).all);
 
     inc.invalidateAll();
-    expectEquivalent(inc, engine, accessor, 'post-invalidateAll-recovery');
+    expectSnapshotsEquivalent(inc, engine, accessor, 'post-invalidateAll-recovery');
   });
 });
