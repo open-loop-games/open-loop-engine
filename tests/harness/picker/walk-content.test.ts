@@ -120,6 +120,37 @@ describe('walkContent', () => {
     engine.stop();
   });
 
+  it('emits declared bindings of inactive effects, with no live chain position', () => {
+    const built = ref(false);
+    const mod: EngineModule = {
+      id: 'fx',
+      install() {
+        const regen = createModifierChain('regen');
+        regen.add(createMultiplicativeModifier({ multiplier: 2 }));
+        const pers = createPersistentEffectSystem({ id: 'auras' });
+        pers.register({
+          id: 'library-bonus',
+          active: computed(() => built.value),
+          modifiers: [
+            { chain: regen, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) },
+          ],
+        });
+      },
+    };
+    const engine = createEngine({
+      gameId: 'wco-5',
+      persistence: false,
+      persistenceNamespace: `wco-5-${Math.random().toString(36).slice(2)}`,
+    });
+    engine.use(mod);
+    engine.start();
+
+    expect(walkContent(engine)[0].indexInChain).toBe(-1);
+    built.value = true;
+    expect(walkContent(engine)[0].indexInChain).toBe(1);
+    engine.stop();
+  });
+
   it('engine without EffectSystemRegistryKey degrades to empty array', () => {
     const engine = createEngine({
       gameId: 'wco-4',

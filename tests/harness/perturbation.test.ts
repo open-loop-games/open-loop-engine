@@ -1,15 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import { ref } from 'vue';
 import {
   CategoriesKey,
+  createAdditiveModifier,
   createEngine,
   createModifierChain,
   createMultiplicativeModifier,
+  createPersistentEffectSystem,
   createProducerCategory,
   createTemporaryEffectSystem,
   createTuningRegistry,
   Decimal,
   TuningRegistriesKey,
   tunable,
+  type Engine,
   type EngineCategories,
   type EngineModule,
 } from '@/index';
@@ -18,6 +22,43 @@ import { applyPerturbation } from '@/harness/perturbation';
 
 function num(v: unknown): number {
   return Decimal.fromValue(v as Decimal).toNumber();
+}
+
+function startEngine(gameId: string, mod: EngineModule): Engine {
+  const engine = createEngine({
+    gameId,
+    persistence: false,
+    persistenceNamespace: `${gameId}-${Math.random().toString(36).slice(2)}`,
+  });
+  engine.use(mod);
+  engine.start();
+  return engine;
+}
+
+/** `dmg` = [flat +5, mult ×2], each bound by a persistent effect gated on its own flag. */
+function persistentDamage(gameId: string) {
+  const on = { flat: ref(true), mult: ref(true) };
+  const flat = createAdditiveModifier({ addend: 5 });
+  let dmg!: ReturnType<typeof createModifierChain>;
+  const engine = startEngine(gameId, {
+    id: 'fx',
+    install() {
+      dmg = createModifierChain('dmg');
+      const effects = createPersistentEffectSystem({ id: 'gear' });
+      effects.register([
+        { id: 'flat', active: () => on.flat.value, modifiers: [{ chain: dmg, modifier: flat }] },
+        {
+          id: 'mult',
+          active: () => on.mult.value,
+          modifiers: [
+            { chain: dmg, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) },
+          ],
+        },
+      ]);
+    },
+  });
+  const entry = (label: string) => walkContent(engine).find((e) => e.label === label)!;
+  return { engine, on, flat, dmg: () => dmg, entry };
 }
 
 describe('applyPerturbation — chain-registry source', () => {
@@ -59,6 +100,71 @@ describe('applyPerturbation — chain-registry source', () => {
     expect(num(chain.apply(10))).toBe(20);
     expect(chain.modifiers).toHaveLength(1);
 
+    engine.stop();
+  });
+
+  it('swaps a modifier in place, so order and value survive perturbation and cleanup', () => {
+    const engine = startEngine('pert-cr-order', {
+      id: 'economy',
+      install() {
+        const gain = createModifierChain('gain');
+        gain.add(createAdditiveModifier({ addend: 5 }));
+        gain.add(createMultiplicativeModifier({ multiplier: 2 }));
+      },
+    });
+    const entry = walkChainRegistry(engine).find((e) => e.label === 'gain[0]')!;
+    const { chain } = entry;
+    const order = [...chain.modifiers];
+    expect(num(chain.apply(1))).toBe(12);
+
+    const identity = applyPerturbation(engine, entry, { kind: 'scalar-multiply', factor: 1 });
+    expect(num(chain.apply(1))).toBe(12);
+    expect(chain.modifiers[1]).toBe(order[1]);
+    identity();
+    expect(num(chain.apply(1))).toBe(12);
+    expect(chain.modifiers).toEqual(order);
+
+    // Re-applying the same entry wraps the same modifier: (1 + 5 + 100) × 2.
+    const again = applyPerturbation(engine, entry, { kind: 'scalar-add', delta: 100 });
+    expect(num(chain.apply(1))).toBe(212);
+    again();
+    expect(chain.modifiers).toEqual(order);
+    engine.stop();
+  });
+
+  it('finds the discovered modifier after an earlier slot fills and shifts its index', () => {
+    const { engine, on, dmg } = persistentDamage('pert-cr-stale');
+    on.flat.value = false;
+    const multEntry = walkChainRegistry(engine).find((e) => e.label === 'dmg[0]')!;
+    on.flat.value = true;
+
+    // mult wrapped: (1 + 5) × 2 + 10; the modifier now at index 0 would give (1 + 5 + 10) × 2.
+    const cleanup = applyPerturbation(engine, multEntry, { kind: 'scalar-add', delta: 10 });
+    expect(num(dmg().apply(1))).toBe(22);
+    cleanup();
+    expect(num(dmg().apply(1))).toBe(12);
+    engine.stop();
+  });
+
+  it('composes stacked perturbations of one modifier, unwinding in any order', () => {
+    const engine = startEngine('pert-cr-stack', {
+      id: 'economy',
+      install() {
+        const gain = createModifierChain('gain');
+        gain.add(createAdditiveModifier({ addend: 5 }));
+        gain.add(createMultiplicativeModifier({ multiplier: 2 }));
+      },
+    });
+    const entry = walkChainRegistry(engine).find((e) => e.label === 'gain[0]')!;
+    const order = [...entry.chain.modifiers];
+    const times3 = applyPerturbation(engine, entry, { kind: 'scalar-multiply', factor: 3 });
+    const plus4 = applyPerturbation(engine, entry, { kind: 'scalar-add', delta: 4 });
+    // ((1 + 5) × 3 + 4) × 2
+    expect(num(entry.chain.apply(1))).toBe(44);
+    times3();
+    expect(num(entry.chain.apply(1))).toBe(20);
+    plus4();
+    expect(entry.chain.modifiers).toEqual(order);
     engine.stop();
   });
 
@@ -256,39 +362,196 @@ describe('applyPerturbation — content source', () => {
     engine.stop();
   });
 
-  it('throws on factory bindings that cannot resolve a live modifier', () => {
-    const mod: EngineModule = {
-      id: 'fx',
-      install(ctx) {
-        const chain = createModifierChain('maxHealth');
-        const temp = createTemporaryEffectSystem({
-          id: 'buffs',
-          registerTick: (cb) => ctx.onTick(cb),
-        });
-        temp.register({
-          id: 'shield',
-          duration: 5,
-          modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 3 }) }],
-        });
-      },
-    };
-    const engine = createEngine({
-      gameId: 'pert-content-2',
-      persistence: false,
-      persistenceNamespace: `pert-content-2-${Math.random().toString(36).slice(2)}`,
+  it('perturbs every activation of the binding, in its place, until cleanup', () => {
+    const { engine, on, flat, dmg, entry } = persistentDamage('pert-content-toggle');
+    const cleanup = applyPerturbation(engine, entry('gear.flat[0]'), {
+      kind: 'scalar-multiply',
+      factor: 3,
     });
-    engine.use(mod);
-    engine.start();
+    expect(num(dmg().apply(1))).toBe(36);
 
-    const entry = walkContent(engine).find((e) => e.label === 'buffs.shield[0]')!;
-    expect(entry).toBeDefined();
-    // Walker couldn't locate the factory-produced instance in the chain.
-    expect(entry.indexInChain).toBe(-1);
+    on.flat.value = false;
+    expect(num(dmg().apply(1))).toBe(2);
+    expect(dmg().modifiers).toHaveLength(1);
 
-    expect(() => applyPerturbation(engine, entry, { kind: 'scalar-multiply', factor: 2 })).toThrow(
-      /factory modifier/,
+    on.flat.value = true;
+    expect(num(dmg().apply(1))).toBe(36);
+    expect(dmg().modifiers).toHaveLength(2);
+
+    cleanup();
+    expect(num(dmg().apply(1))).toBe(12);
+    expect(dmg().modifiers[0]).toBe(flat);
+    expect(dmg().modifiers).toHaveLength(2);
+    engine.stop();
+  });
+
+  it('leaves an effect that deactivated while perturbed unbound after cleanup', () => {
+    const { engine, on, dmg, entry } = persistentDamage('pert-content-off');
+    const cleanup = applyPerturbation(engine, entry('gear.flat[0]'), {
+      kind: 'scalar-add',
+      delta: 10,
+    });
+    on.flat.value = false;
+    cleanup();
+    expect(num(dmg().apply(1))).toBe(2);
+    expect(dmg().modifiers).toHaveLength(1);
+    engine.stop();
+  });
+
+  it('perturbs a factory-form binding', () => {
+    const { engine, on, dmg, entry } = persistentDamage('pert-content-factory');
+    const cleanup = applyPerturbation(engine, entry('gear.mult[0]'), {
+      kind: 'scalar-multiply',
+      factor: 3,
+    });
+    expect(num(dmg().apply(1))).toBe(36);
+    on.mult.value = false;
+    on.mult.value = true;
+    expect(num(dmg().apply(1))).toBe(36);
+    cleanup();
+    expect(num(dmg().apply(1))).toBe(12);
+    engine.stop();
+  });
+
+  it('wraps the right binding from a snapshot taken before other effects churned', () => {
+    const { engine, on, dmg, entry } = persistentDamage('pert-content-stale');
+    on.flat.value = false;
+    const multEntry = entry('gear.mult[0]');
+    on.flat.value = true;
+
+    // mult wrapped: (1 + 5) × 2 + 10; flat wrapped would give (1 + 5 + 10) × 2.
+    const cleanup = applyPerturbation(engine, multEntry, { kind: 'scalar-add', delta: 10 });
+    expect(num(dmg().apply(1))).toBe(22);
+    cleanup();
+    expect(num(dmg().apply(1))).toBe(12);
+    engine.stop();
+  });
+
+  it('composes stacked perturbations of one binding, unwinding in any order', () => {
+    const { engine, flat, dmg, entry } = persistentDamage('pert-content-stack');
+    const times3 = applyPerturbation(engine, entry('gear.flat[0]'), {
+      kind: 'scalar-multiply',
+      factor: 3,
+    });
+    const plus4 = applyPerturbation(engine, entry('gear.flat[0]'), {
+      kind: 'scalar-add',
+      delta: 4,
+    });
+    // ((1 + 5) × 3 + 4) × 2
+    expect(num(dmg().apply(1))).toBe(44);
+    times3();
+    expect(num(dmg().apply(1))).toBe(20);
+    plus4();
+    expect(num(dmg().apply(1))).toBe(12);
+    expect(dmg().modifiers[0]).toBe(flat);
+    engine.stop();
+  });
+
+  it('perturbs a temporary effect across expiry and re-application', () => {
+    let tick!: (dt: number) => void;
+    let dmg!: ReturnType<typeof createModifierChain>;
+    let buffs!: ReturnType<typeof createTemporaryEffectSystem>;
+    const engine = startEngine('pert-content-temp', {
+      id: 'fx',
+      install() {
+        dmg = createModifierChain('dmg');
+        buffs = createTemporaryEffectSystem({
+          id: 'buffs',
+          registerTick: (cb) => {
+            tick = cb;
+            return () => {};
+          },
+        });
+        buffs.register({
+          id: 'rage',
+          duration: 2,
+          modifiers: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+        });
+        dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
+      },
+    });
+    const rage = walkContent(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    buffs.apply('rage');
+    expect(num(dmg.apply(1))).toBe(12);
+
+    const cleanup = applyPerturbation(engine, rage, { kind: 'scalar-multiply', factor: 3 });
+    expect(num(dmg.apply(1))).toBe(36);
+    tick(2);
+    expect(num(dmg.apply(1))).toBe(2);
+    expect(dmg.modifiers).toHaveLength(1);
+    buffs.apply('rage');
+    expect(num(dmg.apply(1))).toBe(36);
+
+    cleanup();
+    expect(num(dmg.apply(1))).toBe(12);
+    tick(2);
+    expect(num(dmg.apply(1))).toBe(2);
+    expect(dmg.modifiers).toHaveLength(1);
+    engine.stop();
+  });
+
+  it('perturbs every live stack of a temporary effect, keeping stack order', () => {
+    let tick!: (dt: number) => void;
+    let dmg!: ReturnType<typeof createModifierChain>;
+    let buffs!: ReturnType<typeof createTemporaryEffectSystem>;
+    const engine = startEngine('pert-content-stacks', {
+      id: 'fx',
+      install() {
+        dmg = createModifierChain('dmg');
+        buffs = createTemporaryEffectSystem({
+          id: 'buffs',
+          registerTick: (cb) => {
+            tick = cb;
+            return () => {};
+          },
+        });
+        buffs.register({
+          id: 'rage',
+          duration: 2,
+          maxStacks: 2,
+          modifiers: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+        });
+        dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
+      },
+    });
+    const rage = walkContent(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    buffs.apply('rage');
+    tick(1);
+    buffs.apply('rage');
+    const stacks = [...dmg.modifiers];
+    expect(num(dmg.apply(1))).toBe(22);
+
+    // ((1 + 5) × 3 + 5) × 3 × 2
+    const cleanup = applyPerturbation(engine, rage, { kind: 'scalar-multiply', factor: 3 });
+    expect(num(dmg.apply(1))).toBe(138);
+    tick(1);
+    // (1 + 5) × 3 × 2, the older stack gone
+    expect(num(dmg.apply(1))).toBe(36);
+    expect(dmg.modifiers).toHaveLength(2);
+
+    cleanup();
+    expect(dmg.modifiers).toEqual([stacks[1], stacks[2]]);
+    expect(num(dmg.apply(1))).toBe(12);
+    engine.stop();
+  });
+
+  it('names the missing piece when an entry no longer resolves', () => {
+    const { engine, entry } = persistentDamage('pert-content-missing');
+    const flatEntry = entry('gear.flat[0]');
+    const at = (address: Partial<typeof flatEntry.address>) => ({
+      ...flatEntry,
+      address: { ...flatEntry.address, ...address },
+    });
+    const times2 = { kind: 'scalar-multiply', factor: 2 } as const;
+    expect(() => applyPerturbation(engine, at({ contentType: 'nope' }), times2)).toThrow(
+      /effect system "nope" not found/,
     );
-
+    expect(() => applyPerturbation(engine, at({ contentId: 'nope' }), times2)).toThrow(
+      /effect def "nope" not found/,
+    );
+    expect(() => applyPerturbation(engine, at({ bindingIndex: 3 }), times2)).toThrow(
+      /no binding at index 3/,
+    );
     engine.stop();
   });
 });

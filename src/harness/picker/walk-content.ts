@@ -17,14 +17,13 @@ import type { ModifierPickerEntry } from './types';
  * the engine's {@link EffectSystemRegistryKey} and emit one
  * {@link ModifierPickerEntry} per `ModifierBinding` on each def.
  *
- * Bindings whose `modifiers` field is a factory function are called once
- * at walk time — this is the same semantics the effect systems use
- * internally when they apply bindings. A factory that allocates fresh
- * `Modifier` objects on every call will produce new objects here too,
- * which is fine for a snapshot but means the picker entry's object
- * identity won't match the instance that actually lives in the chain.
- * Consumers needing perturbation against the live instance should prefer
- * the chain-registry walker for those cases.
+ * Every declared binding is emitted, whether or not its effect is active.
+ * Factory-form `modifiers` lists and modifier factories are called once at
+ * walk time, as the effect systems do on activation, so a factory's entry
+ * carries a fresh object that isn't the one living in the chain. That
+ * only affects `modifier` identity and `indexInChain`: perturbation
+ * addresses the binding by system, def and index, and wraps whatever each
+ * activation binds.
  *
  * Missing registry (e.g. an engine constructed outside the standard
  * `createEngine` flow) degrades to an empty array — not a crash.

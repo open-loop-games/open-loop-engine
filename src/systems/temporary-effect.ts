@@ -46,10 +46,9 @@ import { processGetter, type Computable } from '@/core/computed';
 import { persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import type { Modifier } from '@/core/modifier';
 import type { RegisterTick } from '@/core/sequencer';
 import type { ModifierBinding } from './modifier-binding';
-import { createBindingSlots, type BindingSlots } from './binding-slots';
+import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
 
@@ -176,12 +175,6 @@ interface EffectSnapshot {
   timeRemaining: number;
 }
 
-// === INTERNAL CLEANUP TRACKING ===
-
-interface InstanceCleanup {
-  modifierRemovers: (() => void)[];
-}
-
 // === PRIVATE BUILDERS ===
 
 /** A duration in seconds, or a throw when the save's JSON could not hold it. */
@@ -226,7 +219,8 @@ export function createTemporaryEffectSystem(
   const defs = new Map<string, TemporaryEffectDef>();
   const slotsByDef = new Map<string, BindingSlots>();
   const instances = shallowRef<TemporaryEffectInstance[]>([]);
-  const cleanupMap = new Map<string, InstanceCleanup>();
+  /** Live instance id → the function that unbinds its modifiers. */
+  const unbindByInstance = new Map<string, () => void>();
   const handle = createEmitHandle<TemporaryEffectEvents>();
   let instanceCounter = 0;
 
@@ -241,10 +235,6 @@ export function createTemporaryEffectSystem(
 
   function resolveDuration(def: TemporaryEffectDef): number {
     return toFiniteDuration(def.id, unref(processGetter(def.duration)));
-  }
-
-  function resolveModifier(binding: ModifierBinding): Modifier {
-    return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
   }
 
   function lowestFreeStackIndex(defId: string): number {
@@ -279,22 +269,14 @@ export function createTemporaryEffectSystem(
       duration,
       stackIndex,
       dispose() {
-        if (!cleanupMap.has(id)) return;
+        if (!unbindByInstance.has(id)) return;
         expireInstance(instance);
         syncSavedState();
       },
     };
 
-    const modifierRemovers: (() => void)[] = [];
     const bindings = typeof def.modifiers === 'function' ? def.modifiers() : def.modifiers;
-    if (bindings) {
-      const slots = slotsByDef.get(def.id)!;
-      for (const [index, binding] of bindings.entries()) {
-        const slot = slots.slotFor(index, binding.chain);
-        modifierRemovers.push(slot.add(resolveModifier(binding)));
-      }
-    }
-    cleanupMap.set(id, { modifierRemovers });
+    unbindByInstance.set(id, slotsByDef.get(def.id)!.bind(bindings ?? []));
 
     instances.value = [...instances.value, instance];
 
@@ -308,12 +290,13 @@ export function createTemporaryEffectSystem(
     removeInstance(instance);
   }
 
+  function unbindInstance(instance: TemporaryEffectInstance): void {
+    unbindByInstance.get(instance.id)?.();
+    unbindByInstance.delete(instance.id);
+  }
+
   function removeInstance(instance: TemporaryEffectInstance): void {
-    const cleanup = cleanupMap.get(instance.id);
-    if (cleanup) {
-      for (const remover of cleanup.modifierRemovers) remover();
-      cleanupMap.delete(instance.id);
-    }
+    unbindInstance(instance);
     instances.value = instances.value.filter((i) => i.id !== instance.id);
   }
 
@@ -375,7 +358,7 @@ export function createTemporaryEffectSystem(
       // claims on first apply.
       const slots = createBindingSlots();
       if (Array.isArray(d.modifiers)) {
-        for (const [index, binding] of d.modifiers.entries()) slots.slotFor(index, binding.chain);
+        for (const [index, binding] of d.modifiers.entries()) slots.claim(index, binding.chain);
       }
       slotsByDef.set(d.id, slots);
     }
@@ -451,14 +434,7 @@ export function createTemporaryEffectSystem(
 
   function restore(): void {
     // Clear any existing instances without firing events
-    const existing = [...instances.value];
-    for (const instance of existing) {
-      const cleanup = cleanupMap.get(instance.id);
-      if (cleanup) {
-        for (const remover of cleanup.modifierRemovers) remover();
-        cleanupMap.delete(instance.id);
-      }
-    }
+    for (const instance of instances.value) unbindInstance(instance);
     instances.value = [];
 
     for (const snap of savedState.value) {
@@ -479,14 +455,7 @@ export function createTemporaryEffectSystem(
   function dispose(): void {
     unsubscribeTick();
     // Clean up all instances without firing events
-    const all = [...instances.value];
-    for (const instance of all) {
-      const cleanup = cleanupMap.get(instance.id);
-      if (cleanup) {
-        for (const remover of cleanup.modifierRemovers) remover();
-        cleanupMap.delete(instance.id);
-      }
-    }
+    for (const instance of instances.value) unbindInstance(instance);
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
     slotsByDef.clear();
@@ -515,6 +484,7 @@ export function createTemporaryEffectSystem(
   // a module's install() or connect() phase. Systems constructed outside
   // an engine (tests, throwaway scripts) silently skip registration.
   getCurrentEffectSystemRegistry()?.register(system);
+  registerBindingSlots(system, (defId) => slotsByDef.get(defId));
 
   return system;
 }

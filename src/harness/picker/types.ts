@@ -7,7 +7,8 @@
  * - **Structural identity** — `Modifier`s in auto-registered chains and
  *   effect-system content. Discoverable by enumeration of the engine's
  *   ambient registries (`ChainRegistryKey`, `EffectSystemRegistryKey`).
- *   Perturbation mutates the chain.
+ *   Perturbation wraps the modifier in its chain position, or, for
+ *   content, the binding in every activation.
  *
  * - **Addressability identity** — `tunable()` values registered into a
  *   `TuningRegistry`. The designer's opt-in declaration that a value
@@ -54,7 +55,13 @@ export type ModifierPickerAddress =
       chainId: string;
       /** Targets one existing modifier by its position in the chain. */
       variant: 'modifier-index';
-      /** Position of this modifier within the chain's `modifiers` array */
+      /**
+       * Position of this modifier within the chain's `modifiers` array at
+       * snapshot time. Perturbation prefers the entry's `modifier` while it
+       * is still in the chain and falls back to this index otherwise (a
+       * different engine, or the modifier since swapped out) — refresh the
+       * snapshot when the chain changes.
+       */
       modifierIndex: number;
     }
   | {
@@ -96,9 +103,8 @@ export type PickerAddress = ModifierPickerAddress | TunablePickerAddress;
 
 /**
  * A perturbable modifier surface discovered by the picker. Covers both
- * `content` (effect-system bindings) and `chain-registry` (auto-registered
- * `ModifierChain` modifiers) discovery sources — both perturb via chain
- * mutation.
+ * `content` (effect-system bindings, active or not) and `chain-registry`
+ * (auto-registered `ModifierChain` modifiers) discovery sources.
  */
 export interface ModifierPickerEntry {
   kind: 'modifier';
@@ -106,7 +112,13 @@ export interface ModifierPickerEntry {
   modifier: Modifier;
   /** Owning chain. */
   chain: ModifierChain;
-  /** Position of `modifier` within `chain.modifiers`. */
+  /**
+   * Position of `modifier` within `chain.modifiers` at snapshot time, for
+   * display and diagnostics; perturbation doesn't read it. `-1` when the
+   * snapshot's object isn't in the chain: a content binding whose effect
+   * is inactive, one bound through a factory (each call makes a fresh
+   * modifier), or a `chain-apply` entry.
+   */
   indexInChain: number;
   /** Stable address for this entry. */
   address: ModifierPickerAddress;

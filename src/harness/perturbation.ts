@@ -3,17 +3,23 @@
  *
  * Given a {@link PickerEntry} from the picker and a {@link Perturbation},
  * apply the transform via the mechanism appropriate to the entry's
- * `kind`, and return an idempotent cleanup that reverses it.
+ * address, and return an idempotent cleanup that reverses it.
  *
- * Two perturbation mechanisms:
+ * Three perturbation mechanisms:
  *
- * - **Modifier entries** (`kind: 'modifier'`) — chain mutation:
- *   `chain.remove(old); chain.add(wrapped)`. The wrapper composes on top
- *   of the original (`wrapped.apply(g) = original.apply(g) * F` for
- *   scalar-multiply). Picker entries that cannot resolve to a live
- *   modifier (factory bindings whose `modifier` callable allocates a
- *   fresh instance per call, leaving the walker's snapshot un-locatable
- *   in the live chain) throw a plain `Error`.
+ * - **Content entries** (`address.source: 'content'`) — binding overlay:
+ *   the effect system wraps the def's binding in every activation while
+ *   the perturbation is active. A live activation is swapped in place, a
+ *   later one binds wrapped, expiry removes whatever is live, and cleanup
+ *   swaps the originals back in place. Factory-form bindings are covered,
+ *   since the wrap applies to whatever the binding resolves to.
+ *
+ * - **Chain-registry entries** (`address.source: 'chain-registry'`) —
+ *   in-place swap: `chain.replace(target, wrapped)`, and cleanup swaps
+ *   the target back while the wrapper is still in the chain. A
+ *   `modifier-index` entry resolves its target by identity when the
+ *   discovered modifier is in the chain, else by its recorded index. A
+ *   `chain-apply` entry appends a freestanding scalar modifier instead.
  *
  * - **Tunable entries** (`kind: 'tunable'`) — registry scope push:
  *   capture the current resolved value at apply time, then
@@ -23,24 +29,23 @@
  *   entry carries `registryName: string`, not a registry reference, so
  *   perturbing a scratch sensitivity-fork doesn't stomp the live engine.
  *
- * Both kinds return the same `() => void` idempotent cleanup signature,
- * so the workbench composable handles them uniformly.
+ * The modifier wrapper composes on top of the original
+ * (`wrapped.apply(g) = original.apply(g) * F` for scalar-multiply), and
+ * perturbing an already-perturbed surface composes on top of the active
+ * one; cleanups unwind in any order. Every kind returns the same
+ * `() => void` idempotent cleanup, so the workbench composable handles
+ * them uniformly.
  *
  * Composition note: a `tunable()` value that feeds a `ModifierChain` can
  * be perturbed via either path (workbench can choose). Stacking both
  * produces multiplicative composition — different from re-perturbing one
  * path twice. Workbench surfaces both paths so the designer can pick the
  * intended layer.
- *
- * Ordering caveat for modifier mutation: `chain.remove(old); chain.add(wrapped)`
- * appends to the end of the chain regardless of where `old` sat. For
- * sequential modifiers this changes composition order. Acceptable here —
- * the workbench uses perturbation for sensitivity deltas, not absolute
- * baselines.
  */
 
 import type { Engine } from '@/engine';
 import type { Modifier, ModifierChain } from '@/core/modifier';
+import { overlayBinding, type ModifierWrap } from '@/systems/binding-slots';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
 import { TuningRegistriesKey } from '@/core/override-registry';
@@ -57,24 +62,35 @@ export type Perturbation =
  * calls this on every sensitivity run (against the per-run scratch engine)
  * and on commit (against the live engine).
  *
- * Dispatches on `entry.kind`:
- * - `'modifier'` — chain mutation via `chain.remove` + `chain.add(wrapped)`.
+ * Dispatches on the entry's address:
+ * - `'content'` — overlays the effect def's binding, live and future
+ *   activations alike, each in its own chain position.
+ * - `'chain-registry'` — swaps the addressed modifier for its wrapper in
+ *   place (`modifier-index`), or appends a scalar modifier (`chain-apply`).
  * - `'tunable'` — registry scope push capturing the current resolved value.
  *
+ * Perturbing a perturbed surface composes on top of the active
+ * perturbation. Cleanup restores the exact value and chain order, and
+ * leaves a binding whose effect ended meanwhile unbound.
+ *
  * @param engine - The engine to apply against. For modifier entries the
- *   chain is resolved via `ChainRegistryKey` or `EffectSystemRegistryKey`;
+ *   target is resolved via `ChainRegistryKey` or `EffectSystemRegistryKey`;
  *   for tunable entries the registry is resolved via
  *   `TuningRegistriesKey`. Cross-engine: the entry can be discovered
  *   against one engine and applied to another (e.g. live → scratch fork)
- *   because addresses are string-keyed, not object-keyed.
+ *   because addresses are string-keyed, not object-keyed. A
+ *   `modifier-index` entry applied across engines, or after its chain
+ *   changed shape, falls back to its recorded index — refresh the snapshot
+ *   when the chain changes.
  * @param entry - The {@link PickerEntry} naming the surface to perturb.
  * @param perturbation - Scalar transform applied on top of the current
  *   value (multiply or add).
  * @returns Idempotent cleanup function — calling it once reverses the
  *   perturbation; subsequent calls are no-ops.
- * @throws {Error} when the entry cannot resolve to a live surface
- *   (factory bindings, missing registries, unknown chain ids, unknown
- *   tunable keys).
+ * @throws {Error} when the entry cannot resolve on `engine` (missing
+ *   registries, unknown chain or effect-system ids, a def or binding index
+ *   that no longer exists, no modifier at a chain index, unknown tunable
+ *   keys).
  *
  * @example
  * ```ts
@@ -138,13 +154,8 @@ function applyModifierPerturbation(
       if (address.variant === 'chain-apply') {
         return appendChainWrapper(chain, perturbation);
       }
-      const old = chain.modifiers[address.modifierIndex];
-      if (!old) {
-        throw new Error(
-          `chain "${address.chainId}" has no modifier at index ${address.modifierIndex}`,
-        );
-      }
-      return mutateChain(chain, old, perturbation);
+      const target = resolveChainTarget(chain, entry.modifier, address.modifierIndex);
+      return overlayChainModifier(chain, target, (m) => wrapModifier(m, perturbation));
     }
 
     case 'content': {
@@ -165,64 +176,74 @@ function applyModifierPerturbation(
       }
       const raw = def.modifiers;
       if (!raw) throw new Error(`def "${address.contentId}" has no modifier bindings`);
-      const bindings = (typeof raw === 'function' ? raw() : raw) as ReadonlyArray<{
-        chain: ModifierChain;
-        modifier: Modifier | (() => Modifier);
-      }>;
-      const binding = bindings[address.bindingIndex];
-      if (!binding) {
+      const bindings = typeof raw === 'function' ? raw() : raw;
+      if (address.bindingIndex >= bindings.length) {
         throw new Error(
           `def "${address.contentId}" has no binding at index ${address.bindingIndex}`,
         );
       }
-
-      // Factory bindings produce a fresh modifier per call — the walker's
-      // snapshot cannot match the instance actually living in the chain.
-      // indexInChain is -1 in that case (see walk-content.ts resolution).
-      // TODO(expansion): a binding→chain-index map inside the effect systems
-      // would let this case resolve to the live modifier; punted until a
-      // consumer asks.
-      if (entry.indexInChain < 0) {
-        throw new Error(
-          `content: binding "${address.contentType}.${address.contentId}[${address.bindingIndex}]` +
-            `" uses a factory modifier and cannot be located in the live chain`,
-        );
-      }
-
-      const chain = binding.chain;
-      const old = chain.modifiers[entry.indexInChain];
-      if (!old) {
-        throw new Error(
-          `content: live modifier missing at chain "${chain.id}" index ${entry.indexInChain}`,
-        );
-      }
-      return mutateChain(chain, old, perturbation);
+      return overlayBinding(system, address.contentId, address.bindingIndex, (m) =>
+        wrapModifier(m, perturbation),
+      );
     }
   }
 }
 
-function mutateChain(
+/**
+ * The modifier a `modifier-index` entry names in `chain`: the discovered
+ * object itself while it is still there, else whatever sits at the recorded
+ * index — the only handle a cross-engine apply has.
+ */
+function resolveChainTarget(chain: ModifierChain, discovered: Modifier, index: number): Modifier {
+  if (chain.modifiers.includes(discovered)) return discovered;
+  const atIndex = chain.modifiers[index];
+  if (!atIndex) throw new Error(`chain "${chain.id}" has no modifier at index ${index}`);
+  return atIndex;
+}
+
+/** One chain modifier's active perturbations, outermost last. */
+interface ChainOverlay {
+  original: Modifier;
+  wraps: ModifierWrap[];
+  /** The object currently standing in the chain for `original`. */
+  live: Modifier;
+}
+
+/** Live wrapper → its overlay, so perturbing a perturbed modifier composes on the same stack. */
+const chainOverlays = new WeakMap<Modifier, ChainOverlay>();
+
+/** Swap `target` for its wrapped form in place; the cleanup swaps back while the wrapper is still there. */
+function overlayChainModifier(
   chain: ModifierChain,
-  original: Modifier,
-  perturbation: Perturbation,
+  target: Modifier,
+  wrap: ModifierWrap,
 ): () => void {
-  const wrapped = wrapModifier(original, perturbation);
-  chain.remove(original);
-  chain.add(wrapped);
+  const overlay = chainOverlays.get(target) ?? { original: target, wraps: [], live: target };
+  overlay.wraps.push(wrap);
+  reseatChainOverlay(chain, overlay);
 
   let cleaned = false;
   return () => {
     if (cleaned) return;
     cleaned = true;
-    chain.remove(wrapped);
-    chain.add(original);
+    overlay.wraps.splice(overlay.wraps.indexOf(wrap), 1);
+    reseatChainOverlay(chain, overlay);
   };
+}
+
+/** Swap the overlay's live object for its current composition, in place; a no-op once it has left the chain. */
+function reseatChainOverlay(chain: ModifierChain, overlay: ChainOverlay): void {
+  const next = overlay.wraps.reduce((m, wrap) => wrap(m), overlay.original);
+  if (!chain.replace(overlay.live, next)) return;
+  chainOverlays.delete(overlay.live);
+  overlay.live = next;
+  if (overlay.wraps.length > 0) chainOverlays.set(next, overlay);
 }
 
 /**
  * Chain-level perturbation: append a freestanding scalar modifier to the
- * chain's tail and return a cleanup that removes it. Unlike `mutateChain`
- * there's no "original" to swap with — the wrapper composes on whatever
+ * chain's tail and return a cleanup that removes it. Unlike a
+ * `modifier-index` entry there's no original to swap with — the wrapper composes on whatever
  * the chain already holds (including nothing, for auto-registered empty
  * chains).
  */

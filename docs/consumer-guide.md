@@ -351,7 +351,7 @@ The "game code never imports harness" rule applies to runtime gameplay modules (
 
 Two query shapes recur:
 
-- **"What modifiers are live, and where did they come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. See `api/harness.md#picker`.
+- **"What can modify this value, and where does it come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. Content entries are declared effect bindings, active or not; chain entries are what the chains hold now. See `api/harness.md#picker`.
 - **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#content-walker`.
 
 Null `distance.seconds` is intentional and consumer-interpreted: a stasis analyzer treats it as "cannot rule out this transition"; a countdown UI hides null rows entirely. The walker never makes that policy call.

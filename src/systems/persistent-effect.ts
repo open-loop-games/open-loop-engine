@@ -41,9 +41,8 @@ import { computed, ref, watch, unref, type ComputedRef, type WatchStopHandle } f
 import { processGetter, type Computable } from '@/core/computed';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import type { Modifier } from '@/core/modifier';
 import type { ModifierBinding } from './modifier-binding';
-import { createBindingSlots, type BindingSlots } from './binding-slots';
+import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
 
@@ -126,7 +125,7 @@ interface DefEntry {
   activeRef: ComputedRef<boolean>;
   stopWatch: WatchStopHandle;
   slots: BindingSlots;
-  modifierRemovers: (() => void)[];
+  unbind: () => void;
   isApplied: boolean;
   /** True while {@link settle} runs this entry's edges. */
   settling: boolean;
@@ -192,26 +191,16 @@ export function createPersistentEffectSystem(
   // Bumped on every edge so `getActive` / `getByTag` track the applied set.
   const appliedVersion = ref(0);
 
-  function resolveModifier(binding: ModifierBinding): Modifier {
-    return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
-  }
-
   function applyBindings(entry: DefEntry): void {
-    const bindings =
+    const bindings: ModifierBinding[] | undefined =
       typeof entry.def.modifiers === 'function' ? entry.def.modifiers() : entry.def.modifiers;
-    if (bindings) {
-      for (const [index, binding] of bindings.entries()) {
-        const slot = entry.slots.slotFor(index, binding.chain);
-        entry.modifierRemovers.push(slot.add(resolveModifier(binding)));
-      }
-    }
+    entry.unbind = entry.slots.bind(bindings ?? []);
     entry.isApplied = true;
     appliedVersion.value++;
   }
 
   function removeBindings(entry: DefEntry): void {
-    for (const remover of entry.modifierRemovers) remover();
-    entry.modifierRemovers = [];
+    entry.unbind();
     entry.isApplied = false;
     appliedVersion.value++;
   }
@@ -264,7 +253,7 @@ export function createPersistentEffectSystem(
         activeRef,
         stopWatch: () => {},
         slots: createBindingSlots(),
-        modifierRemovers: [],
+        unbind: () => {},
         isApplied: false,
         settling: false,
       };
@@ -273,7 +262,7 @@ export function createPersistentEffectSystem(
       // whenever it activates. A factory-form list claims on first activation.
       if (Array.isArray(d.modifiers)) {
         for (const [index, binding] of d.modifiers.entries()) {
-          entry.slots.slotFor(index, binding.chain);
+          entry.slots.claim(index, binding.chain);
         }
       }
 
@@ -342,6 +331,7 @@ export function createPersistentEffectSystem(
   // a module's install() or connect() phase. Systems constructed outside
   // an engine (tests, throwaway scripts) silently skip registration.
   getCurrentEffectSystemRegistry()?.register(system);
+  registerBindingSlots(system, (defId) => entries.get(defId)?.slots);
 
   return system;
 }
