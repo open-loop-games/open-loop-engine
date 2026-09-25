@@ -530,6 +530,42 @@ describe('createBestOf', () => {
     expect(bestOf.entries.value.gold!.perSecond.eq(Infinity)).toBe(true);
   });
 
+  it('a zero-elapsed run has no rate, so it never beats a timed perSecond best', () => {
+    const bestOf = createBestOf({
+      id: 'bo-zero-loses',
+      metrics: { gold: { mode: 'perSecond' } },
+    });
+
+    bestOf.submit({ key: 'gold', value: 1000, elapsed: 10, cycleNumber: 1 });
+    bestOf.submit({ key: 'gold', value: -5, elapsed: 0, cycleNumber: 2 });
+    bestOf.submit({ key: 'gold', value: 1e9, elapsed: 0, cycleNumber: 3 });
+
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(1);
+  });
+
+  it('any timed run beats a zero-elapsed perSecond best', () => {
+    const bestOf = createBestOf({
+      id: 'bo-zero-incumbent',
+      metrics: { gold: { mode: 'perSecond' } },
+    });
+
+    bestOf.submit({ key: 'gold', value: 1e9, elapsed: 0, cycleNumber: 1 });
+    bestOf.submit({ key: 'gold', value: 1, elapsed: 5, cycleNumber: 2 });
+
+    expect(bestOf.entries.value.gold!.cycleNumber).toBe(2);
+  });
+
+  it('a zero-elapsed run that lost value does not report a positive rate', () => {
+    const bestOf = createBestOf({
+      id: 'bo-zero-negative',
+      metrics: { gold: { mode: 'perSecond' } },
+    });
+
+    bestOf.submit({ key: 'gold', value: -5, elapsed: 0, cycleNumber: 0 });
+
+    expect(bestOf.entries.value.gold!.perSecond.lte(0)).toBe(true);
+  });
+
   it('submitting to unknown metric key is a no-op', () => {
     const bestOf = createBestOf({
       id: 'bo-unknown-key',

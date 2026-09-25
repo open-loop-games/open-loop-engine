@@ -26,7 +26,11 @@ import type { CycleLog, CycleLogEntry } from './cycle-log';
 
 // === TYPES ===
 
-/** How to compare candidates: highest absolute delta or highest delta/second */
+/**
+ * How to compare candidates: highest absolute delta or highest delta/second.
+ * Under `'perSecond'` a zero-elapsed run has no rate, so it ranks below
+ * every timed run.
+ */
 export type ComparisonMode = 'absolute' | 'perSecond';
 
 /** Which value to use for comparison when a projection function is provided */
@@ -202,8 +206,12 @@ function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
   };
 }
 
+/** Value per second; a zero-elapsed run reports ±Infinity by the value's sign, or 0. */
 function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
-  if (elapsed <= 0) return new Decimal(Infinity);
+  if (elapsed <= 0) {
+    const sign = Decimal.sign(value);
+    return new Decimal(sign === 0 ? 0 : sign * Infinity);
+  }
   return new Decimal(Decimal.div(value, elapsed));
 }
 
@@ -322,13 +330,16 @@ export function createBestOf(options: BestOfOptions): BestOf {
     );
 
     if (metricDef.mode === 'perSecond') {
-      const candidatePS = computePerSecond(candidateVal, candidate.elapsed);
-      const existingPS = computePerSecond(existingVal, existing.elapsed);
-      // Both Infinity: fall back to absolute
-      if (!candidatePS.isFinite() && !existingPS.isFinite()) {
-        return Decimal.gt(candidateVal, existingVal);
-      }
-      return Decimal.gt(candidatePS, existingPS);
+      // A zero-elapsed run has no rate: it never beats a timed run and any
+      // timed run beats it. Two of them fall back to comparing values.
+      const candidateTimed = candidate.elapsed > 0;
+      const existingTimed = existing.elapsed > 0;
+      if (candidateTimed !== existingTimed) return candidateTimed;
+      if (!candidateTimed) return Decimal.gt(candidateVal, existingVal);
+      return Decimal.gt(
+        computePerSecond(candidateVal, candidate.elapsed),
+        computePerSecond(existingVal, existing.elapsed),
+      );
     }
 
     return Decimal.gt(candidateVal, existingVal);
