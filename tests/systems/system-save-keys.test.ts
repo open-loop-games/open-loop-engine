@@ -14,8 +14,25 @@ import { createProducerCategory } from '@/systems/producer-category';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-purchase';
 import { createCostRequirement } from '@/core/requirements';
+import { createInventory } from '@/systems/inventory';
+import { createEngine } from '@/engine';
 
 const registerTick = () => () => {};
+
+const INVENTORY_KEYS = [
+  'storage/loop.anchor',
+  'storage/loop.ore',
+  'storage/loop::anchor.best',
+  'storage/loop::anchor.cumulative',
+  'storage/loop::ore.best',
+  'storage/loop::ore.cumulative',
+  'storage/vault.anchor',
+  'storage/vault.ore',
+  'storage/vault::anchor.best',
+  'storage/vault::anchor.cumulative',
+  'storage/vault::ore.best',
+  'storage/vault::ore.cumulative',
+];
 
 describe('system save keys', () => {
   beforeEach(() => resetAllPersistentContexts());
@@ -55,6 +72,31 @@ describe('system save keys', () => {
       'expedition.count',
       'expedition.elapsed',
     ]);
+  });
+
+  it('inventories sharing item ids save each item under their own context', () => {
+    withPersistentContext('storage', () => {
+      createInventory({ id: 'storage/loop', baseCapacity: 10, items: ['anchor', 'ore'] });
+      createInventory({ id: 'storage/vault', baseCapacity: 10, items: ['anchor', 'ore'] });
+    });
+
+    expect([...getAllPersistentRefs().keys()].sort()).toEqual(INVENTORY_KEYS);
+  });
+
+  it('an engine installing both keeps those keys', () => {
+    const engine = createEngine({ gameId: 'save-keys', persistence: false });
+    engine.use({
+      id: 'storage',
+      install() {
+        createInventory({ id: 'storage/loop', baseCapacity: 10, items: ['anchor', 'ore'] });
+        createInventory({ id: 'storage/vault', baseCapacity: 10, items: ['anchor', 'ore'] });
+      },
+    });
+    engine.start();
+
+    const keys = [...getAllPersistentRefs().keys()].filter((k) => k.startsWith('storage/'));
+    expect(keys.sort()).toEqual(INVENTORY_KEYS);
+    engine.dispose();
   });
 
   describe('auto-purchase accumulators', () => {

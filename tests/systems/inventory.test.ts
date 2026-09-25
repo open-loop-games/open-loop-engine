@@ -5,6 +5,8 @@ import { createAdditiveModifier, createMultiplicativeModifier } from '@/core/mod
 import type { Modifier } from '@/core/modifier';
 import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 import { Decimal } from '@/primitives/decimal';
+import { createEngine } from '@/engine';
+import { ResourceRegistryKey } from '@/core/registries';
 
 describe('Inventory', () => {
   describe('basic operations', () => {
@@ -292,6 +294,33 @@ describe('Inventory', () => {
       expect(inv.get('wood').toNumber()).toBe(40);
       expect(inv.get('stone').toNumber()).toBe(10);
       expect(new Decimal(inv.resources.get('stone')!.value).toNumber()).toBe(10);
+    });
+  });
+
+  describe('in an engine', () => {
+    it('two inventories sharing item ids register each item under its inventory', () => {
+      const engine = createEngine({
+        gameId: 'inv-shared-items',
+        persistence: false,
+        persistenceNamespace: 'inv-shared-items',
+      });
+      let loop!: ReturnType<typeof createInventory>;
+      let vault!: ReturnType<typeof createInventory>;
+      engine.use({
+        id: 'storage',
+        install() {
+          loop = createInventory({ id: 'storage/loop', baseCapacity: 10, items: ['anchor'] });
+          vault = createInventory({ id: 'storage/vault', baseCapacity: 10, items: ['anchor'] });
+        },
+      });
+      engine.start();
+
+      const registry = engine.tryInject(ResourceRegistryKey)!;
+      expect(registry.findById('storage/loop/anchor')).toBe(loop.resources.get('anchor'));
+      expect(registry.findById('storage/vault/anchor')).toBe(vault.resources.get('anchor'));
+      expect(registry.findById('anchor')).toBeUndefined();
+      expect(loop.resources.get('anchor')!.displayName).toBe('anchor');
+      engine.dispose();
     });
   });
 

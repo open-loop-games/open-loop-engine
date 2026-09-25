@@ -9,7 +9,7 @@ import { computed, type ComputedRef } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
-import { createResource, type Resource } from '@/core/resource';
+import { createContextScopedResource, type Resource } from '@/core/resource';
 import { withPersistentContext } from '@/core/persistence';
 import { attachContextReset } from '@/core/resettable';
 import { createModifierChain, type Modifier } from '@/core/modifier';
@@ -32,9 +32,11 @@ export interface InventoryOptions {
   initial?: Record<string, DecimalSource>;
   /**
    * Known item IDs for auto-persistence.
-   * When provided, creates a persistent Resource ref per item via
-   * createResource() + bag.link(), so inventory state is automatically
-   * saved/loaded by the engine's persistence system.
+   * When provided, creates a persistent Resource ref per item, linked into
+   * the bag, so inventory state is automatically saved/loaded by the
+   * engine's persistence system. Each saves under its item id in the
+   * inventory's context and registers as `${inventoryId}/${itemId}`, so
+   * inventories sharing item ids coexist.
    */
   items?: string[];
 }
@@ -73,7 +75,9 @@ export interface Inventory {
   // --- Persistence ---
   /**
    * When `items` was provided, the underlying persistent Resource refs
-   * keyed by item ID. These are auto-saved by the persistence system.
+   * keyed by item ID. These are auto-saved by the persistence system. Each
+   * resource's `id` — the key for Gates, trackers and the resource registry —
+   * is `${inventoryId}/${itemId}`; its `displayName` is the item id.
    */
   readonly resources: ReadonlyMap<string, Resource<DecimalSource>>;
   /** Manual serialization — only needed when NOT using items-based persistence */
@@ -140,10 +144,13 @@ export function createInventory(options: InventoryOptions): Inventory {
     withPersistentContext(id, () => {
       for (const itemId of items) {
         const initialAmount = initial[itemId] ?? 0;
-        const resource = createResource<DecimalSource>(initialAmount, {
-          id: itemId,
-          displayName: itemId,
-        });
+        // Saved as the bare item id inside the inventory's context; the
+        // engine-unique id is qualified so inventories can share item ids.
+        const resource = createContextScopedResource<DecimalSource>(
+          initialAmount,
+          { id: `${id}/${itemId}`, displayName: itemId },
+          itemId,
+        );
         bag.link(itemId, resource);
         linkedResources.set(itemId, resource);
       }

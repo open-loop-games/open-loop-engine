@@ -171,21 +171,47 @@ export function createResource<T>(
   defaultValue: (T & StateConstraint<T>) | Ref<T>,
   options: ResourceOptions = {},
 ): Resource<T> {
+  return buildResource(defaultValue, options);
+}
+
+/**
+ * A persistent resource that saves under `saveName` in the current context
+ * but registers under `options.id`, for a system that builds same-named
+ * resources in sibling contexts — two inventories holding the same item.
+ *
+ * @internal Used by createInventory.
+ */
+export function createContextScopedResource<T>(
+  defaultValue: T & StateConstraint<T>,
+  options: PersistentResourceOptions,
+  saveName: string,
+): Resource<T> & Persistent<T> {
+  return buildResource(defaultValue, options, saveName) as Resource<T> & Persistent<T>;
+}
+
+/** Shared body of the resource factories; `saveName` defaults to the resolved id. */
+function buildResource<T>(
+  defaultValue: (T & StateConstraint<T>) | Ref<T>,
+  options: ResourceOptions,
+  saveName?: string,
+): Resource<T> {
   const { displayName = 'points', precision = 0, small = false, id } = options;
   // A display name is text, free to change or be translated; only a wrapped
   // ref, which saves nothing, may be keyed by it.
   const resolvedId = (isRef(defaultValue) ? (id ?? displayName) : id) as string;
-  if (!isRef(defaultValue) && id?.includes('.')) {
+  const name = saveName ?? resolvedId;
+  if (!isRef(defaultValue) && name?.includes('.')) {
     throw new Error(
-      `Resource id "${resolvedId}" contains ".", which save paths split on. Use another separator, such as "-".`,
+      `Resource id "${name}" contains ".", which save paths split on. Use another separator, such as "-".`,
     );
   }
 
-  // Create persistent or use existing ref. Use the resource's id as the
-  // save-data name so round-trips survive field reorders inside a context.
+  // Create persistent or use existing ref. Save under a stable name — the
+  // resource's id unless the caller scopes it — so round-trips survive field
+  // reorders inside a context.
   const resource: Partial<Resource<T>> = isRef(defaultValue)
     ? defaultValue
-    : persistent(defaultValue, { name: resolvedId });
+    : persistent(defaultValue, { name });
 
   // Attach resource metadata
   resource.id = resolvedId;
@@ -210,7 +236,7 @@ export function createResource<T>(
     nonPersistentResource.small = small;
 
     // Cumulative + best trackers are intrinsic to a persistent resource —
-    // their persistence path is identity-bound to the resource id, so two
+    // their persistence path is identity-bound to the save name, so two
     // resources in the same module each get their own sub-context for
     // 'cumulative' and 'best' without colliding on the tracker name.
     //
@@ -221,7 +247,7 @@ export function createResource<T>(
       // Persistent contexts are flat under the engine namespace, so we
       // qualify the tracker sub-context with the parent context id to
       // keep the tracker's save path bound to the module that owns it.
-      withPersistentContext(`${parentContext}::${resolvedId}`, () => {
+      withPersistentContext(`${parentContext}::${name}`, () => {
         const initial = defaultValue as DecimalSource;
         // `lifetime: true` so module-scoped resets pass over these trackers.
         // Without the flag, a `createReset({ resetModules: [moduleId] })`
