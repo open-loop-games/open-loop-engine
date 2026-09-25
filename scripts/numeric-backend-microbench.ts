@@ -131,7 +131,8 @@ function benchAddTight(iters: number) {
     let a: DSrc = a0;
     const b = b0;
     for (let i = 0; i < iters; i++) {
-      a = renormIfLayer0(Decimal.add(a, b));
+      // A Decimal in comes back a number or a Decimal, never a string.
+      a = renormIfLayer0(Decimal.add(a, b)) as DSrc;
       if (Decimal.gt(a, 1e14)) a = a0;
     }
     return a;
@@ -212,7 +213,7 @@ function benchModifierChain(iters: number) {
     for (let i = 0; i < iters; i++) {
       const r = chain.apply(0);
       // touch the result to prevent DCE; keep cheap.
-      acc = typeof r === 'number' ? r : r.mag;
+      acc = typeof r === 'number' ? r : typeof r === 'string' ? 0 : r.mag;
     }
     return acc;
   });
