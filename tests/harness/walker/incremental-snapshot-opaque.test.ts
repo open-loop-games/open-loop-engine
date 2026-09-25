@@ -5,7 +5,8 @@
  * The challenge leaf emits a closure-form goal on an active challenge as
  * `opaque-predicate` with no deps. The closure reads plain (non-reactive)
  * state, so neither a dep signal nor the challenge's gating computeds see it
- * move. A selective rebuild must still match a full one.
+ * move — and the leaf reads the same stale computeds, so its emission doesn't
+ * either. A selective rebuild must still match a full one.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -28,7 +29,7 @@ const accessor: GameStateAccessor = {
 };
 
 describe('createIncrementalSnapshot — empty-deps emissions', () => {
-  it('refreshes an opaque closure-goal emission on every selective rebuild', () => {
+  it('a selective rebuild matches a full one across a closure flip and a completion', () => {
     const world = { bossDefeated: false };
     let trials!: ReturnType<typeof createChallengeCategory>;
     const module: EngineModule = {

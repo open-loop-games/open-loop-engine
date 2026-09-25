@@ -23,10 +23,9 @@
  *   entity-set changes and the fallback when targeted invalidation isn't
  *   possible.
  * - Otherwise → **selective rebuild**: an entity is dirty when `dirty.*`
- *   reaches one of its entries through the reverse indices, when its gate
- *   signature moved since the last rebuild, or when it holds an emission with
- *   empty deps. Each dirty entity's entries are dropped and re-emitted
- *   through its per-entity emitter, then re-sorted.
+ *   reaches one of its entries through the reverse indices, or when its gate
+ *   signature moved since the last rebuild. Each dirty entity's entries are
+ *   dropped and re-emitted through its per-entity emitter, then re-sorted.
  *
  * Invariants:
  *
@@ -41,10 +40,9 @@
  *   emissions went empty (maxed, inactive) stays registered and comes back
  *   when its signature moves — a reset, an automation policy entering a
  *   challenge.
- * - **Empty deps mean always dirty.** An emission with no deps (an opaque
- *   predicate: closure goal, category-aware Gate) is unreachable by any
- *   `invalidate*` call, so its entity is re-emitted on every selective
- *   rebuild — one leaf call per such entity.
+ * - **An emission with empty deps is re-emitted only when its signature
+ *   moves.** No `invalidate*` call reaches an opaque predicate (closure goal,
+ *   category-aware Gate), and none needs to: see {@link ReadGate}.
  * - `rebuild()` returns a fresh `TransitionSnapshot` object per call. Callers
  *   must not memoize on identity; use deep-equal on `.all` / group arrays.
  * - `accessor` is wrapped with a fresh {@link memoizeAccessor} per rebuild,
@@ -143,6 +141,9 @@ type PerEntityEmit = (
  * Refresh `gate` in place from the entity's live gating state; true when any
  * slot moved. Reads what the matching leaf's emission guards, cost lookup and
  * `currentValue` read off the instance rather than through the accessor.
+ * An opaque emission (empty deps) reads nothing beyond these slots, which is
+ * what lets the selective rebuild skip it until one moves; a leaf whose opaque
+ * emission reads live state must add that state to its signature.
  */
 type ReadGate = (entity: unknown, gate: unknown[]) => boolean;
 
@@ -160,8 +161,6 @@ interface EntityRecord {
   walk: CategoryWalk;
   gate: unknown[];
   labels: Set<string>;
-  /** Holds an emission with empty deps, which no `invalidate*` call reaches. */
-  opaque: boolean;
 }
 
 /**
@@ -213,15 +212,6 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
       readPurchasableGate((entity as { producer: Producer }).producer.repeatable, gate),
   },
 };
-
-function hasNoDeps(deps: TransitionDeps): boolean {
-  return (
-    deps.resources.size === 0 &&
-    deps.rates.size === 0 &&
-    deps.unlocks.size === 0 &&
-    deps.states.size === 0
-  );
-}
 
 /**
  * Build an incremental-snapshot cache over the given engine. The constructor
@@ -340,11 +330,9 @@ export function createIncrementalSnapshot(
 
   function emitForRecord(record: EntityRecord, memo: GameStateAccessor): void {
     const emissions = record.walk.emit(record.ref.categoryId, record.entity, memo);
-    record.opaque = false;
     for (const { transition, deps } of emissions) {
       indexEntry({ transition, deps, entityKey: record.key });
       record.labels.add(transition.label);
-      if (hasNoDeps(deps)) record.opaque = true;
     }
   }
 
@@ -375,7 +363,6 @@ export function createIncrementalSnapshot(
         walk,
         gate: [],
         labels: new Set(),
-        opaque: false,
       };
       walk.readGate(entity, record.gate);
       entities.set(record.key, record);
@@ -410,8 +397,7 @@ export function createIncrementalSnapshot(
     // Every record's signature is refreshed, dirty or not, so the stored gate
     // always describes the state its entries were emitted from.
     for (const record of entities.values()) {
-      const moved = record.walk.readGate(record.entity, record.gate);
-      if (moved || record.opaque) dirtyEntities.add(record.key);
+      if (record.walk.readGate(record.entity, record.gate)) dirtyEntities.add(record.key);
     }
 
     if (dirtyEntities.size === 0) {
