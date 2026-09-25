@@ -33,7 +33,7 @@ import { processGetter } from '@/core/computed';
 import { isProfilingEnabled, profile } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset } from '@/core/resettable';
-import { createContentRegistryHandle, type ContentRegistry } from './content-registry';
+import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
@@ -127,10 +127,10 @@ export interface CategoryBase<
    * The content registry. `registry.patch()` / `pushPatches()` change the def;
    * an instance sees the change only through a getter that reads `getDef(id)`
    * or `registry.get(id)`, since value fields and closures over `def` are
-   * copied or frozen at register. Add defs with `register` — `registry.register()`
-   * leaves a def with no instance or state.
+   * copied or frozen at register. The view has no `register`: add defs with the
+   * category's `register`, which builds each def's instance and state.
    */
-  readonly registry: ContentRegistry<Def>;
+  readonly registry: ContentRegistryView<Def>;
 
   /**
    * Register definitions: validate the whole batch, then build instances.

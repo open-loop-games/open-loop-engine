@@ -42,6 +42,8 @@ import {
   type FirstPassageOptions,
   type Passage,
   type Series,
+  type ContentRegistry,
+  type ContentRegistryView,
   tunable,
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
@@ -84,6 +86,8 @@ import type {
 } from '@/systems/subject-category';
 import type { DialogCategory } from '@/systems/dialog-category';
 import type { ResettableObject } from '@/systems/resettable';
+import type { CategoryBase } from '@/systems/category-base';
+import type { ZoneSystem, ZoneDef } from '@/systems/zone';
 import type { Purchasable, PurchasableOptions } from '@/systems/purchasable';
 import type { Requirements } from '@/core/requirements';
 import type { TickDriverConfig } from '@/core/tick-driver';
@@ -1163,6 +1167,48 @@ describe('Achievement and challenge categories — required options and generics
       | 'registerTick'
       | 'mapState'
     >();
+  });
+});
+
+describe('A category registry is a read-and-patch view', () => {
+  interface Def {
+    id: string;
+  }
+  type View = ContentRegistryView<Def>;
+
+  it('every category exposes its registry without register', () => {
+    expectTypeOf<CategoryBase<Def, unknown>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<AchievementCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<ActionCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<ChallengeCategory<ChallengeDef>['registry']>().toEqualTypeOf<
+      ContentRegistryView<ChallengeDef>
+    >();
+    expectTypeOf<DialogCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<ProducerCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<PurchasableCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<SkillCategory<Def>['registry']>().toEqualTypeOf<View>();
+    expectTypeOf<SubjectCategory<Record<string, never>>['registry']>().toEqualTypeOf<
+      ContentRegistryView<SubjectDef<Record<string, never>>>
+    >();
+  });
+
+  it('adds defs through the category, not its registry', () => {
+    const check = (skills: SkillCategory<Def>) => {
+      skills.registry.patch('mining', {});
+      // @ts-expect-error — a registry add would leave the def with no instance
+      skills.registry.register({ id: 'mining' });
+    };
+    void check;
+  });
+
+  it('a zone system keeps the full registry, whose register is its add', () => {
+    expectTypeOf<ZoneSystem['registry']>().toEqualTypeOf<ContentRegistry<ZoneDef>>();
+  });
+
+  it('a challenge scopes patches onto a category registry view', () => {
+    const check = (skills: SkillCategory<Def>) =>
+      createChallengeCategory({ id: 'ch-view', contentRegistries: { skills: skills.registry } });
+    void check;
   });
 });
 

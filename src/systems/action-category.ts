@@ -46,7 +46,7 @@ import {
   type StartResult,
 } from '@/core/sequencer';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
-import { type ContentRegistry } from './content-registry';
+import { type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { getCurrentEngineCategories } from './engine-categories';
 
@@ -178,7 +178,7 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
 export interface ActionCategory<Def extends { id: string }, State = void, Payload = void>
   extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>> {
   readonly id: string;
-  readonly registry: ContentRegistry<Def>;
+  readonly registry: ContentRegistryView<Def>;
 
   // --- Registration ---
 

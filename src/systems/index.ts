@@ -163,7 +163,11 @@ export * from './challenge-category';
 // === CONTENT ===
 // Generic typed registry for game content definitions (actions, zones, etc.).
 // Named re-exports keep the `@internal` registry handle out of the surface.
-export { createContentRegistry, type ContentRegistry } from './content-registry';
+export {
+  createContentRegistry,
+  type ContentRegistry,
+  type ContentRegistryView,
+} from './content-registry';
 
 // === TEMPORARY EFFECTS ===
 // Time-limited effects (buffs, debuffs, DoTs, power-ups) with modifier integration.

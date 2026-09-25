@@ -12,7 +12,7 @@
  *
  * Uses {@link createCategoryBase} for registration + persistent context.
  * Composes with {@link OverrideRegistry} for scoped push/pop of game
- * behaviors and {@link ContentRegistry} for scoped content patches.
+ * behaviors and {@link ContentRegistryView} for scoped content patches.
  *
  * @example
  * ```ts
@@ -42,7 +42,7 @@ import {
   type CategoryBase,
   type CategoryEntrySignals,
 } from './category-base';
-import type { ContentRegistry } from './content-registry';
+import type { ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import type { OverrideRegistry } from '@/core/override-registry';
 import type { Reset } from './reset';
@@ -243,11 +243,11 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
 
   /**
    * Content registries for scoped patches.
-   * Map of registry name → ContentRegistry instance.
+   * Map of registry name → content registry, such as a category's `registry`.
    * Challenge defs with `contentPatches` reference these by name.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  contentRegistries?: Record<string, ContentRegistry<any>>;
+  contentRegistries?: Record<string, ContentRegistryView<any>>;
 
   /**
    * Optional reset to trigger on challenge enter (TMT/Profectus-style).
@@ -302,7 +302,7 @@ export interface ChallengeCategory<
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /** The content registry for challenge definitions */
-  readonly registry: ContentRegistry<Def>;
+  readonly registry: ContentRegistryView<Def>;
 
   /** Register challenge definitions. Can be called multiple times. */
   register(defs: Def | Def[]): void;

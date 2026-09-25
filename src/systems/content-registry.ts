@@ -96,6 +96,14 @@ export interface ContentRegistry<T extends { id: string }> {
 }
 
 /**
+ * A {@link ContentRegistry} without `register` — what a category exposes as
+ * its `registry`. Reads and patches go through it; a def is added through the
+ * category's own `register`, which builds the def's instance and state
+ * alongside it.
+ */
+export type ContentRegistryView<T extends { id: string }> = Omit<ContentRegistry<T>, 'register'>;
+
+/**
  * A content registry plus the hooks an owner needs to keep it in step with
  * what it builds per entry.
  *

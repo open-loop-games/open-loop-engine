@@ -16,7 +16,7 @@
 
 import type { DialogGraph } from './dialog';
 import { createCategoryBase, type CategoryBase } from './category-base';
-import type { ContentRegistry } from './content-registry';
+import type { ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
@@ -45,10 +45,10 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
    * The content registry. `registry.patch()` / `pushPatches()` change the def;
    * an instance sees the change only through a getter that reads `getDef(id)`
    * or `registry.get(id)`, since value fields and closures over `def` are
-   * copied or frozen at register. Add defs with `register` — `registry.register()`
-   * leaves a def with no instance or state.
+   * copied or frozen at register. The view has no `register`: add defs with the
+   * category's `register`, which builds each def's instance and state.
    */
-  readonly registry: ContentRegistry<Def>;
+  readonly registry: ContentRegistryView<Def>;
   register(defs: Def | Def[]): void;
   getDef(id: string): Def | undefined;
   getEntry(id: string): DialogCategoryEntry<Def> | undefined;

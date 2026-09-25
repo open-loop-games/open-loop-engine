@@ -31,7 +31,7 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import type { GameStateAccessor } from '@/primitives/types';
 import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
-import type { ContentRegistry } from './content-registry';
+import type { ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from './resettable';
 import { getCurrentEngineCategories } from './engine-categories';
 
@@ -264,10 +264,10 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
    * The content registry. `registry.patch()` / `pushPatches()` change the def;
    * an instance sees the change only through a getter that reads `getDef(id)`
    * or `registry.get(id)`, since value fields and closures over `def` are
-   * copied or frozen at register. Add defs with `register` — `registry.register()`
-   * leaves a def with no instance or state.
+   * copied or frozen at register. The view has no `register`: add defs with the
+   * category's `register`, which builds each def's instance and state.
    */
-  readonly registry: ContentRegistry<SubjectDef<S>>;
+  readonly registry: ContentRegistryView<SubjectDef<S>>;
   /** Register subjects against the shared schema. Can be called multiple times (base game + mods). */
   register(defs: SubjectDef<S> | SubjectDef<S>[]): void;
   /** Get the authored def for a subject id (delegates to the registry). */
