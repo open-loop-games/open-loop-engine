@@ -543,8 +543,8 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     expect(lifetimeByKey).toEqual({
       'm/cycle.count': true,
       'm/cycle.bestTime': true,
-      'm.elapsed': false,
-      'm.totalPlayTime': true,
+      'm/time.elapsed': false,
+      'm/time.totalPlayTime': true,
       // Whether banked time survives a prestige is the game's call: run-scoped
       // by default, `keep: [bank.banked]` carries it.
       'm/time-bank.banked': false,

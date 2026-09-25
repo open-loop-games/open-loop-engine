@@ -6,20 +6,31 @@
  * (`totalPlayTime`), a reactive `speedMultiplier` that scales every dt, and a
  * formatted display string for the lifetime counter.
  *
- * Offline-time chunking lives in `core/process-offline-time` — pair the two when
- * a game needs both surfaces.
+ * Offline-time chunking lives in `core/offline` — pair the two when a game
+ * needs both surfaces.
  */
 
 import { ref } from 'vue';
 import type { Ref } from 'vue';
-import { persistent } from '@/core/persistence';
+import { persistent, resolveSystemContextId, withPersistentContext } from '@/core/persistence';
 import { formatTime } from '@/primitives/decimal';
 
 // === TYPES ===
 
 /** Configuration for {@link createTimeSystem}. */
 export interface TimeSystemConfig {
-  /** Initial speed multiplier (default 1). Scales dt passed to `tick()`. */
+  /**
+   * Save context. Defaults to `${module}/time` inside a module; pass one when
+   * a module builds more than one.
+   */
+  id?: string;
+  /**
+   * Initial speed multiplier (default 1). Scales dt passed to `tick()`.
+   *
+   * Fed from an engine tick callback, the dt already carries the tick
+   * driver's own `speedMultiplier`, and this one multiplies on top. Leave it
+   * at 1 to count game time as the driver ran it.
+   */
   speedMultiplier?: number;
 }
 
@@ -32,7 +43,10 @@ export interface TimeSystem {
    * so a reset of the owning module keeps it while zeroing `elapsed`.
    */
   totalPlayTime: Ref<number>;
-  /** Reactive speed multiplier — scales dt in `tick()`. */
+  /**
+   * Reactive speed multiplier — scales dt in `tick()`, on top of any scaling
+   * the dt already carries (see {@link TimeSystemConfig.speedMultiplier}).
+   */
   speedMultiplier: Ref<number>;
   /** Advance time by `dt` seconds (scaled by speedMultiplier). */
   tick(dt: number): void;
@@ -43,25 +57,31 @@ export interface TimeSystem {
 
 // === FACTORIES ===
 
+let timeSystemCounter = 0;
+
 /**
  * Creates a time tracking system with persistent elapsed/total play time,
  * speed multiplier, and formatted display.
  *
- * @param config - Optional speed multiplier
+ * @param config - Save context id and initial speed multiplier
  * @returns A time system with persistent `elapsed` and `totalPlayTime` refs,
  *   a `tick()` method to advance time, and `reset()` which zeroes elapsed
  *   but preserves total play time
  *
  * @example
  * ```ts
- * const time = createTimeSystem({ speedMultiplier: 1 });
- * engine.onTick((dt) => time.tick(dt));
+ * // inside a module's install(ctx)
+ * const time = createTimeSystem();
+ * ctx.onTick((dt) => time.tick(dt));
  * console.log(time.formatPlayTime()); // "1h 23m 45s"
  * ```
  */
 export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
-  const elapsed = persistent(0, { name: 'elapsed' });
-  const totalPlayTime = persistent(0, { name: 'totalPlayTime', lifetime: true });
+  const contextId = resolveSystemContextId(config.id, 'time', () => `time_${timeSystemCounter++}`);
+  const { elapsed, totalPlayTime } = withPersistentContext(contextId, () => ({
+    elapsed: persistent(0, { name: 'elapsed' }),
+    totalPlayTime: persistent(0, { name: 'totalPlayTime', lifetime: true }),
+  }));
   const speedMultiplier = ref(config.speedMultiplier ?? 1);
   return {
     elapsed,

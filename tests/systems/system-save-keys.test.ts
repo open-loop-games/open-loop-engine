@@ -8,6 +8,7 @@ import { createZoneSystem } from '@/systems/zone';
 import { createAutomationTiers } from '@/systems/automation';
 import { createCycle } from '@/systems/cycle';
 import { createTimeBank } from '@/systems/time-bank';
+import { createTimeSystem } from '@/systems/time';
 
 const registerTick = () => () => {};
 
@@ -20,6 +21,7 @@ describe('system save keys', () => {
       createAutomationTiers({ tiers: [{ id: 'manual', name: 'Manual', order: 0 }] });
       createCycle({ thingsToReset: [], registerTick });
       createTimeBank();
+      createTimeSystem();
     });
 
     expect([...getAllPersistentRefs().keys()].sort()).toEqual([
@@ -27,6 +29,8 @@ describe('system save keys', () => {
       'realm/cycle.bestTime',
       'realm/cycle.count',
       'realm/time-bank.banked',
+      'realm/time.elapsed',
+      'realm/time.totalPlayTime',
       'realm/zone.current',
       'realm/zone.unlocked',
     ]);
@@ -35,9 +39,12 @@ describe('system save keys', () => {
   it('an explicit id is the whole context, wherever the system is built', () => {
     withPersistentContext('realm', () => {
       createCycle({ id: 'expedition', thingsToReset: [], registerTick });
+      createTimeSystem({ id: 'clock' });
     });
 
     expect([...getAllPersistentRefs().keys()].sort()).toEqual([
+      'clock.elapsed',
+      'clock.totalPlayTime',
       'expedition.bestTime',
       'expedition.count',
     ]);
