@@ -147,10 +147,10 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 
 Enumerate purchasables, producers, and challenges with their next-transition timing.
 
-- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:148`
+- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:242`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:89`
-- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:69`
-- `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:58`
+- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:92`
+- `interface IncrementalSnapshotEntityRef` — Minimal reference to the source entity behind a cached transition. `src/harness/walker/incremental-snapshot.ts:81`
 - `interface Transition` — A pending state change surfaced by the content walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:51`
 - `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which content-walker leaf produced a given Transition. `src/harness/walker/types.ts:24`
