@@ -421,5 +421,26 @@ describe('createSubjectCategory', () => {
       cat.get('special')!.fields.bond.set(60);
       expect(cat.getEntry('special')!.signals!.unlock.value).toBe(true);
     });
+
+    it('reports a subject at its clamped seed as default', () => {
+      const cat = createSubjectCategory({
+        id: 'npcs',
+        fields: {
+          trust: { kind: 'scalar', initial: 150, max: 100 },
+          mood: {
+            kind: 'vector',
+            dimensions: ['calm'],
+            dimensionConfig: { calm: { initial: -5, min: 0 } },
+          },
+          rank: { kind: 'tier', tiers: ['a', 'b'], initial: 5 },
+        },
+      });
+      cat.register({ id: 'fresh' });
+      const signals = cat.getEntry('fresh')!.signals!;
+      expect(signals.unlock.value).toBe(false);
+      expect(signals.count.value.toNumber()).toBe(0);
+      cat.get('fresh')!.fields.mood.set('calm', 3);
+      expect(signals.count.value.toNumber()).toBe(1);
+    });
   });
 });

@@ -20,7 +20,7 @@
 
 import { computed } from 'vue';
 import { Decimal } from '@/primitives/decimal';
-import { persistent, type Persistent } from '@/core/persistence';
+import { isAtDefault, persistent, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { GameStateAccessor } from '@/primitives/types';
 import { evaluateGate, getAmbientGateRuntime, type Gate, type GateRuntime } from './gate';
@@ -602,7 +602,7 @@ export function createSubjectCategory<S extends FieldSchema>(
       }
       return { id: def.id, fields };
     },
-    buildSignals: (def, instance) => buildSubjectSignals(instance, schema, def),
+    buildSignals: (_def, instance) => buildSubjectSignals(instance),
   });
 
   const category: SubjectCategory<S> = {
@@ -644,60 +644,19 @@ export function createSubjectCategory<S extends FieldSchema>(
  */
 function buildSubjectSignals<S extends FieldSchema>(
   instance: SubjectInstance<S>,
-  schema: S,
-  subjectDef: SubjectDef<S>,
 ): CategoryEntrySignals {
-  const fieldNames = Object.keys(schema) as (keyof S & string)[];
+  const fields = Object.values(instance.fields) as FieldInstance<FieldDef>[];
 
-  // "Default" is the value the field was seeded with — the per-subject override
-  // if present, else the schema default. Comparing against the schema default
-  // alone reports every overridden field as non-default from creation.
-  function isNonDefault(fieldName: keyof S & string): boolean {
-    const field = instance.fields[fieldName];
-    const def = schema[fieldName];
-    const override = subjectDef.fields?.[fieldName];
-    // TS 6 doesn't narrow `field` by `kind` through the mapped schema type; TS 7,
-    // which the type-aware linter runs on, does. Drop the casts and this disable
-    // when the engine compiles with TS 7.
-    /* oxlint-disable typescript/no-unnecessary-type-assertion */
-    switch (field.kind) {
-      case 'scalar':
-        return (
-          (field as ScalarFieldInstance).get() !==
-          ((override as { initial?: number })?.initial ?? (def as ScalarFieldDef).initial ?? 0)
-        );
-      case 'vector': {
-        const vdef = def as VectorFieldDef;
-        const vfield = field as VectorFieldInstance;
-        const vover = override as { initialPerDim?: Record<string, number> } | undefined;
-        return vdef.dimensions.some(
-          (dim) =>
-            vfield.get(dim) !==
-            (vover?.initialPerDim?.[dim] ?? vdef.dimensionConfig?.[dim]?.initial ?? 0),
-        );
-      }
-      case 'tier':
-        return (
-          (field as TierFieldInstance).getIndex() !==
-          ((override as { initial?: number })?.initial ?? (def as TierFieldDef).initial ?? 0)
-        );
-      case 'flag':
-        return (
-          (field as FlagFieldInstance).get() !==
-          ((override as { initial?: boolean })?.initial ?? (def as FlagFieldDef).initial ?? false)
-        );
-      case 'enum': {
-        const eover = override as { initial?: string | null } | undefined;
-        const effective =
-          eover?.initial !== undefined ? eover.initial : ((def as EnumFieldDef).initial ?? null);
-        return (field as EnumFieldInstance).get() !== effective;
-      }
-    }
-    /* oxlint-enable typescript/no-unnecessary-type-assertion */
+  // "Default" is the value the field was seeded with — the ref's default, which
+  // already resolves the per-subject override and the clamp.
+  function isNonDefault(field: FieldInstance<FieldDef>): boolean {
+    return field.kind === 'vector'
+      ? [...field.refs.values()].some((ref) => !isAtDefault(ref))
+      : !isAtDefault(field.ref as Persistent);
   }
 
   return {
-    unlock: computed(() => fieldNames.some(isNonDefault)),
-    count: computed(() => Decimal.fromValue(fieldNames.filter(isNonDefault).length)),
+    unlock: computed(() => fields.some(isNonDefault)),
+    count: computed(() => Decimal.fromValue(fields.filter(isNonDefault).length)),
   };
 }
