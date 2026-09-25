@@ -108,20 +108,6 @@ export const TickDriverKey: InjectionKey<TickDriver> = Symbol('engine:tick-drive
 /** Inject the save manager. Available when `persistence` is not `false`. */
 export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 
-// Keys whose value the engine creates and fills as modules install, so a
-// module's provide would detach tooling from what the engine tracks.
-// SaveManagerKey stays owned when persistence is off: its absence is how a
-// reader tells persistence is off.
-const ENGINE_OWNED_KEYS: ReadonlySet<symbol> = new Set([
-  TickDriverKey,
-  SaveManagerKey,
-  ChainRegistryKey,
-  EffectSystemRegistryKey,
-  ResourceRegistryKey,
-  CategoriesKey,
-  TuningRegistriesKey,
-]);
-
 // `EngineCategories` and `CategoriesKey` live alongside the category
 // factories in `./systems/engine-categories` and reach the public surface
 // through the systems barrel. Imported at the top of this file for the
@@ -171,9 +157,8 @@ export interface EngineContext {
   /**
    * Publish a value for other modules to consume via {@link inject}.
    * Typically called during `install()` to expose a module's public API.
-   * Throws on a key the engine provides itself — {@link TickDriverKey},
-   * {@link SaveManagerKey}, `ChainRegistryKey`, `EffectSystemRegistryKey`,
-   * `ResourceRegistryKey`, `CategoriesKey` and `TuningRegistriesKey`.
+   * Throws on a key the engine provides itself: the registry and service
+   * `*Key` exports, such as {@link TickDriverKey}.
    */
   provide<T>(key: InjectionKey<T>, value: T): void;
 
@@ -582,31 +567,6 @@ export function createEngine(config: EngineConfig): Engine {
         publicInjections = injections;
         const eventBus = createEmitHandle<EngineEvents>();
 
-        const sharedContext: EngineContext = {
-          onTick: (cb) => track(tickDriver.onTick(cb)),
-          onSave: (cb) => saveCallbacks.push(cb),
-          onLoad: (cb) => loadCallbacks.push(cb),
-          on: (event, handler) => track(eventBus.on(event, handler)),
-          emit: (event, ...args) => eventBus.emit(event, ...args),
-          provide<T>(key: InjectionKey<T>, value: T) {
-            if (ENGINE_OWNED_KEYS.has(key)) {
-              throw new Error(
-                `ctx.provide(${key.toString()}) targets an engine-owned key; the engine provides it and fills it as modules install.`,
-              );
-            }
-            injections.set(key, value);
-          },
-          inject<T>(key: InjectionKey<T>): T {
-            if (!injections.has(key)) {
-              throw new Error(`No provider found for injection key: ${key.toString()}`);
-            }
-            return injections.get(key) as T;
-          },
-          tryInject<T>(key: InjectionKey<T>): T | undefined {
-            return injections.get(key) as T | undefined;
-          },
-        };
-
         // Per-engine chain registry — auto-populated by createModifierChain
         // calls that run inside install()/connect() via the ambient set below.
         const chainRegistry = createChainRegistry();
@@ -631,14 +591,48 @@ export function createEngine(config: EngineConfig): Engine {
         // tuning surface.
         const tuningRegistries = new Set<TuningRegistry>();
 
-        // Pre-provide engine services before any module installs
-        injections.set(TickDriverKey, tickDriver);
-        if (saveManager) injections.set(SaveManagerKey, saveManager);
-        injections.set(ChainRegistryKey, chainRegistry);
-        injections.set(EffectSystemRegistryKey, effectSystemRegistry);
-        injections.set(ResourceRegistryKey, resourceRegistry);
-        injections.set(CategoriesKey, engineCategories);
-        injections.set(TuningRegistriesKey, tuningRegistries);
+        // Engine services, pre-provided before any module installs. The engine
+        // fills them as modules install, so a module's provide would detach
+        // tooling from what the engine tracks: `provide` refuses these keys.
+        // SaveManagerKey stays listed when persistence is off: its absence is
+        // how a reader tells persistence is off.
+        const engineServices = new Map<symbol, unknown>([
+          [TickDriverKey, tickDriver],
+          [SaveManagerKey, saveManager],
+          [ChainRegistryKey, chainRegistry],
+          [EffectSystemRegistryKey, effectSystemRegistry],
+          [ResourceRegistryKey, resourceRegistry],
+          [CategoriesKey, engineCategories],
+          [TuningRegistriesKey, tuningRegistries],
+        ]);
+        for (const [key, service] of engineServices) {
+          if (service !== undefined) injections.set(key, service);
+        }
+
+        const sharedContext: EngineContext = {
+          onTick: (cb) => track(tickDriver.onTick(cb)),
+          onSave: (cb) => saveCallbacks.push(cb),
+          onLoad: (cb) => loadCallbacks.push(cb),
+          on: (event, handler) => track(eventBus.on(event, handler)),
+          emit: (event, ...args) => eventBus.emit(event, ...args),
+          provide<T>(key: InjectionKey<T>, value: T) {
+            if (engineServices.has(key)) {
+              throw new Error(
+                `ctx.provide(${key.toString()}) targets an engine-owned key; the engine provides it and fills it as modules install.`,
+              );
+            }
+            injections.set(key, value);
+          },
+          inject<T>(key: InjectionKey<T>): T {
+            if (!injections.has(key)) {
+              throw new Error(`No provider found for injection key: ${key.toString()}`);
+            }
+            return injections.get(key) as T;
+          },
+          tryInject<T>(key: InjectionKey<T>): T | undefined {
+            return injections.get(key) as T | undefined;
+          },
+        };
 
         // All install/connect work runs under the configured namespace so
         // module ids don't collide across engines sharing a runtime, and
