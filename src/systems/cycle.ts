@@ -117,7 +117,11 @@ export interface CycleOptions {
  * the restart sequence. Stats (`count`, `bestTime`) persist across saves.
  */
 export interface Cycle extends ScopedReset {
-  /** Total completed cycles (persistent, saved automatically) */
+  /**
+   * Total completed cycles (persistent, saved automatically). Tagged
+   * `lifetime`, like `bestTime`: the cycle's own reset keeps both, even when
+   * it names the module the cycle was built in.
+   */
   readonly count: Persistent<number>;
 
   /** Fastest cycle completion in seconds (persistent, `Infinity` until first cycle) */
@@ -214,8 +218,8 @@ export function createCycle(options: CycleOptions): Cycle {
 
   const contextId = resolveSystemContextId(id, 'cycle', () => `cycle_${cycleCounter++}`);
   const { count, bestTime } = withPersistentContext(contextId, () => ({
-    count: persistent(0, { name: 'count' }),
-    bestTime: persistent(Infinity, { name: 'bestTime' }),
+    count: persistent(0, { name: 'count', lifetime: true }),
+    bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),
   }));
 
   const elapsed = ref(0);

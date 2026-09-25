@@ -12,7 +12,8 @@
  * - Automatic tracking via CycleLog integration or manual submit()
  * - Strategy snapshot capture for recording winning configurations
  * - Explicit invalidation with stale state preservation
- * - Persistent storage across sessions via persistent()
+ * - Persistent storage across sessions via persistent(), tagged `lifetime` so
+ *   a reset of the owning module keeps the records (`clearAll()` wipes them)
  *
  * @see {@link createCycleLog} for the delta source this composes with
  */
@@ -240,7 +241,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
   // --- Reactive state ---
   const store = withPersistentContext(id, () =>
-    persistent<Record<string, SerializedBestOfEntry | null>>({}, { name: 'store' }),
+    persistent<Record<string, SerializedBestOfEntry | null>>({}, { name: 'store', lifetime: true }),
   );
 
   const handle = createEmitHandle<BestOfEvents>();

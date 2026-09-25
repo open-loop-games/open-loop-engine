@@ -2,7 +2,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
-import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  persistent,
+  beginPersistentContext,
+  endPersistentContext,
+  withPersistentContext,
+  getAllPersistentRefs,
+  serializePersistents,
+  Lifetime,
+} from '@/core/persistence';
+import { createRunPool } from '@/core/run-pool';
+import { createCycle } from '@/systems/cycle';
+import { createCycleLog } from '@/systems/cycle-log';
+import { createTimeSystem } from '@/systems/time';
+import { createTimeBank } from '@/systems/time-bank';
+import { createBestOf } from '@/systems/best-of';
+import { createAutomationTiers } from '@/systems/automation';
+import { createRecommendationSystem } from '@/systems/recommendation';
+import { createDialogSession } from '@/systems/dialog-session';
 import { createReset, createResetTimer } from '@/systems/reset';
 import { Resettable } from '@/systems/resettable';
 import { createSkill } from '@/systems/skill';
@@ -473,5 +490,113 @@ describe('Reset — listener re-entrancy', () => {
     gold.value = bn(50);
     expect(reset.reset()).toBe(true);
     expect(gold.value.eq(0)).toBe(true);
+  });
+});
+
+describe('Reset — system-owned cross-run state survives a reset of its own module', () => {
+  const registerTick = () => () => {};
+
+  /** Every stateful system a module can build, all inside module `m`. */
+  function buildSystems() {
+    return withPersistentContext('m', () => {
+      const cycle = createCycle({ resetModules: ['m'], registerTick });
+      const time = createTimeSystem();
+      const bank = createTimeBank();
+      const bestOf = createBestOf({ id: 'm-best', metrics: { gold: { mode: 'absolute' } } });
+      const pool = createRunPool({ id: 'm-pool', deathPolicy: 'park' });
+      const tiers = createAutomationTiers({
+        tiers: [
+          { id: 'manual', name: 'Manual', order: 0 },
+          { id: 'basic', name: 'Basic', order: 1 },
+        ],
+      });
+      const cycleLog = createCycleLog({ cycle, metrics: {} });
+      const recs = createRecommendationSystem({
+        cycle,
+        cycleLog,
+        bestOf,
+        getCurrentSnapshot: () => ({}),
+        applySnapshot: () => {},
+      });
+      const dialog = createDialogSession({
+        id: 'm-dialog',
+        graphs: [],
+        accessor: {
+          getResource: () => bn(0),
+          isUnlocked: () => false,
+          getState: () => undefined,
+          getRate: () => Decimal.dZero,
+          applyResourceOp: () => {},
+          setUnlocked: () => {},
+          setState: () => {},
+        },
+      });
+      return { cycle, time, bank, bestOf, pool, tiers, recs, dialog };
+    });
+  }
+
+  it('tags each cross-run ref lifetime and leaves run-scoped refs sweepable', () => {
+    buildSystems();
+    const lifetimeByKey = Object.fromEntries(
+      [...getAllPersistentRefs()].map(([key, ref]) => [key, ref[Lifetime]]),
+    );
+    expect(lifetimeByKey).toEqual({
+      'm/cycle.count': true,
+      'm/cycle.bestTime': true,
+      'm.elapsed': false,
+      'm.totalPlayTime': true,
+      // Whether banked time survives a prestige is the game's call: run-scoped
+      // by default, `keep: [bank.banked]` carries it.
+      'm/time-bank.banked': false,
+      'm-best.store': true,
+      'm-pool.instanceIds': true,
+      'm-pool.aliveStates': true,
+      'm/automation.unlocked': true,
+      'm/recommendation.storedRecommendation': true,
+      'm/recommendation.autoApply': true,
+      'dialog-sessions/m-dialog.state': true,
+    });
+  });
+
+  it('keeps counting cycles when the cycle resets its own module', () => {
+    const { cycle } = buildSystems();
+    cycle.end();
+    cycle.end();
+    cycle.end();
+    expect(cycle.count.value).toBe(3);
+  });
+
+  it('keeps lifetime state through a module reset', () => {
+    const { time, pool, tiers, recs, bestOf } = buildSystems();
+    time.tick(50);
+    const run = pool.addInstance({ id: 'a', step: () => false });
+    run.step();
+    tiers.unlock('basic');
+    recs.autoApply.value = true;
+    bestOf.submit({ key: 'gold', value: 5, elapsed: 1, cycleNumber: 0 });
+
+    createReset({ resetModules: ['m'] }).reset();
+
+    expect(time.elapsed.value).toBe(0);
+    expect(time.totalPlayTime.value).toBe(50);
+    expect(run.alive.value).toBe(false);
+    expect(serializePersistents(getAllPersistentRefs())).toMatchObject({
+      'm-pool': { aliveStates: { a: false } },
+    });
+    expect(tiers.hasReached('basic')).toBe(true);
+    expect(recs.autoApply.value).toBe(true);
+    expect(bestOf.entries.value.gold).not.toBeNull();
+  });
+
+  it('a thingsToReset walk over a system agrees with the module reset', () => {
+    const { cycle, time } = buildSystems();
+    cycle.end();
+    time.tick(50);
+
+    createReset({ thingsToReset: [cycle, time] }).reset();
+
+    expect(cycle.count.value).toBe(1);
+    expect(time.totalPlayTime.value).toBe(50);
+    expect(time.elapsed.value).toBe(0);
   });
 });

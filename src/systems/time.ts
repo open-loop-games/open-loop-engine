@@ -27,7 +27,10 @@ export interface TimeSystemConfig {
 export interface TimeSystem {
   /** Seconds elapsed since last reset (persistent). */
   elapsed: Ref<number>;
-  /** Total seconds played across all resets (persistent). */
+  /**
+   * Total seconds played across all resets (persistent). Tagged `lifetime`,
+   * so a reset of the owning module keeps it while zeroing `elapsed`.
+   */
   totalPlayTime: Ref<number>;
   /** Reactive speed multiplier — scales dt in `tick()`. */
   speedMultiplier: Ref<number>;
@@ -58,7 +61,7 @@ export interface TimeSystem {
  */
 export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
   const elapsed = persistent(0, { name: 'elapsed' });
-  const totalPlayTime = persistent(0, { name: 'totalPlayTime' });
+  const totalPlayTime = persistent(0, { name: 'totalPlayTime', lifetime: true });
   const speedMultiplier = ref(config.speedMultiplier ?? 1);
   return {
     elapsed,

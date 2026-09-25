@@ -67,7 +67,13 @@ export interface TimeBankConfig {
 
 /** Banked-time reservoir returned by {@link createTimeBank}. */
 export interface TimeBank {
-  /** Banked seconds (persistent). Prefer `deposit`/`withdraw` over direct writes. */
+  /**
+   * Banked seconds (persistent). Prefer `deposit`/`withdraw` over direct writes.
+   *
+   * Run-scoped, unlike most system-owned state: a reset naming the module
+   * the bank was built in empties it. Whether banked time survives a
+   * prestige is the game's call — pass `keep: [bank.banked]` to carry it.
+   */
   banked: Persistent<number>;
   /**
    * Add seconds to the reservoir, scaled by `earnEfficiency` and clamped at

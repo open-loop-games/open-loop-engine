@@ -21,6 +21,8 @@
  * instances stay dead across save/load regardless of when they're
  * recreated, fixing the lazy-context gap an earlier per-instance layout
  * had with dynamically-spawned runs (borglike clones, Cavernous loops).
+ * Both refs are tagged `lifetime`: the in-memory handles are the authority,
+ * so a module reset leaves them alone and `pool.reset()` stays the seam.
  */
 
 import { computed, ref, shallowRef, watch, type Ref } from 'vue';
@@ -205,8 +207,8 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
   // regardless of when it runs, so dynamic instances created post-load
   // pick up their saved alive state (no resurrection of dead clones).
   const { instanceIds, aliveStates } = withPersistentContext(poolId, () => ({
-    instanceIds: persistent<string[]>([], { name: 'instanceIds' }),
-    aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates' }),
+    instanceIds: persistent<string[]>([], { name: 'instanceIds', lifetime: true }),
+    aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates', lifetime: true }),
   }));
 
   // In-memory collection state. `handleArray` + `handleMap` is the canonical

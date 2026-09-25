@@ -145,7 +145,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   beginPersistentContext(`dialog-sessions/${options.id}`);
   const stateRef: Persistent<DialogRuntimeState> = persistent<DialogRuntimeState>(
     { activeGraphId: undefined, activeNodeId: undefined, visitCounts: {} },
-    { name: 'state' },
+    { name: 'state', lifetime: true },
   );
   endPersistentContext();
 

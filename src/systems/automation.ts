@@ -105,7 +105,10 @@ export interface AutomationTiers {
   /** The highest unlocked tier's order value (reactive). */
   readonly currentTierOrder: ComputedRef<number>;
 
-  /** Set of unlocked tier IDs (persistent). */
+  /**
+   * Set of unlocked tier IDs (persistent). Tagged `lifetime`, so a reset of
+   * the owning module keeps it; `resetUnlocks()` is the wipe.
+   */
   readonly unlocked: Persistent<string[]>;
 
   /** Check whether a specific tier is unlocked. */
@@ -180,7 +183,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     () => `autoTiers_${tierSystemCounter++}`,
   );
   const unlocked = withPersistentContext(contextId, () =>
-    persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
+    persistent<string[]>([...defaultUnlocked], { name: 'unlocked', lifetime: true }),
   );
 
   const handle = createEmitHandle<AutomationTiersEvents>();

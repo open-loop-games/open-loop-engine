@@ -218,6 +218,8 @@ export interface RecommendationSystem {
   /**
    * When `true`, `evaluate()` automatically calls `applySnapshot` with the
    * winning recommendation's snapshot. Persistent toggle, defaults to `false`.
+   * A player setting, so it and the stored recommendation are tagged
+   * `lifetime` and outlive a reset of the owning module.
    */
   readonly autoApply: Persistent<boolean>;
 
@@ -376,8 +378,9 @@ export function createRecommendationSystem(
   const { storedRecommendation, autoApply } = withPersistentContext(contextId, () => ({
     storedRecommendation: persistent<SerializedRecommendation | null>(null, {
       name: 'storedRecommendation',
+      lifetime: true,
     }),
-    autoApply: persistent<boolean>(false, { name: 'autoApply' }),
+    autoApply: persistent<boolean>(false, { name: 'autoApply', lifetime: true }),
   }));
 
   const handle = createEmitHandle<RecommendationSystemEvents>();

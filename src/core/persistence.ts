@@ -422,6 +422,11 @@ export interface PersistentOptions<T = unknown> {
    * The flag is the default for the trackers `Resource.cumulative` and
    * `Resource.best` — see {@link createResource}.
    *
+   * The rule for engine systems: system-owned cross-run state is lifetime
+   * (cycle stats, best-of records, run-pool aliveness, automation unlocks,
+   * total play time and the like). Wipe it with `thingsToReset: [ref]` or the
+   * system's own reset verb, never as a side effect of resetting its module.
+   *
    * A `thingsToReset` walk skips the flag the same way: a lifetime ref found
    * inside an object or category it walks is left alone.
    *
