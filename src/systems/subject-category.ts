@@ -270,13 +270,9 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
   /** Shared schema; readable for introspection and tooling. */
   readonly schema: S;
   /**
-   * The content registry. `registry.patch()` / `pushPatches()` change the def
-   * in place, so code reading `def.x` when it runs sees the change. Defs aren't
-   * reactive, though: a computed reading `def.x` directly isn't re-run by a
-   * patch, one reading through `getDef(id)` or `registry.get(id)` is, and a
-   * field given as a value is copied at register and keeps its old one. The
-   * view has no `register`: add defs with the
-   * category's `register`, which builds each def's instance and state.
+   * The content registry (see {@link ContentRegistryView} for what a patch
+   * reaches). Add defs with the category's `register`, which builds each
+   * def's instance and state.
    */
   readonly registry: ContentRegistryView<SubjectDef<S>>;
   /** Register subjects against the shared schema. Can be called multiple times (base game + mods). */

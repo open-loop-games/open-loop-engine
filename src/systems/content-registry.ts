@@ -98,9 +98,13 @@ export interface ContentRegistry<T extends { id: string }> {
 
 /**
  * A {@link ContentRegistry} without `register` — what a category exposes as
- * its `registry`. Reads and patches go through it; a def is added through the
- * category's own `register`, which builds the def's instance and state
- * alongside it.
+ * its `registry`. `registry.patch()` / `pushPatches()` change a def in
+ * place, so code reading `def.x` when it runs sees the change. Defs aren't
+ * reactive, though: a computed reading `def.x` directly isn't re-run by a
+ * patch, one reading through `getDef(id)` or `registry.get(id)` is, and a
+ * field given as a value is copied at register and keeps its old one. The
+ * view has no `register`: a def is added through the category's own
+ * `register`, which builds the def's instance and state alongside it.
  */
 export type ContentRegistryView<T extends { id: string }> = Omit<ContentRegistry<T>, 'register'>;
 

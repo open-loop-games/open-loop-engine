@@ -91,11 +91,8 @@ export interface ChallengeDef<
 
   /**
    * Content patches applied while this challenge is active.
-   * Map of registry name → entry id → partial fields.
-   * Reverted automatically on exit. A patch changes the def in place; content
-   * built from it sees the change where it reads the def at use time, and a
-   * computed re-runs on it only when it reads through the registry, such as a
-   * getter over a category's `getDef(id)`.
+   * Map of registry name → entry id → partial fields. Reverted automatically
+   * on exit — see {@link ContentRegistryView} for what a patch reaches.
    */
   contentPatches?: Record<string, Record<string, Partial<Record<string, unknown>>>>;
 
@@ -295,13 +292,9 @@ export interface ChallengeCategory<
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /**
-   * The content registry. `registry.patch()` / `pushPatches()` change the def
-   * in place, so code reading `def.x` when it runs sees the change. Defs aren't
-   * reactive, though: a computed reading `def.x` directly isn't re-run by a
-   * patch, one reading through `getDef(id)` or `registry.get(id)` is, and a
-   * field given as a value is copied at register and keeps its old one. The
-   * view has no `register`: add defs with the
-   * category's `register`, which builds each def's challenge and state.
+   * The content registry (see {@link ContentRegistryView} for what a patch
+   * reaches). Add defs with the category's `register`, which builds each
+   * def's challenge and state.
    */
   readonly registry: ContentRegistryView<Def>;
 
