@@ -101,7 +101,11 @@ export interface TemporaryEffectInstance {
   readonly timeRemaining: Ref<number>;
   /** The duration this instance was created with (snapshot at apply time) */
   readonly duration: number;
-  /** Stack index (0-based) among active instances of the same def */
+  /**
+   * Stack slot (0-based) among live instances of the same def: the lowest
+   * index no other live stack holds when this one was applied, so a slot a
+   * stack frees is reused. Not saved; `restore()` reassigns slots from 0.
+   */
   readonly stackIndex: number;
   /** Remove this instance early (cleans up modifiers, fires onExpire) */
   dispose(): void;
@@ -131,7 +135,7 @@ export interface TemporaryEffectSystem {
   readonly id: string;
   /** Kind tag used by the effect-system registry / picker discovery */
   readonly kind: 'temporary';
-  /** Register one or more effect definitions */
+  /** Register one or more effect definitions. Throws on an id already registered. */
   register(def: TemporaryEffectDef | TemporaryEffectDef[]): void;
   /** Get a registered definition by ID */
   getDef(id: string): TemporaryEffectDef | undefined;
@@ -236,6 +240,15 @@ export function createTemporaryEffectSystem(
     return typeof binding.modifier === 'function' ? binding.modifier() : binding.modifier;
   }
 
+  function lowestFreeStackIndex(defId: string): number {
+    const taken = new Set(
+      instances.value.filter((i) => i.defId === defId).map((i) => i.stackIndex),
+    );
+    let index = 0;
+    while (taken.has(index)) index++;
+    return index;
+  }
+
   function syncSavedState(): void {
     savedState.value = instances.value.map((i) => ({
       defId: i.defId,
@@ -331,6 +344,9 @@ export function createTemporaryEffectSystem(
   function register(def: TemporaryEffectDef | TemporaryEffectDef[]): void {
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
+      if (defs.has(d.id)) {
+        throw new Error(`TemporaryEffect: duplicate definition '${d.id}'`);
+      }
       if (typeof d.duration !== 'function' && !isRef(d.duration)) {
         toFiniteDuration(d.id, d.duration);
       }
@@ -376,7 +392,7 @@ export function createTemporaryEffectSystem(
 
     if (currentCount >= maxStacks) return null;
 
-    const instance = createInstance(def, dur, dur, currentCount);
+    const instance = createInstance(def, dur, dur, lowestFreeStackIndex(defId));
     def.onApply?.(instance);
     handle.emit('applied', instance);
     syncSavedState();
@@ -432,8 +448,12 @@ export function createTemporaryEffectSystem(
       const def = defs.get(snap.defId);
       if (!def) continue; // definition removed between versions
       const dur = resolveDuration(def);
-      const currentCount = instances.value.filter((i) => i.defId === snap.defId).length;
-      const instance = createInstance(def, dur, snap.timeRemaining, currentCount);
+      const instance = createInstance(
+        def,
+        dur,
+        snap.timeRemaining,
+        lowestFreeStackIndex(snap.defId),
+      );
       const restoreHook = def.onRestore ?? def.onApply;
       restoreHook?.(instance);
     }

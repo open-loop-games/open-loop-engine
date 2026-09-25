@@ -90,6 +90,13 @@ describe('registration', () => {
     expect(system.getDef('chill')).toBeDefined();
   });
 
+  it('throws on a duplicate definition id, as persistent-effect does', () => {
+    const { system } = createSystem();
+    system.register({ id: 'burn', duration: 4 });
+    expect(() => system.register({ id: 'burn', duration: 8 })).toThrow(/duplicate/);
+    expect(system.getDef('burn')!.duration).toBe(4);
+  });
+
   it('throws if maxStacks > 1 with non-factory modifier', () => {
     const { system } = createSystem();
     const chain = createModifierChain('test');
@@ -381,6 +388,17 @@ describe('stacking', () => {
 
     expect(system.getActive()).toHaveLength(1);
     expect(system.getActive()[0]!.timeRemaining.value).toBe(4);
+  });
+
+  it('stackIndex is the lowest index no live stack of the def holds', () => {
+    const { system } = createSystem();
+    system.register({ id: 'burn', duration: 10, maxStacks: 3 });
+    const a = system.apply('burn')!;
+    const b = system.apply('burn')!;
+    a.dispose();
+    const c = system.apply('burn')!;
+    const d = system.apply('burn')!;
+    expect([b.stackIndex, c.stackIndex, d.stackIndex]).toEqual([1, 0, 2]);
   });
 
   it('maxStacks caps independent stacking', () => {
