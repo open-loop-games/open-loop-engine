@@ -44,6 +44,11 @@ function isEvaluable(v: unknown): v is { evaluate(): DecimalSource } {
   return v != null && typeof v === 'object' && 'evaluate' in v && typeof v.evaluate === 'function';
 }
 
+/** A resource effect's amount, with a Formula evaluated now. */
+function resolveValue(value: ResourceEffect['value']): DecimalSource {
+  return isEvaluable(value) ? value.evaluate() : value;
+}
+
 // === RESOLUTION & APPLICATION ===
 /**
  * Flatten a declarative {@link IEffectInternal} into a list of concrete
@@ -70,7 +75,7 @@ export function resolveEffect(
           type: 'resource',
           target: effect.target,
           operation: effect.operation,
-          value: isEvaluable(effect.value) ? effect.value.evaluate() : effect.value,
+          value: resolveValue(effect.value),
         },
       ];
     case 'unlock':
@@ -93,7 +98,7 @@ export function resolveEffect(
  *
  * Steps apply in order: each composite child, conditional and formula value
  * is resolved just before it applies, so it reads what the steps before it
- * wrote. Leaves resolve through {@link resolveEffect}.
+ * wrote.
  */
 export function applyEffect(
   effect: IEffectInternal,
@@ -109,23 +114,15 @@ export function applyEffect(
       if (branch) applyEffect(branch, accessor, mutator);
       return;
     }
-  }
-  for (const r of resolveEffect(effect, accessor)) {
-    switch (r.type) {
-      case 'resource':
-        mutator.applyResourceOp(
-          r.target,
-          r.operation as ResourceEffect['operation'],
-          r.value as DecimalSource,
-        );
-        break;
-      case 'unlock':
-        mutator.setUnlocked(r.target, r.value as boolean);
-        break;
-      case 'state':
-        mutator.setState(r.target, r.value);
-        break;
-    }
+    case 'resource':
+      mutator.applyResourceOp(effect.target, effect.operation, resolveValue(effect.value));
+      return;
+    case 'unlock':
+      mutator.setUnlocked(effect.target, effect.value);
+      return;
+    case 'state':
+      mutator.setState(effect.target, effect.value);
+      return;
   }
 }
 
