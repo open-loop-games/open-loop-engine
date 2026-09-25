@@ -48,11 +48,11 @@
  *   achievement stays a closure; the engine builds it, no author writes it.
  */
 
-import { computed, unref, type ComputedRef } from 'vue';
+import { computed, type ComputedRef } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { compareState } from '@/core/conditions';
-import { processGetter, resolveComputable, type Computable } from '@/core/computed';
+import { resolveComputable, type Computable } from '@/core/computed';
 import {
   combineFlipDistances,
   secondsToCover,
@@ -434,22 +434,19 @@ export function createPredicateResolver(override?: GateRuntime): PredicateResolv
     runtime,
     assert: (gate, label) => assertGateHandles(gate, runtime, label),
     adopt(predicate, fallback, label) {
-      if (predicate === undefined) {
-        return { gate: undefined, holds: computed(() => fallback), read: () => fallback };
-      }
-      if (isGate(predicate)) {
-        assertGateHandles(predicate, runtime, label);
-        return {
-          gate: predicate,
-          holds: computed(() => evaluateGate(predicate, runtime)),
-          read: () => evaluateGate(predicate, runtime),
-        };
-      }
-      const source = processGetter(predicate);
+      const gate = isGate(predicate) ? predicate : undefined;
+      if (gate) assertGateHandles(gate, runtime, label);
+      const read =
+        predicate === undefined ? () => fallback : () => evaluatePredicate(predicate, runtime);
+      // Built on first access: sites that poll only ever call `read()`, and a
+      // computed nothing reads is held for the owner's lifetime.
+      let holds: ComputedRef<boolean> | undefined;
       return {
-        gate: undefined,
-        holds: computed(() => unref(source)),
-        read: () => resolveComputable(predicate),
+        gate,
+        read,
+        get holds() {
+          return (holds ??= computed(read));
+        },
       };
     },
   };
