@@ -12,19 +12,19 @@ Substrate the content systems compose against. `CategoryBase` + `ContentRegistry
 
 shared skeleton for batch-registration categories
 
-- `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:113`
-- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:79`
-- `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:71`
-- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:54`
-- `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:173`
+- `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:114`
+- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:80`
+- `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:72`
+- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:55`
+- `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:177`
 
 ## Content Registry
 
 generic typed registry for game content definitions
 
 - `interface ContentRegistry<T extends { id: string; }>` — A typed, Map-backed registry for game content definitions. `src/systems/content-registry.ts:44`
-- `type ContentRegistryView<T extends { id: string; }>` — A ContentRegistry without `register` — what a category exposes as its `registry`. `src/systems/content-registry.ts:104`
-- `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:140`
+- `type ContentRegistryView<T extends { id: string; }>` — A ContentRegistry without `register` — what a category exposes as its `registry`. `src/systems/content-registry.ts:105`
+- `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:141`
 
 ## Sequencer
 
