@@ -18,7 +18,7 @@
  * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
  */
 
-import { computed, ref, unref, watch, type ComputedRef, type MaybeRef, type Ref } from 'vue';
+import { computed, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import {
@@ -448,20 +448,16 @@ function buildGetCost(baseReqs: Requirement[]): (purchaseAmount?: DecimalSource)
  * and its Formula makes the cost invertible, so bulk purchasing works via
  * `calculateMaxAffordable`. A `cost` function becomes a getter cost
  * (single-purchase only).
- *
- * Either way, the cost reads through the engine's persistent `scalingAmount`
- * ref — the mirror+watch in the factory body keeps it synced with
- * `purchasable.amount`, so consumers don't need their own mirror.
  */
 function buildScalingCostRequirement(
   options: ScalingPurchasableOptions,
-  scalingAmount: Ref<DecimalSource>,
+  level: Ref<DecimalSource>,
   limit: Computable<DecimalSource> | undefined,
 ): Requirement {
   if (options.costFormula !== undefined) {
     return createCostRequirement({
       resource: options.resource,
-      cost: toFormula(options.costFormula(scalingAmount)),
+      cost: toFormula(options.costFormula(level)),
       maxBulkAmount: limit ?? Decimal.dInf,
     });
   }
@@ -472,7 +468,7 @@ function buildScalingCostRequirement(
     const costFn = options.cost;
     return createCostRequirement({
       resource: options.resource,
-      cost: () => costFn(scalingAmount.value),
+      cost: () => costFn(level.value),
       maxBulkAmount: 1,
     });
   }
@@ -486,7 +482,7 @@ function buildScalingCostRequirement(
   const processedCostScaling = processGetter(options.costScaling);
   return createCostRequirement({
     resource: options.resource,
-    cost: Formula.exponential(scalingAmount, processedBaseCost, processedCostScaling),
+    cost: Formula.exponential(level, processedBaseCost, processedCostScaling),
     maxBulkAmount: limit ?? Decimal.dInf,
   });
 }
@@ -497,7 +493,7 @@ function buildScalingCostRequirement(
  */
 function buildScalingEffect(
   options: ScalingPurchasableEffect,
-  scalingAmount: Ref<DecimalSource>,
+  level: Ref<DecimalSource>,
 ): {
   effectFn: ((amount: DecimalSource) => DecimalSource) | undefined;
   effectCurve: GenericFormula | undefined;
@@ -507,66 +503,22 @@ function buildScalingEffect(
     effectCurve: curve,
     effectFn: (amount: DecimalSource) => new Decimal(curve.evaluate(amount)),
   });
-  if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(scalingAmount)));
+  if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(level)));
   if (effect === undefined || typeof effect === 'function') {
     return { effectCurve: undefined, effectFn: effect };
   }
   // A static base auto-wraps as `base^amount`, an invertible Formula.
-  return fromCurve(Formula.variable(scalingAmount).pow_base(effect));
+  return fromCurve(Formula.variable(level).pow_base(effect));
 }
 
-// === FACTORIES ===
-
 /**
- * Engine-internal raw Purchasable factory. Consumers reach this through
- * {@link createPurchasableCategory} (the L2 front door) or
- * {@link createScalingPurchasable} (the L3 Formula-aware escape).
- *
- * State is always amount-based (`Persistent<DecimalSource>`). One-shot behavior
- * emerges from `limit: 1` — the `active` computed provides boolean convenience.
- *
- * @internal
- * @param options - Configuration for the purchasable
- * @param predicates - resolver `visible` adopts through; a category passes
- *   its own, so content registered after install still resolves
- * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
- *
- * @example Leveled repeatable
- * ```ts
- * const generator = createPurchasable({
- *   id: 'generator',
- *   display: { description: 'Point Generator' },
- *   // Factory form — `level` is this purchasable's own amount ref, so the
- *   // cost is a Formula and `purchaseMax` walks the curve rung by rung.
- *   requirements: (level) =>
- *     createCostRequirement({
- *       resource: points,
- *       cost: Formula.exponential(level, 10, 1.15),
- *       maxBulkAmount: Decimal.dInf,
- *     }),
- *   effect: (amt) => Decimal.pow(2, amt),
- * });
- * generator.purchaseMax();
- * ```
+ * The purchasable's saved level, in a sub-context of its own so purchasables
+ * grouped under one outer context (e.g. `layer0`) don't collide on `amount`.
  */
-export function createPurchasable(
-  options: PurchasableOptions,
-  predicates: PredicateResolver = createPredicateResolver(),
-): Purchasable {
-  const {
-    id,
-    display,
-    requirements,
-    limit,
-    initialAmount,
-    effect,
-    onPurchase,
-    visible,
-    bulkPurchase,
-  } = options;
-
-  // Sub-context per purchasable so multiple purchasables grouped under the
-  // same outer context (e.g. `layer0`) do not collide on the `amount` name.
+function buildPurchasableAmount(
+  id: string,
+  initialAmount: DecimalSource | undefined,
+): { contextId: string; amount: Persistent<DecimalSource> } {
   const parentContext = getCurrentContext();
   const contextId = parentContext ? `${parentContext}:${id}` : id;
   const amount = withPersistentContext(contextId, () =>
@@ -579,6 +531,17 @@ export function createPurchasable(
       amount.value = cloneDefault(initialAmount);
     }
   }
+  return { contextId, amount };
+}
+
+/** Everything a purchasable builds over its level, once `amount` exists. */
+function assemblePurchasable(
+  options: PurchasableOptions,
+  amount: Persistent<DecimalSource>,
+  contextId: string,
+  predicates: PredicateResolver,
+): Purchasable {
+  const { id, display, requirements, limit, effect, onPurchase, visible, bulkPurchase } = options;
 
   const processedLimit = limit != null ? processGetter(limit) : Decimal.dInf;
   const isOneShot = Decimal.eq(unref(processedLimit), 1);
@@ -663,6 +626,48 @@ export function createPurchasable(
   return attachContextReset(purchasable, contextId);
 }
 
+// === FACTORIES ===
+
+/**
+ * Engine-internal raw Purchasable factory. Consumers reach this through
+ * {@link createPurchasableCategory} (the L2 front door) or
+ * {@link createScalingPurchasable} (the L3 Formula-aware escape).
+ *
+ * State is always amount-based (`Persistent<DecimalSource>`). One-shot behavior
+ * emerges from `limit: 1` — the `active` computed provides boolean convenience.
+ *
+ * @internal
+ * @param options - Configuration for the purchasable
+ * @param predicates - resolver `visible` adopts through; a category passes
+ *   its own, so content registered after install still resolves
+ * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
+ *
+ * @example Leveled repeatable
+ * ```ts
+ * const generator = createPurchasable({
+ *   id: 'generator',
+ *   display: { description: 'Point Generator' },
+ *   // Factory form — `level` is this purchasable's own amount ref, so the
+ *   // cost is a Formula and `purchaseMax` walks the curve rung by rung.
+ *   requirements: (level) =>
+ *     createCostRequirement({
+ *       resource: points,
+ *       cost: Formula.exponential(level, 10, 1.15),
+ *       maxBulkAmount: Decimal.dInf,
+ *     }),
+ *   effect: (amt) => Decimal.pow(2, amt),
+ * });
+ * generator.purchaseMax();
+ * ```
+ */
+export function createPurchasable(
+  options: PurchasableOptions,
+  predicates: PredicateResolver = createPredicateResolver(),
+): Purchasable {
+  const { contextId, amount } = buildPurchasableAmount(options.id, options.initialAmount);
+  return assemblePurchasable(options, amount, contextId, predicates);
+}
+
 /**
  * Create a purchasable with leveled cost scaling — the L3 escape hatch for
  * per-instance customized leveled purchases.
@@ -722,7 +727,7 @@ export function createPurchasable(
  */
 export function createScalingPurchasable(
   options: ScalingPurchasableOptions,
-  predicates?: PredicateResolver,
+  predicates: PredicateResolver = createPredicateResolver(),
 ): Purchasable {
   const {
     id,
@@ -736,56 +741,31 @@ export function createScalingPurchasable(
     bulkPurchase,
   } = options;
 
-  // The cost and effect Formulas read the level before the purchasable (and
-  // its saved `amount`) exists, so they close over this mirror instead. It is
-  // derived state: the watch below keeps it equal to `amount`, load included.
-  const scalingAmount = ref<DecimalSource>(initialAmount ?? 0) as Ref<DecimalSource>;
+  const { contextId, amount } = buildPurchasableAmount(id, initialAmount);
+  const costRequirement = buildScalingCostRequirement(options, amount, limit);
+  const { effectFn, effectCurve } = buildScalingEffect(options, amount);
 
-  const costRequirement = buildScalingCostRequirement(options, scalingAmount, limit);
-  const { effectFn, effectCurve } = buildScalingEffect(options, scalingAmount);
-
-  const purchasable: Purchasable = {
-    ...createPurchasable(
-      {
-        id,
-        display: {
-          title,
-          description,
-          effectDisplay:
-            effectDisplay ??
-            (effectFn
-              ? computed(() => `×${formatSmall(effectFn(scalingAmount.value), 2)}`)
-              : undefined),
-        },
-        requirements: costRequirement,
-        limit,
-        initialAmount,
-        effect: effectFn,
-        onPurchase,
-        visible,
-        bulkPurchase,
+  const purchasable = assemblePurchasable(
+    {
+      id,
+      display: {
+        title,
+        description,
+        effectDisplay:
+          effectDisplay ??
+          (effectFn ? computed(() => `×${formatSmall(effectFn(amount.value), 2)}`) : undefined),
       },
-      predicates,
-    ),
-    effectCurve,
-  };
-
-  // Mirror the purchasable's internal `amount` into `scalingAmount`. The cost
-  // Formula was captured at createCostRequirement time (before `purchasable`
-  // existed), so it holds `scalingAmount` as its variable. Without this sync,
-  // `purchase()` bumps `amount` but `getCost(1)` stays pinned at `baseCost`.
-  //
-  // `flush: 'sync'` is required: consumers call `getCost(1)` and read
-  // `canPurchase.value` immediately after `purchase()` returns, well before
-  // the default Vue scheduler flushes post-render. `immediate: true` keeps
-  // post-load state consistent when persistence rehydrates a non-zero amount.
-  watch(
-    () => purchasable.amount.value,
-    (v) => {
-      scalingAmount.value = v;
+      requirements: costRequirement,
+      limit,
+      effect: effectFn,
+      onPurchase,
+      visible,
+      bulkPurchase,
     },
-    { immediate: true, flush: 'sync' },
+    amount,
+    contextId,
+    predicates,
   );
-
+  purchasable.effectCurve = effectCurve;
   return purchasable;
 }
