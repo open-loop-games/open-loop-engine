@@ -622,7 +622,7 @@ function assemblePurchasable(
   };
 
   // A reset walk stops at the purchasable's own context: a ref passed as
-  // `limit`, `visibility` or `bulkPurchase` belongs to whoever created it.
+  // `limit`, `visible` or `bulkPurchase` belongs to whoever created it.
   return attachContextReset(purchasable, contextId);
 }
 
