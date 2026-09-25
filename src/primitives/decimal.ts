@@ -31,10 +31,14 @@ import { notationManager } from './notation-manager';
 // below is the same class that break_eternity default-exports; the `type`
 // namespace points at the instance type so `const d: Decimal = new Decimal(…)`
 // and `x instanceof Decimal` both read naturally.
-/** Anything {@link bn} accepts — a live `Decimal`, a `number`, or a numeric string. */
-export type DecimalSource = OrigDecimal | number | string;
+// break_eternity's .d.ts says `export default class` over a CJS `module.exports`,
+// so under `nodenext` a default import types as the module namespace; reading
+// `default` off the namespace type names the class under every resolution.
+type DecimalClass = typeof import('break_eternity.js') extends { default: infer C } ? C : never;
 /** Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. */
-export type Decimal = OrigDecimal;
+export type Decimal = InstanceType<DecimalClass>;
+/** Anything {@link bn} accepts — a live `Decimal`, a `number`, or a numeric string. */
+export type DecimalSource = Decimal | number | string;
 
 // OVERFLOW_ABS caps below IEEE 754 double precision (2^53 ≈ 9e15). The static
 // fast paths compute in number-space only when the result lands under this
@@ -247,7 +251,7 @@ OrigDecimal.lte = function lte(a: DecimalSource, b: DecimalSource): boolean {
   return origLte(a, b);
 };
 
-export const Decimal = OrigDecimal;
+export const Decimal: DecimalClass = OrigDecimal;
 export default Decimal;
 
 /** Create a Decimal from a number, string, or Decimal */
