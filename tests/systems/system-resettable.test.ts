@@ -3,6 +3,7 @@ import { effectScope } from 'vue';
 import {
   cloneDefault,
   getAllPersistentRefs,
+  isAtDefault,
   Lifetime,
   resetAllPersistentContexts,
   withPersistentContext,
@@ -254,6 +255,13 @@ function lifetimeKeys(): string[] {
   return [...getAllPersistentRefs()].filter(([, ref]) => ref[Lifetime]).map(([key]) => key);
 }
 
+/** Run-scoped refs sitting off their default, which a reset must move back. */
+function movedRunScopedKeys(): string[] {
+  return [...getAllPersistentRefs()]
+    .filter(([, ref]) => !ref[Lifetime] && !isAtDefault(ref))
+    .map(([key]) => key);
+}
+
 function resetVia(c: Case, via: 'thingsToReset' | 'resetModules') {
   resetAllPersistentContexts();
   // Earned-at and best-of timestamps read the clock; both runs see one instant.
@@ -266,13 +274,14 @@ function resetVia(c: Case, via: 'thingsToReset' | 'resetModules') {
       c.dirty(system as never);
       const before = snapshot();
       const lifetime = lifetimeKeys();
+      const moved = movedRunScopedKeys();
       const reset =
         via === 'thingsToReset'
           ? createReset({ thingsToReset: [system] })
           : createReset({ resetModules: ['m'] });
       reset.reset();
       if (via === 'thingsToReset') c.check?.(system as never);
-      return { before, after: snapshot(), lifetime };
+      return { before, after: snapshot(), lifetime, moved };
     })!;
   } finally {
     scope.stop();
@@ -289,7 +298,7 @@ describe('Reset — a standalone system in thingsToReset', () => {
     for (const key of walked.lifetime) {
       expect(walked.after[key], key).toEqual(walked.before[key]);
     }
-    if (Object.keys(walked.before).length > walked.lifetime.length) {
+    if (walked.moved.length > 0) {
       expect(walked.after).not.toEqual(walked.before);
     }
   });

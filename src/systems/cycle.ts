@@ -145,7 +145,8 @@ export interface Cycle extends ScopedReset {
 
   /**
    * Elapsed time in the current cycle, in seconds (persistent, so a reload
-   * resumes the run's clock). Resets to 0 on restart.
+   * resumes the run's clock). Resets to 0 on restart, and under any reset
+   * whose scope covers the cycle's context.
    */
   readonly elapsed: Persistent<number>;
 
@@ -242,13 +243,10 @@ export function createCycle(options: CycleOptions): Cycle {
   } = options;
 
   const contextId = resolveSystemContextId(id, 'cycle', () => `cycle_${cycleCounter++}`);
-  // `elapsed` is lifetime too: the cycle zeroes it itself, and a reset that
-  // covers the cycle's own context would otherwise zero it before `end()`
-  // records the best time.
   const { count, bestTime, elapsed } = withPersistentContext(contextId, () => ({
     count: persistent(0, { name: 'count', lifetime: true }),
     bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),
-    elapsed: persistent(0, { name: 'elapsed', lifetime: true }),
+    elapsed: persistent(0, { name: 'elapsed' }),
   }));
 
   const running = ref(false);
@@ -288,6 +286,10 @@ export function createCycle(options: CycleOptions): Cycle {
     try {
       handle.emit('beforeRestart');
 
+      // Read before the reset, which zeroes `elapsed` when it covers the
+      // cycle's own context.
+      const runTime = elapsed.value;
+
       // Stats and elapsed commit only once the reset has actually run. A Reset
       // carrying a `canReset` gate or an `onBeforeReset` hook can decline, and
       // both checks fire before it touches any ref — so declining is clean and
@@ -296,8 +298,8 @@ export function createCycle(options: CycleOptions): Cycle {
 
       // A zero-length cycle (two ends with no tick between) isn't a run, and
       // a best of 0 is one no later cycle could beat.
-      if (elapsed.value > 0 && elapsed.value < bestTime.value) {
-        bestTime.value = elapsed.value;
+      if (runTime > 0 && runTime < bestTime.value) {
+        bestTime.value = runTime;
       }
       count.value++;
 

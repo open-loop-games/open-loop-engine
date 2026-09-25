@@ -718,9 +718,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     expect(lifetimeByKey).toEqual({
       'm/cycle.count': true,
       'm/cycle.bestTime': true,
-      // The cycle zeroes its own run clock; a reset sweeping it would zero it
-      // before `end()` records the best time.
-      'm/cycle.elapsed': true,
+      'm/cycle.elapsed': false,
       'm/time.elapsed': false,
       'm/time.totalPlayTime': true,
       // Whether banked time survives a prestige is the game's call: run-scoped

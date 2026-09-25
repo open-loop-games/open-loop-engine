@@ -129,7 +129,24 @@ describe('createCycle', () => {
     expect(cycle.bestTime.value).toBe(7);
   });
 
-  it('a reset covering the cycle context keeps elapsed until the best time is recorded', () => {
+  it('a reset from another Reset naming the cycle module zeroes the run clock', () => {
+    const { registerTick, tick } = createTickManager();
+    const cycle = withPersistentContext('cycle-run-clock', () =>
+      createCycle({ thingsToReset: [], registerTick }),
+    );
+    cycle.run();
+    tick(3);
+    cycle.end();
+    tick(2);
+
+    createReset({ resetModules: ['cycle-run-clock'] }).reset();
+
+    expect(cycle.elapsed.value).toBe(0);
+    expect(cycle.count.value).toBe(1);
+    expect(cycle.bestTime.value).toBe(3);
+  });
+
+  it('a reset covering the cycle context still records the best time', () => {
     const { registerTick, tick } = createTickManager();
     const cycle = withPersistentContext('cycle-self-reset', () =>
       createCycle({ resetModules: ['cycle-self-reset'], registerTick }),
