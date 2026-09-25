@@ -7,6 +7,7 @@ import {
   beginPersistentContext,
   endPersistentContext,
   withPersistentContext,
+  withPersistenceNamespace,
   getAllPersistentRefs,
   serializePersistents,
   Lifetime,
@@ -357,6 +358,58 @@ describe('Reset with resetModules', () => {
 
     expect(reset.resolvedScope.size).toBe(1);
     expect(reset.resolvedScope.has(r)).toBe(true);
+  });
+
+  it('resolves resetModules at reset time, so refs created after createReset are in scope', () => {
+    beginPersistentContext('rm-lazy');
+    const early = persistent(0);
+    endPersistentContext();
+    const reset = createReset({ resetModules: ['rm-lazy'] });
+    const cycle = createCycle({ resetModules: ['rm-lazy'], registerTick: () => () => {} });
+    beginPersistentContext('rm-lazy');
+    const late = persistent(0);
+    endPersistentContext();
+
+    expect(reset.resolvedScope.has(late)).toBe(true);
+    expect(cycle.resolvedScope.has(late)).toBe(true);
+
+    early.value = 5;
+    late.value = 7;
+    reset.reset();
+    expect(early.value).toBe(0);
+    expect(late.value).toBe(0);
+  });
+
+  it('warns once when a resetModules id names no registered module', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const reset = createReset({ resetModules: ['rm-no-such-module'] });
+      reset.reset();
+      reset.reset();
+      const calls = warn.mock.calls.filter((c) => String(c[0]).includes('rm-no-such-module'));
+      expect(calls).toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps resolving a module id inside the namespace it was created under', () => {
+    beginPersistentContext('rm-ns-shop');
+    const live = persistent(0);
+    endPersistentContext();
+    live.value = 42;
+
+    const forkReset = withPersistenceNamespace('fork-1', () => {
+      beginPersistentContext('rm-ns-shop');
+      const forked = persistent(0);
+      endPersistentContext();
+      forked.value = 9;
+      return { reset: createReset({ resetModules: ['rm-ns-shop'] }), forked };
+    });
+
+    forkReset.reset.reset();
+    expect(forkReset.forked.value).toBe(0);
+    expect(live.value).toBe(42);
   });
 
   it('backward compat: thingsToReset-only still works', () => {

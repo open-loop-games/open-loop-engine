@@ -320,6 +320,17 @@ export function withPersistenceNamespace<T>(namespace: string | undefined, fn: (
 }
 
 /**
+ * The persistence namespace active right now, for code that must later
+ * re-enter it with {@link withPersistenceNamespace} (a reset resolving its
+ * module scope after install has closed).
+ *
+ * @internal
+ */
+export function getPersistenceNamespace(): string | undefined {
+  return activeNamespace;
+}
+
+/**
  * Strip the namespace prefix from a full context id, leaving the raw id the
  * caller passed to `beginPersistentContext`. Namespace-agnostic code that
  * needs to display or route on the context id (e.g. system fallback ids)

@@ -294,7 +294,9 @@ export function createCycle(options: CycleOptions): Cycle {
     bestTime,
     elapsed,
     running,
-    resolvedScope: reset.resolvedScope,
+    get resolvedScope() {
+      return reset.resolvedScope;
+    },
     reset,
     end,
     on: handle.on,
