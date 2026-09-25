@@ -646,8 +646,13 @@ export function resetPersistent<T>(persistentRef: Persistent<T>): void {
 /**
  * True when a persistent ref's current value equals its default. Used by
  * {@link filterDefaultedRefs} to prune redundant entries from the save
- * envelope; deserialize already restores absent keys to their default, so
- * dropping them is consumer-transparent.
+ * envelope; deserialize restores absent keys to their default.
+ *
+ * That default is the loading build's, not the saving one's: an absent leaf
+ * means "the writing build's default". A content update that changes a
+ * default therefore moves every saved value that sat at the old one, and a
+ * migration reading the leaf sees `undefined`. Changing a default is a save
+ * migration.
  *
  * Equality rules, in order:
  * 1. NaN-vs-NaN (numeric primitives only) → equal.
@@ -722,7 +727,8 @@ function isPlainContainer(v: object): boolean {
  * Return a new Map with refs whose value equals their default removed. Used
  * by the save manager between {@link getAllPersistentRefs} and
  * {@link serializePersistents} so the envelope omits redundant leaves —
- * ~5× size win on saves dominated by default-valued primitives.
+ * ~5× size win on saves dominated by default-valued primitives. A pruned
+ * leaf loads as the loading build's default — see {@link isAtDefault}.
  */
 export function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent> {
   const out = new Map<string, Persistent>();
