@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isReactive } from 'vue';
 import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
 import { seedRNG } from '@/primitives/rng';
 import {
@@ -865,6 +866,27 @@ describe('createSpatialGrid — serialize / restore', () => {
       expect(reloaded.cells[3].kind).toBe('wall');
       expect(Array.from(restored.passable)).toEqual([1, 0, 0, 1]);
       expect(restored.at(1, 1).kind).toBe('wall');
+    } finally {
+      endPersistentContext();
+    }
+  });
+
+  it('restoring from a persistent() ref stores raw cells, not reactive proxies', () => {
+    beginPersistentContext('spatial-grid-raw-cells-test');
+    try {
+      const snapshotRef = persistent<SpatialGridSnapshot<Tile>>({
+        width: 2,
+        height: 1,
+        cells: [floor(), { kind: 'wall' }],
+        passable: [1, 0],
+        explored: [0, 0],
+        visible: [0, 0],
+      });
+      const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
+      grid.restore(snapshotRef.value);
+      expect(isReactive(grid.at(0, 0))).toBe(false);
+      expect(isReactive(grid.at(1, 0))).toBe(false);
+      expect(grid.at(1, 0).kind).toBe('wall');
     } finally {
       endPersistentContext();
     }

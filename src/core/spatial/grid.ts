@@ -3,10 +3,10 @@
  *
  * @cluster spatial-grid
  *
- * Plain-data, Vue-free. Dense `T[]` cell storage plus three `Uint8Array`
- * bitmaps (passable / explored / visible). Adjacency, range, traversal, and
- * an FOV commit adapter that lets external libraries (rot.js shadowcasting)
- * write visibility back without the engine importing them.
+ * Plain data: dense `T[]` cell storage plus three `Uint8Array` bitmaps
+ * (passable / explored / visible). Adjacency, range, traversal, and an FOV
+ * commit adapter that lets external libraries (rot.js shadowcasting) write
+ * visibility back without the engine importing them.
  *
  * Rectangular *storage*, not rectangular *topology*: the `neighborhood`
  * option is the board's adjacency as a set of offsets, so 4-connected,
@@ -29,6 +29,7 @@
  *   outside the FOV path.
  */
 
+import { toRaw } from 'vue';
 import { createEmitHandle } from '../events';
 import { randomItem } from '@/primitives/rng';
 import type { GridCoord, GridDelta, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
@@ -115,8 +116,16 @@ export interface SpatialGridEvents<T> {
  * `{"0":1,...}` and reloads as a lengthless object, which `restore()` rejects).
  * The live grid keeps `Uint8Array` for tick-rate performance; `serialize()`
  * copies out to `number[]` and `restore()` bulk-loads via `.set()`, which
- * accepts a plain array. Snapshot arrays are fresh copies, so mutating the live
- * grid after a serialize never corrupts the snapshot.
+ * accepts a plain array.
+ *
+ * The bitmaps are fresh copies; `cells` is a shallow one. The array is new,
+ * but its entries are the grid's own cell objects, and `restore()` stores the
+ * snapshot's objects in turn. So with object cells, a mutation in place (a
+ * tile's field, say) shows through in both directions, and a checkpoint taken
+ * for an undo or a level retry has to copy its cells first. Primitive cells,
+ * and cells replaced through `set()`, never alias. `restore()` unwraps
+ * reactive proxies, so restoring from a `persistent()` ref's `.value` keeps
+ * the grid's cells raw.
  */
 export interface SpatialGridSnapshot<T> {
   /** `serialize()` writes 1; `restore()` reads an absent version as 1. */
@@ -770,7 +779,9 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       let pCount = 0;
       let epCount = 0;
       for (let i = 0; i < size; i++) {
-        cells[i] = snapshot.cells[i];
+        // A snapshot read back through a `persistent()` ref yields reactive
+        // proxies; the grid holds the raw objects so tick-rate reads skip traps.
+        cells[i] = toRaw(snapshot.cells[i]);
         if (explored[i]) eCount++;
         if (passable[i]) {
           pCount++;
