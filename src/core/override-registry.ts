@@ -30,10 +30,11 @@
  * stack — each pushScope returns an independent cleanup function. Cleanup
  * is idempotent.
  *
- * `scopeVersion` is a reactive `Ref<number>` that bumps on every push and
- * cleanup. Read it from inside a Vue `computed` to make the computed
- * re-evaluate when the scope stack changes. Paired with {@link tunable}
- * for the sim-tunable-values pattern.
+ * `scopeVersion` is a reactive `Ref<number>` that bumps whenever a
+ * resolution can change: every push and cleanup, every `override`, and a
+ * `setDefault` that registers a new key. Read it from inside a Vue
+ * `computed` to make the computed re-evaluate on those changes. Paired
+ * with {@link tunable} for the sim-tunable-values pattern.
  *
  * @example
  * ```ts
@@ -127,9 +128,11 @@ export interface OverrideRegistry<T extends Record<string, (...args: never[]) =>
   readonly scopeDepth: number;
 
   /**
-   * Reactive version counter — bumps on every push and scope cleanup.
-   * Read from inside a `computed` to make it re-evaluate on scope changes.
-   * Paired with {@link tunable} for the sim-tunable-values pattern.
+   * Reactive version counter — bumps whenever a key's resolution can change:
+   * every push and scope cleanup, every `override`, and a `setDefault` that
+   * registers a new key (a no-op `setDefault` doesn't bump). Read from inside
+   * a `computed` to make it re-evaluate on those changes. Paired with
+   * {@link tunable} for the sim-tunable-values pattern.
    */
   readonly scopeVersion: Ref<number>;
 }
@@ -158,6 +161,13 @@ export const TuningRegistriesKey = Symbol('engine:tuning-registries') as Injecti
 >;
 
 // === FACTORY ===
+/** Whether a live scope supplies its own, defined entry for `key`. */
+function overridesKey<T>(scope: Scope<T>, key: keyof T & string): boolean {
+  return (
+    !scope.removed && Object.hasOwn(scope.overrides, key) && scope.overrides[key] !== undefined
+  );
+}
+
 /**
  * Create a new override registry.
  *
@@ -176,20 +186,20 @@ export function createOverrideRegistry<T extends Record<string, (...args: never[
     setDefault<K extends keyof T & string>(key: K, fn: T[K]): void {
       if (!base.has(key)) {
         base.set(key, fn);
+        scopeVersion.value++;
       }
     },
 
     override<K extends keyof T & string>(key: K, fn: T[K]): void {
       base.set(key, fn);
+      scopeVersion.value++;
     },
 
     get<K extends keyof T & string>(key: K): T[K] {
       // Walk scopes top-down
       for (let i = scopes.length - 1; i >= 0; i--) {
         const scope = scopes[i];
-        if (!scope.removed && key in scope.overrides) {
-          return scope.overrides[key] as T[K];
-        }
+        if (overridesKey(scope, key)) return scope.overrides[key] as T[K];
       }
 
       const fn = base.get(key);
@@ -201,7 +211,7 @@ export function createOverrideRegistry<T extends Record<string, (...args: never[
 
     has(key: keyof T & string): boolean {
       for (let i = scopes.length - 1; i >= 0; i--) {
-        if (!scopes[i].removed && key in scopes[i].overrides) return true;
+        if (overridesKey(scopes[i], key)) return true;
       }
       return base.has(key);
     },
@@ -307,7 +317,8 @@ export function getCurrentTuningRegistries(): Set<TuningRegistry> | undefined {
 
 /**
  * Bind a default implementation to `key` on `registry` and return a
- * reactive `ComputedRef` that re-evaluates when the scope stack changes.
+ * reactive `ComputedRef` that re-evaluates when the scope stack changes
+ * or the key is overridden.
  *
  * **`tunable()` is the opt-in declaration that a value belongs in the
  * externally-controlled tuning surface.** It is neither a primitive of
@@ -384,7 +395,7 @@ export function tunable<R>(
 ): ComputedRef<R> {
   registry.setDefault(key, defaultFn);
   return computed(() => {
-    // Register a reactive dep on the scope stack so push/cleanup retriggers.
+    // Register a reactive dep on the registry so push/cleanup/override retriggers.
     // The default fn's own reads register deps on the underlying state.
     void registry.scopeVersion.value;
     return (registry.get(key) as () => R)();

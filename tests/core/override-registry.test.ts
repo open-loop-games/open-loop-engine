@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import {
   createOverrideRegistry,
@@ -16,18 +16,28 @@ describe('OverrideRegistry', () => {
   it('scopeVersion bumps on pushScope and on cleanup', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('test');
     reg.setDefault('f', () => 1);
-    expect(reg.scopeVersion.value).toBe(0);
+    const v0 = reg.scopeVersion.value;
 
     const a = reg.pushScope('a', { f: () => 2 });
-    expect(reg.scopeVersion.value).toBe(1);
+    expect(reg.scopeVersion.value).toBe(v0 + 1);
 
     const b = reg.pushScope('b', { f: () => 3 });
-    expect(reg.scopeVersion.value).toBe(2);
+    expect(reg.scopeVersion.value).toBe(v0 + 2);
 
     b();
-    expect(reg.scopeVersion.value).toBe(3);
+    expect(reg.scopeVersion.value).toBe(v0 + 3);
     a();
-    expect(reg.scopeVersion.value).toBe(4);
+    expect(reg.scopeVersion.value).toBe(v0 + 4);
+  });
+
+  it('scopeVersion bumps on override and on a first setDefault, not on a no-op setDefault', () => {
+    const reg = createOverrideRegistry<{ f: () => number }>('test');
+    reg.setDefault('f', () => 1);
+    expect(reg.scopeVersion.value).toBe(1);
+    reg.setDefault('f', () => 2);
+    expect(reg.scopeVersion.value).toBe(1);
+    reg.override('f', () => 3);
+    expect(reg.scopeVersion.value).toBe(2);
   });
 
   it('cleanup is idempotent and does not double-bump scopeVersion', () => {
@@ -54,6 +64,20 @@ describe('OverrideRegistry', () => {
 
     cleanup();
     expect([...reg.getBaseKeys()].sort()).toEqual(['alpha', 'beta']);
+  });
+
+  it('a scope entry left undefined falls through to the base', () => {
+    const reg = createOverrideRegistry<{ f: () => number }>('test');
+    reg.setDefault('f', () => 1);
+    reg.pushScope('sim', { f: undefined });
+    expect(reg.get('f')()).toBe(1);
+  });
+
+  it('inherited keys never resolve out of a scope', () => {
+    const reg = createOverrideRegistry<Record<string, () => number>>('test');
+    reg.pushScope('sim', {});
+    expect(reg.has('toString')).toBe(false);
+    expect(() => reg.get('toString')).toThrow(/not registered/);
   });
 
   it('exposes its name', () => {
@@ -129,6 +153,25 @@ describe('tunable() helper', () => {
     expect(t.value).toBe(10);
     raw.value = 7;
     expect(t.value).toBe(14);
+  });
+
+  it('re-evaluates when a key first registered after a read appears', () => {
+    const reg = createOverrideRegistry<Record<string, () => number>>('tuning');
+    const probe = computed(() => {
+      void reg.scopeVersion.value;
+      return reg.has('foo') ? reg.get('foo')() : 0;
+    });
+    expect(probe.value).toBe(0);
+    reg.setDefault('foo', () => 3);
+    expect(probe.value).toBe(3);
+  });
+
+  it('re-evaluates when the key is overridden after a read', () => {
+    const reg = createOverrideRegistry<Record<string, () => number>>('tuning');
+    const t = tunable(reg, 'foo', () => 1);
+    expect(t.value).toBe(1);
+    reg.override('foo', () => 5);
+    expect(t.value).toBe(5);
   });
 
   it('setDefault does not clobber an existing registration', () => {
