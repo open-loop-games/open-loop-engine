@@ -34,8 +34,10 @@
  * to the layer's own `updated` event, fired once per `update()`/`reset()`
  * after all cell writes land.
  *
- * Diagnostics: throws on illegal ops (duplicate source id, NaN strength,
- * out-of-bounds source coords) so misuse surfaces synchronously.
+ * Diagnostics: `addSource` throws on illegal input (duplicate source id, NaN
+ * strength, a position off the grid's integer cells) so misuse surfaces
+ * synchronously. A source moved off the grid later is skipped by `update()`
+ * rather than aborting the frame.
  */
 
 import { createEmitHandle } from '../events';
@@ -48,12 +50,13 @@ import type { Unsubscribe } from './types';
  * Held by reference: callers may mutate `x`, `y`, `strength`, or `radius`
  * directly between frames and the next `update()` will use the current
  * values. Source identity is the caller-assigned `id` — re-using an id
- * across `addSource` calls throws.
+ * across `addSource` calls throws. A source whose position leaves the grid,
+ * or lands between cells, contributes nothing until it is back on a cell.
  */
 export interface InfluenceSource {
   /** Stable identifier for source removal/lookup. */
   id: string;
-  /** Grid coordinate of the source. Mutable by reference. */
+  /** Integer grid coordinate of the source. Mutable by reference. */
   x: number;
   y: number;
   /** Source strength at origin; falls off via the configured falloff function. */
@@ -199,7 +202,7 @@ export interface InfluenceLayer {
    * Register a source. The returned reference is the same object the
    * caller passed in — mutating its `x`/`y`/`strength`/`radius` between
    * frames is the supported update path. Throws on duplicate id, NaN
-   * strength, or out-of-bounds coords.
+   * strength, or coords that aren't an in-bounds integer cell.
    */
   addSource(source: InfluenceSource): InfluenceSource;
   /** Remove a source by id. Returns true if a source was removed. */
@@ -298,6 +301,13 @@ export function createInfluenceLayer(
   const handle = createEmitHandle<InfluenceLayerEvents>();
   const { width, height } = grid;
 
+  // Whether the source stands on a grid cell: in bounds, at integer coordinates.
+  function onCell(source: InfluenceSource): boolean {
+    return (
+      Number.isInteger(source.x) && Number.isInteger(source.y) && grid.inBounds(source.x, source.y)
+    );
+  }
+
   function checkSource(source: InfluenceSource): void {
     if (!Number.isFinite(source.strength)) {
       throw new Error(
@@ -309,9 +319,9 @@ export function createInfluenceLayer(
         `InfluenceLayer.addSource: source "${source.id}" has invalid radius (${source.radius})`,
       );
     }
-    if (!grid.inBounds(source.x, source.y)) {
+    if (!onCell(source)) {
       throw new RangeError(
-        `InfluenceLayer.addSource: source "${source.id}" position (${source.x}, ${source.y}) is out of bounds (${width}×${height})`,
+        `InfluenceLayer.addSource: source "${source.id}" position (${source.x}, ${source.y}) is not an integer cell within bounds (${width}×${height})`,
       );
     }
   }
@@ -334,10 +344,12 @@ export function createInfluenceLayer(
     for (const source of sources.values()) {
       const r = source.radius ?? defaultRadius;
       if (r <= 0 || source.strength === 0) continue;
+      // Positions are mutable by reference, so a source can have left the
+      // board since addSource checked it; off the board it contributes nothing.
+      if (!onCell(source)) continue;
       // forEachInRange walks a Chebyshev square; the falloff function
       // chooses how to collapse (dx, dy) into a scalar distance for its
-      // metric. For source positions clamped via checkSource at
-      // registration time the iteration is in-bounds.
+      // metric.
       grid.forEachInRange(source.x, source.y, r, (cx, cy, idx) => {
         if (respectPassability && grid.passable[idx] === 0) return;
         const dx = cx - source.x;

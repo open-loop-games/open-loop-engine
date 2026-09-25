@@ -94,6 +94,32 @@ describe('InfluenceLayer — source registry', () => {
     expect(() => layer.addSource({ id: 'b', x: -1, y: 0, strength: 1 })).toThrow(RangeError);
   });
 
+  it('rejects non-integer source coordinates, and update() skips a source moved onto one', () => {
+    const grid = numericGrid(3, 1);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    expect(() => layer.addSource({ id: 'a', x: 1.5, y: 0, strength: 1 })).toThrow(RangeError);
+
+    const b = layer.addSource({ id: 'b', x: 1, y: 0, strength: 1 });
+    b.x = 1.5;
+    layer.update();
+    expect(Array.from(grid.cells)).toEqual([0, 0, 0]);
+    expect(Object.keys(grid.cells)).toEqual(['0', '1', '2']);
+  });
+
+  it('update() skips a source moved out of bounds and still writes the rest', () => {
+    const grid = numericGrid(4, 1);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    layer.addSource({ id: 'a', x: 0, y: 0, strength: 5 });
+    const b = layer.addSource({ id: 'b', x: 3, y: 0, strength: 7 });
+    const updated = vi.fn();
+    layer.on('updated', updated);
+    // The unit steps off the edge between frames.
+    b.x = 4;
+    expect(() => layer.update()).not.toThrow();
+    expect(Array.from(grid.cells)).toEqual([5, 0, 0, 0]);
+    expect(updated).toHaveBeenCalledTimes(1);
+  });
+
   it('removeSource returns true when present, false when absent', () => {
     const layer = createInfluenceLayer(numericGrid(4, 4), {
       defaultRadius: 1,
