@@ -39,7 +39,6 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Grant } from '@/core/modifier';
 import { createPredicateResolver, type Predicate } from './gate';
-import { lowerGrants, type LoweredGrant } from './modifier-binding';
 import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
@@ -126,8 +125,6 @@ interface DefEntry {
   activeRef: ComputedRef<boolean>;
   stopWatch: WatchStopHandle;
   slots: BindingSlots;
-  /** A static `modifiers` list, lowered at register. */
-  lowered: LoweredGrant[] | undefined;
   unbind: () => void;
   isApplied: boolean;
   /** True while {@link settle} runs this entry's edges. */
@@ -191,13 +188,7 @@ export function createPersistentEffectSystem(
   const appliedVersion = ref(0);
 
   function applyBindings(entry: DefEntry): void {
-    const { def } = entry;
-    const bindings =
-      entry.lowered ??
-      (typeof def.modifiers === 'function'
-        ? lowerGrants(def.modifiers(), predicates, `persistent effect '${def.id}'`)
-        : []);
-    entry.unbind = entry.slots.bind(bindings);
+    entry.unbind = entry.slots.bind();
     entry.isApplied = true;
     appliedVersion.value++;
   }
@@ -250,26 +241,16 @@ export function createPersistentEffectSystem(
 
       const owner = `persistent effect '${d.id}'`;
       const activeRef = predicates.adopt(d.active, false, `${owner} active`).holds;
-      const lowered = Array.isArray(d.modifiers)
-        ? lowerGrants(d.modifiers, predicates, owner)
-        : undefined;
 
       const entry: DefEntry = {
         def: d,
         activeRef,
         stopWatch: () => {},
-        slots: createBindingSlots(),
-        lowered,
+        slots: createBindingSlots(d.modifiers, predicates, owner),
         unbind: () => {},
         isApplied: false,
         settling: false,
       };
-
-      // Claim chain positions now, so a binding evaluates at the same place
-      // whenever it activates. A factory-form list claims on first activation.
-      for (const [index, binding] of (lowered ?? []).entries()) {
-        entry.slots.claim(index, binding.chain);
-      }
 
       // flush: 'sync' so a predicate that flips mid-run binds/unbinds its
       // modifiers on the same synchronous step. Headless sims drive stepOnce()

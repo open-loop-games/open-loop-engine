@@ -50,7 +50,6 @@ import { attachContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import type { Grant } from '@/core/modifier';
 import { createPredicateResolver } from './gate';
-import { lowerGrants, type LoweredGrant } from './modifier-binding';
 import { createBindingSlots, registerBindingSlots, type BindingSlots } from './binding-slots';
 
 // === TYPES ===
@@ -227,8 +226,6 @@ export function createTemporaryEffectSystem(
 ): TemporaryEffectSystem {
   const defs = new Map<string, TemporaryEffectDef>();
   const slotsByDef = new Map<string, BindingSlots>();
-  /** Static `modifiers` lists, lowered at register. */
-  const loweredByDef = new Map<string, LoweredGrant[]>();
   const predicates = createPredicateResolver();
   const instances = shallowRef<TemporaryEffectInstance[]>([]);
   /** Live instance id → the function that unbinds its modifiers. */
@@ -292,12 +289,7 @@ export function createTemporaryEffectSystem(
       },
     };
 
-    const bindings =
-      loweredByDef.get(def.id) ??
-      (typeof def.modifiers === 'function'
-        ? lowerGrants(def.modifiers(), predicates, `temporary effect '${def.id}'`)
-        : []);
-    unbindByInstance.set(id, slotsByDef.get(def.id)!.bind(bindings));
+    unbindByInstance.set(id, slotsByDef.get(def.id)!.bind());
 
     instances.value = [...instances.value, instance];
 
@@ -372,19 +364,8 @@ export function createTemporaryEffectSystem(
           }
         }
       }
-      const lowered = Array.isArray(d.modifiers)
-        ? lowerGrants(d.modifiers, predicates, `temporary effect '${d.id}'`)
-        : undefined;
+      const slots = createBindingSlots(d.modifiers, predicates, `temporary effect '${d.id}'`);
       defs.set(d.id, d);
-
-      // Claim chain positions now, so every stack of this def evaluates at the
-      // same place whatever order effects are applied in. A factory-form list
-      // claims on first apply.
-      const slots = createBindingSlots();
-      if (lowered) {
-        for (const [index, binding] of lowered.entries()) slots.claim(index, binding.chain);
-        loweredByDef.set(d.id, lowered);
-      }
       slotsByDef.set(d.id, slots);
     }
   }
@@ -492,7 +473,6 @@ export function createTemporaryEffectSystem(
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
     slotsByDef.clear();
-    loweredByDef.clear();
   }
 
   const system: TemporaryEffectSystem = {

@@ -15,8 +15,9 @@
  * @cluster effects
  */
 
-import type { Modifier, ModifierChain, ModifierChainSlot } from '@/core/modifier';
-import type { LoweredGrant } from './modifier-binding';
+import type { Grant, Modifier, ModifierChain, ModifierChainSlot } from '@/core/modifier';
+import type { PredicateResolver } from './gate';
+import { lowerGrants } from './modifier-binding';
 
 // === TYPES ===
 
@@ -25,14 +26,12 @@ export type ModifierWrap = (modifier: Modifier) => Modifier;
 
 /** One definition's reserved chain positions and live bindings. */
 export interface BindingSlots {
-  /** Reserve the position for binding `index` on `chain`, ahead of its first activation. */
-  claim(index: number, chain: ModifierChain): void;
   /**
    * Bind one activation's modifiers at their positions.
    *
    * @returns A function that unbinds exactly this activation's modifiers.
    */
-  bind(bindings: readonly LoweredGrant[]): () => void;
+  bind(): () => void;
   /**
    * Wrap binding `index` in every activation, live and later, until the
    * returned cleanup runs. Overlays stack: each wraps the ones before it.
@@ -60,8 +59,21 @@ interface LiveBinding {
  */
 const seated = new WeakMap<Modifier, number>();
 
-/** Create the slot table for one effect definition. */
-export function createBindingSlots(): BindingSlots {
+/**
+ * Create the slot table for one effect definition's `modifiers`.
+ *
+ * A static list lowers here and claims its chain positions at once, so each
+ * binding evaluates at the same place whenever the effect activates. A
+ * factory lowers on every `bind` and claims each position on first use.
+ *
+ * @param predicates - adopts each grant's `when`
+ * @param owner - names the definition in a `when` Gate's error
+ */
+export function createBindingSlots(
+  modifiers: readonly Grant[] | (() => readonly Grant[]) | undefined,
+  predicates: PredicateResolver,
+  owner: string,
+): BindingSlots {
   // A factory-form binding list can aim one index at different chains across
   // activations, so each (index, chain) pair keeps its own slot.
   const byIndex = new Map<number, Map<ModifierChain, ModifierChainSlot>>();
@@ -82,6 +94,10 @@ export function createBindingSlots(): BindingSlots {
     }
     return slot;
   }
+
+  const fixed =
+    typeof modifiers === 'function' ? [] : lowerGrants(modifiers ?? [], predicates, owner);
+  for (const [index, binding] of fixed.entries()) slotFor(index, binding.chain);
 
   function seat(binding: LiveBinding): void {
     const wraps = overlays.get(binding.index) ?? [];
@@ -104,10 +120,9 @@ export function createBindingSlots(): BindingSlots {
   }
 
   return {
-    claim(index, chain) {
-      slotFor(index, chain);
-    },
-    bind(bindings) {
+    bind() {
+      const bindings =
+        typeof modifiers === 'function' ? lowerGrants(modifiers(), predicates, owner) : fixed;
       const bound: LiveBinding[] = [];
       for (const [index, binding] of bindings.entries()) {
         const entry: LiveBinding = {
