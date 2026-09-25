@@ -11,6 +11,9 @@ import {
   beginPersistentContext,
   endPersistentContext,
   resetAllPersistentContexts,
+  withPersistentContext,
+  getAllPersistentRefs,
+  deserializePersistents,
 } from '@/core/persistence';
 import { createMemoryStorage, type StorageAdapter } from '@/core/save-manager';
 import { createEngine, type Engine } from '@/engine';
@@ -151,6 +154,17 @@ describe('apply', () => {
     const refreshed = system.apply('burn')!;
     expect(refreshed).toBe(first); // same instance
     expect(refreshed.timeRemaining.value).toBe(4); // reset to full
+  });
+
+  it('a refresh at a longer duration carries the new duration with it', () => {
+    const { system } = createSystem();
+    const duration = ref(4);
+    system.register({ id: 'burn', duration, stackBehavior: 'refresh' });
+    const first = system.apply('burn')!;
+    duration.value = 9;
+    system.apply('burn');
+    expect(first.timeRemaining.value).toBe(9);
+    expect(first.duration).toBe(9);
   });
 
   it('adds modifiers to chains', () => {
@@ -542,6 +556,38 @@ describe('persistence', () => {
     second.system.restore();
     expect(second.system.getActive().map((i) => i.timeRemaining.value)).toEqual([18]);
     second.engine.dispose();
+  });
+
+  it('a restored instance keeps the duration it was applied with', () => {
+    const storage = createMemoryStorage();
+    const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
+    first.system.apply('haste');
+    for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
+    first.engine.save();
+    first.engine.dispose();
+
+    // Rebalanced since the save: the def now lasts 10s.
+    const second = startSession(storage, [{ id: 'haste', duration: 10 }]);
+    second.engine.load();
+    second.system.restore();
+    const [instance] = second.system.getActive();
+    expect(instance!.duration).toBe(30);
+    expect(instance!.timeRemaining.value).toBe(18);
+    second.engine.dispose();
+  });
+
+  it('a save without durations restores one no shorter than the time remaining', () => {
+    const system = withPersistentContext('legacy', () =>
+      createTemporaryEffectSystem({ id: 'legacy', registerTick: () => () => {} }),
+    );
+    system.register({ id: 'haste', duration: 10 });
+    deserializePersistents(getAllPersistentRefs(), {
+      'temp-effect:legacy': { savedState: [{ defId: 'haste', timeRemaining: 25 }] },
+    });
+    system.restore();
+    const [instance] = system.getActive();
+    expect(instance!.duration).toBe(25);
+    expect(instance!.timeRemaining.value).toBe(25);
   });
 
   it('restore skips a saved instance whose def no longer registers', () => {

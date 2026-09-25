@@ -104,7 +104,7 @@ export interface TemporaryEffectInstance {
   readonly defId: string;
   /** Seconds remaining. Reactive — decreases every tick. */
   readonly timeRemaining: Ref<number>;
-  /** The duration this instance was created with (snapshot at apply time) */
+  /** The duration of the current application: resolved at apply, re-resolved by a refresh, kept through a save */
   readonly duration: number;
   /**
    * Stack slot (0-based) among live instances of the same def: the lowest
@@ -173,6 +173,8 @@ export interface TemporaryEffectSystem {
 interface EffectSnapshot {
   defId: string;
   timeRemaining: number;
+  /** The duration applied; absent from saves written before it was recorded. */
+  duration?: number;
 }
 
 // === PRIVATE BUILDERS ===
@@ -250,6 +252,7 @@ export function createTemporaryEffectSystem(
     savedState.value = instances.value.map((i) => ({
       defId: i.defId,
       timeRemaining: i.timeRemaining.value,
+      duration: i.duration,
     }));
   }
 
@@ -383,6 +386,7 @@ export function createTemporaryEffectSystem(
 
     if (behavior === 'refresh' && currentCount > 0) {
       const existing = instances.value.find((i) => i.defId === defId)!;
+      (existing as { duration: number }).duration = dur;
       existing.timeRemaining.value = dur;
       def.onApply?.(existing);
       handle.emit('applied', existing);
@@ -440,7 +444,7 @@ export function createTemporaryEffectSystem(
     for (const snap of savedState.value) {
       const def = defs.get(snap.defId);
       if (!def) continue; // definition removed between versions
-      const dur = resolveDuration(def);
+      const dur = snap.duration ?? Math.max(resolveDuration(def), snap.timeRemaining);
       const instance = createInstance(
         def,
         dur,
