@@ -1320,14 +1320,6 @@ describe('reactivity re-exports', () => {
 });
 
 describe('save safety', () => {
-  function mapStorage() {
-    const m = new Map<string, string>();
-    return {
-      getItem: (k: string) => m.get(k) ?? null,
-      setItem: (k: string, v: string) => void m.set(k, v),
-      removeItem: (k: string) => void m.delete(k),
-    };
-  }
   function capturingTimers() {
     const callbacks = new Map<number, () => void>();
     let nextId = 1;
@@ -1342,7 +1334,7 @@ describe('save safety', () => {
   }
 
   it('the autosave does not overwrite a save the load refused', () => {
-    const storage = mapStorage();
+    const storage = createMemoryStorage();
     const newer = JSON.stringify({ version: 2, gameId: 'safe', timestamp: 1, data: {} });
     storage.setItem('safe-slot-0', newer);
     const timers = capturingTimers();
@@ -1362,7 +1354,7 @@ describe('save safety', () => {
   });
 
   it('onLoad / onSave fire once on every save-manager path, not just engine.load / engine.save', () => {
-    const storage = mapStorage();
+    const storage = createMemoryStorage();
     const loads: unknown[] = [];
     let saves = 0;
     const engine = createEngine({ gameId: 'hooks', storageAdapter: storage });
@@ -1396,7 +1388,7 @@ describe('save safety', () => {
     const engine = createEngine({
       gameId: 'written',
       autoSaveInterval: 30000,
-      storageAdapter: mapStorage(),
+      storageAdapter: createMemoryStorage(),
       timerProvider: timers,
     });
     engine.use({ id: 'written-mod', install: () => void persistent(0, { name: 'gold' }) });
@@ -1413,13 +1405,13 @@ describe('save safety', () => {
   });
 
   it('load() before start() throws instead of reporting a load that hydrated nothing', () => {
-    const engine = createEngine({ gameId: 'early', storageAdapter: mapStorage() });
+    const engine = createEngine({ gameId: 'early', storageAdapter: createMemoryStorage() });
     engine.use({ id: 'early-mod', install: () => void persistent(0, { name: 'gold' }) });
     expect(() => engine.load()).toThrow(/start\(\)/);
   });
 
   it('load() after dispose() throws', () => {
-    const engine = createEngine({ gameId: 'late', storageAdapter: mapStorage() });
+    const engine = createEngine({ gameId: 'late', storageAdapter: createMemoryStorage() });
     engine.start();
     engine.dispose();
     expect(() => engine.load()).toThrow(/disposed/);
