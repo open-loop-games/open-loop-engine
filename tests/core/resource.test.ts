@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { nextTick } from 'vue';
 import { bn } from '@/primitives/decimal';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import { createCostRequirement, payByReset } from '@/core/requirements';
 import {
   createResource,
   addResource,
@@ -77,5 +78,26 @@ describe('Resource', () => {
     addResource(gold, 50);
     resetResource(gold);
     expect(gold.value.eq(100)).toBe(true);
+  });
+  it('resetResource hands out a copy, so mutating the value in place leaves the default intact', () => {
+    beginPersistentContext('test-resource-reset-alias');
+    const gold = createResource(bn(100), { id: 'Gold' });
+    endPersistentContext();
+    resetResource(gold);
+    gold.value.fromNumber(7);
+    addResource(gold, 1);
+    resetResource(gold);
+    expect(gold.value.toNumber()).toBe(100);
+  });
+  it('payByReset hands out a copy of the default', () => {
+    beginPersistentContext('test-resource-paybyreset-alias');
+    const gold = createResource(bn(100), { id: 'Gold' });
+    endPersistentContext();
+    const req = createCostRequirement({ resource: gold, cost: 1 });
+    payByReset(req);
+    gold.value.fromNumber(7);
+    addResource(gold, 1);
+    payByReset(req);
+    expect(gold.value.toNumber()).toBe(100);
   });
 });

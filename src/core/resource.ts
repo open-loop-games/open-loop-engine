@@ -31,6 +31,7 @@ import {
   type StateConstraint,
   NonPersistent,
   DefaultValue,
+  cloneDefault,
 } from './persistence';
 import { withChain } from './trace';
 import { getCurrentResourceRegistry } from './registries';
@@ -390,7 +391,7 @@ export function hasResource(resource: Resource<DecimalSource>, amount: DecimalSo
 export function resetResource<T extends DecimalSource>(resource: Resource<T>): void {
   const persistentResource = resource as Resource<T> & Partial<Persistent<T>>;
   if (persistentResource[DefaultValue] !== undefined) {
-    resource.value = persistentResource[DefaultValue];
+    resource.value = cloneDefault(persistentResource[DefaultValue]);
   } else {
     resource.value = 0 as T;
   }
