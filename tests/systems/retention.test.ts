@@ -182,6 +182,20 @@ describe('createRetentionPolicy', () => {
     expect(Decimal.eq(bigResource.value, bn('1e99'))).toBe(true);
   });
 
+  it('fractional keeps a number-valued ref a number', () => {
+    beginPersistentContext('ret-number');
+    const level = persistent(10);
+    endPersistentContext();
+
+    createReset({
+      resetModules: ['ret-number'],
+      retain: new Map([[level, fractional(0.5)]]),
+    }).reset();
+
+    expect(level.value).toBe(5);
+    expect(level.value + 1).toBe(6);
+  });
+
   it('empty policy is a no-op', () => {
     beginPersistentContext('ret-empty');
     const val = persistent<number>(0);

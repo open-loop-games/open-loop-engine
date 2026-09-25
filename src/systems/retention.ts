@@ -9,7 +9,7 @@
  * - retain: refs with custom transforms (fractional, formula-based)
  */
 
-import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import { Decimal, toNumber, type DecimalSource } from '@/primitives/decimal';
 import type { Persistent, State } from '@/core/persistence';
 
 // === TYPES ===
@@ -41,12 +41,14 @@ export interface RetentionPolicy {
 
 /**
  * Create a fractional retention transform.
- * Keeps the given fraction of the value (works with Decimal).
+ * Keeps the given fraction of the value, in the value's own kind: a
+ * `number` ref stays a `number`, anything else comes back a `Decimal`.
  *
  * @example retain.set(skillLevel, fractional(0.3)) // keep 30%
  */
 export function fractional(rate: DecimalSource): (value: any) => any {
-  return (value: any) => Decimal.mul(value, rate);
+  return (value: any) =>
+    typeof value === 'number' ? value * toNumber(rate) : Decimal.mul(value, rate);
 }
 
 // === FACTORIES ===
