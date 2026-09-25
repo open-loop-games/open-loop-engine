@@ -63,6 +63,15 @@ export function unrefFormulaSource(value: FormulaSource, variable?: DecimalSourc
   return value instanceof Formula ? value.evaluate(variable) : unref(value);
 }
 
+/**
+ * Lift a FormulaSource to a Formula — a plain value or ref becomes a constant.
+ *
+ * @internal
+ */
+export function toFormula(source: FormulaSource): GenericFormula {
+  return source instanceof Formula ? source : Formula.constant(source);
+}
+
 function integrateVariable(this: GenericFormula) {
   return F.pow(this, 2).div(2);
 }

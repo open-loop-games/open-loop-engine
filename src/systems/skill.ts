@@ -51,7 +51,7 @@ import {
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
 import { processGetter, type Computable } from '@/core/computed';
-import Formula from '@/core/formulas/formulas';
+import { toFormula } from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
 // === TYPES ===
@@ -205,11 +205,6 @@ export interface AccumulatorSkill extends SkillBase {
 export type Skill = LevelDrivenSkill | AccumulatorSkill;
 
 // === PRIVATE BUILDERS ===
-
-/** Coerce a FormulaSource to a Formula — wrap raw values in `Formula.constant`. */
-function toFormula(source: FormulaSource): GenericFormula {
-  return source instanceof Formula ? source : Formula.constant(source);
-}
 
 /**
  * Allocate xp (and permanentBonus, accumulator-only) under the skill's

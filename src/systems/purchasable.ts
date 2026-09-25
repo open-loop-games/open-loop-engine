@@ -41,7 +41,7 @@ import {
 import type { Resource } from '@/core/resource';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachContextReset } from '@/core/resettable';
-import Formula from '@/core/formulas/formulas';
+import Formula, { toFormula } from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
 
@@ -513,11 +513,6 @@ function buildScalingEffect(
   }
   // A static base auto-wraps as `base^amount`, an invertible Formula.
   return fromCurve(Formula.variable(scalingAmount).pow_base(effect));
-}
-
-/** Lift a factory's return to a Formula — a plain value becomes a constant. */
-function toFormula(source: FormulaSource): GenericFormula {
-  return source instanceof Formula ? source : Formula.constant(source);
 }
 
 // === FACTORIES ===
