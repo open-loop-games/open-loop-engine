@@ -19,7 +19,7 @@ import {
   withPersistenceNamespace,
   withPersistentContext,
 } from '@/core/persistence';
-import { Decimal, bn } from '@/primitives/decimal';
+import { Decimal, bn, type DecimalSource } from '@/primitives/decimal';
 
 describe('Persistence', () => {
   it('persistent() creates a ref with default value', () => {
@@ -206,6 +206,52 @@ describe('Persistence', () => {
       expect(bag.value).toHaveLength(3);
       for (const el of bag.value) expect(el).toBeInstanceOf(Decimal);
       expect(bag.value[2].eq('1e9')).toBe(true);
+    });
+  });
+
+  describe('DecimalSource refs with a number default', () => {
+    it('revives a Decimal saved under a number default, past the number range too', () => {
+      beginPersistentContext('test-decimalsource-number-default');
+      const xp = persistent<DecimalSource>(0, { name: 'xp' });
+      endPersistentContext();
+
+      const refs = getAllPersistentRefs();
+      for (const held of [new Decimal('1e500'), new Decimal(12.5)]) {
+        xp.value = held;
+        const parsed = JSON.parse(JSON.stringify(serializePersistents(refs)));
+        xp.value = 0;
+        deserializePersistents(refs, parsed);
+        expect(xp.value).toBeInstanceOf(Decimal);
+        expect(Decimal.eq(xp.value, held)).toBe(true);
+      }
+    });
+
+    it('keeps a plain number a number, and non-finite markers numbers', () => {
+      beginPersistentContext('test-decimalsource-plain');
+      const n = persistent<DecimalSource>(0, { name: 'n' });
+      endPersistentContext();
+
+      const refs = getAllPersistentRefs();
+      for (const held of [7, Infinity]) {
+        n.value = held;
+        const parsed = JSON.parse(JSON.stringify(serializePersistents(refs)));
+        n.value = 0;
+        deserializePersistents(refs, parsed);
+        expect(n.value).toBe(held);
+      }
+    });
+
+    it('leaves non-numeric text under a number default as text', () => {
+      beginPersistentContext('test-number-default-text');
+      const tag = persistent<number | string>(0, { name: 'tag' });
+      endPersistentContext();
+
+      tag.value = 'boss';
+      const refs = getAllPersistentRefs();
+      const parsed = JSON.parse(JSON.stringify(serializePersistents(refs)));
+      tag.value = 0;
+      deserializePersistents(refs, parsed);
+      expect(tag.value).toBe('boss');
     });
   });
 

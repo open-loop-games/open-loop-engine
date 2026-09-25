@@ -1096,7 +1096,8 @@ const NON_FINITE_NUMBERS: Record<string, number> = { Infinity, '-Infinity': -Inf
  * first `.add`/`.gte` call. The default value carries the declared shape and
  * drives revival: wherever the default holds a `Decimal`, the matching loaded
  * leaf is reconstructed via `new Decimal(...)`; wherever it holds a `number`,
- * non-finite strings (`"Infinity"`, `"NaN"`) are recovered. Plain objects and
+ * non-finite strings (`"Infinity"`, `"NaN"`) are recovered and a Decimal's
+ * rendering (a `DecimalSource` ref that held one) revives. Plain objects and
  * arrays recurse; arrays use `default[i]` (falling back to `default[0]`) as the
  * per-element type witness so homogeneous Decimal arrays revive.
  *
@@ -1110,10 +1111,12 @@ function reviveValue(loaded: unknown, defaultNode: unknown): unknown {
     return typeof loaded === 'string' ? new Decimal(loaded) : loaded;
   }
   if (typeof defaultNode === 'number') {
-    if (typeof loaded === 'string' && loaded in NON_FINITE_NUMBERS) {
-      return NON_FINITE_NUMBERS[loaded];
-    }
-    return loaded;
+    if (typeof loaded !== 'string') return loaded;
+    if (loaded in NON_FINITE_NUMBERS) return NON_FINITE_NUMBERS[loaded];
+    // Decimal's parser reads junk as 0, so only text that is exactly a
+    // Decimal's own rendering revives; any other text stays text.
+    const decimal = new Decimal(loaded);
+    return decimal.toString() === loaded ? decimal : loaded;
   }
   if (Array.isArray(defaultNode) && Array.isArray(loaded)) {
     if (defaultNode.length === 0) return loaded;
