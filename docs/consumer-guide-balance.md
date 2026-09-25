@@ -214,7 +214,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 | `runHeadless` | Fixed-tick-count run. Replayable only when you pass `seed`: the module-global RNG is entropy-seeded otherwise. |
 | `runMatrix` / `runMatrixUntil` | Cartesian runs over a parameter grid, when you want many configurations at once. |
 | `runSensitivity` | One parameter swept across a range with per-variant deltas against baseline. Generic over `Cell` and `UntilCell` via `config.until`. |
-| `bisectTuner` | 1-D bisection against a predicate, when a spec gives you a shape and you want the scalar. |
+| `bisectTuner` | 1-D bisection of a fire-time sampler onto a target time, when a spec gives you a shape and you want the scalar. Says when the target lies outside the bracket. |
 | `applyPerturbation` | Apply a perturbation to a `PickerEntry` and get an idempotent cleanup. |
 | `createPickerSnapshot` | Enumerate the engine's addressable choices (content, chain-registry, tunable). |
 | `createSensitivityCell` | Build a matrix cell from a save blob + per-run module factory + analyzer factory. |

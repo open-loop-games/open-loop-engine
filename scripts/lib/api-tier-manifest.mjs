@@ -195,7 +195,7 @@ export const TIER_MANIFEST = [
       '`runMatrix`, `runMatrixUntil`, `runSensitivity` — multi-cell, multi-seed balance sweeps.',
       '`createPickerSnapshot` / `applyPerturbation` — enumerate and perturb tunables/modifiers.',
       '`createTransitionSnapshot` / `createIncrementalSnapshot` — find upcoming content transitions.',
-      '`bisectTuner` — tune a single parameter against a predicate.',
+      '`bisectTuner` — tune a single parameter until an event fires at a target time.',
     ],
     clusters: [
       'analyzers',

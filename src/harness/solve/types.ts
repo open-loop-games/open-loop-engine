@@ -41,6 +41,13 @@ export interface TunerResult {
   /** Number of `sampler` calls (excluding the two calibration runs at `lo` and `hi`). */
   iterations: number;
   direction: 'forward' | 'inverted';
+  /**
+   * `false` when `targetSec` lies outside the fire times sampled at `lo` and
+   * `hi`, so no value in the bracket reaches it and `value` is the nearer
+   * endpoint. {@link bisectTuner} always sets it; optional so a custom
+   * {@link Tuner} needn't.
+   */
+  bracketed?: boolean;
 }
 
 /**

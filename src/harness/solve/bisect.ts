@@ -13,9 +13,13 @@ import type { TunerConfig, TunerResult } from './types';
 
 /**
  * Binary-search 1-D tuner. Two calibration runs at `lo` and `hi` auto-detect
- * direction; iteration halves the bracket toward `targetSec`, returning early
- * once the sample lands within `tolSec`. If the iteration ceiling fires first,
- * the closest-observed sample is returned.
+ * direction and check the target lies between them: an endpoint already
+ * within `tolSec` is returned as is, and a target outside the calibrated
+ * range returns the nearer endpoint with `bracketed: false` rather than
+ * spending the iteration budget. Otherwise iteration halves the bracket
+ * toward `targetSec`, returning early once the sample lands within `tolSec`.
+ * If the iteration ceiling fires first, the closest-observed sample is
+ * returned.
  *
  * @param config - {@link TunerConfig} — search bracket, target fire time,
  *   sampler, optional tolerance + iteration ceiling.
@@ -51,19 +55,25 @@ export function bisectTuner(config: TunerConfig): TunerResult {
   const tHiFinite = isFinite(tHi) ? tHi : Infinity;
   const direction: 'forward' | 'inverted' = tHiFinite >= tLoFinite ? 'forward' : 'inverted';
 
+  const miss = (t: number): number =>
+    Math.abs((isFinite(t) ? t : Number.MAX_SAFE_INTEGER) - targetSec);
+  const nearer = miss(tHi) < miss(tLo) ? { value: hi, time: tHi } : { value: lo, time: tLo };
+  if (isFinite(nearer.time) && miss(nearer.time) <= tolSec) {
+    return { ...nearer, iterations: 0, direction, bracketed: true };
+  }
+  if (targetSec < Math.min(tLoFinite, tHiFinite) || targetSec > Math.max(tLoFinite, tHiFinite)) {
+    return { ...nearer, iterations: 0, direction, bracketed: false };
+  }
+
   let a = lo;
   let b = hi;
-  let best = { value: (lo + hi) / 2, time: Infinity, iterations: 0 };
+  let best = { value: (lo + hi) / 2, time: Infinity };
   for (let i = 1; i <= maxIters; i++) {
     const mid = (a + b) / 2;
     const t = sampler(mid);
-    const delta = Math.abs((isFinite(t) ? t : Number.MAX_SAFE_INTEGER) - targetSec);
-    const bestDelta = Math.abs(
-      (isFinite(best.time) ? best.time : Number.MAX_SAFE_INTEGER) - targetSec,
-    );
-    if (delta < bestDelta) best = { value: mid, time: t, iterations: i };
-    if (isFinite(t) && Math.abs(t - targetSec) <= tolSec) {
-      return { value: mid, time: t, iterations: i, direction };
+    if (miss(t) < miss(best.time)) best = { value: mid, time: t };
+    if (isFinite(t) && miss(t) <= tolSec) {
+      return { value: mid, time: t, iterations: i, direction, bracketed: true };
     }
 
     const tooEarly = isFinite(t) ? t < targetSec : false;
@@ -76,5 +86,5 @@ export function bisectTuner(config: TunerConfig): TunerResult {
       else if (tooLate) a = mid;
     }
   }
-  return { ...best, direction };
+  return { ...best, iterations: maxIters, direction, bracketed: true };
 }
