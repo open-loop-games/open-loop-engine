@@ -11,15 +11,9 @@
  * identical across all three, and growing a fourth registry of the same
  * shape would duplicate the pattern again. This helper extracts it.
  *
- * Two registration semantics are exposed as named methods, mirroring
- * `ModifierChain.bind` (strict-on-dup) vs `ModifierChain.add` (permissive):
- *
- * - `register(entity)` throws on duplicate id. Chain and effect-system
- *   registries call this — a duplicate id is an authoring mistake.
- * - `append(entity)` silently appends regardless of id collisions. The
- *   resource registry calls this — resource ids are raw, not namespaced by
- *   module, so two persistence contexts can legitimately each own the same
- *   id (e.g. per-prestige `points`), and lookups answer the first.
+ * `register(entity)` throws on a duplicate id — in every one of the three
+ * registries a repeated id is an authoring mistake, and answering either
+ * entity for it would silently hide the other.
  *
  * The ambient half is factored separately as {@link createAmbientScope}
  * because the resource registry pairs its NamedRegistry with a wrapper-
@@ -32,8 +26,8 @@
  */
 
 /**
- * Id-keyed registry with both strict and permissive registration methods,
- * id lookup, and insertion-order enumeration.
+ * Id-keyed registry with strict registration, id lookup, and insertion-order
+ * enumeration.
  *
  * @typeParam T - Entity type. Entities don't need an `id` field directly;
  *   the id is extracted via {@link CreateNamedRegistryOptions.idOf}.
@@ -46,20 +40,13 @@ export interface NamedRegistry<T> {
    *   code reads via `get` / `has` / `all`.
    */
   register(entity: T): void;
-  /**
-   * Permissive registration — silently appends regardless of id collisions.
-   * Lookups (`get` / `has`) report the first-inserted entity for a given id.
-   *
-   * @internal Called by entity factories under an ambient scope.
-   */
-  append(entity: T): void;
-  /** First registered entity for `id`, or `undefined` if none matches. */
+  /** The entity registered under `id`, or `undefined` if none matches. */
   get(id: string): T | undefined;
-  /** Whether at least one entity with the given id is registered. */
+  /** Whether an entity with the given id is registered. */
   has(id: string): boolean;
   /** Snapshot of all registered entities in insertion order. */
   all(): readonly T[];
-  /** Number of registered entities (counts every `append` call, not unique ids). */
+  /** Number of registered entities. */
   readonly size: number;
 }
 
@@ -92,11 +79,6 @@ export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): 
         );
       }
       byId.set(id, entity);
-      order.push(entity);
-    },
-    append(entity) {
-      const id = idOf(entity);
-      if (!byId.has(id)) byId.set(id, entity);
       order.push(entity);
     },
     get(id) {

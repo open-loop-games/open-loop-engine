@@ -49,11 +49,10 @@ export type { ResourceRegistryEntry } from './registries';
 export interface Resource<T = DecimalSource> extends Ref<T> {
   /**
    * Stable identifier for save-data and accessor lookups — the
-   * {@link ResourceOptions.id} as passed, not namespaced by module, so two
-   * modules can each own a resource with the same id. A wrapped ref created
-   * without an id takes its `displayName`. Use this (not `displayName`) as
-   * the key when forwarding to {@link GameStateAccessor} methods like
-   * `getResource`/`getRate`.
+   * {@link ResourceOptions.id} as passed, not namespaced by module, and
+   * unique per engine. A wrapped ref created without an id takes its
+   * `displayName`. Use this (not `displayName`) as the key when forwarding
+   * to {@link GameStateAccessor} methods like `getResource`/`getRate`.
    */
   id: string;
   /** Human-readable name shown in UI and used for resource-registry lookups by name */
@@ -102,8 +101,8 @@ export interface ResourceOptions {
    * Save and registry identity — the key Gates and the resource registry
    * look the resource up by. Required for a persistent resource, whose value
    * saves under it; a wrapped ref saves nothing and falls back to
-   * `displayName`. Collision within a persistent context throws at creation,
-   * and so does a `.` in a persistent resource's id, since save paths split on it.
+   * `displayName`. Unique per engine: a repeat throws at creation, and so
+   * does a `.` in a persistent resource's id, since save paths split on it.
    */
   id?: string;
 }
@@ -221,8 +220,7 @@ export function createResource<T>(
     if (parentContext !== undefined) {
       // Persistent contexts are flat under the engine namespace, so we
       // qualify the tracker sub-context with the parent context id to
-      // keep paths identity-bound: two modules with the same resource id
-      // each get distinct tracker contexts under their own module path.
+      // keep the tracker's save path bound to the module that owns it.
       withPersistentContext(`${parentContext}::${resolvedId}`, () => {
         const initial = defaultValue as DecimalSource;
         // `lifetime: true` so module-scoped resets pass over these trackers.

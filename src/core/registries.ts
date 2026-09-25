@@ -31,8 +31,8 @@
  * Storage and the ambient triad are factored into {@link ./named-registry}.
  * Chain and effect-system are direct {@link NamedRegistry} aliases; the
  * resource registry wraps a NamedRegistry of entries because its public
- * lookup surface (`list` / `findByName` / `findById`) differs and a
- * resource id may repeat across persistence contexts.
+ * lookup surface (`list` / `findByName` / `findById`) differs and each
+ * entry carries the persistence context that created it.
  *
  * @cluster registries
  */
@@ -178,17 +178,16 @@ export interface ResourceRegistryEntry<T = DecimalSource> {
  * Enumerable registry of {@link Resource}s for a single engine.
  *
  * Shape is minimal on purpose: enumerate, look up by display name or id,
- * append. Per-resource reactivity is handled by the underlying Vue ref.
+ * register. Per-resource reactivity is handled by the underlying Vue ref.
  *
- * Unlike chain and effect-system registries, resources are appended
- * permissively — ids are unique only within a persistence context, so two
- * modules can each own a resource with the same id and display name (e.g.
- * per-prestige-layer `points`). Both lookups answer the first registered
- * match; the `context` field on each entry lets consumers disambiguate.
+ * A resource id is unique per engine, as chain and effect-system ids are:
+ * registering a repeat throws, naming both persistence contexts. Per-layer
+ * resources (each prestige layer's `points`) take distinct ids.
  */
 export interface ResourceRegistry {
   /**
-   * Add a resource entry to the registry.
+   * Add a resource entry to the registry. Throws if its id is already
+   * registered.
    * @internal Called by {@link createResource} under the ambient scope;
    *   consumers should not call this directly.
    */
@@ -201,13 +200,7 @@ export interface ResourceRegistry {
    * hot path.
    */
   findByName(displayName: string): Resource | undefined;
-  /**
-   * First registered resource whose `id` matches, or `undefined`. Ids are
-   * raw ({@link Resource.id}), not namespaced by module, so two modules can
-   * register the same id — per-prestige-layer `points`, say — and this
-   * answers whichever installed first. Walk {@link ResourceRegistry.list}
-   * and match on `context` when the id alone is ambiguous.
-   */
+  /** The resource registered under `id` ({@link Resource.id}), or `undefined`. */
   findById(id: string): Resource | undefined;
 }
 
@@ -230,7 +223,16 @@ export function createResourceRegistry(): ResourceRegistry {
   });
   return {
     register(entry) {
-      inner.append(entry);
+      const prior = inner.get(entry.resource.id);
+      if (prior) {
+        const where = (e: ResourceRegistryEntry) =>
+          e.context === undefined ? 'top level' : `"${e.context}"`;
+        throw new Error(
+          `ResourceRegistry: duplicate resource id "${entry.resource.id}" — ${where(prior)} and ${where(entry)} both create it. ` +
+            'Resource ids are unique per engine; pass each resource a distinct `id` (a wrapped ref without one takes its displayName).',
+        );
+      }
+      inner.register(entry);
     },
     list() {
       return inner.all();

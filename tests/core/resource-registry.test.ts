@@ -102,6 +102,31 @@ describe('engine-scoped resource registry', () => {
     engine.stop();
   });
 
+  it('a resource id repeated across modules throws, naming both contexts', () => {
+    const engine = testEngine('reg-dup-id');
+    for (const layer of ['prestige', 'transcend']) {
+      engine.use({
+        id: layer,
+        install() {
+          createResource(0, { id: 'points', displayName: 'Points' });
+        },
+      });
+    }
+    expect(() => engine.start()).toThrow(/duplicate resource id "points".*"prestige".*"transcend"/);
+  });
+
+  it('a second id-less wrapped ref with the same displayName throws, asking for an id', () => {
+    const engine = testEngine('reg-dup-wrapped');
+    engine.use({
+      id: 'income-mod',
+      install() {
+        createResource(ref(0), { displayName: 'income' });
+        createResource(ref(1), { displayName: 'income' });
+      },
+    });
+    expect(() => engine.start()).toThrow(/duplicate resource id "income".*distinct `id`/);
+  });
+
   it('list() is a snapshot that a later registration does not grow', () => {
     const engine = testEngine('reg-list-snapshot');
     engine.use(goldModule('gold'));
