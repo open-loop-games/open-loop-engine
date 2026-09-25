@@ -16,6 +16,7 @@ import {
   timeUntilGateFlip,
   type EngineCategories,
   type EngineModule,
+  type DecimalSource,
   type Gate,
   type GameStateAccessor,
   type GateRuntime,
@@ -419,6 +420,102 @@ describe('timeUntilGateFlip — dispatch table', () => {
     );
     expect(dist.reason).toBe('computed');
     expect(dist.seconds).toBe(10);
+    f.stop();
+  });
+});
+
+// ============================================================================
+// timeUntilGateFlip — cumulative-gte against gross inflow
+// ============================================================================
+
+describe('timeUntilGateFlip — cumulative-gte', () => {
+  /** The fixture's runtime, with an accessor reporting these rates for points. */
+  function withRates(
+    f: ReturnType<typeof buildFixture>,
+    rates: { net: DecimalSource; inflow?: DecimalSource },
+  ): GateRuntime {
+    const base = f.runtime.accessor!;
+    const accessor: GameStateAccessor = {
+      ...base,
+      getRate: (id) => (id === 'points' ? new Decimal(rates.net) : base.getRate(id)),
+    };
+    if (rates.inflow !== undefined) {
+      const inflow = rates.inflow;
+      accessor.getInflowRate = (id) => (id === 'points' ? new Decimal(inflow) : Decimal.dZero);
+    }
+    return { ...f.runtime, accessor };
+  }
+
+  // Each step writes the gain and the drain separately, as a game's producers
+  // and sinks do, so the lifetime total counts only the gain. The total moves
+  // in exact binary steps, so the loop's crossing time is exact and the
+  // prediction lands within the final step before it.
+  it.each([
+    { inflow: 10, drain: 0, gap: 100 },
+    { inflow: 10, drain: 4, gap: 100 },
+    { inflow: 10, drain: 10, gap: 55 },
+    { inflow: 3, drain: 7, gap: 20 },
+    { inflow: 0.5, drain: 0.25, gap: 7.3 },
+    { inflow: 1e6, drain: 3e6, gap: 4.2e7 },
+  ])(
+    'with an inflow rate, predicts the crossing a tick loop reaches (inflow $inflow, drain $drain)',
+    ({ inflow, drain, gap }) => {
+      const dt = 0.125;
+      const f = buildFixture();
+      f.points.value = 1e9;
+      const target = Decimal.add(f.points.cumulative!.value, gap);
+      const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: target };
+
+      const predicted = timeUntilGateFlip(gate, withRates(f, { net: inflow - drain, inflow }));
+
+      let steps = 0;
+      while (!evaluateGate(gate, f.runtime)) {
+        f.points.value = Decimal.add(f.points.value, inflow * dt);
+        f.points.value = Decimal.sub(f.points.value, drain * dt);
+        steps++;
+      }
+      const crossing = steps * dt;
+      expect(predicted.reason).toBe('computed');
+      expect(predicted.seconds!).toBeLessThanOrEqual(crossing);
+      expect(predicted.seconds!).toBeGreaterThan(crossing - dt);
+      f.stop();
+    },
+  );
+
+  it('with an inflow rate, reports no-rate when nothing flows in, whatever the net', () => {
+    const f = buildFixture();
+    const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 10 };
+    expect(timeUntilGateFlip(gate, withRates(f, { net: 5, inflow: 0 }))).toEqual({
+      seconds: null,
+      reason: 'no-rate',
+    });
+    f.stop();
+  });
+
+  it('without an inflow rate, a net rate that is not positive leaves the flip uncomputable', () => {
+    // A drain can outpace the gain while the gain still carries the lifetime
+    // total over the threshold, so a stalled net rate can't rule the flip out.
+    const f = buildFixture();
+    const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 10 };
+    for (const net of [0, -3]) {
+      expect(timeUntilGateFlip(gate, withRates(f, { net }))).toEqual({
+        seconds: null,
+        reason: 'uncomputable',
+      });
+    }
+    f.stop();
+  });
+
+  it('a met gate never flips back under rates, however the balance drains', () => {
+    const f = buildFixture();
+    f.points.value = 50;
+    const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 25 };
+    for (const rates of [{ net: -5 }, { net: -5, inflow: 1 }]) {
+      expect(timeUntilGateFlip(gate, withRates(f, rates))).toEqual({
+        seconds: null,
+        reason: 'no-rate',
+      });
+    }
     f.stop();
   });
 });

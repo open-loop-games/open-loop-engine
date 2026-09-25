@@ -36,8 +36,9 @@ import type { Resource } from './resource';
  * - `reason: 'no-rate'` — transition requires motion but the rate is zero or wrong-signed.
  * - `reason: 'opaque-predicate'` — the predicate (unlock, state path, custom) has no
  *   mechanical distance — it flips when something else writes to it.
- * - `reason: 'uncomputable'` — the transition is mathematically uncomputable
- *   (e.g., point-crossing for an `eq` operator, or no actionable children in a combinator).
+ * - `reason: 'uncomputable'` — the transition may happen, but its distance can't be settled
+ *   from current state and rates (e.g., point-crossing for an `eq` operator, no actionable
+ *   children in a combinator, or a lifetime total the net rate can't bound).
  */
 export type TransitionDistance =
   | { seconds: number; reason: 'computed' }
@@ -58,9 +59,15 @@ export type TransitionDistance =
  * would make the dep set over-broad without catching anything the narrow set misses.
  */
 export interface TransitionDeps {
-  /** Resource ids read via `accessor.getResource(id)`. */
+  /**
+   * Resource ids whose amount the distance reads: the balance via
+   * `accessor.getResource(id)`, or the lifetime total a `cumulative-gte` gate reads.
+   */
   resources: ReadonlySet<string>;
-  /** Resource ids read via `accessor.getRate(id)`. */
+  /**
+   * Resource ids whose rate the distance reads: `accessor.getRate(id)`, and
+   * `accessor.getInflowRate(id)` where the accessor serves it.
+   */
   rates: ReadonlySet<string>;
   /** Unlock ids read via `accessor.isUnlocked(id)`. */
   unlocks: ReadonlySet<string>;

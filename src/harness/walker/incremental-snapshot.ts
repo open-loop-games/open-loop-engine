@@ -95,10 +95,14 @@ export interface IncrementalSnapshot {
   /**
    * Resource ids that, if mutated, would require re-emission of at least one
    * cached entry. Live iterable — contents shift with each rebuild.
-   * Consumers diffing engine state should read every id in this iterable.
+   * Consumers diffing engine state should read every id in this iterable:
+   * its balance, and its lifetime total where it has one.
    */
   readonly trackedResources: Iterable<string>;
-  /** Rate-axis analogue of {@link trackedResources}. */
+  /**
+   * Rate-axis analogue of {@link trackedResources}: read the net rate, and
+   * the inflow rate where the accessor serves one.
+   */
   readonly trackedRates: Iterable<string>;
   /** Unlock-axis analogue of {@link trackedResources}. */
   readonly trackedUnlocks: Iterable<string>;

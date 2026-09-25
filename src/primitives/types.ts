@@ -221,6 +221,15 @@ export interface GameStateAccessor {
    * interpret a zero rate as "no-rate, uncomputable distance."
    */
   getRate(id: string): Decimal;
+  /**
+   * Returns the gross inflow rate for the named resource: what it gains per second before
+   * any drain, so never less than {@link GameStateAccessor.getRate} and never negative.
+   *
+   * Optional. `timeUntilGateFlip` reads it to predict a `cumulative-gte` gate, since the
+   * lifetime total grows by inflow alone. Without it the net rate stands in, which
+   * overstates the time whenever something drains the resource.
+   */
+  getInflowRate?(id: string): Decimal;
 }
 
 /**

@@ -607,6 +607,102 @@ describe("runUntil({mode: 'event'}) time accounting", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// cumulative-gte under a drain — the lifetime total moves while the balance holds
+// ---------------------------------------------------------------------------
+
+/**
+ * A `fragments` balance that a sink drains as fast as its source fills it, so
+ * the balance holds while the lifetime total grows at the inflow rate. The
+ * inflow starts once `clock` reaches `inflowFrom`. Challenge `early` reveals at
+ * clock 2, an event ahead of `late`, which reveals at 10 lifetime fragments.
+ */
+function buildDrainedEngine(inflowFrom: number) {
+  resetAllPersistentContexts();
+  let clock!: ReturnType<typeof createResource<number>>;
+  let fragments!: ReturnType<typeof createResource<number>>;
+  let late!: () => boolean;
+  const inflow = () => (clock.value >= inflowFrom ? 1 : 0);
+  const accessor: GameStateAccessor = {
+    getResource: (id) =>
+      id === 'clock' ? bn(clock.value) : id === 'fragments' ? bn(fragments.value) : bn(0),
+    getRate: (id) => (id === 'clock' ? bn(1) : bn(0)),
+    getInflowRate: (id) => (id === 'fragments' ? bn(inflow()) : bn(0)),
+    isUnlocked: () => false,
+    getState: () => undefined,
+  };
+  const module: EngineModule = {
+    id: 'drained',
+    install(ctx) {
+      clock = createResource(0, { id: 'clock', displayName: 'clock' });
+      fragments = createResource(0, { id: 'fragments', displayName: 'fragments' });
+      ctx.onTick((dt) => {
+        const gain = inflow() * dt;
+        fragments.value = fragments.value + gain;
+        fragments.value = fragments.value - gain;
+        clock.value = clock.value + dt;
+      });
+      const boards = createChallengeCategory({ id: 'boards', accessor });
+      boards.register([
+        {
+          id: 'early',
+          name: 'Early',
+          visible: { kind: 'resource-gte', resource: 'clock', value: 2 },
+        },
+        {
+          id: 'late',
+          name: 'Late',
+          visible: { kind: 'cumulative-gte', resource: 'fragments', value: 10 },
+        },
+      ]);
+      const challenge = boards.getChallenge('late')!;
+      late = () => challenge.visible.value;
+      ctx.provide(CategoriesKey, { challenges: [boards] } as EngineCategories);
+    },
+  };
+  const engine = createEngine({ gameId: `drained-${inflowFrom}`, persistence: false });
+  engine.use(module);
+  engine.start();
+  return { engine, accessor, late };
+}
+
+describe("runUntil({mode: 'event'}) — cumulative-gte under a drain", () => {
+  it('re-predicts a lifetime total that grew while its balance held', () => {
+    const { engine, accessor, late } = buildDrainedEngine(0);
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: late,
+      maxSimTime: 50,
+      tickDelta: 0.25,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('predicate');
+    expect(result.elapsedSimulated).toBeCloseTo(10, 6);
+  });
+
+  it('re-predicts when inflow starts while the balance and net rate hold', () => {
+    const { engine, accessor, late } = buildDrainedEngine(2);
+    const result = runUntil({
+      engine,
+      accessor,
+      mode: 'event',
+      until: late,
+      maxSimTime: 50,
+      tickDelta: 0.25,
+    });
+    engine.stop();
+
+    expect(result.terminated).toBe('predicate');
+    expect(result.elapsedSimulated).toBeCloseTo(12, 6);
+    // One event step to each reveal, rather than fast-ticking a stasis the
+    // inflow already broke.
+    expect(result.totalTicks).toBe(2);
+  });
+});
+
 describe("runUntil({mode: 'event'}) guards", () => {
   const trackerAnalyzer = () => ({
     name: 'tracker',

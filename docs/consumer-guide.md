@@ -61,6 +61,7 @@ const engine = createEngine({
   accessor: {
     getResource: (id) => resourcesById[id]?.value ?? Decimal.dZero,
     getRate: (id) => ratesById[id] ?? Decimal.dZero,
+    getInflowRate: (id) => grossById[id] ?? Decimal.dZero, // optional; exact cumulative-gte predictions
     isUnlocked: (id) => flags[id] ?? false,
     getState: (path) => readPath(gameState, path),
     ...mutator, // applyResourceOp / setUnlocked / setState, for the effect side
@@ -107,7 +108,7 @@ The trick is when data needs to express predicates over live game state. An achi
 
 `Gate` is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
 
-Gate kinds split by what they read, and the split decides what you have to wire. **Accessor-backed leaves** (`resource-gte`, `state`, `flag`) are declarative against the accessor, with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it — these are the kinds that oblige you to supply a `GameStateAccessor`. `cumulative-gte` reads the resource's lifetime total from the resource registry, so it evaluates without an accessor; predicting it reads the resource's rate, and that takes one. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` and need no accessor — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
+Gate kinds split by what they read, and the split decides what you have to wire. **Accessor-backed leaves** (`resource-gte`, `state`, `flag`) are declarative against the accessor, with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it — these are the kinds that oblige you to supply a `GameStateAccessor`. `cumulative-gte` reads the resource's lifetime total from the resource registry, so it evaluates without an accessor; predicting it takes one, and divides by the resource's inflow rate — `getInflowRate` where your accessor serves it, else the net rate, which overstates the time while anything drains the resource. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` and need no accessor — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
 
 **When NOT to reach for Gate.** When you have direct typed refs in scope, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is about *content definitions* (where the closure can't live anyway) — typed callsites inside engine module code stay typed.
 

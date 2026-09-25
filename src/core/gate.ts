@@ -27,7 +27,8 @@ export interface ResourceGteGate {
  * True when `resource.cumulative.value >= value`. The `cumulative` slot is
  * intrinsic to every persistent resource, so no tracker setup is required.
  * Read through the resource registry, so it has no {@link gateToCondition}
- * projection; `timeUntilGateFlip` predicts it from the resource's net rate.
+ * projection; `timeUntilGateFlip` predicts it from the resource's inflow rate,
+ * falling back to its net rate when the accessor reports no inflow.
  */
 export interface CumulativeGteGate {
   kind: 'cumulative-gte';

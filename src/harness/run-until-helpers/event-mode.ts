@@ -47,7 +47,8 @@ import {
   type Transition,
   type TransitionSnapshot,
 } from '../walker';
-import type { Decimal } from '@/primitives/decimal';
+import { Decimal } from '@/primitives/decimal';
+import { ResourceRegistryKey, type ResourceRegistry } from '@/core/registries';
 
 /** @internal */
 export type AdvanceToNextEventResult =
@@ -155,6 +156,8 @@ export function runEventModeLoop(
   const stasisProbeInterval = options.stasisProbeInterval ?? 100;
   const bisectTolSec = options.bisectTolSec;
   const inc = createIncrementalSnapshot(engine, accessor);
+  const registry = engine.tryInject(ResourceRegistryKey);
+  const sample = (): DepSnapshot => sampleDeps(inc, accessor, registry);
 
   let simTime = 0;
   let steps = 0;
@@ -164,7 +167,7 @@ export function runEventModeLoop(
   // post-advance sample to drive selective invalidation. `before` is seeded
   // after the initial full rebuild — construction is a full walk, so
   // `inc.trackedResources` etc. are populated at this point.
-  let before = sampleDeps(inc, accessor);
+  let before = sample();
 
   while (true) {
     if (predicate({ tick: steps, simTime })) {
@@ -206,11 +209,11 @@ export function runEventModeLoop(
         break;
       }
       simTime += result.advanced;
-      before = commitDeps(inc, accessor, before);
+      before = commitDeps(inc, sample, before);
     } else if (result.reason === 'no-finite-transition') {
       // Walker sees nothing advancing. Tick at `tickDelta` without rebuilding
       // the walker until state flips, the predicate fires, or budget runs out.
-      const windowStart = sampleDeps(inc, accessor);
+      const windowStart = sample();
       const outcome = profile('runUntil.event.stasisFastTick', () =>
         fastTickDuringStasis(
           engine,
@@ -226,7 +229,7 @@ export function runEventModeLoop(
       simTime = outcome.simTime;
       steps += outcome.ticks;
       inc.invalidateAll();
-      before = sampleDeps(inc, accessor);
+      before = sample();
       if (outcome.exit === 'predicate') {
         terminated = 'predicate';
         break;
@@ -249,7 +252,7 @@ export function runEventModeLoop(
       simulateSpan(engine.tickDriver, dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
-      before = commitDeps(inc, accessor, before);
+      before = commitDeps(inc, sample, before);
     }
     steps++;
   }
@@ -261,38 +264,65 @@ export function runEventModeLoop(
   };
 }
 
+/**
+ * One sample of the slots the walker tracks. A tracked resource also carries
+ * its lifetime total and a tracked rate its inflow, where either is served:
+ * a `cumulative-gte` distance reads both, and a drain matching the inflow
+ * holds the balance and net rate still while the total climbs.
+ */
 interface DepSnapshot {
   resources: Map<string, Decimal>;
+  totals: Map<string, Decimal>;
   rates: Map<string, Decimal>;
+  inflows: Map<string, Decimal>;
   unlocks: Map<string, boolean>;
   states: Map<string, unknown>;
 }
 
-function sampleDeps(inc: IncrementalSnapshot, accessor: GameStateAccessor): DepSnapshot {
+function sampleDeps(
+  inc: IncrementalSnapshot,
+  accessor: GameStateAccessor,
+  registry: ResourceRegistry | undefined,
+): DepSnapshot {
   const resources = new Map<string, Decimal>();
+  const totals = new Map<string, Decimal>();
   const rates = new Map<string, Decimal>();
+  const inflows = new Map<string, Decimal>();
   const unlocks = new Map<string, boolean>();
   const states = new Map<string, unknown>();
-  for (const id of inc.trackedResources) resources.set(id, accessor.getResource(id));
-  for (const id of inc.trackedRates) rates.set(id, accessor.getRate(id));
+  for (const id of inc.trackedResources) {
+    resources.set(id, accessor.getResource(id));
+    const total = registry?.findById(id)?.cumulative;
+    if (total) totals.set(id, new Decimal(total.value));
+  }
+  for (const id of inc.trackedRates) {
+    rates.set(id, accessor.getRate(id));
+    if (accessor.getInflowRate) inflows.set(id, accessor.getInflowRate(id));
+  }
   for (const id of inc.trackedUnlocks) unlocks.set(id, accessor.isUnlocked(id));
   for (const path of inc.trackedStates) states.set(path, accessor.getState(path));
-  return { resources, rates, unlocks, states };
+  return { resources, totals, rates, inflows, unlocks, states };
 }
 
 function forEachChangedDep(
   before: DepSnapshot,
   after: DepSnapshot,
-  visit: (kind: keyof DepSnapshot, key: string) => void,
+  visit: (kind: 'resources' | 'rates' | 'unlocks' | 'states', key: string) => void,
 ): void {
-  for (const [id, afterVal] of after.resources) {
-    const beforeVal = before.resources.get(id);
-    if (beforeVal === undefined || !beforeVal.eq(afterVal)) visit('resources', id);
-  }
-  for (const [id, afterVal] of after.rates) {
-    const beforeVal = before.rates.get(id);
-    if (beforeVal === undefined || !beforeVal.eq(afterVal)) visit('rates', id);
-  }
+  const visitMoved = (
+    kind: 'resources' | 'rates',
+    beforeMap: Map<string, Decimal>,
+    afterMap: Map<string, Decimal>,
+  ): void => {
+    for (const [id, afterVal] of afterMap) {
+      const beforeVal = beforeMap.get(id);
+      if (beforeVal === undefined || !beforeVal.eq(afterVal)) visit(kind, id);
+    }
+  };
+  visitMoved('resources', before.resources, after.resources);
+  visitMoved('resources', before.totals, after.totals);
+  visitMoved('rates', before.rates, after.rates);
+  visitMoved('rates', before.inflows, after.inflows);
   for (const [id, afterVal] of after.unlocks) {
     if (before.unlocks.get(id) !== afterVal) visit('unlocks', id);
   }
@@ -326,10 +356,10 @@ function depsChanged(before: DepSnapshot, after: DepSnapshot): boolean {
  */
 function commitDeps(
   inc: IncrementalSnapshot,
-  accessor: GameStateAccessor,
+  sample: () => DepSnapshot,
   before: DepSnapshot,
 ): DepSnapshot {
-  const after = sampleDeps(inc, accessor);
+  const after = sample();
   diffInto(inc, before, after);
   return after;
 }

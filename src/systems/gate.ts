@@ -21,7 +21,7 @@
  * | Kind           | Evaluator                                           | Predictor                                |
  * |----------------|-----------------------------------------------------|------------------------------------------|
  * | resource-gte   | accessor.getResource(id) >= value                   | timeUntilConditionFlip over projection   |
- * | cumulative-gte | registry.findById(id).cumulative.value >= value     | net-rate estimate over cumulative ref    |
+ * | cumulative-gte | registry.findById(id).cumulative.value >= value     | gap in the cumulative total ÷ inflow     |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | unlock         | findCategoryEntrySignals(...).unlock                | 'opaque-predicate'                       |
  * | flag           | accessor.isUnlocked(id)                             | 'opaque-predicate'                       |
@@ -36,8 +36,8 @@
  */
 
 import { computed } from 'vue';
-import { Decimal } from '@/primitives/decimal';
-import type { ResourceCondition, GameStateAccessor } from '@/primitives/types';
+import { Decimal, toNumber } from '@/primitives/decimal';
+import type { GameStateAccessor } from '@/primitives/types';
 import { compareState } from '@/core/conditions';
 import { type Computable } from '@/core/computed';
 import {
@@ -54,6 +54,7 @@ import {
   getRequiredGateHandles,
   type AllGate,
   type AnyGate,
+  type CumulativeGteGate,
   type Gate,
   type GateHandle,
   type NotGate,
@@ -197,14 +198,17 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
 /**
  * Distance until `gate` flips truth value at current rates. Per-kind dispatch:
  *
- * - `resource-gte` / `cumulative-gte` — projects to `ResourceCondition` and
- *   delegates to {@link timeUntilConditionFlip}, which owns the rate × operator
- *   truth table. `cumulative-gte` divides the gap in the cumulative total by
- *   the resource's net rate, the only rate the accessor reports. Cumulative
- *   counts inflow and ignores drains, so it grows at least that fast: the
- *   seconds are an upper bound on the time to flip, exact when nothing drains
- *   the resource, and `'no-rate'` means the net rate isn't positive, not that
- *   the gate never flips.
+ * - `resource-gte` — projects to `ResourceCondition` and delegates to
+ *   {@link timeUntilConditionFlip}, which owns the rate × operator truth table.
+ * - `cumulative-gte` — divides the gap in the cumulative total by the
+ *   resource's inflow rate, since the total counts gains and ignores drains.
+ *   With {@link GameStateAccessor.getInflowRate} the answer is exact under
+ *   current rates, and `'no-rate'` means nothing flows in. Without it the net
+ *   rate stands in: the seconds are an upper bound on the time to flip, exact
+ *   when nothing drains the resource, and a net rate that isn't positive gives
+ *   `'uncomputable'`, since inflow may still carry the total over. A gate
+ *   already met gives `'no-rate'`: the total never falls, so only a reset
+ *   flips it back.
  * - `count-gte` / `unlock` / `state` / `flag` — `'opaque-predicate'`. Category
  *   counts advance imperatively (purchases, achievement firings); `state` and
  *   `flag` are consumer-write surfaces. None has a mechanical distance.
@@ -219,28 +223,8 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
         { type: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
         demand(runtime, 'accessor', gate.kind),
       );
-    case 'cumulative-gte': {
-      // Reuse the resource-gte arithmetic over a synthetic accessor that
-      // serves the cumulative ref's value under a private id and the base
-      // resource's rate for it.
-      const ref = cumulativeRefFor(gate.resource, runtime, gate.kind);
-      const accessor = demand(runtime, 'accessor', gate.kind);
-      const cumulativeId = `${gate.resource}:cumulative`;
-      const projected: ResourceCondition = {
-        type: 'resource',
-        target: cumulativeId,
-        operator: 'gte',
-        value: gate.value,
-      };
-      const cumulativeAccessor: GameStateAccessor = {
-        getResource: (id) =>
-          id === cumulativeId ? new Decimal(ref.value) : accessor.getResource(id),
-        getRate: (id) => accessor.getRate(id === cumulativeId ? gate.resource : id),
-        isUnlocked: (id) => accessor.isUnlocked(id),
-        getState: (path) => accessor.getState(path),
-      };
-      return timeUntilConditionFlip(projected, cumulativeAccessor);
-    }
+    case 'cumulative-gte':
+      return timeUntilCumulativeFlip(gate, runtime);
     case 'count-gte':
     case 'unlock':
     case 'state':
@@ -256,9 +240,11 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
 /**
  * The accessor slots whose change can move {@link timeUntilGateFlip}'s answer
  * for `gate`, for caches that re-predict only when one of them moves.
- * `cumulative-gte` names its base resource: the cumulative total moves only
- * when that resource's balance does. Category kinds contribute nothing, since
- * they move without any accessor slot moving.
+ * `cumulative-gte` names its base resource on both axes, standing for its
+ * lifetime total and its inflow rate as well as its balance and net rate: a
+ * drain that matches the inflow holds the latter two still while the total
+ * climbs. Category kinds contribute nothing, since they move without any
+ * accessor slot moving.
  *
  * @internal
  */
@@ -300,6 +286,23 @@ function collectGateDepsInto(
       collectGateDepsInto(gate.of, deps);
       return;
   }
+}
+
+function timeUntilCumulativeFlip(
+  gate: CumulativeGteGate,
+  runtime: GateRuntime,
+): TransitionDistance {
+  const total = cumulativeRefFor(gate.resource, runtime, gate.kind).value;
+  const accessor = demand(runtime, 'accessor', gate.kind);
+  if (Decimal.gte(total, gate.value)) return { seconds: null, reason: 'no-rate' };
+  const inflow = accessor.getInflowRate?.(gate.resource);
+  const rate = inflow ?? accessor.getRate(gate.resource);
+  if (Decimal.lte(rate, Decimal.dZero)) {
+    return { seconds: null, reason: inflow !== undefined ? 'no-rate' : 'uncomputable' };
+  }
+  const seconds = toNumber(Decimal.div(Decimal.sub(gate.value, total), rate));
+  if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
+  return { seconds, reason: 'computed' };
 }
 
 function combinatorFlip(

@@ -17,7 +17,7 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
   const unlockCache = new Map<string, boolean>();
   const stateCache = new Map<string, unknown>();
 
-  return {
+  const memo: GameStateAccessor = {
     getResource(id) {
       const hit = resourceCache.get(id);
       if (hit !== undefined) return hit;
@@ -46,4 +46,18 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
       return value;
     },
   };
+  // Only where the source serves it: an absent hook is what tells a
+  // predictor to fall back to the net rate.
+  const getInflowRate = accessor.getInflowRate?.bind(accessor);
+  if (getInflowRate) {
+    const inflowCache = new Map<string, Decimal>();
+    memo.getInflowRate = (id) => {
+      const hit = inflowCache.get(id);
+      if (hit !== undefined) return hit;
+      const value = getInflowRate(id);
+      inflowCache.set(id, value);
+      return value;
+    };
+  }
+  return memo;
 }

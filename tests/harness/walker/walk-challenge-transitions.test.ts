@@ -11,6 +11,7 @@ import {
 } from '@/harness/walker/walk-challenge-transitions';
 import { runUntil } from '@/harness/run-until';
 import { createIncrementalSnapshot } from '@/harness/walker/incremental-snapshot';
+import { createTransitionSnapshot } from '@/harness/walker';
 import { createResource, type Resource } from '@/core/resource';
 
 beforeEach(() => {
@@ -458,7 +459,7 @@ describe('walkChallengeTransitions — challenge-maxed', () => {
 // ---------------------------------------------------------------------------
 
 describe('walkChallengeTransitions — cumulative-gte', () => {
-  function buildCumulativeEngine() {
+  function buildCumulativeEngine(inflow?: number) {
     let fragments!: Resource<number>;
     const accessor: GameStateAccessor = {
       getResource: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
@@ -466,6 +467,9 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
       isUnlocked: () => false,
       getState: () => undefined,
     };
+    if (inflow !== undefined) {
+      accessor.getInflowRate = (id) => (id === 'fragments' ? bn(inflow) : bn(0));
+    }
     const module: EngineModule = {
       id: 'boards',
       install() {
@@ -502,6 +506,16 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
 
     const [vis] = createIncrementalSnapshot(engine, accessor).snapshot.challenges;
     expect(vis.distance).toEqual({ seconds: 20, reason: 'computed' });
+  });
+
+  it('divides by the inflow rate when the accessor reports one, through both snapshots', () => {
+    const { engine, accessor, fragments } = buildCumulativeEngine(4);
+    fragments().value = 30;
+
+    const [walked] = createTransitionSnapshot(engine, accessor).challenges;
+    const [cached] = createIncrementalSnapshot(engine, accessor).snapshot.challenges;
+    expect(walked.distance).toEqual({ seconds: 5, reason: 'computed' });
+    expect(cached.distance).toEqual({ seconds: 5, reason: 'computed' });
   });
 
   it('reports the base resource as the dependency', () => {
