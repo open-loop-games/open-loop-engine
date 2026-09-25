@@ -71,7 +71,6 @@ import type { InjectionKey } from '../primitives/types';
 interface Scope<T> {
   readonly label: string;
   readonly overrides: Partial<T>;
-  removed: boolean;
 }
 
 /**
@@ -161,11 +160,9 @@ export const TuningRegistriesKey = Symbol('engine:tuning-registries') as Injecti
 >;
 
 // === FACTORY ===
-/** Whether a live scope supplies its own, defined entry for `key`. */
+/** Whether a scope supplies its own, defined entry for `key`. */
 function overridesKey<T>(scope: Scope<T>, key: keyof T & string): boolean {
-  return (
-    !scope.removed && Object.hasOwn(scope.overrides, key) && scope.overrides[key] !== undefined
-  );
+  return Object.hasOwn(scope.overrides, key) && scope.overrides[key] !== undefined;
 }
 
 /**
@@ -221,21 +218,20 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
     },
 
     pushScope(label: string, overrides: Partial<T>): () => void {
-      const scope: Scope<T> = { label, overrides, removed: false };
+      const scope: Scope<T> = { label, overrides };
       scopes.push(scope);
       scopeVersion.value++;
 
       return () => {
-        if (scope.removed) return;
-        scope.removed = true;
         const idx = scopes.indexOf(scope);
-        if (idx !== -1) scopes.splice(idx, 1);
+        if (idx === -1) return;
+        scopes.splice(idx, 1);
         scopeVersion.value++;
       };
     },
 
     get scopeDepth(): number {
-      return scopes.filter((s) => !s.removed).length;
+      return scopes.length;
     },
   };
 }
