@@ -341,7 +341,8 @@ export interface Engine {
    * call `load()` explicitly after `start()` (modules must install first so
    * their persistent refs exist to hydrate).
    * @throws On a disposed engine, a circular or missing dependency, or two
-   *   different module objects registered under one id.
+   *   different module objects registered under one id. A module's
+   *   `install()` or `connect()` throwing disposes the engine, then rethrows.
    */
   start(): void;
   stop(): void;
@@ -661,31 +662,39 @@ export function createEngine(config: EngineConfig): Engine {
         // The effect scope owns every watcher and computed a module creates,
         // so dispose() can stop them even when they watch state outliving
         // the engine.
-        moduleScope.run(() =>
-          withChainRegistry(chainRegistry, () =>
-            withEffectSystemRegistry(effectSystemRegistry, () =>
-              withResourceRegistry(resourceRegistry, () =>
-                withEngineCategories(engineCategories, () =>
-                  withTuningRegistries(tuningRegistries, () =>
-                    withGameStateAccessor(config.accessor, () =>
-                      withPersistenceNamespace(config.persistenceNamespace, () => {
-                        for (const mod of sorted) {
-                          withPersistentContext(mod.id, () => mod.install(sharedContext));
-                        }
-                        // Connect phase: all modules installed, now wire cross-module refs
-                        for (const mod of sorted) {
-                          if (mod.connect) {
-                            withPersistentContext(mod.id, () => mod.connect!(sharedContext));
+        try {
+          moduleScope.run(() =>
+            withChainRegistry(chainRegistry, () =>
+              withEffectSystemRegistry(effectSystemRegistry, () =>
+                withResourceRegistry(resourceRegistry, () =>
+                  withEngineCategories(engineCategories, () =>
+                    withTuningRegistries(tuningRegistries, () =>
+                      withGameStateAccessor(config.accessor, () =>
+                        withPersistenceNamespace(config.persistenceNamespace, () => {
+                          for (const mod of sorted) {
+                            withPersistentContext(mod.id, () => mod.install(sharedContext));
                           }
-                        }
-                      }),
+                          // Connect phase: all modules installed, now wire cross-module refs
+                          for (const mod of sorted) {
+                            if (mod.connect) {
+                              withPersistentContext(mod.id, () => mod.connect!(sharedContext));
+                            }
+                          }
+                        }),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
+          );
+        } catch (err) {
+          // A half-installed engine can neither start again nor be reached by
+          // a caller whose reference the throw unwound, so release its
+          // persistent names here — else the next engine collides on them.
+          engine.dispose();
+          throw err;
+        }
 
         installed = true;
       }

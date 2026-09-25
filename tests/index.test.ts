@@ -329,6 +329,25 @@ describe('dispose() — persistent-context teardown', () => {
     engineB.dispose();
   });
 
+  it('a start() whose install throws disposes the engine, so the next one can start', () => {
+    const failing = createEngine({ gameId: 'g', persistence: false });
+    failing.use(makeNamedModule().mod);
+    failing.use({
+      id: 'broken',
+      install() {
+        throw new Error('install failed');
+      },
+    });
+    expect(() => failing.start()).toThrow('install failed');
+    expect(() => failing.start()).toThrow(/disposed/);
+
+    const b = makeNamedModule();
+    const engine = createEngine({ gameId: 'g', persistence: false });
+    engine.use(b.mod);
+    expect(() => engine.start()).not.toThrow();
+    engine.dispose();
+  });
+
   it('start() throws after dispose', () => {
     const m = makeNamedModule();
     const engine = createEngine({ gameId: 'g', persistence: false });
