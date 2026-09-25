@@ -37,7 +37,7 @@ import {
 } from './gate';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
 import type { ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import { getCurrentEngineCategories } from './engine-categories';
 
 // === TYPES ===

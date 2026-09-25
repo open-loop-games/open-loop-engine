@@ -43,7 +43,7 @@ import {
   type CategoryEntrySignals,
 } from './category-base';
 import { type ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import { createAchievement, type Achievement, type AchievementOptions } from './achievement';
 import { getCurrentEngineCategories } from './engine-categories';
 import { createPredicateResolver } from './gate';

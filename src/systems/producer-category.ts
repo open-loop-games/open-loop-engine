@@ -21,7 +21,7 @@ import {
   type CategoryEntrySignals,
 } from './category-base';
 import { type ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import { createScalingPurchasable, type Purchasable } from './purchasable';
 import { getCurrentEngineCategories } from './engine-categories';
 import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';

@@ -34,7 +34,7 @@ import {
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
-import { Resettable } from './resettable';
+import { Resettable } from '@/core/resettable';
 import { createRetentionPolicy } from './retention';
 import { createPredicateResolver, type Predicate } from './gate';
 

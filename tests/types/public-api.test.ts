@@ -86,7 +86,7 @@ import type {
   EnumFieldInstance,
 } from '@/systems/subject-category';
 import type { DialogCategory } from '@/systems/dialog-category';
-import type { ResettableObject } from '@/systems/resettable';
+import type { ResettableObject } from '@/core/resettable';
 import type { CategoryBase } from '@/systems/category-base';
 import type { ZoneSystem, ZoneDef } from '@/systems/zone';
 import type { Purchasable, PurchasableOptions } from '@/systems/purchasable';

@@ -40,7 +40,7 @@ import { computed } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createCategoryBase, type CategoryBase, type CategoryEntrySignals } from './category-base';
 import { type ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import { createSkill, type Skill, type SkillOptions } from './skill';
 import { getCurrentEngineCategories } from './engine-categories';
 import { type Modifier } from '@/core/modifier';

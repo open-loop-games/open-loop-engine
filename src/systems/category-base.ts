@@ -25,11 +25,10 @@ import {
 import type { Grant } from '@/core/modifier';
 import { profileEnd, profileStart } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
-import { attachContextReset } from '@/core/resettable';
+import { attachContextReset, Resettable, type ResettableObject } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
 import type { PredicateResolver } from './gate';
 import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-binding';
-import { Resettable, type ResettableObject } from './resettable';
 
 // === TYPES ===
 

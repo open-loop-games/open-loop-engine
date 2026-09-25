@@ -51,7 +51,7 @@ import {
 } from './category-base';
 import { createPredicateResolver } from './gate';
 import { type ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import { createPurchasable, type Purchasable, type PurchasableOptions } from './purchasable';
 import { getCurrentEngineCategories } from './engine-categories';
 import type { Grant } from '@/core/modifier';

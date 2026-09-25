@@ -43,7 +43,7 @@ import {
   type CategoryEntrySignals,
 } from './category-base';
 import type { ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 import type { OverrideRegistry } from '@/core/override-registry';
 import type { Reset } from './reset';
 import type { IEffect, GameStateAccessor } from '@/primitives/types';

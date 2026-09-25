@@ -8,7 +8,9 @@
 // === RESETTABLE PROTOCOL ===
 // Opt-in interface for objects (categories, stateful systems) that yield
 // persistent refs for recursive reset. Used by resetObject in the reset system.
-export * from './resettable';
+// Lives in core so core primitives can implement it too; re-exported here by
+// name (not `export *`) so the `@internal` `attachContextReset` stays internal.
+export { Resettable, type ResettableObject } from '@/core/resettable';
 
 // === CATEGORY BASE ===
 // Generic registry + per-def persistent context + Resettable wiring. The

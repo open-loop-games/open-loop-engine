@@ -17,7 +17,7 @@
 import type { DialogGraph } from './dialog';
 import { createCategoryBase, type CategoryBase } from './category-base';
 import type { ContentRegistryView } from './content-registry';
-import { Resettable, type ResettableObject } from './resettable';
+import { Resettable, type ResettableObject } from '@/core/resettable';
 
 // === TYPES ===
 

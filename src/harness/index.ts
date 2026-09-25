@@ -153,4 +153,4 @@ export type {
   LoadHandler,
 } from '../engine';
 export { Decimal } from '../primitives/decimal';
-export type { ResettableObject } from '../systems/resettable';
+export type { ResettableObject } from '../core/resettable';
