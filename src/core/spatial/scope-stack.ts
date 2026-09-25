@@ -44,8 +44,7 @@
  *
  * Persistence: `serialize()` returns the active path only. The state cache
  * is ephemeral — cleared on `restore` and rebuilt as callers drive
- * `recalculateAt` after load. No events fire during restore, matching
- * graph's silent bulk-load contract.
+ * `recalculateAt` after load. No events fire during restore.
  */
 
 import { createEmitHandle } from '../events';

@@ -24,9 +24,10 @@
  *
  * Events:
  * - `cellChanged(x, y, prev, next)` — game-logic mutations via `set()`.
+ * - `bulkChanged()` — one coarse signal per `fill()` or `restore()`.
  * - `fovUpdated(deltaIn, deltaOut)` — one batched event per `commit()`.
- * - `maskChanged(mask)` — coarse signal for direct bitmap mutations
- *   outside the FOV path.
+ * - `maskChanged(mask)` — coarse signal that a whole bitmap may have
+ *   changed outside the FOV path; `restore()` emits one per bitmap.
  */
 
 import { toRaw } from 'vue';
@@ -100,7 +101,7 @@ export const HEX_AXIAL_DELTAS: readonly GridDelta[] = [
 /** Events emitted by a {@link SpatialGrid}. Subscribe via `grid.on()`. */
 export interface SpatialGridEvents<T> {
   cellChanged: (x: number, y: number, prev: T, next: T) => void;
-  /** One coarse signal per bulk mutation (`fill()`). No per-cell payload. */
+  /** One coarse signal per bulk mutation (`fill()`, `restore()`). No per-cell payload. */
   bulkChanged: () => void;
   fovUpdated: (deltaIn: GridCoord[], deltaOut: GridCoord[]) => void;
   maskChanged: (mask: 'passable' | 'explored' | 'visible') => void;
@@ -348,7 +349,13 @@ export interface SpatialGrid<T> {
 
   /** Capture the grid's current state as a plain-object snapshot. */
   serialize(): SpatialGridSnapshot<T>;
-  /** Replace the grid's state from a snapshot. Width/height must match construction; a version other than 1 throws. */
+  /**
+   * Replace the grid's state from a snapshot. Width/height must match
+   * construction; a version other than 1 throws. Once every cell, bitmap and
+   * count has landed, emits one `bulkChanged` and then one `maskChanged` per
+   * bitmap (passable, explored, visible), so a renderer repaints a loaded
+   * board the same way it repaints a `fill()` — no per-cell `cellChanged`.
+   */
   restore(snapshot: SpatialGridSnapshot<T>): void;
 }
 
@@ -791,6 +798,10 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       exploredCount = eCount;
       passableCountCache = pCount;
       exploredPassableCount = epCount;
+      handle.emit('bulkChanged');
+      handle.emit('maskChanged', 'passable');
+      handle.emit('maskChanged', 'explored');
+      handle.emit('maskChanged', 'visible');
     },
   };
 

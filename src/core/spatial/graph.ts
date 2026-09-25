@@ -186,8 +186,8 @@ export interface SpatialGraph<N, E> {
   serialize(): SpatialGraphSnapshot<N, E>;
   /**
    * Replace this graph's state from a snapshot. Clears nodes, edges, and
-   * child graphs first; then rebuilds from `snapshot`. No events are
-   * emitted during restore (matches grid's silent bulk-load contract).
+   * child graphs first; then rebuilds from `snapshot`. Silent: no events
+   * fire, so a view over the graph re-reads it after a restore.
    * Throws on snapshot integrity violations (unknown version, edge
    * referencing missing node, child keyed on missing node).
    */

@@ -817,6 +817,28 @@ describe('createSpatialGrid — serialize / restore', () => {
     expect(Array.from(restored.visible)).toEqual(Array.from(original.visible));
   });
 
+  it('restore() emits one bulkChanged and one maskChanged per bitmap, after state lands', () => {
+    const source = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
+    source.passable[0] = 1;
+    source.set(1, 0, { kind: 'wall' });
+    const snapshot = source.serialize();
+
+    const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
+    const events: string[] = [];
+    grid.on('cellChanged', () => events.push('cellChanged'));
+    grid.on('fovUpdated', () => events.push('fovUpdated'));
+    grid.on('bulkChanged', () => events.push(`bulkChanged:${grid.at(1, 0).kind}`));
+    grid.on('maskChanged', (mask) => events.push(`maskChanged:${mask}:${grid.passableCount}`));
+    grid.restore(snapshot);
+
+    expect(events).toEqual([
+      'bulkChanged:wall',
+      'maskChanged:passable:1',
+      'maskChanged:explored:1',
+      'maskChanged:visible:1',
+    ]);
+  });
+
   it('rejects restore from a snapshot with mismatched dimensions', () => {
     const grid = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
     const bad: SpatialGridSnapshot<Tile> = {
