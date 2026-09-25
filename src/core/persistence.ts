@@ -343,6 +343,24 @@ export function getCurrentContext(): string | undefined {
 }
 
 /**
+ * Context id for a system a module usually builds once: the explicit `id` as
+ * given, else `${ambient}/${kind}`, else `fallback()` (a build outside any
+ * module — tests). The kind keeps two systems in one module from sharing a
+ * context and colliding on common ref names like `unlocked`.
+ *
+ * @internal
+ */
+export function resolveSystemContextId(
+  id: string | undefined,
+  kind: string,
+  fallback: () => string,
+): string {
+  if (id !== undefined) return id;
+  const ambient = getCurrentContext();
+  return ambient !== undefined ? `${ambient}/${kind}` : fallback();
+}
+
+/**
  * Full (namespaced) context id used as the key in {@link persistentRefs}.
  * Ref creation and lookup-by-ref must use this so they land in the right
  * namespace bucket. Also used by attribution surfaces (e.g. chain bindings)

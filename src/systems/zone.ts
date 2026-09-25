@@ -36,7 +36,7 @@ import {
   persistent,
   type Persistent,
   withPersistentContext,
-  getCurrentContext,
+  resolveSystemContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { createContentRegistry, type ContentRegistry } from './content-registry';
@@ -62,7 +62,10 @@ export interface ZoneSystemEvents {
 
 /** Options for {@link createZoneSystem} */
 export interface ZoneSystemOptions {
-  /** Persistence ID. Falls back to surrounding context or auto-generated. */
+  /**
+   * Save context. Defaults to `${module}/zone` inside a module; pass one
+   * when a module builds more than one.
+   */
   id?: string;
   /** Initial zone definitions to register */
   zones?: ZoneDef[];
@@ -137,7 +140,6 @@ let zoneCounter = 0;
  * ```
  */
 export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
-  const autoId = `zone_${zoneCounter++}`;
   const { id, zones: initialZones = [], initiallyUnlocked } = options;
 
   // --- Registry ---
@@ -150,7 +152,7 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     initiallyUnlocked ?? (initialZones.length > 0 ? [initialZones[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = id ?? getCurrentContext() ?? autoId;
+  const contextId = resolveSystemContextId(id, 'zone', () => `zone_${zoneCounter++}`);
   const { unlocked, current } = withPersistentContext(contextId, () => ({
     unlocked: persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
     current: persistent<string>(defaultUnlocked[0] ?? '', { name: 'current' }),

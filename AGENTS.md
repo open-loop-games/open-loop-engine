@@ -143,7 +143,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 - `TODO(ergonomics)` — working but verbose path; simplify when the pattern recurs in two+ consumers.
 - See `PROCESS.md` § Parked patterns for rationale and graduation rules.
 
-**Content-unit factories:** Factories accepting `id?: string` resolve identity in order — explicit argument, ambient `withPersistentContext` id, auto-counter (tests only).
+**Save identity:** a save key is derived from ids the consumer chose, never from creation order or display text — either shifts with a content update, and every player's value under it loads as the default. A factory a module builds several of (purchasables, timed-progress trackers) requires `id` and nests under the ambient context. A system a module builds once takes `id?: string` and resolves it through `resolveSystemContextId`: explicit id, else `${ambient}/${kind}`, else an auto-counter that only a build outside any module (tests) reaches.
 
 **Section banners:** `// === UPPERCASE ===` short-form, one line per section. Inner factory-body sub-sections use the same form at deeper indent. Skip banners on files small enough that scrolling isn't an issue.
 

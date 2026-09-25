@@ -23,7 +23,7 @@ import {
   persistent,
   type Persistent,
   withPersistentContext,
-  getCurrentContext,
+  resolveSystemContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
@@ -40,7 +40,10 @@ export interface CycleEvents {
 
 /** Options for {@link createCycle} */
 export interface CycleOptions {
-  /** Persistence ID. Falls back to surrounding context or auto-generated. Explicit IDs are safer for save compat. */
+  /**
+   * Save context. Defaults to `${module}/cycle` inside a module; pass one
+   * when a module builds more than one.
+   */
   id?: string;
 
   /**
@@ -196,8 +199,6 @@ let cycleCounter = 0;
  * ```
  */
 export function createCycle(options: CycleOptions): Cycle {
-  const autoId = `cycle_${cycleCounter++}`;
-
   const {
     id,
     endCondition,
@@ -211,7 +212,7 @@ export function createCycle(options: CycleOptions): Cycle {
     registerTick,
   } = options;
 
-  const contextId = id ?? getCurrentContext() ?? autoId;
+  const contextId = resolveSystemContextId(id, 'cycle', () => `cycle_${cycleCounter++}`);
   const { count, bestTime } = withPersistentContext(contextId, () => ({
     count: persistent(0, { name: 'count' }),
     bestTime: persistent(Infinity, { name: 'bestTime' }),

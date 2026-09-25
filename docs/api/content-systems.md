@@ -53,10 +53,10 @@ batch-registered ordered-execution queue with per-execution state machine
 progressive unlock of automation features
 
 - `interface AutomationTierDef` — Definition for a single automation tier. `src/systems/automation.ts:50`
-- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:97`
+- `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:98`
 - `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:71`
 - `interface AutomationTiersOptions` `src/systems/automation.ts:77`
-- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:165`
+- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:166`
 
 ## BestOf tracker
 
@@ -88,8 +88,8 @@ batch-create Challenges from content definitions
 
 a bounded run that ends, resets a scope, and replays
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:198`
-- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:116`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:201`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:119`
 - `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:34`
 - `interface CycleOptions` `src/systems/cycle.ts:42`
 
@@ -143,10 +143,10 @@ Two consumer entry points: `createPurchasableCategory` batch-registers from cont
 - `interface PurchasableOptions` — Full options for createPurchasable — the engine-internal raw factory. `src/systems/purchasable.ts:82`
 - `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:151`
 - `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with either geometric or closure-form cost scaling. `src/systems/purchasable.ts:181`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:437`
-- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:316`
-- `function setupSweepAutoPurchase(purchasables: Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:238`
-- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:106`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:427`
+- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:306`
+- `function setupSweepAutoPurchase(purchasables: Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:226`
+- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:94`
 
 ## RunPool
 
@@ -197,8 +197,8 @@ constrained persistent selection from a pool
 
 named content groupings with progressive unlock
 
-- `function createZoneSystem(options?: ZoneSystemOptions): ZoneSystem` — Create a zone system — content groupings with progressive unlock. `src/systems/zone.ts:139`
+- `function createZoneSystem(options?: ZoneSystemOptions): ZoneSystem` — Create a zone system — content groupings with progressive unlock. `src/systems/zone.ts:142`
 - `interface ZoneDef` — Definition for a zone in the content registry. `src/systems/zone.ts:47`
-- `interface ZoneSystem` — A zone system instance — the returned object from createZoneSystem. `src/systems/zone.ts:82`
+- `interface ZoneSystem` — A zone system instance — the returned object from createZoneSystem. `src/systems/zone.ts:85`
 - `interface ZoneSystemEvents` — Events emitted by a ZoneSystem instance. `src/systems/zone.ts:56`
 - `interface ZoneSystemOptions` `src/systems/zone.ts:64`

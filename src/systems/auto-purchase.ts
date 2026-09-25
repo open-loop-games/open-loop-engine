@@ -34,18 +34,6 @@ import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
 import type { Purchasable } from './purchasable';
 import type { Producer, ProducerCategory } from './producer-category';
 
-// === CONSTANTS ===
-
-// Monotonic counter used to generate unique persistent-ref names for the
-// policy auto-purchase accumulator. Multiple setup calls inside the same
-// persistent context (e.g., two categories in one module install) each get
-// a distinct key so `importSave` can round-trip them.
-let policyAutoPurchaseAccumulatorCounter = 0;
-
-// Same, for the sweep helper's throttle accumulator. Sweep only allocates one
-// when `interval` is supplied, so the two counters advance independently.
-let sweepAutoPurchaseAccumulatorCounter = 0;
-
 // Iteration bound on the reserve clamp's binary search. Exact for ceilings up
 // to 2^64; past that the search returns its current lower bound — an
 // under-buy, never a floor breach — and the residual is picked up by the next
@@ -280,7 +268,9 @@ export function setupSweepAutoPurchase(
   // mid-run `importSave` would otherwise leave the throttle phase out of sync
   // with the resources and purchase counts it was just restored alongside.
   const accumulator = persistent<number>(0, {
-    name: `sweepAutoPurchaseAccumulator_${++sweepAutoPurchaseAccumulatorCounter}`,
+    // Named by what it drives, so two setups in one module don't collide and
+    // the key holds across builds.
+    name: `sweepAutoPurchaseAccumulator:${purchasables.map((p) => p.id).join('+')}`,
   });
 
   return registerTick((dt: number) => {
@@ -488,7 +478,10 @@ export function setupPolicyAutoPurchase(
   // replay) would leave the accumulator out of sync with the resources and
   // purchase counts that were just restored.
   const accumulator = persistent<number>(0, {
-    name: `policyAutoPurchaseAccumulator_${++policyAutoPurchaseAccumulatorCounter}`,
+    // Named by what it drives — see the sweep helper's accumulator.
+    name: `policyAutoPurchaseAccumulator:${
+      Array.isArray(producers) ? producers.map((p) => p.rateChain.id).join('+') : producers.id
+    }`,
   });
 
   // Per-slot headline-rate cache, keyed by Resource identity. Lives outside

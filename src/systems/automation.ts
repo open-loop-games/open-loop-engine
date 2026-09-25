@@ -38,7 +38,7 @@ import { computed, unref, watch, type ComputedRef, type WatchStopHandle } from '
 import {
   persistent,
   withPersistentContext,
-  getCurrentContext,
+  resolveSystemContextId,
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
@@ -76,7 +76,8 @@ export interface AutomationTiersEvents {
 /** Options for {@link createAutomationTiers}. */
 export interface AutomationTiersOptions {
   /**
-   * Persistence context ID. Falls back to surrounding context or auto-generated.
+   * Save context. Defaults to `${module}/automation` inside a module; pass one
+   * when a module builds more than one.
    */
   id?: string;
   /** Tier definitions (sorted internally by `order`). */
@@ -163,7 +164,6 @@ let tierSystemCounter = 0;
  * ```
  */
 export function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers {
-  const autoId = `autoTiers_${tierSystemCounter++}`;
   const { id, tiers: rawTiers, initiallyUnlocked } = options;
 
   const tiers = [...rawTiers].sort((a, b) => a.order - b.order);
@@ -174,7 +174,11 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   const defaultUnlocked = initiallyUnlocked ?? (tiers.length > 0 ? [tiers[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = id ?? getCurrentContext() ?? autoId;
+  const contextId = resolveSystemContextId(
+    id,
+    'automation',
+    () => `autoTiers_${tierSystemCounter++}`,
+  );
   const unlocked = withPersistentContext(contextId, () =>
     persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
   );

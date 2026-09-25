@@ -31,7 +31,7 @@
 
 import { ref } from 'vue';
 import type { Ref } from 'vue';
-import { persistent, withPersistentContext } from '@/core/persistence';
+import { persistent, resolveSystemContextId, withPersistentContext } from '@/core/persistence';
 import { resolveComputable, type Computable } from '@/core/computed';
 import { processOfflineTime, type OfflineProgressOptions } from '@/core/offline';
 import type { TickDriver } from '@/core/tick-driver';
@@ -47,10 +47,8 @@ let timeBankCounter = 0;
 /** Configuration for {@link createTimeBank}. */
 export interface TimeBankConfig {
   /**
-   * Persistent-context id for the reservoir. Defaults to a process-global
-   * counter id — fine for a single bank, but supply a stable id when a game
-   * holds several banks (per-subsystem reserves) or needs cross-session
-   * determinism.
+   * Save context for the reservoir. Defaults to `${module}/time-bank` inside a
+   * module; pass one when a module holds several banks (per-subsystem reserves).
    */
   id?: string;
   /**
@@ -102,7 +100,11 @@ export interface TimeBank {
  */
 export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
   const { earnEfficiency = 1, cap } = config;
-  const bankContextId = config.id ?? `time-bank_${++timeBankCounter}`;
+  const bankContextId = resolveSystemContextId(
+    config.id,
+    'time-bank',
+    () => `time-bank_${++timeBankCounter}`,
+  );
   const banked = withPersistentContext(bankContextId, () =>
     persistent<number>(0, { name: 'banked' }),
   );

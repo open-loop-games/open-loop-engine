@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  endPersistentContext,
+  withPersistentContext,
+  resetAllPersistentContexts,
+  getAllPersistentRefs,
+} from '@/core/persistence';
 import { createResource, addResource, type Resource } from '@/core/resource';
 import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 import {
@@ -790,6 +796,54 @@ describe('setupPolicyAutoPurchase', () => {
 
     tick(0.8);
     expect(new Decimal(cursor.amount.value).toNumber()).toBe(1);
+  });
+
+  it('interval accumulators save under what they drive, not how many ran before', () => {
+    const build = () => {
+      resetAllPersistentContexts();
+      const { registerTick } = createTickManager();
+      withPersistentContext('shop', () => {
+        const cookies = createResource<DecimalSource>(0, { id: 'cookies' });
+        const category = createProducerCategory<BuildingDef>({
+          id: 'buildings',
+          mapProducer: (def) => ({
+            resource: cookies,
+            baseRate: def.baseRate,
+            trigger: 'continuous',
+            purchase: {
+              costResource: cookies,
+              baseCost: def.baseCost,
+              costScaling: def.costScaling,
+            },
+          }),
+          registerTick,
+        });
+        category.register({
+          id: 'cursor',
+          name: 'Cursor',
+          baseRate: 1,
+          baseCost: 10,
+          costScaling: 1.15,
+        });
+        const upgrade = createScalingPurchasable({
+          id: 'sale',
+          description: 'Sale',
+          resource: cookies,
+          baseCost: 1,
+          costScaling: 2,
+        });
+        setupPolicyAutoPurchase(category, { enabled: true, interval: 2 }, registerTick);
+        setupSweepAutoPurchase([upgrade], { enabled: true, interval: 2 }, registerTick);
+      });
+      return [...getAllPersistentRefs().keys()].filter((k) => k.includes('Accumulator')).sort();
+    };
+
+    const first = build();
+    expect(first).toEqual([
+      'shop.policyAutoPurchaseAccumulator:buildings',
+      'shop.sweepAutoPurchaseAccumulator:sale',
+    ]);
+    expect(build()).toEqual(first);
   });
 
   it('drives a custom SelectionPolicy<Producer> outside the three built-ins', () => {

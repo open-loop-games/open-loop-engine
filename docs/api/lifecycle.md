@@ -22,26 +22,26 @@ catch-up progress by replaying elapsed seconds through the TickDriver in chunks
 
 auto-saved refs with context-scoped registration
 
-- `function createDefinitionStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of per-definition persistent state, where each `stateFactory` result must be an *object* of persistent refs (property keys become the stable save names). `src/core/persistence.ts:830`
-- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:584`
-- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1004`
-- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:680`
-- `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:911`
-- `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:713`
-- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's current value equals its default. `src/core/persistence.ts:615`
-- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:540`
+- `function createDefinitionStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of per-definition persistent state, where each `stateFactory` result must be an *object* of persistent refs (property keys become the stable save names). `src/core/persistence.ts:848`
+- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:602`
+- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1022`
+- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:698`
+- `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:929`
+- `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:731`
+- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's current value equals its default. `src/core/persistence.ts:633`
+- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:558`
 - `const NonPersistent: unique symbol` — Symbol for the non-persistent computed wrapper. `src/core/persistence.ts:75`
-- `function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeof NonPersistent]` — Get the non-persistent computed wrapper for a persistent ref. `src/core/persistence.ts:550`
-- `function noPersist<T extends object>(obj: T): T` `src/core/persistence.ts:551`
-- `function persistent<T>(defaultValue: (T & StateConstraint<T>) | Ref<T & StateConstraint<T>>, options?: PersistentOptions<T>): Persistent<T>` — Create a persistent ref that will be saved/loaded automatically. `src/core/persistence.ts:416`
+- `function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeof NonPersistent]` — Get the non-persistent computed wrapper for a persistent ref. `src/core/persistence.ts:568`
+- `function noPersist<T extends object>(obj: T): T` `src/core/persistence.ts:569`
+- `function persistent<T>(defaultValue: (T & StateConstraint<T>) | Ref<T & StateConstraint<T>>, options?: PersistentOptions<T>): Persistent<T>` — Create a persistent ref that will be saved/loaded automatically. `src/core/persistence.ts:434`
 - `type Persistent<T = State> = Ref<T> & { readonly [PersistentState]: Ref<T>; readonly [DefaultValue]: T; readonly [StackTrace]: string; [Deleted]: boolean; readonly [NonPersistent]: NonPersistent<T>; [SaveDataPath]: string[] | undefined; readonly [CheckNaN]: boolean; [PersistentName]: string | undefined; readonly [PersistentSchema]: unknown; readonly [PersistentDecimal]: boolean; readonly [Lifetime]: boolean; }` — A ref that is automatically saved and loaded. `src/core/persistence.ts:127`
 - `const PersistentDecimal: unique symbol` — Marks a ref as Decimal-valued for schema derivation. `src/core/persistence.ts:102`
 - `const PersistentName: unique symbol` — Stable name of this persistent ref inside its context. `src/core/persistence.ts:88`
-- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:361`
+- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:379`
 - `const PersistentSchema: unique symbol` — Explicit Zod schema for this ref's runtime save validation. `src/core/persistence.ts:95`
-- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its default value. `src/core/persistence.ts:595`
-- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize collected persistent refs to a save object. `src/core/persistence.ts:863`
-- `function setPersistentName(ref: Persistent, name: string): void` — Assign a stable save-data name to a persistent ref inside its context. `src/core/persistence.ts:513`
+- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its default value. `src/core/persistence.ts:613`
+- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize collected persistent refs to a save object. `src/core/persistence.ts:881`
+- `function setPersistentName(ref: Persistent, name: string): void` — Assign a stable save-data name to a persistent ref inside its context. `src/core/persistence.ts:531`
 - `type State` — Serializable state types that can be saved/loaded safely. `src/core/persistence.ts:26`
 - `type StateConstraint<T>` — Compile-time constraint that validates T is serializable without requiring explicit index signatures on interfaces. `src/core/persistence.ts:50`
 - `type StatePrimitive = string | number | boolean | null | undefined` — Primitive subset of State for use in conditional type branches. `src/core/persistence.ts:38`
@@ -110,11 +110,11 @@ persistent game state with multi-slot support
 
 banked-time reservoir with acceleration and burst spend surfaces
 
-- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:170`
-- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:135`
-- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:334`
-- `interface BurstDischargeOptions` `src/systems/time-bank.ts:294`
-- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:212`
-- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:103`
-- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:71`
+- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:172`
+- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:137`
+- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:336`
+- `interface BurstDischargeOptions` `src/systems/time-bank.ts:296`
+- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:214`
+- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:101`
+- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:69`
 - `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:48`

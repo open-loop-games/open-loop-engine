@@ -34,7 +34,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import {
   persistent,
   withPersistentContext,
-  getCurrentContext,
+  resolveSystemContextId,
   type Persistent,
   type State,
 } from '@/core/persistence';
@@ -154,8 +154,8 @@ export interface RecommendationSystemEvents {
 /** Configuration for {@link createRecommendationSystem} */
 export interface RecommendationSystemOptions {
   /**
-   * Persistence namespace. Falls back to surrounding context or auto-generated.
-   * Explicit IDs are safer for save compatibility.
+   * Save context. Defaults to `${module}/recommendation` inside a module; pass one
+   * when a module builds more than one.
    */
   id?: string;
 
@@ -356,7 +356,6 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
 export function createRecommendationSystem(
   options: RecommendationSystemOptions,
 ): RecommendationSystem {
-  const autoId = `recSystem_${recSystemCounter++}`;
   const {
     id,
     cycle,
@@ -369,7 +368,11 @@ export function createRecommendationSystem(
   } = options;
 
   // --- Persistence ---
-  const contextId = id ?? getCurrentContext() ?? autoId;
+  const contextId = resolveSystemContextId(
+    id,
+    'recommendation',
+    () => `recSystem_${recSystemCounter++}`,
+  );
   const { storedRecommendation, autoApply } = withPersistentContext(contextId, () => ({
     storedRecommendation: persistent<SerializedRecommendation | null>(null, {
       name: 'storedRecommendation',

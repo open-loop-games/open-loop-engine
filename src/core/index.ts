@@ -262,6 +262,7 @@ export { createRunPool } from './run-pool';
 // === TIMED PROGRESS ===
 export type {
   TimedProgressOptions,
+  TimedProgressBaseOptions,
   TimedProgress,
   ProgressiveCostEntry,
   ProgressiveCostStep,

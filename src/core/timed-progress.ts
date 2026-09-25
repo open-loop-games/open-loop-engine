@@ -29,21 +29,33 @@ import type { RegisterTick } from './sequencer';
 // `from '@/core/timed-progress'` consumers keep working.
 export type { RegisterTick };
 
-/** Options for {@link createTimedProgress}. */
-export interface TimedProgressOptions {
-  id?: string;
+/**
+ * Options for {@link createTimedProgress}. A saved tracker needs an `id`,
+ * unique among the trackers built in the same module: its progress saves
+ * under `${module}/${id}`. Only an `ephemeral` tracker may omit it.
+ */
+export type TimedProgressOptions = TimedProgressBaseOptions &
+  (
+    | { id: string; ephemeral?: false }
+    | {
+        id?: string;
+        /**
+         * `progress` is a plain Vue ref instead of a persistent one: the
+         * tracker works the same but never appears in save data. Mirrors
+         * {@link Action}'s ephemeral mode for predictors and headless simulation.
+         */
+        ephemeral: true;
+      }
+  );
+
+/** Options every {@link createTimedProgress} tracker shares. */
+export interface TimedProgressBaseOptions {
   /** Total progress needed before `onComplete` fires. */
   duration: Computable<DecimalSource>;
   /** Progress gained per second (default 1). */
   speed?: Computable<DecimalSource>;
   /** Tick registration function — tracker self-wires its tick. */
   registerTick: RegisterTick;
-  /**
-   * When true, `progress` is a plain Vue ref instead of a persistent ref.
-   * Tracker functions identically but never appears in save data. Mirrors
-   * {@link Action}'s ephemeral mode for predictors and headless simulation.
-   */
-  ephemeral?: boolean;
   /**
    * Called after each tick that advanced progress. `delta` is the amount
    * progress moved this tick (may be capped to the duration boundary on the
