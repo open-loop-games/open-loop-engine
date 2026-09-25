@@ -113,10 +113,12 @@ export interface SequencerOptions<M = void> {
    * the running item is left dispatched and complete, never mid-dispatch.
    *
    * When {@link registerTick} is supplied the counter resets automatically at
-   * each tick boundary. A sequencer driven manually without `registerTick` must
-   * call {@link resetAdvanceCount} at the start of each tick, or the cap latches
+   * each tick boundary, and a tick that follows a trip re-drives dispatch. A
+   * sequencer driven manually without `registerTick` must call
+   * {@link resetAdvanceCount} at the start of each tick, or the cap latches
    * into a lifetime budget and dequeueNext stalls once cumulative advances pass
-   * it. Default: {@link DEFAULT_MAX_ADVANCES_PER_TICK} (1000).
+   * it — and after a trip it must call `dequeueNext()` itself to resume.
+   * Default: {@link DEFAULT_MAX_ADVANCES_PER_TICK} (1000).
    */
   maxAdvancesPerTick?: number;
   /**
@@ -1084,9 +1086,15 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // cumulative advances pass the cap. Registered once, fired at the tick
   // boundary (never mid-dispatch-cascade), so within-tick runaway still trips.
   // Sequencers driven without registerTick keep the manual resetAdvanceCount()
-  // obligation.
+  // obligation. A tripped cap left the rest of the queue waiting with nothing
+  // running, so the reset also re-drives dispatch; dequeueNext itself declines
+  // when paused, holding or already running.
   if (registerTick) {
-    registerTick(() => sequencer.resetAdvanceCount());
+    registerTick(() => {
+      const capped = _advanceCapHit;
+      sequencer.resetAdvanceCount();
+      if (capped) dequeueNext();
+    });
   }
 
   return sequencer;

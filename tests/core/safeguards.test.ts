@@ -307,11 +307,23 @@ describe('instant-complete cascades', () => {
   });
 
   it('bounds a cascade by the advance cap, and resumes on the next tick', () => {
-    const q = makeQueue({ startOnEnqueue: false, maxAdvancesPerTick: 1000 });
+    const cbs = new Set<() => void>();
+    const registerTick = (cb: () => void) => {
+      cbs.add(cb);
+      return () => cbs.delete(cb);
+    };
+    beginPersistentContext('cap-resume');
+    const q = createSequencer<void>({
+      id: 'cap-resume',
+      startOnEnqueue: false,
+      maxAdvancesPerTick: 1000,
+      registerTick,
+    });
+    endPersistentContext();
     const starts: string[] = [];
     completeOnStart(q, starts);
 
-    for (let i = 0; i < 1500; i++) q.enqueue(qi(`i${i}`));
+    for (let i = 0; i < 2500; i++) q.enqueue(qi(`i${i}`));
     q.start();
 
     expect(starts).toHaveLength(1000);
@@ -319,12 +331,13 @@ describe('instant-complete cascades', () => {
     expect(getDiagnostics().emitDepthTrips).toBe(0);
     // Degraded, not wedged: nothing is left dispatched-but-unstarted.
     expect(q.currentItem).toBeNull();
-    expect(q.items.value).toHaveLength(500);
+    expect(q.items.value).toHaveLength(1500);
 
-    q.resetAdvanceCount();
-    q.dequeueNext();
-
-    expect(starts).toHaveLength(1500);
+    // The tick boundary resets the counter and re-drives dispatch on its own.
+    for (const cb of [...cbs]) cb();
+    expect(starts).toHaveLength(2000);
+    for (const cb of [...cbs]) cb();
+    expect(starts).toHaveLength(2500);
     expect(q.items.value).toHaveLength(0);
   });
 
