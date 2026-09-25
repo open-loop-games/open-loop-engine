@@ -1472,3 +1472,73 @@ describe('createMemoryStorage', () => {
     expect(gold.value).toBe(42);
   });
 });
+
+describe('SaveManager — save:written', () => {
+  it('save() emits save:written with the slot and the written envelope timestamp', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'wr-save', storageAdapter: storage });
+    const written = vi.fn();
+    mgr.on('save:written', written);
+
+    mgr.save();
+
+    const { timestamp } = JSON.parse(storage.getItem('wr-save-slot-0')!) as { timestamp: number };
+    expect(written).toHaveBeenCalledExactlyOnceWith({ slotId: 0, timestamp });
+  });
+
+  it('saveToSlot() emits it for the target slot', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'wr-slot', storageAdapter: storage });
+    const slot = mgr.createSlot('other');
+    const written = vi.fn();
+    mgr.on('save:written', written);
+
+    mgr.saveToSlot(slot);
+
+    expect(written).toHaveBeenCalledExactlyOnceWith({
+      slotId: slot,
+      timestamp: expect.any(Number),
+    });
+  });
+
+  it('exportSave() serializes without emitting it', () => {
+    const mgr = createSaveManager({ gameId: 'wr-export', storageAdapter: createMapStorage() });
+    const serialized = vi.fn();
+    const written = vi.fn();
+    mgr.on('save:before-serialize', serialized);
+    mgr.on('save:written', written);
+
+    mgr.exportSave();
+
+    expect(serialized).toHaveBeenCalledOnce();
+    expect(written).not.toHaveBeenCalled();
+  });
+
+  it('a protected slot that refuses the write does not emit it', () => {
+    const storage = createMapStorage();
+    storage.setItem('wr-prot-slot-0', '{broken');
+    const mgr = createSaveManager({ gameId: 'wr-prot', storageAdapter: storage });
+    mgr.load();
+    const written = vi.fn();
+    mgr.on('save:written', written);
+
+    mgr.save();
+    mgr.saveToSlot(0);
+
+    expect(written).not.toHaveBeenCalled();
+  });
+
+  it('a storage write that throws does not emit it', () => {
+    const storage = createMapStorage();
+    const mgr = createSaveManager({ gameId: 'wr-quota', storageAdapter: storage });
+    storage.setItem = () => {
+      throw new Error('quota exceeded');
+    };
+    const written = vi.fn();
+    mgr.on('save:written', written);
+
+    expect(() => mgr.save()).toThrow('quota exceeded');
+
+    expect(written).not.toHaveBeenCalled();
+  });
+});

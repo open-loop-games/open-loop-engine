@@ -256,6 +256,13 @@ export interface SaveEvents {
    */
   'save:before-serialize': () => void;
   /**
+   * A save landed in storage: `save`, `saveToSlot` or the engine's autosave
+   * wrote `slotId`. The signal for "Saved" feedback. Unlike
+   * `save:before-serialize`, it never fires for `exportSave`, for a protected
+   * slot that refused the write, or when the storage write threw.
+   */
+  'save:written': (info: { slotId: number; timestamp: number }) => void;
+  /**
    * `load()` refused a slot for a reason other than `not-found`, so the slot
    * still holds a save the live state doesn't reflect. `save()` and
    * `saveToSlot()` skip it until {@link SaveManager.releaseSlot}, `deleteSave`,
@@ -641,6 +648,14 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     };
   }
 
+  /** Serialize live state into `slotId` unless it's protected, announcing the write. */
+  function writeSlot(slotId: number): void {
+    if (_protectedSlots.has(slotId)) return;
+    const envelope = buildEnvelope();
+    storage.setItem(slotStorageKey(slotId), JSON.stringify(envelope));
+    handle.emit('save:written', { slotId, timestamp: envelope.timestamp });
+  }
+
   /**
    * Normalize an envelope's `data` field to an object: if v3 envelope marks
    * `_engine.compression === 'lz'`, decompress and JSON.parse. Throws
@@ -775,8 +790,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // === ACTIVE SLOT OPERATIONS ===
 
     save() {
-      if (_protectedSlots.has(_activeSlotId)) return;
-      storage.setItem(activeStorageKey(), JSON.stringify(buildEnvelope()));
+      writeSlot(_activeSlotId);
     },
 
     load(): SaveLoadResult {
@@ -915,8 +929,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     saveToSlot(slotId: number): void {
       const slot = _slots.find((s) => s.id === slotId);
       if (!slot) throw new Error(`Save slot ${slotId} not found`);
-      if (_protectedSlots.has(slotId)) return;
-      storage.setItem(slotStorageKey(slotId), JSON.stringify(buildEnvelope()));
+      writeSlot(slotId);
     },
 
     isSlotProtected(slotId: number): boolean {

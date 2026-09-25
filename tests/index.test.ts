@@ -1387,6 +1387,27 @@ describe('save safety', () => {
     engine.dispose();
   });
 
+  it('autosave emits save:written; an export does not', () => {
+    const timers = capturingTimers();
+    const engine = createEngine({
+      gameId: 'written',
+      autoSaveInterval: 30000,
+      storageAdapter: mapStorage(),
+      timerProvider: timers,
+    });
+    engine.use({ id: 'written-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    const written = vi.fn();
+    engine.saveManager!.on('save:written', written);
+
+    engine.saveManager!.exportSave();
+    expect(written).not.toHaveBeenCalled();
+    timers.fire(30000);
+
+    expect(written).toHaveBeenCalledExactlyOnceWith({ slotId: 0, timestamp: expect.any(Number) });
+    engine.dispose();
+  });
+
   it('load() before start() throws instead of reporting a load that hydrated nothing', () => {
     const engine = createEngine({ gameId: 'early', storageAdapter: mapStorage() });
     engine.use({ id: 'early-mod', install: () => void persistent(0, { name: 'gold' }) });
