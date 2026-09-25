@@ -103,7 +103,7 @@ export interface ResourceBag {
    * zero-filter pass.
    *
    * Callers must not mutate the map directly — writes bypass capacity
-   * clamping, `Resource` link sync, and the cached running total used by
+   * clamping, `Resource` link sync, and the cached total used by
    * `total()` / `remainingCapacity()`. Use `add` / `set` / `subtract` for
    * writes. The underlying map is Vue-reactive; reads inside a reactive
    * effect track dependencies as expected, reads outside are plain
@@ -169,14 +169,20 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
   const amounts: Map<string, Decimal> = reactive(new Map<string, Decimal>());
   const links = new Map<string, () => void>();
-  // Sum of all amounts, recomputed from the map on every write so clamp,
-  // remaining-capacity and total() reads stay O(1). Recomputing rather than
-  // folding each delta in keeps it exact: an incremental total drifts under
-  // fractional churn and absorbs any slot ~1e16 below another for good.
+  // Sum of all amounts, re-summed from the map on the first read after a
+  // write, so a burst of writes pays for one sum and an uncapped bag's writes
+  // pay for none. Re-summing rather than folding each delta in keeps it
+  // exact: an incremental total drifts under fractional churn and absorbs
+  // any slot ~1e16 below another for good.
   let cachedTotal: Decimal = Decimal.dZero;
+  let totalDirty = false;
 
-  function recomputeTotal(): void {
-    cachedTotal = sumAmountsAsDecimal(toRaw(amounts).values());
+  function getTotal(): Decimal {
+    if (totalDirty) {
+      cachedTotal = sumAmountsAsDecimal(toRaw(amounts).values());
+      totalDirty = false;
+    }
+    return cachedTotal;
   }
 
   function getAmount(typeId: string): Decimal {
@@ -185,7 +191,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
   /**
    * Single mutation funnel. All writes to `amounts` must go through this
-   * so the running total stays in sync. Zero values drop the entry to keep
+   * so the cached total is invalidated. Zero values drop the entry to keep
    * the map sparse (preserving prior behavior of `storeAmount`).
    */
   function writeAmount(typeId: string, newVal: Decimal): void {
@@ -194,7 +200,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     } else {
       amounts.set(typeId, newVal);
     }
-    recomputeTotal();
+    totalDirty = true;
   }
 
   for (const [typeId, value] of Object.entries(initial)) {
@@ -207,7 +213,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   function computeRemainingCapacity(): Decimal {
     const totalCap = resolveCapacity(capacity);
     if (totalCap == null) return Decimal.dInf;
-    return toDecimal(Decimal.max(Decimal.sub(totalCap, cachedTotal), 0));
+    return toDecimal(Decimal.max(Decimal.sub(totalCap, getTotal()), 0));
   }
 
   function computeRemainingForType(typeId: string): Decimal {
@@ -221,7 +227,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         : Decimal.dInf;
     const totalRemaining =
       totalCap != null
-        ? toDecimal(Decimal.max(Decimal.sub(totalCap, cachedTotal), 0))
+        ? toDecimal(Decimal.max(Decimal.sub(totalCap, getTotal()), 0))
         : Decimal.dInf;
     return toDecimal(Decimal.min(typeRemaining, totalRemaining));
   }
@@ -235,7 +241,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     }
     const totalCap = resolveCapacity(capacity);
     if (totalCap != null) {
-      const othersSum = Decimal.sub(cachedTotal, getAmount(typeId));
+      const othersSum = Decimal.sub(getTotal(), getAmount(typeId));
       const maxForType = Decimal.sub(totalCap, othersSum);
       clamped = Decimal.min(clamped, maxForType);
     }
@@ -285,8 +291,6 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
       if (allowNegative) {
         const newVal = toDecimal(Decimal.sub(current, toSub));
-        // Use writeAmount so cachedTotal stays in sync even when the
-        // resulting balance is negative or zero.
         writeAmount(typeId, newVal);
         return toSub;
       }
@@ -307,9 +311,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       return true;
     },
 
-    total(): Decimal {
-      return cachedTotal;
-    },
+    total: getTotal,
 
     types(): string[] {
       return [...amounts.keys()];
@@ -326,6 +328,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     clear(): void {
       amounts.clear();
       cachedTotal = Decimal.dZero;
+      totalDirty = false;
     },
 
     remainingCapacity: computeRemainingCapacity,
@@ -416,6 +419,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     restore(data: Record<string, string>): void {
       amounts.clear();
       cachedTotal = Decimal.dZero;
+      totalDirty = false;
       for (const [typeId, valStr] of Object.entries(data)) {
         const d = toDecimal(valStr);
         if (!d.eq(0)) {
