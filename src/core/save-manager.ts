@@ -48,7 +48,8 @@ const { compressToBase64, decompressFromBase64 } = LZString;
  * Bumped when the engine changes how it writes save data in a way that isn't
  * driven by consumer content. Decoupled from `SaveManagerConfig.version` so
  * consumers don't have to bump their game version every time the engine
- * upgrades its envelope format.
+ * upgrades its envelope format. A save carrying a higher version than this
+ * one is refused with `future-version`.
  *
  * Version history:
  * - `1` (implicit, absent `_engine`): original iteration-order keys (`contextId.0`, `contextId.1`, …)
