@@ -191,31 +191,46 @@ export type GateHandle = 'accessor' | 'categories' | 'registry';
  */
 export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
   const out = new Set<GateHandle>();
-  collectGateHandles(gate, out);
+  forEachGateLeaf(gate, (leaf) => {
+    switch (leaf.kind) {
+      case 'resource-gte':
+      case 'state':
+      case 'flag':
+        out.add('accessor');
+        return;
+      case 'cumulative-gte':
+        out.add('registry');
+        return;
+      case 'count-gte':
+      case 'unlock':
+        out.add('categories');
+        return;
+    }
+  });
   return out;
 }
 
-function collectGateHandles(gate: Gate, out: Set<GateHandle>): void {
+/**
+ * Visit every non-combinator Gate under `gate`, depth-first, for walkers that
+ * collect per leaf. Walkers that combine their children's answers
+ * (evaluation, prediction) keep their own recursion.
+ *
+ * @internal
+ */
+export function forEachGateLeaf(
+  gate: Gate,
+  visit: (leaf: Exclude<Gate, AllGate | AnyGate | NotGate>) => void,
+): void {
   switch (gate.kind) {
-    case 'resource-gte':
-    case 'state':
-    case 'flag':
-      out.add('accessor');
-      return;
-    case 'cumulative-gte':
-      out.add('registry');
-      return;
-    case 'count-gte':
-    case 'unlock':
-      out.add('categories');
-      return;
     case 'all':
     case 'any':
-      for (const child of gate.of) collectGateHandles(child, out);
+      for (const child of gate.of) forEachGateLeaf(child, visit);
       return;
     case 'not':
-      collectGateHandles(gate.of, out);
+      forEachGateLeaf(gate.of, visit);
       return;
+    default:
+      visit(gate);
   }
 }
 

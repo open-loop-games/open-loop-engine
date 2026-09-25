@@ -65,6 +65,7 @@ import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/registries';
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
 import {
+  forEachGateLeaf,
   getRequiredGateHandles,
   isGate,
   type AllGate,
@@ -272,37 +273,25 @@ export function collectGateDeps(gate: Gate): TransitionDeps {
     unlocks: new Set<string>(),
     states: new Set<string>(),
   };
-  collectGateDepsInto(gate, deps);
+  forEachGateLeaf(gate, (leaf) => {
+    switch (leaf.kind) {
+      case 'resource-gte':
+      case 'cumulative-gte':
+        deps.resources.add(leaf.resource);
+        deps.rates.add(leaf.resource);
+        return;
+      case 'flag':
+        deps.unlocks.add(leaf.id);
+        return;
+      case 'state':
+        deps.states.add(leaf.key);
+        return;
+      case 'count-gte':
+      case 'unlock':
+        return;
+    }
+  });
   return deps;
-}
-
-function collectGateDepsInto(
-  gate: Gate,
-  deps: { resources: Set<string>; rates: Set<string>; unlocks: Set<string>; states: Set<string> },
-): void {
-  switch (gate.kind) {
-    case 'resource-gte':
-    case 'cumulative-gte':
-      deps.resources.add(gate.resource);
-      deps.rates.add(gate.resource);
-      return;
-    case 'flag':
-      deps.unlocks.add(gate.id);
-      return;
-    case 'state':
-      deps.states.add(gate.key);
-      return;
-    case 'count-gte':
-    case 'unlock':
-      return;
-    case 'all':
-    case 'any':
-      for (const child of gate.of) collectGateDepsInto(child, deps);
-      return;
-    case 'not':
-      collectGateDepsInto(gate.of, deps);
-      return;
-  }
 }
 
 function timeUntilCumulativeFlip(
@@ -379,22 +368,12 @@ export function getBoundGateRuntime(owner: object): GateRuntime | undefined {
 export function assertGateHandles(gate: Gate, runtime: GateRuntime, label: string): void {
   const missing = [...getRequiredGateHandles(gate)].filter((handle) => !runtime[handle]);
   if (missing.length === 0) return;
-  const kinds = [...collectKinds(gate)].join(', ');
+  const kinds = new Set<Gate['kind']>();
+  forEachGateLeaf(gate, (leaf) => kinds.add(leaf.kind));
   throw new Error(
     `${label}: this gate reads the ${missing.join(' and ')}, which the runtime doesn't carry. ` +
-      `Gate kinds in play: ${kinds}. ${missing.map(handleRemedy).join(' ')}`,
+      `Gate kinds in play: ${[...kinds].join(', ')}. ${missing.map(handleRemedy).join(' ')}`,
   );
-}
-
-function collectKinds(gate: Gate, out = new Set<Gate['kind']>()): ReadonlySet<Gate['kind']> {
-  if (gate.kind === 'all' || gate.kind === 'any') {
-    for (const child of gate.of) collectKinds(child, out);
-  } else if (gate.kind === 'not') {
-    collectKinds(gate.of, out);
-  } else {
-    out.add(gate.kind);
-  }
-  return out;
 }
 
 // === PREDICATE ADOPTION ===
