@@ -830,8 +830,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       return this.integralFormula;
     } else {
       if (this.applySubstitution == null) {
-        console.error('Cannot have two complex operations in an integrable formula');
-        return Formula.constant(0);
+        throw new Error(
+          'A substitution stack reached a node with no substitution rule; ' +
+            "setupFormula's integrability check should have refused the chain",
+        );
       }
       stack.push((variable: GenericFormula) =>
         this.applySubstitution!.call(this, variable, ...this.inputs),
