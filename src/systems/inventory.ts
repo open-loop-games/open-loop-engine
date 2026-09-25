@@ -100,7 +100,7 @@ export interface Inventory {
  *   items: ['wood', 'stone', 'iron'],
  * });
  * inv.add('wood', 10);
- * inv.addCapacityModifier(createAdditiveModifier({ amount: 20 }));
+ * inv.addCapacityModifier(createAdditiveModifier({ addend: 20 }));
  * ```
  */
 export function createInventory(options: InventoryOptions): Inventory {
