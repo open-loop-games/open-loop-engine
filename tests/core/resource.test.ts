@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { nextTick } from 'vue';
-import { bn } from '@/primitives/decimal';
+import { Decimal, bn } from '@/primitives/decimal';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
 import { createCostRequirement, payByReset } from '@/core/requirements';
+import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
+import { createReset } from '@/systems/reset';
 import {
   createResource,
   addResource,
@@ -86,6 +88,37 @@ describe('Resource', () => {
     } finally {
       endPersistentContext();
     }
+  });
+  it('lifetime trackers survive a module reset', () => {
+    beginPersistentContext('tracker-reset');
+    const gold = createResource(bn(0), { id: 'gold' });
+    endPersistentContext();
+    addResource(gold, 50);
+    subtractResource(gold, 20);
+
+    createReset({ resetModules: ['tracker-reset'] }).reset();
+
+    expect(gold.value.toNumber()).toBe(0);
+    expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
+    expect(new Decimal(gold.best!.value).toNumber()).toBe(50);
+  });
+  it('lifetime trackers round-trip through a save, and the load itself is no gain', () => {
+    const mgr = createSaveManager({
+      gameId: 'tracker-save',
+      storageAdapter: createMemoryStorage(),
+    });
+    beginPersistentContext('tracker-save');
+    const gold = createResource(bn(0), { id: 'gold' });
+    endPersistentContext();
+    addResource(gold, 50);
+    const snapshot = mgr.exportSave();
+    subtractResource(gold, 50);
+    addResource(gold, 10);
+
+    expect(mgr.importSave(snapshot).success).toBe(true);
+    expect(gold.value.toNumber()).toBe(50);
+    expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
+    expect(new Decimal(gold.best!.value).toNumber()).toBe(50);
   });
   it('resetResource restores default', () => {
     beginPersistentContext('test-resource-reset');
