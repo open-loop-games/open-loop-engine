@@ -67,6 +67,31 @@ describe('createCycle', () => {
     expect(cycle.bestTime.value).toBe(3);
   });
 
+  it('pauses when a restart its endCondition triggered is declined', () => {
+    const { registerTick, tick } = createTickManager();
+    const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
+    const cycle = createCycle({ reset, endCondition: () => true, registerTick });
+    let beforeRestarts = 0;
+    cycle.on('beforeRestart', () => beforeRestarts++);
+
+    cycle.run();
+    for (let i = 0; i < 5; i++) tick(1);
+
+    expect(beforeRestarts).toBe(1);
+    expect(cycle.running.value).toBe(false);
+    expect(cycle.count.value).toBe(0);
+  });
+
+  it('a declined manual end() leaves the cycle running', () => {
+    const { registerTick } = createTickManager();
+    const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
+    const cycle = createCycle({ reset, registerTick });
+    cycle.run();
+
+    expect(cycle.end()).toBe(false);
+    expect(cycle.running.value).toBe(true);
+  });
+
   it('tracks elapsed time while running', () => {
     const { registerTick, tick } = createTickManager();
     const cycle = createCycle({

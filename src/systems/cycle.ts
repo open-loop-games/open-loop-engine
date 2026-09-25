@@ -50,6 +50,9 @@ export interface CycleOptions {
    * Automatic termination condition, checked every tick while `running` is true.
    * When it returns `true`, the cycle ends and the restart sequence fires.
    * Omit for manual-only cycles where the player calls `cycle.end()`.
+   *
+   * If that restart is declined (see {@link Cycle.end}), the cycle pauses
+   * rather than retrying every tick; call `run()` to resume and re-check.
    */
   endCondition?: () => boolean;
 
@@ -159,7 +162,10 @@ export interface Cycle extends ScopedReset {
    * or `onBeforeReset` hook). The Reset decides after `beforeRestart` has
    * already fired, so `onBeforeRestart` is the cancellation point to prefer:
    * an observer that records on `beforeRestart` (a {@link CycleLog}) will have
-   * logged a cycle that then didn't restart.
+   * logged a cycle that then didn't restart. A declined end that
+   * `endCondition` triggered also pauses the cycle, so that entry is logged
+   * once rather than on every tick; a declined manual call leaves `running`
+   * alone.
    */
   end(): boolean;
 
@@ -289,8 +295,10 @@ export function createCycle(options: CycleOptions): Cycle {
   const unregisterTick = registerTick((dt: number) => {
     if (!running.value) return;
     elapsed.value += dt;
-    if (endCondition && endCondition()) {
-      end();
+    // A declined restart leaves the end condition true, so re-trying next
+    // tick would fire `beforeRestart` (and log a phantom cycle) every tick.
+    if (endCondition && endCondition() && !end()) {
+      running.value = false;
     }
   });
 
