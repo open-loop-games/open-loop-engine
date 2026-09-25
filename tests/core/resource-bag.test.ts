@@ -620,5 +620,26 @@ describe('ResourceBag', () => {
       bag.add('a', 42);
       expect(bag.total().eq(42)).toBe(true);
     });
+
+    it('total() is exactly zero once fractional churn empties the bag', () => {
+      const bag = createResourceBag({ capacity: 1 });
+      bag.set('a', 0.1);
+      bag.set('b', 0.2);
+      bag.set('a', 0);
+      bag.set('b', 0);
+      expect(bag.isEmpty()).toBe(true);
+      expect(bag.total().toNumber()).toBe(0);
+      expect(bag.remainingCapacity().toNumber()).toBe(1);
+      expect(bag.add('z', 1).toNumber()).toBe(1);
+    });
+
+    it('total() keeps a small slot once a much larger one leaves', () => {
+      const bag = createResourceBag({ capacity: 1e20 });
+      bag.set('a', 1e17);
+      bag.set('b', 1);
+      bag.set('a', 0);
+      expect(bag.total().toNumber()).toBe(1);
+      expect(bag.remainingCapacity().toNumber()).toBe(1e20 - 1);
+    });
   });
 });

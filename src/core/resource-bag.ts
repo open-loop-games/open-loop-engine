@@ -8,7 +8,7 @@
  * @cluster resource
  */
 
-import { reactive, watch } from 'vue';
+import { reactive, toRaw, watch } from 'vue';
 import { Decimal, renormIfLayer0 } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { loadingSave } from './persistence';
@@ -170,10 +170,17 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
   const amounts: Map<string, Decimal> = reactive(new Map<string, Decimal>());
   const links = new Map<string, () => void>();
-  // Running total of all amounts. Maintained on every mutation so that
-  // clampToCapacity / computeRemainingCapacity / total() are O(1) instead of
-  // O(n). Invariant: cachedTotal === sum(amounts.values()).
+  // Sum of all amounts, recomputed from the map on every write so clamp,
+  // remaining-capacity and total() reads stay O(1). Recomputing rather than
+  // folding each delta in keeps it exact: an incremental total drifts under
+  // fractional churn and absorbs any slot ~1e16 below another for good.
   let cachedTotal: Decimal = Decimal.dZero;
+
+  function recomputeTotal(): void {
+    let sum: DecimalSource = Decimal.dZero;
+    for (const a of toRaw(amounts).values()) sum = renormIfLayer0(Decimal.add(sum, a));
+    cachedTotal = toDecimal(sum);
+  }
 
   function getAmount(typeId: string): Decimal {
     return amounts.get(typeId) ?? Decimal.dZero;
@@ -185,20 +192,12 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
    * the map sparse (preserving prior behavior of `storeAmount`).
    */
   function writeAmount(typeId: string, newVal: Decimal): void {
-    const old = amounts.get(typeId);
     if (newVal.eq(0)) {
-      if (old !== undefined) {
-        amounts.delete(typeId);
-        cachedTotal = toDecimal(Decimal.sub(cachedTotal, old));
-      }
-      return;
-    }
-    if (old !== undefined) {
-      cachedTotal = toDecimal(Decimal.add(Decimal.sub(cachedTotal, old), newVal));
+      if (!amounts.delete(typeId)) return;
     } else {
-      cachedTotal = toDecimal(Decimal.add(cachedTotal, newVal));
+      amounts.set(typeId, newVal);
     }
-    amounts.set(typeId, newVal);
+    recomputeTotal();
   }
 
   for (const [typeId, value] of Object.entries(initial)) {
@@ -272,9 +271,8 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       } else {
         // destroy: add up to remaining
         const actualAdd = toDecimal(Decimal.min(toAdd, remaining));
-        // `!gt(0)` rather than `lte(0)`: this guard fronts a write that also
-        // folds into `cachedTotal`, and a NaN there would never wash out.
-        // `lte` admits NaN, `gt` rejects it.
+        // `!gt(0)` rather than `lte(0)`: a NaN written here would poison the
+        // slot and every total read after it. `lte` admits NaN, `gt` rejects it.
         if (!actualAdd.gt(0)) return Decimal.dZero;
         writeAmount(typeId, toDecimal(Decimal.add(getAmount(typeId), actualAdd)));
         return actualAdd;
