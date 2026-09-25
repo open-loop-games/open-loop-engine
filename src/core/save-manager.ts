@@ -364,7 +364,9 @@ interface SaveEnvelope {
  * v1 save data for a context looks like `{ jobs: { "0": …, "1": … } }`.
  * v2 expects `{ jobs: { progress: …, timesCompleted: … } }`. The registry's
  * iteration order is authoritative: the Nth ref in the current context's
- * Set owns the Nth slot in the old save.
+ * Set owns the Nth slot in the old save. A ref that is still unnamed moves to
+ * the key the current build reads for it, its index among the context's
+ * unnamed refs.
  *
  * Best-effort: when the current ref's default value has an incompatible
  * runtime type with the old value, the old value is dropped and the ref will
@@ -398,18 +400,19 @@ function migrateIndexToNamed(
     const remapped: Record<string, unknown> = {};
     for (let i = 0; i < contextRefs.length; i++) {
       const ref = contextRefs[i];
-      const name = ref[PersistentName];
-      if (name === undefined) continue; // fall back to numeric slot
       const oldVal = (bucket as Record<string, unknown>)[String(i)];
       if (oldVal === undefined) continue;
+      const name = ref[PersistentName];
+      const newKey = name ?? ref[SaveDataPath]![1];
       if (!looseTypeMatch(ref[DefaultValue], oldVal)) {
         console.warn(
-          `[save] Legacy key migration type mismatch at "${contextId}.${i}" → "${contextId}.${name}": ` +
+          `[save] Legacy key migration type mismatch at "${contextId}.${i}" → "${contextId}.${newKey}": ` +
             `expected ${describeType(ref[DefaultValue])}, got ${describeType(oldVal)}. Falling back to default.`,
         );
         continue;
       }
-      setNested(remapped, name, oldVal);
+      if (name === undefined) remapped[newKey] = oldVal;
+      else setNested(remapped, name, oldVal);
     }
     out[contextId] = remapped;
   }
@@ -656,7 +659,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // but before deserialize, since only here do we have the registry context.
     const engineVersion = envelope._engine?.version ?? 1;
     const refs = getAllPersistentRefs(persistenceNamespace);
-    if (engineVersion < ENGINE_SAVE_VERSION) {
+    // v2 already wrote named keys, so only a v1 envelope is remapped.
+    if (engineVersion < 2) {
       data = migrateIndexToNamed(data, refs);
     }
 

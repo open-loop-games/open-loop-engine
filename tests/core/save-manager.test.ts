@@ -643,6 +643,53 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
     warn.mockRestore();
   });
 
+  it('keeps an unnamed ref from a v1 save, renumbered among unnamed refs only', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const storage = createMapStorage();
+    storage.setItem(
+      'v1mixed-slot-0',
+      JSON.stringify({
+        version: 1,
+        gameId: 'v1mixed',
+        timestamp: 1,
+        data: { 'v1mixed-ctx': { '0': 3, '1': 9 } },
+      }),
+    );
+    const mgr = createSaveManager({ gameId: 'v1mixed', storageAdapter: storage });
+    beginPersistentContext('v1mixed-ctx');
+    const named = persistent(0, { name: 'named' });
+    const unnamed = persistent(0);
+    endPersistentContext();
+
+    expect(mgr.load().success).toBe(true);
+    expect(named.value).toBe(3);
+    expect(unnamed.value).toBe(9);
+    warn.mockRestore();
+  });
+
+  it('leaves a v2 context of unnamed refs keyed as written', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const storage = createMapStorage();
+    storage.setItem(
+      'v2unnamed-slot-0',
+      JSON.stringify({
+        version: 1,
+        gameId: 'v2unnamed',
+        timestamp: 1,
+        data: { 'v2unnamed-ctx': { '0': 9 } },
+        _engine: { version: 2 },
+      }),
+    );
+    const mgr = createSaveManager({ gameId: 'v2unnamed', storageAdapter: storage });
+    beginPersistentContext('v2unnamed-ctx');
+    const unnamed = persistent(0);
+    endPersistentContext();
+
+    expect(mgr.load().success).toBe(true);
+    expect(unnamed.value).toBe(9);
+    warn.mockRestore();
+  });
+
   it('nested named keys from createDefinitionStates round-trip through save/load', () => {
     const storage = createMapStorage();
     // compressSave: false so we can assert on the on-disk envelope shape directly.
