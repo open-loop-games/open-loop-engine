@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
-import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  persistent,
+  beginPersistentContext,
+  endPersistentContext,
+  withPersistentContext,
+  getAllPersistentRefs,
+  serializePersistents,
+  deserializePersistents,
+} from '@/core/persistence';
 import { createCycle } from '@/systems/cycle';
 import { createReset } from '@/systems/reset';
 import { fractional } from '@/systems/retention';
@@ -102,6 +110,35 @@ describe('createCycle', () => {
     tick(0.5);
     tick(0.5);
     expect(cycle.elapsed.value).toBeCloseTo(1.0);
+  });
+
+  it('elapsed survives a save round trip, so a reloaded run keeps timing from where it was', () => {
+    const { registerTick, tick } = createTickManager();
+    const cycle = createCycle({ id: 'cycle-elapsed-save', thingsToReset: [], registerTick });
+    cycle.run();
+    tick(5);
+
+    const refs = getAllPersistentRefs();
+    const save = serializePersistents(refs);
+    cycle.elapsed.value = 0;
+    deserializePersistents(refs, save);
+    expect(cycle.elapsed.value).toBe(5);
+
+    tick(2);
+    cycle.end();
+    expect(cycle.bestTime.value).toBe(7);
+  });
+
+  it('a reset covering the cycle context keeps elapsed until the best time is recorded', () => {
+    const { registerTick, tick } = createTickManager();
+    const cycle = withPersistentContext('cycle-self-reset', () =>
+      createCycle({ resetModules: ['cycle-self-reset'], registerTick }),
+    );
+    cycle.run();
+    tick(3);
+    cycle.end();
+    expect(cycle.bestTime.value).toBe(3);
+    expect(cycle.elapsed.value).toBe(0);
   });
 
   it('does not tick while paused', () => {

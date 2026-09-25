@@ -28,6 +28,7 @@ describe('system save keys', () => {
       'realm/automation.unlocked',
       'realm/cycle.bestTime',
       'realm/cycle.count',
+      'realm/cycle.elapsed',
       'realm/time-bank.banked',
       'realm/time.elapsed',
       'realm/time.totalPlayTime',
@@ -47,6 +48,7 @@ describe('system save keys', () => {
       'clock.totalPlayTime',
       'expedition.bestTime',
       'expedition.count',
+      'expedition.elapsed',
     ]);
   });
 });

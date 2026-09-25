@@ -87,8 +87,8 @@ batch-create Challenges from content definitions
 
 a bounded run that ends, resets a scope, and replays
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:218`
-- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:126`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:226`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:128`
 - `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:34`
 - `interface CycleOptions` `src/systems/cycle.ts:42`
 

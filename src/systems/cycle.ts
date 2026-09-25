@@ -121,7 +121,9 @@ export interface CycleOptions {
  * A cycle instance — the returned object from {@link createCycle}.
  *
  * Call `run()` to start ticking, `pause()` to freeze, `end()` to trigger
- * the restart sequence. Stats (`count`, `bestTime`) persist across saves.
+ * the restart sequence. Stats (`count`, `bestTime`) and the current run's
+ * `elapsed` persist across saves; `running` doesn't, so a game that wants a
+ * run to carry on after a load calls `run()` from its load hook.
  */
 export interface Cycle extends ScopedReset {
   /**
@@ -137,10 +139,16 @@ export interface Cycle extends ScopedReset {
    */
   readonly bestTime: Persistent<number>;
 
-  /** Elapsed time in the current cycle, in seconds. Resets to 0 on restart. */
-  readonly elapsed: Ref<number>;
+  /**
+   * Elapsed time in the current cycle, in seconds (persistent, so a reload
+   * resumes the run's clock). Resets to 0 on restart.
+   */
+  readonly elapsed: Persistent<number>;
 
-  /** Whether the cycle is actively ticking. Controlled by `run()` / `pause()`. */
+  /**
+   * Whether the cycle is actively ticking. Controlled by `run()` / `pause()`;
+   * not saved, so a fresh session starts paused until `run()`.
+   */
   readonly running: Ref<boolean>;
 
   /**
@@ -230,12 +238,15 @@ export function createCycle(options: CycleOptions): Cycle {
   } = options;
 
   const contextId = resolveSystemContextId(id, 'cycle', () => `cycle_${cycleCounter++}`);
-  const { count, bestTime } = withPersistentContext(contextId, () => ({
+  // `elapsed` is lifetime too: the cycle zeroes it itself, and a reset that
+  // covers the cycle's own context would otherwise zero it before `end()`
+  // records the best time.
+  const { count, bestTime, elapsed } = withPersistentContext(contextId, () => ({
     count: persistent(0, { name: 'count', lifetime: true }),
     bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),
+    elapsed: persistent(0, { name: 'elapsed', lifetime: true }),
   }));
 
-  const elapsed = ref(0);
   const running = ref(false);
   const handle = createEmitHandle<CycleEvents>();
 
