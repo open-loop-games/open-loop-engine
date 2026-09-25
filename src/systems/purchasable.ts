@@ -217,6 +217,12 @@ export type ScalingPurchasableOptions = {
     | DecimalSource
     | ((amount: MaybeRef<DecimalSource>) => FormulaSource)
     | ((amount: DecimalSource) => DecimalSource);
+  /**
+   * Formatted current effect, for effects a `×N` readout misrenders
+   * (additive bonuses, flat amounts). Can be a ref or getter. Default: `×`
+   * followed by the effect, when `effect` is set.
+   */
+  effectDisplay?: Computable<string>;
   /** Maximum number of purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
   /** Starting amount. Default: `0` */
@@ -701,6 +707,7 @@ export function createScalingPurchasable(options: ScalingPurchasableOptions): Pu
     title,
     description,
     effect: effectOption,
+    effectDisplay,
     limit,
     initialAmount,
     onPurchase,
@@ -722,9 +729,11 @@ export function createScalingPurchasable(options: ScalingPurchasableOptions): Pu
       display: {
         title,
         description,
-        effectDisplay: effectFn
-          ? computed(() => `×${formatSmall(effectFn(scalingAmount.value), 2)}`)
-          : undefined,
+        effectDisplay:
+          effectDisplay ??
+          (effectFn
+            ? computed(() => `×${formatSmall(effectFn(scalingAmount.value), 2)}`)
+            : undefined),
       },
       requirements: costRequirement,
       limit,

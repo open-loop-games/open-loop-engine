@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import { unref } from 'vue';
 import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
@@ -170,6 +171,39 @@ describe('Purchasable (leveled, limit > 1)', () => {
     });
     expect(Decimal.eq(p.amount.value, 5)).toBe(true);
     expect(p.active.value).toBe(true);
+  });
+});
+
+describe('createScalingPurchasable — effectDisplay', () => {
+  it('defaults to a multiplier readout of the effect', () => {
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'display-default',
+      description: 'Multiplier',
+      resource: points,
+      baseCost: 10,
+      costScaling: 1.15,
+      effect: 2,
+    });
+
+    p.purchase(3);
+    expect(unref(p.display.effectDisplay)).toBe('×8.00');
+  });
+
+  it('takes an override for effects that are not multipliers', () => {
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'display-override',
+      description: 'Spell damage',
+      resource: points,
+      baseCost: 10,
+      costScaling: 1.15,
+      effect: (level: DecimalSource) => Decimal.mul(level, 0.25),
+      effectDisplay: '+0.25 damage per level',
+    });
+
+    p.purchase(2);
+    expect(unref(p.display.effectDisplay)).toBe('+0.25 damage per level');
   });
 });
 
