@@ -15,7 +15,7 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:440`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:441`
 - `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:333`
 - `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:245`
 - `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:136`
