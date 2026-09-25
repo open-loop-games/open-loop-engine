@@ -181,11 +181,19 @@ export function calculateMaxAffordable(
       // Counts are whole levels, so a fractional cap admits the levels below it.
       const cap = Decimal.floor(maxBulkAmount);
 
-      /** Total charged for buying `n` levels — the same operation the purchase pays. */
-      const priceOf = (n: DecimalSource): DecimalSource =>
-        cumulativeCost
-          ? (formula.sum(currentVariable, n).value ?? Decimal.dInf)
-          : formula.evaluate(Decimal.add(currentVariable, n));
+      // Total charged for buying `n` levels, memoized so the guard update below
+      // reads the prices the search already paid for instead of re-pricing them.
+      const prices = new Map<string, DecimalSource>();
+      const priceOf = (n: DecimalSource): DecimalSource => {
+        const d = new Decimal(n);
+        const key = `${d.sign}:${d.layer}:${d.mag}`;
+        let price = prices.get(key);
+        if (price === undefined) {
+          price = priceLevels(formula, currentVariable, n, cumulativeCost) ?? Decimal.dInf;
+          prices.set(key, price);
+        }
+        return price;
+      };
 
       /** Whether buying `n` levels is payable out of the current balance. */
       const canAfford = (n: DecimalSource): boolean => payable(priceOf(n), resource.value);
@@ -222,6 +230,24 @@ export function calculateMaxAffordable(
       return affordable;
     }),
   );
+}
+
+/**
+ * Total charged for `n` levels bought from `from`, in the pricing operation the
+ * purchase pays, or `null` when a cumulative span has no price. No levels cost
+ * nothing, in either operation.
+ *
+ * @internal
+ */
+function priceLevels(
+  formula: GenericFormula,
+  from: DecimalSource,
+  n: DecimalSource,
+  cumulativeCost: boolean,
+): DecimalSource | null {
+  if (Decimal.lte(n, 0)) return Decimal.dZero;
+  if (!cumulativeCost) return formula.evaluate(Decimal.add(from, n));
+  return formula.sum(from, n).value;
 }
 
 /**
@@ -362,11 +388,8 @@ export function calculateCost(
   cumulativeCost = true,
 ): DecimalSource {
   const origValue = unref(formula.innermostVariable) ?? 0;
-  if (Decimal.lte(amountToBuy, 0)) return Decimal.dZero;
-  if (!cumulativeCost) return formula.evaluate(Decimal.add(origValue, amountToBuy));
-
-  const series = formula.sum(origValue, amountToBuy);
-  if (series.value != null) return series.value;
+  const price = priceLevels(formula, origValue, amountToBuy, cumulativeCost);
+  if (price != null) return price;
   console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
   return 0;
 }
