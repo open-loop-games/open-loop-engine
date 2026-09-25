@@ -282,10 +282,6 @@ export const invertAdd = makeBinaryInvert(
   (value, other) => Decimal.sub(value, other),
 );
 
-// Detect whether `lhs` is `var` or `mul(var, k)` shape — i.e., its antiderivative
-// is `K·x²/2`, so `F(x) + c·x = T` reduces to a quadratic with closed-form solve.
-// Returns the slope coefficient K (1 for plain variable, k for mul(var, k)), or
-// null if the shape requires bisection.
 type FormulaInternals = { internalEvaluate?: unknown; internalVariables?: number };
 
 function isPlainVariable(f: unknown): boolean {
@@ -300,8 +296,9 @@ function hasAnyVariable(f: unknown): boolean {
 }
 
 /**
- * The coefficient *source* for a `K·x²/2` antiderivative, or null when the
- * shape needs bisection. Structural only — it never reads the value, because
+ * The coefficient *source* for a `K·x²/2` antiderivative — `lhs` is `var` or
+ * `mul(var, k)`, so `F(x) + c·x = T` reduces to a quadratic with a closed-form
+ * solve — or null when the shape needs bisection. Structural only — it never reads the value, because
  * the caller holds the result for the life of a memoized integral formula and
  * a coefficient is a `FormulaSource`, free to be a ref or a variable-free
  * sub-formula that moves afterwards.

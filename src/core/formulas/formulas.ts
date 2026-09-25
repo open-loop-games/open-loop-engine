@@ -1,10 +1,12 @@
 /**
  * Formula system — invertible, integrable cost and scaling functions
  *
- * Formulas are composable math expressions that support three operations:
+ * Formulas are composable math expressions that support four operations:
  * - **Evaluate**: compute the output for a given input (e.g., cost at level N)
- * - **Invert**: find the input that produces a given output ("how many can I afford?")
- * - **Integrate**: compute cumulative cost over a range (bulk purchase pricing)
+ * - **Invert**: find the input that produces a given output ("which level costs 350?")
+ * - **Sum**: the discrete series `Σ f(from + i)` — what buying levels costs (`sum`)
+ * - **Integrate**: the continuous area across a span (`cumulative`) — what a
+ *   rate accrues over time, a different number from the sum over the same span
  *
  * Build formulas by chaining operations on a variable:
  * ```ts
@@ -482,7 +484,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     // cost formula (Formula.exponential → mul → pow_base → variable), that's
     // 2 array allocations every call × every purchasable × every tick. The
     // 1/2/3-input fast paths cover every op in the table; the default branch
-    // handles the rare >3-input ops (tetrate/iteratedexp/pentate).
+    // serves consumer-built formulas with more inputs.
     const fn = this.internalEvaluate as
       | ((...args: DecimalSource[]) => DecimalSource | null | undefined)
       | undefined;
@@ -912,12 +914,13 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   /**
    * Exponential cost curve: `base * mult^x`. The canonical incremental cost scaling.
    *
-   * Fully invertible and integrable — powers "buy max" via {@link calculateMaxAffordable}
-   * and closed-form bulk pricing via {@link calculateCost} (no O(n) loop).
+   * Fully invertible and integrable, with a closed-form series — powers "buy max"
+   * via {@link calculateMaxAffordable} and bulk pricing via {@link calculateCost}
+   * without an O(n) loop.
    *
    * @param variable - Level input — typically a reactive ref (e.g., `purchasable.amount`),
    *   or a raw `DecimalSource` for ad-hoc evaluation via `.evaluate(level)`.
-   * @param base - Cost at level 0. Can be a ref/getter for scoped tuning.
+   * @param base - Cost at level 0. Can be a ref for scoped tuning.
    * @param mult - Per-level multiplier (e.g., `1.15` = +15% per level)
    *
    * @example
@@ -925,7 +928,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * const cost = Formula.exponential(purchasable.amount, 10, 1.15);
    * cost.evaluate();           // reactive — cost at current level
    * cost.invert(100);          // what level costs 100?
-   * cost.evaluateIntegral(5);  // closed-form sum of costs 0..5
+   * cost.sum(0, 5);           // what levels 0..4 cost, bought one at a time
    * ```
    */
   public static exponential(

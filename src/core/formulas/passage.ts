@@ -102,9 +102,9 @@ function descends(f: (x: Decimal) => DecimalSource, lower: Decimal, atFloor: Dec
  * - **At the floor.** `f(lower) ≥ target` normally means the target is already
  *   met. For a *descending* curve it means the opposite — the crossing is still
  *   ahead — and the unguarded answer is a confident `lower`. So the floor case
- *   probes forward before claiming it. The comparison itself needs guarding too:
- *   break_eternity's `gte` answers `true` against `NaN`, so a curve undefined at
- *   the floor (`recip` at 0) would otherwise report the floor as the answer.
+ *   probes forward before claiming it. A curve undefined at the floor (`recip`
+ *   at 0) is refused outright, rather than left to whichever way an ordering
+ *   comparison against `NaN` happens to answer.
  * - **Below the answer.** A crossing found at `x` is only the *first* one if
  *   nothing below `x` already reached the target. One interior sample tests
  *   exactly the promise the name makes, and cannot fire on a monotone curve.

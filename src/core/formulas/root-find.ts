@@ -3,10 +3,9 @@
  *
  * One monotone-crossing search, shared by everything in the formula layer that
  * has to answer "smallest x where f(x) reaches target" without an algebraic
- * pre-image. Three consumers today: the `add`/`sub` integral inverses (whose
- * cubic-and-higher shapes have no closed form), and `tetrate`/`iteratedexp`
- * inverted in the *base*, where no closed form exists above the degenerate
- * height.
+ * pre-image — an integral inverse whose shape has no closed form, an op
+ * inverted in an argument that has none (`tetrate`'s base), or a first-passage
+ * query, which asks the question of the forward function directly.
  *
  * Two properties it exists to get right once instead of per-caller:
  *
@@ -36,13 +35,13 @@ export interface FindCrossingOptions {
    * Defaults to `lower + 1`, which is also what a non-finite guess falls back to.
    */
   upper?: DecimalSource;
-  /** Doublings allowed while growing `upper` until it brackets `target`. Defaults to 32. */
+  /** Expansions allowed while growing `upper` until it brackets `target`, each at least squaring it. Defaults to 32. */
   expansions?: number;
-  /** Cap on halvings once bracketed. Defaults to 60 — the search normally stops earlier, on bracket collapse. */
+  /** Cap on halvings once bracketed. Defaults to 120 — the search normally stops earlier, on bracket collapse. */
   iterations?: number;
 }
 
-/** Default bracket expansions — 32 doublings cover a factor of 4e9 above the guess. */
+/** Default bracket expansions — 32 squarings reach past any magnitude a game stores. */
 const DEFAULT_EXPANSIONS = 32;
 
 /**

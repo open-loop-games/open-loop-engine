@@ -268,7 +268,7 @@ Two rules follow, both load-bearing:
 
 The spine stays plain arithmetic. But when a spine-derived constant is wired into a live purchasable's cost or a skill's XP curve, **express the curve as a `Formula` rather than a hand-rolled closure** — `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costScaling` shorthands that are Formula-backed underneath.
 
-This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is invertibility, and with it the engine's bulk-purchase math: `calculateMaxAffordable` needs an invertible `Formula`. At the default `maxBulkAmount` a non-Formula cost is single-purchase only; raise it and bulk is priced linearly off the current rung, which undercharges any ladder (`CostRequirementOptions.cost`). Either way you lose the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
+This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is the engine's bulk-purchase math: `calculateMaxAffordable` counts levels over a cost `Formula`, and seeds the count from its inverse where it has one. At the default `maxBulkAmount` a non-Formula cost is single-purchase only; raise it and bulk is priced linearly off the current rung, which undercharges any ladder (`CostRequirementOptions.cost`). Either way you lose the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
 
 The rule of thumb: if a number only ever feeds a prediction, plain arithmetic. If it becomes a cost the player pays repeatedly, `Formula`.
 
