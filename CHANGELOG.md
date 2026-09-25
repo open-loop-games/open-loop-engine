@@ -2,6 +2,13 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.2.1 (2026-09-25)
+
+### Fixes
+
+* **systems:** inventories sharing item ids coexist in one engine (47fa91c)
+* a start() whose module install throws disposes the engine (75878ae)
+
 ## 0.2.0 (2026-09-25)
 
 ### ⚠ Breaking changes
