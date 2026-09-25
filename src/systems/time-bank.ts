@@ -99,7 +99,7 @@ export interface TimeBank {
  *
  * @example
  * ```ts
- * const bank = createTimeBank({ cap: () => capUpgrade.effectValue });
+ * const bank = createTimeBank({ cap: () => toNumber(capUpgrade.effect.value) });
  * // on load, bank offline time instead of simulating it:
  * bank.deposit(offlineSeconds);
  * ```
