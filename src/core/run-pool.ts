@@ -28,7 +28,7 @@
 
 import { computed, ref, shallowRef, watch, type Ref } from 'vue';
 import { createEmitHandle, type Emittable } from './events';
-import { loadingSave, persistent, withPersistentContext } from './persistence';
+import { onHydrated, persistent, withPersistentContext } from './persistence';
 import { attachContextReset } from './resettable';
 
 // === TYPES ===
@@ -220,7 +220,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     readonly handle: RunHandle<Id>;
     step: RunStep;
     readonly onDeath: (() => RunDeathOutcome) | undefined;
-    /** Stops the handle's `aliveStates` watchers, which would otherwise outlive it. */
+    /** Stops the handle's `aliveStates` mirror, which would otherwise outlive it. */
     readonly stop: () => void;
   }
   const handleArray: RunHandle<Id>[] = [];
@@ -230,6 +230,16 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     const entry = entries.get(h.id);
     return entry?.handle === h ? entry : undefined;
   }
+
+  // A load replaces `aliveStates` wholesale: re-seed each handle still in the
+  // pool from it. A handle that has left the pool isn't walked, so a load
+  // naming its id can't revive it.
+  onHydrated(() => {
+    for (const h of handleArray) {
+      const v = aliveStates.value[String(h.id)];
+      if (v !== undefined && v !== h.alive.value) h.alive.value = v;
+    }
+  });
 
   // Versioned view-cache for referentially-stable `instances.value` reads.
   // Pattern cribbed verbatim from sequencer.ts — reads return the same slice
@@ -331,27 +341,17 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     // whatever value was loaded — including `false` for runs that died
     // before the save was taken. `alive` is a local per-handle ref so a
     // destroyed handle's `alive.value` stays at its last value after
-    // `removeFromCollection` cleans the map entry; a forward watcher
-    // mirrors flips into `aliveStates` for persistence, and a reverse
-    // watcher gated on `loadingSave` catches mid-session save loads that
-    // replace the entire map.
+    // `removeFromCollection` cleans the map entry; a watcher mirrors flips
+    // into `aliveStates` for persistence, and the pool's `onHydrated`
+    // re-seeds it after a mid-session load replaces the entire map.
     const idKey = String(reg.id);
     const initialAlive = aliveStates.value[idKey] ?? true;
     aliveStates.value[idKey] = initialAlive;
     const alive = ref(initialAlive);
-    const stopForward = watch(
+    const stopMirror = watch(
       alive,
       (v) => {
         aliveStates.value[idKey] = v;
-      },
-      { flush: 'sync' },
-    );
-    const stopReverse = watch(
-      () => aliveStates.value[idKey],
-      (v) => {
-        if (loadingSave.value && v !== undefined && v !== alive.value) {
-          alive.value = v;
-        }
       },
       { flush: 'sync' },
     );
@@ -386,10 +386,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       handle,
       step: reg.step,
       onDeath: reg.onDeath,
-      stop: () => {
-        stopForward();
-        stopReverse();
-      },
+      stop: stopMirror,
     });
     handleArray.push(handle);
     bumpLive();

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { effectScope, watchEffect } from 'vue';
+import { effectScope, watch, watchEffect } from 'vue';
 import {
   beginPersistentContext,
   endPersistentContext,
   getAllPersistentRefs,
+  loadingSave,
   deserializePersistents,
   serializePersistents,
   withPersistentContext,
@@ -111,8 +112,8 @@ describe('RunPool — construction', () => {
   it('saved alive=false survives a mid-session reload that replaces aliveStates', () => {
     // Mid-session load path: instances are already in the pool, then a
     // deserialize replaces `aliveStates` with a different snapshot. The
-    // reverse watcher (gated on loadingSave) must re-seed each handle's
-    // local alive ref from the new map values.
+    // pool's hydration pass must re-seed each handle's local alive ref from
+    // the new map values.
     const ctxId = `mid-session-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const pool = createRunPool({ id: ctxId, deathPolicy: 'park' });
@@ -132,6 +133,23 @@ describe('RunPool — construction', () => {
 
     expect(pool.getInstance('a')!.alive.value).toBe(true);
     expect(pool.getInstance('b')!.alive.value).toBe(false);
+  });
+
+  it('a mid-session load flips a handle once the load has settled', () => {
+    const ctxId = `settled-${Math.random().toString(36).slice(2, 8)}`;
+    const pool = withPersistentContext(ctxId, () =>
+      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+    );
+    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    const loadingAtFlip: boolean[] = [];
+    watch(handle.alive, () => loadingAtFlip.push(loadingSave.value), { flush: 'sync' });
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { aliveStates: { a: false } },
+    });
+
+    expect(handle.alive.value).toBe(false);
+    expect(loadingAtFlip).toEqual([false]);
   });
 
   it('a destroyed handle stays dead through a later load that revives its id', () => {
