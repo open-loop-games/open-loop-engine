@@ -285,6 +285,22 @@ export function resourceConsumedAt(
   return Decimal.ceil(Decimal.div(progress, interval));
 }
 
+/** The furthest progress {@link resourceConsumedAt} charges at most `units` for. */
+function progressForUnits(units: Decimal, duration: DecimalSource, amount: DecimalSource): Decimal {
+  // (units * duration) / amount, not units * (duration / amount): the latter
+  // rounds the intermediate ratio and lands further off the threshold.
+  let prog = units.mul(duration).div(amount);
+  // The product and resourceConsumedAt's own `progress / (duration / amount)`
+  // round independently, so `prog` can sit a few ulps past the threshold, where
+  // ceil charges `units + 1` — one more than the caller holds. Walk it back
+  // until the helper agrees; charging is monotone in progress, and prog reaches
+  // 0 (charged 0) before the step does, so the loop ends.
+  for (let step = 1e-15; resourceConsumedAt(prog, duration, amount).gt(units); step *= 10) {
+    prog = prog.sub(prog.abs().mul(step));
+  }
+  return prog;
+}
+
 /** One progressive-cost entry — amount total across a full run, plus a live
  * balance getter the primitive calls to decide affordability. */
 export interface ProgressiveCostEntry {
@@ -324,7 +340,9 @@ export interface ProgressiveCostStep {
  *
  * This wraps the canonical pattern around {@link resourceConsumedAt}: each
  * cost drains at `ceil(progress / (duration / amount))` thresholds, and an
- * insufficient balance caps progress to `(prevConsumed + available) * (duration / amount)`.
+ * insufficient balance caps progress at the threshold of unit
+ * `prevConsumed + floor(available)` — so no delta ever exceeds its entry's
+ * `available()`.
  * The caller writes back progress and calls its own resource-remove — the
  * primitive owns no state and makes no mutations.
  *
@@ -408,11 +426,7 @@ export function stepProgressiveCosts(opts: {
       // that resourceConsumedAt's ceil produces. Without it, a fractional
       // available propagates into maxProg and the later ceil rounds back up,
       // making the delta over-request by up to one unit (delta > available).
-      const maxUnits = prevConsumed.add(available.floor());
-      // (maxUnits * duration) / amount, not maxUnits * (duration / amount): the
-      // latter rounds the intermediate ratio and writes state.progress just
-      // above an integer threshold, which then desyncs the next-tick reads.
-      const maxProg = maxUnits.mul(duration).div(cost.amount);
+      const maxProg = progressForUnits(prevConsumed.add(available.floor()), duration, cost.amount);
       if (maxProg.lt(capped)) capped = maxProg;
     }
   }

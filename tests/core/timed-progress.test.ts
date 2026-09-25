@@ -566,3 +566,75 @@ describe('stepProgressiveCosts — calls available() lazily only once per entry'
     expect(calls).toBe(1);
   });
 });
+
+describe('stepProgressiveCosts — never requests more than the balance', () => {
+  // `maxUnits · duration / amount` and resourceConsumedAt's `progress / (duration / amount)`
+  // round independently, so the cap can land a few ulps past the threshold where ceil
+  // charges one unit more than the caller holds. Swept over the integer grid the
+  // over-request showed up on, from a standing start and from a previous cap.
+  function sweepCase(d: number, a: number, prev: DecimalSource, avail: number) {
+    const step = stepProgressiveCosts({
+      prevProgress: prev,
+      proposedProgress: d,
+      duration: d,
+      costs: [{ amount: a, available: () => avail }],
+    });
+    const before = resourceConsumedAt(prev, d, a);
+    const after = resourceConsumedAt(step.cappedProgress, d, a);
+    return { step, before, after };
+  }
+
+  it('holds delta ≤ available, and spends every unit it can, across (duration, amount, available)', () => {
+    const failures: string[] = [];
+    for (let d = 1; d <= 40; d++) {
+      for (let a = 1; a <= 40; a++) {
+        for (let avail = 0; avail < a; avail++) {
+          const first = sweepCase(d, a, 0, avail);
+          const delta = first.step.deltas[0];
+          if (delta.gt(avail) || !delta.eq(first.after.sub(first.before)) || !delta.eq(avail)) {
+            failures.push(`d=${d} a=${a} avail=${avail} delta=${delta.toString()}`);
+          }
+          // Continue from the capped progress with one more unit on hand.
+          const second = sweepCase(d, a, first.step.cappedProgress, 1);
+          const delta2 = second.step.deltas[0];
+          if (delta2.gt(1) || !delta2.eq(second.after.sub(second.before)) || !delta2.eq(1)) {
+            failures.push(`d=${d} a=${a} avail=${avail}+1 delta=${delta2.toString()}`);
+          }
+        }
+      }
+    }
+    expect(failures.slice(0, 5)).toEqual([]);
+  });
+
+  it('holds delta ≤ available tick by tick with Decimal durations and a trickling balance', () => {
+    const failures: string[] = [];
+    for (const d of [7, 10, 60, 100, 300, 1234.5]) {
+      for (let a = 1; a <= 12; a++) {
+        const duration = new Decimal(d);
+        let stock = 0;
+        let prog: DecimalSource = 0;
+        for (let t = 0; t < 4000 && Decimal.lt(prog, duration); t++) {
+          if (t % 41 === 0) stock += 1;
+          const step = stepProgressiveCosts({
+            prevProgress: prog,
+            proposedProgress: Decimal.min(Decimal.add(prog, duration.div(97)), duration),
+            duration,
+            costs: [{ amount: a, available: () => stock }],
+          });
+          if (step.deltas[0].gt(stock)) {
+            failures.push(`d=${d} a=${a} t=${t} stock=${stock} delta=${step.deltas[0].toString()}`);
+          }
+          stock -= step.deltas[0].toNumber();
+          if (!step.stalled) prog = step.cappedProgress;
+        }
+      }
+    }
+    expect(failures.slice(0, 5)).toEqual([]);
+  });
+
+  it('asks nothing of an empty balance when the cap lands on a threshold', () => {
+    // incloneution's construction shape: prev 43.8 of 100 has consumed 3 of 6.
+    const { step } = sweepCase(100, 6, 43.8, 0);
+    expect(Decimal.eq(step.deltas[0], 0)).toBe(true);
+  });
+});
