@@ -309,8 +309,8 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
  *   createExponentialModifier({ exponent: 0.9, description: 'Softcap' }),
  * ]);
  *
- * production.apply(0);  // (0 + 10) × 2 ^ 0.9 = ~17.1
- * production.invert!(17.1);  // ≈ 0 (reverses the chain)
+ * production.apply(0);  // ((0 + 10) × 2) ^ 0.9 = 20 ^ 0.9 ≈ 14.82
+ * production.invert!(14.82);  // ≈ 0 (reverses the chain)
  * ```
  */
 export function createSequentialModifier<T extends Modifier>(

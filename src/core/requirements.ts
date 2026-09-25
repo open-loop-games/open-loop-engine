@@ -104,9 +104,10 @@ export interface CostRequirementOptions {
   requiresPay?: Computable<boolean>;
 
   /**
-   * For bulk purchases with formulas: whether costs are cumulative.
-   * If true, buying 3 costs sum of cost(1) + cost(2) + cost(3).
-   * If false, buying 3 costs cost(3) — a single evaluation at the target level.
+   * For a Formula cost `f` over the level `L`: whether buying `n` sums the
+   * levels bought. If true, it costs `f(L) + f(L+1) + … + f(L+n−1)`. If
+   * false, it costs one evaluation, `f(L+n)`, so even a single purchase is
+   * priced one level ahead of the cumulative mode.
    * Default: true
    */
   cumulativeCost?: Computable<boolean>;
@@ -161,10 +162,11 @@ export interface CostRequirement extends Requirement {
  *   description: "100 points"
  * })
  *
- * // With scaling formula for bulk purchases
+ * // Scaling cost for bulk purchases, over the level ref the purchasable
+ * // hands its `requirements` factory
  * const scalingCost = createCostRequirement({
  *   resource: points,
- *   cost: Formula.variable(0).pow_base(2).mul(10), // 10 * 2^level
+ *   cost: Formula.variable(level).pow_base(2).mul(10), // 10 * 2^level
  *   maxBulkAmount: 10
  * })
  * ```
