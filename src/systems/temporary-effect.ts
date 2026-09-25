@@ -492,6 +492,7 @@ export function createTemporaryEffectSystem(
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
     slotsByDef.clear();
+    loweredByDef.clear();
   }
 
   const system: TemporaryEffectSystem = {
