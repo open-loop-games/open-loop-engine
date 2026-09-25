@@ -120,15 +120,15 @@ export interface TemporaryEffectInstance {
    * stack frees is reused. Not saved; a load reassigns slots from 0.
    */
   readonly stackIndex: number;
-  /** Remove this instance early (cleans up modifiers, fires onExpire) */
-  dispose(): void;
+  /** End this instance now, the way expiry does: fires onExpire and `expired`, then unbinds its modifiers */
+  expire(): void;
 }
 
 /** Events emitted by the temporary effect system */
 export interface TemporaryEffectEvents {
   /** Fired when an effect instance is applied */
   applied: (instance: TemporaryEffectInstance) => void;
-  /** Fired when an effect instance expires or is disposed */
+  /** Fired when an effect instance expires or is ended early */
   expired: (instance: TemporaryEffectInstance) => void;
   /** Fired when all instances of a def are dispelled */
   dispelled: (defId: string) => void;
@@ -282,7 +282,7 @@ export function createTemporaryEffectSystem(
       timeRemaining: timeRef,
       duration,
       stackIndex,
-      dispose() {
+      expire() {
         if (!unbindByInstance.has(id)) return;
         expireInstance(instance);
         syncSavedState();
@@ -468,7 +468,8 @@ export function createTemporaryEffectSystem(
   function dispose(): void {
     unsubscribeTick();
     stopHydrated();
-    // Clean up all instances without firing events; releasing the slots unbinds them.
+    // Clean up all instances without firing events; releasing the slots unbinds them,
+    // and an instance's expire() returns early once its handle is gone.
     unbindByInstance.clear();
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();

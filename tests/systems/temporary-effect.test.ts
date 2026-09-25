@@ -413,7 +413,7 @@ describe('stacking', () => {
     system.register({ id: 'burn', duration: 10, maxStacks: 3 });
     const a = system.apply('burn')!;
     const b = system.apply('burn')!;
-    a.dispose();
+    a.expire();
     const c = system.apply('burn')!;
     const d = system.apply('burn')!;
     expect([b.stackIndex, c.stackIndex, d.stackIndex]).toEqual([1, 0, 2]);
@@ -463,14 +463,19 @@ describe('dispel', () => {
     expect(system.getActive()).toHaveLength(0);
   });
 
-  it('instance.dispose() removes just that one', () => {
+  it('instance.expire() ends just that stack the way expiry does', () => {
+    const onExpire = vi.fn();
+    const expired = vi.fn();
     const { system } = createSystem();
-    system.register({ id: 'burn', duration: 10, maxStacks: 2 });
+    system.register({ id: 'burn', duration: 10, maxStacks: 2, onExpire });
+    system.on('expired', expired);
     const a = system.apply('burn')!;
     system.apply('burn');
 
-    a.dispose();
+    a.expire();
     expect(system.getActive()).toHaveLength(1);
+    expect(onExpire).toHaveBeenCalledWith(a);
+    expect(expired).toHaveBeenCalledWith(a);
   });
 
   it('dispel cleans up modifiers', () => {
