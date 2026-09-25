@@ -53,8 +53,26 @@ function payable(price: DecimalSource, balance: DecimalSource): boolean {
   if (!Decimal.isFinite(price)) return false;
   if (Decimal.lte(price, balance)) return true;
   if (!Decimal.gt(balance, 0)) return false;
-  const slack = Math.max(AFFORDABILITY_TOLERANCE, representationFloor(price));
-  return Decimal.lte(Decimal.div(price, balance), 1 + slack);
+  return Decimal.lte(Decimal.div(price, balance), 1 + payableSlack(price));
+}
+
+/** The relative slack {@link payable} grants a finite price. */
+function payableSlack(price: DecimalSource): number {
+  return Math.max(AFFORDABILITY_TOLERANCE, representationFloor(price));
+}
+
+/**
+ * A balance below which {@link payable} certainly refuses `price`, so a caller
+ * can reject in one comparison before running the ratio test. Twice the slack
+ * clears the division's rounding by orders of magnitude. A price with no
+ * positive bound — zero, negative or NaN — gets `-∞`, which never shortcuts.
+ *
+ * @internal
+ */
+function clearMissBound(price: DecimalSource): DecimalSource {
+  if (!Decimal.gt(price, 0)) return Decimal.dNegInf;
+  if (!Decimal.isFinite(price)) return price;
+  return Decimal.div(price, 1 + 2 * payableSlack(price));
 }
 
 /**
@@ -128,6 +146,7 @@ export function calculateMaxAffordable(
     affordable: DecimalSource; // cached result
     floorCost: DecimalSource; // total cost of buying `affordable` levels (resource must be >= this)
     ceilCost: DecimalSource; // total cost of buying `affordable + 1` levels (resource must be < this)
+    ceilClear: DecimalSource; // clearMissBound(ceilCost): below it, the ceiling test needs one `lt`
     token: { at: DecimalSource }; // curve identity the band was computed against
     cumulative: boolean; // the pricing operation the band was computed in
     maxBulk: DecimalSource; // the cap the band was clamped to
@@ -161,7 +180,9 @@ export function calculateMaxAffordable(
       // decided by (`payable` below), so the cached answer and a recomputation
       // cannot disagree at the boundary — a plain `gte`/`lt` pair here would
       // reject an ulp-wide sliver the recomputation accepts, and return
-      // stale-by-one for resource values sitting in it.
+      // stale-by-one for resource values sitting in it. `ceilClear` only skips
+      // the ratio test where `payable` is certain to refuse, so the sliver
+      // near the ceiling still goes to the predicate.
       if (
         guard !== null &&
         guard.token === token &&
@@ -172,7 +193,7 @@ export function calculateMaxAffordable(
         (guard.maxBulk === maxBulkAmount || Decimal.eq(guard.maxBulk, maxBulkAmount)) &&
         Decimal.eq(currentVariable, guard.variable) &&
         payable(guard.floorCost, resource.value) &&
-        !payable(guard.ceilCost, resource.value)
+        (Decimal.lt(resource.value, guard.ceilClear) || !payable(guard.ceilCost, resource.value))
       ) {
         return guard.affordable;
       }
@@ -217,11 +238,13 @@ export function calculateMaxAffordable(
       // that level is still real, and giving the band an infinite ceiling
       // instead of its price would freeze the answer one short.
       const capped = Decimal.gt(Decimal.add(affordable, 1), cap);
+      const ceilCost = capped ? Decimal.dInf : priceOf(Decimal.add(affordable, 1));
       guard = {
         variable: currentVariable,
         affordable,
         floorCost: priceOf(affordable),
-        ceilCost: capped ? Decimal.dInf : priceOf(Decimal.add(affordable, 1)),
+        ceilCost,
+        ceilClear: clearMissBound(ceilCost),
         token,
         cumulative: cumulativeCost,
         maxBulk: maxBulkAmount,
