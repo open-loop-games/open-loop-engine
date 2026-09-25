@@ -15,25 +15,24 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:390`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:295`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:215`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:107`
-- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:85`
-- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:171`
-- `type LoadHandler = (data: unknown) => void` — Callback invoked after a save is loaded, receiving the `SaveLoadResult` status object (success flag plus timestamp or failure reason) — not the decoded save payload. `src/engine.ts:61`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:193`
-- `type ResetHandler = () => void` — Callback invoked when the engine resets, before persistent refs are restored. `src/engine.ts:63`
-- `type SaveHandler = () => void` — Callback invoked when the engine flushes a save, before storage is written. `src/engine.ts:55`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:94`
-- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:91`
-- `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/engine.ts:53`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:418`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:311`
+- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:223`
+- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:117`
+- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:95`
+- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:179`
+- `type LoadHandler = (result: SaveLoadResult) => void` — Callback invoked after a save loads successfully through any entry point: `engine.load()`, the save manager's `load` / `importSave`, or a harness engine hydrated from a save. `src/engine.ts:73`
+- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:201`
+- `type SaveHandler = () => void` — Callback invoked before live state is serialized — by `engine.save()`, the autosave, and the save manager's `save` / `saveToSlot` / `exportSave` — so it can flush derived state into persistent refs. `src/engine.ts:66`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:104`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:101`
+- `type TickHandler = (dt: number) => void` — Callback invoked every game tick with the elapsed delta time in seconds. `src/engine.ts:60`
 
 ## Reactivity re-exports
 
 Vue's reactivity API surfaced through the engine — import these from `@open-loop/engine`, not from `vue`: a separately-resolved `vue` won't subscribe to engine refs and updates silently miss. Signatures and semantics are Vue's own; read them in Vue's docs.
 
-`computed` · `ComputedRef` · `effect` · `effectScope` · `EffectScope` · `isRef` · `reactive` · `ref` · `Ref` · `shallowRef` · `ShallowRef` · `unref` · `watch` · `watchEffect` · `WatchStopHandle` · `WritableComputedRef`
+`computed` · `ComputedRef` · `effect` · `effectScope` · `EffectScope` · `isRef` · `onScopeDispose` · `reactive` · `ref` · `Ref` · `shallowRef` · `ShallowRef` · `triggerRef` · `unref` · `watch` · `watchEffect` · `WatchStopHandle` · `WritableComputedRef`
 
 ## Events
 
@@ -57,9 +56,9 @@ worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes:
 
 ## Ambient game-state-accessor context
 
-the fifth cross-cutting ambient scope alongside chain registry, effect-system registry, resource registry, and persistence namespace
+one of the cross-cutting ambient scopes `createEngine` sets around `install()` / `connect()`, alongside the chain, effect-system, resource and tuning registries, the engine categories, and the persistence namespace
 
-- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:28`
+- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:29`
 
 ## Throttle
 

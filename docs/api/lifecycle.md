@@ -70,7 +70,7 @@ opt-in interface for objects that can yield their resettable contents to _resetO
 
 Retention policy for declarative carryover across resets
 
-- `function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy` — Creates a declarative retention policy for carrying values across resets. `src/systems/retention.ts:79`
+- `function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy` — Creates a declarative retention policy for carrying values across resets. `src/systems/retention.ts:80`
 - `function fractional(rate: DecimalSource): (value: any) => any` — Create a fractional retention transform. `src/systems/retention.ts:49`
 - `interface RetentionPolicy` — Snapshot/restore pair that selectively preserves persistent refs across a reset. `src/systems/retention.ts:33`
 - `interface RetentionPolicyOptions` — Options for createRetentionPolicy — split refs into `keep` (verbatim) and `retain` (transformed). `src/systems/retention.ts:18`
@@ -82,7 +82,7 @@ persistent game state with multi-slot support
 - `function addField(data: SaveData, path: string, defaultValue: unknown, opts?: AddFieldOptions): SaveData` — Write `defaultValue` at `path`. `src/core/save-migrations.ts:167`
 - `interface AddFieldOptions` `src/core/save-migrations.ts:148`
 - `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:87`
-- `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:441`
+- `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:516`
 - `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: a live `Decimal` instance, a finite `number`, or a numeric string (including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits). `src/core/save-validation.ts:59`
 - `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref's default value and options. `src/core/save-validation.ts:92`
 - `function dropField(data: SaveData, path: string): SaveData` — Remove the value at `path`. `src/core/save-migrations.ts:139`
@@ -92,13 +92,14 @@ persistent game state with multi-slot support
 - `function getSchemaForRef(ref: Persistent): ZodType` — Get the effective schema for a persistent ref — explicit override wins, else auto-derive. `src/core/save-validation.ts:141`
 - `function renameField(data: SaveData, oldPath: string, newPath: string): SaveData` — Move a value from `oldPath` to `newPath`. `src/core/save-migrations.ts:93`
 - `function retypeField(data: SaveData, path: string, transform: (oldValue: unknown) => unknown): SaveData` — Apply `transform` to the value at `path`. `src/core/save-migrations.ts:117`
-- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:200`
-- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:185`
-- `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:153`
-- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: persists, loads, imports, and exports versioned game state. `src/core/save-manager.ts:231`
-- `interface SaveManagerConfig` — Configuration for creating a save manager. `src/core/save-manager.ts:101`
-- `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:159`
-- `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:169`
+- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:211`
+- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:196`
+- `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:164`
+- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: persists, loads, imports, and exports versioned game state. `src/core/save-manager.ts:257`
+- `interface SaveManagerConfig` — Configuration for creating a save manager. `src/core/save-manager.ts:109`
+- `type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>` — One step of a consumer save migration: receives the save data written by version N and returns it reshaped for version N + 1. `src/core/save-manager.ts:106`
+- `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:170`
+- `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:180`
 - `function setNested(data: SaveData, path: string, value: unknown): void` — Write `value` at a `.`-separated nested path, creating intermediate objects as needed. `src/core/save-migrations.ts:64`
 - `interface StorageAdapter` — Pluggable storage backend. `src/core/save-manager.ts:64`
 - `function validateSaveData(refs: Map<string, Persistent>, data: Record<string, unknown>, options: ValidateSaveDataOptions): ValidateSaveDataResult` — Validate raw save data against the live persistent-ref registry. `src/core/save-validation.ts:206`
