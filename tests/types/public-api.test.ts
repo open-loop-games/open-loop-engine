@@ -854,3 +854,178 @@ describe('createCycle / createTimeBank / createSequencer type surface', () => {
     expectTypeOf(jobs.currentMetadata).toEqualTypeOf<JobMeta | undefined>();
   });
 });
+
+describe('Systems — required options vs what defaults', () => {
+  /** Keys of `T` that may be omitted from an object literal of type `T`. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('createZoneSystem: the whole options object is optional', async () => {
+    const { createZoneSystem } = await import('@/index');
+    const zones = createZoneSystem();
+    expectTypeOf(zones).toEqualTypeOf<import('@/systems/zone').ZoneSystem>();
+  });
+
+  it('createAutomationTiers requires tiers; id/initiallyUnlocked default', () => {
+    type Options = import('@/systems/automation').AutomationTiersOptions;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'initiallyUnlocked'>();
+  });
+
+  it('createRecommendationSystem requires cycle/cycleLog/bestOf/getCurrentSnapshot/applySnapshot', () => {
+    type Options = import('@/systems/recommendation').RecommendationSystemOptions;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'defs' | 'getState'>();
+  });
+
+  it('createProducerCategory requires id/mapProducer/registerTick; mapState defaults', () => {
+    interface Def {
+      id: string;
+    }
+    type Options = import('@/systems/producer-category').ProducerCategoryOptions<Def>;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'mapState'>();
+  });
+
+  it('ProducerCategory propagates Def/State through getDef/getState/getProducer', () => {
+    interface Def {
+      id: string;
+      baseRate: number;
+    }
+    interface MyState {
+      totalProduced: number;
+    }
+    type Cat = import('@/systems/producer-category').ProducerCategory<Def, MyState>;
+    expectTypeOf<Cat['getDef']>().returns.toEqualTypeOf<Def | undefined>();
+    expectTypeOf<Cat['getState']>().returns.toEqualTypeOf<MyState | undefined>();
+    expectTypeOf<Cat['getProducer']>().returns.toEqualTypeOf<
+      import('@/systems/producer-category').Producer | undefined
+    >();
+  });
+});
+
+describe('createCostRequirement / createInventory type surface', () => {
+  /** Keys of `T` that may be omitted from an object literal of type `T`. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('createCostRequirement requires resource and cost; the rest defaults', async () => {
+    type Options = import('@/core/requirements').CostRequirementOptions;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<
+      'requiresPay' | 'cumulativeCost' | 'maxBulkAmount' | 'pay' | 'description'
+    >();
+    const { createCostRequirement } = await import('@/index');
+    const resource = createResource(0, { id: 'cost-gold', displayName: 'gold' });
+    const req = createCostRequirement({ resource, cost: 10 });
+    expectTypeOf(req).toEqualTypeOf<import('@/core/requirements').CostRequirement>();
+  });
+
+  it('createInventory requires id and baseCapacity; the rest defaults', () => {
+    type Options = import('@/systems/inventory').InventoryOptions;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<
+      'overflow' | 'totalCapacity' | 'displayName' | 'initial' | 'items'
+    >();
+  });
+
+  it('Inventory.resources is a ReadonlyMap keyed by item id', async () => {
+    const { createInventory } = await import('@/index');
+    const inv = createInventory({ id: 'bag', baseCapacity: 10, items: ['wood'] });
+    expectTypeOf(inv.resources).toEqualTypeOf<
+      ReadonlyMap<string, import('@/core/resource').Resource<DecimalSource>>
+    >();
+  });
+});
+
+describe('Achievement and challenge categories — required options and generics', () => {
+  /** Keys of `T` that may be omitted from an object literal of type `T`. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('createAchievementCategory requires id/mapAchievement; mapState defaults', () => {
+    interface Def {
+      id: string;
+    }
+    type Options = import('@/systems/achievement-category').AchievementCategoryOptions<Def>;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'mapState'>();
+  });
+
+  it('registerTiered returns Achievement<T>[], T defaulting to number', async () => {
+    const { createAchievementCategory } = await import('@/index');
+    const cat = createAchievementCategory<BaseTieredAchievementDef>({
+      id: 'registerTiered-pin',
+      mapAchievement: (def) => ({
+        display: { title: def.title, description: def.description },
+        requirement: def.requirement,
+        effect: def.effect,
+      }),
+    });
+    const tiers = cat.registerTiered({
+      baseId: 'gold',
+      baseName: 'Gold',
+      getValue: () => 0,
+      tiers: [{ threshold: 10, suffix: 'I' }],
+    });
+    expectTypeOf(tiers).toEqualTypeOf<import('@/systems/achievement').Achievement<number>[]>();
+  });
+
+  it('createChallengeCategory requires only id — every other option defaults', () => {
+    type Options = import('@/systems/challenge-category').ChallengeCategoryOptions<ChallengeDef>;
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<
+      | 'overrideRegistry'
+      | 'contentRegistries'
+      | 'reset'
+      | 'mutuallyExclusive'
+      | 'accessor'
+      | 'mutator'
+      | 'registerTick'
+      | 'mapState'
+    >();
+  });
+});
+
+describe('Effect-system factories — persistent and temporary', () => {
+  /** Keys of `T` that may be omitted from an object literal of type `T`. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('createPersistentEffectSystem requires only id', () => {
+    type Options = import('@/systems/persistent-effect').PersistentEffectSystemOptions;
+    expectTypeOf<OptionalKeys<Options>>().toBeNever();
+  });
+
+  it('createTemporaryEffectSystem requires id and registerTick', async () => {
+    type Options = import('@/systems/temporary-effect').TemporaryEffectSystemOptions;
+    expectTypeOf<OptionalKeys<Options>>().toBeNever();
+    const { createTemporaryEffectSystem } = await import('@/index');
+    const sys = createTemporaryEffectSystem({ id: 'effects', registerTick: () => () => {} });
+    sys.register({ id: 'haste', duration: 10 });
+    // apply() answers null at max stacks rather than throwing — pin the union.
+    expectTypeOf(sys.apply('haste')).toEqualTypeOf<
+      import('@/systems/temporary-effect').TemporaryEffectInstance | null
+    >();
+  });
+});
+
+describe('runUntil type surface', () => {
+  /** Keys of `T` that may be omitted from an object literal of type `T`. */
+  type OptionalKeys<T> = {
+    [K in keyof T]-?: object extends Pick<T, K> ? K : never;
+  }[keyof T];
+
+  it('requires engine/until/maxSimTime; tickDelta and the rest default', () => {
+    type Config = import('@/harness/types').RunUntilConfig;
+    expectTypeOf<OptionalKeys<Config>>().toEqualTypeOf<
+      'tickDelta' | 'setup' | 'seed' | 'mode' | 'accessor' | 'bisectTolSec' | 'stasisProbeInterval'
+    >();
+  });
+
+  it('terminated is a three-way discriminant, not a widened string', async () => {
+    const { runUntil } = await import('@/harness');
+    expectTypeOf(runUntil).returns.toEqualTypeOf<import('@/harness/types').RunUntilResult>();
+    type Result = import('@/harness/types').RunUntilResult;
+    expectTypeOf<Result['terminated']>().toEqualTypeOf<
+      'predicate' | 'maxSimTime' | 'unreachable'
+    >();
+  });
+});
