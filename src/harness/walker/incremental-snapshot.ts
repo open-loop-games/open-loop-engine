@@ -236,7 +236,7 @@ function hasNoDeps(deps: TransitionDeps): boolean {
  * // ... player action mutates state ...
  * inc.invalidateResource('gold');
  * const snap = inc.rebuild();
- * advanceToNextEvent(engine, snap);
+ * const next = snap.all[0]; // the soonest pending transition, if any
  * ```
  */
 export function createIncrementalSnapshot(

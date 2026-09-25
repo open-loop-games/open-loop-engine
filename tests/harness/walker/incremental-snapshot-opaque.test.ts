@@ -2,56 +2,19 @@
  * {@link createIncrementalSnapshot} over emissions with empty deps — a
  * predicate the walker can't meter, so no `invalidate*` call ever reaches it.
  *
- * The challenge leaf is wrapped to add an `opaque-predicate` goal emission for
- * a closure-form goal on an active challenge, carrying the closure's live
- * value as `currentValue`. The closure reads plain (non-reactive) state, so
- * neither a dep signal nor the challenge's gating computeds see it move. A
- * selective rebuild must still match a full one.
+ * The challenge leaf emits a closure-form goal on an active challenge as
+ * `opaque-predicate` with no deps. The closure reads plain (non-reactive)
+ * state, so neither a dep signal nor the challenge's gating computeds see it
+ * move. A selective rebuild must still match a full one.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
-import { createChallengeCategory, type ChallengeDef } from '@/systems/challenge-category';
+import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import type { Transition } from '@/harness/walker/types';
 import { createIncrementalSnapshot } from '@/harness/walker';
-
-vi.mock('@/harness/walker/walk-challenge-transitions', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/harness/walker/walk-challenge-transitions')>();
-  return {
-    ...actual,
-    emitChallengeTransitionsForEntity: (
-      categoryId: string,
-      entity: unknown,
-      accessor: GameStateAccessor,
-    ) => {
-      const out = actual.emitChallengeTransitionsForEntity(categoryId, entity, accessor);
-      const { def, challenge } = entity as {
-        def: ChallengeDef;
-        challenge: { active: { value: boolean } };
-      };
-      if (typeof def.goal === 'function' && challenge.active.value) {
-        const transition: Transition = {
-          source: 'challenge',
-          kind: 'goal-complete',
-          categoryId,
-          entityId: def.id,
-          currentValue: def.goal(),
-          distance: { seconds: null, reason: 'opaque-predicate' },
-          label: `${categoryId}.${def.id}.goal-complete`,
-        };
-        out.push({
-          transition,
-          deps: { resources: new Set(), rates: new Set(), unlocks: new Set(), states: new Set() },
-        });
-      }
-      return out;
-    },
-  };
-});
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -84,14 +47,13 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
     const inc = createIncrementalSnapshot(engine, accessor);
     const reference = createIncrementalSnapshot(engine, accessor);
     const goal = () => inc.snapshot.challenges.find((t) => t.kind === 'goal-complete');
-    expect(goal()?.currentValue).toBe(false);
+    expect(goal()?.distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
 
     world.bossDefeated = true;
     inc.invalidateResource('unrelated');
     inc.rebuild();
     reference.invalidateAll();
     expect(inc.snapshot.all).toEqual(reference.rebuild().all);
-    expect(goal()?.currentValue).toBe(true);
 
     trials.getChallenge('boss')!.complete();
     inc.rebuild();
