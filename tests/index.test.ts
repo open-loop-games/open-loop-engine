@@ -1273,6 +1273,36 @@ describe('save safety', () => {
     engine.dispose();
   });
 
+  it('onLoad / onSave fire once on every save-manager path, not just engine.load / engine.save', () => {
+    const storage = mapStorage();
+    const loads: unknown[] = [];
+    let saves = 0;
+    const engine = createEngine({ gameId: 'hooks', storageAdapter: storage });
+    engine.use({
+      id: 'hooks-mod',
+      install(ctx) {
+        persistent(0, { name: 'gold' });
+        ctx.onLoad((result) => loads.push(result));
+        ctx.onSave(() => saves++);
+      },
+    });
+    engine.start();
+    const mgr = engine.saveManager!;
+
+    engine.save();
+    mgr.save();
+    mgr.saveToSlot(0);
+    const exported = mgr.exportSave();
+    expect(saves).toBe(4);
+
+    engine.load();
+    mgr.load();
+    mgr.importSave(exported);
+    expect(loads).toHaveLength(3);
+    expect(loads[2]).toEqual({ success: true, timestamp: JSON.parse(exported).timestamp });
+    engine.dispose();
+  });
+
   it('load() before start() throws instead of reporting a load that hydrated nothing', () => {
     const engine = createEngine({ gameId: 'early', storageAdapter: mapStorage() });
     engine.use({ id: 'early-mod', install: () => void persistent(0, { name: 'gold' }) });

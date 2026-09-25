@@ -234,6 +234,12 @@ export interface SaveEvents {
   /** A consumer-provided migration step ran during load. */
   'save:migration-step': (info: { from: number; to: number }) => void;
   /**
+   * Live state is about to be serialized, by `save`, `saveToSlot` or
+   * `exportSave`. Handlers run synchronously first, so one that flushes
+   * derived state into persistent refs lands in the written save.
+   */
+  'save:before-serialize': () => void;
+  /**
    * `load()` refused a slot for a reason other than `not-found`, so the slot
    * still holds a save the live state doesn't reflect. `save()` and
    * `saveToSlot()` skip it until {@link SaveManager.releaseSlot}, `deleteSave`,
@@ -593,6 +599,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   }
 
   function buildEnvelope(): SaveEnvelope {
+    handle.emit('save:before-serialize');
     const dataObj = serializePersistents(
       filterDefaultedRefs(getAllPersistentRefs(persistenceNamespace)),
     );

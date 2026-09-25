@@ -57,14 +57,19 @@ import type {
 
 /** Callback invoked every game tick with the elapsed delta time in seconds. */
 export type TickHandler = (dt: number) => void;
-/** Callback invoked when the engine flushes a save, before storage is written. */
+/**
+ * Callback invoked before live state is serialized — by `engine.save()`, the
+ * autosave, and the save manager's `save` / `saveToSlot` / `exportSave` —
+ * so it can flush derived state into persistent refs.
+ */
 export type SaveHandler = () => void;
 /**
- * Callback invoked after a save is loaded, receiving the `SaveLoadResult`
- * status object (success flag plus timestamp or failure reason) — not the
- * decoded save payload.
+ * Callback invoked after a save loads successfully through any entry point:
+ * `engine.load()`, the save manager's `load` / `importSave`, or a harness
+ * engine hydrated from a save. Receives the `SaveLoadResult` (always
+ * `success: true`, with the save's timestamp) — not the decoded payload.
  */
-export type LoadHandler = (data: unknown) => void;
+export type LoadHandler = (result: SaveLoadResult) => void;
 /** Callback invoked when the engine resets, before persistent refs are restored. */
 export type ResetHandler = () => void;
 
@@ -113,9 +118,9 @@ export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 export interface EngineContext {
   /** Register a callback invoked every game tick with delta time in seconds */
   onTick(callback: TickHandler): () => void;
-  /** Register a callback invoked when the game is saved */
+  /** Register a callback invoked before live state is serialized; see {@link SaveHandler}. */
   onSave(callback: SaveHandler): void;
-  /** Register a callback invoked when a save is loaded */
+  /** Register a callback invoked after a save loads, by any entry point; see {@link LoadHandler}. */
   onLoad(callback: LoadHandler): void;
   /** Register a callback invoked on game reset */
   onReset(callback: ResetHandler): void;
@@ -319,7 +324,7 @@ export interface Engine {
    * dropped; callers create a new engine via `createEngine()` to resume.
    */
   dispose(): void;
-  /** Save game state, firing all onSave callbacks first. */
+  /** Save game state to the active slot, firing all onSave callbacks first. */
   save(): void;
   /**
    * Load the active slot, firing all onLoad callbacks after.
@@ -463,21 +468,28 @@ export function createEngine(config: EngineConfig): Engine {
   // for external introspection tools.
   let publicInjections: Map<symbol, unknown> | undefined;
 
-  function performSave(): void {
+  // The hooks ride the save manager's own events so every entry point runs
+  // them — consumers wire the manager's import/export/save/load to their UI.
+  saveManager?.on('save:before-serialize', () =>
     withPersistenceNamespace(config.persistenceNamespace, () => {
       for (const cb of saveCallbacks) cb();
-      saveManager?.save();
-    });
+    }),
+  );
+  saveManager?.on('save:loaded', ({ timestamp }) =>
+    withPersistenceNamespace(config.persistenceNamespace, () => {
+      for (const cb of loadCallbacks) cb({ success: true, timestamp });
+    }),
+  );
+
+  function performSave(): void {
+    withPersistenceNamespace(config.persistenceNamespace, () => saveManager?.save());
   }
 
   function performLoad(): SaveLoadResult {
-    return withPersistenceNamespace(config.persistenceNamespace, () => {
-      const result = saveManager?.load() ?? { success: false };
-      if (result.success) {
-        for (const cb of loadCallbacks) cb(result);
-      }
-      return result;
-    });
+    return withPersistenceNamespace(
+      config.persistenceNamespace,
+      () => saveManager?.load() ?? { success: false },
+    );
   }
 
   function topologicalSort(mods: EngineModule[]): EngineModule[] {

@@ -60,6 +60,30 @@ function createGoldPeakAnalyzer(getGold: () => number): Analyzer {
   };
 }
 
+describe('createEngineFromSave', () => {
+  it("runs modules' onLoad hooks, so derived state rebuilds from the save", async () => {
+    const { createEngineFromSave } = await import('@/harness/create-engine');
+    let derived = -1;
+    const { mod, refs } = makeGoldModule(0);
+    const withHook: EngineModule = {
+      id: mod.id,
+      install(ctx) {
+        mod.install(ctx);
+        ctx.onLoad(() => {
+          derived = refs.gold!.value * 2;
+        });
+      },
+    };
+    const engine = createEngineFromSave({
+      saveBlob: makeLiveSave(21),
+      modules: [withHook],
+      namespace: 'from-save-onload',
+    });
+    expect(derived).toBe(42);
+    engine.dispose();
+  });
+});
+
 describe('createSensitivityCell', () => {
   // Captured per-run via setup so tick + analyzer can read the current engine's gold.
   let currentGold: () => number = () => 0;
