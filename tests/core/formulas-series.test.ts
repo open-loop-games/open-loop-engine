@@ -1,17 +1,17 @@
 /**
- * Series laws — the discrete sum, against brute-force summation.
+ * Series contracts — what `Formula.sum` grades, what it reports, and the
+ * agreement between a bulk purchase and the same purchases made one at a time.
  *
- * Every closed form here is checked against `Σ` computed term by term, which is
- * the definition. The umbrella's leaf 1 found eight inherited defects behind
- * capability flags that were tested while the arithmetic never was; this file
- * tests the arithmetic first and the flags only where they carry a decision.
+ * The numerical laws the closed forms and grades must satisfy, swept over their
+ * domains against brute force and the mpmath oracle, live in
+ * `formulas-conformance.test.ts`.
  */
 
 import { describe, expect, test } from 'vitest';
 import { ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { Formula } from '@/core/formulas';
-import { arithmeticSeries, geometricSeries, powerSeries } from '@/core/formulas/series';
+import { geometricSeries, powerSeries } from '@/core/formulas/series';
 import type { GenericFormula } from '@/core/formulas';
 import { createResource } from '@/core/resource';
 import { createCostRequirement, maxRequirementsMet, payRequirements } from '@/core/requirements';
@@ -31,51 +31,9 @@ function relativeError(a: DecimalSource, b: DecimalSource): Decimal {
 
 const EXACT = 1e-12;
 
-describe('closed forms match brute-force summation', () => {
-  test('arithmeticSeries — Σ(a + i)', () => {
-    for (const from of [0, 1, 7, 1000]) {
-      for (const count of [0, 1, 2, 5, 40]) {
-        const truth = bruteForce((x) => x, from, count);
-        expect(
-          Decimal.lte(relativeError(arithmeticSeries(from, count), truth), EXACT),
-          `from=${from} count=${count}`,
-        ).toBe(true);
-      }
-    }
-  });
-
-  test('geometricSeries — Σ base^(a + i)', () => {
-    for (const base of [1.05, 1.15, 1.5, 2, 3, 10]) {
-      for (const from of [0, 1, 13]) {
-        for (const count of [0, 1, 2, 5, 30]) {
-          const truth = bruteForce((x) => Decimal.pow(base, x), from, count);
-          expect(
-            Decimal.lte(relativeError(geometricSeries(base, from, count), truth), EXACT),
-            `base=${base} from=${from} count=${count}`,
-          ).toBe(true);
-        }
-      }
-    }
-  });
-
+describe('closed forms at their edges', () => {
   test('geometricSeries — base 1 is the degenerate arm, not 0/0', () => {
     expect(Decimal.eq(geometricSeries(1, 5, 7), 7)).toBe(true);
-  });
-
-  test('powerSeries — Σ(a + i)^p across the Faulhaber range', () => {
-    for (let p = 0; p <= 8; p++) {
-      for (const from of [0, 1, 2.5, 4, 100]) {
-        for (const count of [0, 1, 2, 5, 25]) {
-          const value = powerSeries(p, from, count);
-          expect(value, `p=${p} from=${from} count=${count} returned null`).not.toBeNull();
-          const truth = bruteForce((x) => Decimal.pow(x, p), from, count);
-          expect(
-            Decimal.lte(relativeError(value!, truth), EXACT),
-            `p=${p} from=${from} count=${count}: got ${String(value)}, want ${truth.toString()}`,
-          ).toBe(true);
-        }
-      }
-    }
   });
 
   test('powerSeries — reports rather than guessing where Faulhaber does not apply', () => {

@@ -5,7 +5,13 @@
  * ("marked as invertible") and round-trips a single point. This file asserts
  * *laws* over a domain sample, per op, per magnitude regime:
  *
- * - **Round-trip**: `op.invert(op.evaluate(x)) ≈ x`
+ * - **Round-trip**: `op.invert(op.evaluate(x)) ≈ x`, and the same through an
+ *   integral
+ * - **Oracle**: forward values, definite integrals and series against mpmath
+ * - **Series**: every closed form and every grade `Formula.sum` gives, against
+ *   brute-force `Σ`
+ * - **Affordability**: buy-max counts what one-at-a-time purchases reach, and
+ *   a short balance buys nothing at any magnitude
  *
  * Two rules the suite exists to enforce, both learned the hard way:
  *
@@ -22,6 +28,7 @@ import Formula, { F, calculateCost, calculateMaxAffordable } from '@/core/formul
 import { inversionTolerance, representationFloor } from '@/core/formulas/inversion';
 import { createResource } from '@/core/resource';
 import { findCrossing } from '@/core/formulas/root-find';
+import { arithmeticSeries, geometricSeries, powerSeries } from '@/core/formulas/series';
 import type { GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
@@ -464,6 +471,38 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
       });
     }
   }
+
+  test('the cost curves buy-max seeds from', () => {
+    // `calculateMaxAffordable` seeds a cumulative count from exactly this
+    // round-trip on the shipped factories, flat slopes and fractional
+    // exponents included.
+    const CURVES: Record<string, (v: DecimalSource) => GenericFormula> = {
+      'exponential 10·1.15ˣ': (v) => Formula.exponential(v, 10, 1.15),
+      'exponential 5·2ˣ': (v) => Formula.exponential(v, 5, 2),
+      'linear 5x+10': (v) => Formula.linear(v, 10, 5),
+      'polynomial 10x²': (v) => Formula.polynomial(v, 10, 2),
+      'polynomial 3x³': (v) => Formula.polynomial(v, 3, 3),
+      'polynomial 10x^1.5': (v) => Formula.polynomial(v, 10, 1.5),
+      '10√x + 5': (v) => F.variable(v).sqrt().mul(10).add(5),
+    };
+    for (const [name, curve] of Object.entries(CURVES)) {
+      for (const x of ['0.5', '2', '10', '137.5', '1e3']) {
+        const formula = curve(x);
+        expect(formula.isIntegralInvertible(), `${name} has no integral inverse`).toBe(true);
+        expectIntegralRoundTrip(formula, x, DEFAULT_TOL);
+      }
+    }
+  });
+
+  // Known defect: a flat curve's antiderivative evaluates to NaN. The `add`
+  // integral recovers `x` by inverting a zero-slope `F`, and `pow_base` at
+  // base 1 builds `1ˣ/ln 1`. Buy-max searches the price instead, so only the
+  // continuous operations (`cumulative`, `evaluateIntegral`) are affected.
+  test.fails('a flat curve integrates to its area', () => {
+    for (const formula of [Formula.linear(3, 10, 0), Formula.exponential(3, 10, 1)]) {
+      expect(String(formula.cumulative(0, 3))).toBe('30');
+    }
+  });
 
   test('a capped branch has a bounded image, and nothing past it has a pre-image', () => {
     // The other half of the domain statement. Where the branch is capped the
@@ -1104,6 +1143,82 @@ describe('cumulative cost: integral vs discrete sum', () => {
     // The gap is the geometric boundary term (s−1)/ln s, exactly — 7.33% here.
     const ratio = new Decimal(area).div(summed).toNumber();
     expect(ratio).toBeCloseTo(0.15 / Math.log(1.15), 10);
+  });
+});
+
+describe('series: the closed forms match brute-force summation', () => {
+  // `arithmeticSeries` and `geometricSeries` are documented exact for any real
+  // `from`, so the sweep crosses zero, takes fractions, and climbs into layer 1.
+
+  /** Σ term(from + i) for i in [0, count) — the definition. */
+  function brute(term: (x: Decimal) => DecimalSource, from: DecimalSource, count: number): Decimal {
+    let total = new Decimal(0);
+    for (let i = 0; i < count; i++) total = total.add(term(Decimal.add(from, i)));
+    return total;
+  }
+
+  const COUNTS = [0, 1, 2, 5, 30];
+
+  test('arithmeticSeries — Σ(a + i)', () => {
+    for (const from of ['-137.5', '-2.5', '0', '0.25', '1', '7', '1000', '1e6', '1e12']) {
+      for (const count of COUNTS) {
+        const truth = brute((x) => x, from, count);
+        expect(
+          Decimal.lte(relativeError(arithmeticSeries(from, count), truth), 1e-12),
+          `from=${from} count=${count}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('geometricSeries — Σ base^(a + i)', () => {
+    for (const base of ['1.05', '1.15', '1.5', '2', '3', '10']) {
+      for (const from of ['-5', '0', '0.5', '1', '13']) {
+        for (const count of COUNTS) {
+          const truth = brute((x) => Decimal.pow(base, x), from, count);
+          expect(
+            Decimal.lte(relativeError(geometricSeries(base, from, count), truth), 1e-12),
+            `base=${base} from=${from} count=${count}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  test('geometricSeries — above layer 0, to the representation floor', () => {
+    // Relative error in value space is what the stored exponent's ulp allows.
+    for (const [base, from] of [
+      ['10', '400'],
+      ['1.15', '1e4'],
+      ['2', '1e5'],
+    ]) {
+      for (const count of [1, 2, 5, 30]) {
+        const truth = brute((x) => Decimal.pow(base, x), from, count);
+        const tol = Math.max(1e-12, 4 * representationFloor(truth));
+        const err = new Decimal(geometricSeries(base, from, count)).div(truth).sub(1).abs();
+        expect(
+          Decimal.lte(err, tol),
+          `base=${base} from=${from} count=${count}: error ${err.toString()} > ${tol}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('powerSeries — Σ(a + i)^p across the Faulhaber range', () => {
+    for (let p = 0; p <= 8; p++) {
+      for (const from of ['0', '1', '2.5', '4', '100']) {
+        for (const count of [0, 1, 2, 5, 25]) {
+          const value = powerSeries(p, from, count);
+          const label = `p=${p} from=${from} count=${count}`;
+          expect(value, `${label} returned null`).not.toBeNull();
+          const truth = brute((x) => Decimal.pow(x, p), from, count);
+          expect(
+            Decimal.lte(relativeError(value!, truth), 1e-12),
+            `${label}: got ${String(value)}, want ${truth.toString()}`,
+          ).toBe(true);
+        }
+      }
+    }
   });
 });
 
