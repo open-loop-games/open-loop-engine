@@ -6,13 +6,11 @@
  * structured distances. Callers bind the result into reactive views with `computed()`
  * if they need reactivity; this module itself has no Vue dependency.
  *
- * Four entry points:
+ * Three entry points:
  *
  * - {@link timeUntilResource} — distance until a resource reaches an upward threshold.
  * - {@link timeUntilAffordable} — distance until a purchasable's next level is buyable.
  * - {@link timeUntilConditionFlip} — distance until an {@link ICondition} changes truth value.
- * - {@link collectConditionDeps} — which accessor slots an `ICondition` tree reads, for
- *   cache-invalidation consumers that need to know when a computed distance could change.
  *
  * Consumed by the content-walker family — each walker leaf wraps one of these
  * per entity and emits `{ source, kind, currentValue, distance }` snapshots for
@@ -47,8 +45,8 @@ export type TransitionDistance =
 /**
  * Accessor slots a transition's distance arithmetic reads.
  *
- * Produced by {@link collectConditionDeps} (for challenge-goal-style condition trees)
- * and by the content walker's per-leaf dep emitters (for cost-resource transitions).
+ * Produced by `collectGateDeps` (in `systems/gate.ts`, for Gate trees) and by the
+ * content walker's per-leaf dep emitters (for cost-resource transitions).
  * Used by incremental-snapshot caches: when any id in a dep set changes, the
  * consumer re-runs the distance calc for transitions that named it.
  *
@@ -209,62 +207,6 @@ function timeUntilResourceFlip(
   const seconds = toNumber(Decimal.div(distance, absRate));
   if (Number.isNaN(seconds)) return { seconds: null, reason: 'uncomputable' };
   return { seconds: Math.max(0, seconds), reason: 'computed' };
-}
-
-/**
- * Collect every accessor slot read by `condition`'s truth evaluation and flip-distance arithmetic.
- *
- * Traverses the `ICondition` tree exactly like {@link timeUntilConditionFlip} and
- * {@link evaluateCondition}: `resource` nodes contribute both their amount and rate
- * slots (the flip calc reads both), `unlock` / `state` contribute their target, and
- * combinators (`and` / `or` / `not`) recurse and union their children.
- *
- * Projection, not interpretation — `opaque-predicate` conditions still contribute deps
- * because a consumer that invalidates on unlock/state writes still wants to re-check
- * the distance-null branch of a combinator they sit inside.
- *
- * @param condition - Root condition to walk.
- * @returns Flat {@link TransitionDeps} — one set per accessor axis, deduped via `Set`.
- *
- * @internal Dependency projection matching {@link timeUntilConditionFlip}'s reads.
- */
-export function collectConditionDeps(condition: ICondition): TransitionDeps {
-  const resources = new Set<string>();
-  const rates = new Set<string>();
-  const unlocks = new Set<string>();
-  const states = new Set<string>();
-  collectDepsInto(condition, resources, rates, unlocks, states);
-  return { resources, rates, unlocks, states };
-}
-
-function collectDepsInto(
-  condition: ICondition,
-  resources: Set<string>,
-  rates: Set<string>,
-  unlocks: Set<string>,
-  states: Set<string>,
-): void {
-  switch (condition.type) {
-    case 'resource':
-      resources.add(condition.target);
-      rates.add(condition.target);
-      return;
-    case 'unlock':
-      unlocks.add(condition.target);
-      return;
-    case 'state':
-      states.add(condition.target);
-      return;
-    case 'and':
-    case 'or':
-      for (const child of condition.conditions) {
-        collectDepsInto(child, resources, rates, unlocks, states);
-      }
-      return;
-    case 'not':
-      collectDepsInto(condition.condition, resources, rates, unlocks, states);
-      return;
-  }
 }
 
 /**

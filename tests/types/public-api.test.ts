@@ -1459,7 +1459,6 @@ describe('Removed surface stays removed', () => {
       | 'createEffectSystemRegistry'
       | 'createResourceRegistry'
       | 'timeUntilConditionFlip'
-      | 'collectConditionDeps'
       | 'combineFlipDistances'
       | 'ChildFlipResult'
       | 'IncrementalSnapshotEntityRef';
