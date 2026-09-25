@@ -8,6 +8,7 @@ import Formula from '@/core/formulas/formulas';
 describe('Purchasable (one-shot, limit: 1)', () => {
   it('starts as not bought (amount 0)', () => {
     const p = createPurchasable({
+      id: 'p1',
       display: { title: 'Test', description: 'Test upgrade' },
       requirements: [],
       limit: 1,
@@ -18,6 +19,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 
   it('can be purchased when requirements met', () => {
     const p = createPurchasable({
+      id: 'p2',
       display: { title: 'Free', description: 'Free upgrade' },
       requirements: [],
       limit: 1,
@@ -30,6 +32,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 
   it('cannot be purchased twice', () => {
     const p = createPurchasable({
+      id: 'p3',
       display: { title: 'Once', description: 'One-time' },
       requirements: [],
       limit: 1,
@@ -44,6 +47,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
   it('calls onPurchase callback', () => {
     let called = false;
     const p = createPurchasable({
+      id: 'p4',
       display: { title: 'Callback', description: 'With callback' },
       requirements: [],
       limit: 1,
@@ -57,6 +61,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 
   it('defaults bulkPurchase to false when limit is 1', () => {
     const p = createPurchasable({
+      id: 'p5',
       display: 'one-shot',
       requirements: [],
       limit: 1,
@@ -66,6 +71,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 
   it('defaults showAmount to false when limit is 1', () => {
     const p = createPurchasable({
+      id: 'p6',
       display: { description: 'one-shot' },
       requirements: [],
       limit: 1,
@@ -75,6 +81,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 
   it('exposes static effect as computed', () => {
     const p = createPurchasable({
+      id: 'p7',
       display: 'effect test',
       requirements: [],
       limit: 1,
@@ -87,6 +94,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
 describe('Purchasable (leveled, limit > 1)', () => {
   it('starts at amount 0', () => {
     const p = createPurchasable({
+      id: 'p8',
       display: { title: 'Worker', description: 'Produces gold' },
       requirements: [],
     });
@@ -96,6 +104,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('can be purchased when requirements met', () => {
     const p = createPurchasable({
+      id: 'p9',
       display: { title: 'Free', description: 'Free repeatable' },
       requirements: [],
       bulkPurchase: false,
@@ -108,6 +117,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('respects limit', () => {
     const p = createPurchasable({
+      id: 'p10',
       display: { title: 'Limited', description: 'Max 3' },
       requirements: [],
       limit: 3,
@@ -119,6 +129,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('defaults bulkPurchase to true when limit > 1', () => {
     const p = createPurchasable({
+      id: 'p11',
       display: 'leveled',
       requirements: [],
     });
@@ -127,6 +138,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('defaults showAmount to true when limit > 1', () => {
     const p = createPurchasable({
+      id: 'p12',
       display: { description: 'leveled' },
       requirements: [],
     });
@@ -135,6 +147,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('computes effect from amount function', () => {
     const p = createPurchasable({
+      id: 'p13',
       display: 'effect test',
       requirements: [],
       effect: (amount) => Decimal.pow(2, amount),
@@ -149,6 +162,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
   it('supports initialAmount', () => {
     const p = createPurchasable({
+      id: 'p14',
       display: 'pre-purchased',
       requirements: [],
       initialAmount: 5,
@@ -308,6 +322,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
   it('createPurchasable with finite limit also reaches the limit via purchaseMax', () => {
     const r = createResource(1e308, { id: 'r', displayName: 'r' });
     const p = createPurchasable({
+      id: 'p15',
       display: { description: 'non-scaling limit 3' },
       requirements: createCostRequirement({
         resource: r,

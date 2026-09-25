@@ -252,9 +252,15 @@ function checkNaNAndWrite<T>(persistentRef: Persistent<T>, value: T): void {
  * the stored context id is prefixed with `${namespace}${NAMESPACE_SEP}` so
  * two engines in the same runtime can share module ids without collision.
  *
- * @param id - Unique identifier for this context (e.g., node ID)
+ * @param id - Unique identifier for this context (e.g., node ID). Must not contain `.`,
+ *   which save paths split on — it throws.
  */
 export function beginPersistentContext(id: string): void {
+  // Save keys are `${contextId}.${name}` and split on "." into the nested save
+  // object, so a dotted context id would save and validate at the wrong path.
+  if (id.includes('.')) {
+    throw new Error(`Persistent context id "${id}" contains ".", which save paths split on.`);
+  }
   const fullId = activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${id}` : id;
   const parent = addingContexts[addingContexts.length - 1];
   addingContexts.push(fullId);
@@ -947,8 +953,9 @@ export function getAllPersistentRefs(namespace?: string): Map<string, Persistent
         const key = `${contextId}.${i}`;
         ref[SaveDataPath] = [contextId, String(i)];
         result.set(key, ref);
+        // Only unnamed refs count, so naming a sibling never shifts this key.
+        i++;
       }
-      i++;
     }
     if (dev && hadUnnamed && !unnamedWarnedContexts.has(fullId)) {
       unnamedWarnedContexts.add(fullId);

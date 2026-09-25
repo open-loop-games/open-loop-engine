@@ -217,7 +217,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       test(`base=${baseCost} s=${costScaling} funds=${funds}`, () => {
         const bulkWallet = createResource(ref<DecimalSource>(funds), 'coins');
         const bulk = createScalingPurchasable({
-          id: `bulk-${baseCost}-${costScaling}-${funds}`,
+          id: `bulk-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
           resource: bulkWallet,
           baseCost,
           costScaling,
@@ -227,7 +227,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
 
         const oneWallet = createResource(ref<DecimalSource>(funds), 'coins');
         const one = createScalingPurchasable({
-          id: `one-${baseCost}-${costScaling}-${funds}`,
+          id: `one-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
           resource: oneWallet,
           baseCost,
           costScaling,
@@ -256,7 +256,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     for (const costScaling of [1.5, 2, 3, 5]) {
       const wallet = createResource(ref<DecimalSource>(1e6), 'coins');
       const p = createScalingPurchasable({
-        id: `clamp-${costScaling}`,
+        id: `clamp-${costScaling}`.replaceAll('.', '_'),
         resource: wallet,
         baseCost: 10,
         costScaling,

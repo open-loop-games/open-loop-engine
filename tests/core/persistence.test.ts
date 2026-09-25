@@ -17,6 +17,7 @@ import {
   filterDefaultedRefs,
   resetAllPersistentContexts,
   withPersistenceNamespace,
+  withPersistentContext,
 } from '@/core/persistence';
 import { Decimal, bn } from '@/primitives/decimal';
 
@@ -727,5 +728,25 @@ describe('getModulePersistentRefs', () => {
     expect(refs.size).toBe(2);
     expect(refs.has(outerRef)).toBe(true);
     expect(refs.has(innerRef)).toBe(true);
+  });
+});
+
+describe('save-key shape', () => {
+  it('an unnamed ref keeps its index when a named ref joins its context', () => {
+    resetAllPersistentContexts();
+    withPersistentContext('mod', () => persistent(1));
+    expect([...getAllPersistentRefs().keys()]).toEqual(['mod.0']);
+
+    resetAllPersistentContexts();
+    withPersistentContext('mod', () => {
+      persistent(2, { name: 'gold' });
+      persistent(1);
+    });
+    expect([...getAllPersistentRefs().keys()].sort()).toEqual(['mod.0', 'mod.gold']);
+  });
+
+  it('refuses a context id containing "." — the save path splits on it', () => {
+    resetAllPersistentContexts();
+    expect(() => withPersistentContext('upgrades/tier.1', () => persistent(0))).toThrow(/"\."/);
   });
 });
