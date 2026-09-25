@@ -41,6 +41,7 @@ import {
   type Series,
 } from '@/index';
 import type { Computable, MaybeGetter } from '@/core/computed';
+import type { RunContext, UntilCell } from '@/harness';
 import type { Resource } from '@/core/resource';
 import type { Persistent } from '@/core/persistence';
 import type { SkillCategory } from '@/systems/skill-category';
@@ -589,6 +590,26 @@ describe('runSensitivity', () => {
       baseline: { aggregate: { metrics: Record<string, unknown> } };
       variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
     }>();
+  });
+
+  it('takes an inline predicate-bounded baseline once the cell shape is named', async () => {
+    const { runSensitivity } = await import('@/harness');
+    // `buildEngine: (ctx) => …` is context-sensitive, so inference alone falls
+    // back to the default `Cell`; the documented call names `UntilCell`.
+    const buildEngine = (_ctx: RunContext, _opts?: { mul: number }) => ({}) as Engine;
+    expectTypeOf(runSensitivity<UntilCell>).toBeCallableWith({
+      baseline: { name: 'b', buildEngine: (ctx) => buildEngine(ctx) },
+      axes: [
+        {
+          name: 'mul',
+          values: [0.5, 2],
+          patch: (b, v) => ({ ...b, buildEngine: (ctx) => buildEngine(ctx, { mul: v as number }) }),
+        },
+      ],
+      seeds: [1],
+      until: () => true,
+      maxSimTime: 10,
+    });
   });
 });
 

@@ -53,13 +53,18 @@ import type {
  * ```
  *
  * @example Predicate-bounded with axis-grouped variants
+ * An inline baseline whose `buildEngine` reads its context can't be inferred
+ * as an `UntilCell`, so name the shape; axis values reach `patch` untyped.
  * ```ts
- * const result = runSensitivity({
+ * const result = runSensitivity<UntilCell>({
  *   baseline: { name: 'baseline', buildEngine: (ctx) => buildEngine(ctx) },
  *   axes: [{
  *     name: 'meta-cost',
  *     values: [0.85, 1.15],
- *     patch: (b, v) => ({ ...b, buildEngine: (ctx) => buildEngine(ctx, { metaCostMul: v }) }),
+ *     patch: (b, v) => ({
+ *       ...b,
+ *       buildEngine: (ctx) => buildEngine(ctx, { metaCostMul: v as number }),
+ *     }),
  *   }],
  *   seeds: [1, 2, 3, 4, 5],
  *   until: (ctx) => ctx.simTime >= minutes(120),
