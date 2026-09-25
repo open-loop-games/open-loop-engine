@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
@@ -39,7 +39,7 @@ function mockAccessor(
 // ---------------------------------------------------------------------------
 
 describe('createTransitionSnapshot — discovery degradation', () => {
-  it('returns an empty snapshot when CategoriesKey is not provided', () => {
+  it('returns an empty snapshot when the engine built no categories', () => {
     const engine = createEngine({ gameId: 'bts-no-key', persistence: false });
     engine.start();
     const snap = createTransitionSnapshot(engine, mockAccessor());
@@ -49,15 +49,25 @@ describe('createTransitionSnapshot — discovery degradation', () => {
     expect(snap.producers).toEqual([]);
   });
 
-  it('returns an empty snapshot when every slice is empty', () => {
+  it('returns an empty snapshot when every category holds no defs', () => {
     const module: EngineModule = {
       id: 'empty-slices',
       install(ctx) {
-        ctx.provide(CategoriesKey, {
-          challenges: [],
-          purchasables: [],
-          producers: [],
-        } as EngineCategories);
+        createChallengeCategory({ id: 'trials' });
+        createPurchasableCategory<{ id: string }>({
+          id: 'upgrades',
+          mapPurchasable: (def) => ({
+            display: { description: def.id },
+            requirements: [],
+            limit: 1,
+          }),
+        });
+        const gold = createResource(0, { id: 'gold' });
+        createProducerCategory<{ id: string }>({
+          id: 'buildings',
+          mapProducer: () => ({ resource: gold, baseRate: 1, trigger: 'continuous' }),
+          registerTick: ctx.onTick,
+        });
       },
     };
     const engine = createEngine({ gameId: 'bts-empty', persistence: false });
@@ -149,12 +159,6 @@ function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
         canStart: { kind: 'resource-gte', resource: 'gems', value: 5 }, // gems rate 1/s → 5s
         goal: { kind: 'resource-gte', resource: 'gems', value: 10 },
       });
-
-      ctx.provide(CategoriesKey, {
-        purchasables: [upgrades],
-        producers: [buildings],
-        challenges: [challenges],
-      } as EngineCategories);
     },
   };
 
@@ -218,7 +222,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     });
     const module: EngineModule = {
       id: 'nulls-only',
-      install(ctx) {
+      install() {
         const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -240,11 +244,6 @@ describe('createTransitionSnapshot — merge + sort', () => {
           canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
           goal: () => false,
         });
-
-        ctx.provide(CategoriesKey, {
-          purchasables: [upgrades],
-          challenges: [challenges],
-        } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'bts-nulls', persistence: false });
@@ -265,7 +264,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     // ascending ('alpha' < 'beta') must decide order.
     const module: EngineModule = {
       id: 'tie-upgrades',
-      install(ctx) {
+      install() {
         const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const cat = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -279,7 +278,6 @@ describe('createTransitionSnapshot — merge + sort', () => {
           { id: 'beta', cost: 10 },
           { id: 'alpha', cost: 10 },
         ]);
-        ctx.provide(CategoriesKey, { purchasables: [cat] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'bts-tie', persistence: false });

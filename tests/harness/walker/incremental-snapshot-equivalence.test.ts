@@ -10,8 +10,12 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
+import { createResource } from '@/core/resource';
+import { createChallengeCategory } from '@/systems/challenge-category';
+import { createProducerCategory } from '@/systems/producer-category';
+import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot, createIncrementalSnapshot } from '@/harness/walker';
@@ -30,7 +34,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('createIncrementalSnapshot — construction', () => {
-  it('returns an empty snapshot when CategoriesKey is not provided', () => {
+  it('returns an empty snapshot when the engine built no categories', () => {
     const engine = createEngine({ gameId: 'inc-no-key', persistence: false });
     engine.start();
     const accessor: GameStateAccessor = {
@@ -46,15 +50,25 @@ describe('createIncrementalSnapshot — construction', () => {
     expect(inc.snapshot.producers).toEqual([]);
   });
 
-  it('returns an empty snapshot when every slice is empty', () => {
+  it('returns an empty snapshot when every category holds no defs', () => {
     const module: EngineModule = {
       id: 'empty-slices',
       install(ctx) {
-        ctx.provide(CategoriesKey, {
-          challenges: [],
-          purchasables: [],
-          producers: [],
-        } as EngineCategories);
+        createChallengeCategory({ id: 'trials' });
+        createPurchasableCategory<{ id: string }>({
+          id: 'upgrades',
+          mapPurchasable: (def) => ({
+            display: { description: def.id },
+            requirements: [],
+            limit: 1,
+          }),
+        });
+        const gold = createResource(0, { id: 'gold' });
+        createProducerCategory<{ id: string }>({
+          id: 'buildings',
+          mapProducer: () => ({ resource: gold, baseRate: 1, trigger: 'continuous' }),
+          registerTick: ctx.onTick,
+        });
       },
     };
     const engine = createEngine({ gameId: 'inc-empty', persistence: false });

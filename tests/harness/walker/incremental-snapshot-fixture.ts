@@ -6,7 +6,7 @@
 
 import { expect } from 'vitest';
 import { reactive, ref } from 'vue';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
@@ -141,12 +141,6 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
           },
         },
       ]);
-
-      ctx.provide(CategoriesKey, {
-        purchasables: [upgrades],
-        producers: [buildings],
-        challenges: [trials],
-      } as EngineCategories);
     },
   };
 

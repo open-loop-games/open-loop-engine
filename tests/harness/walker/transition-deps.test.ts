@@ -78,7 +78,6 @@ describe('emitProducerTransitionsWithDeps', () => {
           registerTick: ctx.onTick,
         });
         category.register(defs);
-        ctx.provide(CategoriesKey, { producers: [category] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'tdeps-producer', persistence: false });
@@ -133,7 +132,7 @@ describe('emitPurchasableTransitionsWithDeps', () => {
   function buildEngine(defs: UpgradeDef[], secondaryName: string) {
     const module: EngineModule = {
       id: 'purchasables-mod',
-      install(ctx) {
+      install() {
         const primary = createResource(0, { id: 'gold', displayName: 'gold' });
         const secondary = createResource(0, { id: secondaryName, displayName: secondaryName });
         const category = createPurchasableCategory<UpgradeDef>({
@@ -148,7 +147,6 @@ describe('emitPurchasableTransitionsWithDeps', () => {
           }),
         });
         category.register(defs);
-        ctx.provide(CategoriesKey, { purchasables: [category] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'tdeps-purchasable', persistence: false });
@@ -209,14 +207,13 @@ describe('emitChallengeTransitionsWithDeps', () => {
   ) {
     const module: EngineModule = {
       id: 'challenges-mod',
-      install(ctx) {
+      install() {
         const challenges = createChallengeCategory({
           id: 'trials',
           mutuallyExclusive: true,
           accessor,
         });
         register(challenges);
-        ctx.provide(CategoriesKey, { challenges: [challenges] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'tdeps-challenge', persistence: false });

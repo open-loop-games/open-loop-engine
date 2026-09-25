@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ref } from 'vue';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { CategoriesKey, createEngine, type EngineModule } from '@/index';
+import { createPurchasableCategory } from '@/systems/purchasable-category';
+import { createCostRequirement } from '@/core/requirements';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
@@ -51,14 +53,13 @@ function buildEngineWithChallenges(
 ) {
   const module: EngineModule = {
     id: 'challenges-mod',
-    install(ctx) {
+    install() {
       const challenges = createChallengeCategory({
         id: categoryId,
         mutuallyExclusive: true,
         accessor,
       });
       register(challenges);
-      ctx.provide(CategoriesKey, { challenges: [challenges] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId: `wct-${categoryId}`, persistence: false });
@@ -72,46 +73,37 @@ function buildEngineWithChallenges(
 // ---------------------------------------------------------------------------
 
 describe('walkChallengeTransitions — discovery degradation', () => {
-  it('returns [] when CategoriesKey is not provided', () => {
+  it('returns [] when the engine built no categories', () => {
     const engine = createEngine({ gameId: 'wct-empty', persistence: false });
     engine.start();
     expect(walkChallengeTransitions(engine, mockAccessor())).toEqual([]);
   });
 
-  it('returns [] when challenges slice is empty', () => {
-    const module: EngineModule = {
-      id: 'empty-mod',
-      install(ctx) {
-        ctx.provide(CategoriesKey, { challenges: [] } as EngineCategories);
-      },
-    };
-    const engine = createEngine({ gameId: 'wct-empty-slice', persistence: false });
-    engine.use(module);
-    engine.start();
-    expect(walkChallengeTransitions(engine, mockAccessor())).toEqual([]);
+  it('returns [] when the challenge category holds no defs', () => {
+    const accessor = mockAccessor();
+    const engine = buildEngineWithChallenges('empty-slice', () => {}, accessor);
+    expect(walkChallengeTransitions(engine, accessor)).toEqual([]);
   });
 
   it('ignores non-challenge category slices', () => {
-    // Walker must filter to `challenges` — non-challenge slices on the same
-    // CategoriesKey object shouldn't leak through.
-    const accessor = mockAccessor();
-    const module: EngineModule = {
-      id: 'mixed-mod',
-      install(ctx) {
-        const challenges = createChallengeCategory({
-          id: 'mix',
-          accessor,
-        });
-        // No defs registered → nothing for this walker to emit.
-        ctx.provide(CategoriesKey, {
-          challenges: [challenges],
-          resources: [], // irrelevant slice, should be ignored
-        } as EngineCategories);
-      },
-    };
+    const accessor = mockAccessor({ rates: { gold: 1 } });
     const engine = createEngine({ gameId: 'wct-mixed', persistence: false });
-    engine.use(module);
+    engine.use({
+      id: 'purchasable-mod',
+      install() {
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+        createPurchasableCategory<{ id: string }>({
+          id: 'upgrades',
+          mapPurchasable: (def) => ({
+            display: { description: def.id },
+            requirements: [createCostRequirement({ resource: gold, cost: 10 })],
+            limit: 1,
+          }),
+        }).register({ id: 'double' });
+      },
+    });
     engine.start();
+    expect(createTransitionSnapshot(engine, accessor).purchasables).not.toEqual([]);
     expect(walkChallengeTransitions(engine, accessor)).toEqual([]);
   });
 });

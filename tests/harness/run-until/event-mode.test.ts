@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  CategoriesKey,
-  createEngine,
-  type Engine,
-  type EngineCategories,
-  type EngineModule,
-} from '@/index';
+import { createEngine, type Engine, type EngineModule } from '@/index';
 import { addResource, createResource } from '@/core/resource';
 import { createMemoryStorage } from '@/core/save-manager';
 import { createCostRequirement } from '@/core/requirements';
@@ -64,7 +58,7 @@ function buildPurchasableEngine(gameId: string): Engine {
   resetAllPersistentContexts();
   const module: EngineModule = {
     id: 'upgrades-only',
-    install(ctx) {
+    install() {
       const gold = createResource(0, { id: 'gold', displayName: 'gold' });
       const upgrades = createPurchasableCategory<UpgradeDef>({
         id: 'upgrades',
@@ -75,7 +69,6 @@ function buildPurchasableEngine(gameId: string): Engine {
         }),
       });
       upgrades.register([{ id: 'cheap', cost: 20 }]);
-      ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -89,7 +82,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   resetAllPersistentContexts();
   const module: EngineModule = {
     id: 'opaque-challenge',
-    install(ctx) {
+    install() {
       const challenges = createChallengeCategory({ id: 'trials', accessor });
       challenges.register({
         id: 'bronze',
@@ -97,7 +90,6 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
         canStart: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
-      ctx.provide(CategoriesKey, { challenges: [challenges] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -260,7 +252,6 @@ describe("runProbe({mode: 'event'})", () => {
           }),
         });
         upgrades.register([{ id: 'cheap', cost: 20 }]);
-        ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
         ctx.onTick(() => {
           tickCount++;
           if (tickCount >= fireAt) flag.fired = true;
@@ -312,7 +303,6 @@ describe("runProbe({mode: 'event'})", () => {
           }),
         });
         upgrades.register([{ id: 'big', cost: 100 }]);
-        ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
         ctx.onTick((dt) => {
           addResource(gold, dt);
         });
@@ -373,7 +363,6 @@ describe("runProbe({mode: 'event'})", () => {
           }),
         });
         upgrades.register([{ id: 'big', cost: 100 }]);
-        ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
         ctx.onTick((dt) => {
           addResource(gold, dt);
         });
@@ -418,7 +407,7 @@ describe("runProbe({mode: 'event'})", () => {
     resetAllPersistentContexts();
     const module: EngineModule = {
       id: 'simtime-bisect',
-      install(ctx) {
+      install() {
         const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -429,7 +418,6 @@ describe("runProbe({mode: 'event'})", () => {
           }),
         });
         upgrades.register([{ id: 'big', cost: 100 }]);
-        ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
       },
     };
     const engine = createEngine({
@@ -511,7 +499,6 @@ function buildGoldEngine(
         }),
       });
       upgrades.register([{ id: 'big', cost: 100 }]);
-      ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
       ctx.onTick((dt) => {
         addResource(gold, dt);
       });
@@ -657,7 +644,6 @@ function buildDrainedEngine(inflowFrom: number) {
       ]);
       const challenge = boards.getChallenge('late')!;
       late = () => challenge.visible.value;
-      ctx.provide(CategoriesKey, { challenges: [boards] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId: `drained-${inflowFrom}`, persistence: false });

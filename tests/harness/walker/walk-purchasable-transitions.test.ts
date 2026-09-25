@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
+import { createChallengeCategory } from '@/systems/challenge-category';
+import { createTransitionSnapshot } from '@/harness/walker';
 import { createResource } from '@/core/resource';
 import { createCostRequirement, createBooleanRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
@@ -64,7 +66,7 @@ function buildEngineWithPurchasables(
   } = {};
   const module: EngineModule = {
     id: 'purchasables-mod',
-    install(ctx) {
+    install() {
       const resource = createResource(resourceInitial, {
         id: resourceName,
         displayName: resourceName,
@@ -84,7 +86,6 @@ function buildEngineWithPurchasables(
       });
       handle.category = category;
       category.register(defs);
-      ctx.provide(CategoriesKey, { purchasables: [category] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -102,38 +103,32 @@ function buildEngineWithPurchasables(
 // ---------------------------------------------------------------------------
 
 describe('walkPurchasableTransitions — discovery degradation', () => {
-  it('returns [] when CategoriesKey is not provided', () => {
+  it('returns [] when the engine built no categories', () => {
     const engine = createEngine({ gameId: 'wpt-empty', persistence: false });
     engine.start();
     expect(walkPurchasableTransitions(engine, mockAccessor())).toEqual([]);
   });
 
-  it('returns [] when purchasables slice is empty', () => {
-    const module: EngineModule = {
-      id: 'empty-mod',
-      install(ctx) {
-        ctx.provide(CategoriesKey, { purchasables: [] } as EngineCategories);
-      },
-    };
-    const engine = createEngine({ gameId: 'wpt-empty-slice', persistence: false });
-    engine.use(module);
-    engine.start();
+  it('returns [] when the purchasable category holds no defs', () => {
+    const { engine } = buildEngineWithPurchasables('wpt-empty-slice', 'upgrades', 'gold', 0, []);
     expect(walkPurchasableTransitions(engine, mockAccessor())).toEqual([]);
   });
 
   it('ignores non-purchasable category slices', () => {
-    const module: EngineModule = {
-      id: 'mixed-mod',
-      install(ctx) {
-        ctx.provide(CategoriesKey, {
-          purchasables: [],
-          resources: [], // irrelevant slice, should be ignored
-        } as EngineCategories);
-      },
-    };
     const engine = createEngine({ gameId: 'wpt-mixed', persistence: false });
-    engine.use(module);
+    engine.use({
+      id: 'challenge-mod',
+      install() {
+        createChallengeCategory({ id: 'trials', accessor: mockAccessor() }).register({
+          id: 'bronze',
+          name: 'Bronze',
+          canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
+          goal: () => false,
+        });
+      },
+    });
     engine.start();
+    expect(createTransitionSnapshot(engine, mockAccessor()).challenges).not.toEqual([]);
     expect(walkPurchasableTransitions(engine, mockAccessor())).toEqual([]);
   });
 });
@@ -199,7 +194,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     const accessor = mockAccessor({ resources: { cookies: 40 }, rates: { cookies: 2 } });
     const module: EngineModule = {
       id: 'divergent-id-mod',
-      install(ctx) {
+      install() {
         const resource = createResource(40, { id: 'cookies', displayName: 'Cookies' });
         const category = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -211,7 +206,6 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
           }),
         });
         category.register([{ id: 'double', cost: 100 }]);
-        ctx.provide(CategoriesKey, { purchasables: [category] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'wpt-divergent-id', persistence: false });
@@ -272,7 +266,7 @@ describe('walkPurchasableTransitions — skip conditions', () => {
     const flag = ref(false);
     const module: EngineModule = {
       id: 'bool-only-mod',
-      install(ctx) {
+      install() {
         const category = createPurchasableCategory<{ id: string }>({
           id: 'flags',
           mapPurchasable: () => ({
@@ -282,7 +276,6 @@ describe('walkPurchasableTransitions — skip conditions', () => {
           }),
         });
         category.register([{ id: 'flip-me' }]);
-        ctx.provide(CategoriesKey, { purchasables: [category] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'wpt-bool', persistence: false });
@@ -328,7 +321,7 @@ describe('walkPurchasableTransitions — purchasable-maxed', () => {
     const accessor = mockAccessor({ resources: { gold: 40 }, rates: { gold: 2 } });
     const module: EngineModule = {
       id: 'inf-mod',
-      install(ctx) {
+      install() {
         const gold = createResource(40, { id: 'gold', displayName: 'gold' });
         const category = createPurchasableCategory<{ id: string; cost: number }>({
           id: 'upgrades',
@@ -339,7 +332,6 @@ describe('walkPurchasableTransitions — purchasable-maxed', () => {
           }),
         });
         category.register([{ id: 'forever', cost: 100 }]);
-        ctx.provide(CategoriesKey, { purchasables: [category] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'wpt-inf', persistence: false });

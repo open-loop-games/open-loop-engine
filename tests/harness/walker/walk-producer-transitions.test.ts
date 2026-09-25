@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
+import { createChallengeCategory } from '@/systems/challenge-category';
+import { createTransitionSnapshot } from '@/harness/walker';
 import { createResource } from '@/core/resource';
 import { createProducerCategory } from '@/systems/producer-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
@@ -80,7 +82,6 @@ function buildEngineWithProducers(
       });
       handle.category = category;
       category.register(defs);
-      ctx.provide(CategoriesKey, { producers: [category] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -114,7 +115,6 @@ function buildEngineWithManualProducer(gameId: string, categoryId: string) {
       });
       handle.category = category;
       category.register([{ id: 'click', baseRate: 1 }]);
-      ctx.provide(CategoriesKey, { producers: [category] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -131,38 +131,32 @@ function buildEngineWithManualProducer(gameId: string, categoryId: string) {
 // ---------------------------------------------------------------------------
 
 describe('walkProducerTransitions — discovery degradation', () => {
-  it('returns [] when CategoriesKey is not provided', () => {
+  it('returns [] when the engine built no categories', () => {
     const engine = createEngine({ gameId: 'wpd-empty', persistence: false });
     engine.start();
     expect(walkProducerTransitions(engine, mockAccessor())).toEqual([]);
   });
 
-  it('returns [] when producers slice is empty', () => {
-    const module: EngineModule = {
-      id: 'empty-mod',
-      install(ctx) {
-        ctx.provide(CategoriesKey, { producers: [] } as EngineCategories);
-      },
-    };
-    const engine = createEngine({ gameId: 'wpd-empty-slice', persistence: false });
-    engine.use(module);
-    engine.start();
+  it('returns [] when the producer category holds no defs', () => {
+    const { engine } = buildEngineWithProducers('wpd-empty-slice', 'buildings', 'gold', []);
     expect(walkProducerTransitions(engine, mockAccessor())).toEqual([]);
   });
 
   it('ignores non-producer category slices', () => {
-    const module: EngineModule = {
-      id: 'mixed-mod',
-      install(ctx) {
-        ctx.provide(CategoriesKey, {
-          producers: [],
-          resources: [], // irrelevant slice, should be ignored
-        } as EngineCategories);
-      },
-    };
     const engine = createEngine({ gameId: 'wpd-mixed', persistence: false });
-    engine.use(module);
+    engine.use({
+      id: 'challenge-mod',
+      install() {
+        createChallengeCategory({ id: 'trials', accessor: mockAccessor() }).register({
+          id: 'bronze',
+          name: 'Bronze',
+          canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
+          goal: () => false,
+        });
+      },
+    });
     engine.start();
+    expect(createTransitionSnapshot(engine, mockAccessor()).challenges).not.toEqual([]);
     expect(walkProducerTransitions(engine, mockAccessor())).toEqual([]);
   });
 });

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import {
-  CategoriesKey,
   createAdditiveModifier,
   createEngine,
   createModifierChain,
@@ -14,7 +13,6 @@ import {
   TuningRegistriesKey,
   tunable,
   type Engine,
-  type EngineCategories,
   type EngineModule,
 } from '@/index';
 import { walkChainRegistry, walkContent, walkTunables } from '@/harness/picker';
@@ -281,7 +279,7 @@ describe('applyPerturbation — chain-registry source', () => {
     }
     const mod: EngineModule = {
       id: 'producers-mod',
-      install(ctx) {
+      install() {
         const producers = createProducerCategory<ProducerDef>({
           id: 'producers',
           mapProducer: (def) => ({ baseRate: def.baseRate }),
@@ -291,7 +289,6 @@ describe('applyPerturbation — chain-registry source', () => {
         producers
           .getProducer('cursor')!
           .rateChain.add(createMultiplicativeModifier({ multiplier: 2 }));
-        ctx.provide(CategoriesKey, { producers: [producers] } as EngineCategories);
       },
     };
     const engine = createEngine({

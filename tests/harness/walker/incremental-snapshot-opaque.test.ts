@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CategoriesKey, createEngine, type EngineCategories, type EngineModule } from '@/index';
+import { createEngine, type EngineModule } from '@/index';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
@@ -33,10 +33,9 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
     let trials!: ReturnType<typeof createChallengeCategory>;
     const module: EngineModule = {
       id: 'inc-opaque',
-      install(ctx) {
+      install() {
         trials = createChallengeCategory({ id: 'trials', accessor });
         trials.register({ id: 'boss', name: 'Boss', goal: () => world.bossDefeated });
-        ctx.provide(CategoriesKey, { challenges: [trials] } as EngineCategories);
       },
     };
     const engine = createEngine({ gameId: 'inc-opaque', persistence: false });

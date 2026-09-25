@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  CategoriesKey,
-  createEngine,
-  type Engine,
-  type EngineCategories,
-  type EngineModule,
-} from '@/index';
+import { createEngine, type Engine, type EngineModule } from '@/index';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
@@ -54,7 +48,7 @@ function buildEmptyEngine(gameId: string): Engine {
 function buildPurchasableEngine(gameId: string): Engine {
   const module: EngineModule = {
     id: 'upgrades-only',
-    install(ctx) {
+    install() {
       const gold = createResource(0, { id: 'gold', displayName: 'gold' });
       const upgrades = createPurchasableCategory<UpgradeDef>({
         id: 'upgrades',
@@ -65,7 +59,6 @@ function buildPurchasableEngine(gameId: string): Engine {
         }),
       });
       upgrades.register([{ id: 'cheap', cost: 20 }]);
-      ctx.provide(CategoriesKey, { purchasables: [upgrades] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });
@@ -77,7 +70,7 @@ function buildPurchasableEngine(gameId: string): Engine {
 function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor): Engine {
   const module: EngineModule = {
     id: 'opaque-challenge',
-    install(ctx) {
+    install() {
       const challenges = createChallengeCategory({ id: 'trials', accessor });
       challenges.register({
         id: 'bronze',
@@ -86,7 +79,6 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
         canStart: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
-      ctx.provide(CategoriesKey, { challenges: [challenges] } as EngineCategories);
     },
   };
   const engine = createEngine({ gameId, persistence: false });

@@ -7,6 +7,8 @@ import {
   CategoriesKey,
   ChainRegistryKey,
   EffectSystemRegistryKey,
+  ResourceRegistryKey,
+  TuningRegistriesKey,
   createModifierChain,
   createTemporaryEffectSystem,
   createPersistentEffectSystem,
@@ -581,6 +583,28 @@ describe('built-in injection keys', () => {
     expect(saveRef).toBeUndefined();
     engine.stop();
   });
+
+  it.each([
+    ['TickDriverKey', TickDriverKey],
+    ['SaveManagerKey', SaveManagerKey],
+    ['ChainRegistryKey', ChainRegistryKey],
+    ['EffectSystemRegistryKey', EffectSystemRegistryKey],
+    ['ResourceRegistryKey', ResourceRegistryKey],
+    ['CategoriesKey', CategoriesKey],
+    ['TuningRegistriesKey', TuningRegistriesKey],
+  ] as [string, InjectionKey<unknown>][])(
+    'ctx.provide(%s, …) throws: the engine owns it',
+    (_, key) => {
+      const engine = createEngine({ gameId: 'test', persistence: false });
+      engine.use({
+        id: 'game',
+        install(ctx) {
+          ctx.provide(key, {});
+        },
+      });
+      expect(() => engine.start()).toThrow(/engine-owned/);
+    },
+  );
 });
 
 describe('CategoriesKey — engine self-publish', () => {
@@ -632,45 +656,6 @@ describe('CategoriesKey — engine self-publish', () => {
     // Adapter walks a category by its public API.
     const firstUpgrade = discovered!.purchasables![0].getAll()[0];
     expect(firstUpgrade.def.id).toBe('double-gold');
-    engine.stop();
-  });
-
-  it('back-compat: consumer ctx.provide(CategoriesKey, ...) overwrites the engine pre-provide', () => {
-    interface UpgDef {
-      id: string;
-      cost: number;
-    }
-
-    const externalUpgrades = createPurchasableCategory<UpgDef>({
-      id: 'external-upgrades',
-      mapPurchasable: () => ({ display: {}, requirements: [], effect: 1 }),
-    });
-    externalUpgrades.register({ id: 'extra-gold', cost: 50 });
-
-    const game: EngineModule = {
-      id: 'game',
-      install(ctx) {
-        ctx.provide(CategoriesKey, { purchasables: [externalUpgrades] });
-      },
-    };
-
-    let discovered: EngineCategories | undefined;
-    const introspector: EngineModule = {
-      id: 'introspector',
-      dependencies: ['game'],
-      install(ctx) {
-        discovered = ctx.tryInject(CategoriesKey);
-      },
-    };
-
-    const engine = createEngine({ gameId: 'test', persistence: false });
-    engine.use(introspector);
-    engine.use(game);
-    engine.start();
-
-    expect(discovered).toBeDefined();
-    expect(discovered!.purchasables).toHaveLength(1);
-    expect(discovered!.purchasables![0].getAll()[0].def.id).toBe('extra-gold');
     engine.stop();
   });
 

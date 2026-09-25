@@ -19,17 +19,11 @@
  * throwaway scripts) silently skip registration — the primitive still
  * works, just isn't discoverable via `tryInject`.
  *
- * A consumer-side `ctx.provide(CategoriesKey, ...)` replaces only the
- * discovery view that `tryInject(CategoriesKey)` returns — harness walkers,
- * picker and perturbation read that one. Category factories keep appending
- * to the engine's accumulator, and Gates keep resolving against it, so the
- * two views diverge from the first category built after the provide. Use
- * the provide only to narrow what tooling walks, and never spread-merge the
- * previous value into it: the copy stops receiving new slots.
+ * The key is engine-owned: `ctx.provide(CategoriesKey, ...)` throws, so
+ * tooling, Gates and category factories always share the one accumulator.
  */
 
 import type { InjectionKey } from '@/primitives/types';
-import type { Resource } from '@/core/resource';
 import type { AchievementCategory } from './achievement-category';
 import type { ActionCategory } from './action-category';
 import type { ChallengeCategory } from './challenge-category';
@@ -87,28 +81,15 @@ export interface EngineCategories {
   /** Action categories (ordered-execution queues with per-execution state machine) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   actions?: ActionCategory<any, any, any>[];
-  /**
-   * Game-published resource list. Optional — the engine already maintains
-   * a per-engine resource registry (see {@link ResourceRegistryKey}), so
-   * most discovery consumers can skip this field and read the registry
-   * directly. Not auto-populated by the engine; only present when a
-   * consumer explicitly publishes via `provide(CategoriesKey, ...)`.
-   */
-  resources?: Resource[];
 }
 
 /**
  * Discovery key for external introspection tools (sim, devtools). The
  * engine pre-provides an {@link EngineCategories} accumulator under this
  * key and self-populates it as category factories run during `install()`
- * and `connect()`. Consume via `engine.tryInject(CategoriesKey)`.
- *
- * A consumer-side `ctx.provide(CategoriesKey, value)` replaces the
- * discovery view only: Gates and later category factories keep the engine's
- * full accumulator, so the provided value never sees categories built after
- * it. Use it to narrow what tooling walks, never spread-merge the previous
- * value into it, and don't publish at all just to expose categories — the
- * engine already does.
+ * and `connect()`. Consume via `engine.tryInject(CategoriesKey)`. The key
+ * is engine-owned — `ctx.provide(CategoriesKey, ...)` throws. Resources
+ * are discovered through `ResourceRegistryKey`.
  *
  * @see {@link EngineCategories} — the published shape
  */
