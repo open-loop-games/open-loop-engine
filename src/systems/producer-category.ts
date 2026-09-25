@@ -55,7 +55,10 @@ export interface ProducerPurchaseConfig {
   onPurchase?: (amount: DecimalSource) => void;
   /** Whether this producer is visible in the UI */
   visibility?: Computable<boolean>;
-  /** Allow purchasing multiple levels at once */
+  /**
+   * Whether a bare `repeatable.purchase()` buys as many as affordable rather
+   * than one; `purchase(1)` buys one either way. Default: `true`
+   */
   bulkPurchase?: Computable<boolean>;
 }
 
@@ -68,9 +71,16 @@ export interface ProducerMapping {
   resource: Resource;
   /** Base production: per unit per second (continuous) or per activation (manual) */
   baseRate: DecimalSource;
-  /** `'continuous'` runs every tick; `'manual'` exposes `.activate()` */
+  /**
+   * `'continuous'` runs every tick; `'manual'` exposes `.activate()`, which
+   * credits `computedRate` once regardless of `count`.
+   */
   trigger: 'continuous' | 'manual';
-  /** If present, creates a ScalingPurchasable for purchase count */
+  /**
+   * If present, creates a ScalingPurchasable for purchase count. On a
+   * `'manual'` producer the count changes nothing `activate` yields, so the
+   * purchase is count-inert there.
+   */
   purchase?: ProducerPurchaseConfig;
   /** Display description for the repeatable (if purchase config present) */
   display?: string;
@@ -140,9 +150,21 @@ export interface ProducerCategoryOptions<Def extends { id: string }, State = voi
  * add modifiers here to boost production.
  */
 export interface Producer {
-  /** Modifier chain for this producer's rate — add bonuses here */
+  /**
+   * Modifier chain for this producer's rate — the seam where upgrades,
+   * synergies and headline multipliers reach its output. A shared chain
+   * counts only once bound in (`producer.rateChain.bind({ modifier: shared })`,
+   * typically from `mapState`, which also runs for producers a mod registers).
+   *
+   * Applies to `baseRate` per unit, before `count` multiplies in, so a flat
+   * `+5` here yields `5 × count`. A flat production-wide bonus belongs on the
+   * resource side, e.g. a producer with no purchase config, whose count is 1.
+   */
   readonly rateChain: ModifierChain;
-  /** Effective rate after all modifiers applied to baseRate */
+  /**
+   * Per-unit rate: `baseRate` after `rateChain`, per second (continuous) or
+   * per activation (manual). A continuous producer's output is this × `count`.
+   */
   readonly computedRate: ComputedRef<DecimalSource>;
   /** The resource this producer generates */
   readonly resource: Resource;
@@ -173,26 +195,28 @@ export interface Producer {
   /**
    * Effective production count: `ownedCount + extraCount`, falling back to 1
    * when neither is configured (the click-clicker default). Drives the tick
-   * body, payback metric, total-rate aggregation, and the entry's `count`
-   * signal. For effects or costs that should apply to a single axis, bind
-   * `ownedCount` or `extraCount` directly instead.
+   * body, `purchaseBeatSeconds`, total-rate aggregation, and the entry's
+   * `count` signal; `activate` ignores it. For effects or costs that should
+   * apply to a single axis, bind `ownedCount` or `extraCount` directly instead.
    */
   readonly count: ComputedRef<DecimalSource>;
   /**
-   * Single-unit payback metric used by {@link setupPolicyAutoPurchase}'s
-   * payback-period selection: `getCost(1) / (computedRate * max(1, count))`.
-   * Returns `Infinity` when nothing is buyable or rate is zero.
+   * Seconds this producer's whole stack takes to earn the price of its next
+   * unit: `getCost(1) / (computedRate * max(1, count))`. Returns `Infinity`
+   * when nothing is buyable or rate is zero.
+   *
+   * A stack-amortized beat, not a payback period. The next unit adds only
+   * `computedRate`, so its own payback is `getCost(1) / computedRate`, longer
+   * than this by the stack height: a tall stack reads as a short beat even
+   * when its marginal unit pays back slowly. Compute marginal payback inline
+   * when that is the question.
    *
    * Not a prediction of when the producer will become buyable from the
    * player's funding sources — that distinction is documented inline at
-   * `harness/walker/walk-producer-transitions.ts`. For bulk-aware or
-   * multi-producer payback math, compute inline; this field is deliberately
-   * single-unit.
+   * `harness/walker/walk-producer-transitions.ts`.
    *
    * When `extraCount` is wired (cascade-feed), the denominator's `count`
-   * carries the cascade-amplified `(owned + generated)` — single-unit cost
-   * stays amortized across the effective count, matching the canonical
-   * AD-shape "buying one more T(N) on top of a tall stack pays back fast."
+   * carries the cascade-amplified `(owned + generated)`.
    */
   readonly purchaseBeatSeconds: ComputedRef<number>;
 }
@@ -309,7 +333,7 @@ function buildProducer<Def extends { id: string }>(
     };
   }
 
-  // Single-unit beat: cost / (rate * max(1, count)). Infinity when nothing
+  // Stack-amortized beat: cost / (rate * max(1, count)). Infinity when nothing
   // is buyable or rate is zero so consumers can branch on a finite check
   // without wrapping the call.
   const purchaseBeatSeconds = computed<number>(() => {

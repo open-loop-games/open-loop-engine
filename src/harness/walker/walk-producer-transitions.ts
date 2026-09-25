@@ -23,17 +23,17 @@
  *
  * ## Separation from `producer.purchaseBeatSeconds`
  *
- * `purchaseBeatSeconds` is a **payback-period** metric: `cost / (rate ×
- * max(1, count))`, using the producer's own per-unit rate as the
- * denominator regardless of whether the player has any income. It is
- * consumed directly off the producer instance by the `payback-period`
- * auto-buy policy and by UI bindings that format "payback in Ns". It is
+ * `purchaseBeatSeconds` is a **stack-earning** metric: `cost / (rate ×
+ * max(1, count))`, using the producer's own output as the denominator
+ * regardless of whether the player has any income. It is consumed
+ * directly off the producer instance by the `payback-period` auto-buy
+ * policy and by UI bindings that format a per-purchase beat. It is
  * *not* a prediction of when the producer will become buyable from the
  * player's actual funding sources, so the walker — whose snapshot feeds
  * event-chain consumers (event-driven probe, countdown hints, stasis
  * analyzers) — emits the accessor-driven prediction instead. Keeping the
  * two surfaces disjoint means consumers always read the primitive their
- * question is framed against: payback on the instance, event prediction
+ * question is framed against: the beat on the instance, event prediction
  * on the snapshot.
  *
  * Multi-cost repeatables use the first cost requirement's resource —
