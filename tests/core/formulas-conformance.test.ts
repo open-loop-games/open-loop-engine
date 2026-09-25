@@ -309,6 +309,17 @@ function expectRoundTrip(formula: GenericFormula, x: DecimalSource, tol: number)
   ).toBe(true);
 }
 
+/** Σ term(from + i) for i in [0, count) — the definition of a discrete bulk sum. */
+function bruteSum(
+  term: (x: Decimal) => DecimalSource,
+  from: DecimalSource,
+  count: number,
+): Decimal {
+  let total = new Decimal(0);
+  for (let i = 0; i < count; i++) total = total.add(term(Decimal.add(from, i)));
+  return total;
+}
+
 // === LAWS ===
 
 describe('round-trip: invert(evaluate(x)) === x', () => {
@@ -1152,15 +1163,6 @@ describe('cumulative cost: integral vs discrete sum', () => {
   // uncertainty is about. Pinning both halves so any renaming or splitting has
   // to preserve the arithmetic.
 
-  /** Σ f(start + i) for i in [0, n) — the definition of a discrete bulk cost. */
-  function discreteSum(formula: GenericFormula, start: DecimalSource, n: number): Decimal {
-    let total = new Decimal(0);
-    for (let i = 0; i < n; i++) {
-      total = total.add(formula.evaluate(Decimal.add(start, i)));
-    }
-    return total;
-  }
-
   const CURVES: Record<string, () => GenericFormula> = {
     'exponential 10·1.15ⁿ': () => Formula.exponential(0, 10, 1.15),
     'linear 5n+10': () => Formula.linear(0, 10, 5),
@@ -1172,7 +1174,7 @@ describe('cumulative cost: integral vs discrete sum', () => {
       const formula = build() as GenericFormula;
       for (const n of [1, 2, 5, 8]) {
         const cost = calculateCost(formula, n, true);
-        const truth = discreteSum(formula, 0, n);
+        const truth = bruteSum((x) => formula.evaluate(x), 0, n);
         expect(
           Decimal.lte(relativeError(cost, truth), 1e-12),
           `${name} n=${n}: calculateCost=${String(cost)}, Σ=${truth.toString()}`,
@@ -1189,7 +1191,7 @@ describe('cumulative cost: integral vs discrete sum', () => {
     // no longer reachable by accident.
     const formula = Formula.exponential(0, 10, 1.15) as GenericFormula;
     const n = 8;
-    const summed = discreteSum(formula, 0, n);
+    const summed = bruteSum((x) => formula.evaluate(x), 0, n);
     expect(Decimal.lte(relativeError(calculateCost(formula, n, true), summed), 1e-12)).toBe(true);
 
     const area = formula.cumulative(0, n);
@@ -1204,19 +1206,12 @@ describe('series: the closed forms match brute-force summation', () => {
   // `arithmeticSeries` and `geometricSeries` are documented exact for any real
   // `from`, so the sweep crosses zero, takes fractions, and climbs into layer 1.
 
-  /** Σ term(from + i) for i in [0, count) — the definition. */
-  function brute(term: (x: Decimal) => DecimalSource, from: DecimalSource, count: number): Decimal {
-    let total = new Decimal(0);
-    for (let i = 0; i < count; i++) total = total.add(term(Decimal.add(from, i)));
-    return total;
-  }
-
   const COUNTS = [0, 1, 2, 5, 30];
 
   test('arithmeticSeries — Σ(a + i)', () => {
     for (const from of ['-137.5', '-2.5', '0', '0.25', '1', '7', '1000', '1e6', '1e12']) {
       for (const count of COUNTS) {
-        const truth = brute((x) => x, from, count);
+        const truth = bruteSum((x) => x, from, count);
         expect(
           Decimal.lte(relativeError(arithmeticSeries(from, count), truth), 1e-12),
           `from=${from} count=${count}`,
@@ -1229,7 +1224,7 @@ describe('series: the closed forms match brute-force summation', () => {
     for (const base of ['1.05', '1.15', '1.5', '2', '3', '10']) {
       for (const from of ['-5', '0', '0.5', '1', '13']) {
         for (const count of COUNTS) {
-          const truth = brute((x) => Decimal.pow(base, x), from, count);
+          const truth = bruteSum((x) => Decimal.pow(base, x), from, count);
           expect(
             Decimal.lte(relativeError(geometricSeries(base, from, count), truth), 1e-12),
             `base=${base} from=${from} count=${count}`,
@@ -1247,7 +1242,7 @@ describe('series: the closed forms match brute-force summation', () => {
       ['2', '1e5'],
     ]) {
       for (const count of [1, 2, 5, 30]) {
-        const truth = brute((x) => Decimal.pow(base, x), from, count);
+        const truth = bruteSum((x) => Decimal.pow(base, x), from, count);
         const tol = Math.max(1e-12, 4 * representationFloor(truth));
         const err = new Decimal(geometricSeries(base, from, count)).div(truth).sub(1).abs();
         expect(
@@ -1265,7 +1260,7 @@ describe('series: the closed forms match brute-force summation', () => {
           const value = powerSeries(p, from, count);
           const label = `p=${p} from=${from} count=${count}`;
           expect(value, `${label} returned null`).not.toBeNull();
-          const truth = brute((x) => Decimal.pow(x, p), from, count);
+          const truth = bruteSum((x) => Decimal.pow(x, p), from, count);
           expect(
             Decimal.lte(relativeError(value!, truth), 1e-12),
             `${label}: got ${String(value)}, want ${truth.toString()}`,
@@ -1282,12 +1277,6 @@ describe('series: every grade Formula.sum gives holds against brute force', () =
   // `approximate` one sits within the error it reports. Chains that reach the
   // Euler–Maclaurin arm only past the term-by-term span are swept there below,
   // against the oracle.
-
-  function bruteSum(formula: GenericFormula, from: DecimalSource, count: number): Decimal {
-    let total = new Decimal(0);
-    for (let i = 0; i < count; i++) total = total.add(formula.evaluate(Decimal.add(from, i)));
-    return total;
-  }
 
   const CHAINS: Record<string, () => GenericFormula> = {
     'exponential 10·1.15ⁿ': () => Formula.exponential(0, 10, 1.15),
@@ -1317,7 +1306,7 @@ describe('series: every grade Formula.sum gives holds against brute force', () =
           const label = `${name} from=${from} count=${count}`;
           expect(errors, `${label} logged`).toEqual([]);
           expect(series.reason, label).not.toBe('not-summable');
-          const truth = bruteSum(formula, from, count);
+          const truth = bruteSum((x) => formula.evaluate(x), from, count);
           const err = relativeError(series.value!, truth);
           const bound = series.reason === 'approximate' ? series.error : 1e-12;
           expect(
@@ -1335,7 +1324,7 @@ describe('series: every grade Formula.sum gives holds against brute force', () =
     for (const [name, build] of Object.entries(CHAINS)) {
       const formula = build();
       const series = formula.sum(4, 2.5);
-      const truth = bruteSum(formula, 4, 3);
+      const truth = bruteSum((x) => formula.evaluate(x), 4, 3);
       expect(
         Decimal.lte(relativeError(series.value!, truth), 1e-12),
         `${name}: ${String(series.value)} vs Σ ${truth.toString()}`,
@@ -1656,16 +1645,8 @@ describe('magnitude regimes: laws hold where no oracle can reach', () => {
    *
    * The consumer-facing consequence, which belongs in the contract: a
    * first-passage computed at layer 1 carries roughly `16 − log₁₀(log₁₀ x)`
-   * significant digits, not 16.
+   * significant digits, not 16. `inversionTolerance` is exactly this bound.
    */
-  const EPSILON = 2.220446049250313e-16;
-  function representationFloor(x: DecimalSource): number {
-    const exponent = Math.abs(Decimal.log10(Decimal.abs(x)).toNumber());
-    if (!Number.isFinite(exponent) || exponent <= 308) return DEFAULT_TOL;
-    // ×4 headroom so the bound tracks the representation rather than one op's
-    // particular rounding, and stays a fence instead of a knife-edge.
-    return Math.max(DEFAULT_TOL, EPSILON * exponent * Math.LN10 * 4);
-  }
 
   // Round-trip is graded in input space, so it stays meaningful at every layer:
   // the answer comes back into the same coordinate the input was stated in.
@@ -1680,7 +1661,7 @@ describe('magnitude regimes: laws hold where no oracle can reach', () => {
       for (const [name, op] of Object.entries(PAIRS)) {
         test(`${name} — ${regime}`, () => {
           for (const x of samples) {
-            expectRoundTrip(op(F.variable(x)), x, representationFloor(x));
+            expectRoundTrip(op(F.variable(x)), x, inversionTolerance(x));
           }
         });
       }
