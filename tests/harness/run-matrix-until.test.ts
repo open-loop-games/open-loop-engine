@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import type { Engine } from '@/index';
+import { random } from '@/primitives/rng';
 import { runMatrixUntil, runMatrix } from '@/harness';
 import type { CellResult, MatrixUntilWorkItem, RunUntilResult, UntilCell } from '@/harness';
 
@@ -80,6 +81,30 @@ describe('runMatrixUntil', () => {
     // One stop() per (cell × seed) run — none left ticking.
     expect(stops).toHaveLength(3);
     expect(built).toBe(3);
+  });
+
+  it('seeds the RNG before buildEngine, so construction draws are independent of sweep order', () => {
+    const sweep = (seeds: number[]): Map<number, number> => {
+      const draws = new Map<number, number>();
+      runMatrixUntil({
+        cells: [
+          {
+            name: 'draws-at-build',
+            buildEngine: ({ seed }) => {
+              draws.set(seed, random());
+              return buildTestEngine({ tick: 0, lastDt: 0 });
+            },
+          },
+        ],
+        seeds,
+        until: () => true,
+        maxSimTime: 1,
+      });
+      return draws;
+    };
+    const alone = sweep([1]);
+    const second = sweep([2, 1]);
+    expect(second.get(1)).toBe(alone.get(1));
   });
 
   it('runs cells × seeds, fresh engine per run, predicate-terminated', () => {

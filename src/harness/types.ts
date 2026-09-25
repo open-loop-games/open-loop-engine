@@ -506,7 +506,10 @@ export interface UntilCell {
   /**
    * Build a fresh engine for this `(cell, seed)`. Consumers typically call
    * `createEngine` or `createEngineFromSave` here; the engine must be
-   * started (the helper or consumer calls `engine.start()`).
+   * started (the helper or consumer calls `engine.start()`). The global RNG
+   * is seeded with `ctx.seed` just before the call, so construction draws
+   * don't depend on sweep order, and reseeded before the first tick. The
+   * runner stops the engine after its run.
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**

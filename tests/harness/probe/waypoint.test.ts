@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Engine } from '@/index';
+import { random } from '@/primitives/rng';
 import { runWaypointProbe } from '@/harness';
 
 /** Minimal engine whose counter advances one tick per simulateTick(dt) call. */
@@ -57,5 +58,56 @@ describe('runWaypointProbe', () => {
     expect(snapshots).toHaveLength(3);
     expect(snapshots.map((s) => s.seed)).toEqual([10, 20, 30]);
     expect(seenSeeds).toEqual([10, 20, 30]);
+  });
+
+  it('seeds the RNG before buildEngine, so every waypoint builds the same engine per seed', () => {
+    const draws: number[] = [];
+    runWaypointProbe({
+      buildEngine: () => {
+        draws.push(random());
+        return buildTickCounterEngine({ tick: 0, simTime: 0 });
+      },
+      waypoints: [
+        { id: 'w1', snapshotAtSec: 1 },
+        { id: 'w2', snapshotAtSec: 2 },
+      ],
+      inspect: () => null,
+      seeds: [5],
+    });
+    expect(draws).toHaveLength(2);
+    expect(draws[1]).toBe(draws[0]);
+  });
+
+  it('stops every engine it builds, even when inspect throws', () => {
+    const stops: number[] = [];
+    let built = 0;
+    const buildEngine = () => {
+      const id = built++;
+      return {
+        tickDriver: { simulateTick: () => {} },
+        stop: () => stops.push(id),
+      } as unknown as Engine;
+    };
+    runWaypointProbe({
+      buildEngine,
+      waypoints: [
+        { id: 'w1', snapshotAtSec: 1 },
+        { id: 'w2', snapshotAtSec: 2 },
+      ],
+      inspect: () => null,
+      seeds: [1, 2],
+    });
+    expect(stops).toEqual([0, 1, 2, 3]);
+
+    expect(() =>
+      runWaypointProbe({
+        buildEngine,
+        waypoints: [{ id: 'w3', snapshotAtSec: 1 }],
+        inspect: () => {
+          throw new Error('inspect failed');
+        },
+      }),
+    ).toThrow('inspect failed');
+    expect(stops).toEqual([0, 1, 2, 3, 4]);
   });
 });

@@ -12,6 +12,7 @@
  * @cluster runners
  */
 
+import { seedRNG } from '@/primitives/rng';
 import { runUntil } from './run-until';
 import { aggregateUntilCell } from './aggregate';
 import { createWorkPlan } from './work-plan';
@@ -67,6 +68,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
 
   for (const item of plan) {
     const { cell, seed } = item;
+    seedRNG(seed);
     const engine = cell.buildEngine({ seed });
     const analyzers = cell.analyzers;
     const accessor = cell.buildAccessor?.(engine);

@@ -86,9 +86,12 @@ let runCounter = 0;
  * {@link runSensitivity}.
  *
  * The returned cell holds the current run's engine in closure; setup
- * replaces it on each re-entry, so runs execute correctly in the harness's
- * sync sequential cycle. Multiple concurrent invocations of a single cell
- * are not supported — matrix execution is sync-sequential by design.
+ * disposes it and builds the next on each re-entry, so runs execute
+ * correctly in the harness's sync sequential cycle. `Cell` has no teardown
+ * hook, so the last run's engine — and its persistent refs — stays live
+ * until the cell sets up again: at most one retained engine per cell.
+ * Multiple concurrent invocations of a single cell are not supported —
+ * matrix execution is sync-sequential by design.
  *
  * @param options - {@link CreateSensitivityCellOptions} — save blob, module
  *   factory, tick handler, optional perturb / analyzer hooks.
@@ -128,7 +131,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
   const setup = (ctx: RunContext): Analyzer[] => {
     for (const unsub of loopFinalizeUnsubs) unsub();
     loopFinalizeUnsubs = [];
-    currentEngine?.stop();
+    currentEngine?.dispose();
     const engine = createEngineFromSave({
       saveBlob,
       modules: modules(),

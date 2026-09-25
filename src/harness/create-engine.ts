@@ -30,9 +30,9 @@ export interface CreateEngineFromSaveOptions {
   /** Modules to install on the new engine, in order. */
   modules: EngineModule[];
   /**
-   * Persistence namespace. Must be unique across concurrent/sequential
-   * engines so persistent-ref contexts and storage keys don't alias.
-   * Defaults to `'workbench-scratch'`.
+   * Persistence namespace. Must be unique among engines not yet disposed so
+   * persistent-ref contexts and storage keys don't alias. Defaults to a
+   * fresh `'workbench-scratch-<n>'` per call.
    */
   namespace?: string;
   /**
@@ -54,13 +54,21 @@ export interface CreateEngineFromSaveOptions {
  * real `setInterval` — the workbench drives ticks manually and a self-ticking
  * scratch engine would both race the manual stepping and leak. Pass
  * `config.timerProvider` to opt into a real timer (then the caller owns
- * stopping it). Memory-backed storage and namespaced refs are GC'd when the
- * reference is dropped.
+ * stopping it). The caller owns the engine: its namespaced persistent refs
+ * stay in the process-wide registry until `engine.dispose()`, so dropping
+ * the reference alone retains them.
  *
  * @internal
  */
+let scratchCounter = 0;
+
 export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine {
-  const { saveBlob, modules, namespace = 'workbench-scratch', config = {} } = options;
+  const {
+    saveBlob,
+    modules,
+    namespace = `workbench-scratch-${scratchCounter++}`,
+    config = {},
+  } = options;
 
   // Adopt the source envelope's gameId so saveManager.importSave's gameId
   // guard accepts the blob. The scratch engine is otherwise isolated via
@@ -88,7 +96,7 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
 
   const result = engine.saveManager!.importSave(saveBlob);
   if (!result.success) {
-    engine.stop();
+    engine.dispose();
     throw new Error('createEngineFromSave: failed to import save blob');
   }
 

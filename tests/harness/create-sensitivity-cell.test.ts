@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEngine, persistent, type Engine, type EngineModule } from '@/index';
+import { getAllPersistentRefs, getPersistenceNamespace } from '@/core/persistence';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import { createSensitivityCell, runSensitivity, type RunContext } from '@/harness';
 
@@ -81,6 +82,37 @@ describe('createEngineFromSave', () => {
     });
     expect(derived).toBe(42);
     engine.dispose();
+  });
+
+  it('releases the namespace of a failed import, so the next call under it succeeds', async () => {
+    const { createEngineFromSave } = await import('@/harness/create-engine');
+    const good = makeLiveSave(7);
+    const corrupt = JSON.stringify({ ...JSON.parse(good), data: 'not-a-save' });
+    expect(() =>
+      createEngineFromSave({
+        saveBlob: corrupt,
+        modules: [makeGoldModule(0).mod],
+        namespace: 'from-save-retry',
+      }),
+    ).toThrow(/failed to import/);
+
+    const { mod, refs } = makeGoldModule(0);
+    const engine = createEngineFromSave({
+      saveBlob: good,
+      modules: [mod],
+      namespace: 'from-save-retry',
+    });
+    expect(refs.gold!.value).toBe(7);
+    engine.dispose();
+  });
+
+  it('gives each call its own namespace by default', async () => {
+    const { createEngineFromSave } = await import('@/harness/create-engine');
+    const blob = makeLiveSave(3);
+    const first = createEngineFromSave({ saveBlob: blob, modules: [makeGoldModule(0).mod] });
+    const second = createEngineFromSave({ saveBlob: blob, modules: [makeGoldModule(0).mod] });
+    first.dispose();
+    second.dispose();
   });
 });
 
@@ -214,5 +246,32 @@ describe('createSensitivityCell', () => {
     } finally {
       setIntervalSpy.mockRestore();
     }
+  });
+
+  it("disposes each run's engine when the next run sets up", () => {
+    const blob = makeLiveSave(5);
+    const namespaces: string[] = [];
+    const cell = createSensitivityCell({
+      name: 'disposal',
+      saveBlob: blob,
+      modules: () => [
+        {
+          id: 'economy',
+          install() {
+            namespaces.push(getPersistenceNamespace()!);
+            persistent(0, { name: 'gold' });
+          },
+        },
+      ],
+      tick: (engine) => engine.tickDriver.stepOnce(),
+      ticks: 1,
+    });
+    for (const seed of [1, 2, 3]) cell.setup({ seed });
+
+    expect(namespaces).toHaveLength(3);
+    expect(getAllPersistentRefs(namespaces[0]).size).toBe(0);
+    expect(getAllPersistentRefs(namespaces[1]).size).toBe(0);
+    // The last run's engine stays live until the cell sets up again.
+    expect(getAllPersistentRefs(namespaces[2]).size).toBeGreaterThan(0);
   });
 });

@@ -67,7 +67,10 @@ export interface BeatResult {
  * through the walker.
  */
 export interface ProbeConfig {
-  /** Build a fresh, started engine for each `(beat × seed)` run. */
+  /**
+   * Build a fresh, started engine for each `(beat × seed)` run. Seeding and
+   * stopping follow {@link UntilCell.buildEngine}.
+   */
   buildEngine: (ctx: RunContext) => Engine;
   /**
    * Build a read-side accessor for a freshly-built engine. Required when
