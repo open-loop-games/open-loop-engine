@@ -140,6 +140,7 @@ export function createInventory(options: InventoryOptions): Inventory {
       for (const itemId of items) {
         const initialAmount = initial[itemId] ?? 0;
         const resource = createResource<DecimalSource>(initialAmount, {
+          id: itemId,
           displayName: itemId,
         });
         bag.link(itemId, resource);

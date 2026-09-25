@@ -59,7 +59,7 @@ export interface ResourcePeakMetrics {
  *
  * @example
  * ```ts
- * const gold = createResource(0, { displayName: 'gold' });
+ * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
  * const tracker = createResourcePeakTracker(gold);
  * runHeadless({ analyzers: [tracker], ... });
  * // tracker.summarize().metrics → { peak, final, avg }

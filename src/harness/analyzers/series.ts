@@ -38,7 +38,7 @@ import { Decimal } from '@/primitives/decimal';
  *
  * @example
  * ```ts
- * const gold = createResource(0, { displayName: 'gold' });
+ * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
  * const tracker = createSeriesTracker(gold);
  * runHeadless({ analyzers: [tracker], ticks: 200, ... });
  * // tracker.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }

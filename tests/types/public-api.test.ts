@@ -94,7 +94,7 @@ describe('createEngine type surface', () => {
 
 describe('createResource overloads', () => {
   it('default-value overload returns Resource & Persistent', () => {
-    const r = createResource(0, { displayName: 'points' });
+    const r = createResource(0, { id: 'points', displayName: 'points' });
     // Must be persistent — this is the contract that makes save-collection work.
     // If a refactor drops the Persistent brand from this overload, resources
     // stop auto-saving and this pin fails loudly.
@@ -111,12 +111,12 @@ describe('createResource overloads', () => {
     // contract is T-independent, and Resource<Decimal> blows up vitest's
     // structural diff over Decimal's ~130 members — a matcher artifact.
     const source: Ref<number> = ref(0);
-    const r = createResource(source, { displayName: 'derived' });
+    const r = createResource(source, { id: 'derived', displayName: 'derived' });
     expectTypeOf(r).toEqualTypeOf<Resource<number>>();
   });
 
   it('resource exposes id, displayName, and precision', () => {
-    const r = createResource(0, { displayName: 'points' });
+    const r = createResource(0, { id: 'points', displayName: 'points' });
     expectTypeOf(r.id).toBeString();
     expectTypeOf(r.displayName).toBeString();
     expectTypeOf(r.precision).toBeNumber();

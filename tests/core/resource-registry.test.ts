@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ref } from 'vue';
 import { createEngine } from '@/index';
 import type { EngineModule } from '@/index';
 import { createResource } from '@/core/resource';
@@ -8,7 +9,7 @@ function goldModule(displayName: string): EngineModule {
   return {
     id: `${displayName}-mod`,
     install() {
-      createResource(0, { displayName });
+      createResource(0, { id: displayName, displayName });
     },
   };
 }
@@ -85,13 +86,18 @@ describe('engine-scoped resource registry', () => {
     engine.stop();
   });
 
-  it('findById falls back to displayName when no explicit id was set', () => {
+  it('findById falls back to displayName for a wrapped ref, which saves nothing', () => {
     const engine = testEngine('reg-find-by-id-fallback');
-    engine.use(goldModule('gold'));
+    engine.use({
+      id: 'income-mod',
+      install() {
+        createResource(ref(0), { displayName: 'income' });
+      },
+    });
     engine.start();
 
     const registry = engine.tryInject(ResourceRegistryKey)!;
-    expect(registry.findById('gold')).toBeDefined();
+    expect(registry.findById('income')).toBeDefined();
 
     engine.stop();
   });
@@ -118,7 +124,7 @@ describe('engine-scoped resource registry', () => {
   it('createResource outside an engine silently skips registration (does not throw)', () => {
     // Top-level resource — no ambient registry, no engine. Must still work as
     // a plain reactive ref for tests and throwaway scripts.
-    const orphan = createResource(0, { displayName: 'orphan' });
+    const orphan = createResource(0, { id: 'orphan', displayName: 'orphan' });
     expect(orphan.displayName).toBe('orphan');
     expect(orphan.value).toEqual(expect.anything());
   });

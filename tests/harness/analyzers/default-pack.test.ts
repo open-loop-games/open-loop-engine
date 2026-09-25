@@ -33,8 +33,12 @@ function testEngine(gameId: string, overrides: Partial<EngineConfig> = {}) {
 describe('defaultAnalyzerPack', () => {
   it('builds one resource-peak tracker per resource registered on the engine', () => {
     const engine = testEngine('pack-resources');
-    engine.use(resourceModule('gold-mod', () => createResource(0, { displayName: 'gold' })));
-    engine.use(resourceModule('gems-mod', () => createResource(0, { displayName: 'gems' })));
+    engine.use(
+      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
+    );
+    engine.use(
+      resourceModule('gems-mod', () => createResource(0, { id: 'gems', displayName: 'gems' })),
+    );
     engine.start();
 
     const pack = defaultAnalyzerPack(engine);
@@ -48,7 +52,7 @@ describe('defaultAnalyzerPack', () => {
     const mod: EngineModule = {
       id: 'game',
       install(ctx) {
-        createResource(0, { displayName: 'gold' });
+        createResource(0, { id: 'gold', displayName: 'gold' });
         const cycle = createCycle({
           endCondition: () => false,
           thingsToReset: [],
@@ -71,7 +75,9 @@ describe('defaultAnalyzerPack', () => {
 
   it('omits the cycle-finalize tracker when no CycleLog is published', () => {
     const engine = testEngine('pack-no-looplog');
-    engine.use(resourceModule('gold-mod', () => createResource(0, { displayName: 'gold' })));
+    engine.use(
+      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
+    );
     engine.start();
 
     const pack = defaultAnalyzerPack(engine);
@@ -81,7 +87,9 @@ describe('defaultAnalyzerPack', () => {
 
   it('returns fresh tracker instances per call (no state bleed)', () => {
     const engine = testEngine('pack-fresh');
-    engine.use(resourceModule('gold-mod', () => createResource(0, { displayName: 'gold' })));
+    engine.use(
+      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
+    );
     engine.start();
 
     const first = defaultAnalyzerPack(engine);
@@ -94,11 +102,15 @@ describe('defaultAnalyzerPack', () => {
 
   it('does not leak registrations across engines', () => {
     const engineA = testEngine('pack-leak-a');
-    engineA.use(resourceModule('gold-mod', () => createResource(0, { displayName: 'gold' })));
+    engineA.use(
+      resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
+    );
     engineA.start();
 
     const engineB = testEngine('pack-leak-b');
-    engineB.use(resourceModule('gems-mod', () => createResource(0, { displayName: 'gems' })));
+    engineB.use(
+      resourceModule('gems-mod', () => createResource(0, { id: 'gems', displayName: 'gems' })),
+    );
     engineB.start();
 
     const packA = defaultAnalyzerPack(engineA);

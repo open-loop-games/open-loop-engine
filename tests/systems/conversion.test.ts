@@ -7,8 +7,8 @@ import { createConversion } from '@/systems/conversion';
 
 describe('Conversion', () => {
   it('single-input single-output exchange — pays cost, adds output', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
     addResource(gold, 100);
 
     const trade = createConversion({
@@ -28,9 +28,9 @@ describe('Conversion', () => {
   });
 
   it('multi-input single-output recipe — every cost paid, single gain', () => {
-    const wood = createResource(bn(0), { displayName: 'Wood' });
-    const mineral = createResource(bn(0), { displayName: 'Mineral' });
-    const beam = createResource(bn(0), { displayName: 'Beam' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
+    const mineral = createResource(bn(0), { id: 'Mineral', displayName: 'Mineral' });
+    const beam = createResource(bn(0), { id: 'Beam', displayName: 'Beam' });
     addResource(wood, 200);
     addResource(mineral, 100);
 
@@ -51,9 +51,9 @@ describe('Conversion', () => {
   });
 
   it('single-input multi-output split — one drain produces multiple gains', () => {
-    const shards = createResource(bn(0), { displayName: 'Shards' });
-    const points = createResource(bn(0), { displayName: 'Points' });
-    const fragments = createResource(bn(0), { displayName: 'Fragments' });
+    const shards = createResource(bn(0), { id: 'Shards', displayName: 'Shards' });
+    const points = createResource(bn(0), { id: 'Points', displayName: 'Points' });
+    const fragments = createResource(bn(0), { id: 'Fragments', displayName: 'Fragments' });
     addResource(shards, 100);
 
     const split = createConversion({
@@ -81,10 +81,10 @@ describe('Conversion', () => {
   });
 
   it('multi-input multi-output — full general case', () => {
-    const a = createResource(bn(0), { displayName: 'A' });
-    const b = createResource(bn(0), { displayName: 'B' });
-    const x = createResource(bn(0), { displayName: 'X' });
-    const y = createResource(bn(0), { displayName: 'Y' });
+    const a = createResource(bn(0), { id: 'A', displayName: 'A' });
+    const b = createResource(bn(0), { id: 'B', displayName: 'B' });
+    const x = createResource(bn(0), { id: 'X', displayName: 'X' });
+    const y = createResource(bn(0), { id: 'Y', displayName: 'Y' });
     addResource(a, 100);
     addResource(b, 50);
 
@@ -111,7 +111,7 @@ describe('Conversion', () => {
     // Pay drains a to 0; add 20 → a = 20. Net +10 from start.
     // If outputs read live post-spend value, output would be 0 and a would
     // end at 0 — this test would fail.
-    const a = createResource(bn(0), { displayName: 'A' });
+    const a = createResource(bn(0), { id: 'A', displayName: 'A' });
     addResource(a, 10);
 
     const compound = createConversion({
@@ -134,9 +134,9 @@ describe('Conversion', () => {
   });
 
   it('canConvert false when any input requirement unmet', () => {
-    const wood = createResource(bn(0), { displayName: 'Wood' });
-    const mineral = createResource(bn(0), { displayName: 'Mineral' });
-    const beam = createResource(bn(0), { displayName: 'Beam' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
+    const mineral = createResource(bn(0), { id: 'Mineral', displayName: 'Mineral' });
+    const beam = createResource(bn(0), { id: 'Beam', displayName: 'Beam' });
     addResource(wood, 200);
 
     const recipe = createConversion({
@@ -157,8 +157,8 @@ describe('Conversion', () => {
   });
 
   it('onConvert returning false cancels the conversion', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
     addResource(gold, 100);
 
     const trade = createConversion({
@@ -178,8 +178,8 @@ describe('Conversion', () => {
   });
 
   it('afterConvert fires with produced map after mutation', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
     addResource(gold, 100);
 
     let observed: Record<string, Decimal> | undefined;
@@ -204,8 +204,8 @@ describe('Conversion', () => {
   });
 
   it('inline consume-all (buy-mana shape) — drains and exchanges', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const mana = createResource(bn(0), { displayName: 'Mana' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const mana = createResource(bn(0), { id: 'Mana', displayName: 'Mana' });
     addResource(gold, 7);
 
     const buyMana = createConversion({
@@ -229,8 +229,8 @@ describe('Conversion', () => {
   });
 
   it('output as constant Computable', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
     addResource(gold, 50);
 
     const trade = createConversion({
@@ -244,8 +244,8 @@ describe('Conversion', () => {
   });
 
   it('output as live-reactive ref — currentGain tracks reactive changes', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const wood = createResource(bn(0), { displayName: 'Wood' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const wood = createResource(bn(0), { id: 'Wood', displayName: 'Wood' });
     addResource(gold, 100);
     const multiplier = ref<DecimalSource>(bn(3));
 

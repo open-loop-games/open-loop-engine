@@ -78,8 +78,8 @@ function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
   const module: EngineModule = {
     id: `inc-equivalence-${gameId}`,
     install(ctx) {
-      const gold = createResource(0, { displayName: 'gold' });
-      const gems = createResource(0, { displayName: 'gems' });
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+      const gems = createResource(0, { id: 'gems', displayName: 'gems' });
 
       const upgrades = createPurchasableCategory<UpgradeDef>({
         id: 'upgrades',

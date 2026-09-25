@@ -7,7 +7,7 @@ import { createCycleFinalizeTracker } from '@/harness/analyzers/cycle-finalize';
 
 describe('createCycleFinalizeTracker', () => {
   it('records cycle count + last-cycle deltas when wired via log.on(finalize, ...)', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createCycleFinalizeTracker();
 
     let loopTickHandler: ((dt: number) => void) | null = null;

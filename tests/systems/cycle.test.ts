@@ -104,7 +104,7 @@ describe('createCycle', () => {
   it('resets persistent refs on end()', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('cycle-reset-test');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const level = persistent(1);
     endPersistentContext();
 
@@ -126,7 +126,7 @@ describe('createCycle', () => {
     const order: string[] = [];
 
     beginPersistentContext('cycle-hooks-test');
-    const pts = createResource(bn(0), { displayName: 'Points' });
+    const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
     addResource(pts, 100);
 
@@ -151,7 +151,7 @@ describe('createCycle', () => {
   it('cancels end() when onBeforeRestart returns false', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('cycle-cancel-test');
-    const pts = createResource(bn(0), { displayName: 'Points' });
+    const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
     addResource(pts, 999);
 
@@ -290,7 +290,7 @@ describe('createCycle with resetModules', () => {
     const { registerTick } = createTickManager();
 
     beginPersistentContext('cycle-rm-retain');
-    const skill = createResource(bn(0), { displayName: 'Skill' });
+    const skill = createResource(bn(0), { id: 'Skill', displayName: 'Skill' });
     const xp = persistent(0);
     endPersistentContext();
 
@@ -425,7 +425,7 @@ describe('createCycle — listener re-entrancy', () => {
   it('refuses a restart re-entered from a beforeRestart listener', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('cycle-reentry');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
     const cycle = createCycle({
       id: 'cycle-reentry',
@@ -458,7 +458,7 @@ describe('createCycle — listener re-entrancy', () => {
   it('the cycle guard does not block its own inner reset', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('cycle-reentry-inner');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
     const reset = createReset({ thingsToReset: [gold] });
     const cycle = createCycle({ id: 'cycle-reentry-inner', reset, registerTick });

@@ -28,7 +28,7 @@ function setup() {
 
 function makeResource(name: string, initial: number) {
   beginPersistentContext(name);
-  const r = createResource(initial, { displayName: name });
+  const r = createResource(initial, { id: name, displayName: name });
   endPersistentContext();
   return r;
 }

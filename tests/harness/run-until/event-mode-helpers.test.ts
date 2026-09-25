@@ -55,7 +55,7 @@ function buildPurchasableEngine(gameId: string): Engine {
   const module: EngineModule = {
     id: 'upgrades-only',
     install(ctx) {
-      const gold = createResource(0, { displayName: 'gold' });
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
       const upgrades = createPurchasableCategory<UpgradeDef>({
         id: 'upgrades',
         mapPurchasable: (def) => ({

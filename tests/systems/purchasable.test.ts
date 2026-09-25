@@ -161,7 +161,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
 
 describe('createScalingPurchasable — effect as Formula', () => {
   it('DecimalSource shorthand auto-wraps as invertible Formula', () => {
-    const points = createResource(1e6, { displayName: 'Points' });
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
     const p = createScalingPurchasable({
       id: 'shorthand-effect',
       description: 'Shorthand effect',
@@ -180,7 +180,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
   });
 
   it('accepts a Formula factory for effect and exposes effectCurve', () => {
-    const points = createResource(1e6, { displayName: 'Points' });
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
     const p = createScalingPurchasable({
       id: 'factory-effect',
       description: 'Factory effect',
@@ -203,7 +203,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
   });
 
   it('opaque value function still works; effectCurve is undefined', () => {
-    const points = createResource(1e6, { displayName: 'Points' });
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
     const p = createScalingPurchasable({
       id: 'opaque-effect',
       description: 'Opaque effect',
@@ -224,7 +224,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
 
 describe('createScalingPurchasable — cost escalation regression', () => {
   it('getCost(1) reflects the next-level cost after purchase', () => {
-    const r = createResource(1e9, { displayName: 'r' });
+    const r = createResource(1e9, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'ol430-basic',
       description: 'cost escalation',
@@ -243,7 +243,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
   });
 
   it('escalates correctly across multiple level steps', () => {
-    const r = createResource(1e9, { displayName: 'r' });
+    const r = createResource(1e9, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'ol430-multi',
       description: 'multi',
@@ -264,7 +264,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
     // 500 cookies, cost 100 then 120, 144, 172.8, 207.36, 248.832 ...
     // Cumulative affordable from 0 with cost 100 * 1.2^k: at most 3 levels
     // (100 + 120 + 144 = 364 ≤ 500; + 172.8 = 536.8 > 500)
-    const r = createResource(500, { displayName: 'r' });
+    const r = createResource(500, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'ol430-afford',
       description: 'afford',
@@ -287,7 +287,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
 
 describe('createScalingPurchasable — purchaseMax at finite limit regression', () => {
   it('purchaseMax reaches the declared limit in a single call', () => {
-    const r = createResource(1e308, { displayName: 'r' });
+    const r = createResource(1e308, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'ol433-limit3',
       description: 'limit 3',
@@ -306,7 +306,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
   });
 
   it('createPurchasable with finite limit also reaches the limit via purchaseMax', () => {
-    const r = createResource(1e308, { displayName: 'r' });
+    const r = createResource(1e308, { id: 'r', displayName: 'r' });
     const p = createPurchasable({
       display: { description: 'non-scaling limit 3' },
       requirements: createCostRequirement({
@@ -326,7 +326,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
 
 describe('createScalingPurchasable — closure cost (costFormula)', () => {
   it('opaque closure cost reads through scalingAmount as level rises', () => {
-    const r = createResource(1e9, { displayName: 'r' });
+    const r = createResource(1e9, { id: 'r', displayName: 'r' });
     // Super-exponential: 10^(1 + level²) — not expressible in engine Formula
     // vocabulary, so the consumer takes the opaque-closure path.
     const p = createScalingPurchasable({
@@ -345,7 +345,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
   });
 
   it('opaque closure cost is paid against the resource', () => {
-    const r = createResource(500, { displayName: 'r' });
+    const r = createResource(500, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'closure-pay',
       description: 'closure pay',
@@ -361,7 +361,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
   });
 
   it('Formula factory closure produces an invertible bulk-aware cost', () => {
-    const r = createResource(1000, { displayName: 'r' });
+    const r = createResource(1000, { id: 'r', displayName: 'r' });
     // 100 + level² via Formula vocabulary — bulk math should work.
     const p = createScalingPurchasable({
       id: 'formula-factory',
@@ -379,7 +379,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
   });
 
   it('opaque closure disables bulk purchase (maxBulkAmount = 1)', () => {
-    const r = createResource(1e6, { displayName: 'r' });
+    const r = createResource(1e6, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'closure-no-bulk',
       description: 'no bulk',
@@ -392,7 +392,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
   });
 
   it('geometric path remains unchanged (regression)', () => {
-    const r = createResource(1e9, { displayName: 'r' });
+    const r = createResource(1e9, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'geometric-regression',
       description: 'geometric',
@@ -409,7 +409,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
   });
 
   it('closure cost reactively flips canPurchase when resource crosses threshold', () => {
-    const r = createResource(50, { displayName: 'r' });
+    const r = createResource(50, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'closure-canpurchase',
       description: 'reactive',
@@ -426,7 +426,7 @@ describe('createScalingPurchasable — closure cost (costFormula)', () => {
 
 describe('createPurchasable — requirements as a factory over the level ref', () => {
   it("hands the factory the purchasable's own amount ref, so the cost is invertible", () => {
-    const points = createResource(1e6, { displayName: 'points' });
+    const points = createResource(1e6, { id: 'points', displayName: 'points' });
     const p = createPurchasable({
       id: 'ladder',
       display: 'Geometric ladder',

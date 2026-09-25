@@ -5,7 +5,7 @@ import { createResourcePeakTracker } from '@/harness/analyzers/resource-peak';
 
 describe('createResourcePeakTracker', () => {
   it('tracks peak, final, and avg across a deterministic sample trajectory', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createResourcePeakTracker(gold);
 
     let tick = 0;
@@ -31,15 +31,15 @@ describe('createResourcePeakTracker', () => {
   });
 
   it('analyzer name is namespaced by displayName to prevent key collision', () => {
-    const gold = createResource(0, { displayName: 'gold' });
-    const gems = createResource(0, { displayName: 'gems' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+    const gems = createResource(0, { id: 'gems', displayName: 'gems' });
 
     expect(createResourcePeakTracker(gold).name).toBe('resource-peak:gold');
     expect(createResourcePeakTracker(gems).name).toBe('resource-peak:gems');
   });
 
   it('zero-tick run reports the start-of-run value for all three metrics', () => {
-    const gold = createResource(42, { displayName: 'gold' });
+    const gold = createResource(42, { id: 'gold', displayName: 'gold' });
     const tracker = createResourcePeakTracker(gold);
 
     const result = runHeadless({
@@ -55,7 +55,7 @@ describe('createResourcePeakTracker', () => {
   });
 
   it('resets state between sequential runs of the same instance', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createResourcePeakTracker(gold);
 
     runHeadless({

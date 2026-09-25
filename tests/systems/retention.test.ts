@@ -9,7 +9,7 @@ import { createRetentionPolicy, fractional } from '@/systems/retention';
 describe('createRetentionPolicy', () => {
   it('keep preserves refs through reset', () => {
     beginPersistentContext('ret-keep');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const prestige = persistent(0);
     const discoveries = persistent(5);
     endPersistentContext();
@@ -42,7 +42,7 @@ describe('createRetentionPolicy', () => {
 
   it('retain applies transform to refs through reset', () => {
     beginPersistentContext('ret-retain');
-    const skillLevel = createResource(bn(0), { displayName: 'Skill' });
+    const skillLevel = createResource(bn(0), { id: 'Skill', displayName: 'Skill' });
     const xp = persistent<number>(0);
     endPersistentContext();
 
@@ -157,7 +157,7 @@ describe('createRetentionPolicy', () => {
 
   it('works with Decimal values via fractional', () => {
     beginPersistentContext('ret-decimal');
-    const bigResource = createResource(bn(0), { displayName: 'Big' });
+    const bigResource = createResource(bn(0), { id: 'Big', displayName: 'Big' });
     endPersistentContext();
 
     addResource(bigResource, bn('1e100'));

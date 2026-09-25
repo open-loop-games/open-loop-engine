@@ -5,7 +5,7 @@ import { createSeriesTracker } from '@/harness/analyzers/series';
 
 describe('createSeriesTracker', () => {
   it('emits one metric per tick keyed t{i} over the trajectory', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createSeriesTracker(gold);
 
     let tick = 0;
@@ -32,12 +32,12 @@ describe('createSeriesTracker', () => {
   });
 
   it('analyzer name is namespaced by displayName', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     expect(createSeriesTracker(gold).name).toBe('series:gold');
   });
 
   it('zero-tick run reports a single-point series', () => {
-    const gold = createResource(42, { displayName: 'gold' });
+    const gold = createResource(42, { id: 'gold', displayName: 'gold' });
     const tracker = createSeriesTracker(gold);
 
     const result = runHeadless({
@@ -52,7 +52,7 @@ describe('createSeriesTracker', () => {
   });
 
   it('resets state between sequential runs of the same instance', () => {
-    const gold = createResource(0, { displayName: 'gold' });
+    const gold = createResource(0, { id: 'gold', displayName: 'gold' });
     const tracker = createSeriesTracker(gold);
 
     runHeadless({

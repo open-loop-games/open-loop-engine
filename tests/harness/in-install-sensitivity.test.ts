@@ -53,7 +53,7 @@ function createToyModule(): EngineModule {
   return {
     id: 'toy',
     install(ctx) {
-      const gold = createResource(0, { displayName: GOLD_NAME });
+      const gold = createResource(0, { id: GOLD_NAME, displayName: GOLD_NAME });
       const chain = createModifierChain(CHAIN_ID);
       chain.add(createMultiplicativeModifier({ multiplier: 1 }));
       ctx.onTick(() => {
@@ -144,7 +144,7 @@ describe('in-install sensitivity integration', () => {
       return {
         id: 'toy-empty',
         install(ctx) {
-          const gold = createResource(0, { displayName: GOLD_NAME });
+          const gold = createResource(0, { id: GOLD_NAME, displayName: GOLD_NAME });
           createModifierChain(EMPTY_CHAIN_ID);
           ctx.onTick(() => {
             const chain = ctx.tryInject(ChainRegistryKey)?.get(EMPTY_CHAIN_ID);
@@ -226,7 +226,7 @@ describe('in-install sensitivity integration', () => {
       return {
         id: 'cycle-gold',
         install(ctx) {
-          const gold = createResource(0, { displayName: GOLD_NAME });
+          const gold = createResource(0, { id: GOLD_NAME, displayName: GOLD_NAME });
           let tickIndex = 0;
           let loopTickHandler: ((dt: number) => void) | null = null;
           const cycle = createCycle({

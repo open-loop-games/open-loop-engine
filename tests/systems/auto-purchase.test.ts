@@ -42,7 +42,7 @@ function createTickManager() {
 }
 
 function createTestResource(name: string, initial: DecimalSource = 0): Resource {
-  return createResource(initial, { displayName: name });
+  return createResource(initial, { id: name, displayName: name });
 }
 
 interface BuildingDef {

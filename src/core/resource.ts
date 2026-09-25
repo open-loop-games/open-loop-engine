@@ -95,13 +95,16 @@ export interface ResourceOptions {
   /** If true, display very small values as-is instead of rounding to 0. Off by default. */
   small?: boolean;
   /**
-   * Stable save-data identifier. When unset, falls back to `displayName`.
-   * Prefer an explicit `id` when two resources could share the same display
-   * name (e.g. translated labels) — collision within a persistent context
-   * throws at creation time.
+   * Save and registry identity — the key Gates and the resource registry
+   * look the resource up by. Required for a persistent resource, whose value
+   * saves under it; a wrapped ref saves nothing and falls back to
+   * `displayName`. Collision within a persistent context throws at creation.
    */
   id?: string;
 }
+
+/** Configuration for a persistent {@link createResource}: `id` is required. */
+export type PersistentResourceOptions = ResourceOptions & { id: string };
 
 /**
  * Wrap an existing ref as a resource (non-persistent).
@@ -145,10 +148,10 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
  * @example
  * ```ts
  * // Basic currency — whole-number display, starts at 0
- * const points = createResource(0, { displayName: 'points' });
+ * const points = createResource(0, { id: 'points', displayName: 'Points' });
  *
  * // Fractional currency — 2 decimal places, starts at 100
- * const gold = createResource(new Decimal(100), { displayName: 'gold', precision: 2 });
+ * const gold = createResource(new Decimal(100), { id: 'gold', displayName: 'Gold', precision: 2 });
  *
  * // Use like any Vue ref
  * watch(points, (val) => console.log('Points changed:', val));
@@ -157,7 +160,7 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
  */
 export function createResource<T>(
   defaultValue: T & StateConstraint<T>,
-  options?: ResourceOptions,
+  options: PersistentResourceOptions,
 ): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T> };
 
 export function createResource<T>(
@@ -165,7 +168,9 @@ export function createResource<T>(
   options: ResourceOptions = {},
 ): Resource<T> {
   const { displayName = 'points', precision = 0, small = undefined, id } = options;
-  const resolvedId = id ?? displayName;
+  // A display name is text, free to change or be translated; only a wrapped
+  // ref, which saves nothing, may be keyed by it.
+  const resolvedId = (isRef(defaultValue) ? (id ?? displayName) : id) as string;
 
   // Create persistent or use existing ref. Use the resource's id as the
   // save-data name so round-trips survive field reorders inside a context.
@@ -276,7 +281,7 @@ export function createResource<T>(
  *
  * @example
  * ```ts
- * const gold = createResource(1234.567, { displayName: "gold", precision: 2 })
+ * const gold = createResource(1234.567, { id: 'gold', displayName: 'Gold', precision: 2 })
  * displayResource(gold) // "1.235 k" — notation takes over above 1000; precision no longer digits-after-decimal
  * displayResource(gold, 999) // "999.00"
  * ```

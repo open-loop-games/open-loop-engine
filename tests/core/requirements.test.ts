@@ -34,26 +34,26 @@ describe('requirements module', () => {
   });
 
   it('cost requirement is met when resource has enough', () => {
-    const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+    const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
     const req = createCostRequirement({ resource: gold, cost: 50 });
     expect(requirementsMet(req)).toBe(true);
   });
 
   it('cost requirement is not met when resource has too little', () => {
-    const gold = createResource(new Decimal(10), { displayName: 'Gold' });
+    const gold = createResource(new Decimal(10), { id: 'Gold', displayName: 'Gold' });
     const req = createCostRequirement({ resource: gold, cost: 50 });
     expect(requirementsMet(req)).toBe(false);
   });
 
   it('payRequirements subtracts from resource', () => {
-    const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+    const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
     const req = createCostRequirement({ resource: gold, cost: 30 });
     payRequirements(req);
     expect(Decimal.lte(gold.value, 70)).toBe(true);
   });
 
   it('isCostRequirement identifies cost requirements', () => {
-    const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+    const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
     const costReq = createCostRequirement({ resource: gold, cost: 10 });
     const boolReq = createBooleanRequirement({ requirement: true });
     expect(isCostRequirement(costReq)).toBe(true);
@@ -102,7 +102,7 @@ describe('requirements module', () => {
 
   describe('anyOf', () => {
     it('is satisfied when any child is satisfied', () => {
-      const gold = createResource(new Decimal(0), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(0), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 50 }),
         createBooleanRequirement({ requirement: true }),
@@ -111,7 +111,7 @@ describe('requirements module', () => {
     });
 
     it('is unsatisfied when no child is satisfied', () => {
-      const gold = createResource(new Decimal(10), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(10), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 50 }),
         createBooleanRequirement({ requirement: false }),
@@ -120,7 +120,7 @@ describe('requirements module', () => {
     });
 
     it('reactively flips with child state changes', () => {
-      const gold = createResource(new Decimal(10), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(10), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 50 }),
         createBooleanRequirement({ requirement: false }),
@@ -131,8 +131,8 @@ describe('requirements module', () => {
     });
 
     it('pays the first satisfied pay-bearing child only', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
-      const gems = createResource(new Decimal(100), { displayName: 'Gems' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
+      const gems = createResource(new Decimal(100), { id: 'Gems', displayName: 'Gems' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createCostRequirement({ resource: gems, cost: 50 }),
@@ -143,7 +143,7 @@ describe('requirements module', () => {
     });
 
     it('skips payment when the satisfied branch is a pure gate', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createBooleanRequirement({ requirement: true }),
         createCostRequirement({ resource: gold, cost: 30 }),
@@ -153,8 +153,8 @@ describe('requirements module', () => {
     });
 
     it('falls through to a pay-bearing later child when earlier child is unsatisfied', () => {
-      const gold = createResource(new Decimal(0), { displayName: 'Gold' });
-      const gems = createResource(new Decimal(100), { displayName: 'Gems' });
+      const gold = createResource(new Decimal(0), { id: 'Gold', displayName: 'Gold' });
+      const gems = createResource(new Decimal(100), { id: 'Gems', displayName: 'Gems' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createCostRequirement({ resource: gems, cost: 40 }),
@@ -165,7 +165,7 @@ describe('requirements module', () => {
     });
 
     it('reports requiresPay based on the first satisfied child', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
 
       // First satisfied is the pure gate — no pay.
       const gateFirst = anyOf(
@@ -190,7 +190,7 @@ describe('requirements module', () => {
     });
 
     it('joins child descriptions with " OR "', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 30, description: 'spend 30 gold' }),
         createBooleanRequirement({ requirement: true, description: 'tier 2 unlocked' }),
@@ -201,7 +201,7 @@ describe('requirements module', () => {
 
   describe('allOf', () => {
     it('is satisfied only when every child is satisfied', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const both = allOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createBooleanRequirement({ requirement: true }),
@@ -216,8 +216,8 @@ describe('requirements module', () => {
     });
 
     it('pays every pay-bearing child', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
-      const gems = createResource(new Decimal(100), { displayName: 'Gems' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
+      const gems = createResource(new Decimal(100), { id: 'Gems', displayName: 'Gems' });
       const req = allOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createCostRequirement({ resource: gems, cost: 50 }),
@@ -229,7 +229,7 @@ describe('requirements module', () => {
     });
 
     it('joins child descriptions with " AND "', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const req = allOf(
         createCostRequirement({ resource: gold, cost: 30, description: 'spend 30 gold' }),
         createBooleanRequirement({ requirement: true, description: 'tier 2 unlocked' }),
@@ -240,7 +240,7 @@ describe('requirements module', () => {
 
   describe('combinator nesting', () => {
     it('anyOf composes with allOf for "(A AND B) OR C"', () => {
-      const gold = createResource(new Decimal(100), { displayName: 'Gold' });
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const tier2 = createBooleanRequirement({ requirement: false });
       const fallback = createBooleanRequirement({ requirement: true });
       const req = anyOf(

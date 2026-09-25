@@ -26,7 +26,7 @@ function buildStepEngine(onStep: () => void): Engine {
 describe('watch-based primitives under runUntil (sync flush)', () => {
   it('Resource.cumulative accumulates gains tick-by-tick, not at async flush time', () => {
     beginPersistentContext('sync-cumulative');
-    const gold = createResource(0, { displayName: 'gold-total' });
+    const gold = createResource(0, { id: 'gold-total', displayName: 'gold-total' });
     endPersistentContext();
     const total = gold.cumulative!;
 
@@ -51,7 +51,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
 
   it('Resource.best observes the peak mid-run, not after the run ends', () => {
     beginPersistentContext('sync-best');
-    const gold = createResource(0, { displayName: 'gold-best' });
+    const gold = createResource(0, { id: 'gold-best', displayName: 'gold-best' });
     endPersistentContext();
     const best = gold.best!;
 
@@ -78,7 +78,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
   });
 
   it('createAchievement earns on the same tick its requirement first holds', () => {
-    const score = createResource(0, { displayName: 'score' });
+    const score = createResource(0, { id: 'score', displayName: 'score' });
     const ach = createAchievement({
       id: 'score-100',
       display: { title: 'Hit 100' },

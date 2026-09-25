@@ -351,7 +351,7 @@ describe('ResourceBag', () => {
   describe('link', () => {
     it('initial sync copies resource value to bag', () => {
       beginPersistentContext('test-link-init');
-      const gold = createResource(bn(50), { displayName: 'Gold' });
+      const gold = createResource(bn(50), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag();
       bag.link('gold', gold);
@@ -364,7 +364,7 @@ describe('ResourceBag', () => {
       // install, so nothing else will. Otherwise the bag holds 100 while the
       // resource still reads 150 and cost/cap checks disagree indefinitely.
       beginPersistentContext('test-link-init-clamp');
-      const gold = createResource(bn(150), { displayName: 'Gold' });
+      const gold = createResource(bn(150), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag({ capacity: 100 });
       bag.link('gold', gold);
@@ -374,7 +374,7 @@ describe('ResourceBag', () => {
 
     it('bag change propagates to resource', async () => {
       beginPersistentContext('test-link-bag-to-res');
-      const gold = createResource(bn(10), { displayName: 'Gold' });
+      const gold = createResource(bn(10), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag();
       bag.link('gold', gold);
@@ -385,7 +385,7 @@ describe('ResourceBag', () => {
 
     it('resource change propagates to bag', async () => {
       beginPersistentContext('test-link-res-to-bag');
-      const gold = createResource(bn(10), { displayName: 'Gold' });
+      const gold = createResource(bn(10), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag();
       bag.link('gold', gold);
@@ -396,7 +396,7 @@ describe('ResourceBag', () => {
 
     it('capacity clamping on resource increase propagates back', async () => {
       beginPersistentContext('test-link-clamp');
-      const gold = createResource(bn(5), { displayName: 'Gold' });
+      const gold = createResource(bn(5), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag({ capacity: 10 });
       bag.link('gold', gold);
@@ -409,7 +409,7 @@ describe('ResourceBag', () => {
 
     it('cleanup stops sync', async () => {
       beginPersistentContext('test-link-cleanup');
-      const gold = createResource(bn(10), { displayName: 'Gold' });
+      const gold = createResource(bn(10), { id: 'Gold', displayName: 'Gold' });
       endPersistentContext();
       const bag = createResourceBag();
       const cleanup = bag.link('gold', gold);
@@ -421,10 +421,10 @@ describe('ResourceBag', () => {
 
     it('re-linking same typeId replaces previous link', async () => {
       beginPersistentContext('test-link-replace-1');
-      const gold1 = createResource(bn(10), { displayName: 'Gold1' });
+      const gold1 = createResource(bn(10), { id: 'Gold1', displayName: 'Gold1' });
       endPersistentContext();
       beginPersistentContext('test-link-replace-2');
-      const gold2 = createResource(bn(20), { displayName: 'Gold2' });
+      const gold2 = createResource(bn(20), { id: 'Gold2', displayName: 'Gold2' });
       endPersistentContext();
       const bag = createResourceBag();
       bag.link('gold', gold1);

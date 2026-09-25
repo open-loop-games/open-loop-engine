@@ -36,7 +36,7 @@ import type { Analyzer } from '@/primitives/types';
 function createPrestigeTreeGame() {
   // --- Layer 0: Points ---
   beginPersistentContext('layer0');
-  const points = createResource(bn(0), { displayName: 'points' });
+  const points = createResource(bn(0), { id: 'points', displayName: 'points' });
 
   const pointUpgrade1 = createPurchasable({
     id: 'pt-up1',
@@ -57,7 +57,7 @@ function createPrestigeTreeGame() {
 
   // --- Layer 1: Prestige ---
   beginPersistentContext('layer1');
-  const prestige = createResource(bn(0), { displayName: 'prestige points' });
+  const prestige = createResource(bn(0), { id: 'prestige points', displayName: 'prestige points' });
 
   const prestigeUpgrade1 = createPurchasable({
     id: 'p-up1',
@@ -70,12 +70,18 @@ function createPrestigeTreeGame() {
 
   // --- Layer 2: Super-Prestige ---
   beginPersistentContext('layer2');
-  const superPrestige = createResource(bn(0), { displayName: 'super prestige' });
+  const superPrestige = createResource(bn(0), {
+    id: 'super prestige',
+    displayName: 'super prestige',
+  });
   endPersistentContext();
 
   // --- Layer 3: Hyper-Prestige ---
   beginPersistentContext('layer3');
-  const hyperPrestige = createResource(bn(0), { displayName: 'hyper prestige' });
+  const hyperPrestige = createResource(bn(0), {
+    id: 'hyper prestige',
+    displayName: 'hyper prestige',
+  });
   endPersistentContext();
 
   // --- Point gain modifier chain ---
@@ -487,8 +493,8 @@ describe('Integration: Prestige Tree layer chain', () => {
     });
 
     it('output formula can fold a multiplier (former gainModifier)', () => {
-      const base = createResource(bn(0), { displayName: 'gm-base' });
-      const gain = createResource(bn(0), { displayName: 'gm-gain' });
+      const base = createResource(bn(0), { id: 'gm-base', displayName: 'gm-base' });
+      const gain = createResource(bn(0), { id: 'gm-gain', displayName: 'gm-gain' });
       addResource(base, 1000);
 
       const conv = createConversion({

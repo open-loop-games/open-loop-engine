@@ -33,7 +33,7 @@ interface PerkDef {
 
 describe('self-referential grants (#18)', () => {
   it('grants mult reading back through the category accessor tracks the purchased amount', () => {
-    const gold = createResource<DecimalSource>(1000, { displayName: 'gold' });
+    const gold = createResource<DecimalSource>(1000, { id: 'gold', displayName: 'gold' });
     const chain = createModifierChain('grants-selfref-a');
 
     const category: PurchasableCategory<PerkDef> = createPurchasableCategory<PerkDef>({
@@ -82,7 +82,7 @@ describe('self-referential grants (#18)', () => {
   });
 
   it('grants attribution ids derive from the grant description text', () => {
-    const gold = createResource<DecimalSource>(1000, { displayName: 'gold' });
+    const gold = createResource<DecimalSource>(1000, { id: 'gold', displayName: 'gold' });
     const chain = createModifierChain('grants-selfref-c');
 
     const category = createPurchasableCategory<PerkDef>({
@@ -100,7 +100,7 @@ describe('self-referential grants (#18)', () => {
   });
 
   it('category accessors are registration-reactive — a pre-registration miss heals', () => {
-    const gold = createResource<DecimalSource>(1000, { displayName: 'gold' });
+    const gold = createResource<DecimalSource>(1000, { id: 'gold', displayName: 'gold' });
 
     const category = createPurchasableCategory<PerkDef>({
       id: 'grants-selfref-d',

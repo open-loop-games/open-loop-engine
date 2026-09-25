@@ -106,7 +106,7 @@ describe('createBestOf', () => {
   it('auto-subscribes to CycleLog finalize events', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-auto');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -129,7 +129,7 @@ describe('createBestOf', () => {
   it('ignores CycleLog deltas for unregistered metric keys', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('bo-ll-ignore');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -149,8 +149,8 @@ describe('createBestOf', () => {
   it('tracks multiple metrics from a single CycleLog finalize', () => {
     const { registerTick, tick } = createTickManager();
     beginPersistentContext('bo-ll-multi');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
-    const xp = createResource(bn(0), { displayName: 'XP' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
+    const xp = createResource(bn(0), { id: 'XP', displayName: 'XP' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold, xp], registerTick });
@@ -547,7 +547,7 @@ describe('createBestOf', () => {
   it('dispose stops auto-tracking from CycleLog', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('bo-dispose');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });

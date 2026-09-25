@@ -65,7 +65,10 @@ function buildEngineWithPurchasables(
   const module: EngineModule = {
     id: 'purchasables-mod',
     install(ctx) {
-      const resource = createResource(resourceInitial, { displayName: resourceName });
+      const resource = createResource(resourceInitial, {
+        id: resourceName,
+        displayName: resourceName,
+      });
       handle.resource = resource;
       const category = createPurchasableCategory<UpgradeDef>({
         id: categoryId,
@@ -327,7 +330,7 @@ describe('walkPurchasableTransitions — purchasable-maxed', () => {
     const module: EngineModule = {
       id: 'inf-mod',
       install(ctx) {
-        const gold = createResource(40, { displayName: 'gold' });
+        const gold = createResource(40, { id: 'gold', displayName: 'gold' });
         const category = createPurchasableCategory<{ id: string; cost: number }>({
           id: 'upgrades',
           mapPurchasable: (def) => ({

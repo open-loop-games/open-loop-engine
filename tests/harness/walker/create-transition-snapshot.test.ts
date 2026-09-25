@@ -96,8 +96,8 @@ function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
   const module: EngineModule = {
     id: 'mixed-content',
     install(ctx) {
-      const gold = createResource(0, { displayName: 'gold' });
-      const gems = createResource(0, { displayName: 'gems' });
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+      const gems = createResource(0, { id: 'gems', displayName: 'gems' });
 
       // Purchasables: two upgrades at different gold costs to produce two
       // distinct becomes-affordable distances.
@@ -219,7 +219,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     const module: EngineModule = {
       id: 'nulls-only',
       install(ctx) {
-        const gold = createResource(0, { displayName: 'gold' });
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
           mapPurchasable: (def) => ({
@@ -266,7 +266,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     const module: EngineModule = {
       id: 'tie-upgrades',
       install(ctx) {
-        const gold = createResource(0, { displayName: 'gold' });
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const cat = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
           mapPurchasable: (def) => ({

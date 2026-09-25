@@ -62,7 +62,7 @@ describe('emitProducerTransitionsWithDeps', () => {
     const module: EngineModule = {
       id: 'producers-mod',
       install(ctx) {
-        const resource = createResource(0, { displayName: costResourceName });
+        const resource = createResource(0, { id: costResourceName, displayName: costResourceName });
         const category = createProducerCategory<BuildingDef>({
           id: 'buildings',
           mapProducer: (def) => ({
@@ -134,8 +134,8 @@ describe('emitPurchasableTransitionsWithDeps', () => {
     const module: EngineModule = {
       id: 'purchasables-mod',
       install(ctx) {
-        const primary = createResource(0, { displayName: 'gold' });
-        const secondary = createResource(0, { displayName: secondaryName });
+        const primary = createResource(0, { id: 'gold', displayName: 'gold' });
+        const secondary = createResource(0, { id: secondaryName, displayName: secondaryName });
         const category = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
           mapPurchasable: (def) => ({

@@ -65,7 +65,7 @@ function buildPurchasableEngine(gameId: string): Engine {
   const module: EngineModule = {
     id: 'upgrades-only',
     install(ctx) {
-      const gold = createResource(0, { displayName: 'gold' });
+      const gold = createResource(0, { id: 'gold', displayName: 'gold' });
       const upgrades = createPurchasableCategory<UpgradeDef>({
         id: 'upgrades',
         mapPurchasable: (def) => ({
@@ -252,7 +252,7 @@ describe("runProbe({mode: 'event'})", () => {
     const module: EngineModule = {
       id: 'tie-with-non-walker-input',
       install(ctx) {
-        const gold = createResource(100, { displayName: 'gold' });
+        const gold = createResource(100, { id: 'gold', displayName: 'gold' });
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
           mapPurchasable: (def) => ({
@@ -303,7 +303,7 @@ describe("runProbe({mode: 'event'})", () => {
     const module: EngineModule = {
       id: 'gold-accumulator',
       install(ctx) {
-        const gold = createResource(0, { displayName: 'gold' });
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         goldRef = gold;
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -364,7 +364,7 @@ describe("runProbe({mode: 'event'})", () => {
     const module: EngineModule = {
       id: 'gold-accumulator-nobisect',
       install(ctx) {
-        const gold = createResource(0, { displayName: 'gold' });
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         goldRef = gold;
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
@@ -421,7 +421,7 @@ describe("runProbe({mode: 'event'})", () => {
     const module: EngineModule = {
       id: 'simtime-bisect',
       install(ctx) {
-        const gold = createResource(0, { displayName: 'gold' });
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
         const upgrades = createPurchasableCategory<UpgradeDef>({
           id: 'upgrades',
           mapPurchasable: (def) => ({

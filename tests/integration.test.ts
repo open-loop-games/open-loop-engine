@@ -17,7 +17,7 @@ describe('Integration: simple idle game loop', () => {
   });
 
   it('resources + modifiers + conditions + effects work together', () => {
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const baseRate = bn(1);
     const multiplier = createMultiplicativeModifier({ multiplier: bn(2) });
     const modifier = createSequentialModifier([multiplier]);

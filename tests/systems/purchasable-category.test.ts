@@ -18,7 +18,7 @@ import Formula from '@/core/formulas/formulas';
 // ============================================================================
 
 function createTestResource(name: string, initial: DecimalSource = 0) {
-  return createResource(initial, { displayName: name });
+  return createResource(initial, { id: name, displayName: name });
 }
 
 // ============================================================================

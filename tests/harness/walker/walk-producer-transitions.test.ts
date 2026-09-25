@@ -60,7 +60,7 @@ function buildEngineWithProducers(
   const module: EngineModule = {
     id: 'producers-mod',
     install(ctx) {
-      const resource = createResource(0, { displayName: resourceName });
+      const resource = createResource(0, { id: resourceName, displayName: resourceName });
       handle.resource = resource;
       const category = createProducerCategory<BuildingDef>({
         id: categoryId,
@@ -100,7 +100,7 @@ function buildEngineWithManualProducer(gameId: string, categoryId: string) {
   const module: EngineModule = {
     id: 'manual-mod',
     install(ctx) {
-      const resource = createResource(0, { displayName: 'clicks' });
+      const resource = createResource(0, { id: 'clicks', displayName: 'clicks' });
       const category = createProducerCategory<ManualDef>({
         id: categoryId,
         mapProducer: (def) => ({

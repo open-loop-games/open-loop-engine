@@ -13,7 +13,7 @@ import { fractional } from '@/systems/retention';
 describe('Reset', () => {
   it('resets persistent refs to defaults', () => {
     beginPersistentContext('reset-test');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     const level = persistent(1);
     endPersistentContext();
     addResource(gold, 500);
@@ -29,7 +29,7 @@ describe('Reset', () => {
   it('calls onReset callback after reset', () => {
     let called = false;
     beginPersistentContext('reset-test-callback');
-    const pts = createResource(bn(100), { displayName: 'Points' });
+    const pts = createResource(bn(100), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
     const reset = createReset({
       thingsToReset: [pts],
@@ -43,7 +43,7 @@ describe('Reset', () => {
 
   it('cancels reset when onBeforeReset returns false', () => {
     beginPersistentContext('reset-test-cancel');
-    const pts = createResource(bn(0), { displayName: 'Points' });
+    const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
     addResource(pts, 999);
     const reset = createReset({
@@ -57,7 +57,7 @@ describe('Reset', () => {
 
   it('createResetTimer zeros on reset', () => {
     beginPersistentContext('reset-test-track');
-    const pts = createResource(bn(0), { displayName: 'TrackPoints' });
+    const pts = createResource(bn(0), { id: 'TrackPoints', displayName: 'TrackPoints' });
     endPersistentContext();
     addResource(pts, 100);
 
@@ -74,7 +74,7 @@ describe('Reset', () => {
 
   it('emits per-instance events via on()', () => {
     beginPersistentContext('reset-test-events');
-    const pts = createResource(bn(0), { displayName: 'EventPoints' });
+    const pts = createResource(bn(0), { id: 'EventPoints', displayName: 'EventPoints' });
     endPersistentContext();
 
     const reset = createReset({
@@ -91,7 +91,7 @@ describe('Reset', () => {
 
   it('unsubscribes per-instance events', () => {
     beginPersistentContext('reset-test-unsub');
-    const pts = createResource(bn(0), { displayName: 'UnsubPoints' });
+    const pts = createResource(bn(0), { id: 'UnsubPoints', displayName: 'UnsubPoints' });
     endPersistentContext();
 
     const reset = createReset({
@@ -216,7 +216,7 @@ describe('Reset with resetModules', () => {
 
   it('retain applies transform to refs', () => {
     beginPersistentContext('rm-retain');
-    const skill = createResource(bn(0), { displayName: 'Skill' });
+    const skill = createResource(bn(0), { id: 'Skill', displayName: 'Skill' });
     const temp = persistent(0);
     endPersistentContext();
 
@@ -322,7 +322,7 @@ describe('Reset with resetModules', () => {
 
   it('backward compat: thingsToReset-only still works', () => {
     beginPersistentContext('rm-compat');
-    const pts = createResource(bn(0), { displayName: 'Points' });
+    const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
     endPersistentContext();
     addResource(pts, 500);
 

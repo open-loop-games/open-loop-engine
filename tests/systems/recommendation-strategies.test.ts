@@ -31,7 +31,7 @@ function createPopulatedStack(prefix: string, opts?: { captureStrategy?: boolean
   const tick = createTickManager();
 
   beginPersistentContext(`${prefix}-res`);
-  const gold = createResource(bn(0), { displayName: 'Gold' });
+  const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
   endPersistentContext();
 
   const cycle = createCycle({

@@ -34,7 +34,7 @@ describe('createCycleLog', () => {
   it('produces zero deltas when nothing changes', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-zero');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -51,7 +51,7 @@ describe('createCycleLog', () => {
   it('computes correct delta for a Persistent ref', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-ref');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -88,7 +88,7 @@ describe('createCycleLog', () => {
   it('captures permanent stat growth (metric not in thingsToReset)', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-perm');
-    const temp = createResource(bn(0), { displayName: 'Temp' });
+    const temp = createResource(bn(0), { id: 'Temp', displayName: 'Temp' });
     const permStat = persistent<number>(10);
     endPersistentContext();
 
@@ -111,7 +111,7 @@ describe('createCycleLog', () => {
   it('resetting resource: delta is pre-reset accumulated value', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-reset-res');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -133,7 +133,7 @@ describe('createCycleLog', () => {
   it('consecutive cycles produce independent deltas', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-consec');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -254,7 +254,7 @@ describe('createCycleLog', () => {
   it('emits finalize event with correct entry', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-event');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -274,7 +274,7 @@ describe('createCycleLog', () => {
   it('finalize fires before afterRestart snapshot', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-finalize-order');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
@@ -402,7 +402,7 @@ describe('createCycleLog', () => {
   it('handles large Decimal values without precision loss', () => {
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-big');
-    const big = createResource(bn(0), { displayName: 'Big' });
+    const big = createResource(bn(0), { id: 'Big', displayName: 'Big' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [big], registerTick });
@@ -441,7 +441,7 @@ describe('createCycleLog', () => {
 
     const { registerTick } = createTickManager();
     beginPersistentContext('ll-headless-analyzer');
-    const gold = createResource(bn(0), { displayName: 'Gold' });
+    const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
     endPersistentContext();
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
