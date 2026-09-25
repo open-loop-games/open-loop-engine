@@ -32,13 +32,10 @@ function toDecimal(x: DecimalSource): Decimal {
  *
  * @internal
  */
-export function sumAmountsAsDecimal(amounts: Record<string, DecimalSource>): Decimal {
-  return toDecimal(
-    Object.values(amounts).reduce<DecimalSource>(
-      (sum, a) => renormIfLayer0(Decimal.add(sum, a)),
-      Decimal.dZero,
-    ),
-  );
+export function sumAmountsAsDecimal(amounts: Iterable<DecimalSource>): Decimal {
+  let sum: DecimalSource = Decimal.dZero;
+  for (const a of amounts) sum = renormIfLayer0(Decimal.add(sum, a));
+  return toDecimal(sum);
 }
 
 function resolveCapacity(cap: CapacitySource | undefined): Decimal | undefined {
@@ -179,9 +176,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   let cachedTotal: Decimal = Decimal.dZero;
 
   function recomputeTotal(): void {
-    let sum: DecimalSource = Decimal.dZero;
-    for (const a of toRaw(amounts).values()) sum = renormIfLayer0(Decimal.add(sum, a));
-    cachedTotal = toDecimal(sum);
+    cachedTotal = sumAmountsAsDecimal(toRaw(amounts).values());
   }
 
   function getAmount(typeId: string): Decimal {
@@ -475,7 +470,7 @@ export function bulkTransfer(
       const toAdd = toDecimal(amount);
       if (toAdd.gt(to.remainingCapacityForType(typeId))) return {};
     }
-    const totalToAdd = sumAmountsAsDecimal(amounts);
+    const totalToAdd = sumAmountsAsDecimal(Object.values(amounts));
     if (Decimal.gt(totalToAdd, to.remainingCapacity())) return {};
 
     const result: Record<string, Decimal> = {};

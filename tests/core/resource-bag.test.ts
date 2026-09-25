@@ -354,7 +354,7 @@ describe('ResourceBag', () => {
       // number leaking through a missing boundary wrap.
       const amounts: Record<string, number> = {};
       for (let i = 0; i < 10; i++) amounts[`r${i}`] = i + 1;
-      const total = sumAmountsAsDecimal(amounts);
+      const total = sumAmountsAsDecimal(Object.values(amounts));
       expect(total).toBeInstanceOf(Decimal);
       expect(total.eq(55)).toBe(true);
       // Chain-form works — proves the boundary actually returned an instance,
