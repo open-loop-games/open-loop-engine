@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import type { HeadlessResult } from '@/core/headless';
 import type { Engine } from '@/index';
-import { createWorkPlan, diffAggregates, runBatch, runMatrix, runSensitivity } from '@/harness';
+import {
+  computeMetricStats,
+  createWorkPlan,
+  diffAggregates,
+  runBatch,
+  runMatrix,
+  runSensitivity,
+} from '@/harness';
 import { aggregateCell } from '@/harness/aggregate';
 import type { Cell, CellResult, UntilCell, WorkItem } from '@/harness';
 
@@ -162,6 +169,16 @@ describe('aggregateCell', () => {
 });
 
 // --- diffAggregates ---
+
+describe('computeMetricStats', () => {
+  it('keeps median the true median and p50 the floor-index percentile', () => {
+    expect(computeMetricStats([1, 3])).toMatchObject({ median: 2, p50: 3 });
+  });
+
+  it('refuses an empty sample', () => {
+    expect(() => computeMetricStats([])).toThrow(/at least one value/);
+  });
+});
 
 describe('diffAggregates', () => {
   it('computes absolute and relative deltas against baseline', () => {

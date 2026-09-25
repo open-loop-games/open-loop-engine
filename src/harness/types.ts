@@ -76,8 +76,10 @@ export interface WorkItem<C = Cell> {
  * `stddev` is population standard deviation (`sqrt(Σ(x-µ)²/n)`), chosen so
  * single-sample cells return `0` cleanly rather than `NaN`. `p5`/`p50`/`p95`
  * use floor-index selection on the sorted sample (same convention as
- * `core/profiler.ts` and the bench runner). `median` is retained as an
- * alias for `p50` to preserve the v1 shape — new code should prefer `p50`.
+ * `core/profiler.ts` and the bench runner), so `p50` is the upper middle
+ * value of an even-sized sample. `median` is the true median, the mean of
+ * the middle pair; the two differ for every even count, so pick one per
+ * comparison and don't mix them across it.
  */
 export interface MetricStats {
   min: number;

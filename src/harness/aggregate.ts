@@ -34,7 +34,8 @@ function percentile(sorted: number[], p: number): number {
 
 /**
  * Descriptive stats (min/max/avg/stddev/median/p5/p50/p95/count) over a
- * non-empty numeric array. Caller guarantees `values.length >= 1`.
+ * numeric array. Throws on an empty one: no summary of zero samples is
+ * honest, and a cell with no numeric samples leaves the metric out instead.
  *
  * Public because the cell aggregators are not the only shape a seed sweep
  * takes: a consumer whose per-run readout is a domain object rather than an
@@ -44,8 +45,9 @@ function percentile(sorted: number[], p: number): number {
  * floor-index note above exists to prevent.
  */
 export function computeMetricStats(values: number[]): MetricStats {
-  // Caller ensures values.length >= 1. Single-pass min/max/avg, then a copy
-  // for the sort so we don't mutate the caller's buffer.
+  if (values.length === 0) throw new Error('computeMetricStats needs at least one value');
+  // Single-pass min/max/avg, then a copy for the sort so we don't mutate the
+  // caller's buffer.
   let min = values[0];
   let max = values[0];
   let sum = 0;
