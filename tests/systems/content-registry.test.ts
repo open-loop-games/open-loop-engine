@@ -177,6 +177,54 @@ describe('ContentRegistry', () => {
     expect(reg.size).toBe(3);
   });
 
+  // --- pushPatches() ---
+
+  it('reverting stacked scopes out of push order leaves the remaining scopes on top', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const revertA = reg.pushPatches({ a: { value: 2 } });
+    const revertB = reg.pushPatches({ a: { value: 3 } });
+
+    revertA();
+    expect(reg.get('a')!.value).toBe(3);
+    revertB();
+    expect(reg.get('a')!.value).toBe(1);
+  });
+
+  it('patch() under a pushed scope writes the base, which the revert exposes', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const revert = reg.pushPatches({ a: { value: 2 } });
+
+    reg.patch('a', { value: 7, name: 'Patched' });
+    expect(reg.get('a')).toEqual({ id: 'a', name: 'Patched', value: 2 });
+    revert();
+    expect(reg.get('a')).toEqual({ id: 'a', name: 'Patched', value: 7 });
+  });
+
+  it('reverting the last scope over a key the entry lacked removes the key', () => {
+    const reg = createContentRegistry<{ id: string; bonus?: number }>('opt');
+    reg.register({ id: 'a' });
+    const revertA = reg.pushPatches({ a: { bonus: 1 } });
+    const revertB = reg.pushPatches({ a: { bonus: 2 } });
+
+    revertB();
+    expect(reg.get('a')).toEqual({ id: 'a', bonus: 1 });
+    revertA();
+    expect(Object.hasOwn(reg.get('a')!, 'bonus')).toBe(false);
+  });
+
+  it('a revert runs once however often it is called', () => {
+    const reg = make();
+    reg.register({ id: 'a', name: 'A', value: 1 });
+    const revertA = reg.pushPatches({ a: { value: 2 } });
+    reg.pushPatches({ a: { value: 3 } });
+
+    revertA();
+    revertA();
+    expect(reg.get('a')!.value).toBe(3);
+  });
+
   // --- reactivity ---
 
   it('a computed reading an entry through get() re-evaluates after patch()', () => {

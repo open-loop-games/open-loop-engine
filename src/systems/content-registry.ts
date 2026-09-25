@@ -58,7 +58,9 @@ export interface ContentRegistry<T extends { id: string }> {
 
   /**
    * Shallow-patch an existing entry's fields (Object.assign semantics).
-   * The `id` field cannot be changed.
+   * The `id` field cannot be changed. A field a {@link pushPatches} scope
+   * covers keeps the scope's value until every covering scope reverts, and
+   * then takes the patched value.
    *
    * @throws If the id does not exist in the registry
    */
@@ -78,7 +80,9 @@ export interface ContentRegistry<T extends { id: string }> {
    * that reverts all patched entries to their pre-patch state.
    *
    * Patches are shallow-merged (Object.assign semantics), same as patch().
-   * Multiple pushPatches calls stack — cleanup functions are independent.
+   * Multiple pushPatches calls stack, and cleanups may run in any order: a
+   * field takes the value of the latest live scope that sets it, or its
+   * unscoped value once none does.
    *
    * @param patches - Map of entry id → partial fields to override
    * @returns Idempotent cleanup function that reverts all patches
@@ -89,6 +93,11 @@ export interface ContentRegistry<T extends { id: string }> {
   /** Number of registered entries */
   readonly size: number;
 }
+
+// === CONSTANTS ===
+
+/** Base-value marker for a key the entry didn't have before a scope set it. */
+const ABSENT: unique symbol = Symbol('absent');
 
 // === FACTORIES ===
 
@@ -109,6 +118,32 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
   const store = new Map<string, T>();
   // Read barrier for the plain store: every read touches it, every write bumps it.
   const version = ref(0);
+  // Pushed scopes in push order. Entries are patched in place, so for every key
+  // a live scope covers, `bases` holds the value beneath all scopes; a revert
+  // re-resolves each key it touched as that base overlaid by the scopes left.
+  const liveScopes: Map<string, Record<string, unknown>>[] = [];
+  const bases = new Map<string, Map<string, unknown>>();
+
+  function resolveKeys(id: string, keys: string[]): void {
+    const entry = store.get(id) as Record<string, unknown> | undefined;
+    const base = bases.get(id);
+    if (!entry || !base) return;
+    for (const key of keys) {
+      let value = base.get(key);
+      let covered = false;
+      for (const scope of liveScopes) {
+        const partial = scope.get(id);
+        if (partial && Object.hasOwn(partial, key)) {
+          value = partial[key];
+          covered = true;
+        }
+      }
+      if (value === ABSENT) delete entry[key];
+      else entry[key] = value;
+      if (!covered) base.delete(key);
+    }
+    if (base.size === 0) bases.delete(id);
+  }
 
   const registry: ContentRegistry<T> = {
     name,
@@ -142,7 +177,11 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
       if (!existing) {
         throw new Error(`[${name}] Cannot patch unknown id: "${id}"`);
       }
-      Object.assign(existing, partial);
+      const base = bases.get(id);
+      for (const [key, value] of Object.entries(partial)) {
+        if (base?.has(key)) base.set(key, value);
+        else (existing as Record<string, unknown>)[key] = value;
+      }
       version.value++;
     },
 
@@ -169,27 +208,27 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
         }
       }
 
-      // Snapshot original values for each patched field, then apply
-      const snapshots = new Map<string, Record<string, unknown>>();
+      // The new scope is the top one, so applying it in place is its resolution.
+      const scope = new Map<string, Record<string, unknown>>();
       for (const [id, partial] of Object.entries(patches)) {
-        const entry = store.get(id)!;
-        const snapshot: Record<string, unknown> = {};
+        const entry = store.get(id) as Record<string, unknown>;
+        let base = bases.get(id);
+        if (!base) bases.set(id, (base = new Map()));
         for (const key of Object.keys(partial)) {
-          snapshot[key] = (entry as Record<string, unknown>)[key];
+          if (!base.has(key)) base.set(key, Object.hasOwn(entry, key) ? entry[key] : ABSENT);
         }
-        snapshots.set(id, snapshot);
+        scope.set(id, { ...partial });
         Object.assign(entry, partial);
       }
+      liveScopes.push(scope);
       version.value++;
 
       let reverted = false;
       return () => {
         if (reverted) return;
         reverted = true;
-        for (const [id, snapshot] of snapshots) {
-          const entry = store.get(id);
-          if (entry) Object.assign(entry, snapshot);
-        }
+        liveScopes.splice(liveScopes.indexOf(scope), 1);
+        for (const [id, partial] of scope) resolveKeys(id, Object.keys(partial));
         version.value++;
       };
     },
