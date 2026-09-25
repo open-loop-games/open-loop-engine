@@ -173,6 +173,22 @@ describe('createActionCategory — lifecycle state machine', () => {
     expect(transitions.some(([_, to]) => to === 'completed')).toBe(true);
   });
 
+  it('emits itemStateChange after the transition commits, so listeners see and keep new state', () => {
+    const { category } = makeCategory();
+    category.register({ id: 'chop', baseTicks: 10 });
+
+    const seen: Array<ActionItemState | undefined> = [];
+    category.on('itemStateChange', (_e, _from, to) => {
+      seen.push(category.currentItem?.lifecycle);
+      if (to === 'running') category.setItemProgress('chop', 0.5);
+    });
+
+    category.enqueue('chop', { payload: { count: 1 } });
+    expect(seen).toEqual(['running']);
+    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(category.currentItem?.progress).toBe(0.5);
+  });
+
   it('setItemError transitions to failed and increments attempt', () => {
     const { category } = makeCategory();
     category.register({ id: 'fragile', baseTicks: 10 });

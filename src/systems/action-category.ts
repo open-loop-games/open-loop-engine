@@ -443,6 +443,10 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     next: ActionItemState,
     extra?: (m: ActionItemMetadata<Payload>) => Partial<ActionItemMetadata<Payload>>,
   ): void {
+    // Emit only once the patch is committed: a listener reading the category
+    // must see the new lifecycle, and one that calls a verb must not have its
+    // write overwritten by this patch's spread of the stale metadata.
+    const transition: { from?: ActionItemState; patched?: ActionItemMetadata<Payload> } = {};
     patchByDefId(defId, (m) => {
       const from = m.lifecycle;
       if (from === next && !extra) return m;
@@ -452,12 +456,16 @@ export function createActionCategory<Def extends { id: string }, State = void, P
         ...(extra ? extra(m) : {}),
       };
       if (from !== next) {
-        const entry = makeEntry(defId, patched);
-        if (entry) handle.emit('itemStateChange', entry, from, next);
-        if (next === 'completed') handle.emit('complete', entry!);
+        transition.from = from;
+        transition.patched = patched;
       }
       return patched;
     });
+    if (transition.from === undefined || !transition.patched) return;
+    const entry = makeEntry(defId, transition.patched);
+    if (!entry) return;
+    handle.emit('itemStateChange', entry, transition.from, next);
+    if (next === 'completed') handle.emit('complete', entry);
   }
 
   // --- Wire sequencer events to lifecycle transitions ----------------------
