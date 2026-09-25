@@ -2,11 +2,12 @@
  * `runWaypointProbe` — snapshot-at-time per-waypoint inspector.
  *
  * Sibling of {@link runProbe}, not a subtype. For each waypoint, drives a
- * freshly-built engine via {@link runUntil} until the waypoint's `snapshotAtSec`
- * is reached, then calls `inspect(engine)` to extract a consumer-shaped
- * snapshot. The canonical use case is methodology-#2 predictor-walks-a-schedule:
- * "at sim-second X, what's the per-producer pacing texture?" — the consumer
- * supplies the snapshot shape via the `inspect` callback.
+ * freshly-built engine via {@link runMatrixUntil} until the waypoint's
+ * `snapshotAtSec` is reached, then calls `inspect(engine)` to extract a
+ * consumer-shaped snapshot. The canonical use case is methodology-#2
+ * predictor-walks-a-schedule: "at sim-second X, what's the per-producer
+ * pacing texture?" — the consumer supplies the snapshot shape via the
+ * `inspect` callback.
  *
  * One engine per (waypoint × seed). Default `seeds: [0]` runs a single
  * deterministic engine per waypoint, matching the prior starter `runFlowProbe`
@@ -14,8 +15,7 @@
  * matters.
  */
 
-import { seedRNG } from '@/primitives/rng';
-import { runUntil } from '../run-until';
+import { runMatrixUntil } from '../run-matrix-until';
 import { reachedTime } from '../sim-time';
 import type { Engine } from '@/engine';
 import type { RunContext } from '../types';
@@ -52,27 +52,27 @@ export interface WaypointSnapshot<T> {
 /** Configuration for {@link runWaypointProbe}. */
 export interface WaypointProbeConfig<T> {
   /**
-   * Build a fresh, started engine for each `(waypoint × seed)` run. The
-   * global RNG is seeded with `ctx.seed` just before the call, and again
-   * before the first tick; the probe stops the engine after `inspect`, and
-   * `teardown` disposes it.
+   * Build a fresh, started engine for each `(waypoint × seed)` run, as
+   * {@link UntilCell.buildEngine}.
    */
   buildEngine: (ctx: RunContext) => Engine;
   waypoints: Waypoint[];
-  /** Extract a consumer-shaped snapshot from the engine at the waypoint time. */
+  /**
+   * Extract a consumer-shaped snapshot from the engine at the waypoint time.
+   * Runs once the engine is stopped, so its state reads as of the last tick.
+   */
   inspect: (engine: Engine) => T;
   /**
-   * Called once per run after `inspect`, and after a run that throws —
-   * release what `buildEngine` built (typically `engine.dispose()`). The
-   * probe only stops the engine, so without this every engine it builds
-   * stays reachable until the probe returns.
+   * Called once per `(waypoint, seed)` run after `inspect`, as
+   * {@link UntilCell.teardown} — release what `buildEngine` built
+   * (typically `engine.dispose()`).
    */
   teardown?: (engine: Engine, ctx: RunContext) => void;
   /** Seeds to run per waypoint. Defaults to `[0]` for deterministic single-engine probes. */
   seeds?: number[];
   /**
-   * Sim-seconds advanced per `simulateTick` iteration, forwarded to
-   * `runUntil`. Defaults to `runUntil`'s own `0.05`; coarsen for
+   * Sim-seconds advanced per `simulateTick` iteration, as
+   * {@link UntilCell.tickDelta}. Defaults to `0.05`; coarsen for
    * long-horizon waypoints (minutes–hours of sim-time).
    */
   tickDelta?: number;
@@ -85,10 +85,11 @@ export interface WaypointProbeConfig<T> {
 }
 
 /**
- * For each waypoint × seed: build a fresh engine, advance via `runUntil`
- * until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`,
- * return one {@link WaypointSnapshot} per `(waypoint, seed)` in iteration
- * order.
+ * For each waypoint × seed: build a fresh engine, advance it until
+ * `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, and return one
+ * {@link WaypointSnapshot} per `(waypoint, seed)` in iteration order. Each
+ * waypoint is a single-cell {@link runMatrixUntil} sweep over `seeds`, so
+ * seeding, stopping and `teardown` follow that runner's per-run lifecycle.
  *
  * The probe stops each run's engine but never disposes it; pass `teardown`
  * to dispose it once `inspect` has read it, or a wide probe holds every
@@ -113,32 +114,28 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
   const pad = config.maxSimTimePad ?? 60;
   const out: WaypointSnapshot<T>[] = [];
   for (const waypoint of config.waypoints) {
-    for (const seed of seeds) {
-      seedRNG(seed);
-      const ctx = { seed };
-      const engine = config.buildEngine(ctx);
-      try {
-        const result = runUntil({
-          engine,
-          until: (ctx) => reachedTime(ctx.simTime, waypoint.snapshotAtSec),
-          maxSimTime: waypoint.snapshotAtSec + pad,
+    let engine!: Engine;
+    runMatrixUntil({
+      cells: [
+        {
+          name: waypoint.id,
           tickDelta: config.tickDelta,
-          seed,
-        });
+          buildEngine: (ctx) => (engine = config.buildEngine(ctx)),
+          teardown: config.teardown,
+        },
+      ],
+      seeds,
+      until: (ctx) => reachedTime(ctx.simTime, waypoint.snapshotAtSec),
+      maxSimTime: waypoint.snapshotAtSec + pad,
+      onRunComplete: ({ seed }, result) =>
         out.push({
           waypointId: waypoint.id,
           seed,
           snapshotSimTime: result.elapsedSimulated,
           reachedTarget: result.terminated === 'predicate',
           snapshot: config.inspect(engine),
-        });
-      } finally {
-        // buildEngine returns a started engine; stop it or its live timer
-        // outlives the probe. `stop?.` tolerates lightweight test fakes.
-        engine.stop?.();
-        config.teardown?.(engine, ctx);
-      }
-    }
+        }),
+    });
   }
   return out;
 }

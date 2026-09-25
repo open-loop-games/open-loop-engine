@@ -91,7 +91,7 @@ describe('runWaypointProbe', () => {
     expect(draws[1]).toBe(draws[0]);
   });
 
-  it('runs teardown once per run, after inspect, even when inspect throws', () => {
+  it("delegates each run's lifecycle to runMatrixUntil: stop, inspect, then teardown on the engine inspect saw", () => {
     const events: string[] = [];
     let built = 0;
     const buildEngine = () => {
@@ -111,11 +111,11 @@ describe('runWaypointProbe', () => {
       seeds: [1, 2],
     });
     expect(events).toEqual([
-      'inspect:0',
       'stop:0',
+      'inspect:0',
       'teardown:0:1',
-      'inspect:1',
       'stop:1',
+      'inspect:1',
       'teardown:1:2',
     ]);
 
@@ -124,45 +124,13 @@ describe('runWaypointProbe', () => {
       runWaypointProbe({
         buildEngine,
         waypoints: [{ id: 'w2', snapshotAtSec: 1 }],
-        inspect: () => {
+        inspect: (engine) => {
+          events.push(`inspect:${idOf(engine)}`);
           throw new Error('inspect failed');
         },
         teardown: (engine) => events.push(`teardown:${idOf(engine)}`),
       }),
     ).toThrow('inspect failed');
-    expect(events).toEqual(['stop:2', 'teardown:2']);
-  });
-
-  it('stops every engine it builds, even when inspect throws', () => {
-    const stops: number[] = [];
-    let built = 0;
-    const buildEngine = () => {
-      const id = built++;
-      return {
-        tickDriver: { simulateTick: () => {} },
-        stop: () => stops.push(id),
-      } as unknown as Engine;
-    };
-    runWaypointProbe({
-      buildEngine,
-      waypoints: [
-        { id: 'w1', snapshotAtSec: 1 },
-        { id: 'w2', snapshotAtSec: 2 },
-      ],
-      inspect: () => null,
-      seeds: [1, 2],
-    });
-    expect(stops).toEqual([0, 1, 2, 3]);
-
-    expect(() =>
-      runWaypointProbe({
-        buildEngine,
-        waypoints: [{ id: 'w3', snapshotAtSec: 1 }],
-        inspect: () => {
-          throw new Error('inspect failed');
-        },
-      }),
-    ).toThrow('inspect failed');
-    expect(stops).toEqual([0, 1, 2, 3, 4]);
+    expect(events).toEqual(['stop:2', 'inspect:2', 'teardown:2']);
   });
 });
