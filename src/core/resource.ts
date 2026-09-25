@@ -48,10 +48,12 @@ export type { ResourceRegistryEntry } from './registries';
  */
 export interface Resource<T = DecimalSource> extends Ref<T> {
   /**
-   * Stable identifier for save-data and accessor lookups. Falls back to
-   * `displayName` when {@link ResourceOptions.id} is unset. Use this (not
-   * `displayName`) as the key when forwarding to {@link GameStateAccessor}
-   * methods like `getResource`/`getRate`.
+   * Stable identifier for save-data and accessor lookups — the
+   * {@link ResourceOptions.id} as passed, not namespaced by module, so two
+   * modules can each own a resource with the same id. A wrapped ref created
+   * without an id takes its `displayName`. Use this (not `displayName`) as
+   * the key when forwarding to {@link GameStateAccessor} methods like
+   * `getResource`/`getRate`.
    */
   id: string;
   /** Human-readable name shown in UI and used for resource-registry lookups by name */

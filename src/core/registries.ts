@@ -29,8 +29,8 @@
  * Storage and the ambient triad are factored into {@link ./named-registry}.
  * Chain and effect-system are direct {@link NamedRegistry} aliases; the
  * resource registry wraps a NamedRegistry of entries because its public
- * lookup surface (`list` / `findByName` / `findById`) differs and duplicate
- * display names are legitimate across persistence-context scopes.
+ * lookup surface (`list` / `findByName` / `findById`) differs and a
+ * resource id may repeat across persistence contexts.
  *
  * @cluster registries
  */
@@ -179,9 +179,10 @@ export interface ResourceRegistryEntry<T = DecimalSource> {
  * append. Per-resource reactivity is handled by the underlying Vue ref.
  *
  * Unlike chain and effect-system registries, resources are appended
- * permissively — duplicate display names are legitimate across persistence-
- * context scopes (e.g. per-prestige-layer `points`), and the `context`
- * field on each entry lets consumers disambiguate.
+ * permissively — ids are unique only within a persistence context, so two
+ * modules can each own a resource with the same id and display name (e.g.
+ * per-prestige-layer `points`). Both lookups answer the first registered
+ * match; the `context` field on each entry lets consumers disambiguate.
  */
 export interface ResourceRegistry {
   /**
@@ -199,11 +200,11 @@ export interface ResourceRegistry {
    */
   findByName(displayName: string): Resource | undefined;
   /**
-   * First registered resource whose `id` matches, or `undefined`. `id` is
-   * the canonical save-key (set explicitly via
-   * {@link ResourceOptions.id}, falling back to `displayName`), so this is
-   * the right lookup for cross-module wiring where two resources could
-   * share a display name but never an id.
+   * First registered resource whose `id` matches, or `undefined`. Ids are
+   * raw ({@link Resource.id}), not namespaced by module, so two modules can
+   * register the same id — per-prestige-layer `points`, say — and this
+   * answers whichever installed first. Walk {@link ResourceRegistry.list}
+   * and match on `context` when the id alone is ambiguous.
    */
   findById(id: string): Resource | undefined;
 }

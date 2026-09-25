@@ -17,9 +17,9 @@
  * - `register(entity)` throws on duplicate id. Chain and effect-system
  *   registries call this — a duplicate id is an authoring mistake.
  * - `append(entity)` silently appends regardless of id collisions. The
- *   resource registry calls this — two persistence-context scopes can
- *   legitimately share display names (e.g. per-prestige `points`), and
- *   the namespaced resource id falls back to displayName.
+ *   resource registry calls this — resource ids are raw, not namespaced by
+ *   module, so two persistence contexts can legitimately each own the same
+ *   id (e.g. per-prestige `points`), and lookups answer the first.
  *
  * The ambient half is factored separately as {@link createAmbientScope}
  * because the resource registry pairs its NamedRegistry with a wrapper-
