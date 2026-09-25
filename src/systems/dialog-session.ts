@@ -210,6 +210,17 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     stateRef.value = runtime.exportState();
   }
 
+  // A runtime throw (an authored next-only cycle) can land after effects have
+  // applied and the pointer has moved, so the snapshot runs regardless and the
+  // saved state never disagrees with the runtime.
+  function synced<T>(op: () => T): T {
+    try {
+      return op();
+    } finally {
+      snapshot();
+    }
+  }
+
   function emitPresentedIfActive(): void {
     const snap = runtime.present();
     if (snap) events.emit('presented', snap);
@@ -217,28 +228,15 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   // --- Public methods ---
 
-  // A runtime throw (an authored next-only cycle) can land after effects have
-  // applied and the pointer has moved, so the snapshot runs regardless and the
-  // saved state never disagrees with the runtime.
   function start(graphId: string, entryNode?: string): void {
-    let started: boolean | void;
-    try {
-      started = runtime.start(graphId, entryNode);
-    } finally {
-      snapshot();
-    }
-    if (started !== false) emitPresentedIfActive();
+    if (synced(() => runtime.start(graphId, entryNode)) !== false) emitPresentedIfActive();
   }
 
   function choose(choiceId: string): void {
     // Capture the active context *before* delegating — runtime.choose advances
     // the pointer (or finishes), so post-call state would lose the source nodeId.
     const before = runtime.exportState();
-    try {
-      runtime.choose(choiceId);
-    } finally {
-      snapshot();
-    }
+    synced(() => runtime.choose(choiceId));
     if (before.activeGraphId && before.activeNodeId) {
       events.emit('chosen', {
         graphId: before.activeGraphId,
@@ -254,21 +252,17 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   function advance(): void {
-    if (!runtime.advance) {
+    const step = runtime.advance;
+    if (!step) {
       throw new Error(`Dialog session ${options.id}: its runtime does not implement advance()`);
     }
-    try {
-      runtime.advance();
-    } finally {
-      snapshot();
-    }
+    synced(() => step.call(runtime));
     emitPresentedIfActive();
   }
 
   function finish(): void {
     const before = runtime.exportState();
-    runtime.finish();
-    snapshot();
+    synced(() => runtime.finish());
     if (before.activeGraphId) {
       events.emit('finished', { graphId: before.activeGraphId });
     }
