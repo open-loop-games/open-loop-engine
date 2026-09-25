@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { bn } from '@/primitives/decimal';
 import type {
-  IResource,
   IEffect,
   ICondition,
-  IModifier,
   ResourceEffect,
   CompositeEffect,
   ResourceCondition,
@@ -12,15 +9,6 @@ import type {
 } from '@/primitives/types';
 
 describe('Primitive types', () => {
-  it('IResource satisfies interface', () => {
-    const r: IResource = { id: 'gold', amount: bn(100) };
-    expect(r.id).toBe('gold');
-    expect(r.amount.eq(100)).toBe(true);
-  });
-  it('IResource with cap satisfies interface', () => {
-    const r: IResource = { id: 'mana', amount: bn(50), cap: bn(100) };
-    expect(r.cap!.eq(100)).toBe(true);
-  });
   it('IEffect discriminated union works', () => {
     const effect: IEffect = { type: 'resource', target: 'gold', operation: 'add', value: 10 };
     expect(effect.type).toBe('resource');
@@ -53,9 +41,5 @@ describe('Primitive types', () => {
       ],
     };
     expect(cond.conditions).toHaveLength(2);
-  });
-  it('IModifier interface compiles', () => {
-    const mod: IModifier = { apply: (v) => v.add(10), enabled: true, description: '+10' };
-    expect(mod.apply(bn(5)).eq(15)).toBe(true);
   });
 });

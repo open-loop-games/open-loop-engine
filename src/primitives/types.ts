@@ -1,13 +1,5 @@
 import type { Decimal, DecimalSource } from './decimal';
 
-/** Live snapshot of a tracked resource: its current amount and optional cap. */
-export interface IResource {
-  id: string;
-  amount: Decimal;
-  /** Maximum value the resource can reach. Absent means uncapped. */
-  cap?: Decimal;
-}
-
 /** Modifies a numeric resource by adding, subtracting, multiplying, or setting its value. */
 export interface ResourceEffect {
   type: 'resource';
@@ -161,17 +153,6 @@ export type ICondition =
   | AndCondition
   | OrCondition
   | NotCondition;
-
-/** A single step in a modifier chain: transforms a Decimal value and optionally inverts it. */
-export interface IModifier {
-  /** Forward transformation — applies the modifier's effect to `value`. */
-  apply(value: Decimal): Decimal;
-  /** Inverse transformation — recovers the pre-modifier value from a post-modifier result. Required for "how much do I need" calculations. */
-  invert?(value: Decimal): Decimal;
-  enabled: boolean;
-  /** Human-readable label shown in modifier breakdowns (e.g. `"+10% from upgrades"`). */
-  description?: string;
-}
 
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */
 export interface AnalyzerResult {

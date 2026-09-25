@@ -14,9 +14,7 @@ export { notationManager } from './notation-manager';
 export { NotationManager } from './notation-manager';
 export { Notation, Presets, HTMLPresets } from './notations';
 export type {
-  IResource,
   IEffect,
-  IModifier,
   ResourceEffect,
   UnlockEffect,
   StateEffect,
