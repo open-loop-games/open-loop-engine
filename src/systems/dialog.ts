@@ -263,6 +263,15 @@ export function createNativeDialogRuntime(
     return evaluateGate(predicate, gateRuntime);
   }
 
+  /** Whether a node's or choice's gate is absent or passes. */
+  function passes(gated: { condition?: Gate }): boolean {
+    return !gated.condition || holds(gated.condition);
+  }
+
+  function canEnter(graphId: string, nodeId: string): boolean {
+    return passes(lookupNode(graphId, nodeId));
+  }
+
   function recordVisit(graphId: string, nodeId: string): void {
     const visits = state.visitCounts[graphId] ?? (state.visitCounts[graphId] = {});
     visits[nodeId] = (visits[nodeId] ?? 0) + 1;
@@ -284,9 +293,7 @@ export function createNativeDialogRuntime(
 
   /** Whether a node's fall-through `next` exists and its gate passes. */
   function canEnterNext(graphId: string, node: DialogNode): boolean {
-    if (!node.next) return false;
-    const nextNode = lookupNode(graphId, node.next);
-    return !nextNode.condition || holds(nextNode.condition);
+    return !!node.next && canEnter(graphId, node.next);
   }
 
   /**
@@ -316,7 +323,7 @@ export function createNativeDialogRuntime(
   }
 
   function gatedChoices(node: DialogNode): DialogChoice[] {
-    return (node.choices ?? []).filter((c) => !c.condition || holds(c.condition));
+    return (node.choices ?? []).filter(passes);
   }
 
   function emitPresented(): void {
@@ -327,8 +334,7 @@ export function createNativeDialogRuntime(
   function start(graphId: string, entryNode?: string): boolean {
     const graph = lookupGraph(graphId);
     const targetId = entryNode ?? graph.entry;
-    const targetNode = lookupNode(graphId, targetId);
-    if (targetNode.condition && !holds(targetNode.condition)) return false;
+    if (!canEnter(graphId, targetId)) return false;
     activate(graphId, targetId);
     settle();
     emitPresented();
@@ -358,7 +364,7 @@ export function createNativeDialogRuntime(
     if (!choice) {
       throw new Error(`Unknown choice ${choiceId} on dialog node ${nodeId}`);
     }
-    if (choice.condition && !holds(choice.condition)) {
+    if (!passes(choice)) {
       throw new Error(`Choice ${choiceId} on node ${nodeId} is currently gated off`);
     }
     if (choice.outcomes) {
@@ -366,12 +372,7 @@ export function createNativeDialogRuntime(
     }
     events.emit('chosen', { graphId, nodeId, choiceId });
 
-    if (!choice.next) {
-      finish();
-      return;
-    }
-    const nextNode = lookupNode(graphId, choice.next);
-    if (nextNode.condition && !holds(nextNode.condition)) {
+    if (!choice.next || !canEnter(graphId, choice.next)) {
       finish();
       return;
     }
