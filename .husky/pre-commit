@@ -1,1 +1,7 @@
-pnpm exec lint-staged && pnpm run typecheck && pnpm run test && pnpm run build:api && git add docs/api/
+pnpm exec lint-staged && pnpm run typecheck && pnpm run test || exit 1
+
+# A linked worktree's branch is rebased onto main, which regenerates docs/api
+# there; committing it here would only conflict at that rebase.
+[ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] && exit 0
+
+pnpm run build:api && git add docs/api/
