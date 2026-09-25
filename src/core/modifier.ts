@@ -21,7 +21,7 @@ import { createEmitHandle, type Emittable } from './events';
 import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
 import { getCurrentFullContext } from './persistence';
-import { isProfilingEnabled, profile } from './profiler';
+import { profile, profileEnd, profileStart } from './profiler';
 
 /**
  * A single step in a value calculation pipeline.
@@ -346,9 +346,15 @@ export function createSequentialModifier<T extends Modifier>(
     );
 
   return {
-    // Hot path: the profile closure is only built while someone is profiling.
-    apply: (gain: DecimalSource) =>
-      isProfilingEnabled() ? profile('modifier.chain.apply', () => applyAll(gain)) : applyAll(gain),
+    // Hot path: a start/end pair, so no closure is built per apply.
+    apply: (gain: DecimalSource) => {
+      const t0 = profileStart();
+      try {
+        return applyAll(gain);
+      } finally {
+        profileEnd('modifier.chain.apply', t0);
+      }
+    },
 
     // Getters, so a child that gains or loses `invert` / `description` after
     // composition (a nested chain, say) is seen on the next read.

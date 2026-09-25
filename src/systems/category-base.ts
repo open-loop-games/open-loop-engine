@@ -23,7 +23,7 @@ import {
   PersistentName,
 } from '@/core/persistence';
 import type { Grant } from '@/core/modifier';
-import { isProfilingEnabled, profile } from '@/core/profiler';
+import { profileEnd, profileStart } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
@@ -323,8 +323,8 @@ export function setupDeclarativeBindings(
  */
 export interface SetupCategoryTickOptions {
   /**
-   * Profiler label for the per-tick walk. When set, the entire walk is wrapped
-   * in {@link profile} so per-system tick cost shows up in
+   * Profiler label for the per-tick walk. When set, the entire walk is timed
+   * under this label so per-system tick cost shows up in
    * {@link getProfileReport}. Omit if the per-entry callback already records
    * its own labels.
    */
@@ -379,15 +379,12 @@ export function setupCategoryTick<Def extends { id: string }, Instance, State>(
     return cachedEntries;
   };
 
-  const walk = (dt: number): void => {
-    for (const entry of getEntries()) perEntry(entry, dt);
-  };
-
   return registerTick((dt: number) => {
-    if (profileLabel && isProfilingEnabled()) {
-      profile(profileLabel, () => walk(dt));
-    } else {
-      walk(dt);
+    const t0 = profileLabel ? profileStart() : 0;
+    try {
+      for (const entry of getEntries()) perEntry(entry, dt);
+    } finally {
+      if (profileLabel) profileEnd(profileLabel, t0);
     }
   });
 }

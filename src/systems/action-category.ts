@@ -37,7 +37,7 @@
 
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
-import { isProfilingEnabled, profile } from '@/core/profiler';
+import { profileEnd, profileStart } from '@/core/profiler';
 import {
   createSequencer,
   type RegisterTick,
@@ -576,11 +576,12 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     const entry = makeEntry(defId, cur.metadata);
     if (!entry) return;
     const tick = mapping.tick;
-    // Hot path: the label and closure are only built while someone is profiling.
-    if (isProfilingEnabled()) {
-      profile(`${categoryId}/${defId}/tick`, () => tick({ entry, dt, category }));
-    } else {
+    const t0 = profileStart();
+    try {
       tick({ entry, dt, category });
+    } finally {
+      // Hot path: the label is only built while someone is profiling.
+      if (t0 !== 0) profileEnd(`${categoryId}/${defId}/tick`, t0);
     }
   });
 
