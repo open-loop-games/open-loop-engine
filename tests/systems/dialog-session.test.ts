@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
-import { getAllPersistentRefs, loadingSave, resetAllPersistentContexts } from '@/core/persistence';
+import {
+  getAllPersistentRefs,
+  resetAllPersistentContexts,
+  withLoadingSave,
+} from '@/core/persistence';
 import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
@@ -206,8 +210,8 @@ describe('createDialogSession', () => {
     // Engine init order is module-install → save-load, so the session's eager
     // importState fires against the *default* stateRef value; the saved
     // active conversation must propagate via the loadingSave-gated watcher.
-    // This test simulates the deserialize step directly: flip loadingSave,
-    // write a non-default state into the ref, flip back. Without the watcher,
+    // This test simulates the deserialize step directly: write a non-default
+    // state into the ref under the load guard. Without the watcher,
     // session.isActive() would stay false.
     const session = withEngine(buildAccessor(), () =>
       createDialogSession({ id: 'load-sync', graphs: [greetingGraph] }),
@@ -227,16 +231,13 @@ describe('createDialogSession', () => {
         | undefined;
       expect(stateRef).toBeDefined();
 
-      loadingSave.value = true;
-      try {
+      withLoadingSave(() => {
         stateRef!.value = {
           activeGraphId: 'rask-greeting',
           activeNodeId: 'training',
           visitCounts: {},
         };
-      } finally {
-        loadingSave.value = false;
-      }
+      });
 
       expect(session.isActive()).toBe(true);
       expect(session.present()?.nodeId).toBe('training');

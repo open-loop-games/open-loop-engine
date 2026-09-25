@@ -149,9 +149,12 @@ export type NonPersistent<T = State> = WritableComputedRef<T> & {
 /**
  * True while a save load or a reset writes persistent refs. Watchers that
  * react to player actions skip these writes: they restore state, they don't
- * change it.
+ * change it. Written only by {@link withLoadingSave}.
  */
 export const loadingSave = ref(false);
+
+/** Open {@link withLoadingSave} calls; the flag clears as the outermost closes. */
+let loadDepth = 0;
 
 const hydratedCallbacks = new Set<() => void>();
 /** Open {@link deferHydration} calls; a settle inside one waits for the last to close. */
@@ -216,19 +219,37 @@ function runHydrated(): unknown[] {
   return errors;
 }
 
-watch(
-  loadingSave,
-  (loading, wasLoading) => {
-    if (!wasLoading || loading) return;
-    if (hydrationDeferrals > 0) {
-      hydrationPending = true;
-      return;
+/**
+ * Run `fn` as a save load or a reset writing persistent refs, with
+ * {@link loadingSave} held throughout. A nested call keeps the outer's hold,
+ * so the state settles once, as the outermost call closes: the
+ * {@link onHydrated} callbacks run then, or wait for an enclosing
+ * {@link deferHydration}. Outside one, the first callback throw rethrows
+ * from here once every callback has run.
+ *
+ * @internal
+ */
+export function withLoadingSave<T>(fn: () => T): T {
+  if (loadDepth++ === 0) loadingSave.value = true;
+  try {
+    return fn();
+  } finally {
+    if (--loadDepth === 0) {
+      loadingSave.value = false;
+      settleHydration();
     }
-    const errors = runHydrated();
-    if (errors.length > 0) throw errors[0];
-  },
-  { flush: 'sync' },
-);
+  }
+}
+
+/** Run the hydration callbacks for a settled load, or hold them for a deferral. */
+function settleHydration(): void {
+  if (hydrationDeferrals > 0) {
+    hydrationPending = true;
+    return;
+  }
+  const errors = runHydrated();
+  if (errors.length > 0) throw errors[0];
+}
 
 /**
  * Run `fn` with {@link onHydrated} callbacks held until it returns or throws,
@@ -1162,9 +1183,7 @@ export function deserializePersistents(
   refs: Map<string, Persistent>,
   save: Record<string, unknown>,
 ): void {
-  loadingSave.value = true;
-
-  try {
+  withLoadingSave(() => {
     for (const [path, persistentRef] of refs) {
       const current = getNested(save, path);
 
@@ -1178,7 +1197,5 @@ export function deserializePersistents(
         resetPersistent(persistentRef);
       }
     }
-  } finally {
-    loadingSave.value = false;
-  }
+  });
 }

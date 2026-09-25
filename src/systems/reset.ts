@@ -27,7 +27,7 @@ import {
   type Persistent,
   isPersistent,
   resetPersistent,
-  loadingSave,
+  withLoadingSave,
   getModulePersistentRefs,
   getPersistentRefs,
   bindPersistenceNamespace,
@@ -323,34 +323,34 @@ export function createReset(options: ResetOptions): Reset {
         // Snapshot retained values before reset
         retention?.snapshot();
 
-        // Set loading flag to prevent watchers from triggering
-        loadingSave.value = true;
-
-        // Reset via recursive object walking (legacy thingsToReset path)
-        if (processedThingsToReset) {
-          const things = unref(processedThingsToReset);
-          for (const thing of things) {
-            if (isPersistent(thing)) resetPersistent(thing);
-            else resetObject(thing);
+        // Load-guarded so watchers that react to player actions skip these
+        // writes, hooks and listeners included.
+        withLoadingSave(() => {
+          // Reset via recursive object walking (legacy thingsToReset path)
+          if (processedThingsToReset) {
+            const things = unref(processedThingsToReset);
+            for (const thing of things) {
+              if (isPersistent(thing)) resetPersistent(thing);
+              else resetObject(thing);
+            }
           }
-        }
 
-        // Reset via module-scoped refs
-        for (const ref of resolveModules(warnUnknownModule)) {
-          if (!retainedRefs.has(ref)) resetPersistent(ref);
-        }
+          // Reset via module-scoped refs
+          for (const ref of resolveModules(warnUnknownModule)) {
+            if (!retainedRefs.has(ref)) resetPersistent(ref);
+          }
 
-        // Restore retained values
-        retention?.restore();
+          // Restore retained values
+          retention?.restore();
 
-        // Post-reset hook
-        onReset?.();
+          // Post-reset hook
+          onReset?.();
 
-        handle.emit('afterReset');
+          handle.emit('afterReset');
+        });
 
         return true;
       } finally {
-        loadingSave.value = false;
         _resetting = false;
       }
     },

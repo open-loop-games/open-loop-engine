@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { effectScope } from 'vue';
 import { bn } from '@/primitives/decimal';
 import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
@@ -24,6 +25,7 @@ import { createDialogSession } from '@/systems/dialog-session';
 import { createAchievementCategory } from '@/systems/achievement-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createReset, createResetTimer } from '@/systems/reset';
+import { createAchievement } from '@/systems/achievement';
 import { createSkill } from '@/systems/skill';
 import { createSkillCategory } from '@/systems/skill-category';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
@@ -68,6 +70,57 @@ describe('Reset', () => {
     addResource(pp, 5);
     expect(Decimal.eq(pp.cumulative!.value, 6)).toBe(true);
     expect(Decimal.eq(pp.best!.value, 21)).toBe(true);
+  });
+
+  it("a reset run from another reset's onReset leaves the outer's hooks guarded", () => {
+    beginPersistentContext('reset-nested-guard');
+    const pp = createResource(bn(0), { id: 'NestedPrestige', displayName: 'Prestige' });
+    endPersistentContext();
+    addResource(pp, 1);
+
+    const inner = createReset({ thingsToReset: [] });
+    const outer = createReset({
+      thingsToReset: [],
+      onReset: () => {
+        inner.reset();
+        addResource(pp, 5);
+      },
+    });
+    outer.on('afterReset', () => addResource(pp, 10));
+    outer.reset();
+
+    expect(Decimal.eq(pp.value, 16)).toBe(true);
+    expect(Decimal.eq(pp.cumulative!.value, 1)).toBe(true);
+    expect(Decimal.eq(pp.best!.value, 1)).toBe(true);
+  });
+
+  it('a nested reset settles once, as the outermost reset ends', () => {
+    const scope = effectScope();
+    const flag = withPersistentContext('reset-nested-settle', () =>
+      persistent(false, { name: 'flag', lifetime: true }),
+    );
+    const achievement = scope.run(() =>
+      createAchievement({
+        id: 'nested-settle',
+        display: { title: 'Flag' },
+        requirement: () => flag.value,
+      }),
+    )!;
+
+    const inner = createReset({ thingsToReset: [] });
+    const outer = createReset({
+      thingsToReset: [],
+      onReset: () => {
+        flag.value = true;
+        inner.reset();
+        flag.value = false;
+      },
+    });
+    outer.reset();
+    scope.stop();
+
+    // The requirement held only mid-reset; the settled state decides.
+    expect(achievement.earned.value).toBe(false);
   });
 
   it('calls onReset callback after reset', () => {
