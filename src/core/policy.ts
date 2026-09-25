@@ -212,13 +212,13 @@ export function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): Select
         if (!deltaRate.gt(0)) continue;
         const cost = Decimal.fromValue(opts.getCost(c));
         const effectiveResource = Decimal.sub(opts.getResource(c), reserve);
-        const unaffordable = Decimal.max(Decimal.sub(cost, effectiveResource), 0);
+        const gap = cost.sub(effectiveResource);
         let waitTerm: Decimal = Decimal.dZero;
-        if (unaffordable.gt(0)) {
+        if (gap.gt(0)) {
           const headlineRate = Decimal.fromValue(getHeadlineRate(c));
           // No income means the gap never closes: no finite wait to score.
           if (!headlineRate.gt(0)) continue;
-          waitTerm = unaffordable.div(headlineRate);
+          waitTerm = gap.div(headlineRate);
         }
         const score = waitTerm.add(cost.div(deltaRate));
         if (bestScore === undefined || score.lt(bestScore)) {
