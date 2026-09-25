@@ -312,6 +312,29 @@ export function setupDeclarativeBindings(
 // === TICK WALKER ===
 
 /**
+ * Read a category's candidates lazily, so late registrations (mods, delayed
+ * content unlocks) join the helper. Registration is additive-only, so `size`
+ * is a sound cache key: while it holds, the entries are unchanged and the
+ * previous list is reused rather than reallocated.
+ *
+ * @internal
+ */
+export function cachedCategoryList<E, T>(
+  category: { readonly size: number; getAll(): E[] },
+  pick: (entry: E) => T,
+): () => T[] {
+  let cachedList: T[] = [];
+  let cachedSize = -1;
+  return () => {
+    if (category.size !== cachedSize) {
+      cachedList = category.getAll().map(pick);
+      cachedSize = category.size;
+    }
+    return cachedList;
+  };
+}
+
+/**
  * Options for {@link setupCategoryTick}.
  *
  * @internal
@@ -364,15 +387,7 @@ export function setupCategoryTick<Def extends { id: string }, Instance, State>(
 ): () => void {
   const { profileLabel } = options;
 
-  let cachedEntries: CategoryEntry<Def, Instance, State>[] = [];
-  let cachedSize = -1;
-  const getEntries = (): CategoryEntry<Def, Instance, State>[] => {
-    if (base.size !== cachedSize) {
-      cachedEntries = base.getAll();
-      cachedSize = base.size;
-    }
-    return cachedEntries;
-  };
+  const getEntries = cachedCategoryList(base, (e) => e);
 
   return registerTick((dt: number) => {
     const t0 = profileLabel ? profileStart() : 0;

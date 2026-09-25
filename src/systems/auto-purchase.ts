@@ -35,6 +35,7 @@ import { countAffordable } from '@/core/formulas/affordability';
 import type { Purchasable } from './purchasable';
 import type { PurchasableCategory } from './purchasable-category';
 import type { Producer, ProducerCategory } from './producer-category';
+import { cachedCategoryList } from './category-base';
 
 // Default policy: cheapest by `repeatable.getCost(1)`. Module-level singleton
 // so identity is stable across `processGetter` calls when `options.policy`
@@ -67,27 +68,6 @@ function largestAffordable(
   // Without a seed the search would bisect all the way down to find this.
   if (Decimal.lt(available, getCost(1))) return Decimal.dZero;
   return countAffordable((n) => Decimal.lte(getCost(n), available), Decimal.floor(ceiling), null);
-}
-
-/**
- * Read a category's candidates lazily, so late registrations (mods, delayed
- * content unlocks) join the helper. Registration is additive-only, so `size`
- * is a sound cache key: while it holds, the entries are unchanged and the
- * previous list is reused rather than reallocated.
- */
-function cachedCategoryList<E, T>(
-  category: { readonly size: number; getAll(): E[] },
-  pick: (entry: E) => T,
-): () => T[] {
-  let cachedList: T[] = [];
-  let cachedSize = -1;
-  return () => {
-    if (category.size !== cachedSize) {
-      cachedList = category.getAll().map(pick);
-      cachedSize = category.size;
-    }
-    return cachedList;
-  };
 }
 
 /**
