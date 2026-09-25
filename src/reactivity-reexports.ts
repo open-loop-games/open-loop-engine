@@ -28,10 +28,12 @@ export {
   computed,
   ref,
   shallowRef,
+  triggerRef,
   reactive,
   isRef,
   unref,
   effectScope,
+  onScopeDispose,
 } from 'vue';
 export type {
   Ref,

@@ -1209,6 +1209,28 @@ describe('EngineConfig.strictValidation', () => {
   });
 });
 
+describe('reactivity re-exports', () => {
+  it('triggerRef and onScopeDispose reach the engine reactivity graph', async () => {
+    const { shallowRef, triggerRef, watchEffect, effectScope, onScopeDispose } =
+      await import('@/index');
+    const list = shallowRef<number[]>([]);
+    const seen: number[] = [];
+    let disposed = false;
+    const scope = effectScope();
+    scope.run(() => {
+      watchEffect(() => void seen.push(list.value.length), { flush: 'sync' });
+      onScopeDispose(() => {
+        disposed = true;
+      });
+    });
+    list.value.push(1);
+    triggerRef(list);
+    expect(seen).toEqual([0, 1]);
+    scope.stop();
+    expect(disposed).toBe(true);
+  });
+});
+
 describe('save safety', () => {
   function mapStorage() {
     const m = new Map<string, string>();
