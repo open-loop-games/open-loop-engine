@@ -29,6 +29,7 @@ import {
   deserializePersistents,
   deferHydration,
   filterDefaultedRefs,
+  withPersistenceNamespace,
   PersistentName,
   DefaultValue,
   SaveDataPath,
@@ -114,8 +115,9 @@ export interface SaveManagerConfig {
   /**
    * Forkable-instance namespace. When set, storage keys carry the namespace
    * (`${gameId}:${namespace}-slot-${id}`) and `getAllPersistentRefs` is
-   * walked filtered to contexts opened under the same namespace. Undefined
-   * = legacy single-engine path, bit-for-bit compatible.
+   * walked filtered to contexts opened under the same namespace. Save-event
+   * handlers and post-load reconcilers run inside it. Undefined = legacy
+   * single-engine path, bit-for-bit compatible.
    *
    * Normally passed through from `EngineConfig.persistenceNamespace`; the
    * engine is the expected caller. Direct `createSaveManager` consumers
@@ -622,11 +624,20 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     return slotStorageKey(_activeSlotId);
   }
 
+  /**
+   * Run `fn` inside this manager's persistence namespace, so the save-event
+   * handlers and the post-load reconcilers it triggers see the same namespace
+   * whichever entry point a consumer called.
+   */
+  function inNamespace<T>(fn: () => T): T {
+    return withPersistenceNamespace(persistenceNamespace, fn);
+  }
+
   function buildEnvelope(): SaveEnvelope {
-    handle.emit('save:before-serialize');
-    const dataObj = serializePersistents(
-      filterDefaultedRefs(getAllPersistentRefs(persistenceNamespace)),
-    );
+    const dataObj = inNamespace(() => {
+      handle.emit('save:before-serialize');
+      return serializePersistents(filterDefaultedRefs(getAllPersistentRefs(persistenceNamespace)));
+    });
     const base = {
       version,
       gameId,
@@ -793,18 +804,20 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
    * the slot, which only a load from storage wants.
    */
   function applySaveText(raw: string, slotId: number, protectOnFail: boolean): SaveLoadResult {
-    return deferHydration(() => {
-      let e: SaveEnvelope;
-      try {
-        e = readEnvelope(raw);
-        applyEnvelope(e, slotId);
-      } catch (err) {
-        return failLoad(slotId, err, protectOnFail);
-      }
-      _protectedSlots.delete(slotId);
-      handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
-      return { success: true, timestamp: e.timestamp };
-    }, reportReconcileError(slotId));
+    return inNamespace(() =>
+      deferHydration(() => {
+        let e: SaveEnvelope;
+        try {
+          e = readEnvelope(raw);
+          applyEnvelope(e, slotId);
+        } catch (err) {
+          return failLoad(slotId, err, protectOnFail);
+        }
+        _protectedSlots.delete(slotId);
+        handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
+        return { success: true, timestamp: e.timestamp };
+      }, reportReconcileError(slotId)),
+    );
   }
 
   /** Report a post-load reconcile's throw without failing the load it followed. */

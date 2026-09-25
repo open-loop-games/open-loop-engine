@@ -496,7 +496,7 @@ export function createEngine(config: EngineConfig): Engine {
 
   function startAutoSaveTimer(): void {
     if (saveManager && autoSaveInterval > 0 && !autoSaveTimer) {
-      autoSaveTimer = timers.setInterval(() => performSave(), autoSaveInterval);
+      autoSaveTimer = timers.setInterval(() => saveManager.save(), autoSaveInterval);
     }
   }
   // Every subscription and effect made on the engine's behalf, released by dispose().
@@ -509,35 +509,21 @@ export function createEngine(config: EngineConfig): Engine {
 
   // The hooks ride the save manager's own events so every entry point runs
   // them — consumers wire the manager's import/export/save/load to their UI.
+  // The manager emits them inside the engine's namespace.
   if (saveManager) {
     cleanups.push(
-      saveManager.on('save:before-serialize', () =>
-        withPersistenceNamespace(config.persistenceNamespace, () => {
-          for (const cb of saveCallbacks) cb();
-        }),
-      ),
-      saveManager.on('save:loaded', ({ timestamp }) =>
-        withPersistenceNamespace(config.persistenceNamespace, () => {
-          for (const cb of loadCallbacks) cb({ success: true, timestamp });
-        }),
-      ),
+      saveManager.on('save:before-serialize', () => {
+        for (const cb of saveCallbacks) cb();
+      }),
+      saveManager.on('save:loaded', ({ timestamp }) => {
+        for (const cb of loadCallbacks) cb({ success: true, timestamp });
+      }),
     );
   }
 
   function track(unsub: () => void): () => void {
     cleanups.push(unsub);
     return unsub;
-  }
-
-  function performSave(): void {
-    withPersistenceNamespace(config.persistenceNamespace, () => saveManager?.save());
-  }
-
-  function performLoad(): SaveLoadResult {
-    return withPersistenceNamespace(
-      config.persistenceNamespace,
-      () => saveManager?.load() ?? { success: false },
-    );
   }
 
   function topologicalSort(mods: EngineModule[]): EngineModule[] {
@@ -574,14 +560,14 @@ export function createEngine(config: EngineConfig): Engine {
     tickDriver,
     saveManager,
     save() {
-      performSave();
+      saveManager?.save();
     },
     load() {
       // Before start() no persistent ref exists to hydrate, so the load would
       // report success, change nothing, and let the next save overwrite it.
       if (disposed) throw new Error('Cannot load into a disposed engine');
       if (!installed) throw new Error('Call start() before load(): modules must install first');
-      return performLoad();
+      return saveManager?.load() ?? { success: false };
     },
     use(module) {
       if (installed) throw new Error(`Cannot use("${module.id}") after start()`);
