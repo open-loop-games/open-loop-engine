@@ -545,4 +545,21 @@ describe('createCycleLog — the baseline follows loads and resets', () => {
     expect(lastDelta(log, 'strength')).toBe(5);
     expect(lastDelta(log, 'gold')).toBe(3);
   });
+
+  it('a load that leaves a metric at its value keeps its growth so far', () => {
+    const { registerTick } = createTickManager();
+    const { a, cycle, log } = withPersistentContext('parts', () => {
+      const a = persistent<number>(0, { name: 'a' });
+      const b = persistent<number>(0, { name: 'b' });
+      const cycle = createCycle({ registerTick });
+      const log = createCycleLog({ cycle, metrics: { power: () => a.value + b.value } });
+      return { a, cycle, log };
+    });
+
+    a.value = 5;
+    deserializePersistents(getAllPersistentRefs(), { parts: { a: 2, b: 3 } });
+    cycle.end();
+
+    expect(lastDelta(log, 'power')).toBe(5);
+  });
 });
