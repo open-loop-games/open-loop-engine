@@ -192,6 +192,13 @@ export interface SpatialGraph<N, E> {
    * Replace this graph's state from a snapshot. Clears nodes, edges, and
    * child graphs first; then rebuilds from `snapshot`. Silent: no events
    * fire, so a view over the graph re-reads it after a restore.
+   *
+   * Every child graph is a new object afterwards, even under an owner id
+   * that survives, so anything holding one points at a detached graph whose
+   * writes never reach the next `serialize()`. Re-acquire held children via
+   * `getChildGraph`, and call `restore` on a `ScopeStack` over this graph
+   * after this restore, never before.
+   *
    * Throws on snapshot integrity violations (unknown version, edge
    * referencing missing node, child keyed on missing node).
    */

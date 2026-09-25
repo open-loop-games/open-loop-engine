@@ -44,7 +44,11 @@
  *
  * Persistence: `serialize()` returns the active path only. The state cache
  * is ephemeral — cleared on `restore` and rebuilt as callers drive
- * `recalculateAt` after load. No events fire during restore.
+ * `recalculateAt` after load. No events fire during restore. Restore the
+ * graph first, then the stack: `SpatialGraph.restore` replaces every child
+ * graph, so a stack left standing over the old ones reads and writes
+ * detached graphs, and a removal no longer exits it. `stack.restore`
+ * re-resolves the path against the live tree.
  */
 
 import { createEmitHandle } from '../events';
