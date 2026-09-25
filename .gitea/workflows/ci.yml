@@ -49,6 +49,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Typechecks a consumer against the built dist under nodenext and bundler
+      # resolution, which the source typecheck never exercises.
+      - name: Consumer typecheck against dist
+        run: pnpm check:nodenext
+
       # Version-keyed drift audits diff docs/api between tags, so what is
       # committed has to be what a clean build generates.
       - name: docs/api matches a clean build

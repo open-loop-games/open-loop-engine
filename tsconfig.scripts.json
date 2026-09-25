@@ -5,5 +5,5 @@
     "noEmit": true
   },
   "include": ["src", "scripts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests", "scripts/nodenext-check"]
 }
