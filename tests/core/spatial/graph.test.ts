@@ -433,6 +433,46 @@ describe('createSpatialGraph — serialize / restore', () => {
     expect(() => graph.restore(snap)).toThrow(/missing node/);
   });
 
+  it('a rejected restore leaves the graph as it was, wherever in the tree it fails', () => {
+    const graph = createSpatialGraph<Pkg, Wire>();
+    graph.addNode(pkg('a'), { id: 'a' });
+    graph.addNode(pkg('b'), { id: 'b' });
+    graph.addEdge('a', 'b', { kind: 'dependency' }, { id: 'e1' });
+    const child = graph.createChildGraph('a');
+    child.addNode(pkg('i'), { id: 'i' });
+    const before = graph.serialize();
+
+    const danglingEdge: SpatialGraphSnapshot<Pkg, Wire> = {
+      version: 1,
+      nodes: [{ id: 'x', data: pkg('x') }],
+      edges: [{ id: 'e9', fromId: 'x', toId: 'ghost', data: { kind: 'dependency' } }],
+      children: {},
+    };
+    const nestedDuplicate: SpatialGraphSnapshot<Pkg, Wire> = {
+      version: 1,
+      nodes: [{ id: 'x', data: pkg('x') }],
+      edges: [],
+      children: {
+        x: {
+          version: 1,
+          nodes: [
+            { id: 'y', data: pkg('y') },
+            { id: 'y', data: pkg('y') },
+          ],
+          edges: [],
+          children: {},
+        },
+      },
+    };
+
+    expect(() => graph.restore(danglingEdge)).toThrow(/missing node 'ghost'/);
+    expect(() => graph.restore(nestedDuplicate)).toThrow(/duplicate node id 'y'/);
+    expect(graph.serialize()).toEqual(before);
+    expect(graph.getChildGraph('a')).toBe(child);
+    // The tree still holds every id it held, so an explicit repeat is refused.
+    expect(() => graph.addNode(pkg('a'), { id: 'a' })).toThrow(/already exists/);
+  });
+
   it('integrates with the persistent() consumer pattern', () => {
     beginPersistentContext('graph-test');
     const snapRef = persistent<SpatialGraphSnapshot<Pkg, Wire>>({

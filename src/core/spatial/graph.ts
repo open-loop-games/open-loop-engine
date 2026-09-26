@@ -189,9 +189,9 @@ export interface SpatialGraph<N, E> {
 
   serialize(): SpatialGraphSnapshot<N, E>;
   /**
-   * Replace this graph's state from a snapshot. Clears nodes, edges, and
-   * child graphs first; then rebuilds from `snapshot`. Silent: no events
-   * fire, so a view over the graph re-reads it after a restore.
+   * Replace this graph's state from a snapshot: clears nodes, edges, and
+   * child graphs, then rebuilds from `snapshot`. Silent: no events fire, so
+   * a view over the graph re-reads it after a restore.
    *
    * Every child graph is a new object afterwards, even under an owner id
    * that survives, so anything holding one points at a detached graph whose
@@ -199,8 +199,10 @@ export interface SpatialGraph<N, E> {
    * `getChildGraph`, and call `restore` on a `ScopeStack` over this graph
    * after this restore, never before.
    *
-   * Throws on snapshot integrity violations (unknown version, edge
-   * referencing missing node, child keyed on missing node).
+   * Throws on a snapshot integrity violation anywhere in its tree (unknown
+   * version, duplicate id, edge referencing missing node, child keyed on
+   * missing node), before it changes anything: a rejected restore leaves the
+   * graph and its children as they were.
    */
   restore(snapshot: SpatialGraphSnapshot<N, E>): void;
 }
@@ -239,7 +241,13 @@ interface TreeOptions {
   readonly takenIds: Map<string, number>;
 }
 
-function makeGraph<N, E>(tree: TreeOptions, ownerNodeId: string | null): SpatialGraph<N, E> {
+// `initial` is a snapshot validateSnapshot has already passed, loaded as the
+// graph is built.
+function makeGraph<N, E>(
+  tree: TreeOptions,
+  ownerNodeId: string | null,
+  initial?: SpatialGraphSnapshot<N, E>,
+): SpatialGraph<N, E> {
   const { idGenerator, takenIds } = tree;
 
   const nodes = new Map<string, GraphNode<N>>();
@@ -523,63 +531,71 @@ function makeGraph<N, E>(tree: TreeOptions, ownerNodeId: string | null): Spatial
     },
 
     restore(snapshot) {
-      if (snapshot.version !== 1) {
-        throw new Error(
-          `SpatialGraph.restore: unsupported snapshot version ${String(snapshot.version)}`,
-        );
-      }
-
+      validateSnapshot(snapshot);
       releaseSubtree(graph);
       nodes.clear();
       edges.clear();
       adjacency.clear();
       childGraphs.clear();
-
-      for (const entry of snapshot.nodes) {
-        const node: GraphNode<N> = {
-          id: entry.id,
-          data: entry.data,
-          parentId: ownerNodeId,
-        };
-        if (nodes.has(entry.id)) {
-          throw new Error(`SpatialGraph.restore: duplicate node id '${entry.id}'`);
-        }
-        nodes.set(entry.id, node);
-        takeId(entry.id);
-      }
-
-      for (const entry of snapshot.edges) {
-        if (!nodes.has(entry.fromId) || !nodes.has(entry.toId)) {
-          throw new Error(
-            `SpatialGraph.restore: edge '${entry.id}' references missing node '${nodes.has(entry.fromId) ? entry.toId : entry.fromId}'`,
-          );
-        }
-        if (edges.has(entry.id)) {
-          throw new Error(`SpatialGraph.restore: duplicate edge id '${entry.id}'`);
-        }
-        const edge: GraphEdge<E> = {
-          id: entry.id,
-          fromId: entry.fromId,
-          toId: entry.toId,
-          data: entry.data,
-        };
-        edges.set(entry.id, edge);
-        takeId(entry.id);
-        indexEdge(edge);
-      }
-
-      for (const [ownerId, childSnap] of Object.entries(snapshot.children)) {
-        if (!nodes.has(ownerId)) {
-          throw new Error(`SpatialGraph.restore: child graph keyed on missing node '${ownerId}'`);
-        }
-        const child = makeGraph<N, E>(tree, ownerId);
-        child.restore(childSnap);
-        childGraphs.set(ownerId, child);
-      }
+      load(snapshot);
     },
   };
 
+  // Build from a snapshot validateSnapshot has passed, into an empty graph.
+  function load(snapshot: SpatialGraphSnapshot<N, E>): void {
+    for (const entry of snapshot.nodes) {
+      nodes.set(entry.id, { id: entry.id, data: entry.data, parentId: ownerNodeId });
+      takeId(entry.id);
+    }
+    for (const entry of snapshot.edges) {
+      const edge: GraphEdge<E> = {
+        id: entry.id,
+        fromId: entry.fromId,
+        toId: entry.toId,
+        data: entry.data,
+      };
+      edges.set(entry.id, edge);
+      takeId(entry.id);
+      indexEdge(edge);
+    }
+    for (const [ownerId, childSnap] of Object.entries(snapshot.children)) {
+      childGraphs.set(ownerId, makeGraph<N, E>(tree, ownerId, childSnap));
+    }
+  }
+
+  if (initial) load(initial);
   return graph;
+}
+
+// Throw on the first integrity violation anywhere in the snapshot tree, so a
+// restore rejects a bad snapshot before it touches the graph.
+function validateSnapshot<N, E>(snapshot: SpatialGraphSnapshot<N, E>): void {
+  if (snapshot.version !== 1) {
+    throw new Error(
+      `SpatialGraph.restore: unsupported snapshot version ${String(snapshot.version)}`,
+    );
+  }
+  const nodeIds = new Set<string>();
+  for (const { id } of snapshot.nodes) {
+    if (nodeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate node id '${id}'`);
+    nodeIds.add(id);
+  }
+  const edgeIds = new Set<string>();
+  for (const { id, fromId, toId } of snapshot.edges) {
+    if (!nodeIds.has(fromId) || !nodeIds.has(toId)) {
+      throw new Error(
+        `SpatialGraph.restore: edge '${id}' references missing node '${nodeIds.has(fromId) ? toId : fromId}'`,
+      );
+    }
+    if (edgeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate edge id '${id}'`);
+    edgeIds.add(id);
+  }
+  for (const [ownerId, childSnap] of Object.entries(snapshot.children)) {
+    if (!nodeIds.has(ownerId)) {
+      throw new Error(`SpatialGraph.restore: child graph keyed on missing node '${ownerId}'`);
+    }
+    validateSnapshot(childSnap);
+  }
 }
 
 function defaultIdGenerator(): () => string {
