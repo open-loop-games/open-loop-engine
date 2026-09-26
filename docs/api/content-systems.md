@@ -143,10 +143,10 @@ Two consumer entry points: `createPurchasableCategory` batch-registers from cont
 - `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:157`
 - `type ScalingPurchasableEffect` — Effect configuration for ScalingPurchasableOptions — at most one of `effect` (a static base or a plain function) or `effectFormula` (a Formula factory). `src/systems/purchasable.ts:198`
 - `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with geometric, Formula or function cost scaling. `src/systems/purchasable.ts:230`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:447`
-- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:318`
-- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:232`
-- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:91`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:450`
+- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:321`
+- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:235`
+- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:94`
 
 ## RunPool
 

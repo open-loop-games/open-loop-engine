@@ -46,8 +46,6 @@ const AFFORDABILITY_TOLERANCE = 1e-12;
  * and widens above layer 0 only to the ulp the stored exponent carries.
  * `Decimal`'s own tolerance comparisons apply their tolerance to that stored
  * exponent, which makes it an absolute slack in orders of magnitude.
- *
- * @internal
  */
 function payable(price: DecimalSource, balance: DecimalSource): boolean {
   if (!Decimal.isFinite(price)) return false;
@@ -66,8 +64,6 @@ function payableSlack(price: DecimalSource): number {
  * can reject in one comparison before running the ratio test. Twice the slack
  * clears the division's rounding by orders of magnitude. A price with no
  * positive bound — zero, negative or NaN — gets `-∞`, which never shortcuts.
- *
- * @internal
  */
 function clearMissBound(price: DecimalSource): DecimalSource {
   if (!Decimal.gt(price, 0)) return Decimal.dNegInf;
@@ -202,22 +198,27 @@ export function calculateMaxAffordable(
       // Counts are whole levels, so a fractional cap admits the levels below it.
       const cap = Decimal.floor(maxBulkAmount);
 
-      // Total charged for buying `n` levels, memoized so the guard update below
-      // reads the prices the search already paid for instead of re-pricing them.
-      const prices = new Map<string, DecimalSource>();
+      // The search's last accepted and last refused counts are the answer and the
+      // one past it, so the guard update below reads their prices instead of
+      // re-pricing them, as does a search that re-probes its last refusal.
+      type Priced = { n: DecimalSource; price: DecimalSource };
+      let lastAccepted: Priced | undefined;
+      let lastRefused: Priced | undefined;
+      /** Total charged for buying `n` levels. */
       const priceOf = (n: DecimalSource): DecimalSource => {
-        const d = new Decimal(n);
-        const key = `${d.sign}:${d.layer}:${d.mag}`;
-        let price = prices.get(key);
-        if (price === undefined) {
-          price = priceLevels(formula, currentVariable, n, cumulativeCost) ?? Decimal.dInf;
-          prices.set(key, price);
-        }
-        return price;
+        if (lastAccepted && Decimal.eq(lastAccepted.n, n)) return lastAccepted.price;
+        if (lastRefused && Decimal.eq(lastRefused.n, n)) return lastRefused.price;
+        return priceLevels(formula, currentVariable, n, cumulativeCost) ?? Decimal.dInf;
       };
 
       /** Whether buying `n` levels is payable out of the current balance. */
-      const canAfford = (n: DecimalSource): boolean => payable(priceOf(n), resource.value);
+      const canAfford = (n: DecimalSource): boolean => {
+        const price = priceOf(n);
+        const ok = payable(price, resource.value);
+        if (ok) lastAccepted = { n, price };
+        else lastRefused = { n, price };
+        return ok;
+      };
 
       const seed = profile('formula.affordable.integral', () =>
         seedAffordable(formula, resource.value, currentVariable, cumulativeCost, cap),
@@ -259,8 +260,6 @@ export function calculateMaxAffordable(
  * Total charged for `n` levels bought from `from`, in the pricing operation the
  * purchase pays, or `null` when a cumulative span has no price. No levels cost
  * nothing, in either operation.
- *
- * @internal
  */
 function priceLevels(
   formula: GenericFormula,
@@ -276,8 +275,6 @@ function priceLevels(
 /**
  * The continuous answer, as a whole count clamped to `[0, cap]`, or `null` when
  * the curve has no inverse to solve it with or the inverse has no answer here.
- *
- * @internal
  */
 function seedAffordable(
   formula: GenericFormula,

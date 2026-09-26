@@ -233,8 +233,12 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
 
   // A load replaces `aliveStates` wholesale: re-seed each handle still in the
   // pool from it. A handle that has left the pool isn't walked, so a load
-  // naming its id can't revive it.
+  // naming its id can't revive it. A settle that left the map object in place
+  // (a reset, another engine's load) has nothing to re-seed.
+  let seededFrom = aliveStates.value;
   onHydrated(() => {
+    if (aliveStates.value === seededFrom) return;
+    seededFrom = aliveStates.value;
     for (const h of handleArray) {
       const v = aliveStates.value[String(h.id)];
       if (v !== undefined && v !== h.alive.value) h.alive.value = v;
@@ -298,13 +302,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     const entry = entryOf(h);
     if (!entry) return; // handle was already torn down
 
-    if (outcome === 'destroyed') {
-      h.alive.value = false;
-      bus.emit('instance:died', h, 'destroyed');
-      removeFromCollection(entry);
-      bus.emit('instance:removed', h);
-      return;
-    }
+    if (outcome === 'destroyed') return forceDestroy(h);
 
     if (outcome === 'parked') {
       h.alive.value = false;

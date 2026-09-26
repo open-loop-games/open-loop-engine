@@ -55,8 +55,8 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:75`
 - `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:105`
 - `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:100`
-- `function calculateCost(formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/affordability.ts:408`
-- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "buy max" for repeatables and conversions. `src/core/formulas/affordability.ts:102`
+- `function calculateCost(formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/affordability.ts:405`
+- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "buy max" for repeatables and conversions. `src/core/formulas/affordability.ts:98`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:72`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:25`
 - `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1364`
@@ -126,11 +126,11 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 composable value calculation chains
 
 - `interface AdditiveModifierOptions` `src/core/modifier.ts:69`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:889`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:903`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:890`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:904`
 - `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:434`
 - `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:396`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:942`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:943`
 - `function createAdditiveModifier<T extends AdditiveModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that adds a value to the input. `src/core/modifier.ts:99`
 - `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:236`
 - `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:633`
@@ -138,7 +138,7 @@ composable value calculation chains
 - `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose multiple modifiers into a single pipeline that applies them in order. `src/core/modifier.ts:317`
 - `interface ExponentialModifierOptions` `src/core/modifier.ts:200`
 - `type Grant` — Declarative binding entry — the shape consumers use inside per-category declarative fields (`grants` / `restricts` / `rewards`). `src/core/modifier.ts:462`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:916`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:917`
 - `interface Modifier` — A single step in a value calculation pipeline. `src/core/modifier.ts:33`
 - `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that acts as a registry. `src/core/modifier.ts:513`
 - `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:383`

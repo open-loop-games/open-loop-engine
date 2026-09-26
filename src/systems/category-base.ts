@@ -389,12 +389,16 @@ export function setupCategoryTick<Def extends { id: string }, Instance, State>(
 
   const getEntries = cachedCategoryList(base, (e) => e);
 
+  const walk = (dt: number) => {
+    for (const entry of getEntries()) perEntry(entry, dt);
+  };
+  if (!profileLabel) return registerTick(walk);
   return registerTick((dt: number) => {
-    const t0 = profileLabel ? profileStart() : 0;
+    const t0 = profileStart();
     try {
-      for (const entry of getEntries()) perEntry(entry, dt);
+      walk(dt);
     } finally {
-      if (profileLabel) profileEnd(profileLabel, t0);
+      profileEnd(profileLabel, t0);
     }
   });
 }

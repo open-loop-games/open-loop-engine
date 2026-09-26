@@ -67,7 +67,10 @@ function largestAffordable(
 ): DecimalSource {
   // Without a seed the search would bisect all the way down to find this.
   if (Decimal.lt(available, getCost(1))) return Decimal.dZero;
-  return countAffordable((n) => Decimal.lte(getCost(n), available), Decimal.floor(ceiling), null);
+  const cap = Decimal.floor(ceiling);
+  // A cap of one was just priced above.
+  if (cap.eq(1)) return cap;
+  return countAffordable((n) => Decimal.lte(getCost(n), available), cap, null);
 }
 
 /**

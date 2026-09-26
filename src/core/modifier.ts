@@ -843,17 +843,18 @@ export function delegateModifier(
       : gate == null
         ? own
         : computed(() => unref(own) !== false && unref(gate) !== false);
+  // Forwarders are built once; the getters only decide whether `raw` has the member now.
+  const invert = (gain: DecimalSource) => raw.invert!(gain);
+  const describe = () => (raw.description as () => ModifierDescription | ModifierDescription[])();
   return {
     apply: (gain) => raw.apply(gain),
     get invert() {
-      return raw.invert == null ? undefined : (gain: DecimalSource) => raw.invert!(gain);
+      return raw.invert == null ? undefined : invert;
     },
     get description() {
       if (description != null) return description;
       const desc = raw.description;
-      return typeof desc === 'function'
-        ? () => (raw.description as () => ModifierDescription | ModifierDescription[])()
-        : desc;
+      return typeof desc === 'function' ? describe : desc;
     },
     enabled,
   };
