@@ -26,7 +26,8 @@
  * so a module reset leaves them alone and `pool.reset()` stays the seam.
  */
 
-import { computed, ref, shallowRef, watch, type Ref } from 'vue';
+import { computed, effectScope, ref, shallowRef, watch, type Ref } from 'vue';
+import { runInScope } from './common';
 import { createEmitHandle, type Emittable } from './events';
 import { onHydrated, persistent, withPersistentContext } from './persistence';
 import { attachContextReset } from './resettable';
@@ -172,6 +173,13 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
    * aliveness.
    */
   reset(): void;
+  /**
+   * Stop the pool's load re-seed and every handle's aliveness mirror. The
+   * saved map stays registered and keeps saving, so building a pool under the
+   * same id again takes a new engine. A pool built during `install()` stops
+   * with `engine.dispose()` without this call.
+   */
+  dispose(): void;
 }
 
 // === FACTORY ===
@@ -231,19 +239,25 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     return entry?.handle === h ? entry : undefined;
   }
 
+  // Owns the hydration hook and every handle's mirror watch, including those
+  // of handles added after install, so all of them stop with the pool.
+  const scope = effectScope();
+
   // A load replaces `aliveStates` wholesale: re-seed each handle still in the
   // pool from it. A handle that has left the pool isn't walked, so a load
   // naming its id can't revive it. A settle that left the map object in place
   // (a reset, another engine's load) has nothing to re-seed.
   let seededFrom = aliveStates.value;
-  onHydrated(() => {
-    if (aliveStates.value === seededFrom) return;
-    seededFrom = aliveStates.value;
-    for (const h of handleArray) {
-      const v = aliveStates.value[String(h.id)];
-      if (v !== undefined && v !== h.alive.value) h.alive.value = v;
-    }
-  });
+  scope.run(() =>
+    onHydrated(() => {
+      if (aliveStates.value === seededFrom) return;
+      seededFrom = aliveStates.value;
+      for (const h of handleArray) {
+        const v = aliveStates.value[String(h.id)];
+        if (v !== undefined && v !== h.alive.value) h.alive.value = v;
+      }
+    }),
+  );
 
   // Versioned view-cache for referentially-stable `instances.value` reads.
   // Pattern cribbed verbatim from sequencer.ts — reads return the same slice
@@ -346,12 +360,14 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     const initialAlive = aliveStates.value[idKey] ?? true;
     aliveStates.value[idKey] = initialAlive;
     const alive = ref(initialAlive);
-    const stopMirror = watch(
-      alive,
-      (v) => {
-        aliveStates.value[idKey] = v;
-      },
-      { flush: 'sync' },
+    const stopMirror = runInScope(scope, () =>
+      watch(
+        alive,
+        (v) => {
+          aliveStates.value[idKey] = v;
+        },
+        { flush: 'sync' },
+      ),
     );
 
     const handle: RunHandle<Id> = {
@@ -410,6 +426,9 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       bus.emit('pool:reset');
     },
     on: bus.on,
+    dispose(): void {
+      scope.stop();
+    },
   };
 
   return attachContextReset(pool, poolId);

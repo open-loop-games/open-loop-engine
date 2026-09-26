@@ -55,7 +55,7 @@ progressive unlock of automation features
 - `interface AutomationTiers` — An automation tiers instance — the returned object from createAutomationTiers. `src/systems/automation.ts:102`
 - `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:75`
 - `interface AutomationTiersOptions` `src/systems/automation.ts:81`
-- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:170`
+- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:174`
 
 ## BestOf tracker
 
@@ -70,7 +70,7 @@ per-metric best-of-run recording
 - `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:78`
 - `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:38`
 - `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:35`
-- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best cycle outcome per metric. `src/systems/best-of.ts:257`
+- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best cycle outcome per metric. `src/systems/best-of.ts:261`
 
 ## Challenge Category
 
@@ -87,7 +87,7 @@ batch-create Challenges from content definitions
 
 a bounded run that ends, resets a scope, and replays
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:229`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:232`
 - `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:132`
 - `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:37`
 - `interface CycleOptions` `src/systems/cycle.ts:45`
@@ -152,14 +152,14 @@ Two consumer entry points: `createPurchasableCategory` batch-registers from cont
 
 core primitive for managing a collection of opaque, addressable "runs" with independent lifecycle state
 
-- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:203`
-- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:47`
-- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:53`
-- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:150`
-- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:98`
-- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:126`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:87`
-- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:40`
+- `function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>` — Creates a persistent pool of opaque runs with lifecycle events. `src/core/run-pool.ts:211`
+- `type RunDeathOutcome` — Outcome of a run's death, returned synchronously from a per-instance `onDeath` callback. `src/core/run-pool.ts:48`
+- `interface RunHandle<Id = string>` — Opaque handle to one run inside the pool. `src/core/run-pool.ts:54`
+- `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — borglike clones, Cavernous loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:151`
+- `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:99`
+- `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:127`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:88`
+- `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:41`
 
 ## Skill
 

@@ -38,7 +38,7 @@ inter-cycle arbitration across registered defs
 
 - `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:28`
 - `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:94`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:366`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:370`
 - `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:126`
 - `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:53`
 - `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:98`

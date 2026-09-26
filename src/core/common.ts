@@ -1,6 +1,8 @@
 /**
- * Common — shared generic type utilities and dev-mode helpers
+ * Common — shared generic type utilities, dev-mode helpers and effect-scope ownership
  */
+
+import type { EffectScope } from 'vue';
 
 /** Extract keys that are required (non-optional) from a type */
 export type RequiredKeys<T> = {
@@ -38,4 +40,15 @@ export function isDev(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const proc = (globalThis as any)?.process;
   return !proc || proc?.env?.NODE_ENV !== 'production';
+}
+
+/**
+ * Run `fn` inside `scope` while it is active, so the watchers and hooks it
+ * builds stop with that scope; run it bare once the scope has stopped or when
+ * there is none.
+ *
+ * @internal
+ */
+export function runInScope<T>(scope: EffectScope | undefined, fn: () => T): T {
+  return scope?.active ? (scope.run(fn) as T) : fn();
 }

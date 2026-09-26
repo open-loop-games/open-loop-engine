@@ -170,6 +170,38 @@ describe('RunPool — construction', () => {
   });
 });
 
+describe('RunPool — teardown', () => {
+  it('dispose() stops the load re-seed and keeps the saved map registered', () => {
+    const ctxId = `dispose-${Math.random().toString(36).slice(2, 8)}`;
+    const pool = withPersistentContext(ctxId, () =>
+      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+    );
+    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    pool.dispose();
+
+    deserializePersistents(getAllPersistentRefs(), {
+      [ctxId]: { aliveStates: { a: false } },
+    });
+
+    expect(handle.alive.value).toBe(true);
+    expect([...getAllPersistentRefs().keys()].some((k) => k.startsWith(ctxId))).toBe(true);
+  });
+
+  it('a handle added outside any scope stops with the scope that built its pool', () => {
+    const ctxId = `scoped-${Math.random().toString(36).slice(2, 8)}`;
+    const scope = effectScope();
+    const pool = scope.run(() =>
+      withPersistentContext(ctxId, () => createRunPool({ id: ctxId, deathPolicy: 'park' })),
+    )!;
+    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    scope.stop();
+
+    const saved = { ...getAllPersistentRefs().get(`${ctxId}.aliveStates`)!.value };
+    handle.alive.value = false;
+    expect(getAllPersistentRefs().get(`${ctxId}.aliveStates`)!.value).toEqual(saved);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // addInstance / removeInstance
 // ---------------------------------------------------------------------------

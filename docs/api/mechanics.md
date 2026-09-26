@@ -12,9 +12,9 @@ The composable evaluation kernel — modifier chains, requirements, formulas, co
 
 ## Common
 
-shared generic type utilities and dev-mode helpers
+shared generic type utilities, dev-mode helpers and effect-scope ownership
 
-- `type RequiredKeys<T>` — Extract keys that are required (non-optional) from a type. `src/core/common.ts:6`
+- `type RequiredKeys<T>` — Extract keys that are required (non-optional) from a type. `src/core/common.ts:8`
 
 ## Computed
 
@@ -35,18 +35,18 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
 - `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:67`
 - `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:181`
-- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:224`
-- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:51`
-- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:84`
-- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:98`
-- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:92`
+- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:237`
+- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:52`
+- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:85`
+- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:99`
+- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:93`
 - `function replacementBinding(options: ReplacementBindingOptions): Grant[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:105`
 - `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:44`
-- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:58`
-- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:128`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:108`
-- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:146`
-- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:138`
+- `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:67`
+- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:137`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:117`
+- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:155`
+- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:147`
 
 ## Formulas
 
