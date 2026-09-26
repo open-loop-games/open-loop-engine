@@ -2,6 +2,183 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.3.0 (2026-09-26)
+
+### ⚠ Breaking changes
+
+* **core:** type EffectDefLike.modifiers as grants (72942fe)
+
+  `EffectDefLike.modifiers` narrows from
+  `ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>)` to
+  `readonly Grant[] | (() => readonly Grant[])`. Reading it off
+  `EffectSystemRegistry` defs no longer needs a cast. A hand-built
+  `EnumerableEffectSystem` whose defs carry non-Grant `modifiers` stops
+  compiling; it never worked with the picker or content perturbation.
+
+  Migration:
+    // before
+    const raw = (def as { modifiers?: Grant[] | (() => Grant[]) }).modifiers;
+    // after
+    const raw = def.modifiers;
+
+  Why: the unknown typing outlived its reason. Both engine effect systems
+  already hold Grant lists, and every reader cast to that.
+
+* **systems:** a temporary-effect instance ends early through expire() (e19128f)
+
+  `TemporaryEffectInstance.dispose()` is renamed
+  `expire()`. Behavior is unchanged: it ends that one instance the way
+  expiry does, firing `onExpire` and `expired`, unbinding its modifiers and
+  writing the save.
+
+  Migration:
+    // before
+    const inst = effects.apply('burn');
+    inst?.dispose();
+    // after
+    inst?.expire();
+
+  Why: dispose() is the engine-wide name for silent teardown, and the system
+  beside it uses it that way. A reader who knew that got the instance wrong.
+  DialogSession keeps its dispose(), which also drops saved state, because
+  sessions are discarded per conversation and its TSDoc says so.
+
+* **harness:** until-runners dispose each run's engine unless a teardown is passed (704cf05)
+
+  an engine returned by `buildEngine` on an until-cell, a
+  `runProbe` config or a `runWaypointProbe` config is now disposed after its
+  run (after `onRunComplete` / `inspect`, and after a run that throws) unless
+  the config passes a `teardown`.
+
+  Migration:
+    // keep each run's engine alive past the sweep
+    runMatrixUntil({ ..., buildEngine, teardown: () => {} })
+    // an explicit dispose teardown is now redundant and can go
+    teardown: (engine) => engine.dispose()
+
+  Why: every documented until-side teardown was that one dispose line, and
+  omitting it kept every run's engine and its persistent refs registered
+  until the process ended. A sweep that wants the engine afterwards is the
+  exception, so it opts out.
+
+* **systems:** drop the 'predict' mode from the gate-handle checks (4c4f3a8)
+
+  `getRequiredGateHandles(gate, use?)` and
+  `assertGateHandles(gate, runtime, label, use?)` lose their optional `use`
+  parameter. Both now answer what the old default, `'evaluate'`, answered.
+
+  Migration:
+    // before
+    assertGateHandles(gate, runtime, 'site', 'predict');
+    // after: predict directly; timeUntilGateFlip throws naming the missing
+    // accessor for a cumulative-gte, as it did before
+    assertGateHandles(gate, runtime, 'site');
+    timeUntilGateFlip(gate, runtime);
+
+  Why removed: the mode had no caller in the engine or any studio consumer. It
+  was a parameter, a doc paragraph and a branch in the handle walker, kept for a
+  predictor that might one day assert before predicting. If one does, it can
+  check for the accessor at its own site before the engine grows a mode for it.
+
+* **systems:** the dialog runtime throws on a repeated graph or node id (aff438b)
+
+  `createNativeDialogRuntime`, and so `createDialogSession`
+  through its default runtime, throws at construction on a graph id repeated
+  across `graphs`, and on a node id repeated within one graph. Input that used
+  to resolve last-wins now throws.
+
+  Migration: give every graph a unique id across all the categories you
+  flatten into one runtime, and every node a unique id within its graph. Where
+  the last-wins shadowing was intended, drop the shadowed graph or node from
+  the list before passing it.
+
+  Why: a repeated id throws in every registry. A silent last-wins at the
+  runtime hid a content collision until a player reached the shadowed line.
+
+### Features
+
+* **harness:** diffAggregates reports the termination-time delta (08d4a92)
+
+### Fixes
+
+* **systems:** RuleAdvisor.dismiss() backfills the freed slot at once (02c6668)
+* **core:** resetCursor cancels a held item as cancel() does (a094306)
+* **systems:** a load that leaves a CycleLog metric unmoved keeps its growth (17d9b29)
+* **core:** RunPool re-seeds handles from a load once hydration runs (a5d924e)
+* **core:** a reset run from another reset's hook keeps the outer's load guard (a532b8b)
+* **systems:** a reset naming a cycle's module zeroes its run clock (af8172c)
+* **core:** name a system's out-of-module fallback context for its kind (cec5123)
+* **systems:** the auto-buy reserve clamp prices an unbounded buy (2809d4b)
+* **systems:** a grant's inline description no longer freezes the modifier it names (0c2ea95)
+* **core:** a rejected SpatialGraph.restore leaves the graph untouched (a2fcba8)
+* **core:** TimedProgress.dispose() releases its saved progress (0165988)
+* **systems:** a composed reset or cycle warns about its unknown module ids (bfcc08a)
+* **core:** runHeadless runs teardown when the run throws (90ee57d)
+* **harness:** incremental snapshot re-emits a challenge gate when a category leaf flips (8b0e0d5)
+* **core:** log and root with the variable on the right no longer claim an integral (b61e562)
+* **core:** a non-linear op over `k − x` integrates with the right sign (36a0721)
+* **core:** `k / x` no longer claims integrals it can't build (3fda34d)
+
+### Performance
+
+* **core:** hybrid payback tests the raw gap instead of a floored copy (aefa4a9)
+* **engine:** let a released subscription drop out of the dispose list (c0a88a9)
+* **systems:** resolve a temporary effect's duration without a throwaway computed (3c69e0f)
+* **core:** the bag sums its total on read, not on every write (d1ce1ab)
+* **core:** build a timed-progress tracker's tick context once (5963f9b)
+* **harness:** export the event-mode checkpoint only for an advance bisection can narrow (fa62a04)
+* **systems:** an adopted predicate builds one computed, on first use (b9d0670)
+* **core:** buy-max reuses the prices its search paid for (104e86c)
+* **core:** buy-max's guard rejects a clear ceiling miss in one comparison (361b9da)
+* trim per-tick and per-settle work the simplify pass left behind (1ce791b)
+
+### Refactors
+
+* **systems:** one snapshot-on-throw helper for every DialogSession call (2f7b6e7)
+* **systems:** name the dialog runtime's "can this node be entered" test (6d97211)
+* **systems:** index dialog graph owners instead of rescanning the category (29d9372)
+* **core:** drop the override registry's unreachable `removed` flag (1794f33)
+* **core:** one clipped Chebyshev walk under composed sum() and peak() (595b0b1)
+* **core:** one parse, check, apply and announce path for load and importSave (40dc613)
+* **core:** lift slot protection in one raw-write helper (a985e1b)
+* **core:** write a remapped legacy key one way (e55d753)
+* **core:** enter the persistence namespace once, in the save manager (a1e1c5e)
+* **engine:** list the engine-owned injection keys once (92a9030)
+* **systems:** binding slots own their definition's grants (898c344)
+* **systems:** effect-system dispose leaves unbinding to the slot release (597513d)
+* **harness:** one wrap stack for binding and chain-modifier overlays (5228853)
+* **core:** the bag's total reuses sumAmountsAsDecimal (0121582)
+* **core:** one resource-to-bag sync path in link (d4e382e)
+* **core:** RunPool keeps one entry per handle, not five maps (055fb47)
+* **harness:** drop the incremental snapshot's always-dirty rule for empty deps (a8edc48)
+* **harness:** key the incremental snapshot's entities by record, not by string (3a8a27b)
+* **harness:** memoizeAccessor builds each cached read from one helper (42ebd08)
+* **harness:** one affordability prediction for the purchasable and producer leaves (384a6b1)
+* **harness:** cut NOOP_TIMER_PROVIDER's comment to one line (658c268)
+* **harness:** runWaypointProbe runs each waypoint through runMatrixUntil (1c6fc0a)
+* **core:** delete the dead collectConditionDeps (d91fc62)
+* **core:** one gap-over-rate tail for the flip distances (dfded92)
+* **systems:** one leaf walker over the Gate AST (73c0416)
+* **systems:** pass the accessor override to the resolver as is (8e0466f)
+* **core:** one helper ANDs a gate onto a modifier's own enabled (1f9299c)
+* **systems:** category and effect grants adopt `when` through one path (9849dc2)
+* **core:** applyEffect dispatches a leaf directly (64fd4df)
+* **core:** hot profiler sites time through profileStart/profileEnd (47512e0)
+* **systems:** the subject normalizer writes its clamp directly (06917c2)
+* **core:** write a ref's default back through resetPersistent everywhere (e9017ce)
+* **core:** bind a resolver to its build-time namespace in one helper (8dd8494)
+* **core:** register a context under the key its lookups build (0c5aa6e)
+* **core:** split buildResource once on wrapped ref vs persistent (c75953a)
+* **systems:** share the level-triggered latch between achievements and tiers (8ecddb6)
+* **core:** one toFormula for the systems that take Formula factories (a3c0067)
+* **systems:** scaling purchasables read their saved level directly (c2a1462)
+* **core:** an integral stack reaching a rule-less node throws (4ee5d5d)
+* **core:** one linear-integral builder for add and both sub orientations (ec595e9)
+* **systems:** delete the resettable.ts shim, import Resettable from core (309cf2e)
+* **systems:** state the registry-reach rule once, on ContentRegistryView (31ccbfd)
+* **systems:** share cachedCategoryList between auto-purchase and setupCategoryTick (631d22d)
+* fold the simplify pass's remaining near-duplicates (c0fcdf5)
+
 ## 0.2.2 (2026-09-25)
 
 ### Features
