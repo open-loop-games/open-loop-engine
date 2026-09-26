@@ -868,10 +868,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
 
     load(): SaveLoadResult {
       const raw = storage.getItem(activeStorageKey());
-      if (!raw) {
-        handle.emit('save:load-failed', { slotId: _activeSlotId, reason: 'not-found' });
-        return { success: false };
-      }
+      if (!raw) return failLoad(_activeSlotId, new LoadFailure('not-found'), false);
       return applySaveText(raw, _activeSlotId, true);
     },
 

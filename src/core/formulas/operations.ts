@@ -417,10 +417,9 @@ function buildLinearIntegral(
   });
 }
 
-export const integrateAdd = makeBinaryIntegrate(
-  (F, c, v) => buildLinearIntegral(v, F, c, 1, 1, 'integrateAdd'),
-  (F, c, v) => buildLinearIntegral(v, F, c, 1, 1, 'integrateAdd'),
-);
+const integrateAddArm = (F: GenericFormula, c: FormulaSource, v: GenericFormula) =>
+  buildLinearIntegral(v, F, c, 1, 1, 'integrateAdd');
+export const integrateAdd = makeBinaryIntegrate(integrateAddArm, integrateAddArm);
 
 export const integrateInnerAdd = makeBinaryIntegrate(
   (x, other) => Formula.add(x, other),

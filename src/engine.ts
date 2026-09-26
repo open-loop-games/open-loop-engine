@@ -496,12 +496,12 @@ export function createEngine(config: EngineConfig): Engine {
   // them — consumers wire the manager's import/export/save/load to their UI.
   // The manager emits them inside the engine's namespace.
   if (saveManager) {
-    cleanups.add(
+    track(
       saveManager.on('save:before-serialize', () => {
         for (const cb of saveCallbacks) cb();
       }),
     );
-    cleanups.add(
+    track(
       saveManager.on('save:loaded', ({ timestamp }) => {
         for (const cb of loadCallbacks) cb({ success: true, timestamp });
       }),
@@ -698,7 +698,6 @@ export function createEngine(config: EngineConfig): Engine {
       engine.stop();
       moduleScope.stop();
       for (const unsub of [...cleanups]) unsub();
-      cleanups.clear();
       // Drop the in-memory persistent-context registry for this engine's
       // namespace so a fresh engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.

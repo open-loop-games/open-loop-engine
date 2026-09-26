@@ -234,15 +234,6 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
         ],
   );
 
-  /** Unlock every tier whose requirement holds; tiers in `silent` skip the event. */
-  function unlockMet(silent: ReadonlySet<string>): void {
-    for (const { tier, met } of requirements) {
-      if (!met.value || unlocked.value.includes(tier.id)) continue;
-      if (silent.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
-      else automationTiers.unlock(tier.id);
-    }
-  }
-
   // --- Public API ---
   const automationTiers: AutomationTiers = {
     tiers,
@@ -271,7 +262,13 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     resetUnlocks(): void {
       const before = new Set(unlocked.value);
       unlocked.value = [...defaultUnlocked];
-      unlockMet(before);
+      // Re-latch every tier whose requirement still holds; one held before the
+      // reset comes back without announcing itself again.
+      for (const { tier, met } of requirements) {
+        if (!met.value || unlocked.value.includes(tier.id)) continue;
+        if (before.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
+        else automationTiers.unlock(tier.id);
+      }
     },
 
     on: handle.on,

@@ -9,20 +9,13 @@
  */
 
 import { reactive, toRaw, watch } from 'vue';
-import { Decimal, renormIfLayer0 } from '@/primitives/decimal';
+import { Decimal, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { loadingSave } from './persistence';
 import type { Resource } from './resource';
 
 /** A capacity value that can be static or a reactive getter */
 export type CapacitySource = DecimalSource | (() => DecimalSource);
-
-// break_eternity Decimals are immutable — `new Decimal(d)` where d is already
-// a Decimal allocates a pointless clone. Skip the clone on the hot paths that
-// funnel DecimalSource arguments through to Decimal statics.
-function toDecimal(x: DecimalSource): Decimal {
-  return x instanceof Decimal ? x : new Decimal(x);
-}
 
 /**
  * Sum a set of amounts into a single Decimal. Renormalizes the accumulator
@@ -35,13 +28,13 @@ function toDecimal(x: DecimalSource): Decimal {
 export function sumAmountsAsDecimal(amounts: Iterable<DecimalSource>): Decimal {
   let sum: DecimalSource = Decimal.dZero;
   for (const a of amounts) sum = renormIfLayer0(Decimal.add(sum, a));
-  return toDecimal(sum);
+  return toFinalDecimal(sum);
 }
 
 function resolveCapacity(cap: CapacitySource | undefined): Decimal | undefined {
   if (cap == null) return undefined;
   const raw = typeof cap === 'function' ? cap() : cap;
-  return toDecimal(raw);
+  return toFinalDecimal(raw);
 }
 
 /** Options for configuring a resource bag at creation time. */
@@ -204,7 +197,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   }
 
   for (const [typeId, value] of Object.entries(initial)) {
-    const d = toDecimal(value);
+    const d = toFinalDecimal(value);
     if (!d.eq(0)) {
       writeAmount(typeId, d);
     }
@@ -213,23 +206,16 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   function computeRemainingCapacity(): Decimal {
     const totalCap = resolveCapacity(capacity);
     if (totalCap == null) return Decimal.dInf;
-    return toDecimal(Decimal.max(Decimal.sub(totalCap, getTotal()), 0));
+    return toFinalDecimal(Decimal.max(Decimal.sub(totalCap, getTotal()), 0));
   }
 
   function computeRemainingForType(typeId: string): Decimal {
-    const typeCapSource = typeCapsSource.get(typeId);
-    const typeCap = resolveCapacity(typeCapSource);
-    const totalCap = resolveCapacity(capacity);
-    if (typeCap == null && totalCap == null) return Decimal.dInf;
+    const typeCap = resolveCapacity(typeCapsSource.get(typeId));
     const typeRemaining =
       typeCap != null
-        ? toDecimal(Decimal.max(Decimal.sub(typeCap, getAmount(typeId)), 0))
+        ? toFinalDecimal(Decimal.max(Decimal.sub(typeCap, getAmount(typeId)), 0))
         : Decimal.dInf;
-    const totalRemaining =
-      totalCap != null
-        ? toDecimal(Decimal.max(Decimal.sub(totalCap, getTotal()), 0))
-        : Decimal.dInf;
-    return toDecimal(Decimal.min(typeRemaining, totalRemaining));
+    return toFinalDecimal(Decimal.min(typeRemaining, computeRemainingCapacity()));
   }
 
   function clampToCapacity(typeId: string, amount: Decimal): Decimal {
@@ -245,11 +231,11 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       const maxForType = Decimal.sub(totalCap, othersSum);
       clamped = Decimal.min(clamped, maxForType);
     }
-    return toDecimal(Decimal.max(clamped, 0));
+    return toFinalDecimal(Decimal.max(clamped, 0));
   }
 
   function setAmount(typeId: string, value: DecimalSource): void {
-    const clamped = clampToCapacity(typeId, toDecimal(value));
+    const clamped = clampToCapacity(typeId, toFinalDecimal(value));
     writeAmount(typeId, clamped);
   }
 
@@ -264,39 +250,39 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     set: setAmount,
 
     add(typeId: string, amount: DecimalSource): Decimal {
-      const toAdd = toDecimal(amount);
+      const toAdd = toFinalDecimal(amount);
       // `!gt(0)` also turns NaN away.
       if (!toAdd.gt(0)) return Decimal.dZero;
       const remaining = computeRemainingForType(typeId);
 
       if (overflow === 'block') {
         if (toAdd.gt(remaining)) return Decimal.dZero;
-        writeAmount(typeId, toDecimal(Decimal.add(getAmount(typeId), toAdd)));
+        writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), toAdd)));
         return toAdd;
       } else {
         // destroy: add up to remaining
-        const actualAdd = toDecimal(Decimal.min(toAdd, remaining));
+        const actualAdd = toFinalDecimal(Decimal.min(toAdd, remaining));
         // `!gt(0)` rather than `lte(0)`: a NaN written here would poison the
         // slot and every total read after it. `lte` admits NaN, `gt` rejects it.
         if (!actualAdd.gt(0)) return Decimal.dZero;
-        writeAmount(typeId, toDecimal(Decimal.add(getAmount(typeId), actualAdd)));
+        writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), actualAdd)));
         return actualAdd;
       }
     },
 
     subtract(typeId: string, amount: DecimalSource, allowNegative = false): Decimal {
-      const toSub = toDecimal(amount);
+      const toSub = toFinalDecimal(amount);
       if (!toSub.gt(0)) return Decimal.dZero;
       const current = getAmount(typeId);
 
       if (allowNegative) {
-        const newVal = toDecimal(Decimal.sub(current, toSub));
+        const newVal = toFinalDecimal(Decimal.sub(current, toSub));
         writeAmount(typeId, newVal);
         return toSub;
       }
 
-      const actual = toDecimal(Decimal.min(toSub, current));
-      writeAmount(typeId, toDecimal(Decimal.sub(current, actual)));
+      const actual = toFinalDecimal(Decimal.min(toSub, current));
+      writeAmount(typeId, toFinalDecimal(Decimal.sub(current, actual)));
       return actual;
     },
 
@@ -327,8 +313,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
     clear(): void {
       amounts.clear();
-      cachedTotal = Decimal.dZero;
-      totalDirty = false;
+      totalDirty = true;
     },
 
     remainingCapacity: computeRemainingCapacity,
@@ -349,8 +334,8 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       function syncFromResource(value: DecimalSource): void {
         syncing = true;
         const next = loadingSave.value
-          ? toDecimal(value)
-          : clampToCapacity(typeId, toDecimal(value));
+          ? toFinalDecimal(value)
+          : clampToCapacity(typeId, toFinalDecimal(value));
         writeAmount(typeId, next);
         if (!Decimal.eq(next, value)) resource.value = next;
         syncing = false;
@@ -407,10 +392,9 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
     restore(data: Record<string, string>): void {
       amounts.clear();
-      cachedTotal = Decimal.dZero;
-      totalDirty = false;
+      totalDirty = true;
       for (const [typeId, valStr] of Object.entries(data)) {
-        const d = toDecimal(valStr);
+        const d = toFinalDecimal(valStr);
         if (!d.eq(0)) {
           writeAmount(typeId, d);
         }
@@ -432,9 +416,9 @@ export function transferBetweenBags(
   typeId: string,
   amount: DecimalSource,
 ): Decimal {
-  const toTransfer = toDecimal(amount);
+  const toTransfer = toFinalDecimal(amount);
   const available = from.get(typeId);
-  const canTake = toDecimal(Decimal.min(toTransfer, available));
+  const canTake = toFinalDecimal(Decimal.min(toTransfer, available));
 
   if (!canTake.gt(0)) return Decimal.dZero;
 
@@ -460,7 +444,7 @@ export function bulkTransfer(
   if (allOrNothing) {
     for (const [typeId, amount] of Object.entries(amounts)) {
       if (!from.has(typeId, amount)) return {};
-      const toAdd = toDecimal(amount);
+      const toAdd = toFinalDecimal(amount);
       if (toAdd.gt(to.remainingCapacityForType(typeId))) return {};
     }
     const totalToAdd = sumAmountsAsDecimal(Object.values(amounts));
@@ -470,7 +454,7 @@ export function bulkTransfer(
     for (const [typeId, amount] of Object.entries(amounts)) {
       from.subtract(typeId, amount);
       to.add(typeId, amount);
-      result[typeId] = toDecimal(amount);
+      result[typeId] = toFinalDecimal(amount);
     }
     return result;
   }
