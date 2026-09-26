@@ -438,7 +438,7 @@ export const integrateSub = makeBinaryIntegrate(
 
 export const integrateInnerSub = makeBinaryIntegrate(
   (x, other) => Formula.sub(x, other),
-  (x, other) => Formula.sub(x, other),
+  (x, other) => Formula.sub(other, x),
 );
 
 export const invertMul = makeBinaryInvert(

@@ -288,6 +288,8 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrateInner: ops.integrateInnerSub,
     sum: ops.sumSub,
     applySubstitution: ops.passthrough,
+    // `k − g(x)` falls as `g` rises, so substituting through it negates.
+    variableOnRight: () => ({ applySubstitution: ops.applySubstitutionNeg }),
   },
   mul: {
     evaluate: Decimal.mul,

@@ -599,6 +599,15 @@ describe('Integrating', () => {
     expect(formula.cumulative(5, 20)).compare_tolerance(23625150);
   });
 
+  test('Integrating through a constant minus the variable', () => {
+    // `k − x` falls as x rises, so substituting through it flips the sign:
+    // ∫₁² (3 − x)³ = [−(3 − x)⁴/4]₁² = 3.75, and ∫₁² e^(3 − x) = e² − e.
+    expect(Formula.sub(3, variable).pow(3).cumulative(1, 2)).compare_tolerance(3.75);
+    expect(Formula.sub(3, variable).exp().cumulative(1, 2)).compare_tolerance(
+      Decimal.exp(2).sub(Decimal.exp(1)),
+    );
+  });
+
   test('Integrating nested complex formulas', () => {
     const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.evaluateIntegral()).toLogError();
