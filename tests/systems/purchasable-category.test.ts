@@ -10,7 +10,7 @@ import {
 } from '@/core/persistence';
 import { createCostRequirement, createBooleanRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
-import { createModifierChain } from '@/core/modifier';
+import { createModifierChain, createMultiplicativeModifier } from '@/core/modifier';
 import Formula from '@/core/formulas/formulas';
 import { createTestResource } from '../helpers/test-resource';
 
@@ -786,6 +786,31 @@ describe('createPurchasableCategory grants', () => {
 
     secondGate.value = false;
     expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
+  });
+
+  it('a description-less chain granted with an inline description stays live', () => {
+    const gold = createTestResource('grants-g4', 1000);
+    const source = createModifierChain('source-g4');
+    const target = createModifierChain('target-g4');
+
+    const category = createPurchasableCategory<UpgradeDef>({
+      id: 'pc-grants4',
+      mapPurchasable: (def) => ({
+        display: { description: def.name },
+        requirements: createCostRequirement({ resource: gold, cost: def.cost }),
+        limit: 1,
+        grants: [{ chain: target, modifier: source, description: 'Source bonus' }],
+      }),
+    });
+
+    category.register([{ id: 'link', name: 'Link', cost: 10, bonus: 1 }]);
+    category.getPurchasable('link')!.purchase();
+
+    // Added after the grant bound: the target still sees it.
+    source.add(createMultiplicativeModifier({ multiplier: 2, description: 'late' }));
+    expect(Decimal.eq(source.apply(10), 20)).toBe(true);
+    expect(Decimal.eq(target.apply(10), 20)).toBe(true);
+    expect(target.bindings()[0].id).toBe('pc-grants4/link/Source bonus');
   });
 });
 

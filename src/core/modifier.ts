@@ -710,7 +710,8 @@ export function createModifierChain(id: string): ModifierChain {
       const rawModifier = typeof opts.modifier === 'function' ? opts.modifier() : opts.modifier;
 
       const activeRef = opts.active == null ? undefined : processGetter(opts.active);
-      const modifier = activeRef == null ? rawModifier : gateModifier(rawModifier, activeRef);
+      const modifier =
+        activeRef == null ? rawModifier : delegateModifier(rawModifier, { gate: activeRef });
 
       // Resolve id — explicit override wins, then explicit attribution text,
       // then (fallback) the modifier's own description getter. The fallback
@@ -823,23 +824,32 @@ class ChainSlot {
 }
 
 /**
- * A modifier that forwards every call to `raw`, enabled only while `raw`'s own
- * `enabled` and `gate` both allow it. Forwarding per call (rather than copying
- * `raw`'s properties) keeps class methods and a chain's live `apply` /
- * `invert` / `description` getters.
+ * A modifier that forwards every call to `raw`, with two optional overrides:
+ * `gate` ANDs onto `raw`'s own `enabled`, and `description` replaces `raw`'s.
+ * Forwarding per call (rather than copying `raw`'s properties) keeps class
+ * methods and a chain's live `apply` / `invert` / `description` getters.
  *
  * @internal
  */
-export function gateModifier(raw: Modifier, gate: MaybeRef<boolean>): Modifier {
+export function delegateModifier(
+  raw: Modifier,
+  overrides: { gate?: MaybeRef<boolean>; description?: Modifier['description'] },
+): Modifier {
+  const { gate, description } = overrides;
   const own = raw.enabled;
   const enabled =
-    own == null ? gate : computed(() => unref(own) !== false && unref(gate) !== false);
+    own == null
+      ? gate
+      : gate == null
+        ? own
+        : computed(() => unref(own) !== false && unref(gate) !== false);
   return {
     apply: (gain) => raw.apply(gain),
     get invert() {
       return raw.invert == null ? undefined : (gain: DecimalSource) => raw.invert!(gain);
     },
     get description() {
+      if (description != null) return description;
       const desc = raw.description;
       return typeof desc === 'function'
         ? () => (raw.description as () => ModifierDescription | ModifierDescription[])()

@@ -18,7 +18,7 @@ import {
   createAdditiveModifier,
   createExponentialModifier,
   createMultiplicativeModifier,
-  gateModifier,
+  delegateModifier,
   type Grant,
   type Modifier,
   type ModifierChain,
@@ -145,10 +145,9 @@ export function buildGrantModifier(grant: Grant): Modifier {
   // variant without forcing consumers to wrap the modifier themselves.
   if (grant.description != null && resolved.description == null) {
     const text = grant.description;
-    return {
-      ...resolved,
+    return delegateModifier(resolved, {
       description: (): ModifierDescription => ({ text, formattedValue: '' }),
-    };
+    });
   }
   return resolved;
 }
@@ -214,7 +213,7 @@ export function lowerGrants(
       chain,
       modifier: () => {
         const modifier = buildGrantModifier(grant);
-        return when == null ? modifier : gateModifier(modifier, when);
+        return when == null ? modifier : delegateModifier(modifier, { gate: when });
       },
     };
   });
