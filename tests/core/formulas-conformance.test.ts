@@ -10,6 +10,7 @@
  * - **Oracle**: forward values, definite integrals and series against mpmath
  * - **Series**: every closed form and every grade `Formula.sum` gives, against
  *   brute-force `Σ`
+ * - **Integrability**: a chain that claims an integral integrates to quadrature
  * - **Affordability**: buy-max counts what one-at-a-time purchases reach, and
  *   a short balance buys nothing at any magnitude
  *
@@ -318,6 +319,38 @@ function bruteSum(
   let total = new Decimal(0);
   for (let i = 0; i < count; i++) total = total.add(term(Decimal.add(from, i)));
   return total;
+}
+
+const GAUSS_NODES = [
+  0, -0.5384693101056831, 0.5384693101056831, -0.906179845938664, 0.906179845938664,
+];
+const GAUSS_WEIGHTS = [
+  0.5688888888888889, 0.47862867049936647, 0.47862867049936647, 0.23692688505618908,
+  0.23692688505618908,
+];
+
+/**
+ * `∫ from→to` by composite five-point Gauss–Legendre over the forward function.
+ * It reads only `evaluate`, so it shares no code with the integral it checks.
+ * `null` when the integrand isn't finite somewhere on the span.
+ */
+function quadrature(
+  integrand: (x: number) => number,
+  from: number,
+  to: number,
+  panels = 32,
+): number | null {
+  const h = (to - from) / panels;
+  let total = 0;
+  for (let p = 0; p < panels; p++) {
+    const mid = from + (p + 0.5) * h;
+    for (let i = 0; i < GAUSS_NODES.length; i++) {
+      const y = integrand(mid + (GAUSS_NODES[i] * h) / 2);
+      if (!Number.isFinite(y)) return null;
+      total += GAUSS_WEIGHTS[i] * y;
+    }
+  }
+  return (total * h) / 2;
 }
 
 // === LAWS ===
@@ -1746,6 +1779,86 @@ describe('oracle: F(b) − F(a) equals the definite integral', () => {
         logTol: 1e-12,
         label: `∫${op}(${side}, k=${k})${tolReason ? ` (${tolReason})` : ''}`,
       });
+    });
+  }
+});
+
+describe('integrability: a chain that claims an integral integrates to quadrature', () => {
+  // `isIntegrable()` is decided from structure when the node is built, and the
+  // integral itself is built lazily through the substitution stack. The two can
+  // disagree without anything failing: a chain that claims an integral it can't
+  // build hands back a plausible wrong number, and `Formula.sum` then corrects
+  // that number into an `approximate` price. So the law quantifies the claim,
+  // over every op in the table as the outer op, in each orientation, above
+  // every linear op in each of its orientations and above a divisor that isn't
+  // the bare variable: when a chain says it is integrable, `cumulative` equals
+  // the area under `evaluate`. A chain that declines holds the law vacuously;
+  // the capability tests pin which ones do.
+  //
+  // Each inner maps its span onto [0.25, 0.5], inside every outer op's domain
+  // but `acosh`'s (x ≥ 1), which the oracle integrates over the bare variable.
+  // The range is positive because `recip` integrates to `ln u`, not `ln |u|`.
+  const INNERS: Record<string, { build: () => GenericFormula; from: number; to: number }> = {
+    x: { build: () => F.variable(0), from: 0.25, to: 0.5 },
+    'x + k': { build: () => F.add(F.variable(0), 0.25), from: 0, to: 0.25 },
+    'k + x': { build: () => F.add(0.25, F.variable(0)), from: 0, to: 0.25 },
+    'x − k': { build: () => F.sub(F.variable(0), 0.75), from: 1, to: 1.25 },
+    'k − x': { build: () => F.sub(2.5, F.variable(0)), from: 2, to: 2.25 },
+    'x · k': { build: () => F.mul(F.variable(0), 0.25), from: 1, to: 2 },
+    'k · x': { build: () => F.mul(0.25, F.variable(0)), from: 1, to: 2 },
+    'x / k': { build: () => F.div(F.variable(0), 4), from: 1, to: 2 },
+    'k / x': { build: () => F.div(0.5, F.variable(0)), from: 1, to: 2 },
+    'k / (x + k)': { build: () => F.div(1, F.variable(0).add(1)), from: 1, to: 3 },
+  };
+
+  const OUTERS: Record<string, (inner: GenericFormula) => GenericFormula> = {
+    identity: (inner) => inner,
+  };
+  for (const [name, { op }] of Object.entries(UNARY)) {
+    if (name !== 'acosh') OUTERS[name] = (inner) => op(inner);
+  }
+  const OUTER_CONST: Record<string, string> = {
+    add: '3',
+    sub: '3',
+    mul: '3',
+    div: '3',
+    log: '10',
+    pow: '3',
+    pow_base: '2',
+    root: '3',
+  };
+  for (const [name, { op }] of Object.entries(BINARY)) {
+    const k = OUTER_CONST[name];
+    OUTERS[`${name}(g, ${k})`] = (inner) => op(inner, k);
+    OUTERS[`${name}(${k}, g)`] = (inner) => op(k, inner);
+  }
+
+  // Measured worst case 8.5e-16, relative to an O(1) area in value space,
+  // where the identity lives; the quadrature is exact to well below that.
+  const INTEGRABILITY_TOL = 1e-12;
+
+  for (const [innerName, { build, from, to }] of Object.entries(INNERS)) {
+    test(`over ${innerName}`, () => {
+      const failures: string[] = [];
+      for (const [outerName, outer] of Object.entries(OUTERS)) {
+        const formula = outer(build());
+        const label = `${outerName} ∘ ${innerName}`;
+        const area = quadrature((x) => new Decimal(formula.evaluate(x)).toNumber(), from, to);
+        if (area == null) {
+          failures.push(`${label}: integrand not finite on [${from}, ${to}]`);
+          continue;
+        }
+        if (!formula.isIntegrable()) continue;
+        const { value: got, errors } = withoutEngineErrors(() => formula.cumulative(from, to));
+        const err = relativeError(got, area);
+        if (errors.length > 0 || !Decimal.lte(err, INTEGRABILITY_TOL)) {
+          failures.push(
+            `${label}: cumulative ${String(got)}, quadrature ${area} (error ${err.toString()})` +
+              (errors.length > 0 ? ` logged ${errors.join('; ')}` : ''),
+          );
+        }
+      }
+      expect(failures).toEqual([]);
     });
   }
 });

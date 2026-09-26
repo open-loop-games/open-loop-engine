@@ -278,7 +278,8 @@ export const invertAdd = makeBinaryInvert(
 
 type FormulaInternals = { internalEvaluate?: unknown; internalVariables?: number };
 
-function isPlainVariable(f: unknown): boolean {
+/** Whether `f` is a variable leaf, with no op between it and the input. */
+export function isPlainVariable(f: unknown): boolean {
   if (!(f instanceof Formula)) return false;
   const fi = f as unknown as FormulaInternals;
   return fi.internalEvaluate === undefined && fi.internalVariables === 1;
@@ -465,6 +466,7 @@ export const invertDiv = makeBinaryInvert(
 // Upstream ran both orientations through the shortcut, so the rhs branch
 // returned `k/(x²/2)` — the integrand reshaped, not an antiderivative at all
 // (∫2.5/x over [1,10] came out as -4.95 against a true 2.5·ln(10) = 5.756).
+// The div descriptor binds this over `k / g(x)` only for a bare `g`.
 export function integrateDiv(stack: SubstitutionStack, lhs: FormulaSource, rhs: FormulaSource) {
   if (hasVariable(lhs)) {
     if (!lhs.isIntegrable()) {
@@ -473,15 +475,7 @@ export function integrateDiv(stack: SubstitutionStack, lhs: FormulaSource, rhs: 
     }
     return Formula.div(lhs.getIntegralFormula(stack), rhs);
   }
-  if (hasVariable(rhs)) {
-    // ∫k/g(x) dx is `k·ln(g(x))` only when g is the bare variable — otherwise
-    // the chain rule contributes a factor the substitution stack can't supply.
-    if (!isPlainVariable(rhs)) {
-      console.error('Could not integrate k/f(x): closed form needs a bare variable denominator');
-      return Formula.constant(0);
-    }
-    return Formula.mul(lhs, Formula.ln(rhs));
-  }
+  if (hasVariable(rhs)) return Formula.mul(lhs, Formula.ln(rhs));
   console.error('Could not integrate due to no input being a variable');
   return Formula.constant(0);
 }

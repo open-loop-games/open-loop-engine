@@ -304,6 +304,13 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integrateDiv,
     sum: ops.sumDiv,
     applySubstitution: ops.applySubstitutionDiv,
+    // `k / g(x)` isn't linear in `g`, so nothing substitutes through it, and
+    // `k·ln(g)` is its antiderivative only for a bare `g`: past that the chain
+    // rule contributes a factor no substitution supplies.
+    variableOnRight: (rhs) => ({
+      applySubstitution: undefined,
+      integrate: ops.isPlainVariable(rhs) ? ops.integrateDiv : undefined,
+    }),
   },
   log: {
     evaluate: Decimal.log,

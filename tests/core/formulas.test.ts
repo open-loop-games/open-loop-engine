@@ -608,6 +608,27 @@ describe('Integrating', () => {
     );
   });
 
+  describe('division integrates by orientation', () => {
+    test('x / k substitutes like any linear op', () => {
+      // ∫₁² (x/2)² = [x³/12]₁² = 7/12.
+      const formula = Formula.div(variable, 2).pow(2);
+      expect(formula.isIntegrable()).toBe(true);
+      expect(formula.cumulative(1, 2)).compare_tolerance(7 / 12);
+    });
+    test('k / x integrates over the bare variable', () => {
+      // ∫₁² 2/x = 2·ln 2.
+      expect(Formula.div(2, variable).cumulative(1, 2)).compare_tolerance(Decimal.ln(2).mul(2));
+    });
+    test('k / x is not a substitution a non-linear op can integrate through', () => {
+      const formula = Formula.div(2, variable).pow(2);
+      expect(formula.isIntegrable()).toBe(false);
+      expect(formula.sum(1, 10000).reason).toBe('not-summable');
+    });
+    test('k / g(x) over a non-bare g is not integrable', () => {
+      expect(Formula.div(2, variable.add(1)).isIntegrable()).toBe(false);
+    });
+  });
+
   test('Integrating nested complex formulas', () => {
     const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.evaluateIntegral()).toLogError();
