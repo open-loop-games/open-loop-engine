@@ -250,7 +250,7 @@ export function overlayBinding(
  * in its chain and removes it when the effect ends, so only the effect's own
  * binding can perturb it without stranding a wrapper there.
  *
- * @internal The balance harness's picker.
+ * @internal The balance harness's picker and perturbation.
  */
 export function isSlotBound(modifier: Modifier): boolean {
   return seated.has(modifier);

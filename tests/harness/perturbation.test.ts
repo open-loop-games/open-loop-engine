@@ -554,6 +554,38 @@ describe('applyPerturbation — content source', () => {
     engine.stop();
   });
 
+  it('refuses an index fallback that lands on a slot-bound effect modifier', () => {
+    const on = ref(false);
+    const plain = createAdditiveModifier({ addend: 1 });
+    let dmg!: ReturnType<typeof createModifierChain>;
+    const engine = startEngine('pert-slot-bound-fallback', {
+      id: 'fx',
+      install() {
+        dmg = createModifierChain('dmg');
+        dmg.add(plain);
+        createPersistentEffectSystem({ id: 'gear' }).register([
+          {
+            id: 'flat',
+            active: () => on.value,
+            modifiers: [{ chain: dmg, modifier: createAdditiveModifier({ addend: 5 }) }],
+          },
+        ]);
+      },
+    });
+    const stale = walkChainRegistry(engine).find((e) => e.label === 'dmg[0]')!;
+    // The snapshot's modifier leaves, and the effect's seats at the index it recorded.
+    dmg.remove(plain);
+    on.value = true;
+    expect(dmg.modifiers).toHaveLength(1);
+
+    expect(() => applyPerturbation(engine, stale, { kind: 'scalar-multiply', factor: 3 })).toThrow(
+      /binding slot/,
+    );
+    on.value = false;
+    expect(dmg.modifiers).toHaveLength(0);
+    engine.stop();
+  });
+
   it('names the missing piece when an entry no longer resolves', () => {
     const { engine, entry } = persistentDamage('pert-content-missing');
     const flatEntry = entry('gear.flat[0]');

@@ -47,6 +47,7 @@ import type { Engine } from '@/engine';
 import type { Modifier, ModifierChain } from '@/core/modifier';
 import {
   createWrapStack,
+  isSlotBound,
   overlayBinding,
   type ModifierWrap,
   type WrapStack,
@@ -191,12 +192,18 @@ function applyModifierPerturbation(
 /**
  * The modifier a `modifier-index` entry names in `chain`: the discovered
  * object itself while it is still there, else whatever sits at the recorded
- * index — the only handle a cross-engine apply has.
+ * index — the only handle a cross-engine apply has. Refuses a slot-bound
+ * modifier there, as the picker does: its effect would strand the wrapper.
  */
 function resolveChainTarget(chain: ModifierChain, discovered: Modifier, index: number): Modifier {
   if (chain.modifiers.includes(discovered)) return discovered;
   const atIndex = chain.modifiers[index];
   if (!atIndex) throw new Error(`chain "${chain.id}" has no modifier at index ${index}`);
+  if (isSlotBound(atIndex)) {
+    throw new Error(
+      `chain "${chain.id}" index ${index} now holds a modifier in a binding slot; perturb it through its effect's content entry`,
+    );
+  }
   return atIndex;
 }
 
