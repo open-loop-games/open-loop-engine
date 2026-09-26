@@ -21,7 +21,13 @@
 import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from './computed';
-import { persistent, withPersistentContext, getCurrentContext } from './persistence';
+import {
+  deletePersistent,
+  getCurrentContext,
+  persistent,
+  withPersistentContext,
+  type Persistent,
+} from './persistence';
 import { attachContextReset } from './resettable';
 import type { RegisterTick } from './sequencer';
 
@@ -99,7 +105,10 @@ export interface TimedProgress {
   timeRemaining: ComputedRef<DecimalSource>;
   /** Clear `progress` back to 0 and zero `tickProgressDelta`. */
   reset(): void;
-  /** Unsubscribe from the tick loop. Call on teardown. */
+  /**
+   * Unsubscribe from the tick loop and release the saved `progress`, so a
+   * tracker with the same id can be built again. Call on teardown.
+   */
   dispose(): void;
 }
 
@@ -287,7 +296,10 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
       state.progress.value = 0;
       tickProgressDelta.value = 0;
     },
-    dispose: unsubTick,
+    dispose(): void {
+      unsubTick();
+      if (state.contextId !== undefined) deletePersistent(state.progress as Persistent);
+    },
   };
   return state.contextId === undefined
     ? timedProgress

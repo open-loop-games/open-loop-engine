@@ -323,6 +323,28 @@ describe('createTimedProgress — reset and dispose', () => {
     bus.tick(5);
     expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
   });
+
+  it('dispose() releases the saved progress, so the same id can be built again', () => {
+    const bus = makeTickBus();
+    beginPersistentContext('tp-recreate');
+    try {
+      const first = createTimedProgress({
+        id: 'job',
+        duration: 10,
+        registerTick: bus.registerTick,
+      });
+      first.dispose();
+      const second = createTimedProgress({
+        id: 'job',
+        duration: 10,
+        registerTick: bus.registerTick,
+      });
+      expect(isPersistent(second.progress)).toBe(true);
+      second.dispose();
+    } finally {
+      endPersistentContext();
+    }
+  });
 });
 
 describe('createTimedProgress — persistence', () => {
