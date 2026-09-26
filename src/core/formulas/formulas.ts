@@ -217,6 +217,13 @@ type OpDescriptor = {
    */
   sum?: (...args: any[]) => any;
   applySubstitution?: (...args: any[]) => any;
+  /**
+   * Rebinds fields when the variable sits on the right (`k op g(x)`), for a
+   * binary op whose rules differ by orientation. Applied when the node is
+   * built, so `isIntegrable()` reports what this orientation can integrate; a
+   * field set to `undefined` withdraws that capability.
+   */
+  variableOnRight?: (rhs: GenericFormula) => Partial<OpDescriptor>;
 };
 
 const unaryOps: Record<string, OpDescriptor> = {
@@ -300,6 +307,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     evaluate: Decimal.log,
     invert: ops.invertLog,
     integrate: ops.integrateLog,
+    variableOnRight: () => ({ integrate: undefined }),
   },
   pow: {
     evaluate: Decimal.pow,
@@ -313,7 +321,12 @@ const binaryOps: Record<string, OpDescriptor> = {
     integrate: ops.integratePowBase,
     sum: ops.sumPowBase,
   },
-  root: { evaluate: Decimal.root, invert: ops.invertRoot, integrate: ops.integrateRoot },
+  root: {
+    evaluate: Decimal.root,
+    invert: ops.invertRoot,
+    integrate: ops.integrateRoot,
+    variableOnRight: () => ({ integrate: undefined }),
+  },
 };
 
 // === FORMULA CLASS ===
@@ -1349,7 +1362,11 @@ function registerOps(table: Record<string, OpDescriptor>, arity: 'unary' | 'bina
       (Formula as any)[name] = (value: FormulaSource) => new Formula({ inputs: [value], ...desc });
     } else {
       (Formula as any)[name] = (value: FormulaSource, other: FormulaSource) =>
-        new Formula({ inputs: [value, other], ...desc });
+        new Formula({
+          inputs: [value, other],
+          ...desc,
+          ...(hasVariable(other) ? desc.variableOnRight?.(other) : undefined),
+        });
     }
 
     // Instance method delegates to static

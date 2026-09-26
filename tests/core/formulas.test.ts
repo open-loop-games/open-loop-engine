@@ -532,6 +532,10 @@ describe('Integrating', () => {
         if (name !== 'log' && name !== 'root') {
           test(`${name}(const, var) is marked as integrable`, () =>
             checkFormula(Formula[name](constant, variable)));
+        } else {
+          // A variable base or root index has no closed-form antiderivative here.
+          test(`${name}(const, var) is marked as not integrable`, () =>
+            expect(Formula[name](constant, variable).isIntegrable()).toBe(false));
         }
         test(`${name}(var, var) is marked as not integrable`, () =>
           expect(Formula[name](variable, variable).isIntegrable()).toBe(false));
