@@ -19,11 +19,7 @@ import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot, createIncrementalSnapshot } from '@/harness/walker';
-import {
-  buildMixedEngine,
-  expectSnapshotsEquivalent,
-  mutableAccessor,
-} from './incremental-snapshot-fixture';
+import { expectSnapshotsEquivalent, setup } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -85,14 +81,11 @@ describe('createIncrementalSnapshot — construction', () => {
   });
 
   it('initial snapshot matches createTransitionSnapshot', () => {
-    const { accessor } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-init', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, engine, inc } = setup(
+      'inc-init',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
     const direct = createTransitionSnapshot(engine, accessor);
     expect(inc.snapshot.all).toEqual(direct.all);
     expect(inc.snapshot.challenges).toEqual(direct.challenges);
@@ -107,14 +100,11 @@ describe('createIncrementalSnapshot — construction', () => {
 
 describe('createIncrementalSnapshot — equivalence across mutations', () => {
   it('matches after purchase', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 25, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-purchase', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-purchase',
+      { gold: 25, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
     expectSnapshotsEquivalent(inc, engine, accessor, 'initial');
 
     // Simulate a purchase-like mutation: gold drops below the 20-cost upgrade.
@@ -124,14 +114,11 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
   });
 
   it('matches after tick-driven rate change', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-rate', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-rate',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
 
     // Tick-like mutation: gold rate changes; distances recompute.
     config.rates.gold = 5;
@@ -140,14 +127,11 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
   });
 
   it('matches after unlock flip', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-unlock', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-unlock',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
 
     config.unlocks['bronze-unlock'] = true;
     inc.invalidateUnlock('bronze-unlock');
@@ -155,14 +139,11 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
   });
 
   it('matches after state mutation', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': true },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-state', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-state',
+      { gold: 0, gems: 0 },
+      { state: { 'trial.seen': false } },
+    );
 
     config.state['trial.seen'] = true;
     inc.invalidateState('trial.seen');
@@ -170,14 +151,11 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
   });
 
   it('matches across a compound sequence using invalidateAll', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-compound', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-compound',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
     expectSnapshotsEquivalent(inc, engine, accessor, 'initial');
 
     // Walk all four axes using invalidateAll between each mutation.
@@ -199,14 +177,11 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
   });
 
   it('a selective rebuild does not pick up an un-invalidated change', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-silent', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-silent',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
     const before = inc.rebuild();
 
     // The gold rate feeds every affordability distance, but only an
@@ -227,20 +202,6 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
 // ---------------------------------------------------------------------------
 
 describe('createIncrementalSnapshot — entity gating changes', () => {
-  function setup(gameId: string, resources: Record<string, number>) {
-    const { accessor, config } = mutableAccessor({
-      resources,
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': true },
-      state: { 'trial.seen': true },
-    });
-    const fixture = buildMixedEngine(gameId, accessor);
-    const inc = createIncrementalSnapshot(fixture.engine, accessor);
-    const check = (label: string) =>
-      expectSnapshotsEquivalent(inc, fixture.engine, accessor, label);
-    return { ...fixture, accessor, config, inc, check };
-  }
-
   it('a maxed purchasable returns after a reset un-maxes it', () => {
     const { upgrades, config, inc, check } = setup('inc-gate-purchasable', { gold: 25, gems: 0 });
     const fast = upgrades.getPurchasable('fast')!;
@@ -318,14 +279,11 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
 describe('createIncrementalSnapshot — dirty-set plumbing', () => {
   it('accepts invalidate* calls for unknown ids without throwing', () => {
-    const { accessor } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: {},
-      state: {},
-    });
-    const { engine } = buildMixedEngine('inc-unknown-ids', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, engine, inc } = setup(
+      'inc-unknown-ids',
+      { gold: 0, gems: 0 },
+      { unlocks: {}, state: {} },
+    );
 
     expect(() => inc.invalidateResource('not-a-resource')).not.toThrow();
     expect(() => inc.invalidateRate('not-a-rate')).not.toThrow();
@@ -339,14 +297,7 @@ describe('createIncrementalSnapshot — dirty-set plumbing', () => {
   it('invalidateAll and exhaustive targeted invalidation yield identical rebuilds', () => {
     // Single engine; the full and the selective path over the same state
     // must produce identical output.
-    const { accessor } = mutableAccessor({
-      resources: { gold: 100, gems: 10 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': true },
-      state: { 'trial.seen': true },
-    });
-    const { engine } = buildMixedEngine('inc-paths', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { inc } = setup('inc-paths', { gold: 100, gems: 10 });
 
     inc.invalidateAll();
     const viaInvalidateAll = inc.rebuild();
@@ -370,14 +321,11 @@ describe('createIncrementalSnapshot — dirty-set plumbing', () => {
 
 describe('createIncrementalSnapshot — rebuild semantics', () => {
   it('returns a fresh TransitionSnapshot object per rebuild', () => {
-    const { accessor } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-identity', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { inc } = setup(
+      'inc-identity',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
 
     const first = inc.rebuild();
     const second = inc.rebuild();
@@ -386,14 +334,11 @@ describe('createIncrementalSnapshot — rebuild semantics', () => {
   });
 
   it('updates `snapshot` getter after rebuild', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-getter', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { config, inc } = setup(
+      'inc-getter',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
 
     const beforeRebuild = inc.snapshot;
     config.rates.gold = 10;

@@ -14,13 +14,34 @@ import { createProducerCategory } from '@/systems/producer-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { createTransitionSnapshot, type createIncrementalSnapshot } from '@/harness/walker';
+import { createIncrementalSnapshot, createTransitionSnapshot } from '@/harness/walker';
 
 export interface MutableAccessorConfig {
   resources: Record<string, number>;
   rates: Record<string, number>;
   unlocks: Record<string, boolean>;
   state: Record<string, unknown>;
+}
+
+/** A frozen GameStateAccessor over a plain (non-reactive) config, defaults to all-empty. */
+export function mockAccessor(
+  config: {
+    resources?: Record<string, number>;
+    rates?: Record<string, number>;
+    unlocks?: Record<string, boolean>;
+    state?: Record<string, unknown>;
+  } = {},
+): GameStateAccessor {
+  const resources = config.resources ?? {};
+  const rates = config.rates ?? {};
+  const unlocks = config.unlocks ?? {};
+  const state = config.state ?? {};
+  return {
+    getResource: (id) => bn(resources[id] ?? 0),
+    isUnlocked: (id) => unlocks[id] ?? false,
+    getState: (path) => state[path],
+    getRate: (id) => bn(rates[id] ?? 0),
+  };
 }
 
 /**
@@ -163,4 +184,29 @@ export function expectSnapshotsEquivalent(
   expect(cached.challenges, `${label}: .challenges mismatch`).toEqual(direct.challenges);
   expect(cached.purchasables, `${label}: .purchasables mismatch`).toEqual(direct.purchasables);
   expect(cached.producers, `${label}: .producers mismatch`).toEqual(direct.producers);
+}
+
+/**
+ * A buildMixedEngine + createIncrementalSnapshot pair over a mutableAccessor,
+ * with a `check` closure bound to it. `overrides` replaces the default
+ * rates/unlocks/state wholesale (not merged) when a case needs a different
+ * starting gate state — the entity-gating suite doesn't, the property suite's
+ * random-mutation runs do.
+ */
+export function setup(
+  gameId: string,
+  resources: MutableAccessorConfig['resources'],
+  overrides: Partial<Omit<MutableAccessorConfig, 'resources'>> = {},
+) {
+  const { accessor, config } = mutableAccessor({
+    resources,
+    rates: { gold: 2, gems: 1 },
+    unlocks: { 'bronze-unlock': true },
+    state: { 'trial.seen': true },
+    ...overrides,
+  });
+  const fixture = buildMixedEngine(gameId, accessor);
+  const inc = createIncrementalSnapshot(fixture.engine, accessor);
+  const check = (label: string) => expectSnapshotsEquivalent(inc, fixture.engine, accessor, label);
+  return { ...fixture, accessor, config, inc, check };
 }

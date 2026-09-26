@@ -22,7 +22,7 @@ import { createTransitionSnapshot, createIncrementalSnapshot } from '@/harness/w
 import {
   buildMixedEngine,
   expectSnapshotsEquivalent,
-  mutableAccessor,
+  setup,
   type MutableAccessorConfig,
 } from './incremental-snapshot-fixture';
 
@@ -165,15 +165,15 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
   for (const seed of SEEDS) {
     it(`equivalent across ${STEPS_PER_SEED} random mutations (seed ${seed})`, () => {
       const rng = createSeededRNG(seed);
-      const { accessor, config } = mutableAccessor({
-        resources: { gold: 0, gems: 0 },
-        rates: { gold: 2, gems: 1 },
-        unlocks: { 'bronze-unlock': false, 'silver-unlock': false },
-        state: { 'trial.seen': false, 'trial.retired': false },
-      });
-      const fixture = buildMixedEngine(`inc-property-${seed}`, accessor);
-      const { engine } = fixture;
-      const inc = createIncrementalSnapshot(engine, accessor);
+      const fixture = setup(
+        `inc-property-${seed}`,
+        { gold: 0, gems: 0 },
+        {
+          unlocks: { 'bronze-unlock': false, 'silver-unlock': false },
+          state: { 'trial.seen': false, 'trial.retired': false },
+        },
+      );
+      const { accessor, config, engine, inc } = fixture;
       const pool = makeMutationPool(rng);
 
       expectSnapshotsEquivalent(inc, engine, accessor, `seed ${seed} initial`);
@@ -192,14 +192,11 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
   }
 
   it('a missed invalidation stays stale until invalidateAll recovers it', () => {
-    const { accessor, config } = mutableAccessor({
-      resources: { gold: 0, gems: 0 },
-      rates: { gold: 2, gems: 1 },
-      unlocks: { 'bronze-unlock': false },
-      state: { 'trial.seen': false },
-    });
-    const { engine } = buildMixedEngine('inc-property-recovery', accessor);
-    const inc = createIncrementalSnapshot(engine, accessor);
+    const { accessor, config, engine, inc } = setup(
+      'inc-property-recovery',
+      { gold: 0, gems: 0 },
+      { unlocks: { 'bronze-unlock': false }, state: { 'trial.seen': false } },
+    );
     const before = inc.rebuild();
 
     // Dep-slot moves that flip no gate: the rates feed every distance, but

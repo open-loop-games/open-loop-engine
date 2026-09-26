@@ -6,33 +6,13 @@ import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
-import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot, type Transition } from '@/harness/walker';
+import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
-
-function mockAccessor(
-  config: {
-    resources?: Record<string, number>;
-    rates?: Record<string, number>;
-    unlocks?: Record<string, boolean>;
-    state?: Record<string, unknown>;
-  } = {},
-): GameStateAccessor {
-  const resources = config.resources ?? {};
-  const rates = config.rates ?? {};
-  const unlocks = config.unlocks ?? {};
-  const state = config.state ?? {};
-  return {
-    getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
-    getState: (path) => state[path],
-    getRate: (id) => bn(rates[id] ?? 0),
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Degenerate inputs
@@ -102,7 +82,7 @@ interface BuildingDef {
  * leaves to sort together. The challenge category receives `accessor` so its
  * `ICondition` gates evaluate against the same state the walker reads.
  */
-function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
+function buildMergeEngine(gameId: string, accessor: GameStateAccessor) {
   const module: EngineModule = {
     id: 'mixed-content',
     install(ctx) {
@@ -174,7 +154,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
       resources: { gold: 0, gems: 0 },
       rates: { gold: 2, gems: 1 },
     });
-    const { engine } = buildMixedEngine('bts-merge', accessor);
+    const { engine } = buildMergeEngine('bts-merge', accessor);
 
     const snap = createTransitionSnapshot(engine, accessor);
 

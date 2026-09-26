@@ -13,20 +13,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createEngine, type EngineModule } from '@/index';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
-import { bn } from '@/primitives/decimal';
-import type { GameStateAccessor } from '@/primitives/types';
 import { createIncrementalSnapshot } from '@/harness/walker';
+import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
 
-const accessor: GameStateAccessor = {
-  getResource: () => bn(0),
-  isUnlocked: () => false,
-  getState: () => undefined,
-  getRate: () => bn(0),
-};
+const accessor = mockAccessor();
 
 describe('createIncrementalSnapshot — empty-deps emissions', () => {
   it('a selective rebuild matches a full one across a closure flip and a completion', () => {

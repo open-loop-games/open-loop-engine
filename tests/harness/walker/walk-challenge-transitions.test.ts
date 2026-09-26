@@ -15,30 +15,11 @@ import { runUntil } from '@/harness/run-until';
 import { createIncrementalSnapshot } from '@/harness/walker/incremental-snapshot';
 import { createTransitionSnapshot } from '@/harness/walker';
 import { createResource, type Resource } from '@/core/resource';
+import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
-
-function mockAccessor(
-  config: {
-    resources?: Record<string, number>;
-    rates?: Record<string, number>;
-    unlocks?: Record<string, boolean>;
-    state?: Record<string, unknown>;
-  } = {},
-): GameStateAccessor {
-  const resources = config.resources ?? {};
-  const rates = config.rates ?? {};
-  const unlocks = config.unlocks ?? {};
-  const state = config.state ?? {};
-  return {
-    getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
-    getState: (path) => state[path],
-    getRate: (id) => bn(rates[id] ?? 0),
-  };
-}
 
 /**
  * Build a minimal engine that publishes a single challenge category under

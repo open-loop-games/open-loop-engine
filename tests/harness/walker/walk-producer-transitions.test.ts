@@ -6,28 +6,12 @@ import { createResource } from '@/core/resource';
 import { createProducerCategory } from '@/systems/producer-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
-import type { GameStateAccessor } from '@/primitives/types';
 import { walkProducerTransitions } from '@/harness/walker/walk-producer-transitions';
+import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
-
-function mockAccessor(
-  config: {
-    resources?: Record<string, number>;
-    rates?: Record<string, number>;
-  } = {},
-): GameStateAccessor {
-  const resources = config.resources ?? {};
-  const rates = config.rates ?? {};
-  return {
-    getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: () => false,
-    getState: () => undefined,
-    getRate: (id) => bn(rates[id] ?? 0),
-  };
-}
 
 interface BuildingDef {
   id: string;

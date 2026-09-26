@@ -8,32 +8,12 @@ import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import { ref } from 'vue';
-import type { GameStateAccessor } from '@/primitives/types';
 import { walkPurchasableTransitions } from '@/harness/walker/walk-purchasable-transitions';
+import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
-
-function mockAccessor(
-  config: {
-    resources?: Record<string, number>;
-    rates?: Record<string, number>;
-    unlocks?: Record<string, boolean>;
-    state?: Record<string, unknown>;
-  } = {},
-): GameStateAccessor {
-  const resources = config.resources ?? {};
-  const rates = config.rates ?? {};
-  const unlocks = config.unlocks ?? {};
-  const state = config.state ?? {};
-  return {
-    getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
-    getState: (path) => state[path],
-    getRate: (id) => bn(rates[id] ?? 0),
-  };
-}
 
 interface UpgradeDef {
   id: string;
