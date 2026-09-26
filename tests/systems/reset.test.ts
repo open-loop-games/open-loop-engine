@@ -455,6 +455,30 @@ describe('Reset with resetModules', () => {
     }
   });
 
+  it('warns about an unknown id inside a composed reset or cycle, but not on a scope read', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warningsFor = (id: string) =>
+      warn.mock.calls.filter((c) => String(c[0]).includes(id)).length;
+    try {
+      const inner = createReset({ resetModules: ['rm-composed-missing'] });
+      const cycle = createCycle({
+        resetModules: ['rm-cycle-missing'],
+        registerTick: () => () => {},
+      });
+      const outer = createReset({ resetModules: [inner, cycle] });
+
+      void outer.resolvedScope;
+      expect(warningsFor('rm-composed-missing')).toBe(0);
+      expect(warningsFor('rm-cycle-missing')).toBe(0);
+
+      outer.reset();
+      expect(warningsFor('rm-composed-missing')).toBe(1);
+      expect(warningsFor('rm-cycle-missing')).toBe(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('keeps resolving a module id inside the namespace it was created under', () => {
     beginPersistentContext('rm-ns-shop');
     const live = persistent(0);

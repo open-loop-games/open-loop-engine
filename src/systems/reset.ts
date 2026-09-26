@@ -192,10 +192,19 @@ export interface ResetEvents {
 // === RESET CREATION ===
 
 /**
+ * Each Reset's scope resolution with its own unknown-id warning attached, so a
+ * reset composing it warns as running it alone would. The `resolvedScope`
+ * getter stays silent: a read before every module has installed would warn
+ * falsely.
+ */
+const warningResolvers = new WeakMap<object, () => Set<Persistent>>();
+
+/**
  * Resolve a list of reset scope entries into a flat set of persistent refs.
  * Module IDs are resolved via the persistent ref registry (including nested
  * contexts); `onUnknown` hears each id with no registered context.
- * ScopedReset objects contribute their own resolved scope.
+ * ScopedReset objects contribute their own resolved scope, and with
+ * `onUnknown` given, warn about their own unknown ids.
  */
 function resolveScope(
   modules: ResetScope[],
@@ -207,7 +216,11 @@ function resolveScope(
       if (onUnknown && getPersistentRefs(entry) === undefined) onUnknown(entry);
       for (const ref of getModulePersistentRefs(entry)) result.add(ref);
     } else {
-      for (const ref of entry.resolvedScope) result.add(ref);
+      // A Cycle's scope is its `reset`'s, so it warns through that entry.
+      const inner = (entry as { reset?: object }).reset;
+      const resolveWarning =
+        onUnknown && (warningResolvers.get(entry) ?? (inner && warningResolvers.get(inner)));
+      for (const ref of resolveWarning ? resolveWarning() : entry.resolvedScope) result.add(ref);
     }
   }
   return result;
@@ -355,6 +368,7 @@ export function createReset(options: ResetOptions): Reset {
       }
     },
   };
+  warningResolvers.set(reset, () => resolveModules(warnUnknownModule));
 
   return reset;
 }
