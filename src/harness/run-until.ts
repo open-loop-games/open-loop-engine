@@ -12,8 +12,8 @@
  * tickDelta is caller-authoritative: each iteration advances the engine by
  * exactly `tickDelta` seconds via `simulateTick`, which respects fixed-mode
  * accumulator semantics for source-faithful ports. A `tickDelta` above the
- * driver's `maxDeltaTime` is split into equal calls under the cap rather
- * than clamped, so reported sim-time is always simulated sim-time. This
+ * driver's `maxDeltaTime` runs as several engine ticks under the cap, so
+ * reported sim-time is always simulated sim-time. This
  * decouples the harness from the engine's live `tickRate` — coarsening
  * tickDelta at the harness level is a real speedup, not a reporting phantom,
  * up to the cap. (`stepOnce()` exists for deterministic-replay paths that
@@ -44,7 +44,7 @@
 import { seedRNG } from '@/primitives/rng';
 import { createTransitionSnapshot } from './walker';
 import { runEventModeLoop, isStasis } from './run-until-helpers/event-mode';
-import { floorSteps, simulateSpan } from './sim-time';
+import { floorSteps } from './sim-time';
 import type { RunUntilConfig, RunUntilResult } from './types';
 
 /**
@@ -128,7 +128,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
       }
     }
     if (tick === maxTicks) break;
-    simulateSpan(engine.tickDriver, tickDelta);
+    engine.tickDriver.simulateTick(tickDelta);
     tick++;
     for (const a of analyzers) a.onTick?.(tick - 1);
   }

@@ -62,7 +62,10 @@ export interface TimerProvider {
 export interface TickDriverConfig {
   /** Ticks per second (default 20). Controls the setInterval cadence. */
   tickRate?: number;
-  /** Maximum seconds of game time per tick (default 1). Caps variable dt. */
+  /**
+   * Maximum seconds of game time per tick (default 1). Live variable-mode play clamps
+   * to it; `simulateTick` splits a longer dt into several ticks instead.
+   */
   maxDeltaTime?: number;
   /** Initial speed multiplier (default 1). Scales dt during live play only. */
   speedMultiplier?: number;
@@ -158,6 +161,8 @@ export interface TickDriver {
    * Feed raw seconds through the loop (for offline processing). Does NOT apply
    * speedMultiplier. In fixed mode, drains the accumulator at `stepSize` per sub-tick
    * with no `maxStepsPerTick` cap (offline is bounded upstream by `processOfflineTime`).
+   * In variable mode, a `rawDt` above `maxDeltaTime` runs as the fewest equal ticks
+   * under the cap, so every second fed in is simulated and `onDeltaOverflow` never fires.
    */
   simulateTick(rawDt: number): void;
   /**
@@ -187,7 +192,7 @@ export interface TickDriver {
   onDeltaOverflow: ((droppedSeconds: number) => void) | undefined;
   /** EWMA of recent tick deltas (seconds). Read-only diagnostic. */
   readonly deltaMean: number;
-  /** Per-tick dt cap (seconds). `simulateTick` clamps to this in variable mode. */
+  /** Per-tick dt cap (seconds). Variable-mode `simulateTick` splits a longer dt into ticks under it. */
   readonly maxDeltaTime: number;
 }
 
@@ -202,6 +207,12 @@ const FILTER_STRENGTH = 20;
  * to round only numerical noise into the intended step count.
  */
 const ACCUMULATOR_EPSILON = 1e-9;
+
+/**
+ * Relative slack on the variable-mode split count: `2.1 / 0.7` is `3.0000000000000004`
+ * (error ~1e-16), while a genuine fractional remainder sits far above this.
+ */
+const SPLIT_QUOTIENT_EPSILON = 1e-12;
 
 /**
  * Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and
@@ -346,7 +357,14 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
       }
       return;
     }
-    processTick(Math.min(rawDt, maxDeltaTime));
+    if (!(rawDt > maxDeltaTime)) {
+      processTick(rawDt);
+      return;
+    }
+    const q = rawDt / maxDeltaTime;
+    const ticks = Math.ceil(q - q * SPLIT_QUOTIENT_EPSILON);
+    const dt = rawDt / ticks;
+    for (let i = 0; i < ticks; i++) processTick(dt);
   }
 
   function startInterval(): void {

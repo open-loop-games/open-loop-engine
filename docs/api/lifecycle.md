@@ -16,7 +16,7 @@ Anything that crosses a session boundary or a prestige reset — `withPersistent
 catch-up progress by replaying elapsed seconds through the TickDriver in chunks
 
 - `interface OfflineProgressOptions` — Options for processOfflineTime — caps the catch-up window and the per-step chunk size. `src/core/offline.ts:8`
-- `function processOfflineTime(tickDriver: TickDriver, elapsedSeconds: number, options?: OfflineProgressOptions): number` — Process offline elapsed time by feeding it through the TickDriver in chunks. `src/core/offline.ts:24`
+- `function processOfflineTime(tickDriver: TickDriver, elapsedSeconds: number, options?: OfflineProgressOptions): number` — Process offline elapsed time by feeding it through the TickDriver in chunks. `src/core/offline.ts:23`
 
 ## Persistence
 

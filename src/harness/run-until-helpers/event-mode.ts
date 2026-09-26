@@ -13,9 +13,8 @@
  * 2. {@link resolveNextEvent} picks the smallest finite distance, floored at
  *    `tickDelta` so dense auto-purchase cadence can't collapse the advance
  *    into a per-step snapshot-rebuild cliff, and capped at the remaining
- *    budget so no advance crosses `maxSimTime`. Every engine advance goes
- *    through {@link simulateSpan}, so a distance beyond the driver's
- *    `maxDeltaTime` is simulated in full, not clamped.
+ *    budget so no advance crosses `maxSimTime`. A distance beyond the
+ *    driver's `maxDeltaTime` is simulated in full, as several engine ticks.
  * 3. Refuse handling splits by reason:
  *    - `'opaque-present'` — fall back to a `tickDelta` step. Opaque
  *      transitions could flip after a tick, so we tick and re-resolve.
@@ -39,7 +38,6 @@ import type { GameStateAccessor } from '@/primitives/types';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
 import { getRNGState, setRNGState, type RNGState } from '@/primitives/rng';
 import type { UntilPredicate } from '../types';
-import { simulateSpan } from '../sim-time';
 import {
   createTransitionSnapshot,
   createIncrementalSnapshot,
@@ -182,7 +180,7 @@ export function runEventModeLoop(
           ? { blob: engine.saveManager!.exportSave(), rng: getRNGState() }
           : null;
       const advanceStart = profileStart();
-      simulateSpan(engine.tickDriver, result.dt);
+      engine.tickDriver.simulateTick(result.dt);
       profileEnd('runUntil.event.advance', advanceStart);
       if (checkpoint !== null && predicate({ tick: steps, simTime: simTime + result.dt })) {
         // Predicate flipped during this advance. Restore + replay sub-intervals
@@ -243,7 +241,7 @@ export function runEventModeLoop(
       const dt = Math.min(tickDelta, remaining);
       if (dt <= 0) break;
       const opaqueStart = profileStart();
-      simulateSpan(engine.tickDriver, dt);
+      engine.tickDriver.simulateTick(dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
       before = commitDeps(inc, sample, before);
@@ -381,7 +379,7 @@ function fastTickDuringStasis(
     const remaining = maxSimTime - simTime;
     const dt = Math.min(tickDelta, remaining);
     if (dt <= 0) break;
-    simulateSpan(engine.tickDriver, dt);
+    engine.tickDriver.simulateTick(dt);
     simTime += dt;
     ticks++;
 
@@ -423,7 +421,7 @@ function bisectFireTime(
   while (high - low > tolSec) {
     const mid = (low + high) / 2;
     restore();
-    simulateSpan(engine.tickDriver, mid);
+    engine.tickDriver.simulateTick(mid);
     // `mid` is relative to the checkpoint (the advance's start); the predicate
     // reads run-absolute `simTime`, so feed it `baseSimTime + mid`. Passing the
     // raw `mid` here silently defeats bisection for any simTime-reading
@@ -434,7 +432,7 @@ function bisectFireTime(
   // Leave the engine at the smallest dt for which the predicate is true so
   // the run ends in the fired state rather than a bisect intermediate.
   restore();
-  simulateSpan(engine.tickDriver, high);
+  engine.tickDriver.simulateTick(high);
   return high;
 }
 

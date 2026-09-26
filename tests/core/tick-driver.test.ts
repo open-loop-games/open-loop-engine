@@ -38,14 +38,27 @@ describe('TickDriver', () => {
     tickDriver.stepOnce();
     expect(log).toEqual(['A', 'B', 'B']);
   });
-  it('simulateTick clamps delta to maxDeltaTime', () => {
-    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
+  it('simulateTick splits a delta above maxDeltaTime into equal ticks under the cap', () => {
+    const overflow = vi.fn();
+    const tickDriver = createTickDriver({
+      tickRate: 20,
+      maxDeltaTime: 1,
+      onDeltaOverflow: overflow,
+    });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(5);
-    // Variable dt: single call with capped dt, not multiple fixed-step calls
-    expect(fn).toHaveBeenCalledTimes(1);
-    expect(fn).toHaveBeenCalledWith(1);
+    tickDriver.simulateTick(2.5);
+    expect(fn).toHaveBeenCalledTimes(3);
+    for (const [dt] of fn.mock.calls) expect(dt).toBeCloseTo(2.5 / 3, 12);
+    expect(overflow).not.toHaveBeenCalled();
+  });
+  it('simulateTick does not add a tick for a quotient a rounding error above an integer', () => {
+    // 2.1 / 0.7 is 3.0000000000000004, which a bare Math.ceil turns into 4.
+    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 0.7 });
+    const fn = vi.fn();
+    tickDriver.onTick(fn);
+    tickDriver.simulateTick(2.1);
+    expect(fn).toHaveBeenCalledTimes(3);
   });
   it('simulateTick passes raw dt when under maxDeltaTime', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
@@ -489,10 +502,10 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(5);
-    // Variable behavior: single capped call, not multiple sub-ticks.
+    tickDriver.simulateTick(0.3);
+    // Variable behavior: one tick of the raw dt, not six 0.05 sub-steps.
     expect(fn).toHaveBeenCalledTimes(1);
-    expect(fn).toHaveBeenCalledWith(1);
+    expect(fn).toHaveBeenCalledWith(0.3);
   });
 
   it('fixed-mode accumulator round-trips through exportSave/importSave', () => {
