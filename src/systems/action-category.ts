@@ -340,6 +340,8 @@ export function createActionCategory<Def extends { id: string }, State = void, P
 
   const mappings = new Map<string, ActionMapping<Def, State, Payload>>();
   const rateChains = new Map<string, ModifierChain>();
+  // The batch registerWithMapping is registering, keyed by def object.
+  let stagedMappings: Map<Def, ActionMapping<Def, State, Payload>> | undefined;
   const mapCtx: ActionCategoryContext = { registerTick };
 
   const handle = createEmitHandle<ActionCategoryEvents<Def, State, Payload>>();
@@ -354,12 +356,10 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     id: categoryId,
     buildState: mapState ? (def) => mapState(def) : undefined,
     buildSignals: (def, _instance, _state) => {
-      const mapping = mappings.get(def.id);
+      const mapping = stagedMappings?.get(def);
       if (!mapping) {
-        // mapAction is invoked below per-def; signals are read after mapping
-        // is cached. This branch is defensive — `buildSignals` runs inside the
-        // per-def context immediately after `buildState`, before this
-        // registerOne call returns, so the mapping must already exist.
+        // Defensive: base registration is reachable only through
+        // registerWithMapping, which stages every def's mapping first.
         throw new Error(
           `createActionCategory: mapping for ${categoryId}/${def.id} missing during buildSignals`,
         );
@@ -368,23 +368,31 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     },
   });
 
-  // Override base.register to install the mapping (and optional rateChain)
-  // before createCategoryBase's buildSignals runs, since buildSignals reads
-  // from the mappings map.
+  // Override base.register to map the batch before createCategoryBase's
+  // buildSignals runs, since buildSignals reads the mapping. Mappings are staged
+  // and installed only for defs that registered: a duplicate id or a throw later
+  // in the batch must neither replace a live def's mapping nor leave one behind.
   const baseRegister = base.register;
   function registerWithMapping(defs: Def | Def[]): void {
     const arr = Array.isArray(defs) ? defs : [defs];
-    for (const def of arr) {
-      // `mapAction` runs in the caller's persistent context, not the def's:
-      // opening the def's here would move the save keys of any refs it
-      // creates.
-      const mapping = mapAction(def, mapCtx);
-      mappings.set(def.id, mapping);
-      if (mapping.rateChain) {
-        rateChains.set(def.id, createModifierChain(`${categoryId}/${def.id}/rate`));
+    const staged = new Map<Def, ActionMapping<Def, State, Payload>>();
+    // `mapAction` runs in the caller's persistent context, not the def's:
+    // opening the def's here would move the save keys of any refs it creates.
+    for (const def of arr) staged.set(def, mapAction(def, mapCtx));
+    const outer = stagedMappings;
+    stagedMappings = staged;
+    try {
+      baseRegister(arr);
+    } finally {
+      stagedMappings = outer;
+      for (const [def, mapping] of staged) {
+        if (base.getDef(def.id) !== def) continue;
+        mappings.set(def.id, mapping);
+        if (mapping.rateChain) {
+          rateChains.set(def.id, createModifierChain(`${categoryId}/${def.id}/rate`));
+        }
       }
     }
-    baseRegister(arr);
   }
 
   // --- Sequencer wiring ----------------------------------------------------

@@ -132,6 +132,65 @@ describe('createActionCategory — registration + per-def state', () => {
   });
 });
 
+describe('createActionCategory — a rejected register leaves no mapping behind', () => {
+  // mapAction throws on 'bad-map'; mapState throws on 'bad-state'.
+  function makeRateCategory() {
+    const driver = makeTickDriver();
+    const tickCalls: string[] = [];
+    const category = createActionCategory<ActionDef, ActionState, ActionPayload>({
+      id: `actions-${Math.random().toString(36).slice(2, 8)}`,
+      registerTick: driver.registerTick,
+      mapAction: (def) => {
+        if (def.id === 'bad-map') throw new Error('mapAction blew up');
+        return { signals: {}, rateChain: true, tick: () => tickCalls.push(def.id) };
+      },
+      mapState: (def) => {
+        if (def.id === 'bad-state') throw new Error('mapState blew up');
+        return { timesCompleted: persistent<DecimalSource>(0) };
+      },
+    });
+    return { category, driver, tickCalls };
+  }
+
+  it('a duplicate id keeps the registered def its rate chain and tick', () => {
+    const { category, driver, tickCalls } = makeRateCategory();
+    category.register({ id: 'chop', baseTicks: 1 });
+    const chain = category.getRateChain('chop');
+    expect(chain).toBeDefined();
+
+    expect(() => category.register({ id: 'chop', baseTicks: 9 })).toThrow(/Duplicate/);
+    expect(category.getRateChain('chop')).toBe(chain);
+    expect(category.getEntry('chop')?.rateChain).toBe(chain);
+
+    category.enqueue('chop', { payload: { count: 1 } });
+    driver.tick(1);
+    expect(tickCalls).toEqual(['chop']);
+  });
+
+  it('a batch that throws partway maps only the defs that registered', () => {
+    const { category } = makeRateCategory();
+    expect(() =>
+      category.register([
+        { id: 'first', baseTicks: 1 },
+        { id: 'bad-state', baseTicks: 1 },
+        { id: 'after', baseTicks: 1 },
+      ]),
+    ).toThrow(/mapState blew up/);
+    expect(category.getRateChain('first')).toBeDefined();
+    expect(category.getRateChain('bad-state')).toBeUndefined();
+    expect(category.getRateChain('after')).toBeUndefined();
+
+    expect(() =>
+      category.register([
+        { id: 'mapped', baseTicks: 1 },
+        { id: 'bad-map', baseTicks: 1 },
+      ]),
+    ).toThrow(/mapAction blew up/);
+    expect(category.getDef('mapped')).toBeUndefined();
+    expect(category.getRateChain('mapped')).toBeUndefined();
+  });
+});
+
 // ============================================================================
 // Polymorphic dispatch via per-mapping tick closures
 // ============================================================================
