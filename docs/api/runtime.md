@@ -15,14 +15,14 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:441`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:333`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:245`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:136`
+- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:426`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:318`
+- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:230`
+- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:122`
 - `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:100`
-- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:201`
+- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:186`
 - `type LoadHandler = (result: SaveLoadResult) => void` — Callback invoked after a save loads successfully through any entry point: `engine.load()`, the save manager's `load` / `importSave`, or a harness engine hydrated from a save. `src/engine.ts:78`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:223`
+- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:208`
 - `type SaveHandler = () => void` — Callback invoked before live state is serialized — by `engine.save()`, the autosave, and the save manager's `save` / `saveToSlot` / `exportSave` — so it can flush derived state into persistent refs. `src/engine.ts:66`
 - `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:109`
 - `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:106`
@@ -72,7 +72,7 @@ lightweight tick-callback rate limiter
 
 persistent elapsed/total play time and reactive speed multiplier
 
-- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:80`
+- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:78`
 - `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:39`
 - `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:22`
 
@@ -80,8 +80,8 @@ persistent elapsed/total play time and reactive speed multiplier
 
 "when does X happen?" math over current engine state
 
-- `interface AffordableLike` — Minimal shape satisfied by Purchasable. `src/core/transitions.ts:82`
-- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until the next level of a purchasable becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:132`
-- `function timeUntilResource(resourceId: string, target: DecimalSource, accessor: GameStateAccessor): TransitionDistance` — Distance until `resource` reaches `target`, in seconds, assuming current rate holds. `src/core/transitions.ts:103`
-- `interface TransitionDeps` — Accessor slots a transition's distance arithmetic reads. `src/core/transitions.ts:61`
-- `type TransitionDistance` — Distance until a state transition occurs, with a reason when the distance is uncomputable. `src/core/transitions.ts:43`
+- `interface AffordableLike` — Minimal shape satisfied by Purchasable. `src/core/transitions.ts:80`
+- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until the next level of a purchasable becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:124`
+- `function timeUntilResource(resourceId: string, target: DecimalSource, accessor: GameStateAccessor): TransitionDistance` — Distance until `resource` reaches `target`, in seconds, assuming current rate holds. `src/core/transitions.ts:101`
+- `interface TransitionDeps` — Accessor slots a transition's distance arithmetic reads. `src/core/transitions.ts:59`
+- `type TransitionDistance` — Distance until a state transition occurs, with a reason when the distance is uncomputable. `src/core/transitions.ts:41`

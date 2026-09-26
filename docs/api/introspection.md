@@ -22,25 +22,25 @@ the typed cross-category accumulator the engine self-publishes for external intr
 
 generic typed registry with scoped push/pop, plus the typed `TuningRegistry` narrow that opts a registry into the picker's tuning-surface enumeration
 
-- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(name: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:176`
-- `function createTuningRegistry(name: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:277`
-- `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:82`
-- `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:405`
-- `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:159`
-- `type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>` — Typed narrow over OverrideRegistry for "values intentionally declared as tuning surface." Every key resolves to a zero-arg reader returning a `DecimalSource`. `src/core/override-registry.ts:146`
+- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(name: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:173`
+- `function createTuningRegistry(name: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:273`
+- `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:81`
+- `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:401`
+- `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:158`
+- `type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>` — Typed narrow over OverrideRegistry for "values intentionally declared as tuning surface." Every key resolves to a zero-arg reader returning a `DecimalSource`. `src/core/override-registry.ts:145`
 
 ## Profiler
 
 - `function enableProfiling(): () => void` — Subscribe to the profiler. `src/core/profiler.ts:45`
-- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a borglike-style console table. `src/core/profiler.ts:233`
-- `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:200`
-- `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:63`
-- `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:71`
-- `function profileEnd(name: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:95`
-- `interface ProfileEntry` — A single row in a ProfileReport. `src/core/profiler.ts:151`
-- `interface ProfileReport` — Structured profiling report produced by getProfileReport. `src/core/profiler.ts:180`
-- `function profileStart(): number` — Start a manual timer. `src/core/profiler.ts:87`
-- `function resetProfile(): void` — Clear all accumulated timings. `src/core/profiler.ts:254`
+- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a borglike-style console table. `src/core/profiler.ts:229`
+- `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:196`
+- `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:59`
+- `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:67`
+- `function profileEnd(name: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:91`
+- `interface ProfileEntry` — A single row in a ProfileReport. `src/core/profiler.ts:147`
+- `interface ProfileReport` — Structured profiling report produced by getProfileReport. `src/core/profiler.ts:176`
+- `function profileStart(): number` — Start a manual timer. `src/core/profiler.ts:83`
+- `function resetProfile(): void` — Clear all accumulated timings. `src/core/profiler.ts:250`
 
 ## Engine-internal registries
 

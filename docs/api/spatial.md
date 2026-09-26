@@ -32,7 +32,7 @@ Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, 
 
 Keyed node/edge container with nested child-graph composition — the substrate `ScopeStack` walks.
 
-- `function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E>` — Create a keyed graph container with nested child-graph support. `src/core/spatial/graph.ts:223`
+- `function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E>` — Create a keyed graph container with nested child-graph support. `src/core/spatial/graph.ts:225`
 - `interface GraphEdge<E>` — An edge in a SpatialGraph. `src/core/spatial/graph.ts:48`
 - `interface GraphNode<N>` — A node in a SpatialGraph. `src/core/spatial/graph.ts:41`
 - `interface SpatialGraph<N, E>` — Keyed node/edge container with nested child-graph composition. `src/core/spatial/graph.ts:95`

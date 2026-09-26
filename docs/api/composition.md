@@ -12,19 +12,19 @@ Substrate the content systems compose against. `CategoryBase` + `ContentRegistry
 
 shared skeleton for batch-registration categories
 
-- `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:114`
-- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:80`
-- `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:72`
-- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:55`
-- `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:177`
+- `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:113`
+- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:79`
+- `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:71`
+- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:54`
+- `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:172`
 
 ## Content Registry
 
 generic typed registry for game content definitions
 
 - `interface ContentRegistry<T extends { id: string; }>` — A typed, Map-backed registry for game content definitions. `src/systems/content-registry.ts:44`
-- `type ContentRegistryView<T extends { id: string; }>` — A ContentRegistry without `register` — what a category exposes as its `registry`. `src/systems/content-registry.ts:105`
-- `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:141`
+- `type ContentRegistryView<T extends { id: string; }>` — A ContentRegistry without `register` — what a category exposes as its `registry`. `src/systems/content-registry.ts:109`
+- `function createContentRegistry<T extends { id: string; }>(name: string): ContentRegistry<T>` — Create a new content registry for a specific content type. `src/systems/content-registry.ts:145`
 
 ## Sequencer
 
@@ -35,7 +35,7 @@ core primitive for ordered execution of items with optional metadata
 - `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:72`
 - `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:96`
 - `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:121`
-- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:390`
+- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:391`
 - `interface FillStrategy<M = void>` — Strategy for automatically filling the sequencer when it runs dry. `src/core/sequencer.ts:64`
 - `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration function — matches `EngineContext.onTick` signature. `src/core/sequencer.ts:57`
 - `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:173`

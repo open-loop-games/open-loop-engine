@@ -34,15 +34,15 @@ maps beat duration to Csikszentmihalyi's Flow Theory engagement bands. Opinionat
 synchronous tick loop for deterministic simulation and tests
 
 - `interface HeadlessConfig` — Configuration for a synchronous headless simulation run. `src/core/headless.ts:11`
-- `interface HeadlessResult` — Results returned after a completed headless simulation run. `src/core/headless.ts:35`
-- `function runHeadless(config: HeadlessConfig): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:51`
+- `interface HeadlessResult` — Results returned after a completed headless simulation run. `src/core/headless.ts:36`
+- `function runHeadless(config: HeadlessConfig): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:52`
 
 ## Perturbation applier
 
 address→override mechanism for the balance workbench
 
-- `function applyPerturbation(engine: Engine, entry: PickerEntry, perturbation: Perturbation): () => void` — Apply `perturbation` to the surface identified by `entry` and return an idempotent cleanup that reverses the mutation. `src/harness/perturbation.ts:106`
-- `type Perturbation` — Scalar transform applied on top of an existing modifier or tunable value. `src/harness/perturbation.ts:56`
+- `function applyPerturbation(engine: Engine, entry: PickerEntry, perturbation: Perturbation): () => void` — Apply `perturbation` to the surface identified by `entry` and return an idempotent cleanup that reverses the mutation. `src/harness/perturbation.ts:111`
+- `type Perturbation` — Scalar transform applied on top of an existing modifier or tunable value. `src/harness/perturbation.ts:61`
 
 ## Picker
 
@@ -65,8 +65,8 @@ Seed-sweep runners. `runProbe` collects per-beat termination-time distributions 
 - `interface BeatProbe` — One beat's predicate + identity. `src/harness/probe/types.ts:19`
 - `interface BeatResult` — Per-beat termination-time distribution from a `seeds`-wide sweep. `src/harness/probe/types.ts:43`
 - `interface ProbeConfig` — Configuration for runProbe. `src/harness/probe/types.ts:69`
-- `function runProbe(config: ProbeConfig): BeatResult[]` — For each beat, drive `seeds.length` fresh engines until the beat predicate fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is observed), aggregated into per-beat termination-time distributions. `src/harness/probe/tick.ts:60`
-- `function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance via `runUntil` until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:111`
+- `function runProbe(config: ProbeConfig): BeatResult[]` — For each beat, drive `seeds.length` fresh engines until the beat predicate fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is observed), aggregated into per-beat termination-time distributions. `src/harness/probe/tick.ts:59`
+- `function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance it until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, and return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:110`
 - `interface Waypoint` — One named time-anchored snapshot target. `src/harness/probe/waypoint.ts:24`
 - `interface WaypointProbeConfig<T>` — Configuration for runWaypointProbe. `src/harness/probe/waypoint.ts:53`
 - `interface WaypointSnapshot<T>` — Per-waypoint × per-seed inspector output. `src/harness/probe/waypoint.ts:31`
@@ -76,18 +76,18 @@ Seed-sweep runners. `runProbe` collects per-beat termination-time distributions 
 reduces raw per-run results into per-metric stats, optional histograms, and (for until-runs) termination-time distributions. Also exports `diffAggregates`, the baseline-vs-variant delta primitive consumed directly by custom-sweep callers when the canned `runSensitivity` shape doesn't fit (see starter `sweep.ts`, `tug/balance/probes.ts`)
 
 - `function computeMetricStats(values: number[]): MetricStats` — Descriptive stats (min/max/avg/stddev/median/p5/p50/p95/count) over a numeric array. `src/harness/aggregate.ts:47`
-- `function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine` — Load a save into a fresh, isolated engine running the given modules — a scratch copy of the game to simulate or inspect without touching the live one. `src/harness/create-engine.ts:88`
-- `interface CreateEngineFromSaveOptions` `src/harness/create-engine.ts:31`
+- `function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine` — Load a save into a fresh, isolated engine running the given modules — a scratch copy of the game to simulate or inspect without touching the live one. `src/harness/create-engine.ts:81`
+- `interface CreateEngineFromSaveOptions` `src/harness/create-engine.ts:24`
 - `function createSensitivityCell(options: CreateSensitivityCellOptions): Cell` — Build a harness `Cell` backed by a per-run engine constructed from a save blob. `src/harness/create-sensitivity-cell.ts:114`
 - `interface CreateSensitivityCellOptions` — Options for createSensitivityCell — bundles the immutable save-blob baseline, the per-run module-instance factory, an optional `perturb` hook, and the analyzer factory used by every run of this cell. `src/harness/create-sensitivity-cell.ts:28`
 - `function createTickCounter(driver: TickDriver): TickCounter` — Count `onTick` fires on `driver` — one per sub-tick in fixed mode, one per interval tick in variable mode. `src/harness/replay.ts:92`
 - `function createWorkPlan<C>(config: { cells: C[]; seeds: number[]; }): WorkItem<C>[]` — Build the flat `(cellIdx, seedIdx, seed, cell)` array that runMatrix and runMatrixUntil iterate. `src/harness/work-plan.ts:38`
-- `function diffAggregates(cell: CellAggregate, baseline: CellAggregate): Record<string, MetricDelta>` — Per-metric delta between a variant cell aggregate and the baseline. `src/harness/aggregate.ts:242`
+- `function diffAggregates(cell: CellAggregate, baseline: CellAggregate): Record<string, MetricDelta>` — Per-metric delta between a variant cell aggregate and the baseline. `src/harness/aggregate.ts:250`
 - `function replayLive(driver: TickDriver, options: ReplayLiveOptions): Promise<number>` — Replay `seconds` of live play at `speed` through `driver`, reproducing `intervalTick`'s dt math deterministically. `src/harness/replay.ts:58`
 - `interface ReplayLiveOptions` `src/harness/replay.ts:31`
 - `function runBatch(config: BatchConfig): MatrixResult` — Run every config × seed pair via runMatrix. `src/harness/run-batch.ts:34`
 - `function runMatrix(config: MatrixConfig): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
-- `function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:60`
+- `function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:58`
 - `function runSensitivity<C extends Cell | UntilCell = Cell>(config: SensitivityConfig<C>): SensitivityResult` — Run baseline plus every variant, then compute per-variant `{ absolute, relative }` deltas against the baseline per metric. `src/harness/run-sensitivity.ts:76`
 - `function runUntil(config: RunUntilConfig): RunUntilResult` — Drive `config.engine` via `engine.tickDriver.simulateTick(tickDelta)` until `config.until` returns `true` or `config.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:79`
 - `interface TickCounter` — A live sub-tick counter returned by createTickCounter. `src/harness/replay.ts:78`
@@ -147,9 +147,9 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 
 Enumerate purchasables, producers, and challenges with their next-transition timing.
 
-- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:246`
+- `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:232`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:85`
-- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:92`
+- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:78`
 - `interface Transition` — A pending state change surfaced by the content walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:47`
 - `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which content-walker leaf produced a given Transition. `src/harness/walker/types.ts:24`

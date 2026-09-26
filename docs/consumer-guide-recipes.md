@@ -221,7 +221,7 @@ const session = createDialogSession({
 });
 ```
 
-Native runtime is the default — pick it for content authored as `DialogGraph` data. Reach for an external adapter when the authoring team already knows Ink/Yarn or when the dialog volume justifies a dedicated authoring tool. Both flow through the same `DialogSession` surface; UI and save format don't care which is wired underneath.
+Graph ids must be unique across every category flattened into one session, and node ids unique within a graph; the native runtime throws at construction on a repeat. Native runtime is the default — pick it for content authored as `DialogGraph` data. Reach for an external adapter when the authoring team already knows Ink/Yarn or when the dialog volume justifies a dedicated authoring tool. Both flow through the same `DialogSession` surface; UI and save format don't care which is wired underneath.
 
 ### Subjects: addressable named entities with typed multi-field state
 
