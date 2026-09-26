@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Analyzer } from '@/primitives/types';
 import { runHeadless } from '@/core/headless';
 import { random } from '@/primitives/rng';
+import { enableTracing, isTracing } from '@/core/trace';
 
 describe('Headless Runner', () => {
   it('runs specified number of ticks', () => {
@@ -119,5 +120,54 @@ describe('Headless Runner', () => {
       teardown: () => calls.push('teardown'),
     });
     expect(calls).toEqual(['summarize', 'teardown']);
+  });
+  it('runs teardown and closes the trace tick window when the run throws', () => {
+    const stopTracing = enableTracing();
+    try {
+      let teardowns = 0;
+      expect(() =>
+        runHeadless({
+          setup: () => [],
+          tick: () => {
+            throw new Error('tick blew up');
+          },
+          ticks: 1,
+          teardown: () => teardowns++,
+        }),
+      ).toThrow('tick blew up');
+      expect(isTracing()).toBe(false);
+      expect(() =>
+        runHeadless({
+          setup: () => [
+            {
+              name: 'a',
+              summarize: () => {
+                throw new Error('analyzer blew up');
+              },
+            },
+          ],
+          tick: () => {},
+          ticks: 1,
+          teardown: () => teardowns++,
+        }),
+      ).toThrow('analyzer blew up');
+      expect(teardowns).toBe(2);
+    } finally {
+      stopTracing();
+    }
+  });
+  it('skips teardown when setup itself throws', () => {
+    let teardowns = 0;
+    expect(() =>
+      runHeadless({
+        setup: () => {
+          throw new Error('setup blew up');
+        },
+        tick: () => {},
+        ticks: 1,
+        teardown: () => teardowns++,
+      }),
+    ).toThrow('setup blew up');
+    expect(teardowns).toBe(0);
   });
 });

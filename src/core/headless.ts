@@ -25,8 +25,9 @@ export interface HeadlessConfig {
   /** Seconds of simulated time per tick (default 0.05, i.e. 20 TPS). */
   tickDelta?: number;
   /**
-   * Called once the analyzers have summarized — release what `setup` built
-   * (e.g. dispose the run's engine).
+   * Called once the analyzers have summarized, or once the run throws after
+   * `setup` returned — release what `setup` built (e.g. dispose the run's
+   * engine). A throwing `setup` skips it: what it built is unknown.
    */
   teardown?: () => void;
 }
@@ -46,28 +47,34 @@ export interface HeadlessResult {
  * `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick`
  * function. Seeds the RNG when `seed` is set, runs the trace and profile
  * buffers per tick, and returns each analyzer's summary at the end, after
- * which `teardown` runs.
+ * which `teardown` runs — also when the run throws after `setup` returned.
  */
 export function runHeadless(config: HeadlessConfig): HeadlessResult {
   const { setup, tick, ticks } = config;
   const tickDelta = config.tickDelta ?? 0.05;
   if (config.seed !== undefined) seedRNG(config.seed);
   const analyzers: Analyzer[] = setup() ?? [];
-  for (const a of analyzers) a.onStart?.();
-  for (let i = 0; i < ticks; i++) {
-    beginTraceTick();
-    beginProfileTick();
-    tick(tickDelta);
-    endProfileTick();
-    endTraceTick();
-    for (const a of analyzers) a.onTick?.(i);
+  try {
+    for (const a of analyzers) a.onStart?.();
+    for (let i = 0; i < ticks; i++) {
+      beginTraceTick();
+      beginProfileTick();
+      try {
+        tick(tickDelta);
+      } finally {
+        endProfileTick();
+        endTraceTick();
+      }
+      for (const a of analyzers) a.onTick?.(i);
+    }
+    for (const a of analyzers) a.onEnd?.();
+    const analyzerResults = analyzers.map((a) => a.summarize());
+    return {
+      totalTicks: ticks,
+      elapsedSimulated: ticks * tickDelta,
+      analyzerResults,
+    };
+  } finally {
+    config.teardown?.();
   }
-  for (const a of analyzers) a.onEnd?.();
-  const analyzerResults = analyzers.map((a) => a.summarize());
-  config.teardown?.();
-  return {
-    totalTicks: ticks,
-    elapsedSimulated: ticks * tickDelta,
-    analyzerResults,
-  };
 }
