@@ -100,6 +100,7 @@ export type {
   State,
   StatePrimitive,
   StateConstraint,
+  IfState,
   Persistent,
   NonPersistent,
   PersistentOptions,

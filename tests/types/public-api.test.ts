@@ -25,6 +25,7 @@ import {
   createEngine,
   createOverrideRegistry,
   createResource,
+  persistent,
   createRuleAdvisor,
   createSkillCategory,
   createSpatialGrid,
@@ -118,6 +119,31 @@ describe('createEngine type surface', () => {
   });
 });
 
+describe('persistent value types', () => {
+  // A literal default widens, so a ref built from `0` accepts any number and a
+  // consumer needs no type argument or cast to write it.
+  it('widens a literal default to its primitive', () => {
+    expectTypeOf(persistent(0).value).toEqualTypeOf<number>();
+    expectTypeOf(persistent('hero').value).toEqualTypeOf<string>();
+    expectTypeOf(persistent(false).value).toEqualTypeOf<boolean>();
+    expectTypeOf(persistent({ level: 1, tags: ['a'] }).value).toEqualTypeOf<{
+      level: number;
+      tags: string[];
+    }>();
+  });
+
+  it('keeps an explicit literal union', () => {
+    expectTypeOf(persistent<1 | -1>(1).value).toEqualTypeOf<1 | -1>();
+  });
+
+  it('rejects a value that is not serializable state', () => {
+    // @ts-expect-error a function is not state
+    persistent({ onLoad: () => 1 });
+    // @ts-expect-error a Map is not state
+    persistent(new Map<string, number>(), { name: 'm' });
+  });
+});
+
 describe('createResource overloads', () => {
   it('default-value overload returns Resource & Persistent', () => {
     const r = createResource(0, { id: 'points', displayName: 'points' });
@@ -126,6 +152,12 @@ describe('createResource overloads', () => {
     // stop auto-saving and this pin fails loudly.
     expectTypeOf(r).toMatchTypeOf<Resource<number>>();
     expectTypeOf(r).toMatchTypeOf<Persistent<number>>();
+    expectTypeOf(r.value).toEqualTypeOf<number>();
+  });
+
+  it('default-value overload rejects a value that is not serializable state', () => {
+    // @ts-expect-error a function is not state
+    createResource(() => 1, { id: 'fn' });
   });
 
   it('existing-ref overload returns a plain Resource (non-persistent)', () => {

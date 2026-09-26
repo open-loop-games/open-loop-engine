@@ -54,17 +54,25 @@ export type StatePrimitive = string | number | boolean | null | undefined;
  * The object branch uses a mapped type (`{ [K in keyof T]: ... }`) which
  * checks each property structurally rather than demanding an index signature.
  * DecimalSource is checked before object so Decimal class instances pass
- * without mapped-type introspection of internal fields.
+ * without mapped-type introspection of internal fields. A function, or an
+ * object holding one (a Map, a class instance with methods), resolves to
+ * `never`: it doesn't survive a save. A field declared `unknown` passes as
+ * opaque state the consumer vouches for; save validation still checks it at
+ * load.
  */
-export type StateConstraint<T> = T extends StatePrimitive
+export type StateConstraint<T> = unknown extends T
   ? T
-  : T extends DecimalSource
+  : T extends StatePrimitive
     ? T
-    : T extends readonly (infer U)[]
-      ? readonly StateConstraint<U>[]
-      : T extends object
-        ? { [K in keyof T]: StateConstraint<T[K]> }
-        : never;
+    : T extends DecimalSource
+      ? T
+      : T extends readonly (infer U)[]
+        ? readonly StateConstraint<U>[]
+        : T extends (...args: never[]) => unknown
+          ? never
+          : T extends object
+            ? { [K in keyof T]: StateConstraint<T[K]> }
+            : never;
 
 // === SYMBOLS ===
 
@@ -572,14 +580,22 @@ export interface PersistentOptions<T = unknown> {
 }
 
 /**
+ * Resolves to `Ok` when `T` is serializable state and to `never` otherwise, so
+ * a parameter typed through it rejects a non-state value at the call. Checking
+ * here instead of intersecting the value parameter with {@link StateConstraint}
+ * lets a literal default widen: `persistent(0)` is a `Persistent<number>`.
+ */
+export type IfState<T, Ok> = [T] extends [StateConstraint<T>] ? Ok : never;
+
+/**
  * Create a persistent ref that will be saved/loaded automatically.
  *
  * @param defaultValue - Initial value for new saves, or an existing ref to wrap
  * @param options - Configuration — see {@link PersistentOptions}
  */
 export function persistent<T>(
-  defaultValue: (T & StateConstraint<T>) | Ref<T & StateConstraint<T>>,
-  options: PersistentOptions<T> = {},
+  defaultValue: T | Ref<T>,
+  ...[options = {}]: IfState<T, [options?: PersistentOptions<T>]>
 ): Persistent<T> {
   const { checkNaN = true, schema, decimal = false, lifetime = false } = options;
   const persistentState: Ref<T> = isRef(defaultValue)

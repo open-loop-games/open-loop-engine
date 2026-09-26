@@ -27,7 +27,9 @@ import {
   loadingSave,
   getCurrentContext,
   withPersistentContext,
+  type IfState,
   type Persistent,
+  type PersistentOptions,
   type StateConstraint,
   NonPersistent,
   DefaultValue,
@@ -118,8 +120,8 @@ export type PersistentResourceOptions = ResourceOptions & { id: string };
  * e.g., a "net income" display backed by a computed ref.
  *
  * Declared before the default-value overload so an existing `Ref<T>` argument
- * binds here: the default-value overload's `T & StateConstraint<T>` parameter
- * is structural enough to also swallow a ref (inferring `T = Ref<T>`), so with
+ * binds here: the default-value overload's bare `T` parameter would also
+ * swallow a ref (inferring `T = Ref<T>`), so with
  * the reverse order a ref would resolve to a bogus `Resource<Ref<T>> &
  * Persistent<...>`. Overload resolution is first-match, and a non-ref value
  * never matches `Ref<T>`, so this ordering is safe for both call shapes.
@@ -163,12 +165,12 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
  * ```
  */
 export function createResource<T>(
-  defaultValue: T & StateConstraint<T>,
-  options: PersistentResourceOptions,
+  defaultValue: T,
+  options: IfState<T, PersistentResourceOptions>,
 ): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T> };
 
 export function createResource<T>(
-  defaultValue: (T & StateConstraint<T>) | Ref<T>,
+  defaultValue: T | Ref<T>,
   options: ResourceOptions = {},
 ): Resource<T> {
   return buildResource(defaultValue, options);
@@ -191,7 +193,7 @@ export function createContextScopedResource<T>(
 
 /** Shared body of the resource factories; `saveName` defaults to the resolved id. */
 function buildResource<T>(
-  defaultValue: (T & StateConstraint<T>) | Ref<T>,
+  defaultValue: T | Ref<T>,
   options: ResourceOptions,
   saveName?: string,
 ): Resource<T> {
@@ -223,7 +225,12 @@ function buildResource<T>(
     // it — so round-trips survive field reorders inside a context. The
     // non-persistent wrapper carries the same metadata.
     const metadata = { id, displayName, precision, small };
-    const persistentResource = persistent(defaultValue, { name });
+    // The public overload checked `T` against IfState; a generic body can't
+    // resolve that check, so the call goes through the unchecked shape.
+    const persistentResource = (persistent as (d: T, o: PersistentOptions<T>) => Persistent<T>)(
+      defaultValue,
+      { name },
+    );
     Object.assign(persistentResource[NonPersistent], metadata);
     resource = Object.assign(persistentResource, metadata);
 
