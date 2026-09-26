@@ -58,7 +58,9 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps } from '@/core/transitions';
 import type { Purchasable } from '@/systems/purchasable';
 import type { Producer } from '@/systems/producer-category';
-import type { Challenge } from '@/systems/challenge-category';
+import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
+import { forEachGateLeaf } from '@/core/gate';
+import { evaluateGate, getBoundGateRuntime, isGate } from '@/systems/gate';
 import type { Transition, TransitionSource } from './types';
 import type { TransitionSnapshot } from './index';
 import { compareTransitions } from './compare-transitions';
@@ -125,11 +127,11 @@ type PerEntityEmit = (
 
 /**
  * Refresh `gate` in place from the entity's live gating state; true when any
- * slot moved. Reads what the matching leaf's emission guards, cost lookup and
- * `currentValue` read off the instance rather than through the accessor.
- * An opaque emission (empty deps) reads nothing beyond these slots, which is
- * what lets the selective rebuild skip it until one moves; a leaf whose opaque
- * emission reads live state must add that state to its signature.
+ * slot moved. Reads what the matching leaf's emission guards, cost lookup,
+ * `currentValue` and distance read off the instance rather than through the
+ * accessor. An emission reads nothing beyond these slots and its deps, which
+ * is what lets the selective rebuild skip it until one moves; a leaf whose
+ * emission reads other live state must add that state to its signature.
  */
 type ReadGate = (entity: unknown, gate: unknown[]) => boolean;
 
@@ -173,12 +175,25 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
   challenges: {
     emit: emitChallengeTransitionsForEntity,
     readGate(entity, gate) {
-      const { challenge } = entity as { challenge: Challenge };
+      const { def, challenge } = entity as { def: ChallengeDef; challenge: Challenge };
       let moved = updateSlot(gate, 0, challenge.active.value);
       moved = updateSlot(gate, 1, challenge.completions.value) || moved;
       moved = updateSlot(gate, 2, challenge.visible.value) || moved;
       moved = updateSlot(gate, 3, challenge.canStart.value) || moved;
       moved = updateSlot(gate, 4, challenge.canComplete.value) || moved;
+      // A category leaf moves with no dep slot moving, and inside a combinator
+      // that doesn't flip, its truth still picks which children carry the
+      // gate's distance.
+      const runtime = getBoundGateRuntime(challenge);
+      if (!runtime) return moved;
+      let slot = 5;
+      for (const field of [def.visible, def.canStart, def.goal]) {
+        if (!isGate(field)) continue;
+        forEachGateLeaf(field, (leaf) => {
+          if (leaf.kind !== 'count-gte' && leaf.kind !== 'unlock') return;
+          moved = updateSlot(gate, slot++, evaluateGate(leaf, runtime)) || moved;
+        });
+      }
       return moved;
     },
   },
