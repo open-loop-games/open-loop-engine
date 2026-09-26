@@ -21,7 +21,7 @@
  * @cluster dialog
  */
 
-import { watch } from 'vue';
+import { effectScope, watch } from 'vue';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 import {
@@ -194,12 +194,15 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // (inverted gate — we want to act *during* load, not avoid acting then).
   // snapshot() writes to stateRef outside any load, so the guard returns
   // immediately on those firings.
-  const stopStateWatch = watch(
-    stateRef,
-    (newState) => {
-      if (loadingSave.value) runtime.importState(newState);
-    },
-    { flush: 'sync' },
+  const scope = effectScope();
+  scope.run(() =>
+    watch(
+      stateRef,
+      (newState) => {
+        if (loadingSave.value) runtime.importState(newState);
+      },
+      { flush: 'sync' },
+    ),
   );
 
   const events = createEmitHandle<DialogSessionEvents>();
@@ -281,7 +284,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
       // Stop the sync watch on stateRef; without this, a discarded session
       // leaks a live watcher that re-imports save state into a stale runtime on
       // every subsequent load (the per-conversation lazy-instantiation path).
-      stopStateWatch();
+      scope.stop();
       deletePersistent(stateRef as unknown as Persistent);
     },
   };

@@ -32,7 +32,7 @@
  * ```
  */
 
-import { computed, type ComputedRef } from 'vue';
+import { computed, effectScope, onScopeDispose, type ComputedRef } from 'vue';
 import type { Persistent } from '@/core/persistence';
 import { onHydrated, persistent } from '@/core/persistence';
 import type { RegisterTick } from '@/core/sequencer';
@@ -546,18 +546,21 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     }),
   });
 
-  const stopHydrated = onHydrated(reconcileScopes);
-
-  let unregisterTick: (() => void) | undefined;
-  if (registerTick) {
-    unregisterTick = registerTick(() => {
-      for (const entry of base.getAll()) {
-        if (entry.instance.canComplete.value) {
-          entry.instance.complete();
-        }
-      }
-    });
-  }
+  const scope = effectScope();
+  scope.run(() => {
+    onHydrated(reconcileScopes);
+    if (registerTick) {
+      onScopeDispose(
+        registerTick(() => {
+          for (const entry of base.getAll()) {
+            if (entry.instance.canComplete.value) {
+              entry.instance.complete();
+            }
+          }
+        }),
+      );
+    }
+  });
 
   const activeChallenge = computed(() => {
     const entry = base.getAll().find((e) => e.instance.active.value);
@@ -616,8 +619,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     },
 
     dispose(): void {
-      unregisterTick?.();
-      stopHydrated();
+      scope.stop();
       for (const id of [...activeCleanups.keys()]) popScopes(id);
     },
 

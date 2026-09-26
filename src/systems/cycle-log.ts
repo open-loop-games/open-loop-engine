@@ -16,7 +16,7 @@
  * @see {@link createRetentionPolicy} for a similar snapshot/restore pattern
  */
 
-import { ref, watch, type Ref } from 'vue';
+import { effectScope, onScopeDispose, ref, watch, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { isPersistent, loadingSave, onHydrated, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
@@ -192,49 +192,56 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
   // re-snapshotting everything) keeps an unmoved permanent stat's growth so
   // far, and ignores another engine's load.
   let preLoad: Record<string, Decimal> | undefined;
-  const stopLoadWatch = watch(
-    loadingSave,
-    (loading) => {
-      if (!loading || preLoad) return;
-      preLoad = {};
-      for (const [key, metric] of Object.entries(metrics)) preLoad[key] = readMetric(metric);
-    },
-    { flush: 'sync' },
-  );
-  const stopHydrated = onHydrated(() => {
-    if (!preLoad) return;
-    for (const [key, metric] of Object.entries(metrics)) {
-      const now = readMetric(metric);
-      if (!Decimal.eq(now, preLoad[key])) startSnapshot[key] = now;
-    }
-    preLoad = undefined;
-  });
+  const scope = effectScope();
+  scope.run(() => {
+    watch(
+      loadingSave,
+      (loading) => {
+        if (!loading || preLoad) return;
+        preLoad = {};
+        for (const [key, metric] of Object.entries(metrics)) preLoad[key] = readMetric(metric);
+      },
+      { flush: 'sync' },
+    );
+    onHydrated(() => {
+      if (!preLoad) return;
+      for (const [key, metric] of Object.entries(metrics)) {
+        const now = readMetric(metric);
+        if (!Decimal.eq(now, preLoad[key])) startSnapshot[key] = now;
+      }
+      preLoad = undefined;
+    });
 
-  const unsubBefore = cycle.on('beforeRestart', () => {
-    const deltas: CycleLogDelta[] = [];
-    for (const [key, metric] of Object.entries(metrics)) {
-      const start = startSnapshot[key] ?? Decimal.dZero;
-      const end = readMetric(metric);
-      deltas.push({ key, start, end, delta: new Decimal(Decimal.sub(end, start)) });
-    }
+    onScopeDispose(
+      cycle.on('beforeRestart', () => {
+        const deltas: CycleLogDelta[] = [];
+        for (const [key, metric] of Object.entries(metrics)) {
+          const start = startSnapshot[key] ?? Decimal.dZero;
+          const end = readMetric(metric);
+          deltas.push({ key, start, end, delta: new Decimal(Decimal.sub(end, start)) });
+        }
 
-    const entry: CycleLogEntry = {
-      cycleNumber: cycle.count.value,
-      elapsed: cycle.elapsed.value,
-      timestamp: Date.now(),
-      deltas,
-      context: { ...currentContext },
-      pinned: false,
-    };
+        const entry: CycleLogEntry = {
+          cycleNumber: cycle.count.value,
+          elapsed: cycle.elapsed.value,
+          timestamp: Date.now(),
+          deltas,
+          context: { ...currentContext },
+          pinned: false,
+        };
 
-    history.value.push(entry);
-    pruneHistory();
-    handle.emit('finalized', entry);
-  });
+        history.value.push(entry);
+        pruneHistory();
+        handle.emit('finalized', entry);
+      }),
+    );
 
-  const unsubAfter = cycle.on('afterRestart', () => {
-    takeSnapshot();
-    currentContext = {};
+    onScopeDispose(
+      cycle.on('afterRestart', () => {
+        takeSnapshot();
+        currentContext = {};
+      }),
+    );
   });
 
   return {
@@ -252,10 +259,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
       if (entry) entry.pinned = false;
     },
     dispose() {
-      unsubBefore();
-      unsubAfter();
-      stopHydrated();
-      stopLoadWatch();
+      scope.stop();
     },
   };
 }

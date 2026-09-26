@@ -191,7 +191,10 @@ export interface Cycle extends ScopedReset {
   /** Subscribe to cycle lifecycle events */
   on: Emittable<CycleEvents>['on'];
 
-  /** Unregister the tick handler. Call when the cycle is no longer needed. */
+  /**
+   * Unregister the tick handler. The run count and timers stay registered and
+   * keep saving, so building a cycle under the same id again takes a new engine.
+   */
   dispose(): void;
 }
 

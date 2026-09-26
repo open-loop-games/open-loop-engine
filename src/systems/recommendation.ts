@@ -270,7 +270,11 @@ export interface RecommendationSystem {
   /** Subscribe to recommendation system events */
   on: Emittable<RecommendationSystemEvents>['on'];
 
-  /** Unsubscribe from the cycle's `afterRestart` event */
+  /**
+   * Unsubscribe from the cycle's `afterRestart` event. The stored
+   * recommendation and `autoApply` stay registered and keep saving, so building
+   * a system under the same id again takes a new engine.
+   */
   dispose(): void;
 }
 

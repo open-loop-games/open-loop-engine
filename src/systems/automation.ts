@@ -34,7 +34,7 @@
  * ```
  */
 
-import { computed, type ComputedRef, type WatchStopHandle } from 'vue';
+import { computed, effectScope, type ComputedRef } from 'vue';
 import {
   persistent,
   withPersistentContext,
@@ -137,7 +137,11 @@ export interface AutomationTiers {
   /** Subscribe to tier lifecycle events. */
   on: Emittable<AutomationTiersEvents>['on'];
 
-  /** Stop the auto-unlock watchers installed for tiers with `requirement`. */
+  /**
+   * Stop the auto-unlock watchers installed for tiers with `requirement`.
+   * `unlocked` stays registered and keeps saving, so building tiers under the
+   * same id again takes a new engine.
+   */
   dispose(): void;
 }
 
@@ -216,8 +220,6 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     return defaultUnlocked[0] ?? '';
   });
 
-  const unsubs: WatchStopHandle[] = [];
-
   const predicates = createPredicateResolver();
   const requirements = tiers.flatMap((tier) =>
     tier.requirement === undefined
@@ -233,6 +235,8 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
           },
         ],
   );
+
+  const scope = effectScope();
 
   // --- Public API ---
   const automationTiers: AutomationTiers = {
@@ -274,15 +278,16 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     on: handle.on,
 
     dispose(): void {
-      for (const unsub of unsubs) unsub();
-      unsubs.length = 0;
+      scope.stop();
     },
   };
 
   // --- Auto-unlock latches for tiers with requirements ---
-  for (const { tier, met } of requirements) {
-    unsubs.push(latchWhenSettled(met, () => automationTiers.unlock(tier.id)));
-  }
+  scope.run(() => {
+    for (const { tier, met } of requirements) {
+      latchWhenSettled(met, () => automationTiers.unlock(tier.id));
+    }
+  });
 
   return attachContextReset(automationTiers, contextId);
 }

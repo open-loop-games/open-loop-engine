@@ -177,7 +177,11 @@ export interface BestOf {
    * config objects.
    */
   setRecencyHalfLifeCycles(halfLifeCycles: number | undefined): void;
-  /** Unsubscribe from CycleLog if connected */
+  /**
+   * Unsubscribe from the CycleLog, if connected. The stored bests stay
+   * registered and keep saving, so building one under the same id again takes
+   * a new engine.
+   */
   dispose(): void;
 }
 

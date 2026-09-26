@@ -10,6 +10,7 @@ import {
 import { createAchievementCategory } from '@/systems/achievement-category';
 import { createModifierChain } from '@/core/modifier';
 import { Decimal } from '@/primitives/decimal';
+import { createEngine } from '@/engine';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -365,5 +366,34 @@ describe('createAchievementCategory grants', () => {
     const recs = chain.bindings();
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toBe('ach-grants1/first/from:first');
+  });
+});
+
+describe('createAchievementCategory — teardown', () => {
+  it('an achievement registered after start() stops with engine.dispose()', () => {
+    const flag = ref(false);
+    const fired: string[] = [];
+    let category!: ReturnType<typeof createAchievementCategory<{ id: string }>>;
+    const engine = createEngine({ gameId: 'test', persistence: false });
+    engine.use({
+      id: 'milestones',
+      install() {
+        category = createAchievementCategory<{ id: string }>({
+          id: 'milestones',
+          mapAchievement: (def) => ({
+            display: { title: def.id },
+            requirement: () => flag.value,
+            onComplete: () => fired.push(def.id),
+          }),
+        });
+        category.register({ id: 'early' });
+      },
+    });
+    engine.start();
+    category.register({ id: 'late' });
+    engine.dispose();
+
+    flag.value = true;
+    expect(fired).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, effectScope, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { createPersistentEffectSystem } from '@/systems/persistent-effect';
 import {
@@ -468,5 +468,19 @@ describe('modifiers take Grants, active takes a Predicate', () => {
     expect(() => system.register({ id: 'lit', active: { kind: 'flag', id: 'lamp' } })).toThrow(
       /persistent effect 'lit' active: /,
     );
+  });
+});
+
+describe('createPersistentEffectSystem — teardown', () => {
+  it('a definition registered outside any scope stops with the scope that built the system', () => {
+    const scope = effectScope();
+    const system = scope.run(() => createPersistentEffectSystem({ id: 'late-fx' }))!;
+    const active = ref(false);
+    const onActivate = vi.fn();
+    system.register({ id: 'late', active, onActivate });
+    scope.stop();
+
+    active.value = true;
+    expect(onActivate).not.toHaveBeenCalled();
   });
 });

@@ -13,7 +13,7 @@
  * loop integration) and not part of the public surface.
  */
 
-import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
+import { computed, getCurrentScope, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import type { DecimalSource } from '@/primitives/decimal';
 import {
   withPersistentContext,
@@ -23,6 +23,7 @@ import {
   PersistentName,
 } from '@/core/persistence';
 import type { Grant } from '@/core/modifier';
+import { runInScope } from '@/core/common';
 import { profileEnd, profileStart } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
 import { attachContextReset, Resettable, type ResettableObject } from '@/core/resettable';
@@ -186,30 +187,36 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
   // A reset walk stops there rather than walking the instance, whose fields
   // name resources and refs other code owns.
   const contextResets: ResettableObject[] = [];
+  // Content registered after install builds its watchers and hydration hooks
+  // here, so they stop with the scope that built the category (the engine's
+  // module scope) instead of outliving `engine.dispose()`.
+  const scope = getCurrentScope();
 
   function registerOne(def: Def): void {
     const contextId = `${categoryId}/${def.id}`;
     // withPersistentContext guarantees the context is popped even if a builder
     // throws — a leaked context silently mis-scopes the save keys of every
     // persistent ref created afterward.
-    const { instance, state, signals } = withPersistentContext(contextId, () => {
-      const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
-      const state = buildState ? buildState(def, instance) : (undefined as State);
+    const { instance, state, signals } = runInScope(scope, () =>
+      withPersistentContext(contextId, () => {
+        const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
+        const state = buildState ? buildState(def, instance) : (undefined as State);
 
-      // Auto-name persistent fields on the returned state object so save keys
-      // are stable across field reorders. Each definition lives in its own
-      // context (`${categoryId}/${def.id}`), so the field name alone is unique.
-      if (state !== null && typeof state === 'object') {
-        for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
-          if (isPersistent(value) && value[PersistentName] === undefined) {
-            setPersistentName(value, fieldName);
+        // Auto-name persistent fields on the returned state object so save keys
+        // are stable across field reorders. Each definition lives in its own
+        // context (`${categoryId}/${def.id}`), so the field name alone is unique.
+        if (state !== null && typeof state === 'object') {
+          for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
+            if (isPersistent(value) && value[PersistentName] === undefined) {
+              setPersistentName(value, fieldName);
+            }
           }
         }
-      }
 
-      const signals = buildSignals?.(def, instance, state);
-      return { instance, state, signals };
-    });
+        const signals = buildSignals?.(def, instance, state);
+        return { instance, state, signals };
+      }),
+    );
 
     entries.set(def.id, { def, instance, state, signals });
     contextResets.push(attachContextReset({}, contextId));

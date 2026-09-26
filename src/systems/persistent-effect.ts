@@ -34,7 +34,8 @@
  * @cluster effects
  */
 
-import { computed, ref, watch, type ComputedRef, type WatchStopHandle } from 'vue';
+import { computed, effectScope, ref, watch, type ComputedRef } from 'vue';
+import { runInScope } from '@/core/common';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Grant } from '@/core/modifier';
@@ -123,7 +124,6 @@ export interface PersistentEffectSystem {
 interface DefEntry {
   def: PersistentEffectDef;
   activeRef: ComputedRef<boolean>;
-  stopWatch: WatchStopHandle;
   slots: BindingSlots;
   unbind: () => void;
   isApplied: boolean;
@@ -184,6 +184,8 @@ export function createPersistentEffectSystem(
   const entries = new Map<string, DefEntry>();
   const handle = createEmitHandle<PersistentEffectEvents>();
   const predicates = createPredicateResolver();
+  // Owns each definition's watch, including those registered after install.
+  const scope = effectScope();
   // Bumped on every edge so `getActive` / `getByTag` track the applied set.
   const appliedVersion = ref(0);
 
@@ -245,7 +247,6 @@ export function createPersistentEffectSystem(
       const entry: DefEntry = {
         def: d,
         activeRef,
-        stopWatch: () => {},
         slots: createBindingSlots(d.modifiers, predicates, owner),
         unbind: () => {},
         isApplied: false,
@@ -257,7 +258,9 @@ export function createPersistentEffectSystem(
       // in a tight loop with no microtask boundary, so a default (pre) flush
       // would leave the effect a step or more late. Mirrors achievement.ts /
       // automation.ts / resource-bag link watchers.
-      entry.stopWatch = watch(activeRef, () => settle(entry), { immediate: true, flush: 'sync' });
+      runInScope(scope, () =>
+        watch(activeRef, () => settle(entry), { immediate: true, flush: 'sync' }),
+      );
 
       entries.set(d.id, entry);
     }
@@ -291,10 +294,8 @@ export function createPersistentEffectSystem(
   }
 
   function dispose(): void {
-    for (const entry of entries.values()) {
-      entry.stopWatch();
-      entry.slots.release();
-    }
+    scope.stop();
+    for (const entry of entries.values()) entry.slots.release();
     entries.clear();
     appliedVersion.value++;
   }

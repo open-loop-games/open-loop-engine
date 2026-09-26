@@ -40,7 +40,16 @@
  * @cluster effects
  */
 
-import { computed, isRef, ref, shallowRef, type ComputedRef, type Ref } from 'vue';
+import {
+  computed,
+  effectScope,
+  isRef,
+  onScopeDispose,
+  ref,
+  shallowRef,
+  type ComputedRef,
+  type Ref,
+} from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { resolveComputable, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
@@ -170,7 +179,11 @@ export interface TemporaryEffectSystem {
   getByTag(tag: string): TemporaryEffectInstance[];
   /** Subscribe to system events */
   on: Emittable<TemporaryEffectEvents>['on'];
-  /** Unsubscribe tick and clean up all instances */
+  /**
+   * Stop ticking and drop the live instances without firing events. The saved
+   * instances stay registered and keep saving, so building the system under
+   * the same id again takes a new engine.
+   */
   dispose(): void;
 }
 
@@ -339,8 +352,6 @@ export function createTemporaryEffectSystem(
     }
   }
 
-  const unsubscribeTick = options.registerTick(tickAll);
-
   // --------------------------------------------------------------------
   // Public API
   // --------------------------------------------------------------------
@@ -459,15 +470,18 @@ export function createTemporaryEffectSystem(
     }
   }
 
-  // Every engine's load and reset settles through here, so rebuild only when
-  // the saved array is no longer the one this system wrote.
-  const stopHydrated = onHydrated(() => {
-    if (savedState.value !== lastSynced) rehydrate();
+  const scope = effectScope();
+  scope.run(() => {
+    onScopeDispose(options.registerTick(tickAll));
+    // Every engine's load and reset settles through here, so rebuild only when
+    // the saved array is no longer the one this system wrote.
+    onHydrated(() => {
+      if (savedState.value !== lastSynced) rehydrate();
+    });
   });
 
   function dispose(): void {
-    unsubscribeTick();
-    stopHydrated();
+    scope.stop();
     // Clean up all instances without firing events; releasing the slots unbinds them,
     // and an instance's expire() returns early once its handle is gone.
     unbindByInstance.clear();
