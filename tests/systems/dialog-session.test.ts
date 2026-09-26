@@ -115,6 +115,28 @@ const cycleGraph: DialogGraph = {
 };
 
 describe('createDialogSession', () => {
+  it('throws on two graphs that share an id instead of letting the last win', () => {
+    const questA: DialogGraph = {
+      id: 'greeting',
+      entry: 'n',
+      nodes: [{ id: 'n', text: 'Quest A greeting' }],
+    };
+    const questB: DialogGraph = { ...questA, nodes: [{ id: 'n', text: 'Quest B greeting' }] };
+    expect(() => buildSession([questA, questB])).toThrow(/duplicate dialog graph id "greeting"/);
+  });
+
+  it('throws on a node id repeated within one graph', () => {
+    const graph: DialogGraph = {
+      id: 'twice',
+      entry: 'n',
+      nodes: [
+        { id: 'n', text: 'first' },
+        { id: 'n', text: 'second' },
+      ],
+    };
+    expect(() => buildSession([graph])).toThrow(/duplicate node id "n" in dialog graph "twice"/);
+  });
+
   it('throws on an authored next-only cycle instead of hanging settle()', () => {
     const session = buildSession([cycleGraph]);
     expect(() => session.start('loop-graph')).toThrow(/cycle/);

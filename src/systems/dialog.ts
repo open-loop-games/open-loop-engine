@@ -175,7 +175,11 @@ export interface DialogRuntimeEvents {
  * {@link GameStateMutator} for outcome dispatch).
  */
 export interface NativeDialogRuntimeOptions {
-  /** Authored graphs available to this runtime. Looked up by graph.id on start(). */
+  /**
+   * Authored graphs available to this runtime, looked up by graph.id on
+   * start(). A graph id repeated across the list, or a node id repeated within
+   * one graph, throws at construction.
+   */
   graphs: DialogGraph[];
   /** Read side — predicate evaluation and outcome read-back. */
   accessor: GameStateAccessor;
@@ -224,11 +228,20 @@ export function createNativeDialogRuntime(
   // closes. Mirrors the eager capture in createReset.
   const predicates = createPredicateResolver({ accessor });
   const gateRuntime = predicates.runtime;
-  const graphsById = new Map<string, DialogGraph>(graphs.map((g) => [g.id, g]));
+  const graphsById = new Map<string, DialogGraph>();
   const nodesByGraph = new Map<string, Map<string, DialogNode>>();
   for (const g of graphs) {
-    nodesByGraph.set(g.id, new Map(g.nodes.map((n) => [n.id, n])));
+    if (graphsById.has(g.id)) {
+      throw new Error(`Dialog runtime: duplicate dialog graph id "${g.id}"`);
+    }
+    graphsById.set(g.id, g);
+    const nodes = new Map<string, DialogNode>();
+    nodesByGraph.set(g.id, nodes);
     for (const node of g.nodes) {
+      if (nodes.has(node.id)) {
+        throw new Error(`Dialog runtime: duplicate node id "${node.id}" in dialog graph "${g.id}"`);
+      }
+      nodes.set(node.id, node);
       const label = `dialog '${g.id}' node '${node.id}'`;
       if (node.condition) predicates.assert(node.condition, `${label} condition`);
       for (const choice of node.choices ?? []) {
