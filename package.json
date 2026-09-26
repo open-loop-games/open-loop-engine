@@ -73,7 +73,6 @@
     "lint": "oxlint src/",
     "format": "oxfmt src tests scripts",
     "format:check": "oxfmt --check src tests scripts",
-    "diag": "npx tsx --tsconfig tsconfig.scripts.json scripts/diag.ts",
     "prepare": "husky"
   },
   "lint-staged": {
