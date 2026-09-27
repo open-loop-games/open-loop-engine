@@ -1,15 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import Formula, { findNonInvertible, unrefFormulaSource } from '@/core/formulas/formulas';
+import Formula, { F, findNonInvertible, unrefFormulaSource } from '@/core/formulas/formulas';
 import { calculateCost, calculateMaxAffordable } from '@/core/formulas/affordability';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
+import type { Resource } from '@/core/resource';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { computed, ref, type MaybeRef } from 'vue';
 import '../utils';
 
-type FormulaFunctions = keyof GenericFormula & keyof typeof Formula & keyof typeof Decimal;
+type FormulaFunctions = keyof GenericFormula & keyof typeof F & keyof typeof Decimal;
 
 const testValues = [-2, '0', new Decimal(10.5)] as const;
 
@@ -141,11 +142,9 @@ const nonInvertibleIntegralTwoParamFunctionNames = nonIntegrableTwoParamFunction
 
 describe('Formula Equality Checking', () => {
   describe('Equality Checks', () => {
-    test('Equals', () => expect(Formula.add(1, 1).equals(Formula.add(1, 1))).toBe(true));
-    test('Not Equals due to inputs', () =>
-      expect(Formula.add(1, 1).equals(Formula.add(1, 0))).toBe(false));
-    test('Not Equals due to functions', () =>
-      expect(Formula.add(1, 1).equals(Formula.sub(1, 1))).toBe(false));
+    test('Equals', () => expect(F.add(1, 1).equals(F.add(1, 1))).toBe(true));
+    test('Not Equals due to inputs', () => expect(F.add(1, 1).equals(F.add(1, 0))).toBe(false));
+    test('Not Equals due to functions', () => expect(F.add(1, 1).equals(F.sub(1, 1))).toBe(false));
     test('Not Equals due to hasVariable', () =>
       expect(Formula.constant(1).equals(Formula.variable(1))).toBe(false));
   });
@@ -176,7 +175,7 @@ describe('Formula Equality Checking', () => {
         }
         test(name, () => {
           const instanceFormula = formula[name]();
-          const staticFormula = Formula[name](formula);
+          const staticFormula = F[name](formula);
           expect(instanceFormula.equals(staticFormula)).toBe(true);
         });
       },
@@ -185,7 +184,7 @@ describe('Formula Equality Checking', () => {
     [...invertibleOneParamFunctionNames, ...nonInvertibleOneParamFunctionNames].forEach((name) => {
       test(name, () => {
         const instanceFormula = formula[name](10);
-        const staticFormula = Formula[name](formula, 10);
+        const staticFormula = F[name](formula, 10);
         expect(instanceFormula.equals(staticFormula)).toBe(true);
       });
     });
@@ -211,14 +210,9 @@ describe('Creating Formulas', () => {
         test('Is not marked as having a variable', () => expect(formula.hasVariable()).toBe(false));
         test('Evaluates correctly', () =>
           expect(formula.evaluate()).compare_tolerance(expectedValue));
-        // @ts-expect-error - dynamic method access
         test('Invert errors', () => expect(() => formula.invert(25)).toLogError());
-        test('Integrate errors', () =>
-          // @ts-expect-error - dynamic method access
-          expect(() => formula.evaluateIntegral()).toLogError());
-        test('Invert integral errors', () =>
-          // @ts-expect-error - dynamic method access
-          expect(() => formula.invertIntegral(25)).toLogError());
+        test('Integrate errors', () => expect(() => formula.evaluateIntegral()).toLogError());
+        test('Invert integral errors', () => expect(() => formula.invertIntegral(25)).toLogError());
       });
     }
     testConstant('number', () => Formula.constant(10));
@@ -229,19 +223,17 @@ describe('Creating Formulas', () => {
 
   function checkFormula<T extends FormulaFunctions>(
     functionName: T,
-    args: Readonly<Parameters<(typeof Formula)[T]>>,
+    args: Readonly<Parameters<(typeof F)[T]>>,
   ) {
     let formula: GenericFormula;
     beforeAll(() => {
       // @ts-expect-error - dynamic method access
-      formula = Formula[functionName](...args);
+      formula = F[functionName](...args);
     });
     // None of these formulas have variables, so they should all behave the same
     test('Is not marked as having a variable', () => expect(formula.hasVariable()).toBe(false));
     test('Is not invertible', () => expect(formula.isInvertible()).toBe(false));
-    test(`Formula errors if trying to invert`, () =>
-      // @ts-expect-error - dynamic method access
-      expect(() => formula.invert(10)).toLogError());
+    test(`Formula errors if trying to invert`, () => expect(() => formula.invert(10)).toLogError());
     test('Is not integrable', () => expect(formula.isIntegrable()).toBe(false));
     test('Has a non-invertible integral', () => expect(formula.isIntegralInvertible()).toBe(false));
   }
@@ -250,7 +242,7 @@ describe('Creating Formulas', () => {
   // It's a lot of tests, but I'd rather be exhaustive
   function testFormulaCall<T extends FormulaFunctions>(
     functionName: T,
-    args: Readonly<Parameters<(typeof Formula)[T]>>,
+    args: Readonly<Parameters<(typeof F)[T]>>,
   ) {
     if ((functionName === 'slog' || functionName === 'layeradd') && args[0] === -1) {
       // These cases in particular take a long time, so skip them
@@ -273,7 +265,7 @@ describe('Creating Formulas', () => {
       testName,
       () => {
         // @ts-expect-error - dynamic method access
-        const formula = Formula[functionName](...args);
+        const formula = F[functionName](...args);
 
         try {
           const expectedEvaluation = Decimal[functionName](
@@ -372,17 +364,17 @@ describe('Inverting', () => {
     invertibleZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var) is marked as invertible and having a variable`, () =>
-          checkFormula(Formula[name](variable)));
+          checkFormula(F[name](variable)));
       });
     });
     invertibleOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as invertible and having a variable`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         test(`${name}(const, var) is marked as invertible and having a variable`, () =>
-          checkFormula(Formula[name](constant, variable)));
+          checkFormula(F[name](constant, variable)));
         test(`${name}(var, var) is marked as not invertible and not having a variable`, () =>
-          checkFormula(Formula[name](variable, variable), false));
+          checkFormula(F[name](variable, variable), false));
       });
     });
   });
@@ -395,36 +387,35 @@ describe('Inverting', () => {
     }
     nonInvertibleZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
-        test(`${name}(var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable)));
+        test(`${name}(var) is marked as not invertible`, () => checkFormula(F[name](variable)));
       });
     });
     nonInvertibleOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         test(`${name}(const, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](constant, variable)));
+          checkFormula(F[name](constant, variable)));
         test(`${name}(var, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, variable)));
+          checkFormula(F[name](variable, variable)));
       });
     });
     nonInvertibleTwoParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const, const) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, constant, constant)));
+          checkFormula(F[name](variable, constant, constant)));
         test(`${name}(const, var, const) is marked as not invertible`, () =>
-          checkFormula(Formula[name](constant, variable, constant)));
+          checkFormula(F[name](constant, variable, constant)));
         test(`${name}(const, const, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](constant, constant, variable)));
+          checkFormula(F[name](constant, constant, variable)));
         test(`${name}(var, var, const) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, variable, constant)));
+          checkFormula(F[name](variable, variable, constant)));
         test(`${name}(var, const, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, constant, variable)));
+          checkFormula(F[name](variable, constant, variable)));
         test(`${name}(const, var, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](constant, variable, variable)));
+          checkFormula(F[name](constant, variable, variable)));
         test(`${name}(var, var, var) is marked as not invertible`, () =>
-          checkFormula(Formula[name](variable, variable, variable)));
+          checkFormula(F[name](variable, variable, variable)));
       });
     });
   });
@@ -439,14 +430,14 @@ describe('Inverting', () => {
     invertibleOneParamFunctionNames.forEach((name) =>
       describe(name, () => {
         test(`${name}(var, const).invert()`, () => {
-          const formula = Formula[name](variable, constant);
+          const formula = F[name](variable, constant);
           const result = formula.evaluate();
 
           expect(formula.invert!(result)).compare_tolerance(2);
         });
         if (name !== 'layeradd') {
           test(`${name}(const, var).invert()`, () => {
-            const formula = Formula[name](constant, variable);
+            const formula = F[name](constant, variable);
             const result = formula.evaluate();
             expect(formula.invert(result)).compare_tolerance(2);
           });
@@ -484,18 +475,18 @@ describe('Inverting', () => {
   });
 
   test('Inverting nested formulas', () => {
-    const formula = Formula.add(variable, constant).mul(constant).floor();
+    const formula = F.add(variable, constant).mul(constant).floor();
     expect(formula.invert(100)).compare_tolerance(0);
   });
 
   describe('Inverting with non-invertible sections', () => {
     test('Non-invertible constant', () => {
-      const formula = Formula.add(variable, constant.sign());
+      const formula = F.add(variable, constant.sign());
       expect(formula.isInvertible()).toBe(true);
       expect(() => formula.invert(10)).not.toLogError();
     });
     test('Non-invertible variable', () => {
-      const formula = Formula.add(variable.sign(), constant);
+      const formula = F.add(variable.sign(), constant);
       expect(formula.isInvertible()).toBe(false);
       expect(() => formula.invert(10)).toLogError();
     });
@@ -522,23 +513,23 @@ describe('Integrating', () => {
     }
     integrableZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
-        test(`${name}(var) is marked as integrable`, () => checkFormula(Formula[name](variable)));
+        test(`${name}(var) is marked as integrable`, () => checkFormula(F[name](variable)));
       });
     });
     integrableOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as integrable`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         if (name !== 'log' && name !== 'root') {
           test(`${name}(const, var) is marked as integrable`, () =>
-            checkFormula(Formula[name](constant, variable)));
+            checkFormula(F[name](constant, variable)));
         } else {
           // A variable base or root index has no closed-form antiderivative here.
           test(`${name}(const, var) is marked as not integrable`, () =>
-            expect(Formula[name](constant, variable).isIntegrable()).toBe(false));
+            expect(F[name](constant, variable).isIntegrable()).toBe(false));
         }
         test(`${name}(var, var) is marked as not integrable`, () =>
-          expect(Formula[name](variable, variable).isIntegrable()).toBe(false));
+          expect(F[name](variable, variable).isIntegrable()).toBe(false));
       });
     });
   });
@@ -549,36 +540,35 @@ describe('Integrating', () => {
     }
     nonIntegrableZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
-        test(`${name}(var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable)));
+        test(`${name}(var) is marked as not integrable`, () => checkFormula(F[name](variable)));
       });
     });
     nonIntegrableOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         test(`${name}(const, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](constant, variable)));
+          checkFormula(F[name](constant, variable)));
         test(`${name}(var, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, variable)));
+          checkFormula(F[name](variable, variable)));
       });
     });
     nonIntegrableTwoParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const, const) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, constant, constant)));
+          checkFormula(F[name](variable, constant, constant)));
         test(`${name}(const, var, const) is marked as not integrable`, () =>
-          checkFormula(Formula[name](constant, variable, constant)));
+          checkFormula(F[name](constant, variable, constant)));
         test(`${name}(const, const, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](constant, constant, variable)));
+          checkFormula(F[name](constant, constant, variable)));
         test(`${name}(var, var, const) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, variable, constant)));
+          checkFormula(F[name](variable, variable, constant)));
         test(`${name}(var, const, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, constant, variable)));
+          checkFormula(F[name](variable, constant, variable)));
         test(`${name}(const, var, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](constant, variable, variable)));
+          checkFormula(F[name](constant, variable, variable)));
         test(`${name}(var, var, var) is marked as not integrable`, () =>
-          checkFormula(Formula[name](variable, variable, variable)));
+          checkFormula(F[name](variable, variable, variable)));
       });
     });
   });
@@ -589,21 +579,21 @@ describe('Integrating', () => {
   test('Integrating nested formulas', () => {
     // 30·(10(x + 10))² + 10 integrates by substitution through the linear ops
     // under `pow`: ∫₀¹⁰ = 1000·[(x + 10)³]₀¹⁰ + 10·10 = 7000100.
-    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
+    const formula = F.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
     expect(formula.cumulative(0, 10)).compare_tolerance(7000100);
   });
 
   test('Integrating nested formulas over an offset span', () => {
     // ∫₅²⁰ = 1000·(30³ − 15³) + 10·15 = 23625150.
-    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
+    const formula = F.add(variable, constant).mul(constant).pow(2).mul(30).add(10);
     expect(formula.cumulative(5, 20)).compare_tolerance(23625150);
   });
 
   test('Integrating through a constant minus the variable', () => {
     // `k − x` falls as x rises, so substituting through it flips the sign:
     // ∫₁² (3 − x)³ = [−(3 − x)⁴/4]₁² = 3.75, and ∫₁² e^(3 − x) = e² − e.
-    expect(Formula.sub(3, variable).pow(3).cumulative(1, 2)).compare_tolerance(3.75);
-    expect(Formula.sub(3, variable).exp().cumulative(1, 2)).compare_tolerance(
+    expect(F.sub(3, variable).pow(3).cumulative(1, 2)).compare_tolerance(3.75);
+    expect(F.sub(3, variable).exp().cumulative(1, 2)).compare_tolerance(
       Decimal.exp(2).sub(Decimal.exp(1)),
     );
   });
@@ -611,37 +601,37 @@ describe('Integrating', () => {
   describe('division integrates by orientation', () => {
     test('x / k substitutes like any linear op', () => {
       // ∫₁² (x/2)² = [x³/12]₁² = 7/12.
-      const formula = Formula.div(variable, 2).pow(2);
+      const formula = F.div(variable, 2).pow(2);
       expect(formula.isIntegrable()).toBe(true);
       expect(formula.cumulative(1, 2)).compare_tolerance(7 / 12);
     });
     test('k / x integrates over the bare variable', () => {
       // ∫₁² 2/x = 2·ln 2.
-      expect(Formula.div(2, variable).cumulative(1, 2)).compare_tolerance(Decimal.ln(2).mul(2));
+      expect(F.div(2, variable).cumulative(1, 2)).compare_tolerance(Decimal.ln(2).mul(2));
     });
     test('k / x is not a substitution a non-linear op can integrate through', () => {
-      const formula = Formula.div(2, variable).pow(2);
+      const formula = F.div(2, variable).pow(2);
       expect(formula.isIntegrable()).toBe(false);
       expect(formula.sum(1, 10000).reason).toBe('not-summable');
     });
     test('k / g(x) over a non-bare g is not integrable', () => {
-      expect(Formula.div(2, variable.add(1)).isIntegrable()).toBe(false);
+      expect(F.div(2, variable.add(1)).isIntegrable()).toBe(false);
     });
   });
 
   test('Integrating nested complex formulas', () => {
-    const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
+    const formula = F.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.evaluateIntegral()).toLogError();
   });
 
   describe('Integrating with non-integrable sections', () => {
     test('Non-integrable constant', () => {
-      const formula = Formula.add(variable, constant.ceil());
+      const formula = F.add(variable, constant.ceil());
       expect(formula.isIntegrable()).toBe(true);
       expect(() => formula.evaluateIntegral()).not.toLogError();
     });
     test('Non-integrable variable', () => {
-      const formula = Formula.add(variable.ceil(), constant);
+      const formula = F.add(variable.ceil(), constant);
       expect(formula.isIntegrable()).toBe(false);
       expect(() => formula.evaluateIntegral()).toLogError();
     });
@@ -728,19 +718,19 @@ describe('Inverting integrals', () => {
     invertibleIntegralZeroPramFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var) is marked as having an invertible integral`, () =>
-          checkFormula(Formula[name](variable)));
+          checkFormula(F[name](variable)));
       });
     });
     invertibleIntegralOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         if (name !== 'log' && name !== 'root') {
           test(`${name}(const, var) is marked as having an invertible integral`, () =>
-            checkFormula(Formula[name](constant, variable)));
+            checkFormula(F[name](constant, variable)));
         }
         test(`${name}(var, var) is marked as not having an invertible integral`, () => {
-          const formula = Formula[name](variable, variable);
+          const formula = F[name](variable, variable);
           expect(formula.isIntegralInvertible()).toBe(false);
           expect(() => formula.invertIntegral(10)).toLogError();
         });
@@ -755,35 +745,35 @@ describe('Inverting integrals', () => {
     nonInvertibleIntegralZeroPramFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable)));
+          checkFormula(F[name](variable)));
       });
     });
     nonInvertibleIntegralOneParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, constant)));
+          checkFormula(F[name](variable, constant)));
         test(`${name}(const, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](constant, variable)));
+          checkFormula(F[name](constant, variable)));
         test(`${name}(var, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, variable)));
+          checkFormula(F[name](variable, variable)));
       });
     });
     nonInvertibleIntegralTwoParamFunctionNames.forEach((name) => {
       describe(name, () => {
         test(`${name}(var, const, const) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, constant, constant)));
+          checkFormula(F[name](variable, constant, constant)));
         test(`${name}(const, var, const) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](constant, variable, constant)));
+          checkFormula(F[name](constant, variable, constant)));
         test(`${name}(const, const, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](constant, constant, variable)));
+          checkFormula(F[name](constant, constant, variable)));
         test(`${name}(var, var, const) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, variable, constant)));
+          checkFormula(F[name](variable, variable, constant)));
         test(`${name}(var, const, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, constant, variable)));
+          checkFormula(F[name](variable, constant, variable)));
         test(`${name}(const, var, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](constant, variable, variable)));
+          checkFormula(F[name](constant, variable, variable)));
         test(`${name}(var, var, var) is marked as not having an invertible integral`, () =>
-          checkFormula(Formula[name](variable, variable, variable)));
+          checkFormula(F[name](variable, variable, variable)));
       });
     });
   });
@@ -792,12 +782,12 @@ describe('Inverting integrals', () => {
   describe.todo('Invertible Integral formulas invert correctly');
 
   test('Inverting integral of nested formulas', () => {
-    const formula = Formula.add(variable, constant).mul(constant).pow(2).mul(30);
+    const formula = F.add(variable, constant).mul(constant).pow(2).mul(30);
     expect(formula.invertIntegral(formula.evaluateIntegral())).compare_tolerance(10);
   });
 
   test('Inverting integral of nested complex formulas', () => {
-    const formula = Formula.pow(1.05, variable).mul(100).pow(0.5);
+    const formula = F.pow(1.05, variable).mul(100).pow(0.5);
     expect(() => formula.invertIntegral(100)).toLogError();
   });
 });
@@ -821,35 +811,31 @@ describe('Step-wise', () => {
   });
 
   test('Non-invertible formula modifier marks formula as such', () => {
-    expect(Formula.step(constant, 10, (value) => Formula.abs(value)).isInvertible()).toBe(false);
-    expect(Formula.step(constant, 10, (value) => Formula.abs(value)).hasVariable()).toBe(false);
+    expect(Formula.step(constant, 10, (value) => F.abs(value)).isInvertible()).toBe(false);
+    expect(Formula.step(constant, 10, (value) => F.abs(value)).hasVariable()).toBe(false);
   });
 
   test('Formula never marked integrable', () => {
-    expect(Formula.step(constant, 10, (value) => Formula.add(value, 10)).isIntegrable()).toBe(
-      false,
-    );
+    expect(Formula.step(constant, 10, (value) => F.add(value, 10)).isIntegrable()).toBe(false);
     expect(() =>
-      Formula.step(constant, 10, (value) => Formula.add(value, 10)).evaluateIntegral(),
+      Formula.step(constant, 10, (value) => F.add(value, 10)).evaluateIntegral(),
     ).toLogError();
   });
 
   test('Formula never marked as having an invertible integral', () => {
-    expect(
-      Formula.step(constant, 10, (value) => Formula.add(value, 10)).isIntegralInvertible(),
-    ).toBe(false);
+    expect(Formula.step(constant, 10, (value) => F.add(value, 10)).isIntegralInvertible()).toBe(
+      false,
+    );
     expect(() =>
-      Formula.step(constant, 10, (value) => Formula.add(value, 10)).invertIntegral(10),
+      Formula.step(constant, 10, (value) => F.add(value, 10)).invertIntegral(10),
     ).toLogError();
   });
 
   test('Formula modifiers with variables mark formula as non-invertible', () => {
-    expect(Formula.step(constant, 10, (value) => Formula.add(value, variable)).isInvertible()).toBe(
+    expect(Formula.step(constant, 10, (value) => F.add(value, variable)).isInvertible()).toBe(
       false,
     );
-    expect(Formula.step(constant, 10, (value) => Formula.add(value, variable)).hasVariable()).toBe(
-      false,
-    );
+    expect(Formula.step(constant, 10, (value) => F.add(value, variable)).hasVariable()).toBe(false);
   });
 
   describe('Pass-through underneath start', () => {
@@ -876,27 +862,27 @@ describe('Step-wise', () => {
 
   describe('Evaluates correctly beyond start', () => {
     test('Evaluates correctly', () =>
-      expect(
-        Formula.step(variable, 8, (value) => Formula.add(value, 2)).evaluate(),
-      ).compare_tolerance(12));
+      expect(Formula.step(variable, 8, (value) => F.add(value, 2)).evaluate()).compare_tolerance(
+        12,
+      ));
     test('Inverts correctly', () =>
-      expect(
-        Formula.step(variable, 8, (value) => Formula.add(value, 2)).invert(12),
-      ).compare_tolerance(10));
+      expect(Formula.step(variable, 8, (value) => F.add(value, 2)).invert(12)).compare_tolerance(
+        10,
+      ));
   });
 
   describe('Evaluates correctly when nested', () => {
     test('Evaluates correctly', () =>
       expect(
-        Formula.add(variable, constant)
-          .step(10, (value) => Formula.mul(value, 2))
+        F.add(variable, constant)
+          .step(10, (value) => F.mul(value, 2))
           .sub(10)
           .evaluate(),
       ).compare_tolerance(20));
     test('Inverts correctly', () =>
       expect(
-        Formula.add(variable, constant)
-          .step(10, (value) => Formula.mul(value, 2))
+        F.add(variable, constant)
+          .step(10, (value) => F.mul(value, 2))
           .sub(10)
           .invert(30),
       ).compare_tolerance(15));
@@ -922,35 +908,31 @@ describe('Conditionals', () => {
   });
 
   test('Non-invertible formula modifier marks formula as such', () => {
-    expect(Formula.if(constant, true, (value) => Formula.abs(value)).isInvertible()).toBe(false);
-    expect(Formula.if(constant, true, (value) => Formula.abs(value)).hasVariable()).toBe(false);
+    expect(Formula.if(constant, true, (value) => F.abs(value)).isInvertible()).toBe(false);
+    expect(Formula.if(constant, true, (value) => F.abs(value)).hasVariable()).toBe(false);
   });
 
   test('Formula never marked integrable', () => {
-    expect(Formula.if(constant, true, (value) => Formula.add(value, 10)).isIntegrable()).toBe(
-      false,
-    );
+    expect(Formula.if(constant, true, (value) => F.add(value, 10)).isIntegrable()).toBe(false);
     expect(() =>
-      Formula.if(constant, true, (value) => Formula.add(value, 10)).evaluateIntegral(),
+      Formula.if(constant, true, (value) => F.add(value, 10)).evaluateIntegral(),
     ).toLogError();
   });
 
   test('Formula never marked as having an invertible integral', () => {
-    expect(
-      Formula.if(constant, true, (value) => Formula.add(value, 10)).isIntegralInvertible(),
-    ).toBe(false);
+    expect(Formula.if(constant, true, (value) => F.add(value, 10)).isIntegralInvertible()).toBe(
+      false,
+    );
     expect(() =>
-      Formula.if(constant, true, (value) => Formula.add(value, 10)).invertIntegral(10),
+      Formula.if(constant, true, (value) => F.add(value, 10)).invertIntegral(10),
     ).toLogError();
   });
 
   test('Formula modifiers with variables mark formula as non-invertible', () => {
-    expect(Formula.if(constant, true, (value) => Formula.add(value, variable)).isInvertible()).toBe(
+    expect(Formula.if(constant, true, (value) => F.add(value, variable)).isInvertible()).toBe(
       false,
     );
-    expect(Formula.if(constant, true, (value) => Formula.add(value, variable)).hasVariable()).toBe(
-      false,
-    );
+    expect(Formula.if(constant, true, (value) => F.add(value, variable)).hasVariable()).toBe(false);
   });
 
   test('Invertible only when every branch that can be live is', () => {
@@ -1047,27 +1029,27 @@ describe('Conditionals', () => {
 
   describe('Evaluates correctly with condition true', () => {
     test('Evaluates correctly', () =>
-      expect(
-        Formula.if(variable, true, (value) => Formula.add(value, 2)).evaluate(),
-      ).compare_tolerance(12));
+      expect(Formula.if(variable, true, (value) => F.add(value, 2)).evaluate()).compare_tolerance(
+        12,
+      ));
     test('Inverts correctly', () =>
-      expect(
-        Formula.if(variable, true, (value) => Formula.add(value, 2)).invert(12),
-      ).compare_tolerance(10));
+      expect(Formula.if(variable, true, (value) => F.add(value, 2)).invert(12)).compare_tolerance(
+        10,
+      ));
   });
 
   describe('Evaluates correctly when nested', () => {
     test('Evaluates correctly', () =>
       expect(
-        Formula.add(variable, constant)
-          .if(true, (value) => Formula.add(value, 2))
+        F.add(variable, constant)
+          .if(true, (value) => F.add(value, 2))
           .div(2)
           .evaluate(),
       ).compare_tolerance(11));
     test('Inverts correctly', () =>
       expect(
-        Formula.add(variable, constant)
-          .if(true, (value) => Formula.add(value, 2))
+        F.add(variable, constant)
+          .if(true, (value) => F.add(value, 2))
           .div(2)
           .invert(12),
       ).compare_tolerance(12));
@@ -1089,7 +1071,7 @@ describe('Custom Formulas', () => {
       ));
     test('Two inputs evaluates correctly', () =>
       expect(
-        new Formula({ inputs: [1, 2], evaluate: (v1, v2) => v1 }).evaluate(),
+        new Formula({ inputs: [1, 2], evaluate: (v1, _v2) => v1 }).evaluate(),
       ).compare_tolerance(1));
   });
 
@@ -1107,7 +1089,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable],
           evaluate: () => 10,
-          invert: (value, v1) => v1.evaluate(),
+          invert: (_value, v1) => v1.evaluate(),
         }).invert(10),
       ).compare_tolerance(1));
     test('Two inputs inverts correctly', () =>
@@ -1115,7 +1097,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable, 2],
           evaluate: () => 10,
-          invert: (value, v1, v2) => v2,
+          invert: (_value, _v1, v2) => v2,
         }).invert(10),
       ).compare_tolerance(2));
   });
@@ -1126,7 +1108,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [],
           evaluate: () => 0,
-          integrate: (stack) => variable,
+          integrate: (_stack) => variable,
         }).evaluateIntegral(),
       ).toLogError());
     test('One input integrates correctly', () =>
@@ -1134,7 +1116,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable],
           evaluate: (v1) => Decimal.add(v1, 10),
-          integrate: (stack, v1) => Formula.add(v1, 10),
+          integrate: (_stack, v1) => F.add(v1, 10),
         }).evaluateIntegral(),
       ).compare_tolerance(11));
     test('Two inputs integrates correctly', () =>
@@ -1142,7 +1124,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable, 10],
           evaluate: (v1, v2) => Decimal.add(v1, v2),
-          integrate: (stack, v1, v2) => Formula.add(v1, v2),
+          integrate: (_stack, v1, v2) => F.add(v1, v2),
         }).evaluateIntegral(),
       ).compare_tolerance(11));
   });
@@ -1153,7 +1135,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [],
           evaluate: () => 0,
-          integrate: (stack) => variable,
+          integrate: (_stack) => variable,
         }).invertIntegral(20),
       ).toLogError());
     test('One input inverts integral correctly', () =>
@@ -1161,7 +1143,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable],
           evaluate: (v1) => Decimal.add(v1, 10),
-          integrate: (stack, v1) => Formula.add(v1, 10),
+          integrate: (_stack, v1) => F.add(v1, 10),
         }).invertIntegral(20),
       ).compare_tolerance(10));
     test('Two inputs inverts integral correctly', () =>
@@ -1169,7 +1151,7 @@ describe('Custom Formulas', () => {
         new Formula({
           inputs: [variable, 10],
           evaluate: (v1, v2) => Decimal.add(v1, v2),
-          integrate: (stack, v1, v2) => Formula.add(v1, v2),
+          integrate: (_stack, v1, v2) => F.add(v1, v2),
         }).invertIntegral(20),
       ).compare_tolerance(10));
   });
@@ -1212,9 +1194,9 @@ function discreteTruth(formula: GenericFormula, R: DecimalSource, A: number): nu
 }
 
 describe('Buy Max', () => {
-  let resource: ReturnType<typeof createResource>;
+  let resource: Resource<DecimalSource>;
   beforeAll(() => {
-    resource = createResource(ref(100000));
+    resource = createResource(ref<DecimalSource>(100000));
   });
   describe('Without cumulative cost', () => {
     test('Counts a non-invertible formula by searching its price', () => {
@@ -1222,7 +1204,7 @@ describe('Buy Max', () => {
       // alone: |1 + n| ≤ 100000 reaches n = 99999.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.abs(variable);
+      const formula = F.abs(variable);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(() => maxAffordable.value).not.toLogError();
       expect(maxAffordable.value).compare_tolerance(99999);
@@ -1233,7 +1215,7 @@ describe('Buy Max', () => {
       // through an inversion guard and reported instead of answering.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.abs(variable);
+      const formula = F.abs(variable);
       expect(() => calculateCost(formula, 5, false)).not.toLogError();
       expect(calculateCost(formula, 5, false)).compare_tolerance(6);
     });
@@ -1250,18 +1232,18 @@ describe('Buy Max', () => {
       // `evaluate(A)`, a single-payment one pays `evaluate(A + 1)` for the
       // level it reaches. Both are gated, each against its own curve.
       const cumulativeLevel = ref<DecimalSource>(0);
-      const cumulative = Formula.recip(Formula.variable(cumulativeLevel));
+      const cumulative = F.recip(Formula.variable(cumulativeLevel));
       expect(new Decimal(cumulative.evaluate()).isNan()).toBe(true);
       expect(calculateMaxAffordable(cumulative, resource, true, 1).value).compare_tolerance(0);
 
       const singleLevel = ref<DecimalSource>(0);
-      const single = Formula.recip(Formula.variable(singleLevel).sub(1));
+      const single = F.recip(Formula.variable(singleLevel).sub(1));
       expect(new Decimal(single.evaluate(1)).isNan()).toBe(true);
       expect(calculateMaxAffordable(single, resource, false, 1).value).compare_tolerance(0);
     });
     test('Calculates max affordable and cost correctly', () => {
       const variable = Formula.variable(0);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(141);
       expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
@@ -1270,7 +1252,7 @@ describe('Buy Max', () => {
     });
     test('Caps the count at maxBulkAmount and prices the capped target', () => {
       const variable = Formula.variable(0);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false, 4);
       expect(maxAffordable.value).compare_tolerance(4);
       expect(calculateCost(formula, maxAffordable.value, false)).compare_tolerance(
@@ -1283,7 +1265,7 @@ describe('Buy Max', () => {
       // correct count of additional purchases is 141 - 10 = 131.
       const purchases = ref(10);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(131);
 
@@ -1298,7 +1280,7 @@ describe('Buy Max', () => {
       // clamp, the result would be negative and poison downstream callers.
       const purchases = ref(200);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false);
       expect(maxAffordable.value).compare_tolerance(0);
     });
@@ -1308,7 +1290,7 @@ describe('Buy Max', () => {
       // Σ(1 + i) = n(n+1)/2 ≤ 100000 reaches n = 446.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.abs(variable);
+      const formula = F.abs(variable);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       expect(() => maxAffordable.value).not.toLogError();
       expect(maxAffordable.value).compare_tolerance(446);
@@ -1318,7 +1300,7 @@ describe('Buy Max', () => {
       // the term-by-term span has no price, and a count nobody priced is never
       // returned. 1e9 would reach ~44720 one at a time; in one purchase it
       // reaches the longest priceable span, the same one `calculateCost` charges.
-      const formula = Formula.abs(Formula.variable(ref(1)));
+      const formula = F.abs(Formula.variable(ref(1)));
       const maxAffordable = calculateMaxAffordable(formula, createResource(ref(1e9)), true);
       expect(maxAffordable.value).compare_tolerance(1000);
       expect(() => calculateCost(formula, 1001, true)).toLogError();
@@ -1329,19 +1311,19 @@ describe('Buy Max', () => {
       // summable, and answering beats reporting. |1|+|2|+…+|5| = 15.
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.abs(variable);
+      const formula = F.abs(variable);
       expect(() => calculateCost(formula, 5, true)).not.toLogError();
       expect(calculateCost(formula, 5, true)).compare_tolerance(15);
     });
     test('Reports rather than stalling when an unsummable span is unbounded', () => {
       const purchases = ref(1);
-      const formula = Formula.abs(Formula.variable(purchases));
+      const formula = F.abs(Formula.variable(purchases));
       expect(() => calculateCost(formula, 1e6, true)).toLogError();
     });
     test('Max affordable and cost agree exactly with 0 purchases', () => {
       const purchases = ref(0);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1367,7 +1349,7 @@ describe('Buy Max', () => {
     test('Max affordable and cost agree exactly with 1 purchase', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1390,7 +1372,7 @@ describe('Buy Max', () => {
     test('The default path prices the levels it counted, exactly', () => {
       const purchases = ref(1);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
@@ -1413,7 +1395,7 @@ describe('Buy Max', () => {
     test('Stays exact partway up the curve, not just from level zero', () => {
       const purchases = ref(90);
       const variable = Formula.variable(purchases);
-      const formula = Formula.pow(1.05, variable).mul(100);
+      const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, true);
       let actualAffordable = 0;
       let summedCost = Decimal.dZero;
