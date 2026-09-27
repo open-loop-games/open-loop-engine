@@ -2,6 +2,21 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.3.1 (2026-09-27)
+
+### Features
+
+* **core:** RunPool.dispose(); a pool's hook and mirrors stop with its scope (5d798b9)
+
+### Fixes
+
+* **core:** variable-mode simulateTick simulates all of a dt above maxDeltaTime (2acb45c)
+* **systems:** a rejected action register no longer replaces or leaves a mapping (81c873b)
+* **harness:** a stale modifier-index entry refuses a slot-bound fallback (0cc892e)
+* **systems:** content registered after start() stops with engine.dispose() (f4be26e)
+* **core:** `persistent(0)` is a `Persistent<number>`, not a `Persistent<0>` (7c9510b)
+* **core:** `CostRequirement.requirementMet` is a count, not `DecimalSource | boolean` (b505257)
+
 ## 0.3.0 (2026-09-26)
 
 ### ⚠ Breaking changes
