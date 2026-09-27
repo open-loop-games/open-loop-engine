@@ -14,8 +14,8 @@
  *
  * Intended as the building block for N-parallel passive tick loops where a
  * single-active-at-a-time state machine (like Sequencer-driven execution)
- * doesn't fit — e.g., incloneution's `tickJobDirect`, idle-loops-ng's
- * `ProgressVar`.
+ * doesn't fit — e.g., incloneution's passive jobs, one tracker per job
+ * ticking beside the action queue.
  */
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
