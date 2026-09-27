@@ -31,7 +31,7 @@ generic typed registry for game content definitions
 core primitive for ordered execution of items with optional metadata
 
 - `interface ConditionalRule<M = void>` — A rule mapping a boolean condition to a sequencer item. `src/core/sequencer-strategies.ts:37`
-- `function createCompositeStrategy<M = void>(...strategies: FillStrategy<M>[]): FillStrategy<M>` — Chain multiple strategies with first-match semantics. `src/core/sequencer-strategies.ts:155`
+- `function createCompositeStrategy<M = void>(...strategies: FillStrategy<M>[]): FillStrategy<M>` — Chain multiple strategies with first-match semantics. `src/core/sequencer-strategies.ts:157`
 - `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:72`
 - `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:96`
 - `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:121`

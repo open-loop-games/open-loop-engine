@@ -4,8 +4,8 @@
  * These are sugar for common automation patterns found in incremental games:
  * - Conditional: evaluate rules top-to-bottom, first match wins (Spell Compiler, Cavernous II)
  * - Priority: always pick the highest-priority candidate (Synergism, NGU Idle)
- * - Round-robin: cycle through candidates in rotation (Increlution)
- * - Composite: chain strategies with first-match semantics (emergency + round-robin)
+ * - Round-robin: cycle through candidates in rotation (Arcanum's hobbies)
+ * - Composite: chain strategies with first-match semantics (goals, then hobbies)
  *
  * One of three sibling "choose one from a list" primitives. The axis is
  * shape, not lifecycle:
@@ -144,11 +144,13 @@ export function createRoundRobinStrategy<M = void>(
  * Chain multiple strategies with first-match semantics.
  * Tries each strategy in order; returns the first non-null result.
  *
- * Common pattern: emergency strategy first, then round-robin:
+ * Common pattern: a higher-priority strategy first, then a round-robin
+ * fallback — Arcanum fills a free slot from its goals before walking its
+ * hobbies list:
  * ```ts
  * createCompositeStrategy(
- *   emergencyFoodStrategy,
- *   createRoundRobinStrategy('auto', getCandidates),
+ *   goalStrategy,
+ *   createRoundRobinStrategy('hobbies', getHobbies),
  * )
  * ```
  */
