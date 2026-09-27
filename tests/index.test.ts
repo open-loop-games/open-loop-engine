@@ -32,7 +32,7 @@ import {
   withPersistenceNamespace,
   withPersistentContext,
 } from '@/core/persistence';
-import type { ChallengeCategory, CycleLog, Persistent } from '@/index';
+import type { ChallengeCategory, ChallengeDef, CycleLog, Persistent } from '@/index';
 import type { EngineModule, InjectionKey, EngineCategories } from '@/index';
 
 describe('createEngine', () => {
@@ -641,7 +641,11 @@ describe('CategoriesKey — engine self-publish', () => {
       install() {
         const upgrades = createPurchasableCategory<UpgDef>({
           id: 'upgrades',
-          mapPurchasable: () => ({ display: {}, requirements: [], effect: 1 }),
+          mapPurchasable: () => ({
+            display: { description: 'upgrade' },
+            requirements: [],
+            effect: 1,
+          }),
         });
         const training = createSkillCategory<TrainDef>({
           id: 'training',
@@ -1135,8 +1139,8 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
 describe('autoSaveInterval — runtime-tunable', () => {
   function mockTimers() {
     let nextId = 1;
-    const setInterval = vi.fn(() => nextId++);
-    const clearInterval = vi.fn();
+    const setInterval = vi.fn<(callback: () => void, ms: number) => number>(() => nextId++);
+    const clearInterval = vi.fn<(id: number) => void>();
     return { setInterval, clearInterval };
   }
 
@@ -1432,7 +1436,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     rules.setDefault('mult', () => 1);
     let roster!: Persistent<string[]>;
     let derived: string[] = [];
-    let category!: ChallengeCategory;
+    let category!: ChallengeCategory<ChallengeDef>;
     const mod: EngineModule = {
       id: 'game',
       install(ctx) {

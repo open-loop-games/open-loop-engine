@@ -274,7 +274,7 @@ describe('runMatrixUntil', () => {
       cells: [
         {
           name: 'a',
-          buildEngine: () => buildTestEngine({ tick: 0 }),
+          buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           tickDelta: 0.1,
         },
       ],
@@ -312,7 +312,7 @@ describe('runMatrixUntil', () => {
       cells: [
         {
           name: 'a',
-          buildEngine: () => buildTestEngine({ tick: 0 }),
+          buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           tickDelta: 0.1,
         },
       ],
@@ -335,8 +335,8 @@ describe('runMatrixUntil', () => {
     const cellEvents: string[] = [];
     runMatrixUntil({
       cells: [
-        { name: 'a', buildEngine: () => buildTestEngine({ tick: 0 }), tickDelta: 0.1 },
-        { name: 'b', buildEngine: () => buildTestEngine({ tick: 0 }), tickDelta: 0.1 },
+        { name: 'a', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
+        { name: 'b', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
       ],
       seeds: [10, 20],
       until: ({ tick }) => tick >= 1,
@@ -362,13 +362,13 @@ describe('runMatrixUntil', () => {
       cells: [
         {
           name: 'a',
-          buildEngine: () => buildTestEngine({ tick: 0 }),
+          buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           analyzers: (engine, ctx) => {
             seenSeeds.push(ctx.seed);
             // Closure captures the engine — a real consumer would read its state
             // here. For this test we just verify the analyzer runs and returns.
             const state = (engine.tickDriver as unknown as { _state?: TestState })._state;
-            return [createTickRecorder(state ?? { tick: 0 })];
+            return [createTickRecorder(state ?? { tick: 0, lastDt: 0 })];
           },
           tickDelta: 0.1,
         },
@@ -386,7 +386,7 @@ describe('runMatrixUntil', () => {
 
   it('synthesizes an empty result for cells with zero seeds', () => {
     const result = runMatrixUntil({
-      cells: [{ name: 'empty', buildEngine: () => buildTestEngine({ tick: 0 }) }],
+      cells: [{ name: 'empty', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }) }],
       seeds: [],
       until: () => true,
       maxSimTime: 1,

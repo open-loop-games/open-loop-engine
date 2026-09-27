@@ -245,6 +245,9 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
         isActive() {
           return state.activeNodeId !== undefined;
         },
+        getVisitCount(graphId, nodeId) {
+          return state.visitCounts[graphId]?.[nodeId] ?? 0;
+        },
         exportState() {
           return { ...state };
         },

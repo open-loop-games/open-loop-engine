@@ -12,7 +12,7 @@ import type { GameStateAccessor, ICondition, IEffect, Analyzer } from '@/primiti
 
 describe('Integration: simple idle game loop', () => {
   it('runs a basic resource accumulation game headlessly', () => {
-    const result = runHeadless({ setup: () => {}, tick: () => {}, ticks: 100, seed: 42 });
+    const result = runHeadless({ setup: () => [], tick: () => {}, ticks: 100, seed: 42 });
     expect(result.totalTicks).toBe(100);
   });
 
@@ -56,12 +56,11 @@ describe('Integration: simple idle game loop', () => {
       summarize: () => ({ name: 'gold-tracker', metrics: { maxGold: tickGold } }),
     };
     runHeadless({
-      setup: () => {},
+      setup: () => [tracker],
       tick: () => {
         tickGold += 1;
       },
       ticks: 50,
-      analyzers: [tracker],
     });
     expect(tickGold).toBe(50);
   });
@@ -70,7 +69,7 @@ describe('Integration: simple idle game loop', () => {
     let total1 = 0,
       total2 = 0;
     runHeadless({
-      setup: () => {},
+      setup: () => [],
       tick: () => {
         total1 += random();
       },
@@ -78,7 +77,7 @@ describe('Integration: simple idle game loop', () => {
       seed: 123,
     });
     runHeadless({
-      setup: () => {},
+      setup: () => [],
       tick: () => {
         total2 += random();
       },

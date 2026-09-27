@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type {
-  IEffect,
-  ICondition,
-  ResourceEffect,
-  CompositeEffect,
-  ResourceCondition,
-  AndCondition,
-} from '@/primitives/types';
+import type { IEffect, CompositeEffect, ResourceCondition, AndCondition } from '@/primitives/types';
 
 describe('Primitive types', () => {
   it('IEffect discriminated union works', () => {

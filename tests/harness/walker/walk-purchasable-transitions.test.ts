@@ -251,7 +251,10 @@ describe('walkPurchasableTransitions — skip conditions', () => {
           id: 'flags',
           mapPurchasable: () => ({
             display: { description: 'flag' },
-            requirements: createBooleanRequirement(flag, 'must flip'),
+            requirements: createBooleanRequirement({
+              requirement: () => flag.value,
+              description: 'must flip',
+            }),
             limit: 1,
           }),
         });

@@ -21,6 +21,7 @@ import {
   walkTunables,
 } from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
+import { createResource } from '@/core/resource';
 import { startEngine } from './helpers';
 
 function num(v: unknown): number {
@@ -282,9 +283,17 @@ describe('applyPerturbation — chain-registry source', () => {
     const mod: EngineModule = {
       id: 'producers-mod',
       install() {
+        const cursorResource = createResource(Decimal.dZero, {
+          id: 'cursor-gold',
+          displayName: 'Cursor Gold',
+        });
         const producers = createProducerCategory<ProducerDef>({
           id: 'producers',
-          mapProducer: (def) => ({ baseRate: def.baseRate }),
+          mapProducer: (def) => ({
+            resource: cursorResource,
+            baseRate: def.baseRate,
+            trigger: 'continuous',
+          }),
           registerTick: () => () => {},
         });
         producers.register([{ id: 'cursor', name: 'Cursor', baseRate: 1 }]);
@@ -589,9 +598,15 @@ describe('applyPerturbation — content source', () => {
   it('names the missing piece when an entry no longer resolves', () => {
     const { engine, entry } = persistentDamage('pert-content-missing');
     const flatEntry = entry('gear.flat[0]');
-    const at = (address: Partial<typeof flatEntry.address>) => ({
+    // walkContent always produces 'content'-source addresses; narrow away the
+    // wider ModifierPickerAddress union so the override merges cleanly.
+    const contentAddress = flatEntry.address as Extract<
+      typeof flatEntry.address,
+      { source: 'content' }
+    >;
+    const at = (address: Partial<typeof contentAddress>) => ({
       ...flatEntry,
-      address: { ...flatEntry.address, ...address },
+      address: { ...contentAddress, ...address },
     });
     const times2 = { kind: 'scalar-multiply', factor: 2 } as const;
     expect(() => applyPerturbation(engine, at({ contentType: 'nope' }), times2)).toThrow(

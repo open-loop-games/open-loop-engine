@@ -24,7 +24,10 @@ expect.extend({
     } else if (Decimal.isNaN(expected)) {
       pass = Decimal.isNaN(received);
     } else {
-      pass = Decimal.eq_tolerance(received, expected, tolerance);
+      // break_eternity's own eq_tolerance defaults an omitted tolerance to
+      // 1e-7 at runtime; match that default explicitly to satisfy the typed
+      // (non-optional) 3-arg overload without changing behavior.
+      pass = Decimal.eq_tolerance(received, expected, tolerance ?? 1e-7);
     }
     return {
       pass,
@@ -38,9 +41,7 @@ expect.extend({
     const { isNot } = this;
     console.error = vi.fn();
     received();
-    const calls = (
-      console.error as Mock<Parameters<typeof console.error>, ReturnType<typeof console.error>>
-    ).mock.calls.length;
+    const calls = (console.error as Mock<typeof console.error>).mock.calls.length;
     const pass = calls >= 1;
     vi.restoreAllMocks();
     return {
