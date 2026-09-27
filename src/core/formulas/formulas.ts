@@ -319,7 +319,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     variableOnRight: () => ({ integrate: undefined }),
   },
   pow: {
-    evaluate: Decimal.pow,
+    evaluate: ops.powExact,
     invert: ops.invertPow,
     integrate: ops.integratePow,
     sum: ops.sumPow,
@@ -331,7 +331,7 @@ const binaryOps: Record<string, OpDescriptor> = {
     sum: ops.sumPowBase,
   },
   root: {
-    evaluate: Decimal.root,
+    evaluate: ops.rootExact,
     invert: ops.invertRoot,
     integrate: ops.integrateRoot,
     variableOnRight: () => ({ integrate: undefined }),

@@ -107,6 +107,32 @@ function makeBinarySubstitution(
   };
 }
 
+// === EXACT SQUARES ===
+
+// Decimal.pow and Decimal.root run a float pow even at exponent 2, landing an
+// ulp off on integers: pow(41, 2) = 1680.9999999999998, root(1681, 2) =
+// 40.99999999999999 (91k of the first 100k perfect squares miss). A floored
+// curve then reads an exact threshold one step low, so exponent 2 takes the
+// exact paths. Decimal.sqrt returns NaN below 1e-16 (sqrt(1e-16) = NaN), where
+// root still answers, so the root path stays the fallback.
+function isTwo(n: DecimalSource): boolean {
+  return typeof n === 'number' ? n === 2 : Decimal.eq(n, 2);
+}
+
+/** `value ^ exponent`, exact for squares. */
+export function powExact(value: DecimalSource, exponent: DecimalSource): Decimal {
+  return isTwo(exponent) ? Decimal.mul(value, value) : Decimal.pow(value, exponent);
+}
+
+/** The `degree`th root of `value`, exact for square roots of perfect squares. */
+export function rootExact(value: DecimalSource, degree: DecimalSource): Decimal {
+  if (isTwo(degree)) {
+    const exact = Decimal.sqrt(value);
+    if (!exact.isNan()) return exact;
+  }
+  return Decimal.root(value, degree);
+}
+
 // === PASSTHROUGH UTILITIES ===
 
 export function passthrough<T extends GenericFormula | DecimalSource>(value: T): T {
@@ -619,7 +645,7 @@ export function integrateLn(stack: SubstitutionStack, lhs: FormulaSource) {
 // === POWERS ===
 
 export const invertPow = makeBinaryInvert(
-  (value, other) => Decimal.root(value, other),
+  (value, other) => rootExact(value, other),
   (value, other) => Decimal.ln(value).div(Decimal.ln(other)),
 );
 
@@ -676,7 +702,7 @@ export const integratePowBase = makeBinaryIntegrate(
 );
 
 export const invertRoot = makeBinaryInvert(
-  (value, other) => Decimal.root(value, Decimal.recip(other)),
+  (value, other) => powExact(value, other),
   (value, other) => Decimal.ln(other).div(Decimal.ln(value)),
 );
 

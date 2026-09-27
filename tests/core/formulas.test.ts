@@ -1875,3 +1875,39 @@ describe('buy-max returns no count it could not price', () => {
     expect(maxAffordable.value).compare_tolerance(9);
   });
 });
+
+describe('squares and square roots are exact on integers', () => {
+  // Decimal.root(x, 2) and Decimal.pow(x, 2) go through a float pow and land
+  // an ulp off: root(1681, 2) = 40.99999999999999, pow(41, 2) = 1680.9999999999998.
+  // A floored curve then reads an exact boundary one step low.
+  const x = Formula.variable(0);
+  const ns = Array.from({ length: 2000 }, (_, i) => i + 1);
+
+  test('sqrt of a perfect square is its root', () => {
+    const misses = ns.filter((n) => !Decimal.eq(x.sqrt().evaluate(n * n), n));
+    expect(misses).toEqual([]);
+  });
+
+  test('sqrt still answers below the range Decimal.sqrt covers', () => {
+    expect(x.sqrt().evaluate('1e-300')).compare_tolerance('1e-150');
+  });
+
+  test('sqr of an integer is its square', () => {
+    const misses = ns.filter((n) => !Decimal.eq(x.sqr().evaluate(n), n * n));
+    expect(misses).toEqual([]);
+  });
+
+  test('sqrt and sqr invert each other exactly', () => {
+    const sqrtMisses = ns.filter((n) => !Decimal.eq(x.sqrt().invert(n), n * n));
+    const sqrMisses = ns.filter((n) => !Decimal.eq(x.sqr().invert(n * n), n));
+    expect(sqrtMisses).toEqual([]);
+    expect(sqrMisses).toEqual([]);
+  });
+
+  test('a quadratic level curve reads each level threshold as that level', () => {
+    // floor((sqrt(8·xp/100 + 1) − 1) / 2); level L starts at L(L+1)·50 XP
+    const level = x.mul(8).div(100).add(1).sqrt().sub(1).div(2).floor();
+    const misses = ns.filter((l) => !Decimal.eq(level.evaluate(l * (l + 1) * 50), l));
+    expect(misses).toEqual([]);
+  });
+});
