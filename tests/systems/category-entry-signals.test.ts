@@ -69,7 +69,12 @@ describe('CategoryEntrySignals — per-category derivation', () => {
   it('Purchasable: unlock=active, count=amount', () => {
     const cat = createPurchasableCategory<UpgDef>({
       id: 'upgrades',
-      mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 5 }),
+      mapPurchasable: () => ({
+        display: { description: '' },
+        requirements: [],
+        effect: 1,
+        limit: 5,
+      }),
     });
     cat.register({ id: 'fast', name: 'Fast' });
 
@@ -251,7 +256,7 @@ describe('Category.id exposure', () => {
 
     const upg = createPurchasableCategory<UpgDef>({
       id: 'upgrades/buildings',
-      mapPurchasable: () => ({ display: {}, requirements: [], effect: 1 }),
+      mapPurchasable: () => ({ display: { description: '' }, requirements: [], effect: 1 }),
     });
     expect(upg.id).toBe('upgrades/buildings');
 

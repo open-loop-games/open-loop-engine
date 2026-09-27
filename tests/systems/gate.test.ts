@@ -19,6 +19,7 @@ import {
   type DecimalSource,
   type Gate,
   type GameStateAccessor,
+  type GameStateAccessorMutator,
   type GateRuntime,
   type ResourceRegistry,
 } from '@/index';
@@ -88,11 +89,14 @@ function buildFixture(): {
   const rates = new Map<string, Decimal>();
   const unlocks = new Map<string, boolean>();
   const stateMap = new Map<string, unknown>();
-  const accessor: GameStateAccessor = {
+  const accessor: GameStateAccessorMutator = {
     getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     isUnlocked: (id) => unlocks.get(id) ?? false,
     getState: (path) => stateMap.get(path),
+    applyResourceOp: () => {},
+    setUnlocked: (id, value) => unlocks.set(id, value),
+    setState: (path, value) => stateMap.set(path, value),
   };
 
   const game: EngineModule = {
@@ -108,7 +112,12 @@ function buildFixture(): {
 
       upgCat = createPurchasableCategory<UpgDef>({
         id: 'upgrades',
-        mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 5 }),
+        mapPurchasable: () => ({
+          display: { description: '' },
+          requirements: [],
+          effect: 1,
+          limit: 5,
+        }),
       });
       upgCat.register({ id: 'fast', name: 'Fast' });
 
@@ -470,8 +479,8 @@ describe('timeUntilGateFlip — cumulative-gte', () => {
 
       let steps = 0;
       while (!evaluateGate(gate, f.runtime)) {
-        f.points.value = Decimal.add(f.points.value, inflow * dt);
-        f.points.value = Decimal.sub(f.points.value, drain * dt);
+        f.points.value = Decimal.add(f.points.value, inflow * dt).toNumber();
+        f.points.value = Decimal.sub(f.points.value, drain * dt).toNumber();
         steps++;
       }
       const crossing = steps * dt;
@@ -561,7 +570,12 @@ function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } 
       createResource(0, { id: 'points', displayName: 'points' });
       const upgCat = createPurchasableCategory<UpgDef>({
         id: 'upgrades',
-        mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 5 }),
+        mapPurchasable: () => ({
+          display: { description: '' },
+          requirements: [],
+          effect: 1,
+          limit: 5,
+        }),
       });
       upgCat.register({ id: 'fast', name: 'Fast' });
       upgCat.getEntry('fast')!.purchasable.amount.value = bn(3);

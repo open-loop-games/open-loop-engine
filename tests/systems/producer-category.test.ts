@@ -10,8 +10,8 @@ import {
   serializePersistents,
   deserializePersistents,
   type Persistent,
-  type DecimalSource,
 } from '@/core/persistence';
+import type { DecimalSource } from '@/primitives/decimal';
 import { createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';

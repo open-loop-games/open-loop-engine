@@ -65,7 +65,11 @@ function makeCategory(opts?: { mode?: 'queue' | 'list'; driver?: FakeTickDriver 
   driver: FakeTickDriver;
 } {
   const driver = opts?.driver ?? makeTickDriver();
-  const category = createActionCategory<ActionDef, ActionState, ActionPayload>({
+  const category: ActionCategory<ActionDef, ActionState, ActionPayload> = createActionCategory<
+    ActionDef,
+    ActionState,
+    ActionPayload
+  >({
     id: `actions-${Math.random().toString(36).slice(2, 8)}`,
     mode: opts?.mode,
     registerTick: driver.registerTick,
@@ -142,7 +146,13 @@ describe('createActionCategory — a rejected register leaves no mapping behind'
       registerTick: driver.registerTick,
       mapAction: (def) => {
         if (def.id === 'bad-map') throw new Error('mapAction blew up');
-        return { signals: {}, rateChain: true, tick: () => tickCalls.push(def.id) };
+        return {
+          signals: { unlock: computed(() => false), count: computed(() => 0) },
+          rateChain: true,
+          tick: () => {
+            tickCalls.push(def.id);
+          },
+        };
       },
       mapState: (def) => {
         if (def.id === 'bad-state') throw new Error('mapState blew up');

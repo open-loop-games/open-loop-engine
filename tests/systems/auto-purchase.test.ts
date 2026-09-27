@@ -70,11 +70,13 @@ describe('setupSweepAutoPurchase', () => {
     const { registerTick, tick } = createManualTicks();
 
     const cheap = createPurchasable({
+      display: 'cheap',
       id: 'cheap',
       requirements: createCostRequirement({ resource: cookies, cost: 10 }),
       limit: 1,
     });
     const dear = createPurchasable({
+      display: 'dear',
       id: 'dear',
       requirements: createCostRequirement({ resource: cookies, cost: 100 }),
       limit: 1,
@@ -115,6 +117,7 @@ describe('setupSweepAutoPurchase', () => {
     const enabled = ref(false);
 
     const upgrade = createPurchasable({
+      display: 'upgrade',
       id: 'upgrade',
       requirements: createCostRequirement({ resource: cookies, cost: 10 }),
       limit: 1,
@@ -159,11 +162,13 @@ describe('setupSweepAutoPurchase', () => {
     const { registerTick, tick } = createManualTicks();
 
     const cheap = createPurchasable({
+      display: 'cheap',
       id: 'cheap',
       requirements: createCostRequirement({ resource: cookies, cost: 50 }),
       limit: 1,
     });
     const dear = createPurchasable({
+      display: 'dear',
       id: 'dear',
       requirements: createCostRequirement({ resource: cookies, cost: 500 }),
       limit: 1,
@@ -188,6 +193,7 @@ describe('setupSweepAutoPurchase', () => {
     // leaving the bank at 600 — so the two shapes are distinguishable here.
     const items = [1, 2, 3, 4, 5].map((n) =>
       createPurchasable({
+        display: `item-${n}`,
         id: `item-${n}`,
         requirements: createCostRequirement({ resource: cookies, cost: 200 }),
         limit: 1,
@@ -213,6 +219,7 @@ describe('setupSweepAutoPurchase', () => {
     // Affordable in cookies under the floor, but chips has only 100 against a
     // 90 floor and a 50 cost — the second currency binds.
     const combo = createPurchasable({
+      display: 'combo',
       id: 'combo',
       requirements: [
         createCostRequirement({ resource: cookies, cost: 100 }),
@@ -236,6 +243,7 @@ describe('setupSweepAutoPurchase', () => {
     // budget, 120 of cost. Measured per requirement each one "fits"; they spend
     // from the same balance, so what the floor admits is their sum.
     const combo = createPurchasable({
+      display: 'same-resource-combo',
       id: 'same-resource-combo',
       requirements: [
         createCostRequirement({ resource: cookies, cost: 60 }),
@@ -260,6 +268,7 @@ describe('setupSweepAutoPurchase', () => {
     // floor only 8 is spendable, and that reaches the first level (7.5), not
     // the second (8.33).
     const saturating = createPurchasable({
+      display: 'saturating',
       id: 'saturating',
       requirements: (level) =>
         createCostRequirement({
@@ -279,11 +288,12 @@ describe('setupSweepAutoPurchase', () => {
   });
 
   it('throttles on interval and does not replay elapsed beats', () => {
-    const ctx = beginPersistentContext('sweep-interval');
+    beginPersistentContext('sweep-interval');
     const cookies = createTestResource('cookies', 1_000);
     const { registerTick, tick } = createManualTicks();
 
     const levels = createPurchasable({
+      display: 'levels',
       id: 'levels',
       requirements: createCostRequirement({ resource: cookies, cost: 100 }),
       limit: 3,
@@ -291,7 +301,7 @@ describe('setupSweepAutoPurchase', () => {
     });
 
     setupSweepAutoPurchase([levels], { enabled: true, interval: 2 }, registerTick);
-    endPersistentContext(ctx);
+    endPersistentContext();
 
     tick(1);
     expect(Decimal.eq(levels.amount.value, 0)).toBe(true);
@@ -310,6 +320,7 @@ describe('setupSweepAutoPurchase', () => {
     const { registerTick } = createManualTicks();
 
     const upgrade = createPurchasable({
+      display: 'upgrade',
       id: 'upgrade',
       requirements: createCostRequirement({ resource: cookies, cost: 10 }),
       limit: 1,
@@ -805,7 +816,10 @@ describe('setupPolicyAutoPurchase', () => {
   it('interval accumulator round-trips through exportSave/importSave', () => {
     // Regression: when a mid-run importSave restores the resource + purchase-
     // count state, the interval accumulator must be restored alongside them.
-    const cookies = createResource<DecimalSource>(1_000_000);
+    const cookies = createResource<DecimalSource>(1_000_000, {
+      id: 'cookies',
+      displayName: 'cookies',
+    });
     const { registerTick, tick } = createManualTicks();
     const mgr = createSaveManager({ gameId: 'ol-672', storageAdapter: createMemoryStorage() });
 

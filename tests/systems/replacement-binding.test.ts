@@ -75,7 +75,7 @@ describe('replacementBinding', () => {
 
     const descs = chain.modifiers.map((m) => {
       const d = typeof m.description === 'function' ? m.description() : m.description;
-      return d?.text;
+      return Array.isArray(d) ? undefined : d?.text;
     });
     expect(descs).toEqual(['Rewire (cancel)', 'Rewire (replacement)']);
   });

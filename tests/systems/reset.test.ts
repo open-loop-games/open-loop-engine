@@ -554,7 +554,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     skills.register({ id: 'reset-cat-lifetime-mastery' });
     const mastery = skills.getSkill('reset-cat-lifetime-mastery')!;
     mastery.xp.value = new Decimal(5000);
-    mastery.accumulateBonus();
+    mastery.accumulateBonus!();
     const bonus = new Decimal(mastery.permanentBonus!.value);
     expect(bonus.gt(0)).toBe(true);
 
@@ -584,6 +584,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     const upgrades = createPurchasableCategory<{ id: string }>({
       id: 'reset-cat-upgrades',
       mapPurchasable: () => ({
+        display: { description: '' },
         requirements: createCostRequirement({ resource: gold, cost: 10 }),
         limit: maxLevel,
         visible: shown,

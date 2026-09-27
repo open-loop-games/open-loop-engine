@@ -4,11 +4,13 @@ import {
   getAllPersistentRefs,
   resetAllPersistentContexts,
   withLoadingSave,
+  type Persistent,
+  type State,
 } from '@/core/persistence';
 import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
-import type { DialogGraph } from '@/systems/dialog';
+import type { DialogGraph, DialogRuntimeState } from '@/systems/dialog';
 
 /**
  * Construct inside an engine install hook and hand the result back for the test
@@ -66,14 +68,13 @@ function buildSession(
   return withEngine(accessor, () => createDialogSession({ id, graphs }));
 }
 
-function savedState(id: string) {
-  return getAllPersistentRefs().get(`dialog-sessions/${id}.state`) as {
-    value: {
-      activeGraphId?: string;
-      activeNodeId?: string;
-      visitCounts: Record<string, Record<string, number>>;
-    };
-  };
+function savedState(id: string): Persistent<State> {
+  return getAllPersistentRefs().get(`dialog-sessions/${id}.state`)!;
+}
+
+/** Narrows the generic introspection value down to the shape this session's stateRef actually holds. */
+function isDialogRuntimeState(v: unknown): v is DialogRuntimeState {
+  return typeof v === 'object' && v !== null && 'visitCounts' in v;
 }
 
 const greetingGraph: DialogGraph = {
@@ -157,8 +158,10 @@ describe('createDialogSession', () => {
     expect(() => session.start('loop-with-effect')).toThrow(/cycle/);
     expect(setStateSpy).toHaveBeenCalledTimes(1);
     const stateRef = savedState('cycle-sync');
-    expect(stateRef.value.activeNodeId).toBe(session.present()?.nodeId);
-    expect(stateRef.value.visitCounts['loop-with-effect']).toEqual({ a: 1, b: 1 });
+    const state = stateRef.value;
+    if (!isDialogRuntimeState(state)) throw new Error('expected dialog runtime state');
+    expect(state.activeNodeId).toBe(session.present()?.nodeId);
+    expect(state.visitCounts['loop-with-effect']).toEqual({ a: 1, b: 1 });
   });
 
   it('starts a graph and presents the entry node', () => {
@@ -322,7 +325,9 @@ describe('createDialogSession', () => {
     expect(session.present()).toMatchObject({ nodeId: 'b', finished: true });
     expect(presented).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'b' }));
     expect(setStateSpy).toHaveBeenCalledWith('met-b', 1);
-    expect(savedState('lapsed').value.activeNodeId).toBe('b');
+    const lapsedState = savedState('lapsed').value;
+    if (!isDialogRuntimeState(lapsedState)) throw new Error('expected dialog runtime state');
+    expect(lapsedState.activeNodeId).toBe('b');
   });
 
   it('refuses to advance a line that offers a choice or is finished', () => {

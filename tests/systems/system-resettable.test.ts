@@ -194,7 +194,8 @@ const cases: Case[] = [
   },
   {
     name: 'purchasable',
-    build: () => createPurchasable({ id: 'sharpen', requirements: [] }),
+    build: () =>
+      createPurchasable({ id: 'sharpen', display: { description: '' }, requirements: [] }),
     dirty: (upgrade: ReturnType<typeof createPurchasable>) => void upgrade.purchase(2),
   },
   {

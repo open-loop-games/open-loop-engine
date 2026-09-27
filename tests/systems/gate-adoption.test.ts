@@ -25,6 +25,7 @@ import {
   requirementsMet,
   type EngineModule,
   type GameStateAccessor,
+  type GameStateAccessorMutator,
   type Resource,
 } from '@/index';
 import { createAchievement } from '@/systems/achievement';
@@ -55,11 +56,14 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
   const rates = new Map<string, Decimal>();
   const stateMap = new Map<string, unknown>();
   let points: Resource<number>;
-  const accessor: GameStateAccessor = {
+  const accessor: GameStateAccessorMutator = {
     getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     isUnlocked: () => false,
     getState: (path) => stateMap.get(path),
+    applyResourceOp: () => {},
+    setUnlocked: () => {},
+    setState: (path, value) => stateMap.set(path, value),
   };
 
   let captured: T;
@@ -391,7 +395,12 @@ function bootstrapAccessorless<T>(install: () => T): { result: T; stop: () => vo
     install() {
       upgrades = createPurchasableCategory<{ id: string }>({
         id: 'producers',
-        mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 10 }),
+        mapPurchasable: () => ({
+          display: { description: '' },
+          requirements: [],
+          effect: 1,
+          limit: 10,
+        }),
       });
       upgrades.register({ id: 'farm' });
       upgrades.getEntry('farm')!.purchasable.amount.value = new Decimal(5);
@@ -779,7 +788,11 @@ describe('Predicate fields — every arm reaches the system', () => {
     const { result, stop } = bootstrap((api) => {
       const upgrades = createPurchasableCategory<{ id: string }>({
         id: 'upgrades',
-        mapPurchasable: () => ({ display: {}, requirements: [], visible: pointsGte(2) }),
+        mapPurchasable: () => ({
+          display: { description: '' },
+          requirements: [],
+          visible: pointsGte(2),
+        }),
       });
       upgrades.register({ id: 'u' });
       const producers = createProducerCategory<{ id: string }>({
@@ -833,7 +846,7 @@ describe('Predicate fields — every arm reaches the system', () => {
       const upgrades = createPurchasableCategory<{ id: string }>({
         id: 'upgrades',
         mapPurchasable: () => ({
-          display: {},
+          display: { description: '' },
           requirements: [],
           limit: 1,
           initialAmount: 1,
@@ -900,14 +913,18 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     const chain = createModifierChain('rate');
     const hidden = createPurchasableCategory<{ id: string }>({
       id: 'hidden',
-      mapPurchasable: () => ({ display: {}, requirements: [], visible: unwiredFlag }),
+      mapPurchasable: () => ({
+        display: { description: '' },
+        requirements: [],
+        visible: unwiredFlag,
+      }),
     });
     expect(() => hidden.register({ id: 'u' })).toThrow(/purchasable 'u' visible: /);
 
     const granted = createPurchasableCategory<{ id: string }>({
       id: 'granted',
       mapPurchasable: () => ({
-        display: {},
+        display: { description: '' },
         requirements: [],
         grants: [{ chain, mult: 2, description: 'Doubler', when: unwiredFlag }],
       }),

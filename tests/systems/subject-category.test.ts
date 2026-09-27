@@ -192,7 +192,12 @@ describe('createSubjectCategory', () => {
       const rask = withEngine(accessor, () => {
         const upgrades = createPurchasableCategory<{ id: string }>({
           id: 'upgrades',
-          mapPurchasable: () => ({ display: {}, requirements: [], effect: 1, limit: 10 }),
+          mapPurchasable: () => ({
+            display: { description: '' },
+            requirements: [],
+            effect: 1,
+            limit: 10,
+          }),
         });
         upgrades.register({ id: 'charm' });
 
@@ -438,9 +443,9 @@ describe('createSubjectCategory', () => {
       cat.register({ id: 'fresh' });
       const signals = cat.getEntry('fresh')!.signals!;
       expect(signals.unlock.value).toBe(false);
-      expect(signals.count.value.toNumber()).toBe(0);
+      expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(0);
       cat.get('fresh')!.fields.mood.set('calm', 3);
-      expect(signals.count.value.toNumber()).toBe(1);
+      expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(1);
     });
   });
 

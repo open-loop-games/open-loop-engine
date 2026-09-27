@@ -5,8 +5,8 @@ import {
   getCurrentFullContext,
   getModulePersistentRefs,
   withPersistentContext,
-  type DecimalSource,
 } from '@/core/persistence';
+import type { DecimalSource } from '@/primitives/decimal';
 
 interface ThingDef {
   id: string;

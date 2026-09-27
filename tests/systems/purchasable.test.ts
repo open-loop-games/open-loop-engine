@@ -530,7 +530,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
   });
 
   it('closure cost reactively flips canPurchase when resource crosses threshold', () => {
-    const r = createResource(50, { id: 'r', displayName: 'r' });
+    const r = createResource<DecimalSource>(50, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'closure-canpurchase',
       description: 'reactive',

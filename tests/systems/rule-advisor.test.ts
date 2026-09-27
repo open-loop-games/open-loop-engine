@@ -87,10 +87,10 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
 describe('createRuleAdvisor — historySource branches', () => {
   it('reads from a CycleLog when historySource is a CycleLog instance', () => {
     const log = fakeLoopLog([{ value: 1 }, { value: 2 }]);
-    let seen: readonly { value: number }[] = [];
+    let seen: readonly CycleLogEntry[] = [];
     const advisor = createRuleAdvisor({
       historySource: log,
-      aggregate: (h: readonly { value: number }[]) => {
+      aggregate: (h: readonly CycleLogEntry[]) => {
         seen = h;
         return h.length;
       },

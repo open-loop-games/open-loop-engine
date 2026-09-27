@@ -6,10 +6,13 @@ import {
   beginPersistentContext,
   endPersistentContext,
   type Persistent,
-  type DecimalSource,
 } from '@/core/persistence';
+import type { DecimalSource } from '@/primitives/decimal';
 import { createCostRequirement, createBooleanRequirement } from '@/core/requirements';
-import { createPurchasableCategory } from '@/systems/purchasable-category';
+import {
+  createPurchasableCategory,
+  type PurchasableCategory,
+} from '@/systems/purchasable-category';
 import { createModifierChain, createMultiplicativeModifier } from '@/core/modifier';
 import Formula from '@/core/formulas/formulas';
 import { createTestResource } from '../helpers/test-resource';
@@ -350,7 +353,7 @@ describe('createPurchasableCategory (one-shot, limit: 1)', () => {
       id: 'pc-test14',
       mapPurchasable: (def) => ({
         display: { description: def.name },
-        requirements: createBooleanRequirement(true),
+        requirements: createBooleanRequirement({ requirement: true }),
         limit: 1,
       }),
     });
@@ -930,7 +933,7 @@ describe('PurchasableCategory — invertible leveled costs', () => {
 describe('createPurchasableCategory — registry patches', () => {
   it('a mapping getter that reads through getDef tracks a registry patch', () => {
     const gold = createTestResource('gold', 1000);
-    const category = createPurchasableCategory<PerkDef>({
+    const category: PurchasableCategory<PerkDef> = createPurchasableCategory<PerkDef>({
       id: 'patched-perks',
       mapPurchasable: (def) => ({
         display: { description: def.name },

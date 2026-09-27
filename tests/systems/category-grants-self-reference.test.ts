@@ -15,7 +15,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { computed, ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
-import type { DecimalSource } from '@/core/persistence';
+import type { DecimalSource } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
 import { createCostRequirement } from '@/core/requirements';
 import {
