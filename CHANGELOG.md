@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.3.2 (2026-09-27)
+
+### Fixes
+
+* **systems:** banked acceleration charges excess in real seconds over any baseline (71f53de)
+
 ## 0.3.1 (2026-09-27)
 
 ### Features
