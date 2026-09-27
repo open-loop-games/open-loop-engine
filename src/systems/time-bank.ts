@@ -147,9 +147,11 @@ export interface BankedAccelerationConfig {
   spendMultiplier: Computable<number>;
   /**
    * What a tick of accelerated play costs the bank.
-   * - `'excess'` (default) — only the sim-time beyond baseline: 1 banked
-   *   second buys "the next second runs at 1 + n×". The corpus-dominant
-   *   conservation shape (Kill the Lich, Idle Loops, Cavernous, Shark Game).
+   * - `'excess'` (default) — only the boost beyond baseline, charged in real
+   *   seconds: a spend at n× costs n − 1 banked seconds per real second,
+   *   whatever the driver's baseline multiplier. The corpus-dominant
+   *   conservation shape (Kill the Lich, Idle Loops, Cavernous, Shark Game);
+   *   Idle Loops charges real time even while a challenge doubles game speed.
    * - `'full'` — the whole accelerated dt: banked seconds are raw sim-seconds
    *   delivered at speed. Deliberately lossier (Kittens Game Redshift).
    */
@@ -240,9 +242,11 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
     // mid-spend has the same hazard; stop the spend around it.)
     if (!isSpending.value || burstInFlight) return;
     // Pay for the tick that just ran at appliedBonus. dt arrives already
-    // scaled by baseline × appliedBonus.
+    // scaled by baseline × appliedBonus, so the real seconds it covers are
+    // dt / (baseline × appliedBonus).
     if (appliedBonus > 1) {
-      const drain = drainMode === 'full' ? dt : (dt * (appliedBonus - 1)) / appliedBonus;
+      const excess = baseline > 0 ? (dt * (appliedBonus - 1)) / (baseline * appliedBonus) : 0;
+      const drain = drainMode === 'full' ? dt : excess;
       const paid = bank.withdraw(drain);
       if (paid < drain) {
         stopSpending();

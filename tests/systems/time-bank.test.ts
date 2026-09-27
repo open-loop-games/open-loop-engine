@@ -108,6 +108,18 @@ describe('createBankedAcceleration — spend loop', () => {
     expect(bank.banked.value).toBeCloseTo(100 - 9, 6); // paid only the excess
   });
 
+  it('charges excess in real seconds over a non-1 baseline', () => {
+    const { driver, sim } = probeDriver();
+    driver.speedMultiplier = 2;
+    const bank = createTimeBank();
+    bank.deposit(100);
+    const accel = createBankedAcceleration({ tickDriver: driver, bank, spendMultiplier: 5 });
+    accel.startSpending();
+    for (let i = 0; i < 20; i++) driver.tickRaw(0.05); // 1 real second
+    expect(sim()).toBeCloseTo(10, 6); // 2x baseline × 5x boost
+    expect(bank.banked.value).toBeCloseTo(100 - 4, 6); // (5 - 1) real seconds, not 8
+  });
+
   it("drainMode 'full' charges the whole accelerated dt", () => {
     const { driver } = probeDriver();
     const bank = createTimeBank();

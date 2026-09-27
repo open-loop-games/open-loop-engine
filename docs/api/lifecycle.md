@@ -112,11 +112,11 @@ persistent game state with multi-slot support
 
 banked-time reservoir with acceleration and burst spend surfaces
 
-- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:173`
+- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:175`
 - `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:137`
-- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:338`
-- `interface BurstDischargeOptions` `src/systems/time-bank.ts:298`
-- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:215`
+- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:342`
+- `interface BurstDischargeOptions` `src/systems/time-bank.ts:302`
+- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:217`
 - `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:104`
 - `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:66`
 - `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:45`
