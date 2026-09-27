@@ -132,6 +132,9 @@ export interface CostRequirementOptions {
  * A requirement that costs a resource to satisfy
  */
 export interface CostRequirement extends Requirement {
+  /** How many purchases the resource covers: `1` when one is affordable, more when `canMaximize` allows bulk. */
+  requirementMet: MaybeRef<DecimalSource>;
+
   /** The resource being spent */
   resource: Resource;
 

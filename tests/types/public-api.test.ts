@@ -22,6 +22,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import {
   createActionCategory,
   createChallengeCategory,
+  createCostRequirement,
   createEngine,
   createOverrideRegistry,
   createResource,
@@ -141,6 +142,13 @@ describe('persistent value types', () => {
     persistent({ onLoad: () => 1 });
     // @ts-expect-error a Map is not state
     persistent(new Map<string, number>(), { name: 'm' });
+  });
+});
+
+describe('createCostRequirement', () => {
+  it('types requirementMet as a count, never a boolean', () => {
+    const req = createCostRequirement({ resource: createResource(ref(10)), cost: 5 });
+    expectTypeOf(req.requirementMet).toEqualTypeOf<MaybeRef<DecimalSource>>();
   });
 });
 
