@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.3.3 (2026-09-27)
+
+### Fixes
+
+* **core:** squares and square roots are exact on integers (b76ac9b)
+
 ## 0.3.2 (2026-09-27)
 
 ### Fixes
