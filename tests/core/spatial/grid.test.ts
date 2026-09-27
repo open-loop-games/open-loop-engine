@@ -556,7 +556,6 @@ describe('createSpatialGrid — FOV adapter', () => {
     let allocations = 0;
     class CountingUint8 extends OriginalUint8 {
       constructor(...args: ConstructorParameters<typeof OriginalUint8>) {
-        // @ts-expect-error forwarding variadic Uint8Array overloads
         super(...args);
         allocations++;
       }
@@ -664,9 +663,9 @@ describe('createSpatialGrid — exploredCount', () => {
       width: 2,
       height: 2,
       cells: [floor(), floor(), floor(), floor()],
-      passable: new Uint8Array([0, 0, 0, 0]),
-      explored: new Uint8Array([1, 0, 1, 1]),
-      visible: new Uint8Array([0, 0, 0, 0]),
+      passable: [0, 0, 0, 0],
+      explored: [1, 0, 1, 1],
+      visible: [0, 0, 0, 0],
     });
     expect(grid.exploredCount).toBe(3);
   });
@@ -692,9 +691,9 @@ describe('createSpatialGrid — passableCount', () => {
       width: 3,
       height: 1,
       cells: [floor(), floor(), floor()],
-      passable: new Uint8Array([1, 1, 1]),
-      explored: new Uint8Array([0, 0, 0]),
-      visible: new Uint8Array([0, 0, 0]),
+      passable: [1, 1, 1],
+      explored: [0, 0, 0],
+      visible: [0, 0, 0],
     });
     expect(grid.passableCount).toBe(3);
   });
@@ -705,9 +704,9 @@ describe('createSpatialGrid — passableCount', () => {
       width: 2,
       height: 2,
       cells: [floor(), floor(), floor(), floor()],
-      passable: new Uint8Array([1, 0, 1, 1]),
-      explored: new Uint8Array([0, 0, 0, 0]),
-      visible: new Uint8Array([0, 0, 0, 0]),
+      passable: [1, 0, 1, 1],
+      explored: [0, 0, 0, 0],
+      visible: [0, 0, 0, 0],
     });
     expect(grid.passableCount).toBe(3);
   });
@@ -816,9 +815,9 @@ describe('createSpatialGrid — exploredPassableCount', () => {
       width: 2,
       height: 2,
       cells: [floor(), floor(), floor(), floor()],
-      passable: new Uint8Array([1, 0, 1, 1]),
-      explored: new Uint8Array([1, 1, 0, 1]),
-      visible: new Uint8Array([0, 0, 0, 0]),
+      passable: [1, 0, 1, 1],
+      explored: [1, 1, 0, 1],
+      visible: [0, 0, 0, 0],
     });
     // passable ∩ explored: index 0 (1,1) and index 3 (1,1) → 2
     expect(grid.exploredPassableCount).toBe(2);

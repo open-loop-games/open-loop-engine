@@ -178,13 +178,15 @@ describe('sequencer advance cap', () => {
     // the cap and dequeueNext returns null forever, permanently stalling the
     // queue (the B3 blocker). One item completes per tick here; cumulative
     // completes (15) far exceed the cap (3), so a lifetime counter would trip.
-    const cbs = new Set<() => void>();
-    const registerTick = (cb: () => void) => {
+    const cbs = new Set<(dt: number) => void>();
+    const registerTick = (cb: (dt: number) => void) => {
       cbs.add(cb);
-      return () => cbs.delete(cb);
+      return () => {
+        cbs.delete(cb);
+      };
     };
     const fireTick = () => {
-      for (const cb of [...cbs]) cb();
+      for (const cb of [...cbs]) cb(0);
     };
 
     beginPersistentContext('b3');
@@ -307,10 +309,12 @@ describe('instant-complete cascades', () => {
   });
 
   it('bounds a cascade by the advance cap, and resumes on the next tick', () => {
-    const cbs = new Set<() => void>();
-    const registerTick = (cb: () => void) => {
+    const cbs = new Set<(dt: number) => void>();
+    const registerTick = (cb: (dt: number) => void) => {
       cbs.add(cb);
-      return () => cbs.delete(cb);
+      return () => {
+        cbs.delete(cb);
+      };
     };
     beginPersistentContext('cap-resume');
     const q = createSequencer<void>({
@@ -334,9 +338,9 @@ describe('instant-complete cascades', () => {
     expect(q.items.value).toHaveLength(1500);
 
     // The tick boundary resets the counter and re-drives dispatch on its own.
-    for (const cb of [...cbs]) cb();
+    for (const cb of [...cbs]) cb(0);
     expect(starts).toHaveLength(2000);
-    for (const cb of [...cbs]) cb();
+    for (const cb of [...cbs]) cb(0);
     expect(starts).toHaveLength(2500);
     expect(q.items.value).toHaveLength(0);
   });

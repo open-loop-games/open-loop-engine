@@ -31,7 +31,7 @@ import { inversionTolerance, representationFloor } from '@/core/formulas/inversi
 import { createResource } from '@/core/resource';
 import { findCrossing } from '@/core/formulas/root-find';
 import { arithmeticSeries, geometricSeries, powerSeries } from '@/core/formulas/series';
-import type { GenericFormula } from '@/core/formulas/types';
+import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { describe, expect, test, vi } from 'vitest';
@@ -85,7 +85,7 @@ type Tolerance = { tol?: undefined; tolReason?: undefined } | { tol: number; tol
 
 /** A unary op that declares an inverse, with the domain its round-trip holds on. */
 type UnaryCase = Tolerance & {
-  op: (value: DecimalSource) => GenericFormula;
+  op: (value: FormulaSource) => GenericFormula;
   domain: DomainName;
 };
 
@@ -156,7 +156,7 @@ type Orientation = {
 const BINARY: Record<
   string,
   Tolerance & {
-    op: (a: DecimalSource, b: DecimalSource) => GenericFormula;
+    op: (a: FormulaSource, b: FormulaSource) => GenericFormula;
     lhs?: Orientation;
     rhs?: Orientation;
   }
@@ -707,11 +707,11 @@ describe('piecewise: step and if', () => {
   // the shape a first-passage search has to do regime detection through. Its
   // laws were never swept.
 
-  const MODIFIERS: Record<string, (v: never) => GenericFormula> = {
+  const MODIFIERS: Record<string, (v: GenericFormula) => GenericFormula> = {
     // Continuous at the breakpoint: m(0) = 0, so the spliced function has no jump.
-    sqrt: (v) => (v as unknown as GenericFormula).sqrt(),
-    'mul 0.5': (v) => (v as unknown as GenericFormula).mul(0.5),
-    'pow 0.75': (v) => (v as unknown as GenericFormula).pow(0.75),
+    sqrt: (v) => v.sqrt(),
+    'mul 0.5': (v) => v.mul(0.5),
+    'pow 0.75': (v) => v.pow(0.75),
   };
 
   test('below the breakpoint the value passes through unchanged', () => {
@@ -1684,7 +1684,7 @@ describe('magnitude regimes: laws hold where no oracle can reach', () => {
   // Round-trip is graded in input space, so it stays meaningful at every layer:
   // the answer comes back into the same coordinate the input was stated in.
   describe('round-trip through log/exp pairs', () => {
-    const PAIRS: Record<string, (v: DecimalSource) => GenericFormula> = {
+    const PAIRS: Record<string, (v: FormulaSource) => GenericFormula> = {
       log10: (v) => F.log10(v),
       log2: (v) => F.log2(v),
       ln: (v) => F.ln(v),

@@ -67,7 +67,7 @@ describe('requirements module', () => {
     it.each([50, 100, 1000, 920000, 1e9])(
       'reports requirementMet=1 at balance==cost==%i',
       (cost) => {
-        const gold = createResource(new Decimal(cost));
+        const gold = createResource(new Decimal(cost), { id: 'Gold', displayName: 'Gold' });
         const req = createCostRequirement({ resource: gold, cost });
         expect(Decimal.eq(unref(req.requirementMet), 1)).toBe(true);
         expect(requirementsMet(req)).toBe(true);
@@ -75,14 +75,14 @@ describe('requirements module', () => {
     );
 
     it('reports requirementMet=N at balance==N×cost for bulk', () => {
-      const gold = createResource(new Decimal(250));
+      const gold = createResource(new Decimal(250), { id: 'Gold', displayName: 'Gold' });
       const req = createCostRequirement({ resource: gold, cost: 50, maxBulkAmount: 5 });
       expect(Decimal.eq(unref(req.requirementMet), 5)).toBe(true);
     });
 
     it('genuine undershoot still reports false (no false snap)', () => {
       // 49.5 is not within 1e-7 relative tolerance of 50 — genuine undershoot.
-      const gold = createResource(new Decimal(49.5));
+      const gold = createResource(new Decimal(49.5), { id: 'Gold', displayName: 'Gold' });
       const req = createCostRequirement({ resource: gold, cost: 50 });
       expect(Decimal.eq(unref(req.requirementMet), 0)).toBe(true);
       expect(requirementsMet(req)).toBe(false);
@@ -94,7 +94,7 @@ describe('requirements module', () => {
       let bal = Decimal.mul(cost, 5);
       bal = Decimal.add(bal, 0.000001);
       bal = Decimal.sub(bal, 0.000001);
-      const gold = createResource(bal);
+      const gold = createResource(bal, { id: 'Gold', displayName: 'Gold' });
       const req = createCostRequirement({ resource: gold, cost: 920000, maxBulkAmount: 5 });
       expect(Decimal.eq(unref(req.requirementMet), 5)).toBe(true);
     });
@@ -259,7 +259,7 @@ describe('requirements module', () => {
     // intentionally undefined. maxRequirementsMet returns dInf/0; callers
     // using combinators must pay with amount=1.
     it('returns dInf for satisfied anyOf', () => {
-      const gold = createResource(new Decimal(100));
+      const gold = createResource(new Decimal(100), { id: 'Gold', displayName: 'Gold' });
       const req = anyOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createBooleanRequirement({ requirement: false }),
@@ -268,7 +268,7 @@ describe('requirements module', () => {
     });
 
     it('returns 0 for unsatisfied allOf', () => {
-      const gold = createResource(new Decimal(10));
+      const gold = createResource(new Decimal(10), { id: 'Gold', displayName: 'Gold' });
       const req = allOf(
         createCostRequirement({ resource: gold, cost: 30 }),
         createBooleanRequirement({ requirement: true }),

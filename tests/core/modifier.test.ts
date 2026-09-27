@@ -64,7 +64,7 @@ describe('Modifier system', () => {
       const seq = createSequentialModifier([mod]);
       expect(seq.children[0].enabled).toBe(enabled);
       enabled.value = false;
-      expect(seq.children[0].enabled!.value).toBe(false);
+      expect(unref(seq.children[0].enabled)).toBe(false);
     });
   });
 });

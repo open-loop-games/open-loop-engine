@@ -5,7 +5,7 @@ import { processOfflineTime } from '@/core/offline';
 describe('processOfflineTime', () => {
   it('feeds elapsed time through game tickDriver in chunks', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
-    const fn = vi.fn();
+    const fn = vi.fn<(dt: number) => void>();
     tickDriver.onTick(fn);
     processOfflineTime(tickDriver, 3, { chunkSize: 1 });
     const totalDt = fn.mock.calls.reduce((sum: number, call: [number]) => sum + call[0], 0);
@@ -14,7 +14,7 @@ describe('processOfflineTime', () => {
 
   it('does not silently drop time when chunkSize exceeds maxDeltaTime', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
-    const fn = vi.fn();
+    const fn = vi.fn<(dt: number) => void>();
     tickDriver.onTick(fn);
     const result = processOfflineTime(tickDriver, 30, { chunkSize: 10 });
     const totalDt = fn.mock.calls.reduce((sum: number, call: [number]) => sum + call[0], 0);
@@ -32,7 +32,7 @@ describe('processOfflineTime', () => {
 
   it('handles remainder smaller than chunkSize', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
-    const fn = vi.fn();
+    const fn = vi.fn<(dt: number) => void>();
     tickDriver.onTick(fn);
     processOfflineTime(tickDriver, 2.5, { chunkSize: 1 });
     const totalDt = fn.mock.calls.reduce((sum: number, call: [number]) => sum + call[0], 0);
@@ -41,7 +41,7 @@ describe('processOfflineTime', () => {
 
   it('clamps negative elapsed to zero', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
-    const fn = vi.fn();
+    const fn = vi.fn<(dt: number) => void>();
     tickDriver.onTick(fn);
     const result = processOfflineTime(tickDriver, -10);
     expect(result).toBe(0);
@@ -50,7 +50,7 @@ describe('processOfflineTime', () => {
 
   it('treats a NaN elapsed (a missing or garbled timestamp) as zero', () => {
     const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 5 });
-    const fn = vi.fn();
+    const fn = vi.fn<(dt: number) => void>();
     tickDriver.onTick(fn);
     expect(processOfflineTime(tickDriver, NaN)).toBe(0);
     expect(fn).not.toHaveBeenCalled();

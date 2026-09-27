@@ -62,7 +62,7 @@ describe('Resource', () => {
     endPersistentContext();
     addResource(gold, 100);
     await nextTick();
-    expect(gold.best!.value.gte(100)).toBe(true);
+    expect(Decimal.gte(gold.best!.value, 100)).toBe(true);
   });
   it('Resource.cumulative slot accumulates gains only', async () => {
     beginPersistentContext('test-resource-total');
@@ -72,7 +72,7 @@ describe('Resource', () => {
     await nextTick();
     addResource(gold, 30);
     await nextTick();
-    expect(gold.cumulative!.value.gte(80)).toBe(true);
+    expect(Decimal.gte(gold.cumulative!.value, 80)).toBe(true);
   });
   it('small values stay hidden by default at any precision', () => {
     beginPersistentContext('test-resource-small-default');

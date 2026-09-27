@@ -175,9 +175,10 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
   for (const { baseCost, costScaling } of CURVES) {
     for (const funds of [1e3, 1e6, 1e12]) {
       test(`base=${baseCost} s=${costScaling} funds=${funds}`, () => {
-        const bulkWallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const bulkWallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const bulk = createScalingPurchasable({
           id: `bulk-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
+          description: 'bulk-buy curve',
           resource: bulkWallet,
           baseCost,
           costScaling,
@@ -185,9 +186,10 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
         });
         const boughtInBulk = bulk.purchaseMax();
 
-        const oneWallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const oneWallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const one = createScalingPurchasable({
           id: `one-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
+          description: 'one-at-a-time curve',
           resource: oneWallet,
           baseCost,
           costScaling,
@@ -214,9 +216,10 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     // The overcharge used to exceed the balance outright on steep curves, and
     // `pay`'s clamp to zero hid it by draining the wallet instead of failing.
     for (const costScaling of [1.5, 2, 3, 5]) {
-      const wallet = createResource(ref<DecimalSource>(1e6), 'coins');
+      const wallet = createResource(ref<DecimalSource>(1e6), { displayName: 'coins' });
       const p = createScalingPurchasable({
         id: `clamp-${costScaling}`.replaceAll('.', '_'),
+        description: 'clamp curve',
         resource: wallet,
         baseCost: 10,
         costScaling,
@@ -249,7 +252,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       .pow_base(2)
       .mul(10)
       .mul(Formula.constant(surcharge).mul(1));
-    const wallet = createResource(ref<DecimalSource>(101), 'coins');
+    const wallet = createResource(ref<DecimalSource>(101), { displayName: 'coins' });
     const req = createCostRequirement({
       resource: wallet,
       cost,
@@ -277,7 +280,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     // zero turned the 333 unaffordable levels into free ones.
     const coef = ref<DecimalSource>(1);
     const funds = 1e5;
-    const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+    const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
     const p = createScalingPurchasable({
       id: 'reactive-coefficient',
       description: 'a cost curve whose slope is a modifier',
@@ -312,7 +315,8 @@ describe('a flat price is an ordinary authored value', () => {
     // is 0/0 — and the count still has to come out of the price.
     const capped = createScalingPurchasable({
       id: 'flat-capped',
-      resource: createResource(ref<DecimalSource>(100), 'coins'),
+      description: 'flat capped curve',
+      resource: createResource(ref<DecimalSource>(100), { displayName: 'coins' }),
       baseCost: 10,
       costScaling: 1,
       limit: 5,
@@ -321,9 +325,10 @@ describe('a flat price is an ordinary authored value', () => {
     expect(String(capped.purchaseMax())).toBe('5');
     expect(String(capped.amount.value)).toBe('5');
 
-    const wallet = createResource(ref<DecimalSource>(100), 'coins');
+    const wallet = createResource(ref<DecimalSource>(100), { displayName: 'coins' });
     const bulk = createScalingPurchasable({
       id: 'flat-bulk',
+      description: 'flat bulk curve',
       resource: wallet,
       baseCost: 10,
       costScaling: 1,
@@ -334,7 +339,8 @@ describe('a flat price is an ordinary authored value', () => {
 
     const single = createScalingPurchasable({
       id: 'flat-single',
-      resource: createResource(ref<DecimalSource>(100), 'coins'),
+      description: 'flat single curve',
+      resource: createResource(ref<DecimalSource>(100), { displayName: 'coins' }),
       baseCost: 10,
       costScaling: 1,
       bulkPurchase: false,
@@ -358,7 +364,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
       for (const costScaling of [1.05, 1.15, 1.5, 2, 3]) {
         const funds = Decimal.mul(10, Decimal.pow(costScaling, startLevel));
         const level = ref<DecimalSource>(startLevel);
-        const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const shape = {
           resource: wallet,
           cumulativeCost: false as const,
@@ -406,7 +412,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
       test(`level=${startLevel} s=${costScaling}`, () => {
         const funds = 1e3;
         const level = ref<DecimalSource>(startLevel);
-        const wallet = createResource(ref<DecimalSource>(funds), 'coins');
+        const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const req = createCostRequirement({
           resource: wallet,
           cost: Formula.exponential(level, 10, costScaling),

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Decimal } from '@/primitives/decimal';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createResource, addResource, subtractResource } from '@/core/resource';
 import {
   beginPersistentContext,
@@ -26,7 +26,7 @@ function setup() {
   enableTracing();
 }
 
-function makeResource(name: string, initial: number) {
+function makeResource(name: string, initial: DecimalSource) {
   beginPersistentContext(name);
   const r = createResource(initial, { id: name, displayName: name });
   endPersistentContext();

@@ -196,7 +196,9 @@ describe('RunPool — teardown', () => {
     const handle = pool.addInstance({ id: 'a', step: aliveStep });
     scope.stop();
 
-    const saved = { ...getAllPersistentRefs().get(`${ctxId}.aliveStates`)!.value };
+    const saved = {
+      ...(getAllPersistentRefs().get(`${ctxId}.aliveStates`)!.value as Record<string, boolean>),
+    };
     handle.alive.value = false;
     expect(getAllPersistentRefs().get(`${ctxId}.aliveStates`)!.value).toEqual(saved);
   });

@@ -8,17 +8,17 @@ import {
 describe('createConditionalStrategy', () => {
   it('returns the first matching rule item', () => {
     const s = createConditionalStrategy(() => [
-      { condition: () => false, item: { id: 'a' } },
-      { condition: () => true, item: { id: 'b' } },
-      { condition: () => true, item: { id: 'c' } },
+      { condition: () => false, item: { id: 'a', metadata: undefined } },
+      { condition: () => true, item: { id: 'b', metadata: undefined } },
+      { condition: () => true, item: { id: 'c', metadata: undefined } },
     ]);
     expect(s.next()).toEqual({ id: 'b' });
   });
 
   it('returns null when no rules match', () => {
     const s = createConditionalStrategy(() => [
-      { condition: () => false, item: { id: 'a' } },
-      { condition: () => false, item: { id: 'b' } },
+      { condition: () => false, item: { id: 'a', metadata: undefined } },
+      { condition: () => false, item: { id: 'b', metadata: undefined } },
     ]);
     expect(s.next()).toBeNull();
   });
@@ -36,21 +36,21 @@ describe('createConditionalStrategy', () => {
           callOrder.push('a');
           return false;
         },
-        item: { id: 'a' },
+        item: { id: 'a', metadata: undefined },
       },
       {
         condition: () => {
           callOrder.push('b');
           return true;
         },
-        item: { id: 'b' },
+        item: { id: 'b', metadata: undefined },
       },
       {
         condition: () => {
           callOrder.push('c');
           return true;
         },
-        item: { id: 'c' },
+        item: { id: 'c', metadata: undefined },
       },
     ]);
 
@@ -64,8 +64,8 @@ describe('createConditionalStrategy', () => {
     let useAlternate = false;
     const s = createConditionalStrategy(() =>
       useAlternate
-        ? [{ condition: () => true, item: { id: 'alt' } }]
-        : [{ condition: () => true, item: { id: 'default' } }],
+        ? [{ condition: () => true, item: { id: 'alt', metadata: undefined } }]
+        : [{ condition: () => true, item: { id: 'default', metadata: undefined } }],
     );
 
     expect(s.next()).toEqual({ id: 'default' });
@@ -76,8 +76,8 @@ describe('createConditionalStrategy', () => {
   it('conditions can reference external mutable state', () => {
     let health = 100;
     const s = createConditionalStrategy(() => [
-      { condition: () => health < 20, item: { id: 'heal' } },
-      { condition: () => true, item: { id: 'attack' } },
+      { condition: () => health < 20, item: { id: 'heal', metadata: undefined } },
+      { condition: () => true, item: { id: 'attack', metadata: undefined } },
     ]);
 
     expect(s.next()).toEqual({ id: 'attack' });
@@ -87,9 +87,11 @@ describe('createConditionalStrategy', () => {
 
   it('composes with createCompositeStrategy as fallback', () => {
     const conditional = createConditionalStrategy(() => [
-      { condition: () => false, item: { id: 'nope' } },
+      { condition: () => false, item: { id: 'nope', metadata: undefined } },
     ]);
-    const fallback = createPriorityStrategy(() => [{ id: 'fallback', priority: 1 }]);
+    const fallback = createPriorityStrategy(() => [
+      { id: 'fallback', metadata: undefined, priority: 1 },
+    ]);
     const composed = createCompositeStrategy(conditional, fallback);
 
     expect(composed.next()).toEqual({ id: 'fallback' });
