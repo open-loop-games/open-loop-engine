@@ -114,7 +114,13 @@ export interface ScopeStack<N, E> {
 
   // Inspection --------------------------------------------------------------
 
-  /** The active path: one id per level entered, innermost last. Live reference. */
+  /**
+   * The active path: one id per level entered, innermost last. Live reference.
+   *
+   * `path`, `depth`, `current`, `currentNodeId` and `breadcrumb` are snapshots:
+   * a computed over them never recomputes. Watch `scope:entered` and
+   * `scope:exited` and re-read.
+   */
   readonly path: readonly string[];
   /** `path.length`. */
   readonly depth: number;

@@ -148,7 +148,11 @@ export interface GoalPicker<TCandidate, TContext, TWeights> {
    */
   pick(context: TContext): GoalPickResult<TCandidate>;
 
-  /** Currently active candidate IDs. Reads slot or internal array on each access. */
+  /**
+   * Currently active candidates. Backed by a slot, it is live. Without one it
+   * is a snapshot of the internal array: a computed over it never recomputes,
+   * so re-read it after each `pick()`.
+   */
   readonly active: readonly TCandidate[];
 
   /** Replace the weights value or getter for the next `pick()` call. */

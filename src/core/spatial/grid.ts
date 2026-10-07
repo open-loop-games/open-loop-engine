@@ -177,6 +177,10 @@ export interface SpatialGrid<T> {
    * During a consumer port, reading this before every legacy write path
    * goes through the FOV adapter or `markMaskChanged` is the classic
    * counter-drift trap.
+   *
+   * A snapshot: typed-array hot-path state, so a computed over it never
+   * recomputes. Re-read it after the write that changed it, or watch the
+   * mask writes you own. Same for `passableCount` and `exploredPassableCount`.
    */
   readonly exploredCount: number;
 
