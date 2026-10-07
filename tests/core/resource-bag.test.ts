@@ -452,6 +452,78 @@ describe('ResourceBag', () => {
       expect(new Decimal(gold2.value).eq(99)).toBe(true);
     });
 
+    it('gain the cap destroys counts toward neither cumulative nor best', () => {
+      beginPersistentContext('test-link-trackers');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacityPerType: { wood: 10 } });
+      bag.link('wood', wood);
+      for (let i = 0; i < 15; i++) addResource(wood, 1);
+      expect(new Decimal(wood.value).toNumber()).toBe(10);
+      expect(new Decimal(wood.cumulative!.value).toNumber()).toBe(10);
+      expect(new Decimal(wood.best!.value).toNumber()).toBe(10);
+    });
+
+    it('a total cap shared with another type clamps tracker gain the same way', () => {
+      beginPersistentContext('test-link-trackers-total');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacity: 10, initial: { stone: 4 } });
+      bag.link('wood', wood);
+      addResource(wood, 9);
+      expect(new Decimal(wood.value).toNumber()).toBe(6);
+      expect(new Decimal(wood.cumulative!.value).toNumber()).toBe(6);
+      expect(new Decimal(wood.best!.value).toNumber()).toBe(6);
+    });
+
+    it('gain counts in full again once the link is cleaned up', () => {
+      beginPersistentContext('test-link-trackers-unlink');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacityPerType: { wood: 10 } });
+      const unlink = bag.link('wood', wood);
+      addResource(wood, 15);
+      unlink();
+      addResource(wood, 15);
+      expect(new Decimal(wood.value).toNumber()).toBe(25);
+      expect(new Decimal(wood.cumulative!.value).toNumber()).toBe(25);
+      expect(new Decimal(wood.best!.value).toNumber()).toBe(25);
+    });
+
+    it('re-linking the same resource to the same type keeps one clamp', () => {
+      beginPersistentContext('test-link-trackers-relink');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacityPerType: { wood: 10 } });
+      bag.link('wood', wood);
+      bag.link('wood', wood);
+      addResource(wood, 15);
+      expect(new Decimal(wood.cumulative!.value).toNumber()).toBe(10);
+    });
+
+    it('linking a resource into a second bag throws', () => {
+      beginPersistentContext('test-link-two-bags');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      createResourceBag({ capacity: 10 }).link('wood', wood);
+      expect(() => createResourceBag({ capacity: 5 }).link('wood', wood)).toThrow(/already linked/);
+    });
+
+    it("a superseded link's cleanup leaves the link that replaced it alone", () => {
+      beginPersistentContext('test-link-stale-cleanup');
+      const a = createResource<DecimalSource>(0, { id: 'a' });
+      const b = createResource<DecimalSource>(0, { id: 'b' });
+      const c = createResource<DecimalSource>(0, { id: 'c' });
+      endPersistentContext();
+      const bag = createResourceBag({ capacity: 10 });
+      const unlinkA = bag.link('slot', a);
+      bag.link('slot', b);
+      unlinkA();
+      bag.link('slot', c);
+      // Linking c over b releases b, even after a's stale cleanup ran.
+      expect(() => createResourceBag().link('slot', b)).not.toThrow();
+    });
+
     it('a save load restores every linked slot under a shared cap', () => {
       // Slots load one at a time; clamping each against the others' pre-load
       // amounts would trim a valid save that moved its holdings between slots.

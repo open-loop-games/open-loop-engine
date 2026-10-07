@@ -12,7 +12,7 @@ import { reactive, toRaw, watch } from 'vue';
 import { Decimal, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { loadingSave } from './persistence';
-import type { Resource } from './resource';
+import { registerResourceClamp, type Resource } from './resource';
 
 /** A capacity value that can be static or a reactive getter */
 export type CapacitySource = DecimalSource | (() => DecimalSource);
@@ -115,7 +115,8 @@ export interface ResourceBag {
    * Establish a two-way reactive sync between this bag's type slot and a Resource ref.
    * Writes to the resource are clamped to capacity, except during a save load or
    * reset, when the written value is taken as saved. Returns an unsubscribe
-   * function that tears down the watchers.
+   * function that tears down the watchers. A resource links into one bag at a
+   * time; linking it into a second throws.
    */
   link(typeId: string, resource: Resource<DecimalSource>): () => void;
   /** Serialize all non-zero amounts to a plain string-keyed record for persistence. */
@@ -323,6 +324,12 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       const existingCleanup = links.get(typeId);
       if (existingCleanup) existingCleanup();
 
+      // First, so a resource already linked elsewhere throws before any
+      // watcher installs.
+      const unregisterClamp = registerResourceClamp(resource, (amount) =>
+        clampToCapacity(typeId, toFinalDecimal(amount)),
+      );
+
       let syncing = false;
 
       // Resource → bag, clamped to capacity, with any clamp written back so
@@ -375,7 +382,9 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       const cleanup = () => {
         stopBagWatch();
         stopResourceWatch();
-        links.delete(typeId);
+        unregisterClamp();
+        // A superseded link's cleanup, run late, must not drop its successor.
+        if (links.get(typeId) === cleanup) links.delete(typeId);
       };
 
       links.set(typeId, cleanup);

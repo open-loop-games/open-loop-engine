@@ -66,9 +66,11 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
   /**
    * Cumulative-gain accumulator — sums every strictly-increasing motion of
    * the resource over its full life. Decreases don't subtract; refunds
-   * (a decrease followed by a re-increase) count as new gain. Starts at the
-   * resource's default, so a starting balance counts as earned. Present on a
-   * persistent resource created inside a persistent context (any engine
+   * (a decrease followed by a re-increase) count as new gain. A linked
+   * `ResourceBag`'s cap clamps a gain before it counts, so overflow the bag
+   * destroys reaches neither this nor `best`. Starts at the resource's
+   * default, so a starting balance counts as earned. Present on a persistent
+   * resource created inside a persistent context (any engine
    * module); absent outside one, and for derived/computed resources created
    * via the {@link createResource} ref-wrapping overload.
    *
@@ -191,6 +193,40 @@ export function createContextScopedResource<T>(
   return buildResource(defaultValue, options, saveName) as Resource<T> & Persistent<T>;
 }
 
+// A capped ResourceBag linked to a resource clamps each write back to its cap,
+// but only from its own watcher, which subscribes at link time and so runs
+// after the cumulative/best trackers subscribed at creation. Both are
+// `flush: 'sync'`, so the trackers would see the raw over-cap write first and
+// count gain the bag then destroys. Rather than lean on subscription order,
+// the trackers apply the bag's clamp themselves, looked up here.
+const resourceClamps = new WeakMap<
+  Resource<DecimalSource>,
+  (amount: DecimalSource) => DecimalSource
+>();
+
+/**
+ * Register the clamp a linked bag applies to `resource`'s writes, so its
+ * trackers count only what lands. Returns the deregistration. Throws when
+ * another clamp is already registered: one resource linked into two bags has
+ * two caps fighting over its value.
+ *
+ * @internal Used by ResourceBag's `link`.
+ */
+export function registerResourceClamp(
+  resource: Resource<DecimalSource>,
+  clamp: (amount: DecimalSource) => DecimalSource,
+): () => void {
+  if (resourceClamps.has(resource)) {
+    throw new Error(
+      `Resource "${resource.id}" is already linked into a resource bag; unlink it before linking it again.`,
+    );
+  }
+  resourceClamps.set(resource, clamp);
+  return () => {
+    if (resourceClamps.get(resource) === clamp) resourceClamps.delete(resource);
+  };
+}
+
 /** Shared body of the resource factories; `saveName` defaults to the resolved id. */
 function buildResource<T>(
   defaultValue: T | Ref<T>,
@@ -263,27 +299,30 @@ function buildResource<T>(
           lifetime: true,
         });
 
+        // The last amount that landed after a linked bag's clamp. Cumulative
+        // diffs against it rather than the raw previous write, which may be
+        // an over-cap value the bag pulled back, so gain is always measured
+        // between two landed amounts.
+        let landed = initial;
+
         // flush: 'sync' so sim harnesses driving engine.tickDriver.stepOnce()
         // in a tight loop (no microtask boundary between ticks) still observe
         // updates on the same tick the source resource changed.
         watch(
           resource as Ref<DecimalSource>,
-          (amount, prevAmount) => {
-            if (loadingSave.value) return;
-            if (Decimal.gt(amount, prevAmount)) {
-              cumulative.value = Decimal.add(cumulative.value, Decimal.sub(amount, prevAmount));
-            }
-          },
-          { flush: 'sync' },
-        );
-
-        watch(
-          resource as Ref<DecimalSource>,
           (amount) => {
-            if (loadingSave.value) return;
-            if (Decimal.gt(amount, best.value)) {
-              best.value = amount;
+            // A load is taken as saved, unclamped, and counts as no gain.
+            if (loadingSave.value) {
+              landed = amount;
+              return;
             }
+            const clamp = resourceClamps.get(resource as Resource<DecimalSource>);
+            const next = clamp ? clamp(amount) : amount;
+            if (Decimal.gt(next, landed)) {
+              cumulative.value = Decimal.add(cumulative.value, Decimal.sub(next, landed));
+            }
+            if (Decimal.gt(next, best.value)) best.value = next;
+            landed = next;
           },
           { flush: 'sync' },
         );
