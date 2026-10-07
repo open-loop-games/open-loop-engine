@@ -1576,3 +1576,48 @@ describe('SaveManager — save:written', () => {
     expect(written).not.toHaveBeenCalled();
   });
 });
+
+describe('SaveManager live reads', () => {
+  const make = () => createSaveManager({ gameId: 'live', storageAdapter: createMapStorage() });
+
+  it('slots recomputes on create, rename and delete', async () => {
+    const { computed } = await import('vue');
+    const mgr = make();
+    const names = computed(() => mgr.slots.map((s) => s.name).join(','));
+    expect(names.value).toBe('Autosave');
+    const id = mgr.createSlot('A');
+    expect(names.value).toBe('Autosave,A');
+    mgr.renameSlot(id, 'B');
+    expect(names.value).toBe('Autosave,B');
+    mgr.deleteSlot(id);
+    expect(names.value).toBe('Autosave');
+  });
+
+  it('slots recomputes on duplicate', async () => {
+    const { computed } = await import('vue');
+    const mgr = make();
+    const count = computed(() => mgr.slots.length);
+    expect(count.value).toBe(1);
+    mgr.duplicateSlot(0, 'copy');
+    expect(count.value).toBe(2);
+  });
+
+  it('activeSlotId recomputes on select', async () => {
+    const { computed } = await import('vue');
+    const mgr = make();
+    const active = computed(() => mgr.activeSlotId);
+    expect(active.value).toBe(0);
+    const id = mgr.createSlot();
+    mgr.selectSlot(id);
+    expect(active.value).toBe(id);
+  });
+
+  it('modId recomputes on set', async () => {
+    const { computed } = await import('vue');
+    const mgr = make();
+    const mod = computed(() => mgr.modId);
+    expect(mod.value).toBeUndefined();
+    mgr.modId = 'm';
+    expect(mod.value).toBe('m');
+  });
+});

@@ -40,6 +40,7 @@ import { createEmitHandle, type Emittable } from './events';
 import { validateSaveData, type ValidationIssue } from './save-validation';
 import { isDev } from './common';
 import { Decimal } from '@/primitives/decimal';
+import { shallowRef } from 'vue';
 import LZString from 'lz-string';
 const { compressToBase64, decompressFromBase64 } = LZString;
 
@@ -565,9 +566,17 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
 
   const handle = createEmitHandle<SaveEvents>();
 
-  let _modId: string | undefined;
-  let _activeSlotId = 0;
+  const _modId = shallowRef<string | undefined>(undefined);
+  const _activeSlotId = shallowRef(0);
   const _slots: SaveSlot[] = [];
+  // `slots` hands out a copy rebuilt per mutation: the same array reference
+  // would let a computed over it dedupe a rename away.
+  const slotsVersion = shallowRef(0);
+  let _slotsView: readonly SaveSlot[] | null = null;
+  function bumpSlots(): void {
+    _slotsView = null;
+    slotsVersion.value++;
+  }
   let _metadataProvider: (() => Record<string, unknown>) | null = null;
   // Slots whose load failed on a save that still sits in storage.
   const _protectedSlots = new Set<number>();
@@ -588,6 +597,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   }
 
   function saveSlotIndex(): void {
+    bumpSlots();
     storage.setItem(slotsKey, JSON.stringify(_slots));
   }
 
@@ -621,7 +631,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   // === ENVELOPE HELPERS ===
 
   function activeStorageKey(): string {
-    return slotStorageKey(_activeSlotId);
+    return slotStorageKey(_activeSlotId.value);
   }
 
   /**
@@ -642,7 +652,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       version,
       gameId,
       timestamp: Date.now(),
-      modId: _modId,
+      modId: _modId.value,
       metadata: _metadataProvider?.() ?? undefined,
     };
     if (compressSave) {
@@ -863,13 +873,13 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     // === ACTIVE SLOT OPERATIONS ===
 
     save() {
-      writeSlot(_activeSlotId);
+      writeSlot(_activeSlotId.value);
     },
 
     load(): SaveLoadResult {
       const raw = storage.getItem(activeStorageKey());
-      if (!raw) return failLoad(_activeSlotId, new LoadFailure('not-found'), false);
-      return applySaveText(raw, _activeSlotId, true);
+      if (!raw) return failLoad(_activeSlotId.value, new LoadFailure('not-found'), false);
+      return applySaveText(raw, _activeSlotId.value, true);
     },
 
     exportSave() {
@@ -877,7 +887,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     importSave(data): SaveLoadResult {
-      return applySaveText(data, _activeSlotId, false);
+      return applySaveText(data, _activeSlotId.value, false);
     },
 
     hasSave() {
@@ -885,7 +895,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     deleteSave() {
-      writeRawSlot(_activeSlotId, null);
+      writeRawSlot(_activeSlotId.value, null);
     },
 
     peek(): SavePeek | null {
@@ -893,20 +903,21 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     get modId() {
-      return _modId;
+      return _modId.value;
     },
     set modId(id: string | undefined) {
-      _modId = id;
+      _modId.value = id;
     },
 
     // === SLOT MANAGEMENT ===
 
     get activeSlotId() {
-      return _activeSlotId;
+      return _activeSlotId.value;
     },
 
     get slots(): readonly SaveSlot[] {
-      return _slots;
+      void slotsVersion.value;
+      return (_slotsView ??= _slots.map((s) => ({ ...s })));
     },
 
     createSlot(name?: string): number {
@@ -914,7 +925,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     },
 
     deleteSlot(slotId: number): void {
-      if (slotId === _activeSlotId) {
+      if (slotId === _activeSlotId.value) {
         throw new Error('Cannot delete the active save slot');
       }
       const idx = _slots.findIndex((s) => s.id === slotId);
@@ -934,7 +945,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     selectSlot(slotId: number): void {
       const slot = _slots.find((s) => s.id === slotId);
       if (!slot) throw new Error(`Save slot ${slotId} not found`);
-      _activeSlotId = slotId;
+      _activeSlotId.value = slotId;
     },
 
     peekSlot(slotId: number): SavePeek | null {
@@ -997,7 +1008,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       try {
         envelope = readEnvelope(data);
       } catch (err) {
-        return failLoad(slotId ?? _activeSlotId, err, false);
+        return failLoad(slotId ?? _activeSlotId.value, err, false);
       }
       let targetId: number;
       if (slotId === undefined) {
