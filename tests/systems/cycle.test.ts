@@ -47,6 +47,33 @@ describe('createCycle', () => {
     expect(Decimal.eq(pp.cumulative!.value, 10)).toBe(true);
   });
 
+  it('pausing in an afterRestart listener dwells until run() is called', () => {
+    const { registerTick, tick } = createManualTicks();
+    const cycle = createCycle({
+      thingsToReset: [],
+      registerTick,
+      endCondition: () => cycle.elapsed.value >= 3,
+    });
+    cycle.on('afterRestart', () => cycle.pause());
+
+    cycle.run();
+    tick(3);
+
+    expect(cycle.count.value).toBe(1);
+    expect(cycle.running.value).toBe(false);
+    expect(cycle.elapsed.value).toBe(0);
+
+    tick(5);
+    tick(5);
+    expect(cycle.running.value).toBe(false);
+    expect(cycle.elapsed.value).toBe(0);
+    expect(cycle.count.value).toBe(1);
+
+    cycle.run();
+    tick(1);
+    expect(cycle.elapsed.value).toBeCloseTo(1);
+  });
+
   it('a zero-length cycle does not record a best time', () => {
     const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({ thingsToReset: [], registerTick });

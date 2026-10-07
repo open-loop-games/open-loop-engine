@@ -37,7 +37,12 @@ import { createPredicateResolver, type Predicate } from './gate';
 export interface CycleEvents {
   /** Fired after `onBeforeRestart` succeeds, before the actual reset executes */
   beforeRestart: () => void;
-  /** Fired after the reset completes and elapsed time is zeroed */
+  /**
+   * Fired after the reset completes and elapsed time is zeroed. Pause from a
+   * listener to dwell on a results screen until the player restarts with
+   * `run()`; the screen reads state captured in `onBeforeRestart` or a
+   * `CycleLog` entry, because the scope has already reset.
+   */
   afterRestart: () => void;
 }
 
