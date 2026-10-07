@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { createRuleAdvisor, type Suggestion } from '@/systems/rule-advisor';
 import { type CycleLog, type CycleLogEntry } from '@/systems/cycle-log';
 
@@ -718,5 +718,31 @@ describe('createRuleAdvisor — Cookie Monster shape (window=1 degenerate case)'
     const out = advisor.reevaluate();
     expect(out.map((s) => s.payload.buildingId)).toEqual(['grandma', 'cursor', 'farm']);
     expect(out.every((s) => s.apply === undefined)).toBe(true);
+  });
+});
+
+describe('createRuleAdvisor — live suggestions', () => {
+  it('a computed over suggestions recomputes on reevaluate and dismiss', () => {
+    const history = ref<number[]>([]);
+    const advisor = createRuleAdvisor({
+      historySource: () => history.value,
+      aggregate: (h) => h.length,
+      analyzers: [
+        (n) =>
+          Array.from({ length: n }, (_, i) => ({
+            key: `k${i}`,
+            severity: 'info' as const,
+            summary: '',
+            payload: undefined,
+          })),
+      ],
+    });
+    const keys = computed(() => advisor.suggestions.map((s) => s.key).join(','));
+    expect(keys.value).toBe('');
+    history.value = [1, 2];
+    advisor.reevaluate();
+    expect(keys.value).toBe('k0,k1');
+    advisor.dismiss('k0');
+    expect(keys.value).toBe('k1');
   });
 });

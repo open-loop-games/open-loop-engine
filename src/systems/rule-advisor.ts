@@ -33,6 +33,7 @@
  * @see {@link createRecommendationSystem} for the inter-cycle sibling
  */
 
+import { shallowRef } from 'vue';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
 
@@ -210,8 +211,7 @@ export interface RuleAdvisor<TPayload> {
   /**
    * Currently-visible suggestions: ranked, dismissed keys removed, then
    * capped — a dismissed suggestion's slot goes to the next-ranked one.
-   * Plain readonly array; wrap in a Vue ref via the `'suggestionsUpdated'` event if
-   * reactive UI binding is needed.
+   * Live: a computed over it recomputes after `reevaluate()` and `dismiss()`.
    */
   readonly suggestions: readonly Suggestion<TPayload>[];
 
@@ -357,17 +357,17 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
 
   let dismissed = new Set<string>();
   let lastVisibleKeys: string[] = [];
-  let visible: readonly Suggestion<TPayload>[] = [];
+  const visible = shallowRef<readonly Suggestion<TPayload>[]>([]);
   // The last reevaluate's ranked, uncapped output, so a dismissal re-projects
   // it and the next-ranked suggestion takes the freed slot.
   let ranked: readonly Suggestion<TPayload>[] = [];
 
   function project(cap: number): void {
-    visible = capList(
+    visible.value = capList(
       ranked.filter((s) => !dismissed.has(s.key)),
       cap,
     );
-    lastVisibleKeys = visible.map((s) => s.key);
+    lastVisibleKeys = visible.value.map((s) => s.key);
   }
 
   function reevaluate(trigger?: string): readonly Suggestion<TPayload>[] {
@@ -398,10 +398,10 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     ranked = merged;
     project(cap);
 
-    handle.emit('suggestionsUpdated', visible);
+    handle.emit('suggestionsUpdated', visible.value);
     if (acceptedKeys.length > 0) handle.emit('accepted', { keys: acceptedKeys, trigger });
 
-    return visible;
+    return visible.value;
   }
 
   function dismiss(key: string): void {
@@ -409,7 +409,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     dismissed.add(key);
     project(getMaxSuggestions());
     handle.emit('dismissed', key);
-    handle.emit('suggestionsUpdated', visible);
+    handle.emit('suggestionsUpdated', visible.value);
   }
 
   function reset(): void {
@@ -419,7 +419,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
 
   return {
     get suggestions() {
-      return visible;
+      return visible.value;
     },
     reevaluate,
     dismiss,
