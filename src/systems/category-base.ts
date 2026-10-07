@@ -290,6 +290,9 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
  *
  * @param owner - names the definition in a `when` Gate's error, e.g.
  *   `"purchasable 'u1'"`
+ * @param role - for an owner that binds several grant lists onto the same
+ *   chains (a challenge's restricts and rewards), prefixes each derived binding
+ *   id so equal descriptions in different lists stay distinct
  * @internal
  */
 export function setupDeclarativeBindings(
@@ -297,6 +300,7 @@ export function setupDeclarativeBindings(
   active: MaybeRef<boolean>,
   predicates: PredicateResolver,
   owner: string,
+  role?: string,
 ): void {
   if (grants == null || grants.length === 0) return;
   const whens = adoptGrantWhens(grants, predicates, owner);
@@ -311,8 +315,12 @@ export function setupDeclarativeBindings(
     // the entry is in the category map) freezes self-referential lookups at
     // their fallback. Escape-hatch grants without a description still fall back
     // to the getter inside bind.
+    const description =
+      role == null || grant.description == null
+        ? grant.description
+        : `${role}/${grant.description}`;
     for (const chain of grantChains(grant))
-      chain.bind({ active: composedActive, modifier, description: grant.description });
+      chain.bind({ active: composedActive, modifier, description });
   }
 }
 

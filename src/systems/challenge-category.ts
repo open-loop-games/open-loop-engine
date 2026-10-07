@@ -513,14 +513,22 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       // `rewards` gates on "has been completed at least once". Both are
       // bound inside the per-def persistent-context scope opened by
       // createCategoryBase, so chain.bind auto-derives attribution ids like
-      // `{categoryId}/{def.id}/{description}`.
+      // `{categoryId}/{def.id}/{role}/{description}`; the role keeps a
+      // restriction and a reward with the same description apart on one chain.
       setupDeclarativeBindings(
         def.restricts,
         active,
         predicates,
         `challenge '${def.id}' restricts`,
+        'restricts',
       );
-      setupDeclarativeBindings(def.rewards, completed, predicates, `challenge '${def.id}' rewards`);
+      setupDeclarativeBindings(
+        def.rewards,
+        completed,
+        predicates,
+        `challenge '${def.id}' rewards`,
+        'rewards',
+      );
 
       const challenge: Challenge = {
         id: def.id,

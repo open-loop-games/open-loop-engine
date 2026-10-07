@@ -79,6 +79,31 @@ describe('ChallengeDef declarative bindings', () => {
     expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
   });
 
+  it('a restriction and a reward sharing a description on one chain both bind', () => {
+    const chain = createModifierChain('ch-shared-desc-chain');
+    const challenges = createChallengeCategory({
+      id: 'ch-shared-desc',
+      mutuallyExclusive: true,
+    });
+
+    challenges.register({
+      id: 'trade',
+      name: 'Trade',
+      goal: () => true,
+      restricts: [{ chain, mult: 0.5, description: 'rate' }],
+      rewards: [{ chain, mult: 3, description: 'rate' }],
+    });
+
+    const ch = challenges.getChallenge('trade')!;
+    expect(chain.bindings()).toHaveLength(2);
+    expect(new Set(chain.bindings().map((b) => b.id)).size).toBe(2);
+
+    ch.enter();
+    expect(Decimal.eq(chain.apply(100), 50)).toBe(true);
+    ch.complete();
+    expect(Decimal.eq(chain.apply(100), 300)).toBe(true);
+  });
+
   it('rewards persist on chain after at least one completion', () => {
     const chain = createModifierChain('ch-rewards-chain');
     const challenges = createChallengeCategory({
@@ -159,7 +184,12 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
         contentPatches: { actions: { buy: { cost: 1 } } },
         ...hooks('zombie'),
       },
-      { id: 'other', name: 'Other', overrides: { combat: () => 5 }, ...hooks('other') },
+      {
+        id: 'other',
+        name: 'Other',
+        overrides: { combat: () => 5 },
+        ...hooks('other'),
+      },
     ]);
     return {
       challenges,
