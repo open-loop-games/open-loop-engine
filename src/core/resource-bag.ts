@@ -8,7 +8,7 @@
  * @cluster resource
  */
 
-import { reactive, toRaw, watch } from 'vue';
+import { reactive, shallowRef, toRaw, watch } from 'vue';
 import { Decimal, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { loadingSave } from './persistence';
@@ -170,8 +170,15 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   // any slot ~1e16 below another for good.
   let cachedTotal: Decimal = Decimal.dZero;
   let totalDirty = false;
+  // The cache reads the raw map, so it tracks nothing; every write bumps this
+  // for effects to track the total through. A write marks the cache dirty
+  // before touching the map, because a link's sync watcher runs inside the
+  // map write and may read the total, and bumps the version after, because a
+  // sync effect re-reading the total on the bump must sum the written map.
+  const totalVersion = shallowRef(0);
 
   function getTotal(): Decimal {
+    void totalVersion.value;
     if (totalDirty) {
       cachedTotal = sumAmountsAsDecimal(toRaw(amounts).values());
       totalDirty = false;
@@ -189,12 +196,12 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
    * the map sparse (preserving prior behavior of `storeAmount`).
    */
   function writeAmount(typeId: string, newVal: Decimal): void {
-    if (newVal.eq(0)) {
-      if (!amounts.delete(typeId)) return;
-    } else {
-      amounts.set(typeId, newVal);
-    }
+    const drop = newVal.eq(0);
+    if (drop && !toRaw(amounts).has(typeId)) return;
     totalDirty = true;
+    if (drop) amounts.delete(typeId);
+    else amounts.set(typeId, newVal);
+    totalVersion.value++;
   }
 
   for (const [typeId, value] of Object.entries(initial)) {
@@ -313,8 +320,9 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     },
 
     clear(): void {
-      amounts.clear();
       totalDirty = true;
+      amounts.clear();
+      totalVersion.value++;
     },
 
     remainingCapacity: computeRemainingCapacity,
@@ -400,8 +408,9 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
     },
 
     restore(data: Record<string, string>): void {
-      amounts.clear();
       totalDirty = true;
+      amounts.clear();
+      totalVersion.value++;
       for (const [typeId, valStr] of Object.entries(data)) {
         const d = toFinalDecimal(valStr);
         if (!d.eq(0)) {

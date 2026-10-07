@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computed, nextTick } from 'vue';
+import { computed, nextTick, watch } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { bn } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
@@ -603,6 +603,65 @@ describe('ResourceBag', () => {
       await nextTick();
       void woodAmount.value;
       expect(computeCount).toBe(countAfterInit);
+    });
+
+    it('computeds over total and remaining capacity follow every mutation', () => {
+      const bag = createResourceBag({ capacity: 100 });
+      const total = computed(() => bag.total().toNumber());
+      const remaining = computed(() => bag.remainingCapacity().toNumber());
+      const read = () => [total.value, remaining.value];
+      expect(read()).toEqual([0, 100]);
+      bag.add('wood', 10);
+      expect(read()).toEqual([10, 90]);
+      bag.subtract('wood', 4);
+      expect(read()).toEqual([6, 94]);
+      bag.set('stone', 20);
+      expect(read()).toEqual([26, 74]);
+      bag.clear();
+      expect(read()).toEqual([0, 100]);
+      bag.restore({ wood: '30' });
+      expect(read()).toEqual([30, 70]);
+    });
+
+    it("a computed over one type's remaining capacity follows another type under a total cap", () => {
+      const bag = createResourceBag({ capacity: 100, capacityPerType: { wood: 80 } });
+      const woodRoom = computed(() => bag.remainingCapacityForType('wood').toNumber());
+      expect(woodRoom.value).toBe(80);
+      bag.add('stone', 50);
+      expect(woodRoom.value).toBe(50);
+      bag.clear();
+      expect(woodRoom.value).toBe(80);
+      bag.restore({ stone: '90' });
+      expect(woodRoom.value).toBe(10);
+    });
+
+    it('a sync watch on a linked resource reads the new total', () => {
+      beginPersistentContext('test-bag-sync-total');
+      const wood = createResource<DecimalSource>(0, { id: 'wood' });
+      endPersistentContext();
+      // Capped, so each add reads the total first and leaves the cache clean.
+      const bag = createResourceBag({ capacity: 100, initial: { stone: 5 } });
+      bag.link('wood', wood);
+      const seen: number[] = [];
+      watch(wood, () => seen.push(bag.total().toNumber()), { flush: 'sync' });
+      bag.add('wood', 3);
+      bag.subtract('wood', 3);
+      expect(seen).toEqual([8, 5]);
+      expect(bag.total().toNumber()).toBe(5);
+    });
+
+    it('a sync watch on the total sees each write', () => {
+      const bag = createResourceBag();
+      const seen: number[] = [];
+      watch(
+        () => bag.total().toNumber(),
+        (total) => seen.push(total),
+        { flush: 'sync' },
+      );
+      bag.add('wood', 3);
+      bag.add('stone', 4);
+      bag.clear();
+      expect(seen).toEqual([3, 7, 0]);
     });
   });
 
