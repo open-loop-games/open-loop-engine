@@ -561,6 +561,12 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     // can show the skip in the same channel as explicit setItemError.
     const meta = item.metadata;
     const terminal: ActionItemMetadata<Payload> = { ...meta, lifecycle: 'failed' };
+    // A list keeps the skipped item one slot behind the cursor, which advances
+    // before `skipped` fires: record the terminal state there or it reads 'pending'.
+    if (mode === 'list') {
+      const slot = sequencer.cursor - 1;
+      if (sequencer.items.value[slot]?.id === item.id) sequencer.patchItem(slot, () => terminal);
+    }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
     if (meta.lifecycle !== 'failed') {

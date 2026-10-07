@@ -536,6 +536,31 @@ describe('createActionCategory — list mode', () => {
     expect(category.sequencer.items.value[0].metadata.progress).toBe(42);
   });
 
+  it('a skipped item reads failed in its list slot, not pending', () => {
+    const driver = makeTickDriver();
+    const category = createActionCategory<ActionDef, void, void>({
+      id: 'list-skip',
+      mode: 'list',
+      registerTick: driver.registerTick,
+      mapAction: (def) => ({
+        signals: { unlock: computed(() => true), count: computed(() => 0) },
+        canRun: () => (def.id === 'blocked' ? 'never' : 'now'),
+        tick: () => {},
+      }),
+    });
+    category.register([
+      { id: 'blocked', baseTicks: 1 },
+      { id: 'ok', baseTicks: 1 },
+    ]);
+    category.enqueue('blocked');
+    category.enqueue('ok');
+
+    expect(category.sequencer.items.value.map((i) => i.metadata.lifecycle)).toEqual([
+      'failed',
+      'running',
+    ]);
+  });
+
   it('replay() re-runs the list from fresh execution slots, duplicate defs included', () => {
     const { category, driver } = makeCategory({ mode: 'list' });
     category.register([
