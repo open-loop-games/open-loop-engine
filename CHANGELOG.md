@@ -2,6 +2,24 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.3.4 (2026-10-07)
+
+### Features
+
+* **systems:** policy auto-buyer can wait for cost (b532d7e)
+
+### Fixes
+
+* **core:** Sequencer.holding is a live read (e36215e)
+* **systems:** list-mode ActionCategory marks a skipped slot failed (a85dcf5)
+* **systems:** challenge restricts and rewards with the same description no longer collide (5a7f57a)
+* **core:** SaveManager slots, activeSlotId and modId are live reads (bacddc6)
+* **core:** TickDriver speedMultiplier, running and tickRate are live reads (6f35ea3)
+* **core:** modifier chain modifiers and bindings, and registry scopeDepth, are live reads (0b784b9)
+* **systems:** RuleAdvisor suggestions is a live read (6636f58)
+* **core:** a linked bag's cap clamps gain before cumulative and best count it (07572a7)
+* **core:** a resource bag's total and remaining capacity are live reads (1e03eef)
+
 ## 0.3.3 (2026-09-27)
 
 ### Fixes
