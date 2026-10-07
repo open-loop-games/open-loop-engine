@@ -294,9 +294,11 @@ createProducerCategory<BuildingDef>({
   id: 'buildings',
   registerTick: ctx.onTick,
   mapProducer: (def) => ({ resource: cookies, baseRate: def.baseRate, trigger: 'continuous' }),
-  mapState: (_def, producer) => { producer.rateChain.bind({ modifier: productionChain }); },
+  mapState: (_def, producer) => { producer.rateChain.bind({ modifier: productionChain, description: 'Production' }); },
 });
 ```
+
+Pass the `description` (or an `id`): bind derives the binding's attribution id from the modifier's description, and a shared chain has none while it is empty or holds an undescribed modifier, so a bare bind throws "cannot auto-derive binding id" whenever `mapState` runs before the chain fills.
 
 For conditional modifiers (active only when a condition is met), there are three levels; pick the most-specific one that fits:
 
