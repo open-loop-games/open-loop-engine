@@ -29,7 +29,12 @@ import { persistent } from '@/core/persistence';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
 import type { Resource } from '@/core/resource';
 import type { RegisterTick } from '@/core/sequencer';
-import { isCostRequirement, type CostRequirement, type Requirement } from '@/core/requirements';
+import {
+  isCostRequirement,
+  requirementsMet,
+  type CostRequirement,
+  type Requirement,
+} from '@/core/requirements';
 import { selectionCheapest, type SelectionPolicy } from '@/core/policy';
 import { countAffordable } from '@/core/formulas/affordability';
 import type { Purchasable } from './purchasable';
@@ -71,6 +76,29 @@ function largestAffordable(
   // A cap of one was just priced above.
   if (cap.eq(1)) return cap;
   return countAffordable((n) => Decimal.lte(getCost(n), available), cap, null);
+}
+
+/**
+ * Whether `req` is a top-level cost the purchase spends — the only requirement
+ * the reserve floor measures and the only one `waitForCost` lets go unmet.
+ * Costs nested inside `anyOf` / `allOf` are opaque here, so both treat them as
+ * plain requirements: never floored, never waited on.
+ */
+function isPayingCost(req: Requirement): req is CostRequirement {
+  return isCostRequirement(req) && unref(req.requiresPay);
+}
+
+function topLevelRequirements(p: Purchasable): Requirement[] {
+  return Array.isArray(p.requirements) ? p.requirements : [p.requirements];
+}
+
+/**
+ * Whether `p` would be purchasable given enough of what it spends: visible, not
+ * maxed, and every requirement but its paying costs met.
+ */
+function isUnlockedButForCost(p: Purchasable): boolean {
+  if (p.maxed.value || !p.visible.value) return false;
+  return topLevelRequirements(p).every((req) => isPayingCost(req) || requirementsMet(req));
 }
 
 /**
@@ -166,13 +194,11 @@ function reserveClampedAmount(
   reserve: Decimal,
   ceilingArg: DecimalSource = p.amountToPurchase.value,
 ): DecimalSource {
-  const reqs: Requirement[] = Array.isArray(p.requirements) ? p.requirements : [p.requirements];
   let ceiling = ceilingArg;
 
   const byResource = new Map<Resource, CostRequirement[]>();
-  for (const req of reqs) {
-    if (!isCostRequirement(req)) continue;
-    if (!unref(req.requiresPay)) continue;
+  for (const req of topLevelRequirements(p)) {
+    if (!isPayingCost(req)) continue;
     const group = byResource.get(req.resource);
     if (group) group.push(req);
     else byResource.set(req.resource, [req]);
@@ -353,9 +379,11 @@ export interface SetupPolicyAutoPurchaseOptions {
    * Spending-discipline floor. The auto-buyer will not drive any resource a
    * purchase *spends* below this value: a candidate is screened out unless every
    * paying cost requirement admits a single unit above the floor, measured per
-   * cost-resource. Note this is the resource the purchase costs, which is not
-   * necessarily the one the producer makes. Orthogonal to policy, applied
-   * uniformly across every candidate. Default: `0` (no reserve).
+   * cost-resource. Under {@link waitForCost} the same test gates the pick
+   * instead, so a pick the floor holds back buys nothing. Note this is the
+   * resource the purchase costs, which is not necessarily the one the producer
+   * makes. Orthogonal to policy, applied uniformly across every candidate.
+   * Default: `0` (no reserve).
    *
    * Only top-level cost requirements are seen. Costs nested inside `anyOf` /
    * `allOf` are opaque to the floor — the same limitation `Purchasable.getCost`
@@ -379,6 +407,26 @@ export interface SetupPolicyAutoPurchaseOptions {
    * can disagree when cost-resource and produce-resource differ.
    */
   reserve?: Computable<DecimalSource>;
+  /**
+   * Let the policy save up. When on, candidates the player can't yet afford
+   * still reach `policy.pick`, and a pick that can't be paid — short of its
+   * cost, or held back by {@link reserve} — buys nothing that slot rather than
+   * falling through to something affordable. This is what makes
+   * {@link selectionHybridPayback}'s wait term live. Default: `false`, where
+   * only candidates payable right now are offered.
+   *
+   * Only cost is waited on: hidden, maxed and otherwise-locked producers stay
+   * out of the candidate list either way. A cost nested inside `anyOf` /
+   * `allOf` is opaque, so it gates like any other requirement.
+   *
+   * Can be a ref or getter, e.g. gated on an automation tier, and is read once
+   * per tick.
+   *
+   * A sibling auto-buyer on the same wallet keeps spending what this one is
+   * saving; to stop it, wrap the policy so it records its pick in a ref and
+   * wire the sibling's `reserve` getter from that pick's cost.
+   */
+  waitForCost?: Computable<boolean>;
   /**
    * Safety cap on drain-loop iterations per tick handler invocation
    * (default `10000`). Mirrors {@link createTickDriver}'s `maxStepsPerTick`:
@@ -415,9 +463,12 @@ export interface SetupPolicyAutoPurchaseOptions {
  * 3. Filter continuous producers by `canPurchase.value && repeatable !== undefined`
  *    and, when `reserve > 0`, whether a single unit is payable with every
  *    cost-resource left at or above the floor. A manual producer yields only
- *    when clicked, so its purchase is the player's call.
+ *    when clicked, so its purchase is the player's call. Under
+ *    {@link SetupPolicyAutoPurchaseOptions.waitForCost | waitForCost}, the
+ *    paying costs and the floor drop out of this filter.
  * 4. Pass the filtered list to `policy.pick()` and purchase the winner,
- *    clamping `bulkAmount` to what the reserve admits.
+ *    clamping `bulkAmount` to what the reserve admits. A winner that can't be
+ *    paid buys nothing.
  * 5. Subtract `interval` from the accumulator (so beat timing stays stable)
  *    and re-scan if more drained slots remain.
  *
@@ -440,6 +491,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  *       getReserve: () => reserveRef.value,
  *       getHeadlineRate: (p) => buildings.getTotalRate(p.resource),
  *     }),
+ *     waitForCost: true,
  *     interval: () => 5 / tier.value,
  *     reserve: reserveRef,
  *   },
@@ -459,6 +511,7 @@ export function setupPolicyAutoPurchase(
   );
   const processedBulk = processGetter<DecimalSource>(options.bulkAmount ?? 1);
   const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
+  const processedWaitForCost = processGetter(options.waitForCost ?? false);
   const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
   const onIterationsOverflow = options.onIterationsOverflow;
 
@@ -528,6 +581,7 @@ export function setupPolicyAutoPurchase(
     const policy = unref(processedPolicy);
     const reserve = Decimal.fromValue(unref(processedReserve));
     const useReserve = reserve.gt(0);
+    const waitForCost = unref(processedWaitForCost);
 
     // Drain-while-≥-interval: one slot per iteration of simulated time,
     // re-scanning each slot so state changes between purchases (resource
@@ -550,13 +604,18 @@ export function setupPolicyAutoPurchase(
       for (const producer of list) {
         const { repeatable } = producer;
         if (!repeatable || producer.trigger !== 'continuous') continue;
-        if (!repeatable.canPurchase.value) continue;
 
-        // Screened through the same helper the bulk clamp uses, so filter and
-        // clamp cannot disagree about what the floor admits. `producer.resource`
-        // is the *produced* resource; the floor belongs on whatever the
-        // purchase spends, which only the requirements know.
-        if (useReserve && Decimal.lte(reserveClampedAmount(repeatable, reserve, 1), 0)) continue;
+        if (waitForCost) {
+          // Affordability and the floor move to the pick, below.
+          if (!isUnlockedButForCost(repeatable)) continue;
+        } else {
+          if (!repeatable.canPurchase.value) continue;
+          // Screened through the same helper the bulk clamp uses, so filter
+          // and clamp cannot disagree about what the floor admits.
+          // `producer.resource` is the *produced* resource; the floor belongs
+          // on whatever the purchase spends, which only the requirements know.
+          if (useReserve && Decimal.lte(reserveClampedAmount(repeatable, reserve, 1), 0)) continue;
+        }
 
         candidates.push(producer);
       }
@@ -564,16 +623,21 @@ export function setupPolicyAutoPurchase(
       const best = candidates.length > 0 ? policy.pick(candidates, { getHeadlineRate }) : undefined;
       profileEnd('autobuy.decide', scanStart);
 
-      if (best && best.repeatable) {
+      // A pick that can't be paid — possible only under `waitForCost` — is
+      // what the policy is saving toward, so the slot buys nothing: falling
+      // through to an affordable runner-up would spend the savings. The floor
+      // half of that check is the clamp below coming out at zero.
+      if (best?.repeatable?.canPurchase.value) {
         const buyTarget = best.repeatable;
         const bulk = unref(processedBulk);
 
         // The candidate filter above only proved that a *single* unit fits
-        // under the floor. Buying `bulk` on that evidence spends straight
-        // through the reserve whenever `bulkAmount > 1`, so clamp to what the
-        // floor actually admits. Capping the ceiling at `amountToPurchase`
-        // costs nothing — `purchase()` re-clamps there anyway — and keeps a
-        // non-finite `bulk` from making the clamp a no-op.
+        // under the floor, and under `waitForCost` not even that. Buying
+        // `bulk` on that evidence spends straight through the reserve
+        // whenever `bulkAmount > 1`, so clamp to what the floor actually
+        // admits. Capping the ceiling at `amountToPurchase` costs nothing —
+        // `purchase()` re-clamps there anyway — and keeps a non-finite `bulk`
+        // from making the clamp a no-op.
         const amount = useReserve
           ? reserveClampedAmount(
               buyTarget,

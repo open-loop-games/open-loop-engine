@@ -23,13 +23,15 @@
  * that family for symmetry. See `core/sequencer-strategies.ts` for the
  * mirrored cross-reference.
  *
- * Affordability filtering is the consumer's responsibility, not the policy's.
- * Each helper that drives a policy (e.g. `setupPolicyAutoPurchase`) filters
- * candidates by `canPurchase` / reserve before invoking `pick`. Policies may
- * still skip candidates whose *scoring meaning* fails (e.g. zero-rate
- * producers under `selectionHybridPayback` cannot be paid back at all and
- * have no defined score), but they should not re-implement the affordability
- * gate.
+ * Filtering is the driver's responsibility, not the policy's. Each helper
+ * that drives a policy (e.g. `setupPolicyAutoPurchase`) filters candidates by
+ * visibility, unlocks and limits before invoking `pick`, and by affordability
+ * and reserve too — unless the driver waits for cost, in which case
+ * unaffordable candidates reach the policy and a pick that can't be paid
+ * means buy nothing this slot. Policies may still skip candidates whose
+ * *scoring meaning* fails (e.g. zero-rate producers under
+ * `selectionHybridPayback` cannot be paid back at all and have no defined
+ * score), but they should not re-implement any of those gates.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
@@ -48,7 +50,9 @@ export interface SelectionPolicy<T> {
    * Score each candidate and return the winner.
    *
    * @param candidates - Pre-filtered candidate list. Caller has already
-   *   applied any affordability/visibility/reserve gates.
+   *   applied visibility, unlock and limit gates, and affordability/reserve
+   *   gates unless it waits for cost — then a pick that can't be paid means
+   *   buy nothing this slot.
    * @param ctx - Untyped pass-through for consumer-defined policies that
    *   want per-call state without re-currying the factory. Built-in
    *   policies ignore it; cast to your own context type in custom policies.
@@ -178,6 +182,11 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  * expensive — it collapses to zero the moment the candidate is affordable,
  * handing the decision to the pure payback term. Sourced from Cookie
  * Monster's `pp` formula and Frozen Cookies' `purchaseEfficiency`.
+ *
+ * The wait term only scores candidates the driver offers before they're
+ * affordable: under `setupPolicyAutoPurchase` that takes `waitForCost`.
+ * Without it every candidate is already affordable and this ranks by payback
+ * alone.
  *
  * Both terms are seconds, so any mix of candidates ranks on one scale. With
  * no income yet (headline rate ≤ 0) an affordable candidate still waits

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import {
   beginPersistentContext,
@@ -18,9 +18,13 @@ import {
 } from '@/core/policy';
 import { createProducerCategory, type Producer } from '@/systems/producer-category';
 import { setupPolicyAutoPurchase, setupSweepAutoPurchase } from '@/systems/auto-purchase';
-import { createPurchasable, createScalingPurchasable } from '@/systems/purchasable';
+import {
+  createPurchasable,
+  createScalingPurchasable,
+  type Purchasable,
+} from '@/systems/purchasable';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
-import { createCostRequirement } from '@/core/requirements';
+import { anyOf, createBooleanRequirement, createCostRequirement } from '@/core/requirements';
 import { F } from '@/core/formulas/formulas';
 import { createManualTicks } from '../helpers/manual-ticks';
 import { createTestResource } from '../helpers/test-resource';
@@ -648,6 +652,198 @@ describe('setupPolicyAutoPurchase', () => {
     );
     expect(droppedReported).toBeGreaterThan(0);
     expect(droppedReported).toBeLessThanOrEqual(1_000_000);
+  });
+
+  describe('waitForCost', () => {
+    // 20 owned cursors give a 20/s headline rate and 50 cookies are banked.
+    // Hybrid scores cursor at 10/1 = 10s and farm at (200 − 50)/20 + 200/200
+    // = 8.5s, so the unaffordable farm is the better buy.
+    function setupSavingScenario() {
+      const cookies = createTestResource('cookies', 200);
+      const { category, registerTick, tick } = makeCategory(cookies);
+      category.register([
+        { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1 },
+        { id: 'farm', name: 'Farm', baseRate: 200, baseCost: 200, costScaling: 1 },
+      ]);
+      const cursor = category.getProducer('cursor')!.repeatable!;
+      const farm = category.getProducer('farm')!.repeatable!;
+      for (let i = 0; i < 20; i++) cursor.purchase(1);
+      cookies.value = 50;
+      return { cookies, category, registerTick, tick, cursor, farm };
+    }
+
+    it('lets hybrid payback hold cash for a better unaffordable producer', () => {
+      const { category, registerTick, tick, cursor, farm } = setupSavingScenario();
+
+      setupPolicyAutoPurchase(
+        category,
+        { enabled: true, policy: hybridPaybackPolicy(category), waitForCost: true },
+        registerTick,
+      );
+
+      tick(0.1);
+      expect(Decimal.eq(cursor.amount.value, 20)).toBe(true);
+      expect(Decimal.eq(farm.amount.value, 0)).toBe(true);
+
+      // 150 short at 20/s closes in 7.5s of production.
+      tick(8);
+      expect(Decimal.eq(farm.amount.value, 1)).toBe(true);
+      expect(Decimal.eq(cursor.amount.value, 20)).toBe(true);
+    });
+
+    it('holds a pick the reserve floor would breach instead of buying the runner-up', () => {
+      const { cookies, category, registerTick, tick, cursor, farm } = setupSavingScenario();
+
+      setupPolicyAutoPurchase(
+        category,
+        { enabled: true, policy: hybridPaybackPolicy(category), waitForCost: true, reserve: 40 },
+        registerTick,
+      );
+
+      // 210 banked covers farm's 200 but not 200 above the 40 floor; cursor
+      // would fit under it, and must not be bought in farm's place.
+      tick(8);
+      expect(Decimal.eq(farm.amount.value, 0)).toBe(true);
+      expect(Decimal.eq(cursor.amount.value, 20)).toBe(true);
+
+      tick(2);
+      expect(Decimal.eq(farm.amount.value, 1)).toBe(true);
+      expect(Decimal.gte(cookies.value, 40)).toBe(true);
+      expect(Decimal.eq(cursor.amount.value, 20)).toBe(true);
+    });
+
+    it('follows a reactive toggle live', () => {
+      const { category, registerTick, tick, cursor, farm } = setupSavingScenario();
+      const waitForCost = ref(true);
+
+      setupPolicyAutoPurchase(
+        category,
+        { enabled: true, policy: hybridPaybackPolicy(category), waitForCost },
+        registerTick,
+      );
+
+      tick(0.1);
+      expect(Decimal.eq(cursor.amount.value, 20)).toBe(true);
+
+      waitForCost.value = false;
+      tick(0.1);
+      expect(Decimal.eq(cursor.amount.value, 21)).toBe(true);
+
+      waitForCost.value = true;
+      tick(0.1);
+      expect(Decimal.eq(cursor.amount.value, 21)).toBe(true);
+      expect(Decimal.eq(farm.amount.value, 0)).toBe(true);
+    });
+
+    it('leaves the affordable-only filter in place when off', () => {
+      const { category, registerTick, tick, cursor, farm } = setupSavingScenario();
+
+      setupPolicyAutoPurchase(
+        category,
+        { enabled: true, policy: hybridPaybackPolicy(category) },
+        registerTick,
+      );
+
+      tick(0.1);
+      expect(Decimal.eq(cursor.amount.value, 21)).toBe(true);
+      expect(Decimal.eq(farm.amount.value, 0)).toBe(true);
+    });
+
+    // A producer over a hand-built purchasable, for requirement shapes a
+    // category's purchase config can't express.
+    function producerOver(id: string, resource: Resource, repeatable: Purchasable): Producer {
+      return {
+        id,
+        trigger: 'continuous',
+        resource,
+        repeatable,
+        computedRate: computed(() => Decimal.dOne),
+        count: computed(() => repeatable.amount.value),
+      } as unknown as Producer;
+    }
+
+    function recordingPolicy() {
+      const seen: string[][] = [];
+      const policy: SelectionPolicy<Producer> = {
+        pick(candidates) {
+          seen.push(candidates.map((c) => c.id));
+          return undefined;
+        },
+      };
+      return { seen, policy };
+    }
+
+    it('still keeps hidden, maxed and otherwise-locked producers from the policy', () => {
+      const cookies = createTestResource('cookies', 0);
+      const { registerTick, tick } = createManualTicks();
+      const cost = () => createCostRequirement({ resource: cookies, cost: 1e6 });
+      const producers = [
+        producerOver(
+          'short',
+          cookies,
+          createPurchasable({ id: 'short', display: 's', requirements: cost() }),
+        ),
+        producerOver(
+          'hidden',
+          cookies,
+          createPurchasable({ id: 'hidden', display: 'h', requirements: cost(), visible: false }),
+        ),
+        producerOver(
+          'maxed',
+          cookies,
+          createPurchasable({
+            id: 'maxed',
+            display: 'm',
+            requirements: cost(),
+            limit: 1,
+            initialAmount: 1,
+          }),
+        ),
+        producerOver(
+          'locked',
+          cookies,
+          createPurchasable({
+            id: 'locked',
+            display: 'l',
+            requirements: [cost(), createBooleanRequirement({ requirement: false })],
+          }),
+        ),
+      ];
+      const { seen, policy } = recordingPolicy();
+
+      setupPolicyAutoPurchase(
+        producers,
+        { enabled: true, policy, waitForCost: true },
+        registerTick,
+      );
+
+      tick(0.1);
+      expect(seen).toEqual([['short']]);
+    });
+
+    it('treats a cost nested in anyOf as a gate rather than waiting on it', () => {
+      const cookies = createTestResource('cookies', 0);
+      const { registerTick, tick } = createManualTicks();
+      const nested = createPurchasable({
+        id: 'nested',
+        display: 'n',
+        requirements: anyOf(createCostRequirement({ resource: cookies, cost: 100 })),
+      });
+      const { seen, policy } = recordingPolicy();
+
+      setupPolicyAutoPurchase(
+        [producerOver('nested', cookies, nested)],
+        { enabled: true, policy, waitForCost: true },
+        registerTick,
+      );
+
+      tick(0.1);
+      expect(seen).toEqual([]);
+
+      cookies.value = 100;
+      tick(0.1);
+      expect(seen).toEqual([['nested']]);
+    });
   });
 
   it('drain stops firing when reserve filters out all candidates mid-drain', () => {
