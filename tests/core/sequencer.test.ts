@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { effectScope, watchEffect } from 'vue';
+import { computed, effectScope, watchEffect } from 'vue';
 import {
   beginPersistentContext,
   endPersistentContext,
@@ -535,6 +535,28 @@ describe('Sequencer — canRun tri-state', () => {
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('run-me');
     expect(events).toEqual(['skip:wait-me']);
+  });
+
+  it('holding is live: a computed over it follows hold entry and release', () => {
+    const tm = createManualTicks();
+    const ctxId = `tri-holdlive-${Math.random().toString(36).slice(2, 8)}`;
+    let gate: StartResult = 'notNow';
+    beginPersistentContext(ctxId);
+    const q = createSequencer({
+      id: ctxId,
+      registerTick: tm.registerTick,
+      canRun: () => gate,
+    });
+    endPersistentContext();
+    const isHolding = computed(() => q.holding);
+    expect(isHolding.value).toBe(false);
+
+    q.enqueue(qi('wait-me'));
+    expect(isHolding.value).toBe(true);
+
+    gate = 'now';
+    tm.tick();
+    expect(isHolding.value).toBe(false);
   });
 
   it('transitions hold → "now" on retry tick, dispatching the held item', () => {

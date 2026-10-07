@@ -306,7 +306,7 @@ export interface Sequencer<M = void> {
   /**
    * Whether the sequencer is currently holding on a `'notNow'` item. While
    * holding, `currentItem` is null, `items.value` is unchanged, and the
-   * retry tick is active.
+   * retry tick is active. Live, but runtime-only: not saved.
    */
   readonly holding: boolean;
 
@@ -506,7 +506,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     () => rawItems.value,
     (newRaw) => {
       if (newRaw === _lastWritten) return;
-      if (_holding) clearHold();
+      if (_holding.value) clearHold();
       _liveItems = deserializeItems(newRaw);
       _head = 0;
       bumpLive();
@@ -556,7 +556,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // item still queued and current=''; the rawItems rehydration watch above
   // re-drives it on the next post-load tick.
 
-  let _holding = false;
+  const _holding = shallowRef(false);
   let _unsubRetryTick: (() => void) | null = null;
 
   function peekHeldItem(): SequencerItem<M> | null {
@@ -570,7 +570,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   }
 
   function clearHold(): void {
-    _holding = false;
+    _holding.value = false;
     _unsubRetryTick?.();
     _unsubRetryTick = null;
   }
@@ -578,7 +578,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   function installRetryTick(): void {
     if (!registerTick || _unsubRetryTick) return;
     _unsubRetryTick = registerTick(() => {
-      if (!_holding) return;
+      if (!_holding.value) return;
       if (paused.value) return;
       retryHeldItem();
     });
@@ -733,7 +733,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     if (paused.value) return null;
     // While holding, the retry tick owns the dispatch decision — anything
     // enqueued meanwhile sits behind the held item.
-    if (_holding) return null;
+    if (_holding.value) return null;
     if (preempted()) return null;
 
     if (++_advancesThisTick > maxAdvancesPerTick) {
@@ -767,7 +767,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
         // 'notNow'
         if (registerTick) {
-          _holding = true;
+          _holding.value = true;
           installRetryTick();
           handle.emit('held', next);
           return null;
@@ -808,7 +808,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
         // 'notNow'
         if (registerTick) {
-          _holding = true;
+          _holding.value = true;
           installRetryTick();
           handle.emit('held', next);
           return null;
@@ -856,7 +856,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       // no running item (the cursor's "next dispatch" slot now points at the
       // new item rather than the held one). For at < cur the cursor shifts
       // and the held item stays tracked; for at > cur nothing changes.
-      const heldBroken = _holding && !isAppend && (isList ? at === rawCursor!.value : at === 0);
+      const heldBroken =
+        _holding.value && !isAppend && (isList ? at === rawCursor!.value : at === 0);
 
       if (isAppend) {
         _liveItems.push(item);
@@ -949,7 +950,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       // A held item is the execution in progress, so it is cancelled as a
       // running one would be: dropped in queue mode, left under the cursor in
       // list mode. Nothing is running while holding.
-      if (_holding) {
+      if (_holding.value) {
         const held = peekHeldItem();
         clearHold();
         if (!held) return;
@@ -984,7 +985,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       }
       // If the removal affected the held position (queue head in queue mode,
       // or at-or-before cursor in list mode), drop the hold and re-drive.
-      if (_holding) {
+      if (_holding.value) {
         const affectsHeld = isList ? index <= rawCursor!.value : index === 0;
         if (affectsHeld) {
           clearHold();
@@ -1010,7 +1011,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         } else if (from > cur && to <= cur) {
           rawCursor!.value++;
         }
-      } else if (_holding && (from === 0 || to === 0)) {
+      } else if (_holding.value && (from === 0 || to === 0)) {
         // Queue-mode hold lives at index 0; disturbing that slot invalidates
         // the held item identity. Drop the hold and re-drive.
         clearHold();
@@ -1031,7 +1032,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     },
 
     setCurrent(item: SequencerItem<M>): void {
-      if (_holding) clearHold();
+      if (_holding.value) clearHold();
       setCurrentRaw(item);
     },
 
@@ -1043,7 +1044,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
     resume(): void {
       paused.value = false;
-      if (_holding) {
+      if (_holding.value) {
         // Snap out of hold by re-running the retry path immediately instead
         // of waiting for the next tick, so the user gets responsive dispatch.
         retryHeldItem();
@@ -1073,7 +1074,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     },
     set canRun(fn: ((item: SequencerItem<M>) => StartResult) | null) {
       _canRun = fn;
-      if (_holding && fn === null) {
+      if (_holding.value && fn === null) {
         // Gate removed while holding — dispatch the held item on next
         // dequeueNext call path.
         clearHold();
@@ -1082,7 +1083,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     },
 
     get holding(): boolean {
-      return _holding;
+      return _holding.value;
     },
 
     fill,
