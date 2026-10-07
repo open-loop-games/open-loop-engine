@@ -13,7 +13,7 @@ Coordinate primitives for adjacency-driven games — grid, graph, scope stack, i
 
 Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:408`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:412`
 - `const DIAGONAL_DELTAS: readonly GridDelta[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:71`
 - `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:154`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
@@ -44,7 +44,7 @@ Keyed node/edge container with nested child-graph composition — the substrate 
 
 Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active.
 
-- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:181`
+- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:187`
 - `interface ScopeStack<N, E>` — Navigation cursor over a recursive graph-of-graphs. `src/core/spatial/scope-stack.ts:98`
 - `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:91`
 - `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:67`

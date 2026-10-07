@@ -57,24 +57,24 @@ seedable pseudo-random number generator and weighted-item picker
 
 the fundamental currency of incremental games
 
-- `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:351`
-- `function bulkTransfer(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal>` — Transfer multiple resource types between bags in one operation. `src/core/resource-bag.ts:438`
+- `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:390`
+- `function bulkTransfer(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal>` — Transfer multiple resource types between bags in one operation. `src/core/resource-bag.ts:456`
 - `type CapacitySource = DecimalSource | (() => DecimalSource)` — A capacity value that can be static or a reactive getter. `src/core/resource-bag.ts:18`
-- `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource (non-persistent). `src/core/resource.ts:140`
-- `function createResource<T>(defaultValue: T, options: IfState<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T>; }` — Create a persistent resource — the standard way to define a game currency. `src/core/resource.ts:167`
-- `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Creates a multi-type resource container with optional per-type and total capacity limits. `src/core/resource-bag.ts:149`
-- `function displayResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource value with its configured precision. `src/core/resource.ts:322`
-- `function hasResource(resource: Resource<DecimalSource>, amount: DecimalSource): boolean` — Check if a resource has at least a certain amount. `src/core/resource.ts:414`
-- `type PersistentResourceOptions` — Configuration for a persistent createResource: `id` is required. `src/core/resource.ts:113`
-- `function resetResource<T extends DecimalSource>(resource: Resource<T>): void` — Reset a resource to its default value (or zero). `src/core/resource.ts:423`
+- `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource (non-persistent). `src/core/resource.ts:142`
+- `function createResource<T>(defaultValue: T, options: IfState<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T>; }` — Create a persistent resource — the standard way to define a game currency. `src/core/resource.ts:169`
+- `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Creates a multi-type resource container with optional per-type and total capacity limits. `src/core/resource-bag.ts:150`
+- `function displayResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource value with its configured precision. `src/core/resource.ts:361`
+- `function hasResource(resource: Resource<DecimalSource>, amount: DecimalSource): boolean` — Check if a resource has at least a certain amount. `src/core/resource.ts:453`
+- `type PersistentResourceOptions` — Configuration for a persistent createResource: `id` is required. `src/core/resource.ts:115`
+- `function resetResource<T extends DecimalSource>(resource: Resource<T>): void` — Reset a resource to its default value (or zero). `src/core/resource.ts:462`
 - `interface Resource<T = DecimalSource> extends Ref<T>` — A named, quantifiable game value backed by a Vue ref. `src/core/resource.ts:51`
 - `interface ResourceBag` — A multi-type resource container with optional capacity limits and reactive Resource linking. `src/core/resource-bag.ts:60`
 - `interface ResourceBagOptions` — Options for configuring a resource bag at creation time. `src/core/resource-bag.ts:41`
-- `interface ResourceOptions` — Configuration for createResource. `src/core/resource.ts:95`
-- `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:385`
-- `interface SubtractResourceOptions` `src/core/resource.ts:366`
-- `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's available stock and the destination's remaining capacity. `src/core/resource-bag.ts:413`
-- `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:337`
+- `interface ResourceOptions` — Configuration for createResource. `src/core/resource.ts:97`
+- `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:424`
+- `interface SubtractResourceOptions` `src/core/resource.ts:405`
+- `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's available stock and the destination's remaining capacity. `src/core/resource-bag.ts:431`
+- `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:376`
 
 ## Conversion
 

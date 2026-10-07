@@ -13,7 +13,7 @@ Decision-support systems that observe the engine and rank actions: rule advisor,
 
 weighted-goal selection over a candidate pool
 
-- `function createGoalPicker<TCandidate, TContext, TWeights>(options: GoalPickerOptions<TCandidate, TContext, TWeights>): GoalPicker<TCandidate, TContext, TWeights>` — Creates a weighted-goal picker over a candidate pool. `src/systems/goal-picker.ts:206`
+- `function createGoalPicker<TCandidate, TContext, TWeights>(options: GoalPickerOptions<TCandidate, TContext, TWeights>): GoalPicker<TCandidate, TContext, TWeights>` — Creates a weighted-goal picker over a candidate pool. `src/systems/goal-picker.ts:210`
 - `type GoalCompletionFn<TCandidate, TContext> = (candidateId: TCandidate, context: TContext) => boolean` — Completion predicate. `src/systems/goal-picker.ts:50`
 - `interface GoalPicker<TCandidate, TContext, TWeights>` — A goal picker instance, returned by createGoalPicker. `src/systems/goal-picker.ts:135`
 - `interface GoalPickerOptions<TCandidate, TContext, TWeights>` — Configuration for createGoalPicker. `src/systems/goal-picker.ts:66`
@@ -24,13 +24,13 @@ weighted-goal selection over a candidate pool
 
 score-and-pick over a candidate list
 
-- `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:96`
-- `interface HybridPaybackOptions<T>` — Options for selectionHybridPayback. `src/core/policy.ts:61`
-- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:120`
-- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:252`
-- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:202`
-- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:154`
-- `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:46`
+- `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:100`
+- `interface HybridPaybackOptions<T>` — Options for selectionHybridPayback. `src/core/policy.ts:65`
+- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:124`
+- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:261`
+- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:211`
+- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:158`
+- `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:48`
 
 ## Recommendation
 
@@ -53,13 +53,13 @@ inter-cycle arbitration across registered defs
 
 intra-session profile-history aggregator with ranked suggestions
 
-- `type AdvisorAggregatorFn<TEntry, TProfile, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TProfile` — Aggregator function — the windowed-history substrate, generic over the consumer's entry, profile, and parallel-context shapes. `src/systems/rule-advisor.ts:89`
-- `type AdvisorAnalyzerFn<TProfile, TPayload, TContext = undefined> = (profile: TProfile, context: TContext) => readonly Suggestion<TPayload>[]` — Analyzer function — domain-specific heuristic that consumes the aggregate plus the parallel `context` value and returns zero or more suggestions. `src/systems/rule-advisor.ts:102`
+- `type AdvisorAggregatorFn<TEntry, TProfile, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TProfile` — Aggregator function — the windowed-history substrate, generic over the consumer's entry, profile, and parallel-context shapes. `src/systems/rule-advisor.ts:90`
+- `type AdvisorAnalyzerFn<TProfile, TPayload, TContext = undefined> = (profile: TProfile, context: TContext) => readonly Suggestion<TPayload>[]` — Analyzer function — domain-specific heuristic that consumes the aggregate plus the parallel `context` value and returns zero or more suggestions. `src/systems/rule-advisor.ts:103`
 - `function createRuleAdvisor<TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create an intra-session advisor that aggregates history into a profile, runs analyzers over the profile and a parallel context value, and surfaces a ranked + dismissable suggestion list. `src/systems/rule-advisor.ts:336`
 - `function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:344`
-- `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (canonical case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:73`
-- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:209`
-- `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:190`
-- `interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined>` — Configuration for createRuleAdvisor. `src/systems/rule-advisor.ts:126`
-- `interface Suggestion<TPayload = unknown>` — One advisory output. `src/systems/rule-advisor.ts:46`
-- `type SuggestionRankFn<TPayload> = (a: Suggestion<TPayload>, b: Suggestion<TPayload>) => number` — Comparator for ranking the merged suggestion list. `src/systems/rule-advisor.ts:111`
+- `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (canonical case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:74`
+- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:210`
+- `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:191`
+- `interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined>` — Configuration for createRuleAdvisor. `src/systems/rule-advisor.ts:127`
+- `interface Suggestion<TPayload = unknown>` — One advisory output. `src/systems/rule-advisor.ts:47`
+- `type SuggestionRankFn<TPayload> = (a: Suggestion<TPayload>, b: Suggestion<TPayload>) => number` — Comparator for ranking the merged suggestion list. `src/systems/rule-advisor.ts:112`

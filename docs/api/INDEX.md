@@ -21,7 +21,7 @@ Start at the highest-level surface that fits, and drop down only when it fights 
 
 A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
-- **Cycle** — one bounded gameplay run that ends, resets a scope, and replays. `createCycle`. → content-systems.md#cycle. Named for the lifecycle, not a genre: a loop incremental's run (Idle Loops, Cavernous), a prestige layer's reincarnation, and a new-game-plus are all the same shape. `end()` is an atomic end→reset→restart and `elapsed`/`running` are not persistent — a run that ends and dwells awaiting a player restart does not fit; that lifecycle stays consumer-side.
+- **Cycle** — one bounded gameplay run that ends, resets a scope, and replays. `createCycle`. → content-systems.md#cycle. Named for the lifecycle, not a genre: a loop incremental's run (Idle Loops, Cavernous), a prestige layer's reincarnation, and a new-game-plus are all the same shape. `end()` resets at the run's end, then fires `afterRestart`. `count`, `bestTime` and `elapsed` persist; `running` doesn't, so call `run()` on load. A run that dwells on a results screen before the player restarts composes by pausing in `afterRestart`; the screen reads what `onBeforeRestart` or a `CycleLog` entry captured, since the scope is already reset. A run that keeps its end state live until the player starts the next one resets on start instead: that is `createReset` plus a tick phase, not Cycle. Phases inside a run aren't Cycle's shape either.
 - **CycleLog** — per-cycle metric delta recorder; observes a `Cycle`'s lifecycle. `createCycleLog`. → content-systems.md#cyclelog
 - **Challenge** — also a start/goal/exit constrained-run lifecycle, but *enter-a-modified-ruleset*, not replay-with-reset. `createChallengeCategory`. → content-systems.md#challenge-category
 - **`createReset`** vs **`Cycle`** — `createReset` is the standalone reset mechanic (scope, retention, `canReset` gate); `Cycle` drives one, adding the run's timer, counter, and restart cadence. `CycleOptions` carries shorthand for the common reset fields and a `reset` field for a pre-built one — it is deliberately not a mirror of `ResetOptions`.
@@ -54,6 +54,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | automation unlock ladder | content-systems.md#automation-tiers |
 | modifier bonus stacking on a chain | mechanics.md#modifier |
 | "buy max" count / bulk cost preview | mechanics.md#formulas |
+| softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |
 | declarative gate (data-driven condition) | mechanics.md#gate |
 | new content category (skill, purchasable, producer, …) | composition.md#category-base |
 | dialog tree with branching | content-narrative.md#dialog |
@@ -105,6 +106,7 @@ Cross-cutting shapes rather than symbol names — "where do I read about X?" whe
 - **edge-triggered effect** — `PersistentEffectSystem` rising/falling-edge modifier binding → mechanics.md#effects
 - **phase-scoped mechanic set** — one `PersistentEffectSystem` def carries N chain bindings behind one predicate, so a chapter's mechanics freeze and thaw together; the predicate may be one-way, and re-evaluates on load with no `restore()`. This is the batch verb for *gating*, the counterpart to `resetModules` for *wiping*. Per-def `visibility` stays one line per def → mechanics.md#effects, lifecycle.md#reset
 - **cost requirement** — `CostRequirement`, bulk-buy via inversion, pay strategies → mechanics.md#requirements, ../consumer-guide-choosing.md#choosing-among-purchasable-primitives
+- **softcap / bend** — `Formula.step(value, start, modifier)` passes the value through below `start` and applies the modifier to the excess above it → mechanics.md#formulas
 - **buy-max affordability** — `calculateMaxAffordable` counts the levels a balance covers, `calculateCost` prices them; any cost curve, an inverse only seeds the count → mechanics.md#formulas
 - **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel-classification
 - **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content

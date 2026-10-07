@@ -87,10 +87,10 @@ batch-create Challenges from content definitions
 
 a bounded run that ends, resets a scope, and replays
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:232`
-- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:132`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — a bounded run that ends, resets a scope, and replays. `src/systems/cycle.ts:237`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:137`
 - `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:37`
-- `interface CycleOptions` `src/systems/cycle.ts:45`
+- `interface CycleOptions` `src/systems/cycle.ts:50`
 
 ## CycleLog
 
@@ -143,10 +143,10 @@ Two consumer entry points: `createPurchasableCategory` batch-registers from cont
 - `type ScalingPurchasableCost` — Cost configuration for ScalingPurchasableOptions. `src/systems/purchasable.ts:157`
 - `type ScalingPurchasableEffect` — Effect configuration for ScalingPurchasableOptions — at most one of `effect` (a static base or a plain function) or `effectFormula` (a Formula factory). `src/systems/purchasable.ts:198`
 - `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — leveled purchases with geometric, Formula or function cost scaling. `src/systems/purchasable.ts:230`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:450`
-- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:321`
-- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:235`
-- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:94`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-buys one producer per throttled beat according to a SelectionPolicy. `src/systems/auto-purchase.ts:502`
+- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:347`
+- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, buying every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:261`
+- `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:122`
 
 ## RunPool
 
