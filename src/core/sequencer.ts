@@ -268,7 +268,12 @@ export interface Sequencer<M = void> {
   remove(index: number): void;
   /** Reorder an item in the waiting sequence. */
   reorder(from: number, to: number): void;
-  /** Clear all items from the waiting sequence (does not touch current). */
+  /**
+   * Clear all items from the waiting sequence. Cancels the current (or held)
+   * item first, so a completion can't advance the list cursor past items
+   * enqueued afterwards; execution stops until `start()`, `resume()` or an
+   * auto-starting `enqueue()`.
+   */
   clear(): void;
 
   // --- Direct current management ---
