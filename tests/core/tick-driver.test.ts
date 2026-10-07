@@ -541,3 +541,34 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('TickDriver live reads', () => {
+  it('speedMultiplier recomputes on set', async () => {
+    const { computed } = await import('vue');
+    const td = createTickDriver({ tickRate: 20 });
+    const speed = computed(() => td.speedMultiplier);
+    expect(speed.value).toBe(1);
+    td.speedMultiplier = 4;
+    expect(speed.value).toBe(4);
+  });
+
+  it('tickRate recomputes on set', async () => {
+    const { computed } = await import('vue');
+    const td = createTickDriver({ tickRate: 20 });
+    const rate = computed(() => td.tickRate);
+    expect(rate.value).toBe(20);
+    td.tickRate = 50;
+    expect(rate.value).toBe(50);
+  });
+
+  it('running recomputes on start and stop', async () => {
+    const { computed } = await import('vue');
+    const td = createTickDriver({ tickRate: 20 });
+    const running = computed(() => td.running);
+    expect(running.value).toBe(false);
+    td.start();
+    expect(running.value).toBe(true);
+    td.stop();
+    expect(running.value).toBe(false);
+  });
+});

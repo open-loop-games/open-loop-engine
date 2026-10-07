@@ -39,6 +39,7 @@
  * source-faithful-port case (incloneution's tick-drift diagnostic).
  */
 
+import { shallowRef } from 'vue';
 import { persistent, withPersistentContext } from './persistence';
 import { beginTraceTick, endTraceTick } from './trace';
 import { beginProfileTick, endProfileTick } from './profiler';
@@ -190,7 +191,11 @@ export interface TickDriver {
    * Live-settable diagnostic callback for variable-mode raw-dt clamp (see config field).
    */
   onDeltaOverflow: ((droppedSeconds: number) => void) | undefined;
-  /** EWMA of recent tick deltas (seconds). Read-only diagnostic. */
+  /**
+   * EWMA of recent tick deltas (seconds). Read-only diagnostic and a snapshot:
+   * it changes every tick, so a computed over it never recomputes. Poll it on
+   * your own cadence.
+   */
   readonly deltaMean: number;
   /** Per-tick dt cap (seconds). Variable-mode `simulateTick` splits a longer dt into ticks under it. */
   readonly maxDeltaTime: number;
@@ -242,12 +247,12 @@ const SPLIT_QUOTIENT_EPSILON = 1e-12;
  * ```
  */
 export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
-  let tickRate = config.tickRate ?? 20;
+  const tickRate = shallowRef(config.tickRate ?? 20);
   const maxDeltaTime = config.maxDeltaTime ?? 1;
-  let tickInterval = 1 / tickRate;
-  let speedMultiplier = config.speedMultiplier ?? 1;
+  let tickInterval = 1 / tickRate.value;
+  const speedMultiplier = shallowRef(config.speedMultiplier ?? 1);
   const tickMode = config.tickMode ?? 'variable';
-  const stepSize = config.stepSize ?? 1 / tickRate;
+  const stepSize = config.stepSize ?? 1 / tickRate.value;
   const maxStepsPerTick = config.maxStepsPerTick ?? 100;
   let onStepsOverflow = config.onStepsOverflow;
   let onDeltaOverflow = config.onDeltaOverflow;
@@ -273,7 +278,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   const callbacks: TickCallback[] = [];
   const phases = new Map<string, PhaseHooks>();
   const activePhases = new Set<string>();
-  let running = false;
+  const running = shallowRef(false);
   let intervalId: number | null = null;
   let lastTime = 0;
   let deltaMean = 0;
@@ -322,7 +327,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     }
 
     if (tickMode === 'fixed') {
-      accumulator.value += cappedDt * speedMultiplier;
+      accumulator.value += cappedDt * speedMultiplier.value;
       let steps = 0;
       while (accumulator.value + ACCUMULATOR_EPSILON >= stepSize && steps < maxStepsPerTick) {
         processTick(stepSize);
@@ -337,11 +342,11 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
       return;
     }
 
-    processTick(cappedDt * speedMultiplier);
+    processTick(cappedDt * speedMultiplier.value);
   }
 
   function intervalTick(): void {
-    if (!running) return;
+    if (!running.value) return;
     const now = performance.now();
     const rawDt = (now - lastTime) / 1000;
     lastTime = now;
@@ -370,7 +375,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   function startInterval(): void {
     lastTime = performance.now();
     deltaMean = tickInterval;
-    intervalId = timers.setInterval(intervalTick, Math.round(1000 / tickRate));
+    intervalId = timers.setInterval(intervalTick, Math.round(1000 / tickRate.value));
   }
 
   function stopInterval(): void {
@@ -381,13 +386,13 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   }
 
   function start(): void {
-    if (running) return;
-    running = true;
+    if (running.value) return;
+    running.value = true;
     startInterval();
   }
 
   function stop(): void {
-    running = false;
+    running.value = false;
     stopInterval();
   }
 
@@ -417,24 +422,24 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
       }
     },
     get running() {
-      return running;
+      return running.value;
     },
     get tickRate() {
-      return tickRate;
+      return tickRate.value;
     },
     set tickRate(value: number) {
-      tickRate = value;
+      tickRate.value = value;
       tickInterval = 1 / value;
-      if (running) {
+      if (running.value) {
         stopInterval();
         startInterval();
       }
     },
     get speedMultiplier() {
-      return speedMultiplier;
+      return speedMultiplier.value;
     },
     set speedMultiplier(value: number) {
-      speedMultiplier = value;
+      speedMultiplier.value = value;
     },
     get onStepsOverflow() {
       return onStepsOverflow;
