@@ -755,8 +755,10 @@ export function createModifierChain(id: string): ModifierChain {
 
       const removeFromChain = chain.add(modifier);
       return () => {
-        removeFromChain();
+        // Delete first: removal bumps `itemsVersion`, and a reader it wakes
+        // must not still see the record.
         bindingsById.delete(bindingId);
+        removeFromChain();
       };
     },
 
@@ -800,10 +802,12 @@ export function createModifierChain(id: string): ModifierChain {
     },
 
     get modifiers(): readonly Modifier[] {
+      void itemsVersion.value;
       return items;
     },
 
     bindings(): readonly BindingRecord[] {
+      void itemsVersion.value;
       return Array.from(bindingsById.values());
     },
 

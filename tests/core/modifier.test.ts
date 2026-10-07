@@ -538,3 +538,35 @@ describe('chain.bind', () => {
     expect(recs[0].id).toBe('mix-ctx/Bound');
   });
 });
+
+describe('createModifierChain live reads', () => {
+  it('modifiers recomputes on add and remove', () => {
+    const chain = createModifierChain('live-mods');
+    const count = computed(() => chain.modifiers.length);
+    expect(count.value).toBe(0);
+    const m = createAdditiveModifier({ addend: bn(1) });
+    chain.add(m);
+    expect(count.value).toBe(1);
+    chain.remove(m);
+    expect(count.value).toBe(0);
+  });
+
+  it('bindings recomputes on bind and unbind', () => {
+    const chain = createModifierChain('live-bindings');
+    const ids = computed(() => chain.bindings().map((b) => b.id));
+    expect(ids.value).toEqual([]);
+    const unbind = chain.bind({ id: 'b', modifier: createAdditiveModifier({ addend: bn(1) }) });
+    expect(ids.value).toEqual(['b']);
+    unbind();
+    expect(ids.value).toEqual([]);
+  });
+
+  it('a changed handler sees the binding already gone after unbind', () => {
+    const chain = createModifierChain('live-bindings-order');
+    const unbind = chain.bind({ id: 'b', modifier: createAdditiveModifier({ addend: bn(1) }) });
+    let seen = -1;
+    chain.on('changed', () => (seen = chain.bindings().length));
+    unbind();
+    expect(seen).toBe(0);
+  });
+});

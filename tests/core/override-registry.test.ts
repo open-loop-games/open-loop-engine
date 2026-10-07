@@ -271,3 +271,16 @@ describe('tunable pilot: Skill-style multiplier lookup', () => {
     expect(new Decimal(skills.getBoost('combat')).toNumber()).toBeCloseTo(baseCombat, 5);
   });
 });
+
+describe('OverrideRegistry live reads', () => {
+  it('scopeDepth recomputes on pushScope and on cleanup', () => {
+    const reg = createOverrideRegistry<{ f: () => number }>('live');
+    reg.setDefault('f', () => 1);
+    const depth = computed(() => reg.scopeDepth);
+    expect(depth.value).toBe(0);
+    const pop = reg.pushScope('a', { f: () => 2 });
+    expect(depth.value).toBe(1);
+    pop();
+    expect(depth.value).toBe(0);
+  });
+});

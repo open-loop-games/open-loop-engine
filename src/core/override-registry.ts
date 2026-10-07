@@ -231,6 +231,7 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
     },
 
     get scopeDepth(): number {
+      void scopeVersion.value;
       return scopes.length;
     },
   };
