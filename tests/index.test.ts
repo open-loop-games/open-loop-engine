@@ -1149,8 +1149,13 @@ describe('autoSaveInterval — runtime-tunable', () => {
     expect(engine.autoSaveInterval).toBe(5000);
   });
 
-  it('defaults to 0 when not configured', () => {
+  it('defaults to 30 s when persistence is on, so the default bootstrap persists', () => {
     const engine = createEngine({ gameId: 'test' });
+    expect(engine.autoSaveInterval).toBe(30_000);
+  });
+
+  it('defaults to 0 when persistence is off', () => {
+    const engine = createEngine({ gameId: 'test', persistence: false });
     expect(engine.autoSaveInterval).toBe(0);
   });
 
@@ -1337,6 +1342,60 @@ describe('save safety', () => {
     };
   }
 
+  it('the autosave holds until a load has run, so a late load is never overwritten', () => {
+    const storage = createMemoryStorage();
+    const timers = capturingTimers();
+    const engine = createEngine({ gameId: 'late', storageAdapter: storage, timerProvider: timers });
+    engine.use({ id: 'late-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    timers.fire(30000);
+    expect(storage.getItem('late-slot-0')).toBeNull();
+    expect(engine.load().success).toBe(false);
+    timers.fire(30000);
+    expect(storage.getItem('late-slot-0')).not.toBeNull();
+    engine.dispose();
+  });
+
+  it('warns once when the first tick runs before any load', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const engine = createEngine({ gameId: 'unloaded', storageAdapter: createMemoryStorage() });
+    engine.use({ id: 'unloaded-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    engine.tickDriver.tickRaw(0.05);
+    engine.tickDriver.tickRaw(0.05);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toMatch(/before load\(\)/);
+    engine.dispose();
+    warn.mockRestore();
+  });
+
+  it('does not warn when autosave is off, as in a sim or a test engine', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const engine = createEngine({
+      gameId: 'sim',
+      autoSaveInterval: 0,
+      storageAdapter: createMemoryStorage(),
+    });
+    engine.use({ id: 'sim-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    engine.tickDriver.tickRaw(0.05);
+    expect(warn).not.toHaveBeenCalled();
+    engine.dispose();
+    warn.mockRestore();
+  });
+
+  it('does not warn when load() runs before the first tick', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const engine = createEngine({ gameId: 'loaded', storageAdapter: createMemoryStorage() });
+    engine.use({ id: 'loaded-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.start();
+    engine.load();
+    engine.tickDriver.tickRaw(0.05);
+    expect(warn).not.toHaveBeenCalled();
+    engine.dispose();
+    warn.mockRestore();
+  });
+
   it('the autosave does not overwrite a save the load refused', () => {
     const storage = createMemoryStorage();
     const newer = JSON.stringify({ version: 2, gameId: 'safe', timestamp: 1, data: {} });
@@ -1397,6 +1456,7 @@ describe('save safety', () => {
     });
     engine.use({ id: 'written-mod', install: () => void persistent(0, { name: 'gold' }) });
     engine.start();
+    engine.load();
     const written = vi.fn();
     engine.saveManager!.on('save:written', written);
 

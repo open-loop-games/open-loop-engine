@@ -139,7 +139,9 @@ A custom-predicate Gate kind carrying a closure is deliberately *not* part of th
 
 ## Persistence
 
-`engine.start()` does not load the save. Call `engine.load()` explicitly after `start()` — modules must install first so their persistent refs exist to hydrate, and `load()` before `start()` (or after `dispose()`) throws. A game bootstrap is `use(...)` → `start()` → `load()`.
+The game bootstrap is `use(...)` → `start()` → `load()`. `start()` installs the modules, so their persistent refs exist, and does not load the save. `load()` hydrates them; a first run reports `not-found`. `load()` before `start()` (or after `dispose()`) throws.
+
+With persistence on, the engine autosaves every 30 s. `autoSaveInterval` sets the period, and 0 turns autosave off. `engine.autoSaveInterval` retunes it at runtime, so a player's autosave setting writes there. Autosave holds until a load has run, so a late `load()` never finds defaults written over its save. In dev, a first tick before any load warns while autosave is on. Call `engine.save()` at checkpoints such as a run's end, on top of the interval.
 
 A load that fails for any reason but `not-found` protects its slot: autosave and `save()` skip it until `saveManager.releaseSlot(id)` or `deleteSave()`, and `save:slot-protected` fires for a UI that offers "discard the unreadable save". `ctx.onLoad` fires after every successful load path (`engine.load()`, the save manager's `load` / `importSave`, harness `createEngineFromSave`), and `ctx.onSave` before every serialization, autosave and `exportSave` included. "Saved" UI keys off `save:written`, not `onSave`: it fires only once `save`, `saveToSlot` or autosave has written the slot.
 

@@ -21,6 +21,7 @@ import {
   withPersistenceNamespace,
   clearPersistentNamespace,
 } from './core/persistence';
+import { isDev } from './core/common';
 import { createEmitHandle } from './core/events';
 import {
   ChainRegistryKey,
@@ -257,8 +258,10 @@ export interface EngineConfig {
    */
   timerProvider?: TimerProvider;
   /**
-   * Interval in ms between autosaves. 0 or omitted disables autosave. The
-   * autosave writes the save manager's active slot, whichever that is.
+   * Interval in ms between autosaves; 0 disables autosave. Default 30000 when
+   * persistence is on. The autosave writes the save manager's active slot,
+   * whichever that is, and holds until a load has run, so it never writes
+   * defaults over a save a later `load()` would read.
    */
   autoSaveInterval?: number;
   /** Set to false to skip save manager creation. Default true. */
@@ -406,6 +409,9 @@ export interface Engine {
   autoSaveInterval: number;
 }
 
+/** Autosave period in ms when persistence is on and `autoSaveInterval` is omitted. */
+const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
+
 /**
  * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
@@ -413,14 +419,16 @@ export interface Engine {
  * @param config - Engine configuration including game ID, TickDriver settings, persistence
  *   options, and available mods
  * @returns An engine instance that accepts modules via `use()`, then `start()` to begin
- *   ticking. Exposes the TickDriver, save manager, and mod selection.
+ *   ticking. Exposes the TickDriver, save manager, and mod selection. With persistence
+ *   on (the default) the game autosaves every 30 s once a `load()` has run.
  *
  * @example
  * ```ts
  * const engine = createEngine({ gameId: 'my-game', tickRate: 20 });
  * engine.use(resourceModule);
  * engine.use(combatModule);
- * engine.start();
+ * engine.start(); // installs modules, so their persistent refs exist
+ * engine.load(); // hydrates them; a first run reports `not-found`
  * ```
  */
 export function createEngine(config: EngineConfig): Engine {
@@ -468,7 +476,10 @@ export function createEngine(config: EngineConfig): Engine {
       : undefined;
 
   let autoSaveTimer: number | null = null;
-  let autoSaveInterval = config.autoSaveInterval ?? 0;
+  // Autosave holds until a load has run: before it, live state is defaults,
+  // and writing them would overwrite the save a later load() would read.
+  let loadRan = false;
+  let autoSaveInterval = config.autoSaveInterval ?? (saveManager ? DEFAULT_AUTO_SAVE_INTERVAL : 0);
   let installed = false;
   let disposed = false;
 
@@ -481,7 +492,9 @@ export function createEngine(config: EngineConfig): Engine {
 
   function startAutoSaveTimer(): void {
     if (saveManager && autoSaveInterval > 0 && !autoSaveTimer) {
-      autoSaveTimer = timers.setInterval(() => saveManager.save(), autoSaveInterval);
+      autoSaveTimer = timers.setInterval(() => {
+        if (loadRan) saveManager.save();
+      }, autoSaveInterval);
     }
   }
   // Every subscription and effect made on the engine's behalf, released by dispose().
@@ -503,7 +516,24 @@ export function createEngine(config: EngineConfig): Engine {
     );
     track(
       saveManager.on('save:loaded', ({ timestamp }) => {
+        loadRan = true;
         for (const cb of loadCallbacks) cb({ success: true, timestamp });
+      }),
+    );
+    track(
+      saveManager.on('save:load-failed', () => {
+        loadRan = true;
+      }),
+    );
+    const offFirstTick = track(
+      tickDriver.onTick(() => {
+        offFirstTick();
+        if (!loadRan && autoSaveInterval > 0 && isDev()) {
+          console.warn(
+            `[engine] "${config.gameId}" ticked before load(): call engine.load() after start() ` +
+              '(a first run reports not-found). Autosave holds until a load has run.',
+          );
+        }
       }),
     );
   }
