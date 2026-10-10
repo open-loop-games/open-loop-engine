@@ -44,7 +44,10 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | add a new resource | resources.md#resource |
 | reactive resource display | resources.md#resource |
 | convert resources / crafting recipe / market trade | resources.md#conversion |
+| cap a resource / storage capacity / overflow | `createResourceBag` (capacity + `link`) → resources.md#resource |
+| random pick / draw k from a pool / shuffle / weighted roll | `randomItem` / `shuffle` / `weightedPick` → resources.md#rng |
 | building / generator / passive production | content-systems.md#producer-category |
+| total income / production rate of a resource | `ProducerCategory.getTotalRate` → content-systems.md#producer-category |
 | upgrade / perk / unlock gate / capped repeatable | content-systems.md#purchasable |
 | one-shot milestone reward | content-systems.md#achievement |
 | skill XP / level curve | content-systems.md#skill |
@@ -129,7 +132,7 @@ Short answers only — which symbol does X. When two of these overlap and pickin
 | Ownership produces continuous flow | `createProducerCategory` → content-systems.md#producer-category |
 | Bought state/effect, upgrade, gate, or capped repeatable | `createPurchasableCategory` → content-systems.md#purchasable |
 | Observed milestone that auto-earns | `createAchievement` / `createAchievementCategory` → content-systems.md#achievement |
-| Generic multi-resource container | `createResourceBag` → resources.md#resource |
+| Resource storage capacity, or a multi-resource container | `createResourceBag` → resources.md#resource |
 | Game-facing item inventory with capacities | `createInventory` → content-systems.md#inventory |
 | Engine tick scheduler | `createTickDriver` → runtime.md#tickdriver |
 | Bounded gameplay run that resets and replays | `createCycle` → content-systems.md#cycle |
