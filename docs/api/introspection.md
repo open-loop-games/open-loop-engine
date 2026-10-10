@@ -32,7 +32,7 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 ## Profiler
 
 - `function enableProfiling(): () => void` — Subscribe to the profiler. `src/core/profiler.ts:45`
-- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a borglike-style console table. `src/core/profiler.ts:229`
+- `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a console table. `src/core/profiler.ts:229`
 - `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:196`
 - `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:59`
 - `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:67`
