@@ -131,7 +131,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     expect(affordable[0].walker).toBe('purchasable');
     expect(affordable[0].categoryId).toBe('upgrades');
     expect(affordable[0].defId).toBe('double');
-    expect(affordable[0].label).toBe('upgrades.double.becomes-affordable');
+    expect(affordable[0].key).toBe('upgrades.double.becomes-affordable');
     expect(affordable[0].currentValue).toEqual(bn(40));
     expect(affordable[0].distance.reason).toBe('computed');
     expect(affordable[0].distance.seconds).toBe(30);
@@ -296,7 +296,7 @@ describe('walkPurchasableTransitions — purchasable-maxed', () => {
     expect(maxed).toBeDefined();
     expect(maxed.distance).toEqual(affordable.distance);
     expect(maxed.currentValue).toEqual(bn(2));
-    expect(maxed.label).toBe('upgrades.lvls.purchasable-maxed');
+    expect(maxed.key).toBe('upgrades.lvls.purchasable-maxed');
   });
 
   it('does not emit purchasable-maxed for uncapped purchasables (limit: Infinity)', () => {

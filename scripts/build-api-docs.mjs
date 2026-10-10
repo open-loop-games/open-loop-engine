@@ -287,7 +287,7 @@ function renderIndex(byCluster) {
     '',
     '| Level | Reach for | Start at |',
     '| --- | --- | --- |',
-    '| **L1: Resource helpers** | `addResource` / `hasResource` / `displayResource`, `Resource.best` / `.cumulative` — direct currency mutation, display, lifetime trackers | resources.md#resource |',
+    '| **L1: Resource helpers** | `addResource` / `hasResource` / `formatResource`, `Resource.best` / `.cumulative` — direct currency mutation, display, lifetime trackers | resources.md#resource |',
     '| **L2: Category systems** | `createProducerCategory`, `createPurchasableCategory`, `createSkillCategory`, `createDialogCategory`, … — repeatable authored content, and the default for it | content-systems.md, content-narrative.md |',
     '| **L3: Raw primitives** | `createScalingPurchasable`, `createCycle`, `createModifierChain`, `createCategoryBase` — one-off systems, or registration shapes category mapping constrains | composition.md, mechanics.md, lifecycle.md |',
     '| **L4: Declarative data** | `Gate`, `E` / `IEffect` — JSON/mod/save/sim-friendly gates and effects | mechanics.md#gate, mechanics.md#effects |',

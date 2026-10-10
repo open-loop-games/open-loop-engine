@@ -60,7 +60,7 @@ export interface PurchasableDisplay {
   /** Main description explaining what this purchasable does */
   description: Computable<string>;
   /** Formatted current effect (e.g., "×8 production"). Shown below description. */
-  effectDisplay?: Computable<string>;
+  effectDescription?: Computable<string>;
   /**
    * Whether to display the current amount (e.g., "Level 5").
    * Default: `false` when limit is 1, `true` otherwise.
@@ -241,7 +241,7 @@ export type ScalingPurchasableOptions = {
    * (additive bonuses, flat amounts). Can be a ref or getter. Default: `×`
    * followed by the effect, when an effect is set.
    */
-  effectDisplay?: Computable<string>;
+  effectDescription?: Computable<string>;
   /** Maximum number of purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
   /** Starting amount. Default: `0` */
@@ -286,7 +286,7 @@ export interface Purchasable {
   display: {
     title: MaybeRef<string | undefined>;
     description: MaybeRef<string>;
-    effectDisplay: MaybeRef<string | undefined>;
+    effectDescription: MaybeRef<string | undefined>;
     showAmount: boolean;
   };
   /** Current effect value — computed from amount for leveled, or static for one-shot */
@@ -338,7 +338,7 @@ function buildPurchasableDisplay(
 ): {
   title: MaybeRef<string | undefined>;
   description: MaybeRef<string>;
-  effectDisplay: MaybeRef<string | undefined>;
+  effectDescription: MaybeRef<string | undefined>;
   showAmount: boolean;
 } {
   if (typeof display === 'object' && display !== null && 'description' in display) {
@@ -346,14 +346,14 @@ function buildPurchasableDisplay(
     return {
       title: toMaybeRef(disp.title),
       description: toMaybeRef(disp.description),
-      effectDisplay: toMaybeRef(disp.effectDisplay),
+      effectDescription: toMaybeRef(disp.effectDescription),
       showAmount: disp.showAmount ?? !isOneShot,
     };
   }
   return {
     title: undefined,
     description: toMaybeRef(display as Computable<string>),
-    effectDisplay: undefined,
+    effectDescription: undefined,
     showAmount: !isOneShot,
   };
 }
@@ -733,7 +733,7 @@ export function createScalingPurchasable(
     id,
     title,
     description,
-    effectDisplay,
+    effectDescription,
     limit,
     initialCount,
     onPurchase,
@@ -751,8 +751,8 @@ export function createScalingPurchasable(
       display: {
         title,
         description,
-        effectDisplay:
-          effectDisplay ??
+        effectDescription:
+          effectDescription ??
           (effectFn ? computed(() => `×${formatSmall(effectFn(count.value), 2)}`) : undefined),
       },
       requirements: costRequirement,

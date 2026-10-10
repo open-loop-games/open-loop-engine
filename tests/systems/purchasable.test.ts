@@ -174,7 +174,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
   });
 });
 
-describe('createScalingPurchasable — effectDisplay', () => {
+describe('createScalingPurchasable — effectDescription', () => {
   it('defaults to a multiplier readout of the effect', () => {
     const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
     const p = createScalingPurchasable({
@@ -187,7 +187,7 @@ describe('createScalingPurchasable — effectDisplay', () => {
     });
 
     p.purchase(3);
-    expect(unref(p.display.effectDisplay)).toBe('×8.00');
+    expect(unref(p.display.effectDescription)).toBe('×8.00');
   });
 
   it('takes an override for effects that are not multipliers', () => {
@@ -199,11 +199,11 @@ describe('createScalingPurchasable — effectDisplay', () => {
       baseCost: 10,
       costScaling: 1.15,
       effect: (level: DecimalSource) => Decimal.mul(level, 0.25),
-      effectDisplay: '+0.25 damage per level',
+      effectDescription: '+0.25 damage per level',
     });
 
     p.purchase(2);
-    expect(unref(p.display.effectDisplay)).toBe('+0.25 damage per level');
+    expect(unref(p.display.effectDescription)).toBe('+0.25 damage per level');
   });
 });
 

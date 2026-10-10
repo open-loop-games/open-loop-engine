@@ -519,22 +519,22 @@ const NOTATION_THRESHOLD = new OrigDecimal(1000);
 /**
  * Format a number with commas as thousands separators
  */
-export function commaFormat(num: DecimalSource, precision: number): string {
+export function commaFormat(num: DecimalSource, decimals: number): string {
   if (num == null) return 'NaN';
 
   if (typeof num === 'number') {
-    if (Math.abs(num) < 0.001) return (0).toFixed(precision);
-    const [intPart, fracPart] = num.toFixed(precision).split('.');
+    if (Math.abs(num) < 0.001) return (0).toFixed(decimals);
+    const [intPart, fracPart] = num.toFixed(decimals).split('.');
     const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return fracPart === undefined ? withCommas : withCommas + '.' + fracPart;
   }
 
   const d = new OrigDecimal(num);
   if (d.mag < 0.001) {
-    return (0).toFixed(precision);
+    return (0).toFixed(decimals);
   }
 
-  const init = d.toStringWithDecimalPlaces(precision);
+  const init = d.toStringWithDecimalPlaces(decimals);
   const portions = init.split('.');
   portions[0] = portions[0].replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1,');
 
@@ -544,13 +544,13 @@ export function commaFormat(num: DecimalSource, precision: number): string {
 /**
  * Format a number in regular decimal notation
  */
-export function regularFormat(num: DecimalSource, precision: number): string {
+export function regularFormat(num: DecimalSource, decimals: number): string {
   if (num == null) return 'NaN';
 
   if (typeof num === 'number') {
     const abs = Math.abs(num);
-    if (abs < 0.0001) return (0).toFixed(precision);
-    let p = precision;
+    if (abs < 0.0001) return (0).toFixed(decimals);
+    let p = decimals;
     if (abs < 0.1 && p !== 0) {
       p = Math.max(p, Math.ceil(-Math.log10(abs)), DEFAULT_DECIMALS);
     }
@@ -559,14 +559,14 @@ export function regularFormat(num: DecimalSource, precision: number): string {
 
   const d = new OrigDecimal(num);
   if (d.mag < 0.0001) {
-    return (0).toFixed(precision);
+    return (0).toFixed(decimals);
   }
 
-  if (d.mag < 0.1 && precision !== 0) {
-    precision = Math.max(precision, d.log10().negate().ceil().toNumber(), DEFAULT_DECIMALS);
+  if (d.mag < 0.1 && decimals !== 0) {
+    decimals = Math.max(decimals, d.log10().negate().ceil().toNumber(), DEFAULT_DECIMALS);
   }
 
-  return d.toStringWithDecimalPlaces(precision);
+  return d.toStringWithDecimalPlaces(decimals);
 }
 
 /**
@@ -577,16 +577,16 @@ export function regularFormat(num: DecimalSource, precision: number): string {
  */
 export function format(
   num: DecimalSource,
-  precision: number = DEFAULT_DECIMALS,
+  decimals: number = DEFAULT_DECIMALS,
   small: boolean = DEFAULT_SHOW_SMALL,
 ): string {
   if (typeof num === 'number') {
     if (Number.isNaN(num)) return 'NaN';
-    if (num < 0) return '-' + format(-num, precision, small);
+    if (num < 0) return '-' + format(-num, decimals, small);
     if (num === Number.POSITIVE_INFINITY) return 'Infinity';
     if (num >= 1000) return notationManager.format(new OrigDecimal(num));
-    if (num >= 0.001 || !small) return regularFormat(num, precision);
-    if (num === 0) return (0).toFixed(precision);
+    if (num >= 0.001 || !small) return regularFormat(num, decimals);
+    if (num === 0) return (0).toFixed(decimals);
     return notationManager.format(new OrigDecimal(num));
   }
 
@@ -597,7 +597,7 @@ export function format(
   }
 
   if (d.sign < 0) {
-    return '-' + format(d.neg(), precision, small);
+    return '-' + format(d.neg(), decimals, small);
   }
 
   if (d.mag === Number.POSITIVE_INFINITY) {
@@ -611,12 +611,12 @@ export function format(
 
   // Regular format for normal numbers
   if (d.gte(THOUSANDTH) || !small) {
-    return regularFormat(d, precision);
+    return regularFormat(d, decimals);
   }
 
   // Zero
   if (d.eq(ZERO)) {
-    return (0).toFixed(precision);
+    return (0).toFixed(decimals);
   }
 
   // Very small numbers — show in notation
@@ -708,6 +708,6 @@ export function formatTime(seconds: DecimalSource): string {
 /**
  * Format a number, always showing very small numbers
  */
-export function formatSmall(num: DecimalSource, precision?: number): string {
-  return format(num, precision, true);
+export function formatSmall(num: DecimalSource, decimals?: number): string {
+  return format(num, decimals, true);
 }

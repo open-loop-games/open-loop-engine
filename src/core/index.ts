@@ -26,7 +26,7 @@ export type {
 } from './resource';
 export {
   createResource,
-  displayResource,
+  formatResource,
   unwrapResource,
   addResource,
   subtractResource,

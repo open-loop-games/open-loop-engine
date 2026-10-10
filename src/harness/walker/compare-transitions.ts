@@ -23,7 +23,7 @@ export function compareTransitions(a: Transition, b: Transition): number {
   // Label ascending as the deterministic tie-break (for finite equals AND
   // for the null group — V8's sort is stable but consumers parse this
   // ordering as contract, not as implementation detail).
-  if (a.label < b.label) return -1;
-  if (a.label > b.label) return 1;
+  if (a.key < b.key) return -1;
+  if (a.key > b.key) return 1;
   return 0;
 }

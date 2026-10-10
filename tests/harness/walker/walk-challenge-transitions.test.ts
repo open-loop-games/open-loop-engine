@@ -113,7 +113,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
     expect(vis[0].walker).toBe('challenge');
     expect(vis[0].categoryId).toBe('vis');
     expect(vis[0].defId).toBe('secret');
-    expect(vis[0].label).toBe('vis.secret.visibility-reveal');
+    expect(vis[0].key).toBe('vis.secret.visibility-reveal');
     expect(vis[0].currentValue).toBe(false);
     expect(vis[0].distance.reason).toBe('computed');
     expect(vis[0].distance.seconds).toBe(30); // (100 - 40) / 2

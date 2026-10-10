@@ -123,7 +123,7 @@ describe('createActionCategory — registration + per-def state', () => {
     const off = enableProfiling();
     try {
       driver.tick(1);
-      const labels = getProfileReport().entries.map((e) => e.name);
+      const labels = getProfileReport().entries.map((e) => e.label);
       expect(labels).toContain(`${category.id}/chop/tick`);
     } finally {
       off();

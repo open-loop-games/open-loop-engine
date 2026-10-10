@@ -9,7 +9,7 @@ describe('profiler wrap sites', () => {
     const off = enableProfiling();
     try {
       chain.apply(3);
-      expect(getProfileReport().entries.map((e) => e.name)).toContain('modifier.chain.apply');
+      expect(getProfileReport().entries.map((e) => e.label)).toContain('modifier.chain.apply');
     } finally {
       off();
     }

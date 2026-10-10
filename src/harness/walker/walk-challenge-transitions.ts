@@ -89,7 +89,7 @@ function buildTransition(
     defId,
     currentValue,
     distance,
-    label: `${categoryId}.${defId}.${kind}`,
+    key: `${categoryId}.${defId}.${kind}`,
   };
 }
 

@@ -31,7 +31,7 @@ function sigFigRounding(sigFigs: number): (value: Decimal) => Decimal {
 export class NotationManager {
   private notations = new Map<string, Notation>();
   private active = 'standard';
-  private precision = 4; // eternal_notations default (defaultRound uses 4 sig figs)
+  private sigFigs = 4; // eternal_notations default (defaultRound uses 4 sig figs)
 
   constructor() {
     this.notations.set('standard', Presets.Standard);
@@ -58,16 +58,16 @@ export class NotationManager {
   }
 
   /** Get the current precision (significant figures). */
-  getPrecision(): number {
-    return this.precision;
+  getSigFigs(): number {
+    return this.sigFigs;
   }
 
   /**
    * Set significant figures for all registered notations.
    * Updates the `rounding` property on notations that support it.
    */
-  setPrecision(sigFigs: number): void {
-    this.precision = sigFigs;
+  setSigFigs(sigFigs: number): void {
+    this.sigFigs = sigFigs;
     const roundFn = sigFigRounding(sigFigs);
     for (const notation of this.notations.values()) {
       if ('rounding' in notation) {

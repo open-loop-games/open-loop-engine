@@ -226,7 +226,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
     upgradeLimit.value = 2;
     check('after-raising-the-limit');
-    expect(inc.snapshot.purchasables.map((t) => t.label)).toContain(
+    expect(inc.snapshot.purchasables.map((t) => t.key)).toContain(
       'upgrades.fast.purchasable-maxed',
     );
   });
@@ -251,7 +251,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
     expect(trials.getChallenge('bronze')!.enter()).toBe(true);
     check('after-enter');
-    expect(inc.snapshot.challenges.map((t) => t.label)).toContain('trials.bronze.goal-complete');
+    expect(inc.snapshot.challenges.map((t) => t.key)).toContain('trials.bronze.goal-complete');
 
     trials.getChallenge('bronze')!.complete(true);
     check('after-first-completion');
@@ -267,9 +267,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
     config.resources.gold = 0;
     inc.invalidateResource('gold');
     check('after-reset');
-    expect(inc.snapshot.challenges.map((t) => t.label)).toContain(
-      'trials.bronze.visibility-reveal',
-    );
+    expect(inc.snapshot.challenges.map((t) => t.key)).toContain('trials.bronze.visibility-reveal');
   });
 });
 

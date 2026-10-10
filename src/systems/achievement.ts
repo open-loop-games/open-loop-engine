@@ -87,7 +87,7 @@ export interface AchievementOptions<T = unknown> {
   image?: Computable<string>;
 
   /** Use smaller display variant */
-  small?: Computable<boolean>;
+  compact?: Computable<boolean>;
 
   /**
    * Callback when the achievement is earned. Never fires for an achievement a
@@ -128,7 +128,7 @@ export interface Achievement<T = unknown> {
   /** Optional badge image URL, or undefined when none was configured */
   image: Ref<string> | undefined;
   /** Whether to render the compact/small tile variant */
-  small: Ref<boolean>;
+  compact: Ref<boolean>;
   /** Whether to emit a popup notification when this achievement is earned */
   showPopup: boolean;
   /** Callback invoked when the achievement is earned */
@@ -177,7 +177,7 @@ export function createAchievement<T = unknown>(
     hidden,
     visible,
     image,
-    small,
+    compact: small,
     onComplete,
     showPopup = true,
   } = options;
@@ -221,7 +221,7 @@ export function createAchievement<T = unknown>(
     hidden: hiddenRef,
     visible: visibleRef,
     image: imageRef,
-    small: smallRef,
+    compact: smallRef,
     showPopup,
     onComplete,
     canComplete,

@@ -235,7 +235,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     expect(snap.all.every((t) => t.distance.seconds === null)).toBe(true);
 
     // Within the null group, labels are ascending.
-    const labels = snap.all.map((t) => t.label);
+    const labels = snap.all.map((t) => t.key);
     expect(labels).toEqual([...labels].sort());
   });
 

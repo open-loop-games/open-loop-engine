@@ -64,13 +64,13 @@ export function isProfilingEnabled(): boolean {
  * Wrap a function call with profiling. Returns the function's result
  * untouched. No-op (returns `fn()` directly) when profiling is disabled.
  */
-export function profile<T>(name: string, fn: () => T): T {
+export function profile<T>(label: string, fn: () => T): T {
   if (refcount === 0) return fn();
   const t0 = performance.now();
   try {
     return fn();
   } finally {
-    record(name, performance.now() - t0);
+    record(label, performance.now() - t0);
   }
 }
 
@@ -88,9 +88,9 @@ export function profileStart(): number {
  * End a manual timer started with {@link profileStart}.
  * No-op when the token is `0`.
  */
-export function profileEnd(name: string, start: number): void {
+export function profileEnd(label: string, start: number): void {
   if (refcount === 0 || start === 0) return;
-  record(name, performance.now() - start);
+  record(label, performance.now() - start);
 }
 
 function record(name: string, elapsed: number): void {
@@ -146,7 +146,7 @@ export function endProfileTick(): void {
 /** A single row in a {@link ProfileReport}. */
 export interface ProfileEntry {
   /** Label passed to {@link profile} or {@link profileEnd}. */
-  name: string;
+  label: string;
   /**
    * Percentage of aggregate `tick.total` time (or of summed totals if
    * tick.total missing). Nested labels overlap, so rows sum past 100.
@@ -204,7 +204,7 @@ export function getProfileReport(): ProfileReport {
     // perTick deltas are in ms; percentile output is in µs.
     const sortedPerTick = [...t.perTick].sort((a, b) => a - b);
     entries.push({
-      name,
+      label: name,
       pct: denominatorMs > 0 ? (t.total / denominatorMs) * 100 : 0,
       totalMs: t.total,
       calls: t.calls,
@@ -240,7 +240,7 @@ export function formatProfileReport(report: ProfileReport): string {
         `[p50 ${e.p50Us.toFixed(0).padStart(5)}µs  ` +
         `p95 ${e.p95Us.toFixed(0).padStart(5)}µs  ` +
         `p99 ${e.p99Us.toFixed(0).padStart(5)}µs]  ` +
-        e.name,
+        e.label,
     );
   }
   return lines.join('\n');

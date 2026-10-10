@@ -5,7 +5,7 @@ Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatt
 ## Canonical entrypoints
 
 - `createResource` — define a named game quantity with persistence and display metadata.
-- `addResource` / `subtractResource` / `hasResource` / `displayResource` — mutate, check, and present resources through the standard helpers.
+- `addResource` / `subtractResource` / `hasResource` / `formatResource` — mutate, check, and present resources through the standard helpers.
 - `Resource.cumulative` / `Resource.best` — read lifetime gain and high-water trackers created with persistent resources.
 - `createResourceBag` — cap resources: per-type and total storage capacity with a block or destroy overflow, and `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.
 - `randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.
@@ -18,8 +18,8 @@ Big number utilities using break_eternity.js Provides Decimal type and formattin
 - `function bn(x: DecimalSource): Decimal` — Create a Decimal from a number, string, or Decimal. `src/primitives/decimal.ts:258`
 - `type Decimal = InstanceType<DecimalClass>` — Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. `src/primitives/decimal.ts:39`
 - `type DecimalSource = Decimal | number | string` — Anything bn accepts — a live `Decimal`, a `number`, or a numeric string. `src/primitives/decimal.ts:41`
-- `function format(num: DecimalSource, precision?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:578`
-- `function formatSmall(num: DecimalSource, precision?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:711`
+- `function format(num: DecimalSource, decimals?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:578`
+- `function formatSmall(num: DecimalSource, decimals?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:711`
 - `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:657`
 - `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:629`
 - `function integerRoot(x: DecimalSource, degree: number): Decimal` — The floored integer `degree`-th root of `x` — the largest integer `m` with `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `src/primitives/decimal.ts:498`
@@ -64,7 +64,7 @@ the fundamental currency of incremental games
 - `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource (non-persistent). `src/core/resource.ts:142`
 - `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game currency. `src/core/resource.ts:169`
 - `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Creates a multi-type resource container with optional per-type and total capacity limits. `src/core/resource-bag.ts:150`
-- `function displayResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource value with its configured precision. `src/core/resource.ts:361`
+- `function formatResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource value with its configured precision. `src/core/resource.ts:361`
 - `function hasResource(resource: Resource<DecimalSource>, amount: DecimalSource): boolean` — Check if a resource has at least a certain amount. `src/core/resource.ts:453`
 - `type PersistentResourceOptions` — Configuration for a persistent createResource: `id` is required. `src/core/resource.ts:115`
 - `function resetResource<T extends DecimalSource>(resource: Resource<T>): void` — Reset a resource to its default value (or zero). `src/core/resource.ts:462`

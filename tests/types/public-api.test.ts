@@ -185,7 +185,7 @@ describe('createResource overloads', () => {
     const r = createResource(0, { id: 'points', displayName: 'points' });
     expectTypeOf(r.id).toBeString();
     expectTypeOf(r.displayName).toBeString();
-    expectTypeOf(r.precision).toBeNumber();
+    expectTypeOf(r.decimals).toBeNumber();
   });
 });
 

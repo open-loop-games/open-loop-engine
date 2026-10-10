@@ -35,8 +35,8 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 - `function formatProfileReport(report: ProfileReport): string` — Format a ProfileReport as a console table. `src/core/profiler.ts:229`
 - `function getProfileReport(): ProfileReport` — Build a structured report of accumulated timings. `src/core/profiler.ts:196`
 - `function isProfilingEnabled(): boolean` — Whether any caller currently holds a profile subscription. `src/core/profiler.ts:59`
-- `function profile<T>(name: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:67`
-- `function profileEnd(name: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:91`
+- `function profile<T>(label: string, fn: () => T): T` — Wrap a function call with profiling. `src/core/profiler.ts:67`
+- `function profileEnd(label: string, start: number): void` — End a manual timer started with profileStart. `src/core/profiler.ts:91`
 - `interface ProfileEntry` — A single row in a ProfileReport. `src/core/profiler.ts:147`
 - `interface ProfileReport` — Structured profiling report produced by getProfileReport. `src/core/profiler.ts:176`
 - `function profileStart(): number` — Start a manual timer. `src/core/profiler.ts:83`

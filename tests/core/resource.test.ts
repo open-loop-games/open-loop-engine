@@ -11,7 +11,7 @@ import {
   subtractResource,
   hasResource,
   resetResource,
-  displayResource,
+  formatResource,
 } from '@/core/resource';
 
 describe('Resource', () => {
@@ -74,12 +74,20 @@ describe('Resource', () => {
     await nextTick();
     expect(Decimal.gte(gold.cumulative!.value, 80)).toBe(true);
   });
-  it('small values stay hidden by default at any precision', () => {
+  it('small values stay hidden by default at any decimals', () => {
     beginPersistentContext('test-resource-small-default');
-    const dust = createResource(bn(0.00001), { id: 'dust', precision: 2 });
-    const hidden = createResource(bn(0.00001), { id: 'hidden', precision: 2, small: false });
+    const dust = createResource(bn(0.00001), { id: 'dust', decimals: 2 });
+    const hidden = createResource(bn(0.00001), { id: 'hidden', decimals: 2, small: false });
     endPersistentContext();
-    expect(displayResource(dust)).toBe(displayResource(hidden));
+    expect(formatResource(dust)).toBe(formatResource(hidden));
+  });
+  it('carries its decimals option into what it formats', () => {
+    beginPersistentContext('test-resource-decimals');
+    const whole = createResource(bn(1.5), { id: 'whole' });
+    const fine = createResource(bn(1.5), { id: 'fine', decimals: 2 });
+    endPersistentContext();
+    expect(fine.decimals).toBe(2);
+    expect(formatResource(fine)).not.toBe(formatResource(whole));
   });
   it('a dotted id throws an error naming the resource id', () => {
     beginPersistentContext('mine');

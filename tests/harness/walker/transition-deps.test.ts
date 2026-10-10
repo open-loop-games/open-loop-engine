@@ -74,7 +74,7 @@ describe('collectProducerTransitionsWithDeps', () => {
     expect(out).toHaveLength(1);
 
     const [entry] = out;
-    expect(entry.transition.label).toBe('buildings.cursor.producer-becomes-affordable');
+    expect(entry.transition.key).toBe('buildings.cursor.producer-becomes-affordable');
     expect(shape(entry.deps)).toEqual({
       resources: ['cookies'],
       rates: ['cookies'],

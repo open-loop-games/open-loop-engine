@@ -9,7 +9,7 @@
  *   engine-scoped registration, and the lifetime `cumulative` / `best`
  *   trackers (built when the resource is created inside a persistent context)
  * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic helpers
- * - {@link displayResource} — formatted string using the resource's precision settings
+ * - {@link formatResource} — formatted string using the resource's precision settings
  * - {@link unwrapResource} — dereference a `Resource | Ref<Resource>` to the underlying Resource
  * - {@link resetResource} — set a resource's value back to its persisted default (or 0)
  *
@@ -60,7 +60,7 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
   /** Human-readable name shown in UI and used for resource-registry lookups by name */
   displayName: string;
   /** Number of decimal places to show when formatting (0 = whole numbers only) */
-  precision: number;
+  decimals: number;
   /** If true, very small values are displayed as-is instead of rounding to 0 */
   small?: boolean;
   /**
@@ -98,7 +98,7 @@ export interface ResourceOptions {
   /** Display name for the resource. Used in UI and registry lookups. Default: `"points"` */
   displayName?: string;
   /** Number of decimal places to show when formatting. Default: `0` (whole numbers) */
-  precision?: number;
+  decimals?: number;
   /** If true, display very small values as-is instead of rounding to 0. Off by default. */
   small?: boolean;
   /**
@@ -136,7 +136,7 @@ export type PersistentResourceOptions = ResourceOptions & { id: string };
  * ```ts
  * const netIncome = computed(() => Decimal.sub(income.value, expenses.value));
  * const netIncomeResource = createResource(netIncome, { displayName: 'net income', precision: 1 });
- * displayResource(netIncomeResource); // formatted string
+ * formatResource(netIncomeResource); // formatted string
  * ```
  */
 export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>;
@@ -233,7 +233,7 @@ function buildResource<T>(
   options: ResourceOptions,
   persistentId?: string,
 ): Resource<T> {
-  const { displayName = 'points', precision = 0, small = false, id } = options;
+  const { displayName = 'points', decimals = 0, small = false, id } = options;
   // Single ambient-context read shared by the tracker setup below and the
   // registry registration at the end. The two sites both need to know
   // whether we're inside an engine namespace; nothing between them changes
@@ -247,7 +247,7 @@ function buildResource<T>(
     resource = Object.assign(defaultValue, {
       id: id ?? displayName,
       displayName,
-      precision,
+      decimals,
       small,
     });
   } else {
@@ -260,7 +260,7 @@ function buildResource<T>(
     // Save under a stable name — the resource's id unless the caller scopes
     // it — so round-trips survive field reorders inside a context. The
     // non-persistent wrapper carries the same metadata.
-    const metadata = { id, displayName, precision, small };
+    const metadata = { id, displayName, decimals, small };
     // The public overload checked `T` against IfSerializable; a generic body can't
     // resolve that check, so the call goes through the unchecked shape.
     const persistentResource = (persistent as (d: T, o: PersistentOptions<T>) => Persistent<T>)(
@@ -354,16 +354,16 @@ function buildResource<T>(
  * @example
  * ```ts
  * const gold = createResource(1234.567, { id: 'gold', displayName: 'Gold', precision: 2 })
- * displayResource(gold) // "1.235 k" — notation takes over above 1000; precision no longer digits-after-decimal
- * displayResource(gold, 999) // "999.00"
+ * formatResource(gold) // "1.235 k" — notation takes over above 1000; precision no longer digits-after-decimal
+ * formatResource(gold, 999) // "999.00"
  * ```
  */
-export function displayResource(resource: Resource, overrideAmount?: DecimalSource): string {
+export function formatResource(resource: Resource, overrideAmount?: DecimalSource): string {
   const amount = overrideAmount ?? resource.value;
-  if (resource.precision === 0) {
+  if (resource.decimals === 0) {
     return formatWhole(resource.small ? amount : Decimal.floor(amount));
   }
-  return format(amount, resource.precision, resource.small);
+  return format(amount, resource.decimals, resource.small);
 }
 
 /**

@@ -165,7 +165,7 @@ describe('walkProducerTransitions — producer-becomes-affordable (computed)', (
     expect(t.kind).toBe('producer-becomes-affordable');
     expect(t.categoryId).toBe('buildings');
     expect(t.defId).toBe('cursor');
-    expect(t.label).toBe('buildings.cursor.producer-becomes-affordable');
+    expect(t.key).toBe('buildings.cursor.producer-becomes-affordable');
     expect(t.distance.reason).toBe('computed');
     expect(t.distance.seconds).toBe(5);
   });

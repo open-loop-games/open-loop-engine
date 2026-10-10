@@ -19,7 +19,7 @@ export const TIER_MANIFEST = [
       'Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatting, and randomness underneath `createResource`; conversion and resource bags on top. Start here for any new countable quantity.',
     entrypoints: [
       '`createResource` — define a named game quantity with persistence and display metadata.',
-      '`addResource` / `subtractResource` / `hasResource` / `displayResource` — mutate, check, and present resources through the standard helpers.',
+      '`addResource` / `subtractResource` / `hasResource` / `formatResource` — mutate, check, and present resources through the standard helpers.',
       '`Resource.cumulative` / `Resource.best` — read lifetime gain and high-water trackers created with persistent resources.',
       '`createResourceBag` — cap resources: per-type and total storage capacity with a block or destroy overflow, and `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.',
       '`randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.',

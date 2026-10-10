@@ -183,7 +183,7 @@ Three tiers based on audience. IDE hover is the primary delivery mechanism — n
 - `@param` for each parameter, with a sentence on the options object's role
 - `@returns` describing the returned object's key capabilities
 - `@example` with a 5–10 line realistic usage snippet
-- Mention related functions if the relationship isn't obvious (e.g., `displayResource` / `resetResource` on `createResource`)
+- Mention related functions if the relationship isn't obvious (e.g., `formatResource` / `resetResource` on `createResource`)
 
 **Public interfaces (Options + Return types)** — the shape consumers configure:
 - `/** */` on every field that isn't self-documenting from name + type alone

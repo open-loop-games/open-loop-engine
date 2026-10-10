@@ -52,5 +52,5 @@ export interface Transition {
   /** Distance to the predicted transition. See {@link TransitionDistance}. */
   distance: TransitionDistance;
   /** Display-ready label, conventionally `{categoryId}.{defId}.{kind}`. */
-  label: string;
+  key: string;
 }

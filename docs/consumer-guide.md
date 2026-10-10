@@ -17,7 +17,7 @@ The engine ships utility functions that handle the Decimal arithmetic, bounds ch
 | `addResource` | Add to a resource, optionally tagging the gain with a modifier chain for trace attribution | `resource.value = Decimal.add(resource.value, amount)` |
 | `subtractResource` | Subtract with insufficient-funds check; returns `false` if short | `if (Decimal.gte(r.value, cost)) { r.value = Decimal.sub(...) }` |
 | `hasResource` | Check if a resource meets a threshold | `Decimal.gte(resource.value, amount)` |
-| `displayResource` | Format a resource for display | `format(resource.value)` |
+| `formatResource` | Format a resource for display | `format(resource.value)` |
 | `resetResource` | Reset to default value | `resource.value = Decimal.dZero` |
 | `resource.best` | Persistent high-water mark on persistent resources | Manual `if (gt(current, best)) best = current` |
 | `resource.cumulative` | Persistent lifetime gain on persistent resources, seeded with the default, so a starting balance counts as earned (as `cumulative-gte` reads it) | Manual accumulator in onTick |

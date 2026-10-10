@@ -276,7 +276,7 @@ export function createIncrementalSnapshot(
   }
 
   function indexEntry(entry: CacheEntry): void {
-    const label = entry.transition.label;
+    const label = entry.transition.key;
     entries.set(label, entry);
     addToReverseIndex(byResource, entry.deps.resources, label);
     addToReverseIndex(byRate, entry.deps.rates, label);
@@ -324,7 +324,7 @@ export function createIncrementalSnapshot(
     const emissions = record.walk.collect(record.categoryId, record.entity, memo);
     for (const { transition, deps } of emissions) {
       indexEntry({ transition, deps, record });
-      record.labels.add(transition.label);
+      record.labels.add(transition.key);
     }
   }
 

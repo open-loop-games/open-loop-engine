@@ -40,7 +40,7 @@ export { createIncrementalSnapshot, type IncrementalSnapshot } from './increment
  * Merged output of {@link createTransitionSnapshot}.
  *
  * `all` is the flat sorted list (finite seconds ascending, null distances
- * last, tie-broken by {@link Transition.label}). The per-source arrays
+ * last, tie-broken by {@link Transition.key}). The per-source arrays
  * preserve the same order as `all`, so consumers can walk one group
  * without needing to re-sort.
  */
