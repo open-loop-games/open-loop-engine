@@ -9,14 +9,14 @@
  *
  * Variable mode (`tickMode: 'variable'`, default): passes real elapsed dt (capped at
  * maxDeltaTime, scaled by speedMultiplier) to callbacks once per interval. Matches
- * TMT/Profectus/AD/Synergism and every existing consumer.
+ * the genre-standard loop and every existing consumer.
  *
  * Fixed mode (`tickMode: 'fixed'`): accumulates real elapsed dt (scaled by
  * speedMultiplier), then drains the accumulator by calling `processTick(stepSize)`
  * repeatedly until the remainder is below stepSize. `maxStepsPerTick` caps per-interval
  * sub-steps; residual above the cap is dropped (optionally reported via
  * `onStepsOverflow`), never banked. For consumers whose tick math presumes a small
- * constant dt (Arcanum 120ms, Increlution tick-counter decay).
+ * constant dt (e.g. 120ms steps, tick-counter decay).
  *
  * EWMA: An exponentially-weighted moving average tracks mean raw dt in both modes.
  * In variable mode the capped dt itself compensates for sustained lag; in fixed mode
@@ -34,9 +34,8 @@
  * Deterministic replay: fixed mode + seeded RNG + `stepOnce()` produces bit-identical
  * sequences across tab-performance profiles. Variable mode cannot.
  *
- * Variable dt with setInterval is the genre standard. EWMA lag compensation adapted
- * from Synergism (200 TPS, filterStrength=20). Fixed mode is an opt-in for the
- * source-faithful-port case (incloneution's tick-drift diagnostic).
+ * Variable dt with setInterval is the genre standard. EWMA lag compensation uses 200 TPS and filterStrength=20. Fixed mode is an opt-in
+ * for source-faithful ports and tick-drift diagnostics.
  */
 
 import { shallowRef } from 'vue';
@@ -80,7 +79,7 @@ export interface TickDriverConfig {
   tickMode?: 'variable' | 'fixed';
   /**
    * Seconds per sub-tick in fixed mode. Defaults to `1 / tickRate`. Unused in variable
-   * mode. Typical values: 0.020 (incloneution/Increlution), 0.120 (Arcanum).
+   * mode. Typical values: 0.020, 0.120.
    */
   stepSize?: number;
   /**
@@ -201,7 +200,7 @@ export interface TickDriver {
   readonly maxDeltaTime: number;
 }
 
-/** EWMA smoothing factor. Higher = more smoothing, slower response. Matches Synergism. */
+/** EWMA smoothing factor. Higher = more smoothing, slower response. */
 const FILTER_STRENGTH = 20;
 
 /**

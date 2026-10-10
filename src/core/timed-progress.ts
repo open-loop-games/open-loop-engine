@@ -14,7 +14,7 @@
  *
  * Intended as the building block for N-parallel passive tick loops where a
  * single-active-at-a-time state machine (like Sequencer-driven execution)
- * doesn't fit — e.g., incloneution's passive jobs, one tracker per job
+ * doesn't fit — e.g., passive jobs, one tracker per job
  * ticking beside the action queue.
  */
 

@@ -223,7 +223,7 @@ export function getProfileReport(): ProfileReport {
 }
 
 /**
- * Format a {@link ProfileReport} as a borglike-style console table.
+ * Format a {@link ProfileReport} as a console table.
  * Useful for headless runs; BenchmarkLayout renders the structured report directly.
  */
 export function formatProfileReport(report: ProfileReport): string {

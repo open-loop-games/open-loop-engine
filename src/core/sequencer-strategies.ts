@@ -2,9 +2,9 @@
  * Built-in fill strategies for Sequencer.
  *
  * These are sugar for common automation patterns found in incremental games:
- * - Conditional: evaluate rules top-to-bottom, first match wins (Spell Compiler, Cavernous II)
- * - Priority: always pick the highest-priority candidate (Synergism, NGU Idle)
- * - Round-robin: cycle through candidates in rotation (Arcanum's hobbies)
+ * - Conditional: evaluate rules top-to-bottom, first match wins
+ * - Priority: always pick the highest-priority candidate
+ * - Round-robin: cycle through candidates in rotation
  * - Composite: chain strategies with first-match semantics (goals, then hobbies)
  *
  * One of three sibling "choose one from a list" primitives. The axis is
@@ -145,7 +145,7 @@ export function createRoundRobinStrategy<M = void>(
  * Tries each strategy in order; returns the first non-null result.
  *
  * Common pattern: a higher-priority strategy first, then a round-robin
- * fallback — Arcanum fills a free slot from its goals before walking its
+ * fallback — fill a free slot from its goals before walking a
  * hobbies list:
  * ```ts
  * createCompositeStrategy(

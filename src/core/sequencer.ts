@@ -341,7 +341,7 @@ export interface Sequencer<M = void> {
    * there (progress, say) must be reset before replaying.
    */
   // TODO(ergonomics): accept optional `toIndex: number` for arbitrary-position
-  // cursor jumps (e.g. Cavernous II's `<` repeat-from-marker). Deferred until
+  // cursor jumps (e.g. a repeat-from-marker jump). Deferred until
   // an in-repo consumer surfaces.
   resetCursor(): void;
 

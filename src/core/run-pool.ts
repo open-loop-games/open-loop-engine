@@ -9,11 +9,11 @@
  * `deathPolicy` (or the per-run `onDeath` override) and fires lifecycle
  * events:
  *
- * - `'destroyed'` — handle leaves the pool (borglike shape).
+ * - `'destroyed'` — handle leaves the pool (the `'destroy'` disposition).
  * - `'parked'` — handle stays with `alive=false` until explicit restart or
- *   `pool.reset()` (Cavernous shape).
+ *   `pool.reset()` (the `'park'` disposition).
  * - `{ restartedWith: step }` — swaps the step in-place; alive stays true
- *   (borglike's in-flight auto-restart shape).
+ *   (in-flight auto-restart).
  *
  * Pool persists its per-id aliveness map under context `${poolId}`, not
  * which ids exist: step closures can't be saved, so the game keeps its own
@@ -21,7 +21,7 @@
  * saved aliveness map is consulted so previously-dead
  * instances stay dead across save/load regardless of when they're
  * recreated, fixing the lazy-context gap an earlier per-instance layout
- * had with dynamically-spawned runs (borglike clones, Cavernous loops).
+ * had with dynamically-spawned runs (spawned clones, loops).
  * The map is tagged `lifetime`: the in-memory handles are the authority,
  * so a module reset leaves them alone and `pool.reset()` stays the seam.
  */
@@ -121,7 +121,7 @@ export interface RunPoolEvents<Id = string> {
 
 /**
  * Configuration for {@link createRunPool}. `deathPolicy` picks the
- * post-death disposition (borglike "destroy" vs Cavernous "park"); the
+ * post-death disposition (`'destroy'` vs `'park'`); the
  * optional `maxInstances` caps concurrent runs.
  */
 export interface RunPoolOptions {
@@ -130,8 +130,8 @@ export interface RunPoolOptions {
   /**
    * Pool-wide default applied when a run's `onDeath` is absent:
    *
-   * - `'destroy'` — handle is removed from the pool (borglike shape).
-   * - `'park'` — handle stays with `alive=false` (Cavernous shape).
+   * - `'destroy'` — handle is removed from the pool (the run is gone).
+   * - `'park'` — handle stays with `alive=false` (the run can be restarted).
    */
   readonly deathPolicy: 'destroy' | 'park';
   /**
@@ -143,7 +143,7 @@ export interface RunPoolOptions {
 }
 
 /**
- * A pool of concurrent run instances — borglike clones, Cavernous loops, idle
+ * A pool of concurrent run instances — spawned clones, loops, idle
  * factory loops — sharing one death policy but each carrying its own step
  * closure. Created by {@link createRunPool}; emit lifecycle events for
  * add/remove/death/restart/reset.

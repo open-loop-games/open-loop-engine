@@ -6,12 +6,11 @@
  * the "I renamed / added / retyped a field mid-dev-cycle" class of save
  * corruption without requiring consumers to hand-write schemas.
  *
- * Architecture vs. Synergism (the inspiration):
- * Synergism hand-writes a ~1000-line `playerSchema` and runs both validation
- * and migration through it. That works because they have no persistent-ref
+ * Architecture: a hand-written save schema (often ~1000 lines) runs both
+ * validation and migration. That is needed only when there is no persistent-ref
  * registry. Open Loop Engine has {@link getAllPersistentRefs} + stable named
- * keys, so the registry *is* the schema — we derive ~1000 LOC worth
- * of schema at runtime from the default values the engine already tracks.
+ * keys, so the registry *is* the schema — derived at runtime from the
+ * default values the engine already tracks.
  * Migrations stay in the existing `migrations` hook; validation runs once,
  * after the full migration chain.
  *

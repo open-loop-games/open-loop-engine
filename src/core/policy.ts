@@ -145,8 +145,8 @@ export function selectionCheapest<T>(getCost: (t: T) => DecimalSource): Selectio
  * Candidates whose beat is non-finite are skipped — the policy treats them
  * as having no defined payback. Treats each candidate in isolation; doesn't
  * read the rest of the economy. Prone to a cold-start pathology when no
- * candidate has finite beat — surveyed userscripts (Frozen Cookies, Cookie
- * Monster, AutoTrimps) all blend in a wait term to handle that case
+ * candidate has finite beat — surveyed auto-buy userscripts all blend in a
+ * wait term to handle that case
  * (see {@link selectionHybridPayback}).
  *
  * @param getBeat - Seconds extractor. `(p) => p.purchaseBeatSeconds.value` is
@@ -180,8 +180,8 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  *
  * The first term dominates while the player is saving toward something
  * expensive — it collapses to zero the moment the candidate is affordable,
- * handing the decision to the pure payback term. Sourced from Cookie
- * Monster's `pp` formula and Frozen Cookies' `purchaseEfficiency`.
+ * handing the decision to the pure payback term. A common auto-buy
+ * userscript formula.
  *
  * The wait term only scores candidates the driver offers before they're
  * affordable: under `setupPolicyAutoPurchase` that takes `waitForCost`.
