@@ -179,7 +179,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
       let moved = updateSlot(gate, 0, challenge.entered.value);
       moved = updateSlot(gate, 1, challenge.completions.value) || moved;
       moved = updateSlot(gate, 2, challenge.visible.value) || moved;
-      moved = updateSlot(gate, 3, challenge.canStart.value) || moved;
+      moved = updateSlot(gate, 3, challenge.canEnter.value) || moved;
       moved = updateSlot(gate, 4, challenge.canComplete.value) || moved;
       // A category leaf moves with no dep slot moving, and inside a combinator
       // that doesn't flip, its truth still picks which children carry the
@@ -187,7 +187,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
       const runtime = getBoundGateRuntime(challenge);
       if (!runtime) return moved;
       let slot = 5;
-      for (const field of [def.visible, def.canStart, def.goal]) {
+      for (const field of [def.visible, def.canEnter, def.goal]) {
         if (!isGate(field)) continue;
         forEachGateLeaf(field, (leaf) => {
           if (leaf.kind !== 'count-gte' && leaf.kind !== 'active') return;

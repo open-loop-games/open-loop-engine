@@ -162,9 +162,9 @@ describe('Sequencer — list mode', () => {
     expect(completed).toEqual(['a', 'b']);
   });
 
-  it('canRun "never" skips items and advances cursor', () => {
+  it('canStart "never" skips items and advances cursor', () => {
     const q = makeQueue({ mode: 'list' });
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const skipped: string[] = [];
     q.on('skipped', (item) => skipped.push(item.id));
 
@@ -450,16 +450,16 @@ describe('Sequencer — startOnEnqueue', () => {
 });
 
 // ============================================================================
-// canRun tri-state — 'now' / 'never' / 'notNow' + hold-and-retry
+// canStart tri-state — 'now' / 'never' / 'notNow' + hold-and-retry
 // ============================================================================
 
-describe('Sequencer — canRun tri-state', () => {
+describe('Sequencer — canStart tri-state', () => {
   it('"now" dispatches normally', () => {
     const ctxId = `tri-now-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
       id: ctxId,
-      canRun: () => 'now',
+      canStart: () => 'now',
     });
     endPersistentContext();
 
@@ -474,7 +474,7 @@ describe('Sequencer — canRun tri-state', () => {
     beginPersistentContext(ctxId);
     const q = createSequencer({
       id: ctxId,
-      canRun: (item) => (item.id === 'bad' ? 'never' : 'now'),
+      canStart: (item) => (item.id === 'bad' ? 'never' : 'now'),
     });
     endPersistentContext();
     q.on('skipped', (item) => skipped.push(item.id));
@@ -496,7 +496,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'notNow',
+      canStart: () => 'notNow',
     });
     endPersistentContext();
     q.on('held', (item) => events.push(`hold:${item.id}`));
@@ -522,7 +522,7 @@ describe('Sequencer — canRun tri-state', () => {
     beginPersistentContext(ctxId);
     const q = createSequencer({
       id: ctxId,
-      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
       // No registerTick — 'notNow' should fall back to 'never'
     });
     endPersistentContext();
@@ -545,7 +545,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
     const isHolding = computed(() => q.holding);
@@ -569,7 +569,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
     q.on('held', (item) => events.push(`hold:${item.id}`));
@@ -603,7 +603,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? gate : 'now'),
     });
     endPersistentContext();
     q.on('held', (item) => events.push(`hold:${item.id}`));
@@ -631,7 +631,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
 
@@ -651,7 +651,7 @@ describe('Sequencer — canRun tri-state', () => {
     expect(q.currentItem?.id).toBe('wait-me');
   });
 
-  it('setting canRun = null while holding clears hold and dispatches', () => {
+  it('setting canStart = null while holding clears hold and dispatches', () => {
     const tm = createManualTicks();
     const ctxId = `tri-gate-off-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -659,14 +659,14 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'notNow',
+      canStart: () => 'notNow',
     });
     endPersistentContext();
 
     q.enqueue(qi('wait-me'));
     expect(q.holding).toBe(true);
 
-    q.canRun = null;
+    q.canStart = null;
     expect(q.holding).toBe(false);
     expect(q.currentItem?.id).toBe('wait-me');
   });
@@ -679,7 +679,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
     });
     endPersistentContext();
 
@@ -701,7 +701,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'notNow',
+      canStart: () => 'notNow',
     });
     endPersistentContext();
 
@@ -723,7 +723,7 @@ describe('Sequencer — canRun tri-state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
     const cancelled: string[] = [];
@@ -756,7 +756,7 @@ describe('Sequencer — canRun tri-state', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
     const cancelled: string[] = [];
@@ -782,7 +782,7 @@ describe('Sequencer — canRun tri-state', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'b' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'b' ? 'notNow' : 'now'),
     });
     endPersistentContext();
     const cancelled: Array<[string, number]> = [];
@@ -810,7 +810,7 @@ describe('Sequencer — canRun tri-state', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'b' ? gate : 'now'),
+      canStart: (item) => (item.id === 'b' ? gate : 'now'),
     });
     endPersistentContext();
 
@@ -1006,14 +1006,14 @@ describe('Sequencer — burst pop ordering', () => {
     expect(q.items.value).toEqual([]);
   });
 
-  it('drains a mixed never/now burst in canRun without losing or reordering', () => {
+  it('drains a mixed never/now burst in canStart without losing or reordering', () => {
     const allowed = new Set(['a', 'c', 'e']);
-    const canRun = (item: SequencerItem<void>): StartResult =>
+    const canStart = (item: SequencerItem<void>): StartResult =>
       allowed.has(item.id) ? 'now' : 'never';
 
     const ctxId = `q-burst-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
-    const q = createSequencer<void>({ id: ctxId, canRun });
+    const q = createSequencer<void>({ id: ctxId, canStart: canStart });
     endPersistentContext();
 
     q.enqueue(qi('a'));
@@ -1138,7 +1138,7 @@ describe('Sequencer — hold state invariants', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'blocked' ? gate : 'now'),
+      canStart: (item) => (item.id === 'blocked' ? gate : 'now'),
     });
     endPersistentContext();
 
@@ -1162,7 +1162,7 @@ describe('Sequencer — hold state invariants', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'notNow',
+      canStart: () => 'notNow',
     });
     endPersistentContext();
 
@@ -1185,7 +1185,7 @@ describe('Sequencer — hold state invariants', () => {
     expect(q.holding).toBe(false);
     expect(q.items.value.map((i) => i.id)).toEqual(['replaced']);
 
-    // Post-load tick re-drives rather than stalling: canRun is still 'notNow',
+    // Post-load tick re-drives rather than stalling: canStart is still 'notNow',
     // so the reloaded item re-enters hold instead of being silently stranded.
     tm.tick();
     expect(q.holding).toBe(true);
@@ -1312,7 +1312,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? gate : 'now'),
     });
     endPersistentContext();
 
@@ -1328,7 +1328,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
     // (jump was dequeued for current, wait-me remains)
     expect(q.items.value.map((i) => i.id)).toEqual(['wait-me']);
 
-    // Unrelated: gate stays 'notNow', so future dequeue still respects canRun.
+    // Unrelated: gate stays 'notNow', so future dequeue still respects canStart.
     void gate;
   });
 
@@ -1340,7 +1340,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
     });
     endPersistentContext();
 
@@ -1364,7 +1364,7 @@ describe('Sequencer — enqueue positional `at` × hold state', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
     });
     endPersistentContext();
 
@@ -1418,13 +1418,13 @@ describe('Sequencer — repeat()', () => {
     expect(q.currentItem).toBeNull();
   });
 
-  it('queue mode: repeat with canRun "never" on re-entry skips and advances', () => {
+  it('queue mode: repeat with canStart "never" on re-entry skips and advances', () => {
     let blockA = false;
     const ctxId = `repeat-never-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
     const q = createSequencer({
       id: ctxId,
-      canRun: (item) => (item.id === 'a' && blockA ? 'never' : 'now'),
+      canStart: (item) => (item.id === 'a' && blockA ? 'never' : 'now'),
     });
     endPersistentContext();
 
@@ -1443,7 +1443,7 @@ describe('Sequencer — repeat()', () => {
     expect(q.currentItem?.id).toBe('b');
   });
 
-  it('queue mode: repeat with canRun "notNow" on re-entry enters hold', () => {
+  it('queue mode: repeat with canStart "notNow" on re-entry enters hold', () => {
     const tm = createManualTicks();
     let blockA = false;
     const ctxId = `repeat-hold-${Math.random().toString(36).slice(2, 8)}`;
@@ -1451,7 +1451,7 @@ describe('Sequencer — repeat()', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
     });
     endPersistentContext();
 
@@ -1537,7 +1537,7 @@ describe('Sequencer — repeat()', () => {
     expect(q.currentItem?.id).toBe('b');
   });
 
-  it('list mode: repeat with canRun "notNow" on re-entry holds at the same cursor', () => {
+  it('list mode: repeat with canStart "notNow" on re-entry holds at the same cursor', () => {
     const tm = createManualTicks();
     let blockA = false;
     const ctxId = `repeat-list-hold-${Math.random().toString(36).slice(2, 8)}`;
@@ -1546,7 +1546,7 @@ describe('Sequencer — repeat()', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'a' && blockA ? 'notNow' : 'now'),
     });
     endPersistentContext();
 
@@ -1722,7 +1722,7 @@ describe('Sequencer — save/load re-drive', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'now',
+      canStart: () => 'now',
     });
     endPersistentContext();
 
@@ -1759,7 +1759,7 @@ describe('Sequencer — save/load re-drive', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => gate,
+      canStart: () => gate,
     });
     endPersistentContext();
 
@@ -1787,7 +1787,7 @@ describe('Sequencer — save/load re-drive', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: () => 'now',
+      canStart: () => 'now',
     });
     endPersistentContext();
 
@@ -1819,7 +1819,7 @@ describe('Sequencer — save/load re-drive', () => {
       id: ctxId,
       startOnEnqueue: false,
       registerTick: tm.registerTick,
-      canRun: () => 'now',
+      canStart: () => 'now',
     });
     endPersistentContext();
 
@@ -1843,7 +1843,7 @@ describe('Sequencer — save/load re-drive', () => {
     const q = createSequencer({
       id: ctxId,
       registerTick: tm.registerTick,
-      canRun: () => 'now',
+      canStart: () => 'now',
     });
     endPersistentContext();
 
@@ -1871,7 +1871,7 @@ describe('Sequencer — skip ordering', () => {
 
   it('list mode: cursor has advanced past the skipped item when skipped fires', () => {
     const q = makeQueue({ mode: 'list' });
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen: number[] = [];
     q.on('skipped', () => seen.push(q.cursor));
 
@@ -1884,7 +1884,7 @@ describe('Sequencer — skip ordering', () => {
 
   it('list mode: cursor has advanced when "notNow" degrades to skip without registerTick', () => {
     const q = makeQueue({ mode: 'list' });
-    q.canRun = (item) => (item.id === 'wait-me' ? 'notNow' : 'now');
+    q.canStart = (item) => (item.id === 'wait-me' ? 'notNow' : 'now');
     const seen: number[] = [];
     q.on('skipped', () => seen.push(q.cursor));
 
@@ -1904,7 +1904,7 @@ describe('Sequencer — skip ordering', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? gate : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? gate : 'now'),
     });
     endPersistentContext();
     const seen: number[] = [];
@@ -1923,7 +1923,7 @@ describe('Sequencer — skip ordering', () => {
 
   it('queue mode: the skipped item is already gone from items when skipped fires', () => {
     const q = makeQueue();
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen: string[][] = [];
     q.on('skipped', () => seen.push(q.items.value.map((i) => i.id)));
 
@@ -1940,7 +1940,7 @@ describe('Sequencer — skip ordering', () => {
     const q = createSequencer<SkipMeta>({
       id: ctxId,
       mode: 'list',
-      canRun: (item) => (item.id === 'b' ? 'never' : 'now'),
+      canStart: (item) => (item.id === 'b' ? 'never' : 'now'),
     });
     endPersistentContext();
 
@@ -1965,7 +1965,7 @@ describe('Sequencer — skip ordering', () => {
   // is what keeps a mutating listener from being overwritten on the way out.
   it('list mode: clearing from a skipped listener leaves the done sentinel intact', () => {
     const q = makeQueue({ mode: 'list' });
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     let cleared = false;
     q.on('skipped', () => {
       if (cleared) return;
@@ -2053,7 +2053,7 @@ describe('Sequencer — listener re-entrancy', () => {
 
   it('queue mode: enqueueing from a skipped listener does not orphan the next item', () => {
     const q = makeQueue();
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen = trackLifecycle(q);
     q.pause();
     q.enqueue(qi('skip-me'));
@@ -2069,7 +2069,7 @@ describe('Sequencer — listener re-entrancy', () => {
 
   it('list mode: enqueueing from a skipped listener does not re-start the dispatched item', () => {
     const q = makeQueue({ mode: 'list' });
-    q.canRun = (item) => (item.id === 'skip-me' ? 'never' : 'now');
+    q.canStart = (item) => (item.id === 'skip-me' ? 'never' : 'now');
     const seen = trackLifecycle(q);
     once(q, 'skipped', () => q.enqueue(qi('c')));
 
@@ -2087,7 +2087,7 @@ describe('Sequencer — listener re-entrancy', () => {
       id: ctxId,
       mode: 'list',
       registerTick: tm.registerTick,
-      canRun: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
+      canStart: (item) => (item.id === 'wait-me' ? 'notNow' : 'now'),
     });
     endPersistentContext();
     const seen = trackLifecycle(q);

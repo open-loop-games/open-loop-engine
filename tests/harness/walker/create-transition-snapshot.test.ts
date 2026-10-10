@@ -127,7 +127,7 @@ function buildMergeEngine(gameId: string, accessor: GameStateAccessor) {
         { id: 'fallow', baseRate: 0, baseCost: 150 },
       ]);
 
-      // Challenges: declarative `canStart` keyed on gems; the merger's
+      // Challenges: declarative `canEnter` keyed on gems; the merger's
       // accessor reports rates the walker turns into a distance.
       const challenges = createChallengeCategory({
         id: 'trials',
@@ -136,7 +136,7 @@ function buildMergeEngine(gameId: string, accessor: GameStateAccessor) {
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        canStart: { kind: 'resource-gte', resource: 'gems', value: 5 }, // gems rate 1/s → 5s
+        canEnter: { kind: 'resource-gte', resource: 'gems', value: 5 }, // gems rate 1/s → 5s
         goal: { kind: 'resource-gte', resource: 'gems', value: 10 },
       });
     },
@@ -221,7 +221,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
         challenges.register({
           id: 'bronze',
           name: 'Bronze',
-          canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
+          canEnter: { kind: 'resource-gte', resource: 'gems', value: 5 },
           goal: () => false,
         });
       },

@@ -23,7 +23,7 @@ export interface InventoryOptions {
   /** Starting per-item capacity */
   baseCapacity: DecimalSource;
   /** What happens when adding beyond capacity (default: 'block') */
-  overflow?: 'block' | 'destroy';
+  overflow?: 'block' | 'discard';
   /** Optional total weight-style limit across all items */
   totalCapacity?: DecimalSource;
   /** Display name for UI */

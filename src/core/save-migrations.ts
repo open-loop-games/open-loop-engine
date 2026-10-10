@@ -16,7 +16,7 @@
  * Key features:
  * - `getNested` / `setNested` — foundation primitives shared with the
  *   serialize/deserialize paths
- * - `renameField`, `retypeField`, `dropField`, `addField` — single-path
+ * - `renameField`, `retypeField`, `deleteField`, `addField` — single-path
  *   transforms
  * - `forEachDef` — iterate over a context's per-definition state
  *
@@ -133,10 +133,10 @@ export function retypeField(
  *
  * @example
  * ```ts
- * 3: (data) => dropField(data as Record<string, unknown>, 'experimental.featureFlag'),
+ * 3: (data) => deleteField(data as Record<string, unknown>, 'experimental.featureFlag'),
  * ```
  */
-export function dropField(data: SaveData, path: string): SaveData {
+export function deleteField(data: SaveData, path: string): SaveData {
   const ref = parentRef(data, path);
   if (ref === undefined) return data;
   const [parent, leaf] = ref;

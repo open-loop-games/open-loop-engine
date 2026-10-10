@@ -70,7 +70,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
         trials.register({
           id: 'mine',
           name: 'Mine',
-          canStart: {
+          canEnter: {
             kind: 'all',
             of: [
               { kind: 'count-gte', category: 'shop', entry: 'pick', value: 1 },
@@ -93,7 +93,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
     const pick = shop.getPurchasable('pick')!;
     pick.amount.value = 1;
     inc.rebuild();
-    expect(trials.getChallenge('mine')!.canStart.value).toBe(false);
+    expect(trials.getChallenge('mine')!.canEnter.value).toBe(false);
     expect(startUnlock()?.distance).toEqual({ seconds: null, reason: 'no-rate' });
     expect(inc.snapshot.all).toEqual(createTransitionSnapshot(engine, accessor).all);
 

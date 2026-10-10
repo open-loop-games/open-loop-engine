@@ -1,7 +1,7 @@
 /**
  * Content walker — enumerate pending challenge transitions.
  *
- * `ChallengeDef` carries `visible`, `canStart` and `goal` as a Predicate — a
+ * `ChallengeDef` carries `visible`, `canEnter` and `goal` as a Predicate — a
  * boolean, ref, getter or {@link Gate}. A field emits a transition whenever
  * it could still flip the way the transition names:
  *
@@ -17,7 +17,7 @@
  *
  * - `visibility-reveal` — `visible` is currently false.
  * - `becomes-enterable` — the challenge is neither active nor maxed and its
- *   `canStart` gate is currently false.
+ *   `canEnter` gate is currently false.
  * - `goal-complete` — the challenge is active and its goal doesn't hold yet.
  * - `challenge-maxed` — as `goal-complete`, on the last completion
  *   (`completions === completionLimit - 1`), with the same distance.
@@ -113,10 +113,10 @@ function emitForEntity(
     }
   }
 
-  // `Challenge.canStart` is the gate with the active and maxed guards folded
+  // `Challenge.canEnter` is the gate with the active and maxed guards folded
   // in, so outside those two states it reads the gate's own truth.
-  if (!challenge.entered.value && !challenge.maxed.value && !challenge.canStart.value) {
-    const flip = predictFieldFlip(def.canStart, runtime);
+  if (!challenge.entered.value && !challenge.maxed.value && !challenge.canEnter.value) {
+    const flip = predictFieldFlip(def.canEnter, runtime);
     if (flip) {
       out.push({
         transition: buildTransition(categoryId, defId, 'becomes-enterable', false, flip.distance),

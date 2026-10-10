@@ -102,7 +102,7 @@ describe('walkPurchasableTransitions — discovery degradation', () => {
         createChallengeCategory({ id: 'trials', accessor: mockAccessor() }).register({
           id: 'bronze',
           name: 'Bronze',
-          canStart: { kind: 'resource-gte', resource: 'gems', value: 5 },
+          canEnter: { kind: 'resource-gte', resource: 'gems', value: 5 },
           goal: () => false,
         });
       },

@@ -198,7 +198,7 @@ describe('ResourceBag', () => {
     });
 
     it('destroy overflow: add beyond total capacity caps', () => {
-      const bag = createResourceBag({ capacity: 10, initial: { wood: 8 }, overflow: 'destroy' });
+      const bag = createResourceBag({ capacity: 10, initial: { wood: 8 }, overflow: 'discard' });
       const added = bag.add('iron', 5);
       expect(added.eq(2)).toBe(true);
       expect(bag.get('iron').eq(2)).toBe(true);
@@ -231,7 +231,7 @@ describe('ResourceBag', () => {
     });
 
     it('destroy overflow: add beyond per-type cap caps', () => {
-      const bag = createResourceBag({ capacityPerType: { wood: 10 }, overflow: 'destroy' });
+      const bag = createResourceBag({ capacityPerType: { wood: 10 }, overflow: 'discard' });
       bag.set('wood', 8);
       const added = bag.add('wood', 5);
       expect(added.eq(2)).toBe(true);
@@ -292,7 +292,7 @@ describe('ResourceBag', () => {
 
     it('transfer limited by target capacity (destroy)', () => {
       const from = createResourceBag({ initial: { wood: 20 } });
-      const to = createResourceBag({ capacity: 5, overflow: 'destroy' });
+      const to = createResourceBag({ capacity: 5, overflow: 'discard' });
       const transferred = transferBetweenBags(from, to, 'wood', 10);
       expect(transferred.eq(5)).toBe(true);
       expect(from.get('wood').eq(15)).toBe(true);
@@ -745,7 +745,7 @@ describe('ResourceBag', () => {
     });
 
     it('capacity respected after many mutations (clamp uses running total)', () => {
-      const bag = createResourceBag({ capacity: 100, overflow: 'destroy' });
+      const bag = createResourceBag({ capacity: 100, overflow: 'discard' });
       for (let i = 0; i < 50; i++) bag.add('x', 1);
       for (let i = 0; i < 50; i++) bag.add('y', 1);
       expect(bag.total().eq(100)).toBe(true);

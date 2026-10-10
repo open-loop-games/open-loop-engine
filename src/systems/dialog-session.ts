@@ -58,7 +58,7 @@ export interface DialogSessionEvents {
   /**
    * Fired when the conversation ends: `finish()`, or a choice with no `next`
    * or whose `next` is gated off. Landing on a line presented with
-   * `finished: true` does not fire it — the UI calls `finish()` to close it.
+   * `terminal: true` does not fire it — the UI calls `finish()` to close it.
    */
   finished: (info: { graphId: string }) => void;
 }
@@ -108,7 +108,7 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   choose(choiceId: string): void;
   /**
    * Continue past a line whose choices gated off after it presented them —
-   * the one `present()` reports with no choices and `finished: false`.
+   * the one `present()` reports with no choices and `terminal: false`.
    * Enters `next` and presents where it lands; throws on any other line.
    */
   advance(): void;
@@ -150,7 +150,7 @@ const defaultNativeFactory: DialogRuntimeFactory = (graphs, accessor, mutator) =
  *   graphs: dialogCategory.getAll().flatMap((e) => e.graphs),
  * });
  *
- * // A line presented with `finished: true` waits for the UI's session.finish().
+ * // A line presented with `terminal: true` waits for the UI's session.finish().
  * session.on('presented', (snap) => renderDialog(snap));
  * session.on('finished', ({ graphId }) => closeDialogUI(graphId));
  *

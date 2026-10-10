@@ -77,7 +77,7 @@ function buildPurchasableEngine(gameId: string) {
 }
 
 /**
- * Challenge whose `canStart` is a pure `FlagCondition` — the walker emits
+ * Challenge whose `canEnter` is a pure `FlagCondition` — the walker emits
  * `{ seconds: null, reason: 'opaque-predicate' }`. Conservative stasis
  * refuses to short-circuit in this case even though no finite distance
  * exists.
@@ -92,7 +92,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
         id: 'bronze',
         name: 'Bronze',
         // FlagCondition → opaque-predicate distance, no computable horizon.
-        canStart: { kind: 'flag', id: 'unreachable-flag' },
+        canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
     },

@@ -81,7 +81,7 @@ export interface ChallengeDef<
   visible?: Predicate;
 
   /** Start gate — prevents entering when not met. Default: `true` */
-  canStart?: Predicate;
+  canEnter?: Predicate;
 
   /**
    * Overrides pushed to the override registry while this challenge is active.
@@ -179,7 +179,7 @@ export interface Challenge {
   readonly canComplete: ComputedRef<boolean>;
 
   /** True when the challenge can be entered */
-  readonly canStart: ComputedRef<boolean>;
+  readonly canEnter: ComputedRef<boolean>;
 
   /** Whether the challenge should be shown in UI */
   readonly visible: ComputedRef<boolean>;
@@ -255,7 +255,7 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
    * Game state accessor. Falls back to the ambient accessor wired by
    * `createEngine`. The category resolves the Gate runtime triple (accessor +
    * categories + registry) ambiently at construction time; Gate-typed visible
-   * / canStart / goal fields evaluate through that captured runtime.
+   * / canEnter / goal fields evaluate through that captured runtime.
    */
   accessor?: GameStateAccessor;
 
@@ -435,19 +435,19 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
       const label = `challenge '${def.id}'`;
       const goal = predicates.adopt(def.goal, false, `${label} goal`);
-      const canStart = predicates.adopt(def.canStart, true, `${label} canStart`);
+      const canEnter = predicates.adopt(def.canEnter, true, `${label} canEnter`);
       const visible = predicates.adopt(def.visible, true, `${label} visible`);
 
       const canComplete = computed(() => active.value && goal.holds.value);
 
-      const canStartComputed = computed(() => {
+      const canEnterComputed = computed(() => {
         if (maxed.value) return false;
         if (active.value) return false;
-        return canStart.holds.value;
+        return canEnter.holds.value;
       });
 
       function enter(): boolean {
-        if (!canStartComputed.value) return false;
+        if (!canEnterComputed.value) return false;
 
         if (mutuallyExclusive) {
           for (const entry of base.getAll()) {
@@ -537,7 +537,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         completed,
         maxed,
         canComplete,
-        canStart: canStartComputed,
+        canEnter: canEnterComputed,
         visible: visible.holds,
         enter,
         exit,

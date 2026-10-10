@@ -40,7 +40,7 @@ export interface SequencerItem<M = void> {
 }
 
 /**
- * Tri-state precondition result from a {@link SequencerOptions.canRun} check.
+ * Tri-state precondition result from a {@link SequencerOptions.canStart} check.
  *
  * - `'now'` — dispatch the item
  * - `'never'` — permanently unrunnable, skip and advance
@@ -84,7 +84,7 @@ export interface SequencerEvents<M = void> {
   /** Emitted when the current item is re-dispatched via `repeat()` instead of `complete()`. */
   repeated: (item: SequencerItem<M>) => void;
   /**
-   * Emitted when an item fails its `canRun` check with `'never'` — either from
+   * Emitted when an item fails its `canStart` check with `'never'` — either from
    * `dequeueNext` walking the sequence, or from the retry tick when a held
    * item's gate turns permanent.
    *
@@ -96,7 +96,7 @@ export interface SequencerEvents<M = void> {
   /**
    * Emitted when dequeueNext holds on `'notNow'` — the held item stays in
    * `items` and is re-evaluated via the retry tick each subsequent tick,
-   * transitioning out when canRun returns `'now'` (dispatch) or `'never'` (skip).
+   * transitioning out when canStart returns `'now'` (dispatch) or `'never'` (skip).
    */
   held: (item: SequencerItem<M>) => void;
 }
@@ -106,7 +106,7 @@ export const DEFAULT_MAX_ADVANCES_PER_TICK = 1000;
 
 /**
  * Configuration for {@link createSequencer}. Mode picks queue (consume on
- * complete) vs list (cursor walks a persistent list); `canRun` + `registerTick`
+ * complete) vs list (cursor walks a persistent list); `canStart` + `registerTick`
  * wire the tri-state pre-run gate (`now` / `notNow` / `never`) plus its retry
  * tick.
  */
@@ -154,12 +154,12 @@ export interface SequencerOptions<M = void> {
    * `'notNow'` requires {@link registerTick}. Without it, `'notNow'`
    * silently degrades to `'never'`.
    */
-  canRun?: (item: SequencerItem<M>) => StartResult;
+  canStart?: (item: SequencerItem<M>) => StartResult;
   /**
    * Tick registration, used twice: the per-tick advance-cap reset (see
-   * {@link maxAdvancesPerTick}), and the `'notNow'` retry path. When a canRun
+   * {@link maxAdvancesPerTick}), and the `'notNow'` retry path. When a canStart
    * call returns `'notNow'`, the sequencer installs a retry callback via this
-   * function and re-evaluates canRun each tick until the item transitions
+   * function and re-evaluates canStart each tick until the item transitions
    * to `'now'` or `'never'`. Without this, `'notNow'` falls back to `'never'`.
    *
    * Must run every callback it is given — see {@link RegisterTick}.
@@ -316,7 +316,7 @@ export interface Sequencer<M = void> {
    * does not eagerly re-evaluate — the next retry tick (or dequeueNext call)
    * picks it up.
    */
-  canRun: ((item: SequencerItem<M>) => StartResult) | null;
+  canStart: ((item: SequencerItem<M>) => StartResult) | null;
 
   /**
    * Whether the sequencer is currently holding on a `'notNow'` item. While
@@ -388,7 +388,7 @@ function deserializeItem<M>(raw: string): SequencerItem<M> {
  * supporting both FIFO queue mode and repeating list mode with cursor.
  *
  * @param options - Sequencer configuration including mode, size limits, and optional
- *   pre-run gating via `canRun`
+ *   pre-run gating via `canStart`
  * @returns A sequencer with enqueue/dequeue/reorder operations, pause/resume control,
  *   pluggable fill strategies, and persistent state that survives save/load
  *
@@ -562,7 +562,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
   const handle = createEmitHandle<SequencerEvents<M>>();
   let _fillStrategy: FillStrategy<M> | null = null;
-  let _canRun: ((item: SequencerItem<M>) => StartResult) | null = options.canRun ?? null;
+  let _canStart: ((item: SequencerItem<M>) => StartResult) | null = options.canStart ?? null;
   let _advancesThisTick = 0;
   let _advanceCapHit = false;
 
@@ -613,7 +613,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       dequeueNext();
       return;
     }
-    const result = _canRun ? _canRun(held) : 'now';
+    const result = _canStart ? _canStart(held) : 'now';
     if (result === 'now') {
       clearHold();
       // Consume the held item (pop in queue mode; cursor stays put in list
@@ -678,8 +678,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     // Fill items are lightly gated: only 'now' dispatches. 'never' and
     // 'notNow' both drop — fill never enters hold state because fill
     // strategies are expected to return runnable items.
-    if (_canRun) {
-      const result = _canRun(item);
+    if (_canStart) {
+      const result = _canStart(item);
       if (result !== 'now') return null;
     }
     _filling = true;
@@ -766,7 +766,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       while (rawCursor!.value < items.value.length) {
         if (preempted()) return null;
         const next = items.value[rawCursor!.value];
-        const result = _canRun ? _canRun(next) : 'now';
+        const result = _canStart ? _canStart(next) : 'now';
 
         if (result === 'now') {
           setCurrentRaw(next);
@@ -804,7 +804,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       while (_head < _liveItems.length) {
         if (preempted()) return null;
         const next = _liveItems[_head];
-        const result = _canRun ? _canRun(next) : 'now';
+        const result = _canStart ? _canStart(next) : 'now';
 
         if (result === 'now') {
           popHead();
@@ -1084,11 +1084,11 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       _fillStrategy = s;
     },
 
-    get canRun() {
-      return _canRun;
+    get canStart() {
+      return _canStart;
     },
-    set canRun(fn: ((item: SequencerItem<M>) => StartResult) | null) {
-      _canRun = fn;
+    set canStart(fn: ((item: SequencerItem<M>) => StartResult) | null) {
+      _canStart = fn;
       if (_holding.value && fn === null) {
         // Gate removed while holding — dispatch the held item on next
         // dequeueNext call path.

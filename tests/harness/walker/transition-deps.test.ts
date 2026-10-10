@@ -243,7 +243,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
       c.register({
         id: 'gated',
         name: 'Gated',
-        canStart: {
+        canEnter: {
           kind: 'any',
           of: [
             { kind: 'resource-gte', resource: 'mana', value: 20 },

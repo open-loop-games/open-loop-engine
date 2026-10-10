@@ -118,7 +118,7 @@ describe('Inventory', () => {
     });
 
     it('destroy overflow: adds partial amount up to cap', () => {
-      const inv = createInventory({ id: 'inv', baseCapacity: 10, overflow: 'destroy' });
+      const inv = createInventory({ id: 'inv', baseCapacity: 10, overflow: 'discard' });
       inv.add('wood', 8);
       const added = inv.add('wood', 5); // only 2 fits
       expect(added.eq(2)).toBe(true);

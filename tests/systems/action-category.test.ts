@@ -482,11 +482,11 @@ describe('createActionCategory — Resettable', () => {
 });
 
 // ============================================================================
-// canRun composition
+// canStart composition
 // ============================================================================
 
-describe('createActionCategory — per-def canRun', () => {
-  it('mapping.canRun gates dispatch', () => {
+describe('createActionCategory — per-def canStart', () => {
+  it('mapping.canStart gates dispatch', () => {
     const driver = makeTickDriver();
     const allow = ref(false);
 
@@ -496,7 +496,7 @@ describe('createActionCategory — per-def canRun', () => {
       registerTick: driver.registerTick,
       mapAction: () => ({
         signals: { active: computed(() => true), count: computed(() => 0) },
-        canRun: () => (allow.value ? 'now' : 'never'),
+        canStart: () => (allow.value ? 'now' : 'never'),
         tick: ({ category: cat }) => {
           cat.sequencer.complete();
         },
@@ -504,7 +504,7 @@ describe('createActionCategory — per-def canRun', () => {
     });
     category.register({ id: 'g', baseTicks: 1 });
     category.enqueue('g');
-    expect(category.currentItem).toBeNull(); // skipped because canRun returned 'never'
+    expect(category.currentItem).toBeNull(); // skipped because canStart returned 'never'
 
     allow.value = true;
     category.enqueue('g');
@@ -544,7 +544,7 @@ describe('createActionCategory — list mode', () => {
       registerTick: driver.registerTick,
       mapAction: (def) => ({
         signals: { active: computed(() => true), count: computed(() => 0) },
-        canRun: () => (def.id === 'blocked' ? 'never' : 'now'),
+        canStart: () => (def.id === 'blocked' ? 'never' : 'now'),
         tick: () => {},
       }),
     });

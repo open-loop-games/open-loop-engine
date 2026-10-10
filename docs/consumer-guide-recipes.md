@@ -156,7 +156,7 @@ The convergent shape across consumers:
 
 - Each content-type entry carries a player-set `automationPriority` and a static category-level `passBonus`.
 - Score is `priority * 10 + passBonus[effectSystemId]` — the multiplier preserves player priority dominance while the pass-bonus map deterministically orders cross-category ties.
-- A single fill strategy walks every relevant `category.getAll()`, filters by unlock + visibility, builds a candidate list, sorts descending by score, and returns the first item whose task's `canRun()` returns `'now'`.
+- A single fill strategy walks every relevant `category.getAll()`, filters by unlock + visibility, builds a candidate list, sorts descending by score, and returns the first item whose task's `canStart()` returns `'now'`.
 
 ```ts
 import { computed, type FillStrategy, type SequencerItem } from '@open-loop/engine';
@@ -189,7 +189,7 @@ const strategy: FillStrategy<ActionMeta> = {
   next() {
     for (const { item } of candidates.value) {
       const task = actions.getTask(item.id);
-      if (task?.canRun?.() === 'now') return item;
+      if (task?.canStart?.() === 'now') return item;
     }
     return null;
   },

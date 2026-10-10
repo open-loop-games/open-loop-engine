@@ -25,7 +25,7 @@ beforeEach(() => {
  * Build a minimal engine that publishes a single challenge category under
  * `CategoriesKey.challenges` so the walker has something to iterate. The
  * provided `accessor` is forwarded to the category for ICondition
- * evaluation (visible / canStart / goal).
+ * evaluation (visible / canEnter / goal).
  */
 function buildEngineWithChallenges(
   categoryId: string,
@@ -176,7 +176,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
 // ---------------------------------------------------------------------------
 
 describe('walkChallengeTransitions — becomes-enterable', () => {
-  it('emits becomes-enterable with computed distance for declarative canStart', () => {
+  it('emits becomes-enterable with computed distance for declarative canEnter', () => {
     const accessor = mockAccessor({ resources: { mana: 10 }, rates: { mana: 1 } });
     const engine = buildEngineWithChallenges(
       'start',
@@ -184,7 +184,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
         c.register({
           id: 'gated',
           name: 'Gated',
-          canStart: { kind: 'resource-gte', resource: 'mana', value: 20 },
+          canEnter: { kind: 'resource-gte', resource: 'mana', value: 20 },
         }),
       accessor,
     );
@@ -205,7 +205,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
         c.register({
           id: 'c',
           name: 'C',
-          canStart: { kind: 'resource-gte', resource: 'gold', value: 100 },
+          canEnter: { kind: 'resource-gte', resource: 'gold', value: 100 },
           goal: () => false,
         }),
       accessor,
@@ -228,7 +228,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
         c.register({
           id: 'c',
           name: 'C',
-          canStart: { kind: 'resource-gte', resource: 'gold', value: 100 },
+          canEnter: { kind: 'resource-gte', resource: 'gold', value: 100 },
         }),
       accessor,
     );
@@ -244,7 +244,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
     ).toHaveLength(0);
   });
 
-  it('emits an opaque becomes-enterable for a category-aware canStart gate', () => {
+  it('emits an opaque becomes-enterable for a category-aware canEnter gate', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
       'start-count',
@@ -252,7 +252,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
         c.register({
           id: 'c',
           name: 'C',
-          canStart: { kind: 'count-gte', category: 'upgrades', entry: 'farm', value: 3 },
+          canEnter: { kind: 'count-gte', category: 'upgrades', entry: 'farm', value: 3 },
         }),
       accessor,
     );
@@ -263,7 +263,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
     expect(unlock[0].distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });
 
-  it('skips becomes-enterable when boolean canStart', () => {
+  it('skips becomes-enterable when boolean canEnter', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
       'start-bool',
@@ -271,7 +271,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
         c.register({
           id: 'open',
           name: 'Open',
-          canStart: true,
+          canEnter: true,
           goal: () => false,
         }),
       accessor,

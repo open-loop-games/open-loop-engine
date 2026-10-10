@@ -4,7 +4,7 @@ import {
   setNested,
   renameField,
   retypeField,
-  dropField,
+  deleteField,
   addField,
   forEachDef,
 } from '@/core/save-migrations';
@@ -142,28 +142,28 @@ describe('retypeField', () => {
   });
 });
 
-describe('dropField', () => {
+describe('deleteField', () => {
   it('removes the leaf', () => {
     const data: Record<string, unknown> = { a: 1, b: 2 };
-    dropField(data, 'a');
+    deleteField(data, 'a');
     expect(data).toEqual({ b: 2 });
   });
 
   it('removes a nested leaf and leaves siblings intact', () => {
     const data: Record<string, unknown> = { stats: { kills: 1, deaths: 2 } };
-    dropField(data, 'stats.deaths');
+    deleteField(data, 'stats.deaths');
     expect(data).toEqual({ stats: { kills: 1 } });
   });
 
   it('no-ops when the path is missing', () => {
     const data: Record<string, unknown> = { a: 1 };
-    dropField(data, 'b');
+    deleteField(data, 'b');
     expect(data).toEqual({ a: 1 });
   });
 
   it('no-ops when an intermediate is missing', () => {
     const data: Record<string, unknown> = {};
-    dropField(data, 'a.b.c');
+    deleteField(data, 'a.b.c');
     expect(data).toEqual({});
   });
 });
@@ -259,7 +259,7 @@ describe('forEachDef', () => {
 describe('composition', () => {
   it('chains via the returned data ref', () => {
     const data: Record<string, unknown> = { a: 1, c: 3 };
-    const out = renameField(dropField(data, 'c'), 'a', 'b');
+    const out = renameField(deleteField(data, 'c'), 'a', 'b');
     expect(out).toBe(data);
     expect(data).toEqual({ b: 1 });
   });

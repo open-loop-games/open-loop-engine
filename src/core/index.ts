@@ -177,7 +177,7 @@ export {
   setNested,
   renameField,
   retypeField,
-  dropField,
+  deleteField,
   addField,
   forEachDef,
 } from './save-migrations';

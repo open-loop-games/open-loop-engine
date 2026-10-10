@@ -273,7 +273,7 @@ describe('createDialogSession', () => {
     };
     const session = buildSession([graph]);
     session.start('optional-follow-up');
-    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: true });
+    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], terminal: true });
   });
 
   it('falls through a node whose choices are all gated off', () => {
@@ -292,7 +292,7 @@ describe('createDialogSession', () => {
     };
     const session = buildSession([graph]);
     session.start('gated-aside');
-    expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], finished: true });
+    expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], terminal: true });
   });
 
   it('advances a node whose choices were gated off after it presented them', () => {
@@ -317,12 +317,12 @@ describe('createDialogSession', () => {
     expect(session.present()?.choices.map((c) => c.id)).toEqual(['offer']);
 
     accessor.setFlag('offer-open', false);
-    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: false });
+    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], terminal: false });
 
     const presented = vi.fn();
     session.on('presented', presented);
     session.advance();
-    expect(session.present()).toMatchObject({ nodeId: 'b', finished: true });
+    expect(session.present()).toMatchObject({ nodeId: 'b', terminal: true });
     expect(presented).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'b' }));
     expect(setStateSpy).toHaveBeenCalledWith('met-b', 1);
     const lapsedState = savedState('lapsed').value;

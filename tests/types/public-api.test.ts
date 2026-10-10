@@ -1535,7 +1535,7 @@ describe('Systems predicate fields take Predicate', () => {
     type Opt<T> = Exclude<T, undefined>;
     expectTypeOf<Opt<import('@/index').AutomationTierDef['unlockWhen']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<ChallengeDef['visible']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<ChallengeDef['canStart']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<ChallengeDef['canEnter']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<ChallengeDef['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').CycleOptions['endCondition']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').ResetOptions['canReset']>>().toEqualTypeOf<P>();

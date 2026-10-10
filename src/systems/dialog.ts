@@ -88,7 +88,7 @@ export interface DialogPresentation {
    * visible choice means the choices gated off after the line presented and
    * `next` can be entered: the UI offers a continue that calls `advance()`.
    */
-  finished: boolean;
+  terminal: boolean;
 }
 
 /**
@@ -164,7 +164,7 @@ export interface DialogRuntimeEvents {
   /**
    * Fired when the runtime clears its active pointer: `finish()`, or a choice
    * with no `next` or whose `next` is gated off. Landing on a line presented
-   * with `finished: true` does not fire it.
+   * with `terminal: true` does not fire it.
    */
   finished: (info: { graphId: string }) => void;
 }
@@ -362,7 +362,7 @@ export function createNativeDialogRuntime(
       nodeId: node.id,
       text: node.text,
       choices: choices.map((c) => ({ id: c.id, text: c.text })),
-      finished: choices.length === 0 && !canEnterNext(state.activeGraphId, node),
+      terminal: choices.length === 0 && !canEnterNext(state.activeGraphId, node),
     };
   }
 
@@ -397,7 +397,7 @@ export function createNativeDialogRuntime(
   function advance(): void {
     const snap = present();
     if (!snap) throw new Error('No active dialog node — call start() first');
-    if (snap.choices.length > 0 || snap.finished) {
+    if (snap.choices.length > 0 || snap.terminal) {
       throw new Error(`Dialog node ${snap.nodeId} has nothing to advance through`);
     }
     settle();

@@ -48,10 +48,10 @@ export interface ResourceBagOptions {
   /**
    * Behavior when an add operation would exceed capacity.
    * - `'block'` — rejects the entire add and returns zero
-   * - `'destroy'` — adds up to the remaining capacity and discards the rest
+   * - `'discard'` — adds up to the remaining capacity and discards the rest
    * Default: `'block'`.
    */
-  overflow?: 'block' | 'destroy';
+  overflow?: 'block' | 'discard';
   /** Human-readable label used by UIs and debug output. */
   displayName?: string;
 }
@@ -132,7 +132,7 @@ export interface ResourceBag {
  * capacity limits.
  *
  * @param options - Bag configuration including initial amounts, capacity limits,
- *   and overflow behavior ('block' rejects additions, 'destroy' truncates to cap)
+ *   and overflow behavior ('block' rejects additions, 'discard' truncates to cap)
  * @returns A resource bag supporting add/subtract/has operations, two-way reactive
  *   linking to Resource refs, and serialization for persistence
  *

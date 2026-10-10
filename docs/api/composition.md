@@ -42,4 +42,4 @@ core primitive for ordered execution of items with optional metadata
 - `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:79`
 - `interface SequencerItem<M = void>` — A sequencer entry: string ID plus typed metadata. `src/core/sequencer.ts:37`
 - `interface SequencerOptions<M = void>` — Configuration for createSequencer. `src/core/sequencer.ts:113`
-- `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canRun check. `src/core/sequencer.ts:54`
+- `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canStart check. `src/core/sequencer.ts:54`

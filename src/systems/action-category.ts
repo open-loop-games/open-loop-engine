@@ -107,11 +107,11 @@ export interface ActionMapping<Def extends { id: string }, State, Payload> {
    */
   tick?: (ctx: ActionTickContext<Def, State, Payload>) => void;
   /**
-   * Per-def pre-run gate. Composed into the internal sequencer's `canRun` —
+   * Per-def pre-run gate. Composed into the internal sequencer's `canStart` —
    * the engine looks up the entry by `currentItem.metadata.defId` and invokes
    * this if present, defaulting to `'now'` otherwise.
    */
-  canRun?: (entry: ActionCategoryEntry<Def, State, Payload>) => StartResult;
+  canStart?: (entry: ActionCategoryEntry<Def, State, Payload>) => StartResult;
   /** Required: unlock/count signals for the engine's CategoryEntrySignals cross-cut. */
   signals: CategoryEntrySignals;
   /**
@@ -154,7 +154,7 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
    */
   mode?: 'queue' | 'list';
   /**
-   * Map a def to its tick/canRun/signals/rateChain configuration. Called at
+   * Map a def to its tick/canStart/signals/rateChain configuration. Called at
    * registration time, in the caller's persistent context — unlike `mapState`,
    * not the def's.
    */
@@ -405,12 +405,12 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     maxSize,
     startOnEnqueue,
     registerTick,
-    canRun: (item) => {
+    canStart: (item) => {
       const mapping = mappings.get(item.metadata.defId);
-      if (!mapping?.canRun) return 'now';
+      if (!mapping?.canStart) return 'now';
       const entry = makeEntry(item.metadata.defId, item.metadata);
       if (!entry) return 'never';
-      return mapping.canRun(entry);
+      return mapping.canStart(entry);
     },
   });
 
@@ -557,7 +557,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   });
 
   sequencer.on('skipped', (item) => {
-    // Skip means canRun returned 'never'. Surface as terminal 'failed' so UI
+    // Skip means canStart returned 'never'. Surface as terminal 'failed' so UI
     // can show the skip in the same channel as explicit setItemError.
     const meta = item.metadata;
     const terminal: ActionItemMetadata<Payload> = { ...meta, lifecycle: 'failed' };

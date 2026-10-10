@@ -87,7 +87,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        canStart: { kind: 'flag', id: 'unreachable-flag' },
+        canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
     },

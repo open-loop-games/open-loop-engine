@@ -76,7 +76,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
         id: 'bronze',
         name: 'Bronze',
         // FlagCondition → walker emits `reason: 'opaque-predicate'`.
-        canStart: { kind: 'flag', id: 'unreachable-flag' },
+        canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
     },

@@ -171,10 +171,10 @@ describe('Achievement adoption — requirement accepts Gate', () => {
 });
 
 // ============================================================================
-// ChallengeCategory.{visible, canStart, goal} accept Gate
+// ChallengeCategory.{visible, canEnter, goal} accept Gate
 // ============================================================================
 
-describe('ChallengeCategory adoption — visible / canStart / goal accept Gate', () => {
+describe('ChallengeCategory adoption — visible / canEnter / goal accept Gate', () => {
   it('Gate-typed goal flips canComplete reactively', () => {
     const { result, stop } = bootstrap(() => {
       const cat = createChallengeCategory<{ id: string; name: string; goal?: any }>({
@@ -218,14 +218,14 @@ describe('ChallengeCategory adoption — visible / canStart / goal accept Gate',
     stop();
   });
 
-  it('Gate-typed visible / canStart fields control entry', () => {
+  it('Gate-typed visible / canEnter fields control entry', () => {
     const { result, stop } = bootstrap((api) => {
       api.points.value = 5;
       const cat = createChallengeCategory<{
         id: string;
         name: string;
         visible?: any;
-        canStart?: any;
+        canEnter?: any;
         goal?: () => boolean;
       }>({
         id: 'challenges',
@@ -235,22 +235,22 @@ describe('ChallengeCategory adoption — visible / canStart / goal accept Gate',
         id: 'locked',
         name: 'Locked',
         visible: { kind: 'resource-gte', resource: 'points', value: 10 },
-        canStart: { kind: 'resource-gte', resource: 'points', value: 10 },
+        canEnter: { kind: 'resource-gte', resource: 'points', value: 10 },
       });
       const before = {
         visible: cat.getChallenge('locked')!.visible.value,
-        canStart: cat.getChallenge('locked')!.canStart.value,
+        canEnter: cat.getChallenge('locked')!.canEnter.value,
       };
       api.points.value = 10;
       const after = {
         visible: cat.getChallenge('locked')!.visible.value,
-        canStart: cat.getChallenge('locked')!.canStart.value,
+        canEnter: cat.getChallenge('locked')!.canEnter.value,
       };
       return { before, after };
     });
 
-    expect(result.before).toEqual({ visible: false, canStart: false });
-    expect(result.after).toEqual({ visible: true, canStart: true });
+    expect(result.before).toEqual({ visible: false, canEnter: false });
+    expect(result.after).toEqual({ visible: true, canEnter: true });
     stop();
   });
 });
@@ -693,7 +693,7 @@ describe('Predicate fields — every arm reaches the system', () => {
     stop();
   });
 
-  it('challenge visible, canStart and goal take refs and getters', () => {
+  it('challenge visible, canEnter and goal take refs and getters', () => {
     const shown = ref(false);
     const { result, stop } = bootstrap(() => {
       const cat = createChallengeCategory<ChallengeDef>({ id: 'trials', mutuallyExclusive: false });
@@ -701,14 +701,14 @@ describe('Predicate fields — every arm reaches the system', () => {
         id: 't',
         name: 'T',
         visible: shown,
-        canStart: () => shown.value,
+        canEnter: () => shown.value,
         goal: shown,
       });
       return cat.getChallenge('t')!;
     });
 
     expect(result.visible.value).toBe(false);
-    expect(result.canStart.value).toBe(false);
+    expect(result.canEnter.value).toBe(false);
     shown.value = true;
     expect(result.visible.value).toBe(true);
     expect(result.enter()).toBe(true);
@@ -879,8 +879,8 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     }
   });
 
-  it('challenge visible, canStart and goal', () => {
-    for (const field of ['visible', 'canStart', 'goal'] as const) {
+  it('challenge visible, canEnter and goal', () => {
+    for (const field of ['visible', 'canEnter', 'goal'] as const) {
       const cat = createChallengeCategory<ChallengeDef>({ id: `c-${field}` });
       expect(() => cat.register({ id: 'c', name: 'C', [field]: unwiredFlag })).toThrow(
         new RegExp(`challenge 'c' ${field}: `),

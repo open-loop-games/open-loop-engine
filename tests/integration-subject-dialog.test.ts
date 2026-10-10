@@ -222,10 +222,10 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
             nodeId: 'a',
             text: 'Stub A',
             choices: [{ id: 'next', text: 'Continue' }],
-            finished: false,
+            terminal: false,
           };
         }
-        return { nodeId: 'b', text: 'Stub B', choices: [], finished: true };
+        return { nodeId: 'b', text: 'Stub B', choices: [], terminal: true };
       }
       return {
         start(graphId, entryNode) {
@@ -272,7 +272,7 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
 
       session.choose('next');
       expect(session.present()?.nodeId).toBe('b');
-      expect(session.present()?.finished).toBe(true);
+      expect(session.present()?.terminal).toBe(true);
       // `advance` is optional on the contract; the session names the gap.
       expect(() => session.advance()).toThrow(/does not implement advance/);
 

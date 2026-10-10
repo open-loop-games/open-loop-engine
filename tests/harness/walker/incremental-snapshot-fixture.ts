@@ -138,7 +138,7 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
           id: 'bronze',
           name: 'Bronze',
           visible: { kind: 'resource-gte', resource: 'gold', value: 10 },
-          canStart: {
+          canEnter: {
             kind: 'all',
             of: [
               { kind: 'resource-gte', resource: 'gems', value: 5 },
@@ -152,7 +152,7 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
         {
           id: 'silver',
           name: 'Silver',
-          canStart: { kind: 'flag', id: 'silver-unlock' },
+          canEnter: { kind: 'flag', id: 'silver-unlock' },
           goal: {
             kind: 'any',
             of: [
