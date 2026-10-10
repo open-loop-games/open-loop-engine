@@ -10,8 +10,7 @@
  * `inspect` callback.
  *
  * One engine per (waypoint × seed). Default `seeds: [0]` runs a single
- * deterministic engine per waypoint, matching the prior starter `runFlowProbe`
- * behavior; pass a wider seed list when waypoint-time variance across seeds
+ * deterministic engine per waypoint; pass a wider seed list when waypoint-time variance across seeds
  * matters.
  */
 

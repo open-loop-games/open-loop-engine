@@ -3,8 +3,7 @@
  * stats, optional histograms, and (for until-runs) termination-time
  * distributions. Also exports `diffAggregates`, the baseline-vs-variant
  * delta primitive consumed directly by custom-sweep callers when the
- * canned `runSensitivity` shape doesn't fit (see starter `sweep.ts`,
- * `tug/balance/probes.ts`).
+ * canned `runSensitivity` shape doesn't fit.
  *
  * @cluster runners
  */

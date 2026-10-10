@@ -233,8 +233,8 @@ export interface BatchConfig {
 }
 
 /**
- * A named config patch — the generic equivalent of borglike's domain-
- * specific `excludeUpgrades` axis. `patch` receives the baseline cell and
+ * A named config patch — the generic equivalent of a domain-specific
+ * axis such as excluding upgrades. `patch` receives the baseline cell and
  * returns a new cell; the harness re-labels the returned cell with
  * `variant.name` so variant identity is stable regardless of what the patch
  * does to the underlying name.
