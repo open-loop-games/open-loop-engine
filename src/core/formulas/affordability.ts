@@ -399,7 +399,7 @@ export function countAffordable(
  *
  * @param formula - Cost formula — the price of the level at its variable
  * @param count - Number of levels to price; a fractional amount takes every whole level below it
- * @param sumLevels - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
+ * @param sumLevels - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + count)` alone. Default: `true`
  * @returns The total cost, or 0 with a report when the span has no price
  */
 export function calculateCost(

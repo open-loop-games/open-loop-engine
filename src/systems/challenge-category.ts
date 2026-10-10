@@ -482,7 +482,7 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
         def.onExit?.();
       }
 
-      function complete(remainActive = false): void {
+      function complete(stayEntered = false): void {
         if (!active.value) return;
         if (completions.value >= limit) return;
 
@@ -496,7 +496,7 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
 
         def.onComplete?.();
 
-        if (!remainActive) {
+        if (!stayEntered) {
           exit();
         }
       }

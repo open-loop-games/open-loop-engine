@@ -208,7 +208,7 @@ const warningResolvers = new WeakMap<object, () => Set<Persistent>>();
  */
 function resolveScope(
   modules: ResetScope[],
-  onUnknown?: (moduleId: string) => void,
+  onUnknown?: (contextId: string) => void,
 ): Set<Persistent> {
   const result = new Set<Persistent>();
   for (const entry of modules) {
@@ -282,17 +282,17 @@ export function createReset(options: ResetOptions): Reset {
   const hasRetention = (keep && keep.length > 0) || (retain && retain.size > 0);
   const retention = hasRetention ? createRetention({ keep, retain }) : undefined;
 
-  const warnedModules = new Set<string>();
-  function warnUnknownModule(moduleId: string): void {
-    if (warnedModules.has(moduleId)) return;
-    warnedModules.add(moduleId);
+  const warnedContexts = new Set<string>();
+  function warnUnknownContext(contextId: string): void {
+    if (warnedContexts.has(contextId)) return;
+    warnedContexts.add(contextId);
     console.warn(
-      `createReset: resetPersistentContexts names "${moduleId}", which has no registered module ` +
+      `createReset: resetPersistentContexts names "${contextId}", which has no registered persistent ` +
         `context — nothing under that id is reset. Check the id.`,
     );
   }
   const resolveModules = bindPersistenceNamespace(
-    (onUnknown?: (moduleId: string) => void): Set<Persistent> =>
+    (onUnknown?: (contextId: string) => void): Set<Persistent> =>
       resetPersistentContexts ? resolveScope(resetPersistentContexts, onUnknown) : new Set(),
   );
 
@@ -350,7 +350,7 @@ export function createReset(options: ResetOptions): Reset {
           }
 
           // Reset via module-scoped refs
-          for (const ref of resolveModules(warnUnknownModule)) {
+          for (const ref of resolveModules(warnUnknownContext)) {
             if (!retainedRefs.has(ref)) resetPersistent(ref);
           }
 
@@ -369,7 +369,7 @@ export function createReset(options: ResetOptions): Reset {
       }
     },
   };
-  warningResolvers.set(reset, () => resolveModules(warnUnknownModule));
+  warningResolvers.set(reset, () => resolveModules(warnUnknownContext));
 
   return reset;
 }

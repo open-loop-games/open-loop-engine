@@ -179,7 +179,7 @@ export function createResource<T>(
 }
 
 /**
- * A persistent resource that saves under `saveName` in the current context
+ * A persistent resource that saves under its persistent id in the current context
  * but registers under `options.id`, for a system that builds same-named
  * resources in sibling contexts — two inventories holding the same item.
  *
@@ -227,7 +227,7 @@ export function registerResourceClamp(
   };
 }
 
-/** Shared body of the resource factories; `saveName` defaults to the resolved id. */
+/** Shared body of the resource factories; the persistent id defaults to the resolved id. */
 function buildResource<T>(
   defaultValue: T | Ref<T>,
   options: ResourceOptions,
@@ -285,7 +285,7 @@ function buildResource<T>(
       withPersistentContext(`${parentContext}::${name}`, () => {
         const initial = defaultValue as DecimalSource;
         // `lifetime: true` so module-scoped resets pass over these trackers.
-        // Without the flag, a `createReset({ resetPersistentContexts: [moduleId] })`
+        // Without the flag, a `createReset({ resetPersistentContexts: [contextId] })`
         // would zero `cumulative` / `best` even when the underlying resource
         // was kept via `keep:[resource]`, contradicting the "full life"
         // semantic these refs advertise. To wipe lifetime stats on a hard

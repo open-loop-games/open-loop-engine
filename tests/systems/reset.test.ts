@@ -445,7 +445,7 @@ describe('Reset with resetPersistentContexts', () => {
     expect(late.value).toBe(0);
   });
 
-  it('warns once when a resetPersistentContexts id names no registered module', () => {
+  it('warns once when a resetPersistentContexts id names no registered persistent context', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const reset = createReset({ resetPersistentContexts: ['rm-no-such-module'] });

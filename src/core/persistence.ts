@@ -896,7 +896,7 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
  * nested child contexts (categories, per-definition states, etc.).
  *
  * Unlike {@link getPersistentRefs} which returns only refs in one context,
- * this walks the parent→child context tree rooted at `moduleId` and collects
+ * this walks the parent→child context tree rooted at `contextId` and collects
  * every non-lifetime ref reachable from that root. Used by the reset system
  * to resolve `resetPersistentContexts` scope.
  *

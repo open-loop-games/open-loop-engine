@@ -117,7 +117,7 @@ export type SuggestionRankFn<TPayload> = (
 /**
  * Configuration for {@link createRuleAdvisor}.
  *
- * Generic ordering: `TEntry` and `TProfile` reach the aggregator + analyzers;
+ * Generic ordering: `TEntry` and `TDigest` reach the digest function and analyzers;
  * `TPayload` reaches the returned advisor. `TContext` defaults to `undefined`
  * so context-free callers can omit it entirely. With inference-first design,
  * none of these are spelled out at call sites in practice — the function form
@@ -333,16 +333,13 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * });
  * ```
  */
-export function createRuleAdvisor<TProfile, TPayload, TContext = undefined>(
-  options: Omit<
-    RuleAdvisorOptions<CycleLogEntry, TProfile, TPayload, TContext>,
-    'historySource'
-  > & {
+export function createRuleAdvisor<TDigest, TPayload, TContext = undefined>(
+  options: Omit<RuleAdvisorOptions<CycleLogEntry, TDigest, TPayload, TContext>, 'historySource'> & {
     historySource: CycleLog;
   },
 ): RuleAdvisor<TPayload>;
-export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(
-  options: Omit<RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext>, 'historySource'> & {
+export function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefined>(
+  options: Omit<RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext>, 'historySource'> & {
     historySource: () => readonly TEntry[];
   },
 ): RuleAdvisor<TPayload>;
