@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { IEffect, CompositeEffect, ResourceCondition, AndCondition } from '@/primitives/types';
+import type { IEffect, CompositeEffect, ResourceCondition, AllCondition } from '@/primitives/types';
 
 describe('Primitive types', () => {
   it('IEffect discriminated union works', () => {
@@ -26,8 +26,8 @@ describe('Primitive types', () => {
     expect(cond.type).toBe('resource');
   });
   it('Composite condition nests', () => {
-    const cond: AndCondition = {
-      type: 'and',
+    const cond: AllCondition = {
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'unlock', target: 'smithing' },

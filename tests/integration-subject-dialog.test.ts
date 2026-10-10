@@ -81,7 +81,7 @@ const raskGreeting: DialogGraph = {
         {
           id: 'ask-restricted',
           text: 'Ask about the restricted library.',
-          condition: { kind: 'flag', id: 'knowledge-restricted-library-tip' },
+          visible: { kind: 'flag', id: 'knowledge-restricted-library-tip' },
           next: 'restricted',
         },
         { id: 'ask-mundane', text: 'Pleasantries.', next: 'mundane' },
@@ -165,7 +165,7 @@ describe('Scenario 2 — multi-loop persistence', () => {
           id: 'mentor-rask',
           fields: {
             trust: {
-              gates: [
+              advanceWhen: [
                 { kind: 'flag', id: 'knowledge-rask-approach' },
                 { kind: 'flag', id: 'knowledge-rask-competence' },
                 { kind: 'flag', id: 'knowledge-rask-task' },

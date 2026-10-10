@@ -164,7 +164,7 @@ describe('AutomationTiers', () => {
     const at = createAutomationTiers({
       tiers: [
         { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, requirement: () => true },
+        { id: 'basic', name: 'Basic', order: 1, unlockWhen: () => true },
       ],
     });
     expect(at.isTierUnlocked('basic')).toBe(true);
@@ -176,7 +176,7 @@ describe('AutomationTiers', () => {
     const at = createAutomationTiers({
       tiers: [
         { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, requirement: flag },
+        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     expect(at.isTierUnlocked('basic')).toBe(false);
@@ -192,7 +192,7 @@ describe('AutomationTiers', () => {
     const at = createAutomationTiers({
       tiers: [
         { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, requirement: flag },
+        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     const events: string[] = [];
@@ -210,7 +210,7 @@ describe('AutomationTiers', () => {
     const at = createAutomationTiers({
       tiers: [
         { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, requirement: flag },
+        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     expect(at.isTierUnlocked('basic')).toBe(false);
@@ -237,7 +237,7 @@ describe('AutomationTiers — a met requirement is a level, not an edge', () => 
       const tiers = createAutomationTiers({
         tiers: [
           { id: 'manual', name: 'Manual', order: 0 },
-          ...tierDefs.map((t) => ({ ...t, requirement: () => gold.value >= 10 })),
+          ...tierDefs.map((t) => ({ ...t, unlockWhen: () => gold.value >= 10 })),
         ],
       });
       tiers.on('unlocked', (id) => events.push(id));

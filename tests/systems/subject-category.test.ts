@@ -151,7 +151,7 @@ describe('createSubjectCategory', () => {
           id: 'mentor-rask',
           fields: {
             trust: {
-              gates: [
+              advanceWhen: [
                 { kind: 'flag', id: 'knowledge-rask-approach' },
                 { kind: 'flag', id: 'knowledge-rask-competence' },
                 { kind: 'flag', id: 'knowledge-rask-task' },
@@ -209,7 +209,7 @@ describe('createSubjectCategory', () => {
           id: 'mentor-rask',
           fields: {
             trust: {
-              gates: [{ kind: 'count-gte', category: 'upgrades', entity: 'charm', value: 2 }],
+              advanceWhen: [{ kind: 'count-gte', category: 'upgrades', entity: 'charm', value: 2 }],
             },
           },
         });
@@ -249,7 +249,7 @@ describe('createSubjectCategory', () => {
           id: 'mages-guild',
           fields: {
             rank: {
-              gates: [
+              advanceWhen: [
                 { kind: 'flag', id: 'never' },
                 { kind: 'flag', id: 'never' },
               ],

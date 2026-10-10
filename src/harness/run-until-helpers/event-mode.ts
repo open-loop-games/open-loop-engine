@@ -187,7 +187,7 @@ export function runEventModeLoop(
         // to narrow the fire time to within `bisectTolSec`; otherwise the
         // top-of-loop check on the next iteration would record
         // `simTime + result.advanced` as the fire time.
-        const fireDt = bisectFireTime(
+        const fireDt = bisectTerminationTime(
           engine,
           predicate,
           checkpoint,
@@ -399,7 +399,7 @@ function fastTickDuringStasis(
   return { simTime, ticks, exit: 'maxSimTime' };
 }
 
-function bisectFireTime(
+function bisectTerminationTime(
   engine: Engine,
   predicate: UntilPredicate,
   checkpoint: { blob: string; rng: RNGState },

@@ -82,7 +82,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
     const ach = createAchievement({
       id: 'score-100',
       display: { title: 'Hit 100' },
-      requirement: () => Number(score.value) >= 100,
+      goal: () => Number(score.value) >= 100,
     });
 
     let earnedAtTick = -1;

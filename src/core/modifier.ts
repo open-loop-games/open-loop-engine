@@ -711,7 +711,7 @@ export function createModifierChain(id: string): ModifierChain {
 
       const activeRef = opts.active == null ? undefined : processGetter(opts.active);
       const modifier =
-        activeRef == null ? rawModifier : delegateModifier(rawModifier, { gate: activeRef });
+        activeRef == null ? rawModifier : delegateModifier(rawModifier, { when: activeRef });
 
       // Resolve id — explicit override wins, then explicit attribution text,
       // then (fallback) the modifier's own description getter. The fallback
@@ -829,7 +829,7 @@ class ChainSlot {
 
 /**
  * A modifier that forwards every call to `raw`, with two optional overrides:
- * `gate` ANDs onto `raw`'s own `enabled`, and `description` replaces `raw`'s.
+ * `when` ANDs onto `raw`'s own `enabled`, and `description` replaces `raw`'s.
  * Forwarding per call (rather than copying `raw`'s properties) keeps class
  * methods and a chain's live `apply` / `invert` / `description` getters.
  *
@@ -837,16 +837,16 @@ class ChainSlot {
  */
 export function delegateModifier(
   raw: Modifier,
-  overrides: { gate?: MaybeRef<boolean>; description?: Modifier['description'] },
+  overrides: { when?: MaybeRef<boolean>; description?: Modifier['description'] },
 ): Modifier {
-  const { gate, description } = overrides;
+  const { when, description } = overrides;
   const own = raw.enabled;
   const enabled =
     own == null
-      ? gate
-      : gate == null
+      ? when
+      : when == null
         ? own
-        : computed(() => unref(own) !== false && unref(gate) !== false);
+        : computed(() => unref(own) !== false && unref(when) !== false);
   // Forwarders are built once; the getters only decide whether `raw` has the member now.
   const invert = (gain: DecimalSource) => raw.invert!(gain);
   const describe = () => (raw.description as () => ModifierDescription | ModifierDescription[])();

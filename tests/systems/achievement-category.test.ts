@@ -229,7 +229,7 @@ describe('createAchievementCategory', () => {
       id: 'test10',
       mapAchievement: (def) => ({
         display: { title: def.name },
-        requirement: condition,
+        goal: condition,
       }),
     });
 
@@ -252,7 +252,7 @@ describe('createAchievementCategory', () => {
       id: 'test11',
       mapAchievement: (def) => ({
         display: { title: def.name },
-        requirement: condition,
+        goal: condition,
         onComplete: () => {
           completed = true;
         },
@@ -382,7 +382,7 @@ describe('createAchievementCategory — teardown', () => {
           id: 'milestones',
           mapAchievement: (def) => ({
             display: { title: def.id },
-            requirement: () => flag.value,
+            goal: () => flag.value,
             onComplete: () => fired.push(def.id),
           }),
         });

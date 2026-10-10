@@ -156,7 +156,7 @@ describe('createBankedAcceleration — spend loop', () => {
       tickDriver: driver,
       bank,
       spendMultiplier: 10,
-      gate,
+      when: gate,
     });
     accel.startSpending();
     driver.tickRaw(0.05); // accelerated tick: 0.5 sim, drains 0.45

@@ -64,7 +64,7 @@ Each sense has a stable ID: two letters for the family and a number.
 | PD3 | **predicate field** | a def field typed `Predicate` | requirement-bearing field, gating field |
 | PD4 | **predicate** | plain: any test that returns a boolean | — |
 | PD5 | **requirement** | a `Requirement`: an object with a met state and an optional payment | requirement, for any test that is not a `Requirement` |
-| PD6 | **met** | a requirement's satisfied state | requirementMet |
+| PD6 | **met** | a requirement's satisfied state | met |
 | PD7 | **condition IR** | the internal serializable test `ICondition` | bare "condition" for it |
 | PD8 | **condition** | plain: a state of affairs that holds or not | — |
 | PD9 | **holds**, **flips** | a predicate is true; a predicate's truth value changes | fires, lands, trips (for a predicate) |

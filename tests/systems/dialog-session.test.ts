@@ -89,7 +89,7 @@ const greetingGraph: DialogGraph = {
         {
           id: 'ask-secret',
           text: 'Ask about the restricted library.',
-          condition: { kind: 'flag', id: 'knowledge-restricted-tip' },
+          visible: { kind: 'flag', id: 'knowledge-restricted-tip' },
           next: 'secret',
         },
       ],
@@ -268,7 +268,7 @@ describe('createDialogSession', () => {
       entry: 'a',
       nodes: [
         { id: 'a', text: 'A', next: 'b' },
-        { id: 'b', text: 'B', condition: { kind: 'flag', id: 'never' } },
+        { id: 'b', text: 'B', when: { kind: 'flag', id: 'never' } },
       ],
     };
     const session = buildSession([graph]);
@@ -284,7 +284,7 @@ describe('createDialogSession', () => {
         {
           id: 'a',
           text: 'A',
-          choices: [{ id: 'aside', text: 'Aside', condition: { kind: 'flag', id: 'never' } }],
+          choices: [{ id: 'aside', text: 'Aside', visible: { kind: 'flag', id: 'never' } }],
           next: 'b',
         },
         { id: 'b', text: 'B' },
@@ -306,7 +306,7 @@ describe('createDialogSession', () => {
         {
           id: 'a',
           text: 'A',
-          choices: [{ id: 'offer', text: 'Offer', condition: { kind: 'flag', id: 'offer-open' } }],
+          choices: [{ id: 'offer', text: 'Offer', visible: { kind: 'flag', id: 'offer-open' } }],
           next: 'b',
         },
         { id: 'b', text: 'B', onEnter: [{ type: 'state', target: 'met-b', value: 1 }] },
@@ -344,7 +344,7 @@ describe('createDialogSession', () => {
     const lockedGraph: DialogGraph = {
       id: 'locked',
       entry: 'door',
-      nodes: [{ id: 'door', text: 'Door', condition: { kind: 'flag', id: 'never' } }],
+      nodes: [{ id: 'door', text: 'Door', when: { kind: 'flag', id: 'never' } }],
     };
     const session = buildSession([greetingGraph, lockedGraph]);
     session.start('rask-greeting');

@@ -108,7 +108,7 @@ describe('Reset', () => {
       createAchievement({
         id: 'nested-settle',
         display: { title: 'Flag' },
-        requirement: () => flag.value,
+        goal: () => flag.value,
       }),
     )!;
 
@@ -797,7 +797,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
         id: 'm-achievements',
         mapAchievement: () => ({
           display: { title: 'Rich' },
-          requirement: () => lifetimeGold.value >= 100,
+          goal: () => lifetimeGold.value >= 100,
           onComplete: () => rewards++,
         }),
       });

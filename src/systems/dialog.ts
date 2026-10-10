@@ -36,7 +36,7 @@ export interface DialogNode {
    * Skip this node when present and falsy. Evaluated as a {@link Gate}
    * through the ambient Gate runtime — typed predicate spec, no closures.
    */
-  condition?: Gate;
+  when?: Gate;
   /**
    * Player-facing choices. A node with none visible falls through to `next`,
    * and is terminal without one.
@@ -58,9 +58,9 @@ export interface DialogChoice {
   text: string;
   /**
    * Hide this choice from the presented list when present and falsy. Same
-   * {@link Gate} contract as {@link DialogNode.condition}.
+   * {@link Gate} contract as {@link DialogNode.when}.
    */
-  condition?: Gate;
+  visible?: Gate;
   /** Effects emitted when this choice is selected. */
   outcomes?: IEffect[];
   /** Target node id. Omit for "end conversation". */
@@ -243,10 +243,10 @@ export function createNativeDialogRuntime(
       }
       nodes.set(node.id, node);
       const label = `dialog '${g.id}' node '${node.id}'`;
-      if (node.condition) predicates.assert(node.condition, `${label} condition`);
+      if (node.when) predicates.assert(node.when, `${label} condition`);
       for (const choice of node.choices ?? []) {
-        if (choice.condition) {
-          predicates.assert(choice.condition, `${label} choice '${choice.id}' condition`);
+        if (choice.visible) {
+          predicates.assert(choice.visible, `${label} choice '${choice.id}' condition`);
         }
       }
     }
@@ -277,12 +277,12 @@ export function createNativeDialogRuntime(
   }
 
   /** Whether a node's or choice's gate is absent or passes. */
-  function passes(gated: { condition?: Gate }): boolean {
-    return !gated.condition || holds(gated.condition);
+  function passes(gate: Gate | undefined): boolean {
+    return !gate || holds(gate);
   }
 
   function canEnter(graphId: string, nodeId: string): boolean {
-    return passes(lookupNode(graphId, nodeId));
+    return passes(lookupNode(graphId, nodeId).when);
   }
 
   function recordVisit(graphId: string, nodeId: string): void {
@@ -336,7 +336,7 @@ export function createNativeDialogRuntime(
   }
 
   function gatedChoices(node: DialogNode): DialogChoice[] {
-    return (node.choices ?? []).filter(passes);
+    return (node.choices ?? []).filter((c) => passes(c.visible));
   }
 
   function emitPresented(): void {
@@ -377,7 +377,7 @@ export function createNativeDialogRuntime(
     if (!choice) {
       throw new Error(`Unknown choice ${choiceId} on dialog node ${nodeId}`);
     }
-    if (!passes(choice)) {
+    if (!passes(choice.visible)) {
       throw new Error(`Choice ${choiceId} on node ${nodeId} is currently gated off`);
     }
     if (choice.outcomes) {

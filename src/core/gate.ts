@@ -259,9 +259,9 @@ export function gateToCondition(gate: Gate): ICondition {
     case 'flag':
       return { type: 'unlock', target: gate.id };
     case 'all':
-      return { type: 'and', conditions: gate.of.map(gateToCondition) };
+      return { type: 'all', conditions: gate.of.map(gateToCondition) };
     case 'any':
-      return { type: 'or', conditions: gate.of.map(gateToCondition) };
+      return { type: 'any', conditions: gate.of.map(gateToCondition) };
     case 'not':
       return { type: 'not', condition: gateToCondition(gate.of) };
     case 'count-gte':

@@ -213,7 +213,7 @@ export function lowerGrants(
       chain,
       modifier: () => {
         const modifier = buildGrantModifier(grant);
-        return when == null ? modifier : delegateModifier(modifier, { gate: when });
+        return when == null ? modifier : delegateModifier(modifier, { when });
       },
     };
   });

@@ -30,7 +30,7 @@ export interface Requirement {
    * Whether this requirement is currently met.
    * Can be boolean (met/not met) or a number (how many times it can be met).
    */
-  requirementMet: MaybeRef<DecimalSource | boolean>;
+  met: MaybeRef<DecimalSource | boolean>;
 
   /**
    * Whether satisfying this requirement costs something.
@@ -40,7 +40,7 @@ export interface Requirement {
 
   /**
    * Whether this requirement supports buying multiple at once.
-   * If true, `requirementMet` returns how many can be bought.
+   * If true, `met` returns how many can be bought.
    */
   canMaximize?: MaybeRef<boolean>;
 
@@ -133,7 +133,7 @@ export interface CostRequirementOptions {
  */
 export interface CostRequirement extends Requirement {
   /** How many purchases the resource covers: `1` when one is affordable, more when `canMaximize` allows bulk. */
-  requirementMet: MaybeRef<DecimalSource>;
+  met: MaybeRef<DecimalSource>;
 
   /** The resource being spent */
   resource: Resource;
@@ -193,7 +193,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
     return Decimal.mul(unref(processedCost), amount);
   }
 
-  const requirementMet = computed((): DecimalSource => {
+  const met = computed((): DecimalSource => {
     if (formulaMaxAffordable) return unref(formulaMaxAffordable);
 
     const available = resource.value;
@@ -223,7 +223,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
     maxBulkAmount: processedMaxBulk,
     getCost,
 
-    requirementMet,
+    met,
     requiresPay: requiresPay != null ? processGetter(requiresPay) : true,
 
     canMaximize: computed(() => {
@@ -259,7 +259,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
  */
 export interface BooleanRequirementOptions {
   /** The condition that must be true */
-  requirement: Computable<boolean>;
+  met: Computable<boolean>;
   /** Description for UI display */
   description?: Computable<string>;
 }
@@ -273,16 +273,16 @@ export interface BooleanRequirementOptions {
  * @example
  * ```ts
  * const unlockRequirement = createBooleanRequirement({
- *   requirement: () => upgrades.unlock.active.value,
+ *   met: () => upgrades.unlock.active.value,
  *   description: "Unlock upgrade purchased"
  * })
  * ```
  */
 export function createBooleanRequirement(options: BooleanRequirementOptions): Requirement {
-  const { requirement, description } = options;
+  const { met: requirement, description } = options;
 
   return {
-    requirementMet: processGetter(requirement),
+    met: processGetter(requirement),
     requiresPay: false,
     description: description != null ? processGetter(description) : undefined,
     [SkipPersistence]: true,
@@ -291,7 +291,7 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
 
 // === COMBINATORS ===
 
-// Combinators always expose boolean `requirementMet` and `canMaximize: false`.
+// Combinators always expose boolean `met` and `canMaximize: false`.
 // Bulk semantics across mixed children (cost + boolean, OR-gated branches) are
 // not well-defined, and `maxRequirementsMet` returns `dInf`/`0` for boolean
 // requirements — combinators are not bulk-aware. Use combinators where the
@@ -322,7 +322,7 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
  *   inputs: {
  *     trigger: anyOf(
  *       createCostRequirement({ resource: coins, cost: 1e16 }),
- *       createBooleanRequirement({ requirement: () => Decimal.gte(prestigeGain.value, 100) }),
+ *       createBooleanRequirement({ met: () => Decimal.gte(prestigeGain.value, 100) }),
  *     ),
  *   },
  *   outputs: { … },
@@ -331,7 +331,7 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
  */
 export function anyOf(...children: Requirement[]): Requirement {
   return {
-    requirementMet: computed(() => children.some((c) => requirementsMet(c))),
+    met: computed(() => children.some((c) => requirementsMet(c))),
     requiresPay: computed(() => {
       for (const child of children) {
         if (requirementsMet(child)) return unref(child.requiresPay);
@@ -374,15 +374,15 @@ export function anyOf(...children: Requirement[]): Requirement {
  * anyOf(
  *   allOf(
  *     createCostRequirement({ resource: coins, cost: 1e16 }),
- *     createBooleanRequirement({ requirement: () => tier2Unlocked.value }),
+ *     createBooleanRequirement({ met: () => tier2Unlocked.value }),
  *   ),
- *   createBooleanRequirement({ requirement: () => Decimal.gte(prestigeGain.value, 100) }),
+ *   createBooleanRequirement({ met: () => Decimal.gte(prestigeGain.value, 100) }),
  * );
  * ```
  */
 export function allOf(...children: Requirement[]): Requirement {
   return {
-    requirementMet: computed(() => children.every((c) => requirementsMet(c))),
+    met: computed(() => children.every((c) => requirementsMet(c))),
     requiresPay: computed(() => children.some((c) => unref(c.requiresPay))),
     canMaximize: false,
     pay: (amount: DecimalSource = 1) => {
@@ -413,7 +413,7 @@ export function requirementsMet(requirements: Requirements): boolean {
     return requirements.every(requirementsMet);
   }
 
-  const met = unref(requirements.requirementMet);
+  const met = unref(requirements.met);
   return typeof met === 'boolean' ? met : Decimal.gt(met, 0);
 }
 
@@ -438,7 +438,7 @@ export function maxRequirementsMet(requirements: Requirements): DecimalSource {
     return requirements.map(maxRequirementsMet).reduce((a, b) => renormIfLayer0(Decimal.min(a, b)));
   }
 
-  const met = unref(requirements.requirementMet);
+  const met = unref(requirements.met);
 
   if (typeof met === 'boolean') {
     return met ? Decimal.dInf : 0;

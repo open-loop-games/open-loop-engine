@@ -269,7 +269,7 @@ describe('timeUntilConditionFlip — opaque predicates', () => {
 describe('timeUntilConditionFlip — and combinator', () => {
   it('currently-false: max over currently-false children (all computable)', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
@@ -285,7 +285,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('currently-false: ignores currently-true children', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
@@ -302,7 +302,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('currently-true: min over children (any flip breaks AND)', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
@@ -318,7 +318,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('strict-null: any null-distance child propagates null with reason', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'unlock', target: 'smithing' },
@@ -334,7 +334,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
   });
 
   it('empty children → uncomputable', () => {
-    const c: ICondition = { type: 'and', conditions: [] };
+    const c: ICondition = { type: 'all', conditions: [] };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'uncomputable' });
   });
@@ -343,7 +343,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
 describe('timeUntilConditionFlip — or combinator', () => {
   it('currently-false: min over all children (any child flipping satisfies OR)', () => {
     const c: ICondition = {
-      type: 'or',
+      type: 'any',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
@@ -358,7 +358,7 @@ describe('timeUntilConditionFlip — or combinator', () => {
 
   it('currently-true: max over currently-true children (all must flip)', () => {
     const c: ICondition = {
-      type: 'or',
+      type: 'any',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
@@ -374,7 +374,7 @@ describe('timeUntilConditionFlip — or combinator', () => {
 
   it('currently-true: ignores currently-false children (they stay false, assumed)', () => {
     const c: ICondition = {
-      type: 'or',
+      type: 'any',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
         { type: 'resource', target: 'wood', operator: 'gte', value: 500 },
@@ -421,17 +421,17 @@ describe('combineFlipDistances — children that never flip', () => {
   });
 
   it('OR currently-false takes the soonest child that flips, past ones that never do', () => {
-    const d = combineFlipDistances([child(false, never), child(false, computed(10))], 'or');
+    const d = combineFlipDistances([child(false, never), child(false, computed(10))], 'any');
     expect(d).toEqual(computed(10));
   });
 
   it('AND currently-true takes the soonest child that breaks, past ones that never do', () => {
-    const d = combineFlipDistances([child(true, computed(5)), child(true, never)], 'and');
+    const d = combineFlipDistances([child(true, computed(5)), child(true, never)], 'all');
     expect(d).toEqual(computed(5));
   });
 
   it('a min over children that all never flip never flips', () => {
-    const d = combineFlipDistances([child(false, never), child(false, never)], 'or');
+    const d = combineFlipDistances([child(false, never), child(false, never)], 'any');
     expect(d).toEqual(never);
   });
 
@@ -443,17 +443,17 @@ describe('combineFlipDistances — children that never flip', () => {
       expect(
         combineFlipDistances(
           [child(false, never), child(false, computed(10)), child(false, open)],
-          'or',
+          'any',
         ),
       ).toEqual(open);
     }
   });
 
   it('a max propagates a child that never flips: the combinator waits on it', () => {
-    expect(combineFlipDistances([child(false, computed(10)), child(false, never)], 'and')).toEqual(
+    expect(combineFlipDistances([child(false, computed(10)), child(false, never)], 'all')).toEqual(
       never,
     );
-    expect(combineFlipDistances([child(true, computed(10)), child(true, never)], 'or')).toEqual(
+    expect(combineFlipDistances([child(true, computed(10)), child(true, never)], 'any')).toEqual(
       never,
     );
   });

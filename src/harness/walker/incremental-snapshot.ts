@@ -42,7 +42,7 @@
  *   challenge.
  * - **An emission with empty deps is re-emitted only when its signature
  *   moves.** No `invalidate*` call reaches an opaque predicate (closure goal,
- *   category-aware Gate), and none needs to: see {@link ReadGate}.
+ *   category-aware Gate), and none needs to: see {@link ReadSignature}.
  * - `rebuild()` returns a fresh `TransitionSnapshot` object per call. Callers
  *   must not memoize on identity; use deep-equal on `.all` / group arrays.
  * - `accessor` is wrapped with a fresh {@link memoizeAccessor} per rebuild,
@@ -133,11 +133,11 @@ type PerEntityEmit = (
  * is what lets the selective rebuild skip it until one moves; a leaf whose
  * emission reads other live state must add that state to its signature.
  */
-type ReadGate = (entity: unknown, gate: unknown[]) => boolean;
+type ReadSignature = (entity: unknown, gate: unknown[]) => boolean;
 
 interface CategoryWalk {
   emit: PerEntityEmit;
-  readGate: ReadGate;
+  readSignature: ReadSignature;
 }
 
 /** A walkable entity, registered whether or not it currently emits. */
@@ -145,7 +145,7 @@ interface EntityRecord {
   categoryId: string;
   entity: unknown;
   walk: CategoryWalk;
-  gate: unknown[];
+  signature: unknown[];
   labels: Set<string>;
 }
 
@@ -174,7 +174,7 @@ function readPurchasableGate(purchasable: Purchasable | undefined, gate: unknown
 const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
   challenges: {
     emit: emitChallengeTransitionsForEntity,
-    readGate(entity, gate) {
+    readSignature(entity, gate) {
       const { def, challenge } = entity as { def: ChallengeDef; challenge: Challenge };
       let moved = updateSlot(gate, 0, challenge.active.value);
       moved = updateSlot(gate, 1, challenge.completions.value) || moved;
@@ -199,12 +199,12 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
   },
   purchasables: {
     emit: emitPurchasableTransitionsForEntity,
-    readGate: (entity, gate) =>
+    readSignature: (entity, gate) =>
       readPurchasableGate((entity as { purchasable: Purchasable }).purchasable, gate),
   },
   producers: {
     emit: emitProducerTransitionsForEntity,
-    readGate: (entity, gate) =>
+    readSignature: (entity, gate) =>
       readPurchasableGate((entity as { producer: Producer }).producer.repeatable, gate),
   },
 };
@@ -346,10 +346,10 @@ export function createIncrementalSnapshot(
         categoryId,
         entity,
         walk,
-        gate: [],
+        signature: [],
         labels: new Set(),
       };
-      walk.readGate(entity, record.gate);
+      walk.readSignature(entity, record.signature);
       entities.push(record);
       emitForRecord(record, memo);
     });
@@ -382,7 +382,7 @@ export function createIncrementalSnapshot(
     // Every record's signature is refreshed, dirty or not, so the stored gate
     // always describes the state its entries were emitted from.
     for (const record of entities) {
-      if (record.walk.readGate(record.entity, record.gate)) dirtyEntities.add(record);
+      if (record.walk.readSignature(record.entity, record.signature)) dirtyEntities.add(record);
     }
 
     if (dirtyEntities.size === 0) {

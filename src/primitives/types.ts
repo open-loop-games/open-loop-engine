@@ -110,8 +110,8 @@ export interface StateCondition {
  * True only when every child condition holds (short-circuits on first false).
  * @internal
  */
-export interface AndCondition {
-  type: 'and';
+export interface AllCondition {
+  type: 'all';
   conditions: ICondition[];
 }
 
@@ -119,8 +119,8 @@ export interface AndCondition {
  * True when at least one child condition holds (short-circuits on first true).
  * @internal
  */
-export interface OrCondition {
-  type: 'or';
+export interface AnyCondition {
+  type: 'any';
   conditions: ICondition[];
 }
 
@@ -150,8 +150,8 @@ export type ICondition =
   | ResourceCondition
   | UnlockCondition
   | StateCondition
-  | AndCondition
-  | OrCondition
+  | AllCondition
+  | AnyCondition
   | NotCondition;
 
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */

@@ -109,7 +109,7 @@ describe('Achievement adoption — requirement accepts Gate', () => {
       const ach = createAchievement({
         id: 'rich',
         display: { title: 'Rich', description: '100 points' },
-        requirement: {
+        goal: {
           kind: 'resource-gte',
           resource: 'points',
           value: 100,
@@ -130,7 +130,7 @@ describe('Achievement adoption — requirement accepts Gate', () => {
       const gateAch = createAchievement({
         id: 'gated',
         display: { title: 'Gated', description: '50 points' },
-        requirement: {
+        goal: {
           kind: 'resource-gte',
           resource: 'points',
           value: 50,
@@ -139,7 +139,7 @@ describe('Achievement adoption — requirement accepts Gate', () => {
       const closureAch = createAchievement({
         id: 'closure',
         display: { title: 'Closure', description: 'always' },
-        requirement: () => false,
+        goal: () => false,
       });
       return { gateAch, closureAch };
     });
@@ -159,7 +159,7 @@ describe('Achievement adoption — requirement accepts Gate', () => {
       createAchievement({
         id: 'flag',
         display: { title: 'Flag', description: 'set true' },
-        requirement: flag,
+        goal: flag,
       }),
     );
 
@@ -486,7 +486,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
         id: 'milestones',
         mapAchievement: () => ({
           display: { title: 'Rich' },
-          requirement: { kind: 'resource-gte', resource: 'points', value: 10 },
+          goal: { kind: 'resource-gte', resource: 'points', value: 10 },
         }),
       }),
     );
@@ -507,7 +507,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
 
     result.register({
       id: 'late',
-      fields: { trust: { gates: [{ kind: 'resource-gte', resource: 'points', value: 10 }] } },
+      fields: { trust: { advanceWhen: [{ kind: 'resource-gte', resource: 'points', value: 10 }] } },
     });
     expect(result.get('late')!.fields.trust.tryAdvance()).toBe('friend');
     stop();
@@ -526,7 +526,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
         accessor: override,
         mapAchievement: () => ({
           display: { title: 'Flagged' },
-          requirement: { kind: 'flag', id: 'anything' },
+          goal: { kind: 'flag', id: 'anything' },
         }),
       });
       achievements.register({ id: 'flagged' });
@@ -537,7 +537,9 @@ describe('Gate-accepting categories — content registered after start()', () =>
       });
       subjects.register({
         id: 'rask',
-        fields: { trust: { gates: [{ kind: 'resource-gte', resource: 'points', value: 500 }] } },
+        fields: {
+          trust: { advanceWhen: [{ kind: 'resource-gte', resource: 'points', value: 500 }] },
+        },
       });
       return { achievements, subjects };
     });
@@ -750,7 +752,7 @@ describe('Predicate fields — every arm reaches the system', () => {
         id: 'auto',
         tiers: [
           { id: 'manual', name: 'Manual', order: 0 },
-          { id: 'basic', name: 'Basic', order: 1, requirement: pointsGte(7) },
+          { id: 'basic', name: 'Basic', order: 1, unlockWhen: pointsGte(7) },
         ],
       }),
     }));
@@ -770,7 +772,7 @@ describe('Predicate fields — every arm reaches the system', () => {
         tickDriver: driver,
         bank,
         spendMultiplier: 10,
-        gate: pointsGte(1),
+        when: pointsGte(1),
       });
       return { api, accel };
     });
@@ -830,7 +832,9 @@ describe('Predicate fields — every arm reaches the system', () => {
     const open = ref(false);
     const npcs = createSubjectCategory({
       id: 'npcs',
-      fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'], gates: [() => open.value] } },
+      fields: {
+        trust: { kind: 'tier', tiers: ['stranger', 'friend'], advanceWhen: [() => open.value] },
+      },
     });
     npcs.register({ id: 'rask' });
     const trust = npcs.get('rask')!.fields.trust;
@@ -865,8 +869,8 @@ describe('Predicate fields — every arm reaches the system', () => {
 });
 
 describe('Predicate fields — a Gate missing a handle throws at register, labelled', () => {
-  it('achievement requirement, visible and hidden', () => {
-    for (const field of ['requirement', 'visible', 'hidden'] as const) {
+  it('achievement goal, visible and hidden', () => {
+    for (const field of ['goal', 'visible', 'hidden'] as const) {
       const cat = createAchievementCategory<{ id: string }>({
         id: `a-${field}`,
         mapAchievement: () => ({ display: { title: 'A' }, [field]: unwiredFlag }),
@@ -896,15 +900,15 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     ).toThrow(/endCondition: /);
     expect(() =>
       createAutomationTiers({
-        tiers: [{ id: 'basic', name: 'Basic', order: 0, requirement: unwiredFlag }],
+        tiers: [{ id: 'basic', name: 'Basic', order: 0, unlockWhen: unwiredFlag }],
       }),
-    ).toThrow(/automation tier 'basic' requirement: /);
+    ).toThrow(/automation tier 'basic' unlockWhen: /);
     expect(() =>
       createBankedAcceleration({
         tickDriver: createTickDriver({ tickRate: 20 }),
         bank: createTimeBank(),
         spendMultiplier: 2,
-        gate: unwiredFlag,
+        when: unwiredFlag,
       }),
     ).toThrow(/gate: /);
   });
@@ -935,9 +939,11 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
   it('subject tier gates', () => {
     const npcs = createSubjectCategory({
       id: 'npcs',
-      fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'], gates: [unwiredFlag] } },
+      fields: {
+        trust: { kind: 'tier', tiers: ['stranger', 'friend'], advanceWhen: [unwiredFlag] },
+      },
     });
-    expect(() => npcs.register({ id: 'rask' })).toThrow(/tier 'trust' gate 0: /);
+    expect(() => npcs.register({ id: 'rask' })).toThrow(/tier 'trust' advanceWhen\[0\]: /);
   });
 
   it('dialog conditions, when the runtime is built', () => {
@@ -952,7 +958,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
               {
                 id: 'a',
                 text: 'hi',
-                condition: { kind: 'count-gte', category: 'x', entity: 'y', value: 1 },
+                when: { kind: 'count-gte', category: 'x', entity: 'y', value: 1 },
               },
             ],
           },

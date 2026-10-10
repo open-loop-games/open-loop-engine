@@ -58,7 +58,7 @@ describe('Achievement', () => {
     const a = createAchievement({
       id: 'test-ach-auto',
       display: { title: 'Auto', description: 'Auto awarded' },
-      requirement: flag,
+      goal: flag,
     });
     // requirement is immediately true, watch with immediate:true should award it
     expect(a.earned.value).toBe(true);
@@ -72,7 +72,7 @@ function makeTieredCategory(id: string) {
     id,
     mapAchievement: (def) => ({
       display: { title: def.title, description: def.description },
-      requirement: def.requirement,
+      goal: def.goal,
     }),
   });
 }
@@ -144,7 +144,7 @@ describe('AchievementCategory.registerTiered', () => {
       id: 'tier-effect-cat',
       mapAchievement: (def) => ({
         display: { title: def.title },
-        requirement: def.requirement,
+        goal: def.goal,
         effect: def.effect,
       }),
     });
@@ -191,7 +191,7 @@ describe('Achievement — a load restores state, it does not earn', () => {
         id: 'ach',
         mapAchievement: (def) => ({
           display: { title: def.id },
-          requirement: () => gold.value >= 10,
+          goal: () => gold.value >= 10,
           onComplete: () => log.push(`onComplete ${def.id}`),
         }),
       });

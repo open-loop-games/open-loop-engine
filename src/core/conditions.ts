@@ -10,8 +10,8 @@ import type {
   ResourceCondition,
   UnlockCondition,
   StateCondition,
-  AndCondition,
-  OrCondition,
+  AllCondition,
+  AnyCondition,
   NotCondition,
 } from '@/primitives/types';
 
@@ -89,9 +89,9 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
       return accessor.isUnlocked(condition.target);
     case 'state':
       return compareState(accessor.getState(condition.target), condition.operator, condition.value);
-    case 'and':
+    case 'all':
       return condition.conditions.every((c) => evaluateCondition(c, accessor));
-    case 'or':
+    case 'any':
       return condition.conditions.some((c) => evaluateCondition(c, accessor));
     case 'not':
       return !evaluateCondition(condition.condition, accessor);
@@ -109,8 +109,8 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
     case 'state':
       deps.push(condition.target);
       break;
-    case 'and':
-    case 'or':
+    case 'all':
+    case 'any':
       condition.conditions.forEach((c) => collectDependencies(c, deps));
       break;
     case 'not':
@@ -157,11 +157,11 @@ export const C = {
   state(target: string, operator: StateCondition['operator'], value: unknown): StateCondition {
     return { type: 'state', target, operator, value };
   },
-  and(...conditions: ICondition[]): AndCondition {
-    return { type: 'and', conditions };
+  all(...conditions: ICondition[]): AllCondition {
+    return { type: 'all', conditions };
   },
-  or(...conditions: ICondition[]): OrCondition {
-    return { type: 'or', conditions };
+  any(...conditions: ICondition[]): AnyCondition {
+    return { type: 'any', conditions };
   },
   not(condition: ICondition): NotCondition {
     return { type: 'not', condition };

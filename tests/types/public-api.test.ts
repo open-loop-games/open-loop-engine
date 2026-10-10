@@ -146,9 +146,9 @@ describe('persistent value types', () => {
 });
 
 describe('createCostRequirement', () => {
-  it('types requirementMet as a count, never a boolean', () => {
+  it('types met as a count, never a boolean', () => {
     const req = createCostRequirement({ resource: createResource(ref(10)), cost: 5 });
-    expectTypeOf(req.requirementMet).toEqualTypeOf<MaybeRef<DecimalSource>>();
+    expectTypeOf(req.met).toEqualTypeOf<MaybeRef<DecimalSource>>();
   });
 });
 
@@ -513,11 +513,11 @@ describe('Subject category surface type pins', () => {
   it('SubjectDef.fields override accepts the per-kind partial shape', () => {
     type S = { trust: { kind: 'tier'; tiers: readonly ['a', 'b'] } };
     type Def = SubjectDef<S>;
-    // Per-subject override on a tier field accepts initial + gates only — schema-frozen
+    // Per-subject override on a tier field accepts initial + advanceWhen only — schema-frozen
     // tiers list isn't overridable. If the override shape regresses to a broader type,
     // this pin fails.
     expectTypeOf<NonNullable<Def['fields']>['trust']>().toMatchTypeOf<
-      { initial?: number; gates?: ReadonlyArray<unknown> } | undefined
+      { initial?: number; advanceWhen?: ReadonlyArray<unknown> } | undefined
     >();
   });
 });
@@ -925,7 +925,7 @@ describe('registerTiered spec — buildDef optionality', () => {
       id: string;
       title: string;
       description: string;
-      requirement: () => boolean;
+      goal: () => boolean;
     }
     expectTypeOf<
       OptionalKeys<TieredAchievementSpec<BaseTieredAchievementDef>>
@@ -1223,7 +1223,7 @@ describe('Achievement and challenge categories — required options and generics
       id: 'registerTiered-pin',
       mapAchievement: (def) => ({
         display: { title: def.title, description: def.description },
-        requirement: def.requirement,
+        goal: def.goal,
         effect: def.effect,
       }),
     });
@@ -1529,19 +1529,19 @@ describe('Systems predicate fields take Predicate', () => {
 
   it('every systems predicate field is Predicate', () => {
     type Opt<T> = Exclude<T, undefined>;
-    expectTypeOf<Opt<import('@/index').AutomationTierDef['requirement']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').AutomationTierDef['unlockWhen']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<ChallengeDef['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<ChallengeDef['canStart']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<ChallengeDef['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').CycleOptions['endCondition']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').ResetOptions['canReset']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').BankedAccelerationConfig['gate']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').BankedAccelerationConfig['when']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<PurchasableOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').ProducerPurchaseConfig['visible']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').AchievementOptions['requirement']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').AchievementOptions['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['hidden']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').TierFieldDef['gates']>>().toEqualTypeOf<
+    expectTypeOf<Opt<import('@/index').TierFieldDef['advanceWhen']>>().toEqualTypeOf<
       ReadonlyArray<P | undefined>
     >();
     expectTypeOf<Opt<Grant['when']>>().toEqualTypeOf<P>();
@@ -1557,7 +1557,10 @@ describe('Systems predicate fields take Predicate', () => {
 
   it('dialog conditions stay Gate-only', () => {
     type Opt<T> = Exclude<T, undefined>;
-    expectTypeOf<Opt<import('@/index').DialogNode['condition']>>().toEqualTypeOf<
+    expectTypeOf<Opt<import('@/index').DialogNode['when']>>().toEqualTypeOf<
+      import('@/index').Gate
+    >();
+    expectTypeOf<Opt<import('@/index').DialogChoice['visible']>>().toEqualTypeOf<
       import('@/index').Gate
     >();
   });

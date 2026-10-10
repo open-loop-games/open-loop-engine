@@ -12,7 +12,7 @@
  * const buyThrottle = createThrottle({ interval: 0.5 }); // every 500ms
  *
  * loop.onTick((dt) => {
- *   if (buyThrottle.gate(dt)) {
+ *   if (buyThrottle.ready(dt)) {
  *     attemptAutoBuy();
  *   }
  * });
@@ -29,7 +29,7 @@ export interface ThrottleOptions {
 /**
  * A gate that rate-limits execution within a tick callback.
  *
- * Call {@link gate} each tick with the elapsed dt. It returns `true` at most
+ * Call {@link ready} each tick with the elapsed dt. It returns `true` at most
  * once per configured interval, accumulating dt between allowed executions.
  */
 export interface Throttle {
@@ -38,7 +38,7 @@ export interface Throttle {
    * The internal accumulator subtracts (not resets) to preserve timing accuracy.
    * Fires at most once per call, even with large dt values.
    */
-  gate(dt: number): boolean;
+  ready(dt: number): boolean;
   /** Reset the accumulator to zero (e.g., on loop restart). */
   reset(): void;
   /** The configured interval in seconds (read-only). */
@@ -57,7 +57,7 @@ export interface Throttle {
  * const prestiageCheck = createThrottle({ interval: 2 }); // every 2 seconds
  *
  * gameLoop.onTick((dt) => {
- *   if (prestiageCheck.gate(dt) && shouldAutoPrestige()) {
+ *   if (prestiageCheck.ready(dt) && shouldAutoPrestige()) {
  *     prestige();
  *   }
  * });
@@ -68,7 +68,7 @@ export function createThrottle(options: ThrottleOptions): Throttle {
   let accumulated = 0;
 
   return {
-    gate(dt: number): boolean {
+    ready(dt: number): boolean {
       if (interval <= 0) return true;
 
       accumulated += dt;

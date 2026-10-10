@@ -353,7 +353,7 @@ describe('createPurchasableCategory (one-shot, limit: 1)', () => {
       id: 'pc-test14',
       mapPurchasable: (def) => ({
         display: { description: def.name },
-        requirements: createBooleanRequirement({ requirement: true }),
+        requirements: createBooleanRequirement({ met: true }),
         limit: 1,
       }),
     });

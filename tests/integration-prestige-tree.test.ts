@@ -212,19 +212,19 @@ function createPrestigeTreeGame() {
   const firstPrestigeAchievement = createAchievement({
     id: 'first-prestige',
     display: { title: 'First Prestige', description: 'Prestige for the first time' },
-    requirement: computed(() => Decimal.gte(prestige.value, 1)),
+    goal: computed(() => Decimal.gte(prestige.value, 1)),
   });
 
   const hundredPointsAchievement = createAchievement({
     id: 'hundred-points',
     display: { title: 'Century', description: 'Reach 100 points' },
-    requirement: computed(() => Decimal.gte(points.value, 100)),
+    goal: computed(() => Decimal.gte(points.value, 100)),
   });
 
   const superPrestigeAchievement = createAchievement({
     id: 'first-super',
     display: { title: 'Super!', description: 'Perform a super prestige' },
-    requirement: computed(() => Decimal.gte(superPrestige.value, 1)),
+    goal: computed(() => Decimal.gte(superPrestige.value, 1)),
   });
   endPersistentContext();
 

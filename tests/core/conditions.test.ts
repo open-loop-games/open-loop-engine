@@ -38,7 +38,7 @@ describe('evaluateCondition', () => {
   });
   it('and requires all', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
         { type: 'unlock', target: 'smithing' },
@@ -48,7 +48,7 @@ describe('evaluateCondition', () => {
   });
   it('or passes if any', () => {
     const c: ICondition = {
-      type: 'or',
+      type: 'any',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
         { type: 'unlock', target: 'smithing' },
@@ -79,7 +79,7 @@ describe('extractDependencies', () => {
   });
   it('deduplicates', () => {
     const c: ICondition = {
-      type: 'and',
+      type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
         { type: 'resource', target: 'gold', operator: 'lte', value: 200 },

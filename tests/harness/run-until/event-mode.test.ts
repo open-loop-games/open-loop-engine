@@ -398,7 +398,7 @@ describe("runProbe({mode: 'event'})", () => {
   });
 
   it('bisects a simTime-reading predicate to run-absolute fire time on a later advance', () => {
-    // Regression: bisectFireTime evaluated the predicate with checkpoint-
+    // Regression: bisectTerminationTime evaluated the predicate with checkpoint-
     // relative `mid` as simTime, so a simTime-reading predicate — the exact
     // idiom in runUntil's @example — never saw its time clause flip inside the
     // bisect loop, and the search fell to the advance boundary. The divergence

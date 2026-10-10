@@ -65,16 +65,16 @@ export interface VectorFieldDef<Dims extends string = string> {
 }
 
 /**
- * Ordered tier ladder with per-transition advancement gates. `gates[from]`
+ * Ordered tier ladder with per-transition advancement gates. `advanceWhen[from]`
  * must hold (or be absent) to advance from index `from` to `from+1`.
- * Per-subject overrides typically replace `gates` to give each subject its
+ * Per-subject overrides typically replace `advanceWhen` to give each subject its
  * own protocol; the tier list itself is schema-frozen.
  */
 export interface TierFieldDef {
   kind: 'tier';
   tiers: readonly string[];
   initial?: number;
-  gates?: ReadonlyArray<Predicate | undefined>;
+  advanceWhen?: ReadonlyArray<Predicate | undefined>;
 }
 
 /** Single persistent boolean per subject. */
@@ -148,7 +148,7 @@ export interface TierFieldInstance extends Emittable<TierFieldEvents> {
   getIndex(): number;
   getTier(): string | undefined;
   /**
-   * Try to advance one tier. Evaluates `gates[currentIndex]` before
+   * Try to advance one tier. Evaluates `advanceWhen[currentIndex]` before
    * incrementing. Returns the new tier name, or `null` when blocked / already
    * at max.
    *
@@ -214,7 +214,7 @@ export type PerSubjectOverride<F extends FieldDef> = F extends ScalarFieldDef
   : F extends VectorFieldDef<infer Dims>
     ? { initialPerDim?: Partial<Record<Dims, number>> }
     : F extends TierFieldDef
-      ? { initial?: number; gates?: ReadonlyArray<Predicate | undefined> }
+      ? { initial?: number; advanceWhen?: ReadonlyArray<Predicate | undefined> }
       : F extends FlagFieldDef
         ? { initial?: boolean }
         : F extends EnumFieldDef<infer V>
@@ -386,10 +386,14 @@ function buildTierField(
   }
   const initial = override?.initial ?? schema.initial ?? 0;
   const maxIndex = schema.tiers.length - 1;
-  const gates = (override?.gates ?? schema.gates)?.map((gate, i) =>
+  const gates = (override?.advanceWhen ?? schema.advanceWhen)?.map((gate, i) =>
     gate === undefined
       ? undefined
-      : predicates.adopt(gate, true, `subject '${subjectId}' tier '${fieldName}' gate ${i}`),
+      : predicates.adopt(
+          gate,
+          true,
+          `subject '${subjectId}' tier '${fieldName}' advanceWhen[${i}]`,
+        ),
   );
 
   const clampIndex = (i: number): number => clampTierIndex(schema, i);
@@ -598,7 +602,7 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  *
  * npcs.register({
  *   id: 'mentor-rask',
- *   fields: { trust: { gates: [
+ *   fields: { trust: { advanceWhen: [
  *     { kind: 'flag', id: 'knowledge-rask-approach' },
  *     { kind: 'flag', id: 'knowledge-rask-competence' },
  *   ] } },

@@ -805,7 +805,7 @@ describe('setupPolicyAutoPurchase', () => {
           createPurchasable({
             id: 'locked',
             display: 'l',
-            requirements: [cost(), createBooleanRequirement({ requirement: false })],
+            requirements: [cost(), createBooleanRequirement({ met: false })],
           }),
         ),
       ];

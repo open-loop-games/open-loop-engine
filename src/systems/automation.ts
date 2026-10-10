@@ -18,9 +18,9 @@
  *   tiers: [
  *     { id: 'manual', name: 'Manual', order: 0 },
  *     { id: 'basic', name: 'Auto-buy', order: 1,
- *       requirement: () => upgrades.autoBuy.earned.value },
+ *       unlockWhen: () => upgrades.autoBuy.earned.value },
  *     { id: 'conditional', name: 'Conditionals', order: 2,
- *       requirement: () => Decimal.gte(prestige.count.value, 5) },
+ *       unlockWhen: () => Decimal.gte(prestige.count.value, 5) },
  *   ],
  * });
  *
@@ -68,7 +68,7 @@ export interface AutomationTierDef {
    * A getter or ref re-evaluates reactively; a Gate resolves through the
    * runtime captured at `createAutomationTiers` time.
    */
-  requirement?: Predicate;
+  unlockWhen?: Predicate;
 }
 
 /** Events emitted by an {@link AutomationTiers} instance. */
@@ -129,7 +129,7 @@ export interface AutomationTiers {
 
   /**
    * Lock all tiers except those in the initially-unlocked set and those whose
-   * `requirement` still holds, which stay unlocked without an `unlocked` event.
+   * `unlockWhen` still holds, which stay unlocked without an `unlocked` event.
    * Intended for prestige/reset scenarios.
    */
   resetUnlocks(): void;
@@ -138,7 +138,7 @@ export interface AutomationTiers {
   on: Emittable<AutomationTiersEvents>['on'];
 
   /**
-   * Stop the auto-unlock watchers installed for tiers with `requirement`.
+   * Stop the auto-unlock watchers installed for tiers with `unlockWhen`.
    * `unlocked` stays registered and keeps saving, so building tiers under the
    * same id again takes a new engine.
    */
@@ -160,9 +160,9 @@ export interface AutomationTiers {
  *   tiers: [
  *     { id: 'none', name: 'Manual', order: 0 },
  *     { id: 'sequencer', name: 'Sequencer', order: 1,
- *       requirement: () => stats.manualCasts.value >= 10 },
+ *       unlockWhen: () => stats.manualCasts.value >= 10 },
  *     { id: 'conditionals', name: 'Conditionals', order: 3,
- *       requirement: () => zones.isUnlocked('elemental_trials') },
+ *       unlockWhen: () => zones.isUnlocked('elemental_trials') },
  *   ],
  * });
  *
@@ -222,16 +222,13 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
   const predicates = createPredicateResolver();
   const requirements = tiers.flatMap((tier) =>
-    tier.requirement === undefined
+    tier.unlockWhen === undefined
       ? []
       : [
           {
             tier,
-            met: predicates.adopt(
-              tier.requirement,
-              false,
-              `automation tier '${tier.id}' requirement`,
-            ).holds,
+            met: predicates.adopt(tier.unlockWhen, false, `automation tier '${tier.id}' unlockWhen`)
+              .holds,
           },
         ],
   );

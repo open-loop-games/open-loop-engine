@@ -72,7 +72,7 @@ export interface AchievementOptions<T = unknown> {
    * If omitted, the achievement only earns via an explicit
    * {@link Achievement.complete} call.
    */
-  requirement?: Predicate;
+  goal?: Predicate;
 
   /** The effect/reward value when this achievement is earned. */
   effect?: Computable<T>;
@@ -172,7 +172,7 @@ export function createAchievement<T = unknown>(
   const {
     id,
     display,
-    requirement,
+    goal: requirement,
     effect,
     hidden,
     visible,
@@ -195,7 +195,7 @@ export function createAchievement<T = unknown>(
     earnedAt: persistent<number | null>(null, { name: 'earnedAt', lifetime: true }),
   }));
 
-  const adoptedRequirement = predicates.adopt(requirement, true, `achievement '${id}' requirement`);
+  const adoptedRequirement = predicates.adopt(requirement, true, `achievement '${id}' goal`);
   const hiddenRef = predicates.adopt(hidden, false, `achievement '${id}' hidden`).holds;
   const visibleRef = predicates.adopt(visible, true, `achievement '${id}' visible`).holds;
   const processedImage = image !== undefined ? processGetter(image) : undefined;

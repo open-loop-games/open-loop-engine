@@ -156,10 +156,10 @@ export function timeUntilConditionFlip(
   switch (condition.type) {
     case 'resource':
       return timeUntilResourceFlip(condition, accessor);
-    case 'and':
-      return timeUntilCombinatorFlip(condition.conditions, accessor, 'and');
-    case 'or':
-      return timeUntilCombinatorFlip(condition.conditions, accessor, 'or');
+    case 'all':
+      return timeUntilCombinatorFlip(condition.conditions, accessor, 'all');
+    case 'any':
+      return timeUntilCombinatorFlip(condition.conditions, accessor, 'any');
     case 'not':
       return timeUntilConditionFlip(condition.condition, accessor);
     case 'unlock':
@@ -250,18 +250,18 @@ export interface ChildFlipResult {
  */
 export function combineFlipDistances(
   children: ChildFlipResult[],
-  kind: 'and' | 'or',
+  kind: 'all' | 'any',
 ): TransitionDistance {
   if (children.length === 0) {
     return { seconds: null, reason: 'uncomputable' };
   }
   const combinatorTrue =
-    kind === 'and' ? children.every((s) => s.currentlyTrue) : children.some((s) => s.currentlyTrue);
+    kind === 'all' ? children.every((s) => s.currentlyTrue) : children.some((s) => s.currentlyTrue);
 
   // AND true → any child flips false (min). AND false → all false-children flip true (max).
   // OR  true → all true-children flip false (max). OR  false → any child flips true (min).
   const [mode, actionable] =
-    kind === 'and'
+    kind === 'all'
       ? combinatorTrue
         ? (['min', children] as const)
         : (['max', children.filter((s) => !s.currentlyTrue)] as const)
@@ -293,7 +293,7 @@ export function combineFlipDistances(
 function timeUntilCombinatorFlip(
   children: ICondition[],
   accessor: GameStateAccessor,
-  kind: 'and' | 'or',
+  kind: 'all' | 'any',
 ): TransitionDistance {
   const results: ChildFlipResult[] = children.map((c) => ({
     currentlyTrue: evaluateCondition(c, accessor),

@@ -364,7 +364,7 @@ function buildLimitRequirement(
   amount: Persistent<DecimalSource>,
 ): Requirement {
   return {
-    requirementMet: computed((): DecimalSource => {
+    met: computed((): DecimalSource => {
       const lim = unref(processedLimit);
       const current = amount.value;
       return Decimal.max(Decimal.sub(lim, current), 0);

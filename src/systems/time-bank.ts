@@ -165,7 +165,7 @@ export interface BankedAccelerationConfig {
    * while actively playing" gates. A Gate resolves through the runtime
    * captured at `createBankedAcceleration` time.
    */
-  gate?: Predicate;
+  when?: Predicate;
   /**
    * When true, banks the seconds `TickDriver` drops when a tab-hide or hitch
    * outruns `maxDeltaTime`, by chaining onto `onDeltaOverflow`. The one
@@ -218,7 +218,7 @@ export interface BankedAcceleration {
  * ```
  */
 export function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration {
-  const { tickDriver, bank, spendMultiplier, drainMode = 'excess', gate } = config;
+  const { tickDriver, bank, spendMultiplier, drainMode = 'excess', when: gate } = config;
   const spendGate = createPredicateResolver().adopt(gate, true, 'createBankedAcceleration gate');
 
   const isSpending = ref(false);

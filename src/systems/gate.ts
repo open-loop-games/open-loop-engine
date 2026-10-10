@@ -320,7 +320,7 @@ function combinatorFlip(
     currentlyTrue: evaluateGate(child, runtime),
     distance: timeUntilGateFlip(child, runtime),
   }));
-  return combineFlipDistances(children, gate.kind === 'all' ? 'and' : 'or');
+  return combineFlipDistances(children, gate.kind === 'all' ? 'all' : 'any');
 }
 
 // === RUNTIME BINDING ===
@@ -507,7 +507,7 @@ export function createGateRequirement(options: GateRequirementOptions): Requirem
   const runtime = getAmbientGateRuntime();
   assertGateHandles(gate, runtime, 'createGateRequirement');
   return createBooleanRequirement({
-    requirement: computed(() => evaluateGate(gate, runtime)),
+    met: computed(() => evaluateGate(gate, runtime)),
     description,
   });
 }

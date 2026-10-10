@@ -17,7 +17,7 @@
  *   id: 'milestones',
  *   mapAchievement: (def) => ({
  *     display: { title: def.name, description: `Reach ${def.threshold}` },
- *     requirement: computed(() => Decimal.gte(points.value, def.threshold)),
+ *     goal: computed(() => Decimal.gte(points.value, def.threshold)),
  *   }),
  * });
  *
@@ -118,7 +118,7 @@ export interface BaseTieredAchievementDef<T = unknown> {
   id: string;
   title: string;
   description: string;
-  requirement: () => boolean;
+  goal: () => boolean;
   /** The tier's {@link TieredAchievementTier.effect}, for `mapAchievement` to forward. */
   effect?: T;
 }
@@ -171,7 +171,7 @@ export interface TieredAchievementBuildDefParams<T = number> {
   id: string;
   title: string;
   description: string;
-  requirement: () => boolean;
+  goal: () => boolean;
   tierIndex: number;
   tier: TieredAchievementTier<T>;
 }
@@ -295,7 +295,7 @@ export interface AchievementCategory<
  *   id: 'achievements',
  *   mapAchievement: (def) => ({
  *     display: { title: def.name, description: def.desc },
- *     requirement: computed(() => checkCondition(def)),
+ *     goal: computed(() => checkCondition(def)),
  *     onComplete: () => grantReward(def),
  *   }),
  * });
@@ -359,7 +359,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
           id: tierId,
           title: `${baseName} ${tier.suffix}`,
           description: tier.description ?? `Reach ${formatted}`,
-          requirement: () => Decimal.gte(getValue(), evalThreshold()),
+          goal: () => Decimal.gte(getValue(), evalThreshold()),
           tierIndex: index,
           tier,
         };
@@ -370,7 +370,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
               id: params.id,
               title: params.title,
               description: params.description,
-              requirement: params.requirement,
+              goal: params.goal,
               effect: tier.effect,
             } as unknown as Def);
         defs.push(def);
