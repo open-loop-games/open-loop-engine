@@ -99,7 +99,7 @@ function buildTransition(
   distance: Transition['distance'],
 ): Transition {
   return {
-    source: 'purchasable',
+    walker: 'purchasable',
     kind,
     categoryId,
     defId,

@@ -58,7 +58,7 @@ describe('walkEffectSystemBindings', () => {
       'buffs.haste[1]',
     ]);
     for (const e of entries) {
-      expect(e.address.source).toBe('effect-system');
+      expect(e.address.walker).toBe('effect-system');
     }
     engine.stop();
   });
@@ -115,7 +115,7 @@ describe('walkEffectSystemBindings', () => {
     const entries = walkEffectSystemBindings(engine);
     expect(entries).toHaveLength(1);
     expect(entries[0].label).toBe('buffs.shield[0]');
-    expect(entries[0].address.source).toBe('effect-system');
+    expect(entries[0].address.walker).toBe('effect-system');
     engine.stop();
   });
 

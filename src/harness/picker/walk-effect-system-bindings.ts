@@ -45,7 +45,7 @@ export function walkEffectSystemBindings(engine: Engine): ModifierPickerEntry[] 
         chain,
         indexInChain: chain.modifiers.indexOf(modifier),
         address: {
-          source: 'effect-system',
+          walker: 'effect-system',
           effectSystemId: systemId,
           defId: def.id,
           grantIndex,

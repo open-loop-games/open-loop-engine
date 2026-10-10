@@ -6,7 +6,7 @@
  */
 
 export type {
-  PickerSource,
+  PickerWalker,
   PickerAddress,
   ModifierPickerAddress,
   TunablePickerAddress,

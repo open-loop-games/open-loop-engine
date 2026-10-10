@@ -110,7 +110,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
     const out = walkChallengeTransitions(engine, accessor);
     const vis = out.filter((t) => t.kind === 'visibility-reveal');
     expect(vis).toHaveLength(1);
-    expect(vis[0].source).toBe('challenge');
+    expect(vis[0].walker).toBe('challenge');
     expect(vis[0].categoryId).toBe('vis');
     expect(vis[0].defId).toBe('secret');
     expect(vis[0].label).toBe('vis.secret.visibility-reveal');

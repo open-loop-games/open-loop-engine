@@ -41,7 +41,7 @@ describe('walkTunables', () => {
 
     for (const e of entries) {
       expect(e.kind).toBe('tunable');
-      expect(e.address.source).toBe('tunable');
+      expect(e.address.walker).toBe('tunable');
     }
 
     const fooCost = entries.find((e) => e.key === 'foo/cost')!;

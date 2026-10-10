@@ -83,7 +83,7 @@ function buildTransition(
   distance: Transition['distance'],
 ): Transition {
   return {
-    source: 'challenge',
+    walker: 'challenge',
     kind,
     categoryId,
     defId,

@@ -34,7 +34,7 @@
 import { toRaw } from 'vue';
 import { createEmitHandle } from '../events';
 import { randomItem } from '@/primitives/rng';
-import type { GridCoord, GridDelta, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
+import type { GridCoord, GridOffset, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
 
 /** Options accepted by {@link createSpatialGrid}. */
 export interface SpatialGridOptions<T> {
@@ -56,11 +56,11 @@ export interface SpatialGridOptions<T> {
    * Iteration order follows this array, and traversal tie-breaks follow
    * iteration order, so the order is part of the board's contract.
    */
-  readonly neighborhood?: readonly GridDelta[];
+  readonly neighborhood?: readonly GridOffset[];
 }
 
 /** 4-connected orthogonal adjacency: E, W, N, S. The `neighborhood` default. */
-export const ORTHOGONAL_DELTAS: readonly GridDelta[] = [
+export const ORTHOGONAL_DELTAS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: -1, dy: 0 },
   { dx: 0, dy: -1 },
@@ -68,7 +68,7 @@ export const ORTHOGONAL_DELTAS: readonly GridDelta[] = [
 ];
 
 /** 8-connected adjacency: the four orthogonals plus the four diagonals. */
-export const DIAGONAL_DELTAS: readonly GridDelta[] = [
+export const DIAGONAL_DELTAS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: -1, dy: 0 },
   { dx: 0, dy: -1 },
@@ -90,7 +90,7 @@ export const DIAGONAL_DELTAS: readonly GridDelta[] = [
  * type, no hex distance, no pixel layout. Those stay consumer-side, where the
  * storage offset and the rendering convention already live.
  */
-export const HEX_AXIAL_DELTAS: readonly GridDelta[] = [
+export const HEX_AXIAL_DELTAS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: 1, dy: -1 },
   { dx: 0, dy: -1 },
@@ -241,12 +241,12 @@ export interface SpatialGrid<T> {
    * In-bounds neighbors of (x, y) under the grid's configured
    * `neighborhood`, in that array's order.
    *
-   * @param deltas - Ad-hoc adjacency for this call only, overriding the
+   * @param neighborhood - Ad-hoc adjacency for this call only, overriding the
    *   grid's own. For the query that wants a different topology than the
    *   board — an 8-connected scan on a 4-connected board, say — without
    *   changing what traversal does.
    */
-  neighbors(x: number, y: number, deltas?: readonly GridDelta[]): Iterable<GridCoord>;
+  neighbors(x: number, y: number, neighborhood?: readonly GridOffset[]): Iterable<GridCoord>;
   /** All cells within Chebyshev `radius` of (x, y), within bounds. */
   inRange(x: number, y: number, radius: number): Iterable<GridCoord>;
   /**
@@ -476,10 +476,14 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
     exploredPassableCount = epCount;
   }
 
-  function* neighborsOf(x: number, y: number, deltas: readonly GridDelta[]): Generator<GridCoord> {
-    for (let i = 0; i < deltas.length; i++) {
-      const nx = x + deltas[i].dx;
-      const ny = y + deltas[i].dy;
+  function* neighborsOf(
+    x: number,
+    y: number,
+    offsets: readonly GridOffset[],
+  ): Generator<GridCoord> {
+    for (let i = 0; i < offsets.length; i++) {
+      const nx = x + offsets[i].dx;
+      const ny = y + offsets[i].dy;
       if (inBounds(nx, ny)) yield { x: nx, y: ny };
     }
   }
@@ -601,9 +605,9 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
     inBounds,
 
-    neighbors(x, y, deltas = neighborhood) {
+    neighbors(x, y, offsets = neighborhood) {
       checkBounds(x, y);
-      return neighborsOf(x, y, deltas);
+      return neighborsOf(x, y, offsets);
     },
 
     inRange(x, y, radius) {

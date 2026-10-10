@@ -74,8 +74,8 @@ export function createPickerSnapshot(engine: Engine): PickerSnapshot {
       return;
     }
     if (
-      MODIFIER_SOURCE_PRIORITY[entry.address.source] >
-      MODIFIER_SOURCE_PRIORITY[existing.address.source]
+      MODIFIER_SOURCE_PRIORITY[entry.address.walker] >
+      MODIFIER_SOURCE_PRIORITY[existing.address.walker]
     ) {
       canonical.set(entry.modifier, entry);
     }
@@ -91,7 +91,7 @@ export function createPickerSnapshot(engine: Engine): PickerSnapshot {
 
   for (const entry of canonical.values()) {
     all.push(entry);
-    if (entry.address.source === 'effect-system') content.push(entry);
+    if (entry.address.walker === 'effect-system') content.push(entry);
     else chains.push(entry);
   }
 

@@ -61,7 +61,7 @@ import type { Producer } from '@/systems/producer-category';
 import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
 import { forEachGateLeaf } from '@/core/gate';
 import { evaluateGate, getBoundGateRuntime, isGate } from '@/systems/gate';
-import type { Transition, TransitionSource } from './types';
+import type { Transition, TransitionWalker } from './types';
 import type { TransitionSnapshot } from './index';
 import { compareTransitions } from './compare-transitions';
 import { memoizeAccessor } from './memoize-accessor';
@@ -298,12 +298,12 @@ export function createIncrementalSnapshot(
     const all: Transition[] = [];
     for (const entry of entries.values()) all.push(entry.transition);
     all.sort(compareTransitions);
-    const groups: Record<TransitionSource, Transition[]> = {
+    const groups: Record<TransitionWalker, Transition[]> = {
       challenge: [],
       purchasable: [],
       producer: [],
     };
-    for (const t of all) groups[t.source].push(t);
+    for (const t of all) groups[t.walker].push(t);
     return {
       all,
       challenges: groups.challenge,

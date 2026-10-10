@@ -7,14 +7,14 @@
  *
  * Three perturbation mechanisms:
  *
- * - **Content entries** (`address.source: 'content'`) — binding overlay:
+ * - **Effect-system entries** (`address.walker: 'effect-system'`) — grant wrap:
  *   the effect system wraps the def's binding in every activation while
  *   the perturbation is active. A live activation is swapped in place, a
  *   later one binds wrapped, expiry removes whatever is live, and cleanup
  *   swaps the originals back in place. Factory-form bindings are covered,
  *   since the wrap applies to whatever the binding resolves to.
  *
- * - **Chain-registry entries** (`address.source: 'chain-registry'`) —
+ * - **Chain-registry entries** (`address.walker: 'chain-registry'`) —
  *   in-place swap: `chain.replace(target, wrapped)`, and cleanup swaps
  *   the target back while the wrapper is still in the chain. A
  *   `modifier-index` entry resolves its target by identity when the
@@ -152,7 +152,7 @@ function applyModifierPerturbation(
 ): () => void {
   const { address } = entry;
 
-  switch (address.source) {
+  switch (address.walker) {
     case 'chain-registry': {
       const registry = engine.tryInject(ChainRegistryKey);
       if (!registry) throw new Error('ChainRegistryKey not provided on engine');

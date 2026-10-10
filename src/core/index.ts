@@ -280,7 +280,7 @@ export {
 // === SPATIAL PRIMITIVES ===
 export type {
   GridCoord,
-  GridDelta,
+  GridOffset,
   PassabilityFn,
   TraversalCostFn,
   Unsubscribe,

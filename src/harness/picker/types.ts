@@ -1,5 +1,5 @@
 /**
- * Picker types — `PickerSource`, `PickerAddress`, `PickerEntry`,
+ * Picker types — `PickerWalker`, `PickerAddress`, `PickerEntry`,
  * `PickerSnapshot`.
  *
  * Picker walks two layers of intent:
@@ -19,7 +19,7 @@
  * `PickerEntry` is a discriminated union by top-level `kind` so the two
  * layers narrow cleanly. Workbench and perturbation code dispatch on
  * `kind`; consumers that need fine-grained source dispatch within
- * `kind === 'modifier'` pattern-match on `address.source` afterward.
+ * `kind === 'modifier'` pattern-match on `address.walker` afterward.
  */
 
 import type { Modifier, ModifierChain } from '@/core/modifier';
@@ -32,7 +32,7 @@ import type { Modifier, ModifierChain } from '@/core/modifier';
  * Tunable entries don't compete with modifier entries for identity and
  * skip dedup entirely.
  */
-export type PickerSource = 'effect-system' | 'chain-registry' | 'tunable';
+export type PickerWalker = 'effect-system' | 'chain-registry' | 'tunable';
 
 /**
  * Address of a `ModifierPickerEntry`. Discriminated union by `source` —
@@ -41,7 +41,7 @@ export type PickerSource = 'effect-system' | 'chain-registry' | 'tunable';
  */
 export type ModifierPickerAddress =
   | {
-      source: 'effect-system';
+      walker: 'effect-system';
       /** Effect-system id (e.g. `'buffs'`, `'constructions-effects'`) */
       effectSystemId: string;
       /** Def id within the effect system */
@@ -50,7 +50,7 @@ export type ModifierPickerAddress =
       grantIndex: number;
     }
   | {
-      source: 'chain-registry';
+      walker: 'chain-registry';
       /** The {@link ModifierChain.id} */
       chainId: string;
       /** Targets one existing modifier by its position in the chain. */
@@ -65,7 +65,7 @@ export type ModifierPickerAddress =
       modifierIndex: number;
     }
   | {
-      source: 'chain-registry';
+      walker: 'chain-registry';
       /**
        * Targets the chain as a whole — perturbation appends a scalar
        * wrapper modifier rather than wrapping an existing one. The only
@@ -86,7 +86,7 @@ export type ModifierPickerAddress =
  * `ModifierPickerAddress` (chain-registry source).
  */
 export interface TunablePickerAddress {
-  source: 'tunable';
+  walker: 'tunable';
   /** `TuningRegistry.name` — used to look up the registry at perturb time. */
   registryName: string;
   /** Key within the registry. */
@@ -95,7 +95,7 @@ export interface TunablePickerAddress {
 
 /**
  * Address of any {@link PickerEntry}. Union of the modifier-side and
- * tunable-side address shapes — pattern-match on `address.source` for
+ * tunable-side address shapes — pattern-match on `address.walker` for
  * fine-grained dispatch, or narrow on the entry's `kind` discriminator
  * before reaching `address`.
  */
@@ -166,9 +166,9 @@ export type PickerEntry = ModifierPickerEntry | TunablePickerEntry;
 export interface PickerSnapshot {
   /** All entries after deduplication, in walker order. */
   all: readonly PickerEntry[];
-  /** Modifier entries whose canonical address source is `content`. */
+  /** Modifier entries whose canonical address walker is `effect-system`. */
   content: readonly ModifierPickerEntry[];
-  /** Modifier entries whose canonical address source is `chain-registry`. */
+  /** Modifier entries whose canonical address walker is `chain-registry`. */
   chains: readonly ModifierPickerEntry[];
   /** Tunable entries — one per key per registered tuning registry. */
   tunables: readonly TunablePickerEntry[];

@@ -33,7 +33,7 @@ describe('walkChainRegistry', () => {
       'damage[*]',
       'damage[0]',
     ]);
-    expect(entries.every((e) => e.address.source === 'chain-registry')).toBe(true);
+    expect(entries.every((e) => e.address.walker === 'chain-registry')).toBe(true);
 
     engine.stop();
   });
@@ -53,7 +53,7 @@ describe('walkChainRegistry', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].label).toBe('empty-chain[*]');
     expect(entries[0].address).toMatchObject({
-      source: 'chain-registry',
+      walker: 'chain-registry',
       chainId: 'empty-chain',
       variant: 'chain-apply',
     });

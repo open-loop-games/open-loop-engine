@@ -20,7 +20,7 @@ export interface GridCoord {
  * `SpatialGrid` uses as its adjacency, so the distinction is what keeps an
  * absolute coordinate from being passed where an offset belongs.
  */
-export interface GridDelta {
+export interface GridOffset {
   readonly dx: number;
   readonly dy: number;
 }

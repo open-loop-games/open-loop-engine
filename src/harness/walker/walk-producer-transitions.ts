@@ -73,7 +73,7 @@ function buildTransition(
   distance: Transition['distance'],
 ): Transition {
   return {
-    source: 'producer',
+    walker: 'producer',
     kind,
     categoryId,
     defId,

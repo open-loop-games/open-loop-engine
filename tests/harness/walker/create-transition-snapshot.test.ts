@@ -165,7 +165,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     //  - farms.fallow.producer-becomes-affordable    gold (150-0)/2 =  75s
     //  - upgrades.slow.becomes-affordable            gold (200-0)/2 = 100s
     const kinds = snap.all.map((t) => ({
-      source: t.source,
+      source: t.walker,
       kind: t.kind,
       defId: t.defId,
       seconds: t.distance.seconds,

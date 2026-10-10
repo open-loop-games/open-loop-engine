@@ -596,11 +596,11 @@ describe('applyPerturbation — content source', () => {
   it('names the missing piece when an entry no longer resolves', () => {
     const { engine, entry } = persistentDamage('pert-content-missing');
     const flatEntry = entry('gear.flat[0]');
-    // walkEffectSystemBindings always produces 'effect-system'-source addresses; narrow away the
+    // walkEffectSystemBindings always produces 'effect-system'-walker addresses; narrow away the
     // wider ModifierPickerAddress union so the override merges cleanly.
     const contentAddress = flatEntry.address as Extract<
       typeof flatEntry.address,
-      { source: 'effect-system' }
+      { walker: 'effect-system' }
     >;
     const at = (address: Partial<typeof contentAddress>) => ({
       ...flatEntry,

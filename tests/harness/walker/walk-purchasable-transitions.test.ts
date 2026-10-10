@@ -128,7 +128,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     const out = walkPurchasableTransitions(engine, accessor);
     const affordable = out.filter((t) => t.kind === 'becomes-affordable');
     expect(affordable).toHaveLength(1);
-    expect(affordable[0].source).toBe('purchasable');
+    expect(affordable[0].walker).toBe('purchasable');
     expect(affordable[0].categoryId).toBe('upgrades');
     expect(affordable[0].defId).toBe('double');
     expect(affordable[0].label).toBe('upgrades.double.becomes-affordable');

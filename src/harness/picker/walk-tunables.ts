@@ -37,7 +37,7 @@ export function walkTunables(engine: Engine): TunablePickerEntry[] {
         registryName: registry.name,
         key,
         address: {
-          source: 'tunable',
+          walker: 'tunable',
           registryName: registry.name,
           key,
         },

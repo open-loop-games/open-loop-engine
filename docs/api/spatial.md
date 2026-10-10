@@ -11,15 +11,15 @@ Coordinate primitives for adjacency-driven games — grid, graph, scope stack, i
 
 ## Grid
 
-Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, configurable topology: the `neighborhood` delta set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridDelta`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
+Bounded 2D grid with FOV adapter and a serialized form. Rectangular storage, configurable topology: the `neighborhood` offset set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridOffset`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.
 
 - `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:412`
-- `const DIAGONAL_DELTAS: readonly GridDelta[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:71`
+- `const DIAGONAL_DELTAS: readonly GridOffset[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:71`
 - `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:154`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
-- `interface GridDelta` — A 2D integer offset from a cell to one of its neighbors. `src/core/spatial/types.ts:23`
-- `const HEX_AXIAL_DELTAS: readonly GridDelta[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which makes axial deltas equal grid deltas. `src/core/spatial/grid.ts:93`
-- `const ORTHOGONAL_DELTAS: readonly GridDelta[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:63`
+- `interface GridOffset` — A 2D integer offset from a cell to one of its neighbors. `src/core/spatial/types.ts:23`
+- `const HEX_AXIAL_DELTAS: readonly GridOffset[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which makes axial deltas equal grid deltas. `src/core/spatial/grid.ts:93`
+- `const ORTHOGONAL_DELTAS: readonly GridOffset[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:63`
 - `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:36`
 - `interface SerializedSpatialGrid<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:132`
 - `interface SpatialGrid<T>` — Bounded 2D grid with configurable adjacency, BFS and weighted distance fields, an FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:165`
@@ -55,13 +55,13 @@ Stack navigator over a recursive `SpatialGraph` — tracks which nested child gr
 
 Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric grid into an influence map.
 
-- `function composeInfluenceLayers(views: readonly InfluenceLayerView[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerView` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:480`
-- `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Wrap a `SpatialGrid<number>` with an influence-map lifecycle. `src/core/spatial/influence-layer.ts:288`
-- `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:250`
-- `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff curve applied per cell during accumulation. `src/core/spatial/influence-layer.ts:99`
-- `const gaussianFalloff: FalloffFunction` — Gaussian falloff `exp(-(d/r)^2 * 2)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:243`
-- `interface InfluenceLayer` — Lifecycle handle for an influence layer. `src/core/spatial/influence-layer.ts:186`
-- `interface InfluenceLayerOptions` — Options accepted by createInfluenceLayer. `src/core/spatial/influence-layer.ts:102`
-- `interface InfluenceLayerView` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:144`
+- `function composeInfluenceLayers(views: readonly InfluenceLayerView[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerView` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:481`
+- `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Wrap a `SpatialGrid<number>` with an influence-map lifecycle. `src/core/spatial/influence-layer.ts:289`
+- `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:251`
+- `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff curve applied per cell during accumulation. `src/core/spatial/influence-layer.ts:100`
+- `const gaussianFalloff: FalloffFunction` — Gaussian falloff `exp(-(d/r)^2 * 2)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:244`
+- `interface InfluenceLayer` — Lifecycle handle for an influence layer. `src/core/spatial/influence-layer.ts:187`
+- `interface InfluenceLayerOptions` — Options accepted by createInfluenceLayer. `src/core/spatial/influence-layer.ts:103`
+- `interface InfluenceLayerView` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:145`
 - `interface InfluenceSource` — A point source contributing influence to the layer. `src/core/spatial/influence-layer.ts:56`
-- `const linearFalloff: FalloffFunction` — Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. `src/core/spatial/influence-layer.ts:236`
+- `const linearFalloff: FalloffFunction` — Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. `src/core/spatial/influence-layer.ts:237`

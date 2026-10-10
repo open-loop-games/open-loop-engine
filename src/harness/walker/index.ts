@@ -25,7 +25,7 @@
 
 import type { Engine } from '@/engine';
 import type { GameStateAccessor } from '@/primitives/types';
-import type { Transition, TransitionSource } from './types';
+import type { Transition, TransitionWalker } from './types';
 import { walkChallengeTransitions } from './walk-challenge-transitions';
 import { walkPurchasableTransitions } from './walk-purchasable-transitions';
 import { walkProducerTransitions } from './walk-producer-transitions';
@@ -33,7 +33,7 @@ import { memoizeAccessor } from './memoize-accessor';
 import { compareTransitions } from './compare-transitions';
 import { profile } from '@/core/profiler';
 
-export type { Transition, TransitionSource } from './types';
+export type { Transition, TransitionWalker } from './types';
 export { createIncrementalSnapshot, type IncrementalSnapshot } from './incremental-snapshot';
 
 /**
@@ -97,12 +97,12 @@ export function createTransitionSnapshot(
     ];
     merged.sort(compareTransitions);
 
-    const groups: Record<TransitionSource, Transition[]> = {
+    const groups: Record<TransitionWalker, Transition[]> = {
       challenge: [],
       purchasable: [],
       producer: [],
     };
-    for (const t of merged) groups[t.source].push(t);
+    for (const t of merged) groups[t.walker].push(t);
 
     return {
       all: merged,

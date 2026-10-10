@@ -62,8 +62,9 @@ export interface InfluenceSource {
   /** Source strength at origin; falls off via the configured falloff function. */
   strength: number;
   /**
-   * Per-source radius cap (Euclidean) override. Sources stop contributing
-   * past it. Omit to use the layer's `defaultRadius`.
+   * Per-source radius override: the half-width of the square of cells the
+   * source reaches (a Chebyshev reach). The falloff picks the metric inside
+   * that square. Omit to use the layer's `defaultRadius`.
    */
   radius?: number;
 }

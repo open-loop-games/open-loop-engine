@@ -21,7 +21,7 @@ export type { TransitionDeps } from '@/core/transitions';
  * by the merger as the group key for `TransitionSnapshot.{challenges,
  * purchasables, producers}`.
  */
-export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
+export type TransitionWalker = 'challenge' | 'purchasable' | 'producer';
 
 /**
  * A pending state change surfaced by the transition walkers.
@@ -34,7 +34,7 @@ export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
  */
 export interface Transition {
   /** Which transition walker produced this transition. */
-  source: TransitionSource;
+  walker: TransitionWalker;
   /** Per-source kind tag; string-typed to keep leaves independent. */
   kind: string;
   /** Owning category's `registry.name` (e.g. `'challenges'`, `'buildings'`). */

@@ -54,7 +54,7 @@ Walk engine state to enumerate addressable choices for solvers / UIs.
 - `type PickerAddress = ModifierPickerAddress | TunablePickerAddress` — Address of any PickerEntry. `src/harness/picker/types.ts:102`
 - `type PickerEntry = ModifierPickerEntry | TunablePickerEntry` — Normalized picker output. `src/harness/picker/types.ts:155`
 - `interface PickerSnapshot` `src/harness/picker/types.ts:166`
-- `type PickerSource = 'effect-system' | 'chain-registry' | 'tunable'` — Which discovery walker produced a given PickerEntry. `src/harness/picker/types.ts:35`
+- `type PickerWalker = 'effect-system' | 'chain-registry' | 'tunable'` — Which discovery walker produced a given PickerEntry. `src/harness/picker/types.ts:35`
 - `interface TunablePickerAddress` — Address of a `TunablePickerEntry`. `src/harness/picker/types.ts:88`
 - `interface TunablePickerEntry` — A designer-flagged tunable value discovered by the picker. `src/harness/picker/types.ts:138`
 
@@ -150,4 +150,4 @@ Enumerate purchasables, producers, and challenges with their next-transition tim
 - `interface IncrementalSnapshot` — Caching overlay on the transition-walker snapshot. `src/harness/walker/incremental-snapshot.ts:78`
 - `interface Transition` — A pending state change surfaced by the transition walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:47`
-- `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which transition walker produced a given Transition. `src/harness/walker/types.ts:24`
+- `type TransitionWalker = 'challenge' | 'purchasable' | 'producer'` — Which transition walker produced a given Transition. `src/harness/walker/types.ts:24`

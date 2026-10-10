@@ -49,7 +49,7 @@ export function walkChainRegistry(engine: Engine): ModifierPickerEntry[] {
         chain,
         indexInChain: -1,
         address: {
-          source: 'chain-registry',
+          walker: 'chain-registry',
           chainId: chain.id,
           variant: 'chain-apply',
         },
@@ -66,7 +66,7 @@ export function walkChainRegistry(engine: Engine): ModifierPickerEntry[] {
       chain,
       indexInChain: modifierIndex,
       address: {
-        source: 'chain-registry',
+        walker: 'chain-registry',
         chainId: chain.id,
         variant: 'modifier-index',
         modifierIndex,

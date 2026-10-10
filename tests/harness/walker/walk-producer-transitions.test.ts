@@ -161,7 +161,7 @@ describe('walkProducerTransitions — producer-becomes-affordable (computed)', (
     expect(out).toHaveLength(1);
 
     const t = out[0];
-    expect(t.source).toBe('producer');
+    expect(t.walker).toBe('producer');
     expect(t.kind).toBe('producer-becomes-affordable');
     expect(t.categoryId).toBe('buildings');
     expect(t.defId).toBe('cursor');

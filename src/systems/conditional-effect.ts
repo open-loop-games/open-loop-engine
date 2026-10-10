@@ -127,14 +127,14 @@ interface DefEntry {
   slots: BindingSlots;
   unbind: () => void;
   isApplied: boolean;
-  /** True while {@link settle} runs this entry's edges. */
+  /** True while {@link settle} activates or deactivates this entry. */
   settling: boolean;
 }
 
 // === CONSTANTS ===
 
 /** Edges one predicate change may run before the effect is judged to feed back on itself. */
-const MAX_SETTLE_EDGES = 8;
+const MAX_SETTLE_FLIPS = 8;
 
 // === FACTORIES ===
 
@@ -202,8 +202,8 @@ export function createConditionalEffectSystem(
   }
 
   /**
-   * Run edges until the applied state matches the predicate. An edge can
-   * flip the predicate itself (a hook spends what it reads); the watcher
+   * Activate or deactivate until the applied state matches the predicate. An
+   * activation can flip the predicate itself (a callback spends what it reads); the watcher
    * call that flip triggers is swallowed by `settling`, and the loop
    * re-reads the predicate instead.
    */
@@ -211,8 +211,8 @@ export function createConditionalEffectSystem(
     if (entry.settling) return;
     entry.settling = true;
     try {
-      for (let edges = 0; entry.activeRef.value !== entry.isApplied; edges++) {
-        if (edges === MAX_SETTLE_EDGES) {
+      for (let flips = 0; entry.activeRef.value !== entry.isApplied; flips++) {
+        if (flips === MAX_SETTLE_FLIPS) {
           throw new Error(
             `ConditionalEffect '${entry.def.id}': 'active' keeps flipping as its own bindings ` +
               `apply and remove — the predicate reads a value its bindings change.`,

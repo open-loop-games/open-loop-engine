@@ -20,7 +20,7 @@ export {
 } from './analyzers';
 export {
   createPickerSnapshot,
-  type PickerSource,
+  type PickerWalker,
   type PickerAddress,
   type ModifierPickerAddress,
   type TunablePickerAddress,
@@ -45,7 +45,7 @@ export type { TunerConfig, TunerResult, Tuner } from './solve';
 export { createTransitionSnapshot, createIncrementalSnapshot } from './walker';
 export type {
   Transition,
-  TransitionSource,
+  TransitionWalker,
   TransitionSnapshot,
   IncrementalSnapshot,
 } from './walker';
