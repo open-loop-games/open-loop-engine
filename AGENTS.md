@@ -21,6 +21,10 @@ Symbol-grepping for names you arrived with confirms expectation and misses adjac
 - `docs/api/<tier>.md` — per-tier directory with a `## Canonical entrypoints` block. Read this for the routed tier before writing code.
 - `docs/consumer-guide.md` — narrative thinking model: levels of abstraction, persistence, modifier chains, when the engine should grow.
 
+## Terms
+
+`docs/terms.md` is the engine's controlled vocabulary: one term per meaning, each sense with a stable ID, and the rules for engine text. Read the family for a word before you write TSDoc, a doc, a runtime message or a `BREAKING CHANGE:` footer. Inside this repo it holds over any wider term list.
+
 ## Commands
 
 ```bash
