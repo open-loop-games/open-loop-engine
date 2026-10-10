@@ -93,7 +93,7 @@ function buildTransition(
   };
 }
 
-function emitForEntity(
+function collectForEntity(
   categoryId: string,
   entity: ChallengeEntity,
   accessor: GameStateAccessor,
@@ -172,7 +172,7 @@ export function walkChallengeTransitions(
   engine: Engine,
   accessor: GameStateAccessor,
 ): Transition[] {
-  return emitChallengeTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
+  return collectChallengeTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
 }
 
 /**
@@ -184,7 +184,7 @@ export function walkChallengeTransitions(
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitChallengeTransitionsWithDeps(
+export function collectChallengeTransitionsWithDeps(
   engine: Engine,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
@@ -194,7 +194,7 @@ export function emitChallengeTransitionsWithDeps(
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
   forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'challenges') return;
-    emitForEntity(categoryId, entity as unknown as ChallengeEntity, accessor, out);
+    collectForEntity(categoryId, entity as unknown as ChallengeEntity, accessor, out);
   });
   return out;
 }
@@ -203,18 +203,18 @@ export function emitChallengeTransitionsWithDeps(
  * Re-emit challenge transitions for a single cached entity. Consumed by
  * {@link createIncrementalSnapshot}'s selective-rebuild path: given
  * an entity reference cached at the last full rebuild, produce the same
- * `{ transition, deps }` emissions {@link emitChallengeTransitionsWithDeps}
+ * `{ transition, deps }` emissions {@link collectChallengeTransitionsWithDeps}
  * would yield for that one entity — no `forEachCategoryEntry` walk, no
  * engine lookup.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitChallengeTransitionsForEntity(
+export function collectChallengeTransitionsForEntity(
   categoryId: string,
   entity: unknown,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  emitForEntity(categoryId, entity as ChallengeEntity, accessor, out);
+  collectForEntity(categoryId, entity as ChallengeEntity, accessor, out);
   return out;
 }

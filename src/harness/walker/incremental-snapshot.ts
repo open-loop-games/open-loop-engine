@@ -65,9 +65,9 @@ import type { Transition, TransitionWalker } from './types';
 import type { TransitionSnapshot } from './index';
 import { compareTransitions } from './compare-transitions';
 import { memoizeAccessor } from './memoize-accessor';
-import { emitChallengeTransitionsForEntity } from './walk-challenge-transitions';
-import { emitPurchasableTransitionsForEntity } from './walk-purchasable-transitions';
-import { emitProducerTransitionsForEntity } from './walk-producer-transitions';
+import { collectChallengeTransitionsForEntity } from './walk-challenge-transitions';
+import { collectPurchasableTransitionsForEntity } from './walk-purchasable-transitions';
+import { collectProducerTransitionsForEntity } from './walk-producer-transitions';
 import { profile } from '@/core/profiler';
 import { forEachCategoryEntry } from '../walk';
 
@@ -119,7 +119,7 @@ interface CacheEntry {
   record: EntityRecord;
 }
 
-type PerEntityEmit = (
+type PerEntityCollect = (
   categoryId: string,
   entity: unknown,
   accessor: GameStateAccessor,
@@ -136,7 +136,7 @@ type PerEntityEmit = (
 type ReadSignature = (entity: unknown, gate: unknown[]) => boolean;
 
 interface CategoryWalk {
-  emit: PerEntityEmit;
+  collect: PerEntityCollect;
   readSignature: ReadSignature;
 }
 
@@ -173,7 +173,7 @@ function readPurchasableGate(purchasable: Purchasable | undefined, gate: unknown
 
 const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
   challenges: {
-    emit: emitChallengeTransitionsForEntity,
+    collect: collectChallengeTransitionsForEntity,
     readSignature(entity, gate) {
       const { def, challenge } = entity as { def: ChallengeDef; challenge: Challenge };
       let moved = updateSlot(gate, 0, challenge.entered.value);
@@ -198,12 +198,12 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
     },
   },
   purchasables: {
-    emit: emitPurchasableTransitionsForEntity,
+    collect: collectPurchasableTransitionsForEntity,
     readSignature: (entity, gate) =>
       readPurchasableGate((entity as { purchasable: Purchasable }).purchasable, gate),
   },
   producers: {
-    emit: emitProducerTransitionsForEntity,
+    collect: collectProducerTransitionsForEntity,
     readSignature: (entity, gate) =>
       readPurchasableGate((entity as { producer: Producer }).producer.repeatable, gate),
   },
@@ -320,8 +320,8 @@ export function createIncrementalSnapshot(
     dirty.all = false;
   }
 
-  function emitForRecord(record: EntityRecord, memo: GameStateAccessor): void {
-    const emissions = record.walk.emit(record.categoryId, record.entity, memo);
+  function collectForRecord(record: EntityRecord, memo: GameStateAccessor): void {
+    const emissions = record.walk.collect(record.categoryId, record.entity, memo);
     for (const { transition, deps } of emissions) {
       indexEntry({ transition, deps, record });
       record.labels.add(transition.label);
@@ -351,7 +351,7 @@ export function createIncrementalSnapshot(
       };
       walk.readSignature(entity, record.signature);
       entities.push(record);
-      emitForRecord(record, memo);
+      collectForRecord(record, memo);
     });
 
     clearDirty();
@@ -394,7 +394,7 @@ export function createIncrementalSnapshot(
     for (const record of dirtyEntities) {
       for (const label of record.labels) dropEntry(label);
       record.labels.clear();
-      emitForRecord(record, memo);
+      collectForRecord(record, memo);
     }
 
     clearDirty();

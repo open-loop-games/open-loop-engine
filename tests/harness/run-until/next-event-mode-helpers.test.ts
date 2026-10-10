@@ -8,7 +8,7 @@ import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { createTransitionSnapshot } from '@/harness';
-import { resolveNextEvent } from '@/harness/run-until-helpers/event-mode';
+import { resolveNextEvent } from '@/harness/run-until-helpers/next-event-mode';
 
 beforeEach(() => {
   resetAllPersistentContexts();

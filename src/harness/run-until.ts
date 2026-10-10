@@ -29,7 +29,7 @@
  * Run mode (`config.mode`):
  *
  * - `'uniform'` (default) — fixed-tick loop above. Content-blind.
- * - `'event'` — walker-visible event-stepping with fast-tick fallbacks.
+ * - `'next-event'` — walker-visible event-stepping with fast-tick fallbacks.
  *   Requires `config.accessor`, and takes no analyzers. Predicate fire-time
  *   can be resolved within an advance via `config.bisectTolSec`.
  * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check.
@@ -43,7 +43,7 @@
 
 import { seedRNG } from '@/primitives/rng';
 import { createTransitionSnapshot } from './walker';
-import { runEventModeLoop, isStasis } from './run-until-helpers/event-mode';
+import { runNextEventLoop, isStasis } from './run-until-helpers/next-event-mode';
 import { floorSteps } from './sim-time';
 import type { RunUntilConfig, RunUntilResult } from './types';
 
@@ -83,21 +83,21 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   if (mode !== 'uniform' && !config.accessor) {
     throw new Error(`runUntil: mode "${mode}" requires config.accessor`);
   }
-  if (mode === 'event' && config.bisectTolSec !== undefined && !engine.saveManager) {
+  if (mode === 'next-event' && config.bisectTolSec !== undefined && !engine.saveManager) {
     throw new Error(
       'runUntil: bisectTolSec restores save checkpoints and requires an engine with a saveManager (persistence enabled)',
     );
   }
   if (config.seed !== undefined) seedRNG(config.seed);
   const analyzers = config.setup?.() ?? [];
-  if (mode === 'event' && analyzers.length > 0) {
+  if (mode === 'next-event' && analyzers.length > 0) {
     throw new Error(
       'runUntil: mode "event" steps variable distances and cannot drive the analyzer tick lifecycle — use mode "tick" for analyzers',
     );
   }
 
-  if (mode === 'event') {
-    const out = runEventModeLoop(engine, config.accessor!, until, maxSimTime, tickDelta, {
+  if (mode === 'next-event') {
+    const out = runNextEventLoop(engine, config.accessor!, until, maxSimTime, tickDelta, {
       bisectTolSec: config.bisectTolSec,
       stasisCheckInterval: config.stasisCheckInterval,
     });

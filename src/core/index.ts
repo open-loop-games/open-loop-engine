@@ -145,10 +145,10 @@ export type { GameStateAccessorMutator } from './game-state-accessor';
 // === TICK DRIVER ===
 export type {
   TickDriverConfig,
-  PhaseHooks,
+  PhaseHandlers,
   TickDriver,
   TimerProvider,
-  TickCallback,
+  TickHandler,
 } from './tick-driver';
 export { createTickDriver } from './tick-driver';
 

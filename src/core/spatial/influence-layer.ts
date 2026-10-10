@@ -133,7 +133,7 @@ export interface InfluenceLayerOptions {
    * accumulation. Hook into a profiler to track influence-map cost on
    * large maps. No per-cell overhead.
    */
-  profileHook?: (samples: number) => void;
+  onProfile?: (samples: number) => void;
 }
 
 /**
@@ -295,7 +295,7 @@ export function createInfluenceLayer(
     falloff,
     retentionFactor,
     respectPassability = false,
-    profileHook,
+    onProfile,
   } = options;
 
   if (!Number.isFinite(defaultRadius) || defaultRadius <= 0) {
@@ -439,7 +439,7 @@ export function createInfluenceLayer(
     update() {
       evaporate();
       const samples = accumulate();
-      profileHook?.(samples);
+      onProfile?.(samples);
       handle.emit('updated');
     },
 

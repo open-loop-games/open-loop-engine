@@ -109,7 +109,7 @@ function buildTransition(
   };
 }
 
-function emitForEntity(
+function collectForEntity(
   categoryId: string,
   entity: PurchasableEntity,
   accessor: GameStateAccessor,
@@ -171,7 +171,7 @@ export function walkPurchasableTransitions(
   engine: Engine,
   accessor: GameStateAccessor,
 ): Transition[] {
-  return emitPurchasableTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
+  return collectPurchasableTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
 }
 
 /**
@@ -185,7 +185,7 @@ export function walkPurchasableTransitions(
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitPurchasableTransitionsWithDeps(
+export function collectPurchasableTransitionsWithDeps(
   engine: Engine,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
@@ -195,7 +195,7 @@ export function emitPurchasableTransitionsWithDeps(
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
   forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'purchasables') return;
-    emitForEntity(categoryId, entity as unknown as PurchasableEntity, accessor, out);
+    collectForEntity(categoryId, entity as unknown as PurchasableEntity, accessor, out);
   });
   return out;
 }
@@ -206,12 +206,12 @@ export function emitPurchasableTransitionsWithDeps(
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitPurchasableTransitionsForEntity(
+export function collectPurchasableTransitionsForEntity(
   categoryId: string,
   entity: unknown,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  emitForEntity(categoryId, entity as PurchasableEntity, accessor, out);
+  collectForEntity(categoryId, entity as PurchasableEntity, accessor, out);
   return out;
 }

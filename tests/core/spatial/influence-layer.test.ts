@@ -256,19 +256,19 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(layer.read().at(5, 3)).toBeCloseTo(4);
   });
 
-  it('profileHook fires once per update with cells-touched count', () => {
+  it('onProfile fires once per update with cells-touched count', () => {
     const grid = numericGrid(5, 5);
-    const profileHook = vi.fn();
+    const onProfile = vi.fn();
     const layer = createInfluenceLayer(grid, {
       defaultRadius: 1,
       falloff: linearFalloff,
-      profileHook,
+      onProfile,
     });
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 1 });
     layer.update();
-    expect(profileHook).toHaveBeenCalledTimes(1);
+    expect(onProfile).toHaveBeenCalledTimes(1);
     // 3x3 Chebyshev box centered at (2,2) → 9 samples.
-    expect(profileHook).toHaveBeenCalledWith(9);
+    expect(onProfile).toHaveBeenCalledWith(9);
   });
 
   it('supports custom Chebyshev falloff via lookup table (roguelike danger pattern)', () => {
@@ -302,15 +302,15 @@ describe('InfluenceLayer — update & accumulation', () => {
 
   it('zero-strength source contributes no samples', () => {
     const grid = numericGrid(5, 5);
-    const profileHook = vi.fn();
+    const onProfile = vi.fn();
     const layer = createInfluenceLayer(grid, {
       defaultRadius: 1,
       falloff: linearFalloff,
-      profileHook,
+      onProfile,
     });
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 0 });
     layer.update();
-    expect(profileHook).toHaveBeenCalledWith(0);
+    expect(onProfile).toHaveBeenCalledWith(0);
     expect(layer.read().at(2, 2)).toBe(0);
   });
 });

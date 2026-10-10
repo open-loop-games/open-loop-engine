@@ -65,7 +65,7 @@ export const CLUSTER_TITLES = {
   probe: {
     title: 'Probes',
     blurb:
-      'Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `event` / `stasis-aware`) inherited from `runMatrixUntil`.',
+      'Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `next-event` / `stasis-aware`) inherited from `runMatrixUntil`.',
   },
   picker: {
     title: 'Picker',

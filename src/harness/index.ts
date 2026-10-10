@@ -97,8 +97,8 @@ export type {
   MaybeGetter,
   Emittable,
   TickDriver,
-  PhaseHooks,
-  TickCallback,
+  PhaseHandlers,
+  TickHandler,
   TimerProvider,
   GameStateAccessor,
   GameStateMutator,
@@ -147,7 +147,6 @@ export type {
   EngineEvents,
   EngineModule,
   ModDef,
-  TickHandler,
   SaveHandler,
   LoadHandler,
 } from '../engine';

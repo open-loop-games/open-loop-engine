@@ -5,7 +5,7 @@
  * `createTransitionSnapshot` can concatenate, sort, and group uniformly.
  *
  * Unified shape so the canonical engine-internal consumers (`runUntil`'s
- * `'event'` and `'stasis-aware'` modes) and any future broader-adoption
+ * `'next-event'` and `'stasis-aware'` modes) and any future broader-adoption
  * consumer (`InfeasibilityOracle` graduation, devtools, UI hints) can treat
  * every discovered pending state change the same way regardless of which
  * subsystem produced it.

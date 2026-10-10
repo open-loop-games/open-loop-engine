@@ -108,13 +108,13 @@ export function resolveNextEvent(
 }
 
 /** @internal */
-export interface EventModeOptions {
+export interface NextEventModeOptions {
   bisectTolSec?: number;
   stasisCheckInterval?: number;
 }
 
 /** @internal */
-export interface EventModeResult {
+export interface NextEventModeResult {
   totalTicks: number;
   elapsedSimulated: number;
   terminated: 'predicate' | 'maxSimTime' | 'unreachable';
@@ -134,19 +134,19 @@ export interface EventModeResult {
  * @param maxSimTime - Sim-seconds ceiling.
  * @param tickDelta - Advance floor, and the fixed-tick delta of the stasis
  *   fast-tick and of opaque-present refuses.
- * @param options - {@link EventModeOptions} — bisect tolerance and stasis
+ * @param options - {@link NextEventModeOptions} — bisect tolerance and stasis
  *   probe interval.
  *
  * @internal
  */
-export function runEventModeLoop(
+export function runNextEventLoop(
   engine: Engine,
   accessor: GameStateAccessor,
   predicate: UntilPredicate,
   maxSimTime: number,
   tickDelta: number,
-  options: EventModeOptions,
-): EventModeResult {
+  options: NextEventModeOptions,
+): NextEventModeResult {
   const stasisCheckInterval = options.stasisCheckInterval ?? 100;
   const bisectTolSec = options.bisectTolSec;
   const inc = createIncrementalSnapshot(engine, accessor);

@@ -8,9 +8,9 @@ import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps } from '@/core/transitions';
-import { emitProducerTransitionsWithDeps } from '@/harness/walker/walk-producer-transitions';
-import { emitPurchasableTransitionsWithDeps } from '@/harness/walker/walk-purchasable-transitions';
-import { emitChallengeTransitionsWithDeps } from '@/harness/walker/walk-challenge-transitions';
+import { collectProducerTransitionsWithDeps } from '@/harness/walker/walk-producer-transitions';
+import { collectPurchasableTransitionsWithDeps } from '@/harness/walker/walk-purchasable-transitions';
+import { collectChallengeTransitionsWithDeps } from '@/harness/walker/walk-challenge-transitions';
 import { mockAccessor } from './incremental-snapshot-fixture';
 
 beforeEach(() => {
@@ -31,7 +31,7 @@ function shape(deps: TransitionDeps) {
 // Producer — single cost resource
 // ---------------------------------------------------------------------------
 
-describe('emitProducerTransitionsWithDeps', () => {
+describe('collectProducerTransitionsWithDeps', () => {
   interface BuildingDef {
     id: string;
     baseRate: number;
@@ -70,7 +70,7 @@ describe('emitProducerTransitionsWithDeps', () => {
     const engine = buildEngine('cookies', [{ id: 'cursor', baseRate: 1, baseCost: 10 }]);
     const accessor = mockAccessor({ resources: { cookies: 0 }, rates: { cookies: 2 } });
 
-    const out = emitProducerTransitionsWithDeps(engine, accessor);
+    const out = collectProducerTransitionsWithDeps(engine, accessor);
     expect(out).toHaveLength(1);
 
     const [entry] = out;
@@ -90,7 +90,7 @@ describe('emitProducerTransitionsWithDeps', () => {
     ]);
     const accessor = mockAccessor({ resources: { cookies: 0 }, rates: { cookies: 1 } });
 
-    const out = emitProducerTransitionsWithDeps(engine, accessor);
+    const out = collectProducerTransitionsWithDeps(engine, accessor);
     expect(out).toHaveLength(2);
     // Each entry owns its deps — mutating one must not bleed into another.
     expect(out[0].deps.resources).not.toBe(out[1].deps.resources);
@@ -102,7 +102,7 @@ describe('emitProducerTransitionsWithDeps', () => {
 // Purchasable — multi-cost (first requirement wins)
 // ---------------------------------------------------------------------------
 
-describe('emitPurchasableTransitionsWithDeps', () => {
+describe('collectPurchasableTransitionsWithDeps', () => {
   interface UpgradeDef {
     id: string;
     primaryCost: number;
@@ -144,7 +144,7 @@ describe('emitPurchasableTransitionsWithDeps', () => {
       rates: { gold: 10, wood: 5 },
     });
 
-    const out = emitPurchasableTransitionsWithDeps(engine, accessor);
+    const out = collectPurchasableTransitionsWithDeps(engine, accessor);
     const affordable = out.find((e) => e.transition.kind === 'becomes-affordable');
     expect(affordable).toBeDefined();
     expect(shape(affordable!.deps)).toEqual({
@@ -167,7 +167,7 @@ describe('emitPurchasableTransitionsWithDeps', () => {
       rates: { gold: 10, wood: 5 },
     });
 
-    const out = emitPurchasableTransitionsWithDeps(engine, accessor);
+    const out = collectPurchasableTransitionsWithDeps(engine, accessor);
     const affordable = out.find((e) => e.transition.kind === 'becomes-affordable');
     const maxed = out.find((e) => e.transition.kind === 'purchasable-maxed');
     expect(affordable).toBeDefined();
@@ -180,7 +180,7 @@ describe('emitPurchasableTransitionsWithDeps', () => {
 // Challenge — AND / OR / NOT over resources + unlocks + state paths
 // ---------------------------------------------------------------------------
 
-describe('emitChallengeTransitionsWithDeps', () => {
+describe('collectChallengeTransitionsWithDeps', () => {
   function buildEngine(
     register: (category: ReturnType<typeof createChallengeCategory>) => void,
     accessor: GameStateAccessor,
@@ -222,7 +222,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
       });
     }, accessor);
 
-    const out = emitChallengeTransitionsWithDeps(engine, accessor);
+    const out = collectChallengeTransitionsWithDeps(engine, accessor);
     const vis = out.find((e) => e.transition.kind === 'visibility-reveal');
     expect(vis).toBeDefined();
     expect(shape(vis!.deps)).toEqual({
@@ -253,7 +253,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
       });
     }, accessor);
 
-    const out = emitChallengeTransitionsWithDeps(engine, accessor);
+    const out = collectChallengeTransitionsWithDeps(engine, accessor);
     const unlock = out.find((e) => e.transition.kind === 'becomes-enterable');
     expect(unlock).toBeDefined();
     expect(shape(unlock!.deps)).toEqual({
@@ -280,7 +280,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const challenges = (engine.tryInject(CategoriesKey) as EngineCategories).challenges![0];
     challenges.getChallenge('survive')!.enter();
 
-    const out = emitChallengeTransitionsWithDeps(engine, accessor);
+    const out = collectChallengeTransitionsWithDeps(engine, accessor);
     const goal = out.find((e) => e.transition.kind === 'goal-complete');
     expect(goal).toBeDefined();
     expect(shape(goal!.deps)).toEqual({
@@ -304,7 +304,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const challenges = (engine.tryInject(CategoriesKey) as EngineCategories).challenges![0];
     challenges.getChallenge('once')!.enter();
 
-    const out = emitChallengeTransitionsWithDeps(engine, accessor);
+    const out = collectChallengeTransitionsWithDeps(engine, accessor);
     const goal = out.find((e) => e.transition.kind === 'goal-complete');
     const maxed = out.find((e) => e.transition.kind === 'challenge-maxed');
     expect(goal).toBeDefined();
@@ -348,7 +348,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
       });
     }, accessor);
 
-    const out = emitChallengeTransitionsWithDeps(engine, accessor);
+    const out = collectChallengeTransitionsWithDeps(engine, accessor);
     const vis = out.find((e) => e.transition.kind === 'visibility-reveal');
     expect(vis).toBeDefined();
     expect(shape(vis!.deps)).toEqual({

@@ -127,7 +127,7 @@ export interface TickDriverConfig {
 }
 
 /** Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. */
-export interface PhaseHooks {
+export interface PhaseHandlers {
   onEnter?: () => void;
   onExit?: () => void;
   onTick?: (dt: number) => void;
@@ -138,7 +138,7 @@ export interface PhaseHooks {
  * (speed-scaled, capped) elapsed time in variable mode, always `fixedDt` in
  * fixed mode.
  */
-export type TickCallback = (dt: number) => void;
+export type TickHandler = (dt: number) => void;
 
 /**
  * The TickDriver instance returned by {@link createTickDriver}. Exposes
@@ -147,7 +147,7 @@ export type TickCallback = (dt: number) => void;
  * overflow diagnostics.
  */
 export interface TickDriver {
-  onTick(callback: TickCallback): () => void;
+  onTick(handler: TickHandler): () => void;
   /**
    * Run one live tick from an injected `rawDt` — the speed-aware path the timer
    * loop runs internally, exposed for deterministic replay. Applies the EWMA
@@ -173,7 +173,7 @@ export interface TickDriver {
   tickOnce(): void;
   start(): void;
   stop(): void;
-  registerPhase(name: string, hooks: PhaseHooks): void;
+  registerPhase(name: string, handlers: PhaseHandlers): void;
   enterPhase(name: string): void;
   exitPhase(name: string): void;
   readonly running: boolean;
@@ -275,8 +275,8 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };
 
-  const callbacks: TickCallback[] = [];
-  const phases = new Map<string, PhaseHooks>();
+  const callbacks: TickHandler[] = [];
+  const phases = new Map<string, PhaseHandlers>();
   const activePhases = new Set<string>();
   const running = shallowRef(false);
   let intervalId: number | null = null;
@@ -288,7 +288,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   // rest down a slot; the unsubscribe steps this back so none is skipped.
   let tickIndex = -1;
 
-  function onTick(callback: TickCallback): () => void {
+  function onTick(callback: TickHandler): () => void {
     callbacks.push(callback);
     return () => {
       const idx = callbacks.indexOf(callback);

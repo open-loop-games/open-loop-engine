@@ -14,7 +14,7 @@
 // === MODULE SYSTEM ===
 
 import { effectScope } from 'vue';
-import { createTickDriver } from './core/tick-driver';
+import { createTickDriver, type TickHandler } from './core/tick-driver';
 import { createSaveManager } from './core/save-manager';
 import {
   withPersistentContext,
@@ -57,8 +57,7 @@ import type {
   StorageAdapter,
 } from './core/save-manager';
 
-/** Callback invoked every game tick with the elapsed delta time in seconds. */
-export type TickHandler = (dt: number) => void;
+export type { TickHandler } from './core/tick-driver';
 /**
  * Callback invoked before live state is serialized — by `engine.save()`, the
  * autosave, and the save manager's `save` / `saveToSlot` / `exportSave` —
@@ -122,7 +121,7 @@ export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
  */
 export interface EngineContext {
   /** Register a callback invoked every game tick with delta time in seconds */
-  onTick(callback: TickHandler): () => void;
+  onTick(handler: TickHandler): () => void;
   /** Register a callback invoked before live state is serialized; see {@link SaveHandler}. */
   onSave(callback: SaveHandler): void;
   /** Register a callback invoked after a save loads, by any entry point; see {@link LoadHandler}. */

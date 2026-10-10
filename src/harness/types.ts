@@ -15,7 +15,7 @@ import type { Engine } from '@/engine';
  *
  * - `'uniform'` (default) — fixed-tick `advanceTime(tickDelta)` loop, predicate
  *   evaluated each iteration. Content-blind.
- * - `'event'` — walker-visible event-stepping. Builds an {@link createIncrementalSnapshot}
+ * - `'next-event'` — walker-visible event-stepping. Builds an {@link createIncrementalSnapshot}
  *   per iteration, advances by the smallest finite transition distance, falls
  *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`.
  *   Predicate fire-time can be resolved within an advance via
@@ -27,7 +27,7 @@ import type { Engine } from '@/engine';
  *   opaque-predicate transition, the run terminates with `terminated: 'unreachable'`.
  *   Requires an accessor.
  */
-export type RunMode = 'uniform' | 'event' | 'stasis-aware';
+export type RunMode = 'uniform' | 'next-event' | 'stasis-aware';
 
 /**
  * Context passed to a {@link Cell}'s `setup` function. Carries the seed in
@@ -172,7 +172,7 @@ export interface CellAggregate {
   /**
    * Count of runs by termination reason. `predicate + maxSimTime + unreachable`
    * always equals the seed count for a {@link runMatrixUntil} cell.
-   * `unreachable` is non-zero only for runs in `'event'` or
+   * `unreachable` is non-zero only for runs in `'next-event'` or
    * `'stasis-aware'` mode that observed stasis.
    */
   terminationCounts?: { predicate: number; maxSimTime: number; unreachable: number };
@@ -303,9 +303,9 @@ export interface SensitivityConfig<C extends Cell | UntilCell = Cell> {
    * {@link RunMode}.
    */
   mode?: RunMode;
-  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'event'`. */
+  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'event'`. */
+  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }
 
@@ -429,13 +429,13 @@ export interface RunUntilConfig {
    */
   mode?: RunMode;
   /**
-   * Read-side accessor used by `'event'` and `'stasis-aware'` modes to
+   * Read-side accessor used by `'next-event'` and `'stasis-aware'` modes to
    * resolve resource amounts, rates, unlocks, and state paths into walker
    * transition distances. Must read the same state the engine ticks against.
    */
   accessor?: GameStateAccessor;
   /**
-   * In `'event'` mode, resolve predicate fire time by bisecting within the
+   * In `'next-event'` mode, resolve predicate fire time by bisecting within the
    * advance that crossed it. Checkpoints `engine.saveManager.exportSave()`
    * and RNG state before each advance; if the predicate flips during a
    * single advance, binary-searches `dt` in `[0, advanced]` until
@@ -447,7 +447,7 @@ export interface RunUntilConfig {
    */
   bisectTolSec?: number;
   /**
-   * In `'event'` mode, rebuild the snapshot every Nth tick while inside the
+   * In `'next-event'` mode, rebuild the snapshot every Nth tick while inside the
    * stasis fast-tick loop to detect exit-from-stasis (clicks, onTick
    * subscriptions, future `TimedInput`). Default `100`. Trades ~1%
    * worst-case wall against bounded latency-to-resume for event-stepping.
@@ -478,7 +478,7 @@ export interface RunUntilResult {
    * - `'predicate'` — the `until` predicate fired.
    * - `'maxSimTime'` — the sim-time ceiling was reached without the predicate
    *   firing.
-   * - `'unreachable'` — `'event'` or `'stasis-aware'` mode observed
+   * - `'unreachable'` — `'next-event'` or `'stasis-aware'` mode observed
    *   stasis (no walker-visible transition can mechanically push state
    *   forward) before the predicate fired or the ceiling was reached.
    *   Conservative: opaque-predicate transitions block this classification.
@@ -510,7 +510,7 @@ export interface UntilCell {
   buildEngine: (ctx: RunContext) => Engine;
   /**
    * Read-side accessor factory. Required when {@link MatrixUntilConfig.mode}
-   * is `'event'` or `'stasis-aware'` — those modes introspect content
+   * is `'next-event'` or `'stasis-aware'` — those modes introspect content
    * through the walker. Called once per `(cell, seed)` alongside
    * `buildEngine`. The accessor must read the same state the engine ticks
    * against; stasis/event resolution is only as sound as the distances the
@@ -556,14 +556,14 @@ export interface MatrixUntilConfig {
   aggregate?: AggregateOptions;
   /**
    * Run mode applied uniformly to every cell. Defaults to `'uniform'`. When
-   * `'event'` or `'stasis-aware'`, every {@link UntilCell} must supply
+   * `'next-event'` or `'stasis-aware'`, every {@link UntilCell} must supply
    * {@link UntilCell.buildAccessor}; the runner throws at entry otherwise.
    * See {@link RunMode}.
    */
   mode?: RunMode;
-  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'event'`. */
+  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'event'`. */
+  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }
 

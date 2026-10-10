@@ -27,7 +27,7 @@ import type { BeatResult, BeatProbeOptions } from './types';
  *
  * Mode dispatch (`config.mode`, default `'uniform'`):
  * - `'uniform'` — fixed-tick loop, content-blind. Default.
- * - `'event'` — walker-visible event-stepping for live-rate-insufficient legs.
+ * - `'next-event'` — walker-visible event-stepping for live-rate-insufficient legs.
  *   Requires `config.buildAccessor`.
  * - `'stasis-aware'` — per-tick stasis check; terminates with
  *   `counts.unreachable` for seeds the walker confirms cannot fire. Requires

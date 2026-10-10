@@ -4,7 +4,7 @@
  * A probe collects per-beat termination-time distributions from a
  * `seeds`-wide sweep. {@link runBeatProbe} is the single shipped implementation;
  * it dispatches on {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s
- * three loop modes (`'uniform'` / `'event'` / `'stasis-aware'`).
+ * three loop modes (`'uniform'` / `'next-event'` / `'stasis-aware'`).
  */
 
 import type { Engine } from '@/engine';
@@ -35,7 +35,7 @@ export interface Beat {
 /**
  * Per-beat termination-time distribution from a `seeds`-wide sweep.
  *
- * `counts.unreachable` is non-zero only when the probe ran in `'event'` or
+ * `counts.unreachable` is non-zero only when the probe ran in `'next-event'` or
  * `'stasis-aware'` mode and a seed terminated with
  * `RunUntilResult.terminated === 'unreachable'`. Tick-mode probes always
  * report `unreachable: 0` — tick-mode is content-blind.
@@ -99,13 +99,13 @@ export interface BeatProbeOptions {
    */
   tickDelta?: number;
   /**
-   * Run mode. Defaults to `'uniform'`. `'event'` event-steps via the walker
+   * Run mode. Defaults to `'uniform'`. `'next-event'` event-steps via the walker
    * (attacks never-fires cost for live-rate-insufficient legs); `'stasis-aware'`
    * short-circuits unreachable runs with a per-tick walker check. See {@link RunMode}.
    */
   mode?: RunMode;
-  /** See `RunUntilConfig.bisectTolSec`. Ignored when `mode !== 'event'`. */
+  /** See `RunUntilConfig.bisectTolSec`. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See `RunUntilConfig.stasisCheckInterval`. Ignored when `mode !== 'event'`. */
+  /** See `RunUntilConfig.stasisCheckInterval`. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }

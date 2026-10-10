@@ -98,7 +98,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   return engine;
 }
 
-describe("runBeatProbe({mode: 'event'})", () => {
+describe("runBeatProbe({mode: 'next-event'})", () => {
   it('steps by walker-visible event distance and terminates on predicate', () => {
     // Accessor reports gold=0, rate=5, cost=20 → 4s per event.
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
@@ -115,7 +115,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-reachable-${seed}`),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -135,7 +135,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const beat: Beat = { id: 'never-fires', predicate: () => false };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: ({ seed }) => buildEmptyEngine(`event-empty-${seed}`),
       buildAccessor: () => mockAccessor(),
       beats: [beat],
@@ -177,7 +177,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
 
     const beat: Beat = { id: 'flag-fires', predicate: () => flag.fired };
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: () => engine,
       buildAccessor: () => mockAccessor(),
       beats: [beat],
@@ -195,7 +195,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const beat: Beat = { id: 'never-fires', predicate: () => false };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: ({ seed }) => buildOpaqueChallengeEngine(`event-opaque-${seed}`, accessor),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -218,7 +218,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const beat: Beat = { id: 'never-fires', predicate: () => false };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-tie-${seed}`),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -267,7 +267,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const accessor = mockAccessor({ resources: { gold: 100 }, rates: { gold: 0 } });
     const beat: Beat = { id: 'flag-fires', predicate: () => flag.fired };
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
       beats: [beat],
@@ -324,7 +324,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
 
     const tol = 0.5;
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
       beats: [beat],
@@ -383,7 +383,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
       beats: [beat],
@@ -440,7 +440,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: ({ simTime }) => simTime >= threshold,
       maxSimTime: 1000,
       tickDelta: 1,
@@ -461,7 +461,7 @@ describe("runBeatProbe({mode: 'event'})", () => {
     const beat: Beat = { id: 'hard-false', predicate: () => false };
 
     const results = runBeatProbe({
-      mode: 'event',
+      mode: 'next-event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-maxsim-${seed}`),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -523,13 +523,13 @@ function buildGoldEngine(
   return { engine, accessor, gold };
 }
 
-describe("runUntil({mode: 'event'}) time accounting", () => {
+describe("runUntil({mode: 'next-event'}) time accounting", () => {
   it('simulates every second it reports on an engine with the default maxDeltaTime', () => {
     const { engine, accessor, gold } = buildGoldEngine();
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: () => gold() >= 100 - 1e-9,
       maxSimTime: 10_000,
       tickDelta: 0.5,
@@ -546,7 +546,7 @@ describe("runUntil({mode: 'event'}) time accounting", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: () => gold() >= 100 - 1e-9,
       maxSimTime: 50,
       tickDelta: 1,
@@ -563,7 +563,7 @@ describe("runUntil({mode: 'event'}) time accounting", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: () => gold() >= 100 - 1e-9,
       maxSimTime: 50,
       tickDelta: 1,
@@ -582,7 +582,7 @@ describe("runUntil({mode: 'event'}) time accounting", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: () => gold() >= 100 - 1e-9,
       maxSimTime: 50,
       tickDelta: 1,
@@ -652,13 +652,13 @@ function buildDrainedEngine(inflowFrom: number) {
   return { engine, accessor, late };
 }
 
-describe("runUntil({mode: 'event'}) — cumulative-gte under a drain", () => {
+describe("runUntil({mode: 'next-event'}) — cumulative-gte under a drain", () => {
   it('re-predicts a lifetime total that grew while its balance held', () => {
     const { engine, accessor, late } = buildDrainedEngine(0);
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: late,
       maxSimTime: 50,
       tickDelta: 0.25,
@@ -674,7 +674,7 @@ describe("runUntil({mode: 'event'}) — cumulative-gte under a drain", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: late,
       maxSimTime: 50,
       tickDelta: 0.25,
@@ -689,7 +689,7 @@ describe("runUntil({mode: 'event'}) — cumulative-gte under a drain", () => {
   });
 });
 
-describe("runUntil({mode: 'event'}) guards", () => {
+describe("runUntil({mode: 'next-event'}) guards", () => {
   const trackerAnalyzer = () => ({
     id: 'tracker',
     summarize: () => ({ id: 'tracker', metrics: {} }),
@@ -701,7 +701,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
       runUntil({
         engine,
         accessor,
-        mode: 'event',
+        mode: 'next-event',
         until: () => false,
         maxSimTime: 10,
         setup: () => [trackerAnalyzer()],
@@ -715,7 +715,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'event',
+      mode: 'next-event',
       until: () => false,
       maxSimTime: 10,
       setup: () => [],
@@ -728,7 +728,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
     let built: Engine | undefined;
     expect(() =>
       runMatrixUntil({
-        mode: 'event',
+        mode: 'next-event',
         cells: [
           {
             id: 'with-analyzers',
@@ -755,7 +755,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
       runUntil({
         engine,
         accessor,
-        mode: 'event',
+        mode: 'next-event',
         until: () => false,
         maxSimTime: 10,
         bisectTolSec: 0.5,
@@ -771,7 +771,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
       runUntil({
         engine,
         accessor,
-        mode: 'event',
+        mode: 'next-event',
         until: () => gold() >= 10,
         maxSimTime: 200,
         tickDelta: 1,

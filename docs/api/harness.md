@@ -60,7 +60,7 @@ Walk engine state to enumerate addressable choices for solvers / UIs.
 
 ## Probes
 
-Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `event` / `stasis-aware`) inherited from `runMatrixUntil`.
+Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `next-event` / `stasis-aware`) inherited from `runMatrixUntil`.
 
 - `interface Beat` — One beat's predicate + identity. `src/harness/probe/types.ts:19`
 - `interface BeatProbeOptions` — Configuration for runBeatProbe. `src/harness/probe/types.ts:69`
@@ -118,7 +118,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:110`
 - `interface MetricStats` — Numeric summary of one metric across a cell's runs. `src/harness/types.ts:90`
 - `interface RunContext` — Context passed to a Cell's `setup` function. `src/harness/types.ts:37`
-- `type RunMode = 'uniform' | 'event' | 'stasis-aware'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
+- `type RunMode = 'uniform' | 'next-event' | 'stasis-aware'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
 - `interface RunUntilConfig` — Configuration for a single predicate-bounded run. `src/harness/types.ts:395`
 - `interface RunUntilResult` — Result of a predicate-bounded run. `src/harness/types.ts:463`
 - `interface SensitivityConfig<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:275`

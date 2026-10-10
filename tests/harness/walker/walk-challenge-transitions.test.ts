@@ -8,7 +8,7 @@ import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import {
-  emitChallengeTransitionsWithDeps,
+  collectChallengeTransitionsWithDeps,
   walkChallengeTransitions,
 } from '@/harness/walker/walk-challenge-transitions';
 import { runUntil } from '@/harness/run-until';
@@ -509,7 +509,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
 
   it('reports the base resource as the dependency', () => {
     const { engine, accessor } = buildCumulativeEngine();
-    const [entry] = emitChallengeTransitionsWithDeps(engine, accessor);
+    const [entry] = collectChallengeTransitionsWithDeps(engine, accessor);
     expect([...entry.deps.resources]).toEqual(['fragments']);
     expect([...entry.deps.rates]).toEqual(['fragments']);
   });

@@ -83,7 +83,7 @@ function buildTransition(
   };
 }
 
-function emitForEntity(
+function collectForEntity(
   categoryId: string,
   entity: ProducerEntity,
   accessor: GameStateAccessor,
@@ -125,7 +125,7 @@ function emitForEntity(
  *   be called from non-install contexts (probes, devtools, tests).
  */
 export function walkProducerTransitions(engine: Engine, accessor: GameStateAccessor): Transition[] {
-  return emitProducerTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
+  return collectProducerTransitionsWithDeps(engine, accessor).map((entry) => entry.transition);
 }
 
 /**
@@ -139,7 +139,7 @@ export function walkProducerTransitions(engine: Engine, accessor: GameStateAcces
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitProducerTransitionsWithDeps(
+export function collectProducerTransitionsWithDeps(
   engine: Engine,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
@@ -149,7 +149,7 @@ export function emitProducerTransitionsWithDeps(
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
   forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'producers') return;
-    emitForEntity(categoryId, entity as unknown as ProducerEntity, accessor, out);
+    collectForEntity(categoryId, entity as unknown as ProducerEntity, accessor, out);
   });
   return out;
 }
@@ -160,12 +160,12 @@ export function emitProducerTransitionsWithDeps(
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
-export function emitProducerTransitionsForEntity(
+export function collectProducerTransitionsForEntity(
   categoryId: string,
   entity: unknown,
   accessor: GameStateAccessor,
 ): { transition: Transition; deps: TransitionDeps }[] {
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  emitForEntity(categoryId, entity as ProducerEntity, accessor, out);
+  collectForEntity(categoryId, entity as ProducerEntity, accessor, out);
   return out;
 }
