@@ -2,6 +2,33 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.4.0 (2026-10-10)
+
+### ⚠ Breaking changes
+
+* **engine:** persistence autosaves by default, once a load has run (8964d9f)
+
+  with persistence on, `autoSaveInterval` defaults to
+  30000 instead of 0, and autosave writes only after a load has run
+  (`engine.load()` or a save-manager `load` / `importSave`, any result,
+  `not-found` included). In dev, the first tick before any load warns
+  once while autosave is on.
+
+  Migration:
+    // a game that runs its own save timer: move it onto the engine
+    engine.autoSaveInterval = prefs.autoSave ? prefs.intervalMs : 0;
+    // a sim or test engine that must never write: say so
+    createEngine({ gameId, autoSaveInterval: 0, ... });
+    // a game that relied on autosave before loading: call load() after start()
+    engine.start();
+    engine.load();
+
+  Why: a default of 0 made "persistence on" save nothing unless the
+  consumer found a field no guide mentioned. The load gate keeps the new
+  default from writing defaults over a save that a game loads late, for
+  example after a title screen. A warn-only fix was declined: every
+  warning that could flag a missing save is noisy on a real consumer.
+
 ## 0.3.4 (2026-10-07)
 
 ### Features
