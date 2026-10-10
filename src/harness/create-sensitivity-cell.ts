@@ -8,7 +8,7 @@
  * closure drives it.
  *
  * Ordering inside `setup`: build engine from save → apply perturb →
- * build analyzers → auto-subscribe `onCycleFinalize` to any published
+ * build analyzers → auto-subscribe `onRunFinalize` to any published
  * CycleLog → cycle runs to `ticks × tickDelta`.
  *
  * @cluster runners
@@ -52,9 +52,9 @@ export interface CreateSensitivityCellOptions {
    * default is `(engine) => defaultAnalyzerPack(engine)`; omit for
    * metric-free runs.
    *
-   * Analyzers exposing `onCycleFinalize` are auto-subscribed to the engine's
+   * Analyzers exposing `onRunFinalize` are auto-subscribed to the engine's
    * `CycleLogKey` (when any module publishes one) inside `setup()`. No
-   * extra wiring step is required for the cycle-finalize hook.
+   * extra wiring step is required for the run-finalize hook.
    */
   buildAnalyzers?: (engine: Engine) => Analyzer[];
   /**
@@ -148,7 +148,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     const log = engine.tryInject(CycleLogKey);
     if (log) {
       for (const analyzer of analyzers) {
-        const hook = analyzer.onCycleFinalize;
+        const hook = analyzer.onRunFinalize;
         if (hook) loopFinalizeUnsubs.push(log.on('finalized', (entry) => hook(entry)));
       }
     }

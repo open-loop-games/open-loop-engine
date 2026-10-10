@@ -31,7 +31,7 @@ export interface BestReplayDefOptions {
    * Minimum completed cycles before this def becomes applicable.
    * Default: 1 (needs at least one recorded best).
    */
-  minCycles?: number;
+  minRuns?: number;
   /**
    * Minimum best value (the metric's observed cycle delta) before this def
    * becomes applicable — a goal the player must have reached once.
@@ -83,7 +83,7 @@ function ratePerSecond(value: DecimalSource, elapsed: number): Decimal {
  *   // ...
  *   defs: [
  *     createBestReplayDef('gold'),
- *     createBestReplayDef('xp', { minCycles: 3 }),
+ *     createBestReplayDef('xp', { minRuns: 3 }),
  *     // Quiet until the best run has produced 1000 damage.
  *     createBestReplayDef('damage', { id: 'goal:damage', threshold: 1000 }),
  *   ],
@@ -95,7 +95,7 @@ export function createBestReplayDef(
   options?: BestReplayDefOptions,
 ): RecommendationDef {
   const strategyId = options?.id ?? `best-replay:${metricKey}`;
-  const minCycles = options?.minCycles ?? 1;
+  const minRuns = options?.minRuns ?? 1;
   const threshold = options?.threshold;
 
   function getValidEntry(ctx: RecommendationContext): BestOfEntry | null {
@@ -117,7 +117,7 @@ export function createBestReplayDef(
     id: strategyId,
 
     canApply(ctx: RecommendationContext): boolean {
-      if (ctx.cycle.count.value < minCycles) return false;
+      if (ctx.cycle.count.value < minRuns) return false;
       const entry = getValidEntry(ctx);
       if (!entry) return false;
       return threshold == null || Decimal.gte(entry.value, threshold);
@@ -151,7 +151,7 @@ export function createBestReplayDef(
               delta,
             },
           },
-          summary: `Replay best ${metricKey} config (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, cycle #${entry.cycleNumber})`,
+          summary: `Replay best ${metricKey} config (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, run #${entry.runNumber})`,
         },
       };
     },

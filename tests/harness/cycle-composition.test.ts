@@ -9,7 +9,7 @@ function createLoopCounterAnalyzer(): Analyzer {
   let finalized = 0;
   return {
     name: 'cycle-counter',
-    onCycleFinalize: () => {
+    onRunFinalize: () => {
       finalized += 1;
     },
     summarize: (): AnalyzerResult => ({
@@ -20,7 +20,7 @@ function createLoopCounterAnalyzer(): Analyzer {
 }
 
 describe('runMatrix composition with direct CycleLog finalize subscription', () => {
-  it('delivers one onCycleFinalize call per completed cycle, isolated per run', () => {
+  it('delivers one onRunFinalize call per completed cycle, isolated per run', () => {
     // Each cell.tick drives an internally-registered cycle tick handler.
     // The cycle ends every 1 second of elapsed time — at dt=0.05, that's
     // one cycle per 20 ticks. 100 ticks ⇒ 5 finalized cycles per run.
@@ -44,10 +44,10 @@ describe('runMatrix composition with direct CycleLog finalize subscription', () 
             });
             const log = createCycleLog({ cycle, metrics: {} });
             for (const analyzer of analyzers) {
-              const hook = analyzer.onCycleFinalize;
+              const hook = analyzer.onRunFinalize;
               if (hook) log.on('finalized', (entry) => hook(entry));
             }
-            cycle.run();
+            cycle.resume();
             return analyzers;
           },
           tick: (dt) => loopTickHandler?.(dt),

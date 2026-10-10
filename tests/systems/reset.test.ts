@@ -770,7 +770,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     run.step();
     tiers.unlock('basic');
     recs.autoApply.value = true;
-    bestOf.submit({ key: 'gold', value: 5, elapsed: 1, cycleNumber: 0 });
+    bestOf.submit({ key: 'gold', value: 5, elapsed: 1, runNumber: 0 });
 
     createReset({ resetPersistentContexts: ['m'] }).reset();
 

@@ -114,7 +114,7 @@ const cases: Case[] = [
     dirty: (
       cycle: ReturnType<typeof createCycle> & { ticks: ReturnType<typeof createManualTicks> },
     ) => {
-      cycle.run();
+      cycle.resume();
       cycle.ticks.tick(5);
       cycle.end();
       cycle.ticks.tick(2);
@@ -129,7 +129,7 @@ const cases: Case[] = [
     name: 'best-of',
     build: () => createBestOf({ id: 'm-best', metrics: { gold: { mode: 'absolute' } } }),
     dirty: (bestOf: ReturnType<typeof createBestOf>) =>
-      void bestOf.submit({ key: 'gold', value: 5, elapsed: 1, cycleNumber: 0 }),
+      void bestOf.submit({ key: 'gold', value: 5, elapsed: 1, runNumber: 0 }),
   },
   {
     name: 'achievement',

@@ -35,15 +35,15 @@ import { createPredicateResolver, type Predicate } from './gate';
 
 /** Events emitted by a {@link Cycle} instance */
 export interface CycleEvents {
-  /** Fired after `onBeforeRestart` succeeds, before the actual reset executes */
-  beforeRestart: () => void;
+  /** Fired after `onBeforeEnd` succeeds, before the actual reset executes */
+  beforeEnd: () => void;
   /**
    * Fired after the reset completes and elapsed time is zeroed. Pause from a
    * listener to dwell on a results screen until the player restarts with
-   * `run()`; the screen reads state captured in `onBeforeRestart` or a
+   * `resume()`; the screen reads state captured in `onBeforeEnd` or a
    * `CycleLog` entry, because the scope has already reset.
    */
-  afterRestart: () => void;
+  afterEnd: () => void;
 }
 
 /** Options for {@link createCycle} */
@@ -56,19 +56,19 @@ export interface CycleOptions {
 
   /**
    * Automatic termination condition, checked every tick while `running` is true.
-   * When it holds, the cycle ends and the restart sequence fires. A Gate
+   * When it holds, the cycle ends and the end sequence fires. A Gate
    * resolves through the runtime captured at `createCycle` time.
    * Omit for manual-only cycles where the player calls `cycle.end()`.
    *
    * If that restart is declined (see {@link Cycle.end}), the cycle pauses
-   * rather than retrying every tick; call `run()` to resume and re-check.
+   * rather than retrying every tick; call `resume()` to re-check.
    */
   endCondition?: Predicate;
 
   /**
    * A pre-built {@link Reset} to drive instead of constructing one from the
    * shorthand fields below. Takes precedence over `thingsToReset` /
-   * `resetPersistentContexts` / `keep` / `retain` / `onRestart`, which are ignored when
+   * `resetPersistentContexts` / `keep` / `retain` / `onEnd`, which are ignored when
    * this is supplied.
    *
    * Those five fields are shorthand covering the common case, deliberately not
@@ -110,7 +110,7 @@ export interface CycleOptions {
    * Pre-restart hook. Return `false` to cancel the restart.
    * Use for: calculating prestige currency, recording per-cycle stats, skill XP accumulation.
    */
-  onBeforeRestart?: () => boolean | void;
+  onBeforeEnd?: () => boolean | void;
 
   /**
    * Post-restart hook, called after all persistent refs have been reset.
@@ -118,9 +118,9 @@ export interface CycleOptions {
    *
    * It is the Reset's `onReset`, run under the reset's load guard: resource
    * writes here never reach `cumulative` / `best`. Grant earnings in an
-   * `afterRestart` listener, which runs once the reset has returned.
+   * `afterEnd` listener, which runs once the reset has returned.
    */
-  onRestart?: () => void;
+  onEnd?: () => void;
 
   /** Function to register a per-tick callback with the game loop (e.g., `ctx.onTick`) */
   registerTick: RegisterTick;
@@ -129,10 +129,10 @@ export interface CycleOptions {
 /**
  * A cycle instance — the returned object from {@link createCycle}.
  *
- * Call `run()` to start ticking, `pause()` to freeze, `end()` to trigger
- * the restart sequence. Stats (`count`, `bestTime`) and the current run's
+ * Call `resume()` to start ticking, `pause()` to freeze, `end()` to trigger
+ * the end sequence. Stats (`count`, `bestTime`) and the current run's
  * `elapsed` persist across saves; `running` doesn't, so a game that wants a
- * run to carry on after a load calls `run()` from its load hook.
+ * run to carry on after a load calls `resume()` from its load hook.
  */
 export interface Cycle extends ScopedReset {
   /**
@@ -156,8 +156,8 @@ export interface Cycle extends ScopedReset {
   readonly elapsed: Persistent<number>;
 
   /**
-   * Whether the cycle is actively ticking. Controlled by `run()` / `pause()`;
-   * not saved, so a fresh session starts paused until `run()`.
+   * Whether the cycle is actively ticking. Controlled by `resume()` / `pause()`;
+   * not saved, so a fresh session starts paused until `resume()`.
    */
   readonly running: Ref<boolean>;
 
@@ -171,15 +171,15 @@ export interface Cycle extends ScopedReset {
   readonly reset: Reset;
 
   /**
-   * Trigger the restart sequence: `onBeforeRestart` → `beforeRestart` event →
-   * reset → stats → zero elapsed → `afterRestart` event.
+   * Trigger the end sequence: `onBeforeEnd` → `beforeEnd` event →
+   * reset → stats → zero elapsed → `afterEnd` event.
    *
-   * Returns `false` without touching stats, elapsed, or the `afterRestart`
-   * event if the restart is cancelled — either by `onBeforeRestart` returning
+   * Returns `false` without touching stats, elapsed, or the `afterEnd`
+   * event if the restart is cancelled — either by `onBeforeEnd` returning
    * `false`, or by the underlying {@link Reset} declining (its `canReset` gate
-   * or `onBeforeReset` hook). The Reset decides after `beforeRestart` has
-   * already fired, so `onBeforeRestart` is the cancellation point to prefer:
-   * an observer that records on `beforeRestart` (a {@link CycleLog}) will have
+   * or `onBeforeReset` hook). The Reset decides after `beforeEnd` has
+   * already fired, so `onBeforeEnd` is the cancellation point to prefer:
+   * an observer that records on `beforeEnd` (a {@link CycleLog}) will have
    * logged a cycle that then didn't restart. A declined end that
    * `endCondition` triggered also pauses the cycle, so that entry is logged
    * once rather than on every tick; a declined manual call leaves `running`
@@ -188,7 +188,7 @@ export interface Cycle extends ScopedReset {
   end(): boolean;
 
   /** Start or resume ticking (sets `running = true`) */
-  run(): void;
+  resume(): void;
 
   /** Pause ticking (sets `running = false`). Elapsed time and endCondition checks freeze. */
   pause(): void;
@@ -209,28 +209,28 @@ export interface Cycle extends ScopedReset {
  * Create a cycle — a bounded run that ends, resets a scope, and replays.
  *
  * Wires up a {@link Reset} with an elapsed timer, run counter, and best-time
- * tracker. The restart sequence is: `onBeforeRestart` → `beforeRestart` →
- * reset persistent refs → `onRestart` → stats → zero elapsed → `afterRestart`.
+ * tracker. The end sequence is: `onBeforeEnd` → `beforeEnd` →
+ * reset persistent refs → `onEnd` → stats → zero elapsed → `afterEnd`.
  *
  * Fits any lifecycle shaped that way, whatever the game calls it — a loop
  * incremental's run, a prestige layer's reincarnation, a new-game-plus.
  *
  * @param options - Configuration for the cycle (end condition, things to reset, hooks, tick registration)
- * @returns A {@link Cycle} with `run()`, `pause()`, `end()`, stats, and event hooks
+ * @returns A {@link Cycle} with `resume()`, `pause()`, `end()`, stats, and event hooks
  *
  * @example
  * ```ts
  * const run = createCycle({
  *   endCondition: () => Decimal.lte(mana.value, 0),
  *   thingsToReset: [points, upgrades, skills.map(s => s.xp)],
- *   onBeforeRestart() {
+ *   onBeforeEnd() {
  *     // Accumulate permanent skill bonuses before reset
  *     for (const skill of skills) skill.accumulateBonus();
  *   },
  *   registerTick: ctx.onTick,
  * });
  *
- * run.run();  // start ticking
+ * run.resume();  // start ticking
  * // Cycle auto-ends when mana depletes, or call run.end() manually
  * ```
  */
@@ -243,8 +243,8 @@ export function createCycle(options: CycleOptions): Cycle {
     resetPersistentContexts,
     keep,
     retain,
-    onBeforeRestart,
-    onRestart,
+    onBeforeEnd,
+    onEnd,
     registerTick,
   } = options;
 
@@ -269,7 +269,7 @@ export function createCycle(options: CycleOptions): Cycle {
       resetPersistentContexts,
       keep,
       retain,
-      onReset: onRestart,
+      onReset: onEnd,
     });
 
   // `elapsed` is read after the emit and zeroed after that, so a listener
@@ -283,14 +283,14 @@ export function createCycle(options: CycleOptions): Cycle {
   function end(): boolean {
     if (_restarting) return false;
 
-    if (onBeforeRestart) {
-      const result = onBeforeRestart();
+    if (onBeforeEnd) {
+      const result = onBeforeEnd();
       if (result === false) return false;
     }
 
     _restarting = true;
     try {
-      handle.emit('beforeRestart');
+      handle.emit('beforeEnd');
 
       // Read before the reset, which zeroes `elapsed` when it covers the
       // cycle's own context.
@@ -311,7 +311,7 @@ export function createCycle(options: CycleOptions): Cycle {
 
       elapsed.value = 0;
 
-      handle.emit('afterRestart');
+      handle.emit('afterEnd');
 
       return true;
     } finally {
@@ -323,7 +323,7 @@ export function createCycle(options: CycleOptions): Cycle {
     if (!running.value) return;
     elapsed.value += dt;
     // A declined restart leaves the end condition true, so re-trying next
-    // tick would fire `beforeRestart` (and log a phantom cycle) every tick.
+    // tick would fire `beforeEnd` (and log a phantom cycle) every tick.
     if (ended?.read() && !end()) {
       running.value = false;
     }
@@ -340,7 +340,7 @@ export function createCycle(options: CycleOptions): Cycle {
     reset,
     end,
     on: handle.on,
-    run() {
+    resume() {
       running.value = true;
     },
     pause() {

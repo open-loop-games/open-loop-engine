@@ -63,7 +63,7 @@ export interface BestOfMetricDef {
 
   /**
    * When set (and > 0), the stored incumbent's comparison value decays with
-   * age measured in cycle count: every `recencyHalfLifeCycles` cycles that pass
+   * age measured in cycle count: every `recencyHalfLifeRuns` cycles that pass
    * between the incumbent's cycle and the current candidate's cycle halve its
    * effective value. The candidate is always treated as fresh (no decay).
    *
@@ -71,7 +71,7 @@ export interface BestOfMetricDef {
    * fresh runs over calcified high-water marks. Leave unset for classic
    * strict best-of behavior.
    */
-  recencyHalfLifeCycles?: number;
+  recencyHalfLifeRuns?: number;
 }
 
 /** Validity status of a best-of entry */
@@ -88,7 +88,7 @@ export interface BestOfEntry {
   /** Cycle duration in seconds */
   elapsed: number;
   /** Which cycle number produced this */
-  cycleNumber: number;
+  runNumber: number;
   /** When this record was set (Unix ms) */
   timestamp: number;
   /** Consumer-provided opaque configuration snapshot, or undefined */
@@ -103,7 +103,7 @@ interface SerializedBestOfEntry {
   perSecond: string;
   projected: string | undefined;
   elapsed: number;
-  cycleNumber: number;
+  runNumber: number;
   timestamp: number;
   strategySnapshot: State | undefined;
   status: BestOfStatus;
@@ -118,7 +118,7 @@ export interface BestOfCandidate {
   /** Elapsed time in seconds */
   elapsed: number;
   /** Cycle number */
-  cycleNumber: number;
+  runNumber: number;
   /** Override for strategy snapshot (takes precedence over captureStrategy) */
   strategySnapshot?: State;
 }
@@ -171,12 +171,12 @@ export interface BestOf {
    * Runtime override for incumbent recency decay, applied to every metric
    * on this instance. Pass a positive number to enable age-based decay
    * (half-life in cycle count), or `undefined` to clear the override and
-   * fall back to each metric's static `recencyHalfLifeCycles` config.
+   * fall back to each metric's static `recencyHalfLifeRuns` config.
    *
    * Useful for toggling decay at runtime without mutating shared metric
    * config objects.
    */
-  setRecencyHalfLifeCycles(halfLifeCycles: number | undefined): void;
+  setRecencyHalfLifeRuns(halfLifeRuns: number | undefined): void;
   /**
    * Unsubscribe from the CycleLog, if connected. The stored bests stay
    * registered and keep saving, so building one under the same id again takes
@@ -193,18 +193,11 @@ function serialize(entry: BestOfEntry): SerializedBestOfEntry {
     perSecond: entry.perSecond.toString(),
     projected: entry.projected?.toString(),
     elapsed: entry.elapsed,
-    cycleNumber: entry.cycleNumber,
+    runNumber: entry.runNumber,
     timestamp: entry.timestamp,
     strategySnapshot: entry.strategySnapshot,
     status: entry.status,
   };
-}
-
-/** The entry's cycle number, read from `loopNumber` in an entry saved before the rename. */
-function savedCycleNumber(raw: SerializedBestOfEntry): number {
-  return (
-    (raw as { cycleNumber?: number }).cycleNumber ?? (raw as { loopNumber?: number }).loopNumber!
-  );
 }
 
 function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
@@ -213,7 +206,7 @@ function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
     perSecond: new Decimal(raw.perSecond),
     projected: raw.projected != null ? new Decimal(raw.projected) : undefined,
     elapsed: raw.elapsed,
-    cycleNumber: savedCycleNumber(raw),
+    runNumber: raw.runNumber,
     timestamp: raw.timestamp,
     strategySnapshot: raw.strategySnapshot,
     status: raw.status,
@@ -285,7 +278,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
   }
 
   function resolveRecencyHalfLife(def: BestOfMetricDef): number | undefined {
-    return recencyOverride !== undefined ? recencyOverride : def.recencyHalfLifeCycles;
+    return recencyOverride !== undefined ? recencyOverride : def.recencyHalfLifeRuns;
   }
 
   /**
@@ -299,12 +292,12 @@ export function createBestOf(options: BestOfOptions): BestOf {
     existingVal: Decimal,
     existingCycle: number,
     candidateCycle: number,
-    halfLifeCycles: number | undefined,
+    halfLifeRuns: number | undefined,
   ): Decimal {
-    if (halfLifeCycles === undefined || halfLifeCycles <= 0) return existingVal;
-    const ageCycles = candidateCycle - existingCycle;
-    if (ageCycles <= 0) return existingVal;
-    const factor = Math.pow(0.5, ageCycles / halfLifeCycles);
+    if (halfLifeRuns === undefined || halfLifeRuns <= 0) return existingVal;
+    const ageRuns = candidateCycle - existingCycle;
+    if (ageRuns <= 0) return existingVal;
+    const factor = Math.pow(0.5, ageRuns / halfLifeRuns);
     return new Decimal(Decimal.mul(existingVal, factor));
   }
 
@@ -322,7 +315,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
       perSecond: Decimal;
       projected: Decimal | undefined;
       elapsed: number;
-      cycleNumber: number;
+      runNumber: number;
     },
     existing: SerializedBestOfEntry,
     metricDef: BestOfMetricDef,
@@ -338,8 +331,8 @@ export function createBestOf(options: BestOfOptions): BestOf {
     );
     const existingVal = applyRecencyDecay(
       rawExistingVal,
-      savedCycleNumber(existing),
-      candidate.cycleNumber,
+      existing.runNumber,
+      candidate.runNumber,
       resolveRecencyHalfLife(metricDef),
     );
 
@@ -380,7 +373,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
           perSecond: candidatePS,
           projected,
           elapsed: candidate.elapsed,
-          cycleNumber: candidate.cycleNumber,
+          runNumber: candidate.runNumber,
         },
         existing,
         metricDef,
@@ -397,7 +390,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
       perSecond: candidatePS,
       projected,
       elapsed: candidate.elapsed,
-      cycleNumber: candidate.cycleNumber,
+      runNumber: candidate.runNumber,
       timestamp: Date.now(),
       strategySnapshot: snapshot,
       status: 'valid',
@@ -414,7 +407,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
         key: delta.key,
         value: delta.delta,
         elapsed: logEntry.elapsed,
-        cycleNumber: logEntry.cycleNumber,
+        runNumber: logEntry.runNumber,
       });
     }
   }
@@ -461,8 +454,8 @@ export function createBestOf(options: BestOfOptions): BestOf {
       store.value = {};
     },
 
-    setRecencyHalfLifeCycles(halfLifeCycles: number | undefined) {
-      recencyOverride = halfLifeCycles;
+    setRecencyHalfLifeRuns(halfLifeRuns: number | undefined) {
+      recencyOverride = halfLifeRuns;
     },
 
     dispose() {

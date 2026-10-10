@@ -213,10 +213,10 @@ describe('in-install sensitivity integration', () => {
     source.stop();
   });
 
-  it('createSensitivityCell auto-binds onCycleFinalize when the engine publishes a CycleLog', () => {
+  it('createSensitivityCell auto-binds onRunFinalize when the engine publishes a CycleLog', () => {
     // Receipt for the workbench dead-wire fix: defaultAnalyzerPack ships
-    // createCycleFinalizeTracker when CycleLogKey is published, and the cell
-    // setup auto-subscribes any onCycleFinalize hook via log.on('finalized', ...).
+    // createRunFinalizeAnalyzer when CycleLogKey is published, and the cell
+    // setup auto-subscribes any onRunFinalize hook via log.on('finalized', ...).
     // Before the auto-bind, this metric was silently zero in every workbench run.
     const TICKS_PER_LOOP = 5;
     const LOOPS = 3;
@@ -246,7 +246,7 @@ describe('in-install sensitivity integration', () => {
             addResource(gold, 1);
             loopTickHandler?.(dt);
           });
-          cycle.run();
+          cycle.resume();
         },
       };
     }
@@ -273,7 +273,7 @@ describe('in-install sensitivity integration', () => {
 
     const result = runMatrix({ cells: [cell], seeds: [1] });
 
-    const loopsMetric = result.cells[0]!.aggregate.metrics['cycle-finalize.cycles'];
+    const loopsMetric = result.cells[0]!.aggregate.metrics['run-finalize.runs'];
     expect(loopsMetric).toBeDefined();
     expect(loopsMetric!.avg).toBe(LOOPS);
 

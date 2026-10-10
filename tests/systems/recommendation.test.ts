@@ -510,7 +510,7 @@ describe('createRecommendationSystem', () => {
   // Cycle wiring
   // ==========================================================================
 
-  it('evaluates automatically on cycle afterRestart', () => {
+  it('evaluates automatically on cycle afterEnd', () => {
     const { tick, gold, cycle, cycleLog, bestOf } = createTestStack('wire-auto');
     const received: Recommendation[] = [];
 
@@ -527,7 +527,7 @@ describe('createRecommendationSystem', () => {
     recs.on('recommended', (rec) => received.push(rec));
 
     // Run a cycle cycle: start → tick → end
-    cycle.run();
+    cycle.resume();
     addResource(gold, bn(50));
     tick.tick(1);
     cycle.end();
@@ -553,7 +553,7 @@ describe('createRecommendationSystem', () => {
     recs.on('recommended', (rec) => received.push(rec));
     recs.dispose();
 
-    cycle.run();
+    cycle.resume();
     addResource(gold, bn(50));
     tick.tick(1);
     cycle.end();

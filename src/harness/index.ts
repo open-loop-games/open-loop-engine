@@ -14,7 +14,7 @@ export type { CreateEngineFromSaveOptions } from './create-engine';
 export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
 export {
   createResourcePeakTracker,
-  createCycleFinalizeTracker,
+  createRunFinalizeAnalyzer,
   defaultAnalyzerPack,
   createSeriesTracker,
   seriesAnalyzerPack,

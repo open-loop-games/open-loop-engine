@@ -178,8 +178,8 @@ export interface Analyzer {
    * system, so analyzers wired directly to `log.on('finalized', ...)` outside
    * a harness cell also satisfy this hook.
    */
-  onCycleFinalize?(entry: {
-    cycleNumber: number;
+  onRunFinalize?(entry: {
+    runNumber: number;
     elapsed: number;
     timestamp: number;
     deltas: ReadonlyArray<{

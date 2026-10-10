@@ -3,12 +3,12 @@ import { addResource, createResource } from '@/core/resource';
 import { runHeadless } from '@/core/headless';
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog, type CycleLogEntry } from '@/systems/cycle-log';
-import { createCycleFinalizeTracker } from '@/harness/analyzers/cycle-finalize';
+import { createRunFinalizeAnalyzer } from '@/harness/analyzers/run-finalize';
 
-describe('createCycleFinalizeTracker', () => {
-  it('records cycle count + last-cycle deltas when wired via log.on(finalized, ...)', () => {
+describe('createRunFinalizeAnalyzer', () => {
+  it('records run count + last-cycle deltas when wired via log.on(finalized, ...)', () => {
     const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-    const tracker = createCycleFinalizeTracker();
+    const tracker = createRunFinalizeAnalyzer();
 
     let loopTickHandler: ((dt: number) => void) | null = null;
     let loopCount = 0;
@@ -27,8 +27,8 @@ describe('createCycleFinalizeTracker', () => {
 
     const result = runHeadless({
       setup: () => {
-        log.on('finalized', (entry) => tracker.onCycleFinalize?.(entry));
-        cycle.run();
+        log.on('finalized', (entry) => tracker.onRunFinalize?.(entry));
+        cycle.resume();
         return [tracker];
       },
       tick: (dt) => {
@@ -40,13 +40,13 @@ describe('createCycleFinalizeTracker', () => {
     });
 
     const metrics = result.analyzerResults[0]!.metrics;
-    expect(metrics.cycles).toBe(3);
+    expect(metrics.runs).toBe(3);
     expect(metrics['last.gold.end']).toBe(30);
     expect(metrics['last.gold.delta']).toBe(30);
   });
 
-  it('reports cycles: 0 and no per-key metrics when no CycleLog is bound', () => {
-    const tracker = createCycleFinalizeTracker();
+  it('reports runs: 0 and no per-key metrics when no CycleLog is bound', () => {
+    const tracker = createRunFinalizeAnalyzer();
 
     const result = runHeadless({
       setup: () => [tracker],
@@ -55,14 +55,14 @@ describe('createCycleFinalizeTracker', () => {
     });
 
     const metrics = result.analyzerResults[0]!.metrics;
-    expect(metrics.cycles).toBe(0);
-    expect(Object.keys(metrics)).toEqual(['cycles']);
+    expect(metrics.runs).toBe(0);
+    expect(Object.keys(metrics)).toEqual(['runs']);
   });
 
-  it('onStart resets cycle count between sequential runs of the same instance', () => {
-    const tracker = createCycleFinalizeTracker();
+  it('onStart resets run count between sequential runs of the same instance', () => {
+    const tracker = createRunFinalizeAnalyzer();
     const fakeEntry: CycleLogEntry = {
-      cycleNumber: 0,
+      runNumber: 0,
       elapsed: 0,
       timestamp: 0,
       deltas: [],
@@ -71,12 +71,12 @@ describe('createCycleFinalizeTracker', () => {
     };
 
     tracker.onStart?.();
-    tracker.onCycleFinalize!(fakeEntry);
-    tracker.onCycleFinalize!(fakeEntry);
-    expect(tracker.summarize().metrics.cycles).toBe(2);
+    tracker.onRunFinalize!(fakeEntry);
+    tracker.onRunFinalize!(fakeEntry);
+    expect(tracker.summarize().metrics.runs).toBe(2);
 
     tracker.onStart?.();
-    tracker.onCycleFinalize!(fakeEntry);
-    expect(tracker.summarize().metrics.cycles).toBe(1);
+    tracker.onRunFinalize!(fakeEntry);
+    expect(tracker.summarize().metrics.runs).toBe(1);
   });
 });

@@ -69,7 +69,7 @@ export interface CycleLogDelta {
 /** A single cycle's recorded outcome */
 export interface CycleLogEntry {
   /** Cycle number at finalize time (cycle.count before increment) */
-  cycleNumber: number;
+  runNumber: number;
   /** Elapsed time in seconds at finalize time */
   elapsed: number;
   timestamp: number;
@@ -88,7 +88,7 @@ export interface CycleLogEvents {
 /**
  * A CycleLog instance — the returned object from {@link createCycleLog}.
  *
- * Subscribes to a Cycle's `beforeRestart`/`afterRestart` events to record
+ * Subscribes to a Cycle's `beforeEnd`/`afterEnd` events to record
  * per-cycle metric deltas in a reactive ring buffer.
  */
 export interface CycleLog {
@@ -98,7 +98,7 @@ export interface CycleLog {
   on: Emittable<CycleLogEvents>['on'];
   /**
    * Attach a named annotation to the current cycle's context.
-   * Context resets each cycle (on afterRestart) and is captured into the
+   * Context resets each cycle (on afterEnd) and is captured into the
    * finalized entry. Calling with the same key overwrites the previous value.
    */
   annotate(key: string, value: unknown): void;
@@ -213,7 +213,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
     });
 
     onScopeDispose(
-      cycle.on('beforeRestart', () => {
+      cycle.on('beforeEnd', () => {
         const deltas: CycleLogDelta[] = [];
         for (const [key, metric] of Object.entries(metrics)) {
           const start = startSnapshot[key] ?? Decimal.dZero;
@@ -222,7 +222,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
         }
 
         const entry: CycleLogEntry = {
-          cycleNumber: cycle.count.value,
+          runNumber: cycle.count.value,
           elapsed: cycle.elapsed.value,
           timestamp: Date.now(),
           deltas,
@@ -237,7 +237,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
     );
 
     onScopeDispose(
-      cycle.on('afterRestart', () => {
+      cycle.on('afterEnd', () => {
         takeSnapshot();
         currentAnnotations = {};
       }),

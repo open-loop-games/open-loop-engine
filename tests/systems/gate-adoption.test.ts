@@ -733,7 +733,7 @@ describe('Predicate fields — every arm reaches the system', () => {
         endCondition: pointsGte(3),
         registerTick: ticks.registerTick,
       });
-      cycle.run();
+      cycle.resume();
       return { api, cycle };
     });
 

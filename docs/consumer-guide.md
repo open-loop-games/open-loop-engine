@@ -174,7 +174,7 @@ So adding a resource, upgrade, producer, or category entry inside a module scope
 
 A system or category in `thingsToReset` resets what it owns — its own persistent context, or each entry's per-definition context — and nothing it merely names: a purchasable's cost resource, a producer's output, a ref passed as `limit` or `visibility`. List those explicitly when the reset should clear them.
 
-Resource writes inside `onReset`, `afterReset` listeners and a cycle's `onRestart` run under the load guard and never reach `cumulative` / `best` — including a reset run from inside another's hooks, since the guard holds until the outermost reset ends. Grant prestige currency after `reset()` returns, or in `afterRestart`.
+Resource writes inside `onReset`, `afterReset` listeners and a cycle's `onEnd` run under the load guard and never reach `cumulative` / `best` — including a reset run from inside another's hooks, since the guard holds until the outermost reset ends. Grant prestige currency after `reset()` returns, or in `afterEnd`.
 
 Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved scope, evaluated at reset time. Refs in `keep` survive verbatim; refs in `retain` are snapshot before the wipe, run through the supplied transform, and written back after:
 

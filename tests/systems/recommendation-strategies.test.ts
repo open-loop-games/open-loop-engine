@@ -42,7 +42,7 @@ function createPopulatedStack(
 
   /** Run a cycle cycle: set gold, tick, end. String gold allows values past the double range. */
   function runCycle(goldAmount: number | string, elapsed: number) {
-    cycle.run();
+    cycle.resume();
     addResource(gold, bn(goldAmount));
     tick.tick(elapsed);
     cycle.end();
@@ -104,12 +104,12 @@ describe('createBestReplayDef', () => {
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
-  it('minCycles option gates applicability on cycle count', () => {
+  it('minRuns option gates applicability on cycle count', () => {
     const { runCycle, buildContext } = createPopulatedStack('br-mincycles');
 
     runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold', { minCycles: 3 });
+    const strategy = createBestReplayDef('gold', { minRuns: 3 });
     // cycle.count is 1 after one completed cycle
     expect(strategy.canApply(buildContext())).toBe(false);
 

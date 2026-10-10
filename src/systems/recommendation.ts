@@ -25,7 +25,7 @@
  * @see ./recommendation-strategies.ts for built-in def factories
  * @see {@link createRuleAdvisor} for the intra-session sibling — same advisory
  *   shape, but re-fired on consumer signals (rule edits, encounter changes)
- *   instead of `cycle.afterRestart`, and emits a ranked list of independent
+ *   instead of `cycle.afterEnd`, and emits a ranked list of independent
  *   suggestions rather than one winning configuration
  */
 
@@ -167,7 +167,7 @@ export interface RecommendationSystemOptions {
    */
   id?: string;
 
-  /** The Cycle whose `afterRestart` event triggers evaluation */
+  /** The Cycle whose `afterEnd` event triggers evaluation */
   cycle: Cycle;
 
   /** The CycleLog providing per-cycle metric history */
@@ -254,7 +254,7 @@ export interface RecommendationSystem {
    *
    * Returns the produced {@link Recommendation} or `null` if no def applied
    * or the BestOf resolver returned `null` (no active context).
-   * Called automatically on `cycle.on('afterRestart')` and can also be called manually.
+   * Called automatically on `cycle.on('afterEnd')` and can also be called manually.
    */
   evaluate(): Recommendation | null;
 
@@ -271,7 +271,7 @@ export interface RecommendationSystem {
   on: Emittable<RecommendationSystemEvents>['on'];
 
   /**
-   * Unsubscribe from the cycle's `afterRestart` event. The stored
+   * Unsubscribe from the cycle's `afterEnd` event. The stored
    * recommendation and `autoApply` stay registered and keep saving, so building
    * a system under the same id again takes a new engine.
    */
@@ -475,7 +475,7 @@ export function createRecommendationSystem(
   }
 
   // --- Cycle wiring ---
-  const unsubAfterRestart = cycle.on('afterRestart', () => {
+  const unsubAfterEnd = cycle.on('afterEnd', () => {
     evaluate();
   });
 
@@ -514,7 +514,7 @@ export function createRecommendationSystem(
     on: handle.on,
 
     dispose() {
-      unsubAfterRestart();
+      unsubAfterEnd();
     },
   };
   return attachPersistentContextReset(system, contextId);

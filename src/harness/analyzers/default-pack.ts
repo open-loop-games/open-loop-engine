@@ -7,7 +7,7 @@
  * - One {@link createResourcePeakTracker} per entry in the engine's
  *   {@link ResourceRegistryKey} — the per-engine resource registry,
  *   auto-populated by every `createResource()` call during install/connect.
- * - A {@link createCycleFinalizeTracker} iff the engine has a canonical
+ * - A {@link createRunFinalizeAnalyzer} iff the engine has a canonical
  *   CycleLog published via {@link CycleLogKey}. Games without a cycle cadence
  *   skip it automatically.
  *
@@ -20,7 +20,7 @@ import type { Analyzer } from '@/primitives/types';
 import type { Engine } from '@/engine';
 import { ResourceRegistryKey } from '@/core/registries';
 import { CycleLogKey } from '@/systems/cycle-log';
-import { createCycleFinalizeTracker } from './cycle-finalize';
+import { createRunFinalizeAnalyzer } from './run-finalize';
 import { createResourcePeakTracker } from './resource-peak';
 
 /**
@@ -46,7 +46,7 @@ export function defaultAnalyzerPack(engine: Engine): Analyzer[] {
     createResourcePeakTracker(entry.resource),
   );
   if (engine.tryInject(CycleLogKey) !== undefined) {
-    pack.push(createCycleFinalizeTracker());
+    pack.push(createRunFinalizeAnalyzer());
   }
   return pack;
 }

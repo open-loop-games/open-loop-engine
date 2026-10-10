@@ -135,7 +135,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
       weights: { a: 3, b: 2, c: 1 },
       scorer: (id, w) => w[id] ?? 0,
       capacity: 2,
-      mode: 'fresh-each-cycle',
+      mode: 'fresh-each-pick',
     });
 
     const first = picker.pick();
@@ -156,7 +156,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
       weights: () => weights,
       scorer: (id, w) => w[id] ?? 0,
       capacity: 1,
-      mode: 'fresh-each-cycle',
+      mode: 'fresh-each-pick',
     });
 
     expect(picker.pick().active).toEqual(['a']);
@@ -171,7 +171,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
       weights: { a: 1 },
       scorer: (id, w) => w[id] ?? 0,
       isCompleted,
-      mode: 'fresh-each-cycle',
+      mode: 'fresh-each-pick',
     });
     picker.pick();
     picker.pick();
@@ -189,7 +189,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
       scorer: (id, w) => w[id] ?? 0,
       capacity: 2,
       slot,
-      mode: 'fresh-each-cycle',
+      mode: 'fresh-each-pick',
     });
 
     picker.pick();

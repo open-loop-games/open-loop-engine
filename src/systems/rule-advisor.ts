@@ -12,7 +12,7 @@
  * **Time-horizon split (vs {@link createRecommendationSystem}):** this primitive
  * covers the *intra-session* shape (re-fired on rule edits, encounter changes,
  * or any caller-defined signal). RecommendationSystem covers the *inter-cycle*
- * shape (re-fired by `cycle.on('afterRestart')`, picks one configuration to apply
+ * shape (re-fired by `cycle.on('afterEnd')`, picks one configuration to apply
  * next cycle). Both surfaces ship; both stay advisory by design.
  *
  * **When to reach for this:**
@@ -226,7 +226,7 @@ export interface RuleAdvisor<TPayload> {
    * cycle-end ones).
    *
    * Idempotent over identical history + dismissal state. Caller decides when
-   * to invoke (cycle afterRestart, rule edits, encounter changes — the
+   * to invoke (cycle afterEnd, rule edits, encounter changes — the
    * canonical triggers).
    */
   reevaluate(trigger?: string): readonly Suggestion<TPayload>[];
@@ -317,7 +317,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * });
  *
  * // Caller-side trigger wiring with trigger labels:
- * cycle.on('afterRestart', () => advisor.reevaluate('cycle'));
+ * cycle.on('afterEnd', () => advisor.reevaluate('cycle'));
  * watch(() => ruleSets.value, () => { advisor.reset(); advisor.reevaluate('edit'); });
  *
  * // Inferred-acceptance only counts edit-triggered drops:

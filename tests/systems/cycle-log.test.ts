@@ -145,17 +145,17 @@ describe('createCycleLog', () => {
     expect(log.history.value[1].deltas[0].delta.eq(120)).toBe(true);
   });
 
-  it('cycleNumber is cycle.count before increment', () => {
+  it('runNumber is cycle.count before increment', () => {
     const { registerTick } = createManualTicks();
 
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    cycle.end(); // count was 0 at beforeRestart
-    cycle.end(); // count was 1 at beforeRestart
+    cycle.end(); // count was 0 at beforeEnd
+    cycle.end(); // count was 1 at beforeEnd
 
-    expect(log.history.value[0].cycleNumber).toBe(0);
-    expect(log.history.value[1].cycleNumber).toBe(1);
+    expect(log.history.value[0].runNumber).toBe(0);
+    expect(log.history.value[1].runNumber).toBe(1);
   });
 
   it('elapsed reflects cycle.elapsed at finalize time', () => {
@@ -164,7 +164,7 @@ describe('createCycleLog', () => {
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    cycle.run();
+    cycle.resume();
     tick(3.5);
     cycle.end();
 
@@ -185,7 +185,7 @@ describe('createCycleLog', () => {
 
     expect(log.history.value).toHaveLength(3);
     // Oldest remaining should be cycle 2 (cycles 0 and 1 pruned)
-    expect(log.history.value[0].cycleNumber).toBe(2);
+    expect(log.history.value[0].runNumber).toBe(2);
   });
 
   it('pinned entries survive pruning', () => {
@@ -201,7 +201,7 @@ describe('createCycleLog', () => {
     cycle.end(); // entry 3 — should prune unpinned, keeping pinned + 2 newest unpinned
 
     // Pinned entry (cycle 0) + 2 most recent unpinned
-    expect(log.history.value.some((e) => e.cycleNumber === 0 && e.pinned)).toBe(true);
+    expect(log.history.value.some((e) => e.runNumber === 0 && e.pinned)).toBe(true);
     const unpinned = log.history.value.filter((e) => !e.pinned);
     expect(unpinned).toHaveLength(2);
   });
@@ -217,12 +217,12 @@ describe('createCycleLog', () => {
     cycle.end(); // entry 1
     cycle.end(); // entry 2 — pinned entry survives
 
-    expect(log.history.value.some((e) => e.cycleNumber === 0)).toBe(true);
+    expect(log.history.value.some((e) => e.runNumber === 0)).toBe(true);
 
     log.unpin(0);
     cycle.end(); // entry 3 — now entry 0 can be pruned
 
-    expect(log.history.value.some((e) => e.cycleNumber === 0)).toBe(false);
+    expect(log.history.value.some((e) => e.runNumber === 0)).toBe(false);
   });
 
   it('pin/unpin out-of-bounds are no-ops', () => {
@@ -264,7 +264,7 @@ describe('createCycleLog', () => {
     expect(received[0].deltas[0].delta.eq(42)).toBe(true);
   });
 
-  it('finalized fires before afterRestart snapshot', () => {
+  it('finalized fires before afterEnd snapshot', () => {
     const { registerTick } = createManualTicks();
     beginPersistentContext('ll-finalize-order');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -275,7 +275,7 @@ describe('createCycleLog', () => {
 
     let goldAtFinalize: Decimal | null = null;
     log.on('finalized', () => {
-      // At finalize time, gold hasn't been reset yet (beforeRestart fires before reset)
+      // At finalize time, gold hasn't been reset yet (beforeEnd fires before reset)
       goldAtFinalize = new Decimal(gold.value);
     });
 
@@ -411,11 +411,11 @@ describe('createCycleLog', () => {
   // Analyzer wiring via log.on('finalized', ...)
   // ==========================================================================
 
-  it('log.on(finalized, ...) delivers one onCycleFinalize call per cycle over a headless run', () => {
+  it('log.on(finalized, ...) delivers one onRunFinalize call per cycle over a headless run', () => {
     const entries: CycleLogEntry[] = [];
     const loopAnalyzer: Analyzer = {
       name: 'cycle-counter',
-      onCycleFinalize: (entry) => entries.push(entry as CycleLogEntry),
+      onRunFinalize: (entry) => entries.push(entry as CycleLogEntry),
       summarize: () => ({
         name: 'cycle-counter',
         metrics: { cycles: entries.length },
@@ -439,7 +439,7 @@ describe('createCycleLog', () => {
 
     const cycle = createCycle({ thingsToReset: [gold], registerTick });
     const log = createCycleLog({ cycle, metrics: { gold } });
-    log.on('finalized', (entry) => loopAnalyzer.onCycleFinalize?.(entry));
+    log.on('finalized', (entry) => loopAnalyzer.onRunFinalize?.(entry));
 
     // Drive 3 cycles: each tick adds gold, every 2 ticks end a cycle
     const result = runHeadless({
@@ -452,7 +452,7 @@ describe('createCycleLog', () => {
     });
 
     expect(entries).toHaveLength(3);
-    expect(entries[0].cycleNumber).toBe(0);
+    expect(entries[0].runNumber).toBe(0);
     expect(entries[0].deltas[0].delta.eq(20)).toBe(true);
     expect(tickCount).toBe(6);
     expect(result.analyzerResults[0].metrics.cycles).toBe(3);
@@ -463,14 +463,14 @@ describe('createCycleLog', () => {
     const entries: CycleLogEntry[] = [];
     const analyzer: Analyzer = {
       name: 'x',
-      onCycleFinalize: (entry) => entries.push(entry as CycleLogEntry),
+      onRunFinalize: (entry) => entries.push(entry as CycleLogEntry),
       summarize: () => ({ name: 'x', metrics: {} }),
     };
 
     const { registerTick } = createManualTicks();
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
-    const dispose = log.on('finalized', (entry) => analyzer.onCycleFinalize?.(entry));
+    const dispose = log.on('finalized', (entry) => analyzer.onRunFinalize?.(entry));
 
     cycle.end();
     expect(entries).toHaveLength(1);

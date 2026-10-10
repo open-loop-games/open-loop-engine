@@ -118,7 +118,7 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
    * Under `'fresh-each-cycle'` with a Slot, `slot.deselect` fires its
    * `onDeselect` hook for every previously-active candidate each cycle.
    */
-  mode?: 'persistent' | 'fresh-each-cycle';
+  mode?: 'persistent' | 'fresh-each-pick';
 
   /**
    * Profiling hook. Fires once per `pick()` call AFTER the slot has been
@@ -248,7 +248,7 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
   function pick(context: TContext): GoalPickResult<TCandidate> {
     const swept: TCandidate[] = [];
 
-    if (mode === 'fresh-each-cycle') {
+    if (mode === 'fresh-each-pick') {
       const currentActive = [...readActive()];
       for (const id of currentActive) {
         if (removeSelection(id)) swept.push(id);

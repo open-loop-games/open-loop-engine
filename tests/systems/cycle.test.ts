@@ -29,17 +29,17 @@ describe('createCycle', () => {
     expect(cycle.running.value).toBe(false);
   });
 
-  it('a grant in an afterRestart listener counts toward cumulative; one in onRestart does not', () => {
+  it('a grant in an afterEnd listener counts toward cumulative; one in onEnd does not', () => {
     const { registerTick } = createManualTicks();
     beginPersistentContext('cycle-grant');
     const pp = createResource(bn(0), { id: 'Prestige', displayName: 'Prestige' });
     endPersistentContext();
     const cycle = createCycle({
       thingsToReset: [],
-      onRestart: () => addResource(pp, 5),
+      onEnd: () => addResource(pp, 5),
       registerTick,
     });
-    cycle.on('afterRestart', () => addResource(pp, 10));
+    cycle.on('afterEnd', () => addResource(pp, 10));
 
     cycle.end();
 
@@ -47,16 +47,16 @@ describe('createCycle', () => {
     expect(Decimal.eq(pp.cumulative!.value, 10)).toBe(true);
   });
 
-  it('pausing in an afterRestart listener dwells until run() is called', () => {
+  it('pausing in an afterEnd listener dwells until run() is called', () => {
     const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({
       thingsToReset: [],
       registerTick,
       endCondition: () => cycle.elapsed.value >= 3,
     });
-    cycle.on('afterRestart', () => cycle.pause());
+    cycle.on('afterEnd', () => cycle.pause());
 
-    cycle.run();
+    cycle.resume();
     tick(3);
 
     expect(cycle.count.value).toBe(1);
@@ -69,7 +69,7 @@ describe('createCycle', () => {
     expect(cycle.elapsed.value).toBe(0);
     expect(cycle.count.value).toBe(1);
 
-    cycle.run();
+    cycle.resume();
     tick(1);
     expect(cycle.elapsed.value).toBeCloseTo(1);
   });
@@ -77,7 +77,7 @@ describe('createCycle', () => {
   it('a zero-length cycle does not record a best time', () => {
     const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({ thingsToReset: [], registerTick });
-    cycle.run();
+    cycle.resume();
     tick(3);
     cycle.end();
     cycle.end(); // a double-clicked restart, no tick in between
@@ -91,9 +91,9 @@ describe('createCycle', () => {
     const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
     const cycle = createCycle({ reset, endCondition: () => true, registerTick });
     let beforeRestarts = 0;
-    cycle.on('beforeRestart', () => beforeRestarts++);
+    cycle.on('beforeEnd', () => beforeRestarts++);
 
-    cycle.run();
+    cycle.resume();
     for (let i = 0; i < 5; i++) tick(1);
 
     expect(beforeRestarts).toBe(1);
@@ -105,7 +105,7 @@ describe('createCycle', () => {
     const { registerTick } = createManualTicks();
     const reset = createReset({ thingsToReset: [], onBeforeReset: () => false });
     const cycle = createCycle({ reset, registerTick });
-    cycle.run();
+    cycle.resume();
 
     expect(cycle.end()).toBe(false);
     expect(cycle.running.value).toBe(true);
@@ -117,7 +117,7 @@ describe('createCycle', () => {
       thingsToReset: [],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
     tick(0.5);
     tick(0.5);
     expect(cycle.elapsed.value).toBeCloseTo(1.0);
@@ -126,7 +126,7 @@ describe('createCycle', () => {
   it('elapsed survives a save round trip, so a reloaded run keeps timing from where it was', () => {
     const { registerTick, tick } = createManualTicks();
     const cycle = createCycle({ id: 'cycle-elapsed-save', thingsToReset: [], registerTick });
-    cycle.run();
+    cycle.resume();
     tick(5);
 
     const refs = getAllPersistentRefs();
@@ -145,7 +145,7 @@ describe('createCycle', () => {
     const cycle = withPersistentContext('cycle-run-clock', () =>
       createCycle({ thingsToReset: [], registerTick }),
     );
-    cycle.run();
+    cycle.resume();
     tick(3);
     cycle.end();
     tick(2);
@@ -162,7 +162,7 @@ describe('createCycle', () => {
     const cycle = withPersistentContext('cycle-self-reset', () =>
       createCycle({ resetPersistentContexts: ['cycle-self-reset'], registerTick }),
     );
-    cycle.run();
+    cycle.resume();
     tick(3);
     cycle.end();
     expect(cycle.bestTime.value).toBe(3);
@@ -175,7 +175,7 @@ describe('createCycle', () => {
       thingsToReset: [],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
     tick(1);
     cycle.pause();
     tick(1);
@@ -188,7 +188,7 @@ describe('createCycle', () => {
       thingsToReset: [],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
     tick(5);
     const result = cycle.end();
     expect(result).toBe(true);
@@ -202,7 +202,7 @@ describe('createCycle', () => {
       thingsToReset: [],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
 
     // First cycle: 10 seconds
     tick(10);
@@ -241,7 +241,7 @@ describe('createCycle', () => {
     expect(level.value).toBe(1);
   });
 
-  it('calls onBeforeRestart before reset and onRestart after', () => {
+  it('calls onBeforeEnd before reset and onEnd after', () => {
     const { registerTick } = createManualTicks();
     const order: string[] = [];
 
@@ -252,12 +252,12 @@ describe('createCycle', () => {
 
     const cycle = createCycle({
       thingsToReset: [pts],
-      onBeforeRestart: () => {
+      onBeforeEnd: () => {
         order.push('before');
         // pts should still have its value here
         expect(pts.value.eq(100)).toBe(true);
       },
-      onRestart: () => {
+      onEnd: () => {
         order.push('after');
         // pts should be reset by now
         expect(pts.value.eq(0)).toBe(true);
@@ -268,7 +268,7 @@ describe('createCycle', () => {
     expect(order).toEqual(['before', 'after']);
   });
 
-  it('cancels end() when onBeforeRestart returns false', () => {
+  it('cancels end() when onBeforeEnd returns false', () => {
     const { registerTick } = createManualTicks();
     beginPersistentContext('cycle-cancel-test');
     const pts = createResource(bn(0), { id: 'Points', displayName: 'Points' });
@@ -277,7 +277,7 @@ describe('createCycle', () => {
 
     const cycle = createCycle({
       thingsToReset: [pts],
-      onBeforeRestart: () => false,
+      onBeforeEnd: () => false,
       registerTick,
     });
     const result = cycle.end();
@@ -300,7 +300,7 @@ describe('createCycle', () => {
       thingsToReset: [xp],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
 
     // Tick without triggering end
     tick(1);
@@ -329,7 +329,7 @@ describe('createCycle', () => {
       thingsToReset: [],
       registerTick,
     });
-    cycle.run();
+    cycle.resume();
     tick(1);
     expect(cycle.elapsed.value).toBeCloseTo(1);
 
@@ -347,8 +347,8 @@ describe('createCycle', () => {
       registerTick,
     });
 
-    const unsub1 = cycle.on('beforeRestart', () => events.push('before'));
-    const unsub2 = cycle.on('afterRestart', () => events.push('after'));
+    const unsub1 = cycle.on('beforeEnd', () => events.push('before'));
+    const unsub2 = cycle.on('afterEnd', () => events.push('after'));
 
     cycle.end();
     expect(events).toEqual(['before', 'after']);
@@ -375,7 +375,7 @@ describe('createCycle with resetPersistentContexts', () => {
       registerTick,
     });
 
-    cycle.run();
+    cycle.resume();
     tick(1);
     cycle.end();
 
@@ -516,12 +516,12 @@ describe('createCycle — reset composition', () => {
     });
 
     let restarts = 0;
-    cycle.on('afterRestart', () => restarts++);
+    cycle.on('afterEnd', () => restarts++);
 
-    cycle.run();
+    cycle.resume();
     tick(3);
 
-    // Declined: no count, no bestTime, no afterRestart, elapsed untouched,
+    // Declined: no count, no bestTime, no afterEnd, elapsed untouched,
     // and the scope is left alone.
     expect(cycle.end()).toBe(false);
     expect(cycle.count.value).toBe(0);
@@ -542,7 +542,7 @@ describe('createCycle — reset composition', () => {
 });
 
 describe('createCycle — listener re-entrancy', () => {
-  it('refuses a restart re-entered from a beforeRestart listener', () => {
+  it('refuses a restart re-entered from a beforeEnd listener', () => {
     const { registerTick, tick } = createManualTicks();
     beginPersistentContext('cycle-reentry');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -555,15 +555,15 @@ describe('createCycle — listener re-entrancy', () => {
 
     let nested: boolean | undefined;
     let fired = false;
-    cycle.on('beforeRestart', () => {
+    cycle.on('beforeEnd', () => {
       if (fired) return;
       fired = true;
       nested = cycle.end();
     });
     let afterRestarts = 0;
-    cycle.on('afterRestart', () => afterRestarts++);
+    cycle.on('afterEnd', () => afterRestarts++);
 
-    cycle.run();
+    cycle.resume();
     tick(7);
     expect(cycle.end()).toBe(true);
 
@@ -584,7 +584,7 @@ describe('createCycle — listener re-entrancy', () => {
     const cycle = createCycle({ id: 'cycle-reentry-inner', reset, registerTick });
 
     addResource(gold, 500);
-    cycle.run();
+    cycle.resume();
     tick(3);
 
     expect(cycle.end()).toBe(true);

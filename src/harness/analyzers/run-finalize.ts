@@ -1,10 +1,10 @@
 /**
- * Cycle-finalize tracker — implements {@link Analyzer.onCycleFinalize} to
+ * Cycle-finalize tracker — implements {@link Analyzer.onRunFinalize} to
  * record per-cycle aggregate metrics. One of the two default analyzers in
  * {@link defaultAnalyzerPack}.
  *
  * Reports:
- * - `cycles` — total number of finalized cycles observed during the run
+ * - `runs` — total number of finalized runs observed during the run
  * - `last.{key}.end` — end value of each tracked metric at the most recent cycle
  * - `last.{key}.delta` — net change of each tracked metric on the most recent cycle
  *
@@ -13,34 +13,34 @@
  *
  * Auto-bound by {@link createSensitivityCell} when the per-run engine
  * publishes a CycleLog via `CycleLogKey`. Outside a harness cell, subscribe
- * directly: `log.on('finalized', entry => tracker.onCycleFinalize?.(entry))`.
+ * directly: `log.on('finalized', entry => tracker.onRunFinalize?.(entry))`.
  */
 
 import type { Analyzer, AnalyzerResult } from '@/primitives/types';
 import { Decimal } from '@/primitives/decimal';
 
-type FinalizeEntry = Parameters<NonNullable<Analyzer['onCycleFinalize']>>[0];
+type FinalizeEntry = Parameters<NonNullable<Analyzer['onRunFinalize']>>[0];
 
 /**
  * Create an {@link Analyzer} that counts finalized cycles and snapshots the
  * most recent cycle's deltas into the summary.
  */
-export function createCycleFinalizeTracker(): Analyzer {
-  let cycles = 0;
+export function createRunFinalizeAnalyzer(): Analyzer {
+  let runs = 0;
   let lastEntry: FinalizeEntry | null = null;
 
   return {
-    name: 'cycle-finalize',
+    name: 'run-finalize',
     onStart() {
-      cycles = 0;
+      runs = 0;
       lastEntry = null;
     },
-    onCycleFinalize(entry) {
-      cycles += 1;
+    onRunFinalize(entry) {
+      runs += 1;
       lastEntry = entry;
     },
     summarize(): AnalyzerResult {
-      const metrics: Record<string, number> = { cycles };
+      const metrics: Record<string, number> = { runs };
       if (lastEntry) {
         for (const delta of lastEntry.deltas) {
           metrics[`last.${delta.key}.end`] = new Decimal(delta.end).toNumber();
@@ -48,7 +48,7 @@ export function createCycleFinalizeTracker(): Analyzer {
         }
       }
       return {
-        name: 'cycle-finalize',
+        name: 'run-finalize',
         metrics,
       };
     },

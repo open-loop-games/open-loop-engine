@@ -48,7 +48,7 @@ describe('defaultAnalyzerPack', () => {
     engine.stop();
   });
 
-  it('appends a cycle-finalize tracker when a CycleLog is published via CycleLogKey', () => {
+  it('appends a run-finalize analyzer when a CycleLog is published via CycleLogKey', () => {
     const mod: EngineModule = {
       id: 'game',
       install(ctx) {
@@ -68,12 +68,12 @@ describe('defaultAnalyzerPack', () => {
 
     const pack = defaultAnalyzerPack(engine);
     const names = pack.map((a) => a.name);
-    expect(names).toContain('cycle-finalize');
+    expect(names).toContain('run-finalize');
     expect(names).toContain('resource-peak:gold');
     engine.stop();
   });
 
-  it('omits the cycle-finalize tracker when no CycleLog is published', () => {
+  it('omits the run-finalize analyzer when no CycleLog is published', () => {
     const engine = testEngine('pack-no-looplog');
     engine.use(
       resourceModule('gold-mod', () => createResource(0, { id: 'gold', displayName: 'gold' })),
