@@ -16,7 +16,7 @@ import { seedRNG } from '@/primitives/rng';
 import { runUntil } from './run-until';
 import { aggregateUntilCell } from './aggregate';
 import { createWorkPlan } from './work-plan';
-import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult } from './types';
+import type { CellResult, MatrixUntilOptions, MatrixUntilResult, RunUntilResult } from './types';
 
 /**
  * Sync cartesian run over `cells × seeds` where each run terminates on a
@@ -30,7 +30,7 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  * has read it (or after a throwing run). A cell's `teardown` replaces that
  * dispose — pass a no-op to keep the engines alive past the sweep.
  *
- * @param config - {@link MatrixUntilConfig} — until-cells, seeds, shared
+ * @param options - {@link MatrixUntilOptions} — until-cells, seeds, shared
  *   predicate, max sim-time ceiling, optional callbacks + aggregate opts.
  * @returns {@link MatrixUntilResult} with per-cell {@link CellResult}.
  *
@@ -55,10 +55,10 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  * result.cells[0].aggregate.terminationTime!.avg;
  * ```
  */
-export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
-  const mode = config.mode ?? 'uniform';
+export function runMatrixUntil(options: MatrixUntilOptions): MatrixUntilResult {
+  const mode = options.mode ?? 'uniform';
   if (mode !== 'uniform') {
-    for (const cell of config.cells) {
+    for (const cell of options.cells) {
       if (!cell.buildAccessor) {
         throw new Error(
           `runMatrixUntil: mode "${mode}" requires UntilCell.buildAccessor on every cell (missing on "${cell.id}")`,
@@ -66,9 +66,9 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
       }
     }
   }
-  const plan = createWorkPlan(config);
-  const perCellRuns: RunUntilResult[][] = config.cells.map(() => []);
-  const cellResults: (CellResult<RunUntilResult> | null)[] = config.cells.map(() => null);
+  const plan = createWorkPlan(options);
+  const perCellRuns: RunUntilResult[][] = options.cells.map(() => []);
+  const cellResults: (CellResult<RunUntilResult> | null)[] = options.cells.map(() => null);
 
   for (const item of plan) {
     const { cell, seed } = item;
@@ -82,15 +82,15 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
       try {
         result = runUntil({
           engine,
-          until: config.until,
-          maxSimTime: config.maxSimTime,
+          until: options.until,
+          maxSimTime: options.maxSimTime,
           tickDelta: cell.tickDelta,
           setup: analyzers ? () => analyzers(engine, ctx) : undefined,
           seed,
           mode,
           accessor,
-          bisectTolSec: config.bisectTolSec,
-          stasisCheckInterval: config.stasisCheckInterval,
+          bisectTolSec: options.bisectTolSec,
+          stasisCheckInterval: options.stasisCheckInterval,
         });
       } finally {
         // buildEngine returns a *started* engine (contract); with the default
@@ -100,7 +100,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
         engine.stop?.();
       }
       perCellRuns[item.cellIdx].push(result);
-      config.onRunComplete?.(item, result);
+      options.onRunComplete?.(item, result);
     } finally {
       if (cell.teardown) cell.teardown(engine, ctx);
       // `dispose?.` tolerates lightweight test fakes.
@@ -109,22 +109,22 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
 
     if (
       cellResults[item.cellIdx] === null &&
-      perCellRuns[item.cellIdx].length === config.seeds.length
+      perCellRuns[item.cellIdx].length === options.seeds.length
     ) {
       const runs = perCellRuns[item.cellIdx];
       const cellResult: CellResult<RunUntilResult> = {
         id: cell.id,
         runs,
-        aggregate: aggregateUntilCell(runs, config.aggregate),
+        aggregate: aggregateUntilCell(runs, options.aggregate),
       };
       cellResults[item.cellIdx] = cellResult;
-      config.onCellComplete?.(cellResult);
+      options.onCellComplete?.(cellResult);
     }
   }
 
   // Cells with zero seeds never fire onCellComplete — synthesize an empty
   // result so the MatrixUntilResult shape stays predictable.
-  const cells: CellResult<RunUntilResult>[] = config.cells.map(
+  const cells: CellResult<RunUntilResult>[] = options.cells.map(
     (cell, i) =>
       cellResults[i] ?? {
         id: cell.id,

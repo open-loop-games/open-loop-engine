@@ -9,7 +9,7 @@
  * (multiplier-like knobs).
  */
 
-import type { TunerConfig, TunerResult } from './types';
+import type { TunerOptions, TunerResult } from './types';
 
 /**
  * Binary-search 1-D tuner. Two calibration runs at `lo` and `hi` auto-detect
@@ -21,7 +21,7 @@ import type { TunerConfig, TunerResult } from './types';
  * If the iteration ceiling fires first, the closest-observed sample is
  * returned.
  *
- * @param config - {@link TunerConfig} — search bracket, target fire time,
+ * @param options - {@link TunerOptions} — search bracket, target fire time,
  *   sampler, optional tolerance + iteration ceiling.
  * @returns {@link TunerResult} — the converged value, its sampled fire time,
  *   the iteration count, and the auto-detected direction.
@@ -38,10 +38,10 @@ import type { TunerConfig, TunerResult } from './types';
  * // result.value ≈ the multiplier that makes beat-2 fire at 10:00
  * ```
  */
-export function bisectTuner(config: TunerConfig): TunerResult {
-  const { lo, hi, targetSec, sampler } = config;
-  const tolSec = config.tolSec ?? 1;
-  const maxIters = config.maxIters ?? 22;
+export function bisectTuner(options: TunerOptions): TunerResult {
+  const { lo, hi, targetSec, sampler } = options;
+  const tolSec = options.tolSec ?? 1;
+  const maxIters = options.maxIters ?? 22;
 
   const tLo = sampler(lo);
   const tHi = sampler(hi);

@@ -61,7 +61,7 @@ export interface ScalarFieldDef {
 export interface VectorFieldDef<Dims extends string = string> {
   kind: 'vector';
   dimensions: readonly Dims[];
-  dimensionConfig?: Partial<Record<Dims, { initial?: number; min?: number; max?: number }>>;
+  dimensionOptions?: Partial<Record<Dims, { initial?: number; min?: number; max?: number }>>;
 }
 
 /**
@@ -301,7 +301,7 @@ function clampScalar(schema: ScalarFieldDef, v: number): number {
 }
 
 function clampVectorDim(schema: VectorFieldDef, dim: string, v: number): number {
-  const cfg = schema.dimensionConfig?.[dim];
+  const cfg = schema.dimensionOptions?.[dim];
   return Math.min(cfg?.max ?? Infinity, Math.max(cfg?.min ?? -Infinity, v));
 }
 
@@ -355,13 +355,13 @@ function buildVectorField<Dims extends string>(
 
   const refs = new Map<Dims, Persistent<number>>();
   for (const dim of schema.dimensions) {
-    const cfg = schema.dimensionConfig?.[dim];
+    const cfg = schema.dimensionOptions?.[dim];
     // Clamp the authored initial to the dim's range (set() clamps; a raw seed would not).
     const initial = clampForDim(dim, override?.initialPerDim?.[dim] ?? cfg?.initial ?? 0);
     refs.set(dim, persistent<number>(initial, { id: `${fieldName}/${dim}` }));
   }
   function get(dim: Dims): number {
-    return refs.get(dim)?.value ?? schema.dimensionConfig?.[dim]?.initial ?? 0;
+    return refs.get(dim)?.value ?? schema.dimensionOptions?.[dim]?.initial ?? 0;
   }
   function set(dim: Dims, value: number): void {
     const r = refs.get(dim);

@@ -49,7 +49,7 @@ export interface WaypointSnapshot<T> {
 }
 
 /** Configuration for {@link runWaypointProbe}. */
-export interface WaypointProbeConfig<T> {
+export interface WaypointProbeOptions<T> {
   /**
    * Build a fresh, started engine for each `(waypoint × seed)` run, as
    * {@link UntilCell.buildEngine}.
@@ -106,19 +106,19 @@ export interface WaypointProbeConfig<T> {
  * }
  * ```
  */
-export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[] {
-  const seeds = config.seeds ?? [0];
-  const pad = config.maxSimTimePad ?? 60;
+export function runWaypointProbe<T>(options: WaypointProbeOptions<T>): WaypointSnapshot<T>[] {
+  const seeds = options.seeds ?? [0];
+  const pad = options.maxSimTimePad ?? 60;
   const out: WaypointSnapshot<T>[] = [];
-  for (const waypoint of config.waypoints) {
+  for (const waypoint of options.waypoints) {
     let engine!: Engine;
     runMatrixUntil({
       cells: [
         {
           id: waypoint.id,
-          tickDelta: config.tickDelta,
-          buildEngine: (ctx) => (engine = config.buildEngine(ctx)),
-          teardown: config.teardown,
+          tickDelta: options.tickDelta,
+          buildEngine: (ctx) => (engine = options.buildEngine(ctx)),
+          teardown: options.teardown,
         },
       ],
       seeds,
@@ -130,7 +130,7 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
           seed,
           snapshotSimTime: result.elapsedSimulated,
           reachedTarget: result.terminated === 'predicate',
-          snapshot: config.inspect(engine),
+          snapshot: options.inspect(engine),
         }),
     });
   }

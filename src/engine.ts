@@ -1,7 +1,7 @@
 /**
  * Engine assembly — the module-system façade that composes core + systems into
  * a runnable game: {@link createEngine}, {@link EngineContext},
- * {@link EngineModule}, {@link EngineConfig}, and the built-in injection keys.
+ * {@link EngineModule}, {@link EngineOptions}, and the built-in injection keys.
  *
  * Lives in its own module rather than the root barrel so the harness can import
  * the engine builder without a back-edge through `@/index` — which re-exports
@@ -227,7 +227,7 @@ export interface ModDef {
  * other field tunes tick cadence, save behavior, mod support, or persistence
  * namespacing.
  */
-export interface EngineConfig {
+export interface EngineOptions {
   gameId: string;
   intervalRate?: number;
   maxDeltaTime?: number;
@@ -400,7 +400,7 @@ export interface Engine {
 
   /**
    * Live interval in milliseconds between autosaves. Mirrors
-   * {@link EngineConfig.autoSaveInterval} but is mutable at runtime —
+   * {@link EngineOptions.autoSaveInterval} but is mutable at runtime —
    * setting it re-arms the autosave timer with the new period (or stops
    * it when set to 0). No effect when `persistence: false` was passed to
    * {@link createEngine}. Symmetric to `engine.tickDriver.intervalRate`.
@@ -415,7 +415,7 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
  *
- * @param config - Engine configuration including game ID, TickDriver settings, persistence
+ * @param options - Engine configuration including game ID, TickDriver settings, persistence
  *   options, and available mods
  * @returns An engine instance that accepts modules via `use()`, then `start()` to begin
  *   ticking. Exposes the TickDriver, save manager, and mod selection. With persistence
@@ -430,14 +430,14 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  * engine.load(); // hydrates them; a first run reports `not-found`
  * ```
  */
-export function createEngine(config: EngineConfig): Engine {
+export function createEngine(options: EngineOptions): Engine {
   const modules: EngineModule[] = [];
   const saveCallbacks: SaveHandler[] = [];
   const loadCallbacks: LoadHandler[] = [];
-  const registeredMods: ModDef[] = [...(config.mods ?? [])];
+  const registeredMods: ModDef[] = [...(options.mods ?? [])];
   let selectedModId: string | null = null;
 
-  const timers = config.timerProvider ?? {
+  const timers = options.timerProvider ?? {
     setInterval: globalThis.setInterval.bind(globalThis),
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };
@@ -447,30 +447,30 @@ export function createEngine(config: EngineConfig): Engine {
   // deterministically across sessions, and is evicted by `dispose()`'s
   // `deletePersistenceNamespace`. Outside the namespace it would strand in the
   // default bucket — excluded from its own save (open-loop-engine#9).
-  const tickDriver = withPersistenceNamespace(config.persistenceNamespace, () =>
+  const tickDriver = withPersistenceNamespace(options.persistenceNamespace, () =>
     createTickDriver({
-      intervalRate: config.intervalRate,
-      maxDeltaTime: config.maxDeltaTime,
-      speedMultiplier: config.speedMultiplier,
-      tickMode: config.tickMode,
-      fixedDt: config.fixedDt,
-      maxTicksPerInterval: config.maxTicksPerInterval,
-      onTicksOverflow: config.onTicksOverflow,
-      onDeltaOverflow: config.onDeltaOverflow,
-      timerProvider: config.timerProvider,
+      intervalRate: options.intervalRate,
+      maxDeltaTime: options.maxDeltaTime,
+      speedMultiplier: options.speedMultiplier,
+      tickMode: options.tickMode,
+      fixedDt: options.fixedDt,
+      maxTicksPerInterval: options.maxTicksPerInterval,
+      onTicksOverflow: options.onTicksOverflow,
+      onDeltaOverflow: options.onDeltaOverflow,
+      timerProvider: options.timerProvider,
       persistentContextId: 'tick-driver',
     }),
   );
   const saveManager =
-    config.persistence !== false
+    options.persistence !== false
       ? createSaveManager({
-          gameId: config.gameId,
-          saveVersion: config.saveVersion,
-          migrations: config.saveMigrations,
-          storageAdapter: config.storageAdapter,
-          maxSlots: config.maxSaveSlots,
-          persistenceNamespace: config.persistenceNamespace,
-          strictValidation: config.strictValidation,
+          gameId: options.gameId,
+          saveVersion: options.saveVersion,
+          migrations: options.saveMigrations,
+          storageAdapter: options.storageAdapter,
+          maxSlots: options.maxSaveSlots,
+          persistenceNamespace: options.persistenceNamespace,
+          strictValidation: options.strictValidation,
         })
       : undefined;
 
@@ -478,7 +478,7 @@ export function createEngine(config: EngineConfig): Engine {
   // Autosave holds until a load has run: before it, live state is defaults,
   // and writing them would overwrite the save a later load() would read.
   let loadRan = false;
-  let autoSaveInterval = config.autoSaveInterval ?? (saveManager ? DEFAULT_AUTO_SAVE_INTERVAL : 0);
+  let autoSaveInterval = options.autoSaveInterval ?? (saveManager ? DEFAULT_AUTO_SAVE_INTERVAL : 0);
   let installed = false;
   let disposed = false;
 
@@ -529,7 +529,7 @@ export function createEngine(config: EngineConfig): Engine {
         offFirstTick();
         if (!loadRan && autoSaveInterval > 0 && isDev()) {
           console.warn(
-            `[engine] "${config.gameId}" ticked before load(): call engine.load() after start() ` +
+            `[engine] "${options.gameId}" ticked before load(): call engine.load() after start() ` +
               '(a first run reports not-found). Autosave holds until a load has run.',
           );
         }
@@ -685,8 +685,8 @@ export function createEngine(config: EngineConfig): Engine {
                 withResourceRegistry(resourceRegistry, () =>
                   withEngineCategories(engineCategories, () =>
                     withTuningRegistries(tuningRegistries, () =>
-                      withGameStateAccessor(config.accessor, () =>
-                        withPersistenceNamespace(config.persistenceNamespace, () => {
+                      withGameStateAccessor(options.accessor, () =>
+                        withPersistenceNamespace(options.persistenceNamespace, () => {
                           for (const mod of sorted) {
                             withPersistentContext(mod.id, () => mod.install(sharedContext));
                           }
@@ -730,7 +730,7 @@ export function createEngine(config: EngineConfig): Engine {
       // Drop the in-memory persistent-context registry for this engine's
       // namespace so a fresh engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.
-      deletePersistenceNamespace(config.persistenceNamespace);
+      deletePersistenceNamespace(options.persistenceNamespace);
       disposed = true;
     },
 

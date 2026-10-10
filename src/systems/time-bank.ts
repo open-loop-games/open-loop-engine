@@ -45,7 +45,7 @@ import { createPredicateResolver, type Predicate } from './gate';
 // === TIME BANK ===
 
 /** Configuration for {@link createTimeBank}. */
-export interface TimeBankConfig {
+export interface TimeBankOptions {
   /**
    * Save context for the reservoir. Defaults to `${module}/time-bank` inside a
    * module; pass one when a module holds several banks (per-subsystem reserves).
@@ -93,7 +93,7 @@ export interface TimeBank {
  * consumer policy and spent through {@link createBankedAcceleration},
  * {@link burstDischarge}, or a bespoke consumer drain.
  *
- * @param config - Earn efficiency, cap, and persistent-context id.
+ * @param options - Earn efficiency, cap, and persistent-context id.
  * @returns The reservoir with `deposit`/`withdraw` and the persistent
  *   `banked` ref.
  *
@@ -104,9 +104,9 @@ export interface TimeBank {
  * bank.deposit(offlineSeconds);
  * ```
  */
-export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
-  const { depositEfficiency = 1, capacity: cap } = config;
-  const bankContextId = resolveSystemPersistentContextId(config.id, 'time-bank');
+export function createTimeBank(options: TimeBankOptions = {}): TimeBank {
+  const { depositEfficiency = 1, capacity: cap } = options;
+  const bankContextId = resolveSystemPersistentContextId(options.id, 'time-bank');
   const banked = withPersistentContext(bankContextId, () =>
     persistent<number>(0, { id: 'banked' }),
   );
@@ -137,7 +137,7 @@ export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
 // === BANKED ACCELERATION ===
 
 /** Configuration for {@link createBankedAcceleration}. */
-export interface BankedAccelerationConfig {
+export interface BankedAccelerationOptions {
   /** The driver whose `speedMultiplier` the spend loop owns while spending. */
   tickDriver: TickDriver;
   /** The reservoir the spend loop drains. */
@@ -199,7 +199,7 @@ export interface BankedAcceleration {
  * depletion. The wrapper owns `tickDriver.speedMultiplier` while a spend is
  * running; the baseline is captured at `startSpending` and restored on stop.
  *
- * @param config - Driver + bank wiring, spend multiplier, drain accounting,
+ * @param options - Driver + bank wiring, spend multiplier, drain accounting,
  *   optional gate and live-overflow banking.
  * @returns Start/stop controls, the transient `isSpending` flag, and
  *   `dispose()`.
@@ -217,8 +217,8 @@ export interface BankedAcceleration {
  * accel.startSpending();        // player toggles the boost
  * ```
  */
-export function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration {
-  const { tickDriver, bank, spendMultiplier, withdrawMode = 'excess', when: gate } = config;
+export function createBankedAcceleration(options: BankedAccelerationOptions): BankedAcceleration {
+  const { tickDriver, bank, spendMultiplier, withdrawMode = 'excess', when: gate } = options;
   const spendGate = createPredicateResolver().adopt(gate, true, 'createBankedAcceleration gate');
 
   const isSpending = ref(false);
@@ -263,7 +263,7 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
   });
 
   let restoreOverflow: (() => void) | undefined;
-  if (config.depositLiveOverflow) {
+  if (options.depositLiveOverflow) {
     const prior = tickDriver.onDeltaOverflow;
     tickDriver.onDeltaOverflow = (droppedSeconds) => {
       prior?.(droppedSeconds);

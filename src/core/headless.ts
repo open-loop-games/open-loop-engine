@@ -8,7 +8,7 @@ import { beginTraceTick, endTraceTick } from './trace';
 import { beginProfileTick, endProfileTick } from './profiler';
 
 /** Configuration for a synchronous headless simulation run. */
-export interface HeadlessConfig {
+export interface HeadlessOptions {
   /**
    * Called once before the tick loop — initialize state, register resources,
    * etc. Returns the analyzer list for this run; metric-free runs return `[]`.
@@ -49,10 +49,10 @@ export interface HeadlessResult {
  * buffers per tick, and returns each analyzer's summary at the end, after
  * which `teardown` runs — also when the run throws after `setup` returned.
  */
-export function runHeadless(config: HeadlessConfig): HeadlessResult {
-  const { setup, tick, ticks } = config;
-  const tickDelta = config.tickDelta ?? 0.05;
-  if (config.seed !== undefined) seedRNG(config.seed);
+export function runHeadless(options: HeadlessOptions): HeadlessResult {
+  const { setup, tick, ticks } = options;
+  const tickDelta = options.tickDelta ?? 0.05;
+  if (options.seed !== undefined) seedRNG(options.seed);
   const analyzers: Analyzer[] = setup() ?? [];
   try {
     for (const a of analyzers) a.onStart?.();
@@ -75,6 +75,6 @@ export function runHeadless(config: HeadlessConfig): HeadlessResult {
       analyzerSummaries,
     };
   } finally {
-    config.teardown?.();
+    options.teardown?.();
   }
 }

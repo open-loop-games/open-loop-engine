@@ -11,4 +11,4 @@
 export { runBeatProbe } from './tick';
 export { runWaypointProbe } from './waypoint';
 export type { Beat, BeatResult, BeatProbeOptions } from './types';
-export type { Waypoint, WaypointSnapshot, WaypointProbeConfig } from './waypoint';
+export type { Waypoint, WaypointSnapshot, WaypointProbeOptions } from './waypoint';

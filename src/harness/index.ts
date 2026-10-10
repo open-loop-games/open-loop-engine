@@ -38,10 +38,10 @@ export type {
   BeatProbeOptions,
   Waypoint,
   WaypointSnapshot,
-  WaypointProbeConfig,
+  WaypointProbeOptions,
 } from './probe';
 export { bisectTuner } from './solve';
-export type { TunerConfig, TunerResult, Tuner } from './solve';
+export type { TunerOptions, TunerResult, Tuner } from './solve';
 export { createTransitionSnapshot, createIncrementalSnapshot } from './walker';
 export type {
   Transition,
@@ -142,7 +142,7 @@ export type {
 } from '../systems';
 export type {
   Engine,
-  EngineConfig,
+  EngineOptions,
   EngineContext,
   EngineEvents,
   EngineModule,

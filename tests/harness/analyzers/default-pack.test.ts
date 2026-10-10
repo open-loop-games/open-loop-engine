@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine } from '@/index';
-import type { EngineModule, EngineConfig } from '@/index';
+import type { EngineModule, EngineOptions } from '@/index';
 import { createResource } from '@/core/resource';
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog, CycleLogKey } from '@/systems/cycle-log';
@@ -21,7 +21,7 @@ function resourceModule(id: string, create: () => void): EngineModule {
 // shared persistent-context store doesn't collide across tests when reusing
 // module ids.
 let nsCounter = 0;
-function testEngine(gameId: string, overrides: Partial<EngineConfig> = {}) {
+function testEngine(gameId: string, overrides: Partial<EngineOptions> = {}) {
   return createEngine({
     gameId,
     persistence: false,

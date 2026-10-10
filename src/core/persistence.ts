@@ -440,7 +440,7 @@ export function withPersistentContext<T>(id: string, fn: () => T): T {
  * @param namespace - Namespace string, or undefined to run unnamespaced
  * @param fn - Block to execute
  * @internal Consumer code should not call this directly — set
- *   {@link EngineConfig.persistenceNamespace} instead.
+ *   {@link EngineOptions.persistenceNamespace} instead.
  */
 export function withPersistenceNamespace<T>(namespace: string | undefined, fn: () => T): T {
   const prev = activeNamespace;

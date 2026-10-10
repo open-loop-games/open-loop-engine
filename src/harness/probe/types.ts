@@ -104,8 +104,8 @@ export interface BeatProbeOptions {
    * short-circuits unreachable runs with a per-tick walker check. See {@link RunMode}.
    */
   mode?: RunMode;
-  /** See `RunUntilConfig.bisectTolSec`. Ignored when `mode !== 'next-event'`. */
+  /** See `RunUntilOptions.bisectTolSec`. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See `RunUntilConfig.stasisCheckInterval`. Ignored when `mode !== 'next-event'`. */
+  /** See `RunUntilOptions.stasisCheckInterval`. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }

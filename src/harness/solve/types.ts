@@ -13,7 +13,7 @@
  * function — a single 1-D parameter maps to a fire time, and the tuner
  * searches for the value that lands on `targetSec`.
  */
-export interface TunerConfig {
+export interface TunerOptions {
   /** Low end of the search bracket. Sampled once for direction detection. */
   lo: number;
   /** High end of the search bracket. Sampled once for direction detection. */
@@ -56,4 +56,4 @@ export interface TunerResult {
  * scope-push-based iteration, all sharing this signature so the caller
  * picks strategy at the import site.
  */
-export type Tuner = (config: TunerConfig) => TunerResult;
+export type Tuner = (config: TunerOptions) => TunerResult;

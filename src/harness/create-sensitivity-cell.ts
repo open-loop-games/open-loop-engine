@@ -15,7 +15,7 @@
  */
 
 import type { Analyzer } from '@/primitives/types';
-import type { Engine, EngineConfig, EngineModule } from '@/engine';
+import type { Engine, EngineOptions, EngineModule } from '@/engine';
 import { CycleLogKey } from '@/systems/cycle-log';
 import { createEngineFromSave } from './create-engine';
 import type { Cell, RunContext } from './types';
@@ -72,8 +72,8 @@ export interface CreateSensitivityCellOptions {
    */
   persistenceNamespace?: string;
   /** Forwarded to `createEngineFromSave` — same restrictions apply. */
-  config?: Omit<
-    EngineConfig,
+  engineOptions?: Omit<
+    EngineOptions,
     'gameId' | 'persistence' | 'persistenceNamespace' | 'storageAdapter' | 'autoSaveInterval'
   >;
 }
@@ -122,7 +122,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     ticks,
     tickDelta,
     persistenceNamespace: namespace = `workbench-${name}`,
-    config,
+    engineOptions: config,
   } = options;
 
   let currentEngine: Engine | undefined;
@@ -141,7 +141,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
       saveText,
       modules: modules(),
       persistenceNamespace: `${namespace}-${runCounter++}`,
-      config,
+      engineOptions: config,
     });
     perturb?.(engine, ctx);
     const analyzers: Analyzer[] = buildAnalyzers?.(engine) ?? [];

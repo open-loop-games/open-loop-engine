@@ -33,9 +33,9 @@ maps beat duration to Csikszentmihalyi's Flow Theory engagement bands. Opinionat
 
 synchronous tick loop for deterministic simulation and tests
 
-- `interface HeadlessConfig` — Configuration for a synchronous headless simulation run. `src/core/headless.ts:11`
+- `interface HeadlessOptions` — Configuration for a synchronous headless simulation run. `src/core/headless.ts:11`
 - `interface HeadlessResult` — Results returned after a completed headless simulation run. `src/core/headless.ts:36`
-- `function runHeadless(config: HeadlessConfig): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:52`
+- `function runHeadless(options: HeadlessOptions): HeadlessResult` — Run a fixed-tick-count headless simulation, threading each analyzer's `onStart` / `onTick` / `onEnd` callbacks around the consumer's `tick` function. `src/core/headless.ts:52`
 
 ## Perturbation applier
 
@@ -65,10 +65,10 @@ Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributi
 - `interface Beat` — One beat's predicate + identity. `src/harness/probe/types.ts:19`
 - `interface BeatProbeOptions` — Configuration for runBeatProbe. `src/harness/probe/types.ts:69`
 - `interface BeatResult` — Per-beat termination-time distribution from a `seeds`-wide sweep. `src/harness/probe/types.ts:43`
-- `function runBeatProbe(config: BeatProbeOptions): BeatResult[]` — For each beat, drive `seeds.length` fresh engines until the beat predicate fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is observed), aggregated into per-beat termination-time distributions. `src/harness/probe/tick.ts:59`
-- `function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance it until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, and return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:109`
+- `function runBeatProbe(options: BeatProbeOptions): BeatResult[]` — For each beat, drive `seeds.length` fresh engines until the beat predicate fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is observed), aggregated into per-beat termination-time distributions. `src/harness/probe/tick.ts:59`
+- `function runWaypointProbe<T>(options: WaypointProbeOptions<T>): WaypointSnapshot<T>[]` — For each waypoint × seed: build a fresh engine, advance it until `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, and return one WaypointSnapshot per `(waypoint, seed)` in iteration order. `src/harness/probe/waypoint.ts:109`
 - `interface Waypoint` — One named time-anchored snapshot target. `src/harness/probe/waypoint.ts:23`
-- `interface WaypointProbeConfig<T>` — Configuration for runWaypointProbe. `src/harness/probe/waypoint.ts:52`
+- `interface WaypointProbeOptions<T>` — Configuration for runWaypointProbe. `src/harness/probe/waypoint.ts:52`
 - `interface WaypointSnapshot<T>` — Per-waypoint × per-seed inspector output. `src/harness/probe/waypoint.ts:30`
 
 ## Cell-aggregation kernel
@@ -81,37 +81,37 @@ reduces raw per-run results into per-metric stats, optional histograms, and (for
 - `function createSensitivityCell(options: CreateSensitivityCellOptions): Cell` — Build a harness `Cell` backed by a per-run engine constructed from a save blob. `src/harness/create-sensitivity-cell.ts:114`
 - `interface CreateSensitivityCellOptions` — Options for createSensitivityCell — bundles the immutable save-blob baseline, the per-run module-instance factory, an optional `perturb` hook, and the analyzer factory used by every run of this cell. `src/harness/create-sensitivity-cell.ts:28`
 - `function createTickCounter(driver: TickDriver): TickCounter` — Count `onTick` fires on `driver` — one per sub-tick in fixed mode, one per interval tick in variable mode. `src/harness/replay.ts:92`
-- `function createWorkPlan<C>(config: { cells: C[]; seeds: number[]; }): WorkItem<C>[]` — Build the flat `(cellIdx, seedIdx, seed, cell)` array that runMatrix and runMatrixUntil iterate. `src/harness/work-plan.ts:38`
+- `function createWorkPlan<C>(options: { cells: C[]; seeds: number[]; }): WorkItem<C>[]` — Build the flat `(cellIdx, seedIdx, seed, cell)` array that runMatrix and runMatrixUntil iterate. `src/harness/work-plan.ts:38`
 - `function diffAggregates(cell: CellAggregate, baseline: CellAggregate): Record<string, MetricDelta>` — Per-metric delta between a variant cell aggregate and the baseline. `src/harness/aggregate.ts:249`
 - `function replayLive(driver: TickDriver, options: ReplayLiveOptions): Promise<number>` — Replay `seconds` of live play at `speed` through `driver`, reproducing `intervalTick`'s dt math deterministically. `src/harness/replay.ts:58`
 - `interface ReplayLiveOptions` `src/harness/replay.ts:31`
-- `function runMatrix(config: MatrixConfig): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
-- `function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:58`
-- `function runSensitivity<C extends Cell | UntilCell = Cell>(config: SensitivityConfig<C>): SensitivityResult` — Run baseline plus every variant, then compute per-variant `{ absolute, relative }` deltas against the baseline per metric. `src/harness/run-sensitivity.ts:76`
-- `function runUntil(config: RunUntilConfig): RunUntilResult` — Drive `config.engine` via `engine.tickDriver.advanceTime(tickDelta)` until `config.until` returns `true` or `config.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:79`
+- `function runMatrix(options: MatrixOptions): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
+- `function runMatrixUntil(options: MatrixUntilOptions): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:58`
+- `function runSensitivity<C extends Cell | UntilCell = Cell>(options: SensitivityOptions<C>): SensitivityResult` — Run baseline plus every variant, then compute per-variant `{ absolute, relative }` deltas against the baseline per metric. `src/harness/run-sensitivity.ts:76`
+- `function runUntil(options: RunUntilOptions): RunUntilResult` — Drive `options.engine` via `engine.tickDriver.advanceTime(tickDelta)` until `options.until` returns `true` or `options.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:79`
 - `interface TickCounter` — A live sub-tick counter returned by createTickCounter. `src/harness/replay.ts:78`
 
 ## Solvers
 
 Tune a parameter to satisfy a predicate (bisection, etc.).
 
-- `function bisectTuner(config: TunerConfig): TunerResult` — Binary-search 1-D tuner. `src/harness/solve/bisect.ts:41`
-- `type Tuner = (config: TunerConfig) => TunerResult` — Runner-level swappable for 1-D parameter search. `src/harness/solve/types.ts:59`
-- `interface TunerConfig` — Configuration for a Tuner call. `src/harness/solve/types.ts:16`
+- `function bisectTuner(options: TunerOptions): TunerResult` — Binary-search 1-D tuner. `src/harness/solve/bisect.ts:41`
+- `type Tuner = (config: TunerOptions) => TunerResult` — Runner-level swappable for 1-D parameter search. `src/harness/solve/types.ts:59`
+- `interface TunerOptions` — Configuration for a Tuner call. `src/harness/solve/types.ts:16`
 - `interface TunerResult` — Outcome of a tuner run. `src/harness/solve/types.ts:36`
 
 ## Measurement harness types
 
 cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run results and producing namespaced numeric aggregates
 
-- `interface AggregateOptions` — Options threaded through MatrixConfig (and the batch/sensitivity wrappers) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:133`
+- `interface AggregateOptions` — Options threaded through MatrixOptions (and the batch/sensitivity wrappers) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:133`
 - `interface Cell` — One named configuration in a matrix. `src/harness/types.ts:47`
 - `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerName}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:162`
 - `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:193`
 - `interface HistogramOptions` — Consumer-supplied histogram spec for one metric. `src/harness/types.ts:122`
-- `interface MatrixConfig` — Top-level matrix runner config — N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:206`
+- `interface MatrixOptions` — Top-level matrix runner config — N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:206`
 - `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:218`
-- `interface MatrixUntilConfig` — Configuration for runMatrixUntil — `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:545`
+- `interface MatrixUntilOptions` — Configuration for runMatrixUntil — `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:545`
 - `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:571`
 - `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:538`
 - `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:318`
@@ -119,10 +119,10 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface MetricStats` — Numeric summary of one metric across a cell's runs. `src/harness/types.ts:90`
 - `interface RunContext` — Context passed to a Cell's `setup` function. `src/harness/types.ts:37`
 - `type RunMode = 'uniform' | 'next-event' | 'stasis-aware'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
-- `interface RunUntilConfig` — Configuration for a single predicate-bounded run. `src/harness/types.ts:395`
+- `interface RunUntilOptions` — Configuration for a single predicate-bounded run. `src/harness/types.ts:395`
 - `interface RunUntilResult` — Result of a predicate-bounded run. `src/harness/types.ts:463`
-- `interface SensitivityConfig<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:275`
-- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityConfig.variants. `src/harness/types.ts:347`
+- `interface SensitivityOptions<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:275`
+- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityOptions.variants. `src/harness/types.ts:347`
 - `interface SensitivityVariantResult` — One variant's contribution to a SensitivityResult. `src/harness/types.ts:329`
 - `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One axis in a cartesian sensitivity sweep — a label, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:248`
 - `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:499`

@@ -123,7 +123,7 @@ batch-create Producers from content definitions
 - `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A registered entry: definition + Producer instance + optional state + introspection signals. `src/systems/producer-category.ts:228`
 - `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:123`
 - `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:70`
-- `interface ProducerPurchaseConfig` — Purchase configuration for producers that can be bought multiple times. `src/systems/producer-category.ts:44`
+- `interface ProducerPurchaseOptions` — Purchase configuration for producers that can be bought multiple times. `src/systems/producer-category.ts:44`
 
 ## Purchasable
 

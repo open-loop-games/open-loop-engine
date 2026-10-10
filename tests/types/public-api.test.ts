@@ -53,7 +53,7 @@ import type { Computable, MaybeGetter } from '@/core/computed';
 import type { FormulaSource } from '@/core/formulas/types';
 import type {
   CreateEngineFromSaveOptions,
-  MatrixUntilConfig,
+  MatrixUntilOptions,
   MatrixUntilResult,
   RunContext,
   RunUntilResult,
@@ -93,7 +93,7 @@ import type { CategoryBase } from '@/systems/category-base';
 import type { ZoneSystem, ZoneDef } from '@/systems/zone';
 import type { Purchasable, PurchasableOptions } from '@/systems/purchasable';
 import type { Requirements } from '@/core/requirements';
-import type { TickDriverConfig } from '@/core/tick-driver';
+import type { TickDriverOptions } from '@/core/tick-driver';
 import type {
   BindOptions,
   BindingRecord,
@@ -318,22 +318,22 @@ describe('auto-purchase helper type surface', () => {
   });
 });
 
-describe('TickDriverConfig type surface', () => {
+describe('TickDriverOptions type surface', () => {
   it('pins tickMode as a literal union, not widened string', () => {
     // Widening tickMode to `string` would let typos like `'fiexd'` compile;
     // this catches it. New modes require updating the pin in the same commit.
-    expectTypeOf<TickDriverConfig['tickMode']>().toEqualTypeOf<'variable' | 'fixed' | undefined>();
+    expectTypeOf<TickDriverOptions['tickMode']>().toEqualTypeOf<'variable' | 'fixed' | undefined>();
   });
 
   it('pins fixed-mode numeric knobs as optional numbers', () => {
-    expectTypeOf<TickDriverConfig['fixedDt']>().toEqualTypeOf<number | undefined>();
-    expectTypeOf<TickDriverConfig['maxTicksPerInterval']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverOptions['fixedDt']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverOptions['maxTicksPerInterval']>().toEqualTypeOf<number | undefined>();
   });
 
   it('pins onTicksOverflow as a diagnostic callback, not a thrown-error channel', () => {
     // The overflow path is non-fatal — the callback signature shape records that
     // consumers receive a dropped-steps count and return nothing.
-    expectTypeOf<TickDriverConfig['onTicksOverflow']>().toEqualTypeOf<
+    expectTypeOf<TickDriverOptions['onTicksOverflow']>().toEqualTypeOf<
       ((droppedSteps: number) => void) | undefined
     >();
   });
@@ -778,7 +778,7 @@ describe('runSensitivity', () => {
       MatrixUntilResult['cells'][number]['runs'][number]
     >().toEqualTypeOf<RunUntilResult>();
     expectTypeOf<
-      Parameters<NonNullable<MatrixUntilConfig['onCellComplete']>>[0]['runs'][number]['terminated']
+      Parameters<NonNullable<MatrixUntilOptions['onCellComplete']>>[0]['runs'][number]['terminated']
     >().toEqualTypeOf<RunUntilResult['terminated']>();
   });
 
@@ -1013,7 +1013,7 @@ describe('Purchasable factories — id and options shape', () => {
     expectTypeOf(p).toEqualTypeOf<Purchasable>();
   });
 
-  it('the geometric arm and ProducerPurchaseConfig take costScaling as a ref or getter', async () => {
+  it('the geometric arm and ProducerPurchaseOptions take costScaling as a ref or getter', async () => {
     const { createScalingPurchasable } = await import('@/index');
     const resource = createResource(0, { id: 'reactive-gold', displayName: 'gold' });
     const scaling = ref<DecimalSource>(1.15);
@@ -1031,7 +1031,7 @@ describe('Purchasable factories — id and options shape', () => {
       baseCost: 10,
       costScaling: () => scaling.value,
     });
-    type Config = import('@/systems/producer-category').ProducerPurchaseConfig;
+    type Config = import('@/systems/producer-category').ProducerPurchaseOptions;
     expectTypeOf<Config['costScaling']>().toEqualTypeOf<Computable<DecimalSource>>();
   });
 
@@ -1328,7 +1328,7 @@ describe('runUntil type surface', () => {
   }[keyof T];
 
   it('requires engine/until/maxSimTime; tickDelta and the rest default', () => {
-    type Config = import('@/harness/types').RunUntilConfig;
+    type Config = import('@/harness/types').RunUntilOptions;
     expectTypeOf<OptionalKeys<Config>>().toEqualTypeOf<
       'tickDelta' | 'setup' | 'seed' | 'mode' | 'accessor' | 'bisectTolSec' | 'stasisCheckInterval'
     >();
@@ -1352,9 +1352,9 @@ describe('SaveMigration and saveMigrations config (B1)', () => {
     >();
   });
 
-  it('EngineConfig.saveMigrations and SaveManagerConfig.migrations key migrations by version', () => {
-    type EngineMigrations = import('@/engine').EngineConfig['saveMigrations'];
-    type ManagerMigrations = import('@/core/save-manager').SaveManagerConfig['migrations'];
+  it('EngineOptions.saveMigrations and SaveManagerOptions.migrations key migrations by version', () => {
+    type EngineMigrations = import('@/engine').EngineOptions['saveMigrations'];
+    type ManagerMigrations = import('@/core/save-manager').SaveManagerOptions['migrations'];
     type Migration = import('@/core/save-manager').SaveMigration;
     expectTypeOf<EngineMigrations>().toEqualTypeOf<Record<number, Migration> | undefined>();
     expectTypeOf<ManagerMigrations>().toEqualTypeOf<Record<number, Migration> | undefined>();
@@ -1376,7 +1376,7 @@ describe('SaveMigration and saveMigrations config (B1)', () => {
 
 describe('createTimeSystem type surface (B2)', () => {
   it('id is optional — defaults to a per-module context', () => {
-    type Options = import('@/systems/time').TimeSystemConfig;
+    type Options = import('@/systems/time').TimeSystemOptions;
     expectTypeOf<Options['id']>().toEqualTypeOf<string | undefined>();
   });
 
@@ -1541,9 +1541,9 @@ describe('Systems predicate fields take Predicate', () => {
     expectTypeOf<Opt<ChallengeDef['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').CycleOptions['endCondition']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').ResetOptions['canReset']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').BankedAccelerationConfig['when']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').BankedAccelerationOptions['when']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<PurchasableOptions['visible']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').ProducerPurchaseConfig['visible']>>().toEqualTypeOf<P>();
+    expectTypeOf<Opt<import('@/index').ProducerPurchaseOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['hidden']>>().toEqualTypeOf<P>();

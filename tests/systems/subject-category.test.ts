@@ -121,7 +121,7 @@ describe('createSubjectCategory', () => {
           opinion: {
             kind: 'vector',
             dimensions: ['trust', 'fear', 'value', 'anger'] as const,
-            dimensionConfig: { fear: { min: 0, max: 100 } },
+            dimensionOptions: { fear: { min: 0, max: 100 } },
           },
         },
       });
@@ -435,7 +435,7 @@ describe('createSubjectCategory', () => {
           mood: {
             kind: 'vector',
             dimensions: ['calm'],
-            dimensionConfig: { calm: { initial: -5, min: 0 } },
+            dimensionOptions: { calm: { initial: -5, min: 0 } },
           },
           rank: { kind: 'ladder', rungs: ['a', 'b'], initial: 5 },
         },
@@ -459,7 +459,7 @@ describe('createSubjectCategory', () => {
         id: 'npcs',
         fields: {
           trust: { kind: 'scalar', min: 0, max: 50 },
-          mood: { kind: 'vector', dimensions: ['calm'], dimensionConfig: { calm: { max: 10 } } },
+          mood: { kind: 'vector', dimensions: ['calm'], dimensionOptions: { calm: { max: 10 } } },
           rank: { kind: 'ladder', rungs: ['a', 'b', 'c'] },
           path: { kind: 'enum', values: ['light', 'dark'], initial: 'light' },
         },

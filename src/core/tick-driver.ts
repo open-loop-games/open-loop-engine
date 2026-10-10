@@ -60,7 +60,7 @@ export interface TimerProvider {
  * overflow diagnostics, and the timer provider; every field has a default
  * matching the genre-standard 20 Hz variable-dt shape.
  */
-export interface TickDriverConfig {
+export interface TickDriverOptions {
   /** Ticks per second (default 20). Controls the setInterval cadence. */
   intervalRate?: number;
   /**
@@ -223,7 +223,7 @@ const SPLIT_QUOTIENT_EPSILON = 1e-12;
  * Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and
  * a choice of variable-dt (default) or fixed-step accumulator mode.
  *
- * @param config - Driver configuration: tick rate, max delta, speed multiplier, `tickMode`
+ * @param options - Driver configuration: tick rate, max delta, speed multiplier, `tickMode`
  *   (`'variable'` or `'fixed'`), plus fixed-mode knobs (`fixedDt`, `maxTicksPerInterval`,
  *   `onTicksOverflow`) and an optional custom timer provider for Web Workers or testing.
  * @returns A TickDriver that can be started/stopped, supports per-phase enter/exit/tick
@@ -246,16 +246,16 @@ const SPLIT_QUOTIENT_EPSILON = 1e-12;
  * });
  * ```
  */
-export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
-  const intervalRate = shallowRef(config.intervalRate ?? 20);
-  const maxDeltaTime = config.maxDeltaTime ?? 1;
+export function createTickDriver(options: TickDriverOptions = {}): TickDriver {
+  const intervalRate = shallowRef(options.intervalRate ?? 20);
+  const maxDeltaTime = options.maxDeltaTime ?? 1;
   let tickInterval = 1 / intervalRate.value;
-  const speedMultiplier = shallowRef(config.speedMultiplier ?? 1);
-  const tickMode = config.tickMode ?? 'variable';
-  const fixedDt = config.fixedDt ?? 1 / intervalRate.value;
-  const maxTicksPerInterval = config.maxTicksPerInterval ?? 100;
-  let onTicksOverflow = config.onTicksOverflow;
-  let onDeltaOverflow = config.onDeltaOverflow;
+  const speedMultiplier = shallowRef(options.speedMultiplier ?? 1);
+  const tickMode = options.tickMode ?? 'variable';
+  const fixedDt = options.fixedDt ?? 1 / intervalRate.value;
+  const maxTicksPerInterval = options.maxTicksPerInterval ?? 100;
+  let onTicksOverflow = options.onTicksOverflow;
+  let onDeltaOverflow = options.onDeltaOverflow;
 
   // Fixed-mode time-integrated accumulator. Persistent so `importSave` restores
   // it alongside the rest of engine state; closure-local state would leave a
@@ -265,12 +265,12 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   // A caller-supplied id (the engine's namespaced `'tick-driver'`) is a stable
   // key for cross-session determinism; the counter fallback is collision-free
   // but order-dependent — see `persistentContextId`.
-  const driverContextId = config.persistentContextId ?? `tick-driver_${++tickDriverCounter}`;
+  const driverContextId = options.persistentContextId ?? `tick-driver_${++tickDriverCounter}`;
   const accumulator = withPersistentContext(driverContextId, () =>
     persistent<number>(0, { id: 'accumulator' }),
   );
 
-  const timers: TimerProvider = config.timerProvider ?? {
+  const timers: TimerProvider = options.timerProvider ?? {
     setInterval: globalThis.setInterval.bind(globalThis),
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };

@@ -41,7 +41,7 @@ export interface ProducerCategoryContext {
  * Purchase configuration for producers that can be bought multiple times.
  * Creates a {@link Purchasable} via `createScalingPurchasable` under the hood.
  */
-export interface ProducerPurchaseConfig {
+export interface ProducerPurchaseOptions {
   /** Resource spent to purchase */
   costResource: Resource;
   /** Cost of the first purchase. Can be a ref/getter for scoped tuning. */
@@ -82,7 +82,7 @@ export interface ProducerMapping {
    * auto-buyer (`setupPolicyAutoPurchase`) skips a `'manual'`
    * producer's purchase.
    */
-  purchase?: ProducerPurchaseConfig;
+  purchase?: ProducerPurchaseOptions;
   /** Display description for the repeatable (if purchase config present) */
   display?: string;
   /**

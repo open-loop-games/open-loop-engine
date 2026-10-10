@@ -19,7 +19,7 @@ import type { Engine } from '@/engine';
  *   per iteration, advances by the smallest finite transition distance, falls
  *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`.
  *   Predicate fire-time can be resolved within an advance via
- *   {@link RunUntilConfig.bisectTolSec}. Requires an accessor — modes other
+ *   {@link RunUntilOptions.bisectTolSec}. Requires an accessor — modes other
  *   than `'uniform'` introspect content through the walker — and takes no
  *   analyzers, since advances are variable-length.
  * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check via
@@ -39,7 +39,7 @@ export interface RunContext {
 }
 
 /**
- * One named configuration in a matrix. Mirrors {@link HeadlessConfig} but
+ * One named configuration in a matrix. Mirrors {@link HeadlessOptions} but
  * without the `seed` field — the harness supplies that per work item. Setup
  * constructs and returns the analyzer list for this run; metric-free cells
  * return `[]`.
@@ -124,7 +124,7 @@ export interface HistogramOptions {
 }
 
 /**
- * Options threaded through {@link MatrixConfig} (and the batch/sensitivity
+ * Options threaded through {@link MatrixOptions} (and the batch/sensitivity
  * wrappers) to opt into histogram bucketing for specific metrics. Percentile
  * outputs (`p5`/`p50`/`p95`) are always computed — they're cheap relative
  * to the sort already done for `median`. Histograms are opt-in because
@@ -203,7 +203,7 @@ export interface CellResult<R extends HeadlessResult = HeadlessResult> {
  * aggregates (via `aggregate`). Callback fields fire in iteration order;
  * histogram opt-in lives on `aggregate`.
  */
-export interface MatrixConfig {
+export interface MatrixOptions {
   cells: Cell[];
   seeds: number[];
   /** Fires after each individual `(cell, seed)` run completes, in deterministic order. */
@@ -254,7 +254,7 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
 
 /**
  * Baseline-plus-variants sweep config consumed by {@link runSensitivity}.
- * Mirrors {@link MatrixConfig}'s callback + aggregate shape, with the
+ * Mirrors {@link MatrixOptions}'s callback + aggregate shape, with the
  * cell list split into baseline + variant patches so the runner knows
  * which result to diff against.
  *
@@ -263,7 +263,7 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
  * - `C extends UntilCell` — predicate-bounded sweep, runs via
  *   {@link runMatrixUntil}. Requires {@link until} and {@link maxSimTime};
  *   `mode`/`bisectTolSec`/`stasisCheckInterval` opt-in per
- *   {@link MatrixUntilConfig}.
+ *   {@link MatrixUntilOptions}.
  *
  * Variants may be supplied flat (`variants[]`) or axis-grouped (`axes[]`,
  * each axis expanded to one variant per value). Both can be supplied at
@@ -272,7 +272,7 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
  * exercise per-run setup hooks like {@link createSensitivityCell}'s
  * `perturb` against the baseline alone.
  */
-export interface SensitivityConfig<C extends Cell | UntilCell = Cell> {
+export interface SensitivityOptions<C extends Cell | UntilCell = Cell> {
   baseline: C;
   /** Flat variant patches. Combined with {@link axes} if both supplied. */
   variants?: Variant<C>[];
@@ -303,9 +303,9 @@ export interface SensitivityConfig<C extends Cell | UntilCell = Cell> {
    * {@link RunMode}.
    */
   mode?: RunMode;
-  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
+  /** See {@link RunUntilOptions.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
+  /** See {@link RunUntilOptions.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }
 
@@ -340,7 +340,7 @@ export interface SensitivityVariantResult {
 
 /**
  * Output of a sensitivity sweep — baseline cell plus one entry per variant,
- * in the same order as {@link SensitivityConfig.variants}. Each variant
+ * in the same order as {@link SensitivityOptions.variants}. Each variant
  * carries its own {@link CellResult} and a metric-keyed delta map vs the
  * baseline.
  */
@@ -392,7 +392,7 @@ export type UntilPredicate = (ctx: UntilContext) => boolean;
  * rather than a consumer-supplied tick callback. The engine must be started
  * (`engine.start()`) before calling `runUntil`.
  */
-export interface RunUntilConfig {
+export interface RunUntilOptions {
   /** Engine to drive. Must be started before the call. */
   engine: Engine;
   /** Termination predicate. Evaluated once before every advanceTime, including tick 0. */
@@ -509,7 +509,7 @@ export interface UntilCell {
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**
-   * Read-side accessor factory. Required when {@link MatrixUntilConfig.mode}
+   * Read-side accessor factory. Required when {@link MatrixUntilOptions.mode}
    * is `'next-event'` or `'stasis-aware'` — those modes introspect content
    * through the walker. Called once per `(cell, seed)` alongside
    * `buildEngine`. The accessor must read the same state the engine ticks
@@ -521,7 +521,7 @@ export interface UntilCell {
    * Analyzer factory. Closes over the freshly-built engine so analyzers
    * can read engine state without reaching for module-level refs.
    * Omit for metric-free cells. Event mode throws if it returns any
-   * analyzers — see {@link RunUntilConfig.setup}.
+   * analyzers — see {@link RunUntilOptions.setup}.
    */
   analyzers?: (engine: Engine, ctx: RunContext) => Analyzer[];
   /** Optional per-cell tick delta override. Defaults to `0.05`. */
@@ -540,9 +540,9 @@ export type MatrixUntilWorkItem = WorkItem<UntilCell>;
 /**
  * Configuration for {@link runMatrixUntil} — `cells × seeds` predicate-bounded
  * sweep. The shared `until` predicate and `maxSimTime` ceiling apply to every
- * run; callbacks mirror {@link MatrixConfig}.
+ * run; callbacks mirror {@link MatrixOptions}.
  */
-export interface MatrixUntilConfig {
+export interface MatrixUntilOptions {
   cells: UntilCell[];
   seeds: number[];
   /** Termination predicate shared across every `(cell, seed)` run. */
@@ -561,9 +561,9 @@ export interface MatrixUntilConfig {
    * See {@link RunMode}.
    */
   mode?: RunMode;
-  /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
+  /** See {@link RunUntilOptions.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
+  /** See {@link RunUntilOptions.stasisCheckInterval}. Ignored when `mode !== 'next-event'`. */
   stasisCheckInterval?: number;
 }
 

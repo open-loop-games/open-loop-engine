@@ -1244,9 +1244,9 @@ describe('autoSaveInterval — runtime-tunable', () => {
   });
 });
 
-describe('EngineConfig.strictValidation', () => {
+describe('EngineOptions.strictValidation', () => {
   // Hand-build a corrupted uncompressed envelope and feed it through importSave;
-  // skips needing the save-manager's compressSave knob plumbed through EngineConfig.
+  // skips needing the save-manager's compressSave knob plumbed through EngineOptions.
   function corruptedEnvelope(gameId: string, moduleId: string): string {
     return JSON.stringify({
       version: 1,

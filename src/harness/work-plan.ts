@@ -16,8 +16,8 @@ import type { WorkItem } from './types';
  * {@link runMatrix} and {@link runMatrixUntil} iterate. Stable order:
  * outer loop over cells, inner loop over seeds.
  *
- * @param config - `{ cells, seeds }` — only the iterable dimensions matter,
- *   so this accepts any superset of `MatrixConfig` / `MatrixUntilConfig`.
+ * @param options - `{ cells, seeds }` — only the iterable dimensions matter,
+ *   so this accepts any superset of `MatrixOptions` / `MatrixUntilOptions`.
  * @returns Flat `WorkItem<C>[]` carrying the original cell reference, cell
  *   index, seed value, and seed index for each `(cell, seed)` pair.
  *
@@ -35,12 +35,12 @@ import type { WorkItem } from './types';
  * await Promise.all(plan.map((item) => pool.run(serialize(item))));
  * ```
  */
-export function createWorkPlan<C>(config: { cells: C[]; seeds: number[] }): WorkItem<C>[] {
+export function createWorkPlan<C>(options: { cells: C[]; seeds: number[] }): WorkItem<C>[] {
   const plan: WorkItem<C>[] = [];
-  for (let cellIdx = 0; cellIdx < config.cells.length; cellIdx++) {
-    const cell = config.cells[cellIdx];
-    for (let seedIdx = 0; seedIdx < config.seeds.length; seedIdx++) {
-      plan.push({ cellIdx, seedIdx, seed: config.seeds[seedIdx], cell });
+  for (let cellIdx = 0; cellIdx < options.cells.length; cellIdx++) {
+    const cell = options.cells[cellIdx];
+    for (let seedIdx = 0; seedIdx < options.seeds.length; seedIdx++) {
+      plan.push({ cellIdx, seedIdx, seed: options.seeds[seedIdx], cell });
     }
   }
   return plan;

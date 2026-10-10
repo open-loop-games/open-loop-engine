@@ -25,15 +25,15 @@ import type { BeatResult, BeatProbeOptions } from './types';
  * fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is
  * observed), aggregated into per-beat termination-time distributions.
  *
- * Mode dispatch (`config.mode`, default `'uniform'`):
+ * Mode dispatch (`options.mode`, default `'uniform'`):
  * - `'uniform'` — fixed-tick loop, content-blind. Default.
  * - `'next-event'` — walker-visible event-stepping for live-rate-insufficient legs.
- *   Requires `config.buildAccessor`.
+ *   Requires `options.buildAccessor`.
  * - `'stasis-aware'` — per-tick stasis check; terminates with
  *   `counts.unreachable` for seeds the walker confirms cannot fire. Requires
- *   `config.buildAccessor`.
+ *   `options.buildAccessor`.
  *
- * @param config — beats, seeds, fresh-engine factory, sim-time ceiling,
+ * @param options — beats, seeds, fresh-engine factory, sim-time ceiling,
  *   optional tick granularity, optional `mode` + `buildAccessor`.
  * @returns one {@link BeatResult} per beat, with termination-time stats
  *   over predicate-fired seeds, counts split by termination reason, and
@@ -56,26 +56,26 @@ import type { BeatResult, BeatProbeOptions } from './types';
  * }
  * ```
  */
-export function runBeatProbe(config: BeatProbeOptions): BeatResult[] {
-  const tickDelta = config.tickDelta ?? 1;
-  const mode = config.mode ?? 'uniform';
-  if (mode !== 'uniform' && !config.buildAccessor) {
-    throw new Error(`runBeatProbe: mode "${mode}" requires config.buildAccessor`);
+export function runBeatProbe(options: BeatProbeOptions): BeatResult[] {
+  const tickDelta = options.tickDelta ?? 1;
+  const mode = options.mode ?? 'uniform';
+  if (mode !== 'uniform' && !options.buildAccessor) {
+    throw new Error(`runBeatProbe: mode "${mode}" requires options.buildAccessor`);
   }
   const out: BeatResult[] = [];
-  for (const beat of config.beats) {
+  for (const beat of options.beats) {
     let engineForPredicate: Engine | undefined;
 
     const cell: UntilCell = {
       id: beat.id,
       tickDelta,
       buildEngine: (ctx) => {
-        const engine = config.buildEngine(ctx);
+        const engine = options.buildEngine(ctx);
         engineForPredicate = engine;
         return engine;
       },
-      buildAccessor: config.buildAccessor ? (engine) => config.buildAccessor!(engine) : undefined,
-      teardown: config.teardown,
+      buildAccessor: options.buildAccessor ? (engine) => options.buildAccessor!(engine) : undefined,
+      teardown: options.teardown,
     };
 
     const until: UntilPredicate = () => {
@@ -85,12 +85,12 @@ export function runBeatProbe(config: BeatProbeOptions): BeatResult[] {
 
     const result = runMatrixUntil({
       cells: [cell],
-      seeds: config.seeds,
+      seeds: options.seeds,
       until,
-      maxSimTime: config.maxSimTime,
+      maxSimTime: options.maxSimTime,
       mode,
-      bisectTolSec: config.bisectTolSec,
-      stasisCheckInterval: config.stasisCheckInterval,
+      bisectTolSec: options.bisectTolSec,
+      stasisCheckInterval: options.stasisCheckInterval,
     });
 
     const aggregate = result.cells[0].aggregate;

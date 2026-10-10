@@ -1,2 +1,2 @@
 export { bisectTuner } from './bisect';
-export type { TunerConfig, TunerResult, Tuner } from './types';
+export type { TunerOptions, TunerResult, Tuner } from './types';

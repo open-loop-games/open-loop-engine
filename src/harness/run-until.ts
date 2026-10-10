@@ -26,15 +26,15 @@
  * so a run that starts already in the target state terminates immediately
  * with `totalTicks: 0`.
  *
- * Run mode (`config.mode`):
+ * Run mode (`options.mode`):
  *
  * - `'uniform'` (default) — fixed-tick loop above. Content-blind.
  * - `'next-event'` — walker-visible event-stepping with fast-tick fallbacks.
- *   Requires `config.accessor`, and takes no analyzers. Predicate fire-time
- *   can be resolved within an advance via `config.bisectTolSec`.
+ *   Requires `options.accessor`, and takes no analyzers. Predicate fire-time
+ *   can be resolved within an advance via `options.bisectTolSec`.
  * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check.
  *   When the walker reports no finite or opaque-predicate transition,
- *   terminates with `terminated: 'unreachable'`. Requires `config.accessor`.
+ *   terminates with `terminated: 'unreachable'`. Requires `options.accessor`.
  *
  * {@link runMatrixUntil} is the `cells × seeds` counterpart.
  *
@@ -45,15 +45,15 @@ import { seedRNG } from '@/primitives/rng';
 import { createTransitionSnapshot } from './walker';
 import { runNextEventLoop, isStasis } from './run-until-helpers/next-event-mode';
 import { floorSteps } from './sim-time';
-import type { RunUntilConfig, RunUntilResult } from './types';
+import type { RunUntilOptions, RunUntilResult } from './types';
 
 /**
- * Drive `config.engine` via `engine.tickDriver.advanceTime(tickDelta)` until
- * `config.until` returns `true` or `config.maxSimTime` sim-seconds have
+ * Drive `options.engine` via `engine.tickDriver.advanceTime(tickDelta)` until
+ * `options.until` returns `true` or `options.maxSimTime` sim-seconds have
  * elapsed, whichever comes first. Returns the tick count, elapsed sim-time,
  * termination reason, and analyzer results.
  *
- * @param config - {@link RunUntilConfig} — engine, predicate, max sim-time
+ * @param options - {@link RunUntilOptions} — engine, predicate, max sim-time
  *   ceiling, optional tickDelta/setup/seed, optional mode + accessor.
  * @returns {@link RunUntilResult} — superset of `HeadlessResult` with a
  *   `terminated: 'predicate' | 'maxSimTime' | 'unreachable'` field.
@@ -76,20 +76,20 @@ import type { RunUntilConfig, RunUntilResult } from './types';
  * }
  * ```
  */
-export function runUntil(config: RunUntilConfig): RunUntilResult {
-  const { engine, until, maxSimTime } = config;
-  const tickDelta = config.tickDelta ?? 0.05;
-  const mode = config.mode ?? 'uniform';
-  if (mode !== 'uniform' && !config.accessor) {
-    throw new Error(`runUntil: mode "${mode}" requires config.accessor`);
+export function runUntil(options: RunUntilOptions): RunUntilResult {
+  const { engine, until, maxSimTime } = options;
+  const tickDelta = options.tickDelta ?? 0.05;
+  const mode = options.mode ?? 'uniform';
+  if (mode !== 'uniform' && !options.accessor) {
+    throw new Error(`runUntil: mode "${mode}" requires options.accessor`);
   }
-  if (mode === 'next-event' && config.bisectTolSec !== undefined && !engine.saveManager) {
+  if (mode === 'next-event' && options.bisectTolSec !== undefined && !engine.saveManager) {
     throw new Error(
       'runUntil: bisectTolSec restores save checkpoints and requires an engine with a saveManager (persistence enabled)',
     );
   }
-  if (config.seed !== undefined) seedRNG(config.seed);
-  const analyzers = config.setup?.() ?? [];
+  if (options.seed !== undefined) seedRNG(options.seed);
+  const analyzers = options.setup?.() ?? [];
   if (mode === 'next-event' && analyzers.length > 0) {
     throw new Error(
       'runUntil: mode "event" steps variable distances and cannot drive the analyzer tick lifecycle — use mode "tick" for analyzers',
@@ -97,9 +97,9 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   }
 
   if (mode === 'next-event') {
-    const out = runNextEventLoop(engine, config.accessor!, until, maxSimTime, tickDelta, {
-      bisectTolSec: config.bisectTolSec,
-      stasisCheckInterval: config.stasisCheckInterval,
+    const out = runNextEventLoop(engine, options.accessor!, until, maxSimTime, tickDelta, {
+      bisectTolSec: options.bisectTolSec,
+      stasisCheckInterval: options.stasisCheckInterval,
     });
     return {
       totalTicks: out.totalTicks,
@@ -113,7 +113,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   const maxTicks = floorSteps(maxSimTime, tickDelta);
   let tick = 0;
   let terminated: 'predicate' | 'maxSimTime' | 'unreachable' = 'maxSimTime';
-  const accessor = config.accessor;
+  const accessor = options.accessor;
 
   while (tick <= maxTicks) {
     if (until({ iteration: tick, simTime: tick * tickDelta })) {

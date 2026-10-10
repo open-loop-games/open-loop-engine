@@ -215,7 +215,7 @@ Reach for the getter only when the predicate is derived from more than one sourc
 
 ### Writing migrations
 
-When you bump `EngineConfig.saveVersion`, supply a `saveMigrations` entry for each version that transforms data from `v → v+1`. Migrations run sequentially over the raw decoded save object before validation and deserialize. A step must return the object: one that returns nothing doesn't compile, and fails the load at runtime. Changing a default is a migration too — a leaf at the old default was pruned from the save, so it loads as the new default, and a migration sees `undefined` for it, meaning "the writing build's default". The engine ships a small kit of pure transforms — compose them in the migration body rather than hand-rolling traversal each time.
+When you bump `EngineOptions.saveVersion`, supply a `saveMigrations` entry for each version that transforms data from `v → v+1`. Migrations run sequentially over the raw decoded save object before validation and deserialize. A step must return the object: one that returns nothing doesn't compile, and fails the load at runtime. Changing a default is a migration too — a leaf at the old default was pruned from the save, so it loads as the new default, and a migration sees `undefined` for it, meaning "the writing build's default". The engine ships a small kit of pure transforms — compose them in the migration body rather than hand-rolling traversal each time.
 
 ```ts
 import { renameField, retypeField, forEachDef, type SaveMigration } from '@open-loop/engine';

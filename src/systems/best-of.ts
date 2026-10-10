@@ -171,7 +171,7 @@ export interface BestOf {
    * Runtime override for incumbent recency decay, applied to every metric
    * on this instance. Pass a positive number to enable age-based decay
    * (half-life in cycle count), or `undefined` to clear the override and
-   * fall back to each metric's static `recencyHalfLifeRuns` config.
+   * fall back to each metric's static `recencyHalfLifeRuns` option.
    *
    * Useful for toggling decay at runtime without mutating shared metric
    * config objects.

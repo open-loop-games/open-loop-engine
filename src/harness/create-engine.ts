@@ -10,7 +10,7 @@
  */
 
 import { createEngine } from '@/engine';
-import type { Engine, EngineConfig, EngineModule } from '@/engine';
+import type { Engine, EngineOptions, EngineModule } from '@/engine';
 import type { TimerProvider } from '@/core/tick-driver';
 import { createMemoryStorage } from '@/core/save-manager';
 
@@ -37,8 +37,8 @@ export interface CreateEngineFromSaveOptions {
    * `persistenceNamespace`, `storageAdapter`, and `autoSaveInterval` are
    * fixed by this helper and cannot be overridden.
    */
-  config?: Omit<
-    EngineConfig,
+  engineOptions?: Omit<
+    EngineOptions,
     'gameId' | 'persistence' | 'persistenceNamespace' | 'storageAdapter' | 'autoSaveInterval'
   >;
 }
@@ -53,13 +53,13 @@ let scratchCounter = 0;
  *
  * The engine gets a no-op timer, so `start()` arms no real `setInterval`:
  * drive it with `tickDriver.tickOnce()` / `advanceTime`, or a harness
- * runner. Pass `config.timerProvider` for a self-ticking one (then stop it
+ * runner. Pass `engineOptions.timerProvider` for a self-ticking one (then stop it
  * yourself). The caller owns the engine: its namespaced persistent refs stay
  * in the process-wide registry until `engine.dispose()`, so dropping the
  * reference alone retains them.
  *
  * @param options - The save blob, the modules to install, and optionally a
- *   persistence namespace and extra `createEngine` config.
+ *   persistence namespace and extra `createEngine` options.
  * @returns The started engine, with the save applied.
  * @throws {Error} when the blob isn't valid JSON or the save fails to import;
  *   the half-built engine is disposed first.
@@ -83,7 +83,7 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
     saveText,
     modules,
     persistenceNamespace: namespace = `workbench-scratch-${scratchCounter++}`,
-    config = {},
+    engineOptions: config = {},
   } = options;
 
   // Adopt the source envelope's gameId so saveManager.importSave's gameId

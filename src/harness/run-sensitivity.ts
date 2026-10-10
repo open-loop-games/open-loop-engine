@@ -13,7 +13,7 @@ import { runMatrix } from './run-matrix';
 import { runMatrixUntil } from './run-matrix-until';
 import type {
   Cell,
-  SensitivityConfig,
+  SensitivityOptions,
   SensitivityResult,
   SensitivityVariantResult,
   SweepAxis,
@@ -31,9 +31,9 @@ import type {
  * Cell shape picks the runner: a {@link Cell} baseline drives
  * {@link runMatrix} (fixed-tick), an {@link UntilCell} baseline drives
  * {@link runMatrixUntil} (predicate-bounded). Until-mode requires
- * {@link SensitivityConfig.until} and `maxSimTime`.
+ * {@link SensitivityOptions.until} and `maxSimTime`.
  *
- * @param config - {@link SensitivityConfig} — baseline cell, flat variants
+ * @param options - {@link SensitivityOptions} — baseline cell, flat variants
  *   and/or axes, seeds, optional callbacks, histogram opt-in, and (for
  *   until-mode) the shared predicate + ceiling.
  * @returns {@link SensitivityResult} — baseline {@link CellResult} plus
@@ -74,19 +74,19 @@ import type {
  * ```
  */
 export function runSensitivity<C extends Cell | UntilCell = Cell>(
-  config: SensitivityConfig<C>,
+  options: SensitivityOptions<C>,
 ): SensitivityResult {
-  const variants = expandVariants(config);
-  if (config.until !== undefined) {
-    return runUntilPath(config, variants);
+  const variants = expandVariants(options);
+  if (options.until !== undefined) {
+    return runUntilPath(options, variants);
   }
-  if (config.maxSimTime !== undefined || config.mode !== undefined) {
+  if (options.maxSimTime !== undefined || options.mode !== undefined) {
     throw new Error(
       'runSensitivity: `maxSimTime` / `mode` require `until` to switch the sweep to predicate-bounded mode',
     );
   }
   return runFixedTickPath(
-    config as unknown as SensitivityConfig<Cell>,
+    options as unknown as SensitivityOptions<Cell>,
     variants as unknown as Variant<Cell>[],
   );
 }
@@ -98,9 +98,9 @@ export function runSensitivity<C extends Cell | UntilCell = Cell>(
  *
  * @internal
  */
-function expandVariants<C extends Cell | UntilCell>(config: SensitivityConfig<C>): Variant<C>[] {
-  const out: Variant<C>[] = [...(config.variants ?? [])];
-  const axes = config.axes;
+function expandVariants<C extends Cell | UntilCell>(options: SensitivityOptions<C>): Variant<C>[] {
+  const out: Variant<C>[] = [...(options.variants ?? [])];
+  const axes = options.axes;
   if (!axes || axes.length === 0) return out;
 
   type AxisEntry = { axisName: string; value: unknown; patch: SweepAxis<unknown, C>['patch'] };
@@ -141,17 +141,17 @@ function expandVariants<C extends Cell | UntilCell>(config: SensitivityConfig<C>
  * @internal
  */
 function runFixedTickPath(
-  config: SensitivityConfig<Cell>,
+  options: SensitivityOptions<Cell>,
   variants: Variant<Cell>[],
 ): SensitivityResult {
-  const variantCells: Cell[] = variants.map((v) => ({ ...v.patch(config.baseline), id: v.id }));
-  const cells: Cell[] = [config.baseline, ...variantCells];
+  const variantCells: Cell[] = variants.map((v) => ({ ...v.patch(options.baseline), id: v.id }));
+  const cells: Cell[] = [options.baseline, ...variantCells];
   const matrix = runMatrix({
     cells,
-    seeds: config.seeds,
-    onRunComplete: config.onRunComplete,
-    onCellComplete: config.onCellComplete,
-    aggregate: config.aggregate,
+    seeds: options.seeds,
+    onRunComplete: options.onRunComplete,
+    onCellComplete: options.onCellComplete,
+    aggregate: options.aggregate,
   });
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
@@ -168,13 +168,13 @@ function runFixedTickPath(
  * @internal
  */
 function runUntilPath<C extends Cell | UntilCell>(
-  config: SensitivityConfig<C>,
+  options: SensitivityOptions<C>,
   variants: Variant<C>[],
 ): SensitivityResult {
-  if (config.maxSimTime === undefined) {
+  if (options.maxSimTime === undefined) {
     throw new Error('runSensitivity: predicate-bounded mode requires `maxSimTime`');
   }
-  const untilBaseline = config.baseline as unknown as UntilCell;
+  const untilBaseline = options.baseline as unknown as UntilCell;
   const untilVariants = variants as unknown as Variant<UntilCell>[];
   const variantCells: UntilCell[] = untilVariants.map((v) => ({
     ...v.patch(untilBaseline),
@@ -183,15 +183,15 @@ function runUntilPath<C extends Cell | UntilCell>(
   const cells: UntilCell[] = [untilBaseline, ...variantCells];
   const matrix = runMatrixUntil({
     cells,
-    seeds: config.seeds,
-    until: config.until!,
-    maxSimTime: config.maxSimTime,
-    onRunComplete: config.onRunComplete as never,
-    onCellComplete: config.onCellComplete,
-    aggregate: config.aggregate,
-    mode: config.mode,
-    bisectTolSec: config.bisectTolSec,
-    stasisCheckInterval: config.stasisCheckInterval,
+    seeds: options.seeds,
+    until: options.until!,
+    maxSimTime: options.maxSimTime,
+    onRunComplete: options.onRunComplete as never,
+    onCellComplete: options.onCellComplete,
+    aggregate: options.aggregate,
+    mode: options.mode,
+    bisectTolSec: options.bisectTolSec,
+    stasisCheckInterval: options.stasisCheckInterval,
   });
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {

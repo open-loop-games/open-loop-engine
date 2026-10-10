@@ -83,7 +83,7 @@ persistent game state with multi-slot support
 - `function addField(data: SaveData, path: string, defaultValue: unknown, opts?: AddFieldOptions): SaveData` — Write `defaultValue` at `path`. `src/core/save-migrations.ts:167`
 - `interface AddFieldOptions` `src/core/save-migrations.ts:148`
 - `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:91`
-- `function createSaveManager(config: SaveManagerConfig): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:539`
+- `function createSaveManager(options: SaveManagerOptions): SaveManager` — Create a save manager — orchestrates serialization, slot management, migrations, and validation around the persistent-ref tree. `src/core/save-manager.ts:539`
 - `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: a live `Decimal` instance, a finite `number`, or a numeric string (including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits). `src/core/save-validation.ts:58`
 - `function deleteField(data: SaveData, path: string): SaveData` — Remove the value at `path`. `src/core/save-migrations.ts:139`
 - `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref's default value and options. `src/core/save-validation.ts:91`
@@ -97,7 +97,7 @@ persistent game state with multi-slot support
 - `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:202`
 - `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:169`
 - `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: persists, loads, imports, and exports versioned game state. `src/core/save-manager.ts:287`
-- `interface SaveManagerConfig` — Configuration for creating a save manager. `src/core/save-manager.ts:113`
+- `interface SaveManagerOptions` — Configuration for creating a save manager. `src/core/save-manager.ts:113`
 - `type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>` — One step of a consumer save migration: receives the save data written by version N and returns it reshaped for version N + 1. `src/core/save-manager.ts:110`
 - `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:175`
 - `interface SaveSlot` — A named save slot. `src/core/save-manager.ts:185`
@@ -113,10 +113,10 @@ persistent game state with multi-slot support
 banked-time reservoir with acceleration and burst spend surfaces
 
 - `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:178`
-- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:140`
+- `interface BankedAccelerationOptions` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:140`
 - `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:345`
 - `interface BurstDischargeOptions` `src/systems/time-bank.ts:305`
-- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:220`
-- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:107`
+- `function createBankedAcceleration(options: BankedAccelerationOptions): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:220`
+- `function createTimeBank(options?: TimeBankOptions): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:107`
 - `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:69`
-- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:48`
+- `interface TimeBankOptions` — Configuration for createTimeBank. `src/systems/time-bank.ts:48`

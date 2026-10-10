@@ -23,7 +23,7 @@ import { formatTime } from '@/primitives/decimal';
 // === TYPES ===
 
 /** Configuration for {@link createTimeSystem}. */
-export interface TimeSystemConfig {
+export interface TimeSystemOptions {
   /**
    * Save context. Defaults to `${module}/time` inside a module; pass one when
    * a module builds more than one.
@@ -53,7 +53,7 @@ export interface TimeSystem {
  * Creates a time tracking system with persistent elapsed/total play time and
  * a formatted display.
  *
- * @param config - Save context id
+ * @param options - Save context id
  * @returns A time system with persistent `elapsed` and `totalPlayTime` refs,
  *   a `tick()` method to advance time, and `reset()` which zeroes elapsed
  *   but preserves total play time
@@ -66,8 +66,8 @@ export interface TimeSystem {
  * console.log(time.formatPlayTime()); // "1h 23m 45s"
  * ```
  */
-export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
-  const contextId = resolveSystemPersistentContextId(config.id, 'time');
+export function createTimeSystem(options: TimeSystemOptions = {}): TimeSystem {
+  const contextId = resolveSystemPersistentContextId(options.id, 'time');
   const { elapsed, totalPlayTime } = withPersistentContext(contextId, () => ({
     elapsed: persistent(0, { id: 'elapsed' }),
     totalPlayTime: persistent(0, { id: 'totalPlayTime', lifetime: true }),

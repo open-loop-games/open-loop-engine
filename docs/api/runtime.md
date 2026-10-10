@@ -13,14 +13,14 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 
 ## Engine assembly
 
-the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineConfig_, and the built-in injection keys
+the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineOptions_, and the built-in injection keys
 
-- `function createEngine(config: EngineConfig): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:433`
+- `function createEngine(options: EngineOptions): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:433`
 - `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:320`
-- `interface EngineConfig` — Configuration passed to createEngine. `src/engine.ts:230`
 - `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:122`
 - `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:100`
 - `interface EngineModule` — A registerable unit of game content. `src/engine.ts:186`
+- `interface EngineOptions` — Configuration passed to createEngine. `src/engine.ts:230`
 - `type LoadHandler = (result: SaveLoadResult) => void` — Callback invoked after a save loads successfully through any entry point: `engine.load()`, the save manager's `load` / `importSave`, or a harness engine hydrated from a save. `src/engine.ts:78`
 - `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:208`
 - `type SaveHandler = () => void` — Callback invoked before live state is serialized — by `engine.save()`, the autosave, and the save manager's `save` / `saveToSlot` / `exportSave` — so it can flush derived state into persistent refs. `src/engine.ts:66`
@@ -46,10 +46,10 @@ Typed per-instance event emitter primitive
 
 worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
 
-- `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:249`
+- `function createTickDriver(options?: TickDriverOptions): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:249`
 - `interface PhaseHandlers` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:130`
 - `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:149`
-- `interface TickDriverConfig` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:63`
+- `interface TickDriverOptions` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:63`
 - `type TickHandler = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real (speed-scaled, capped) elapsed time in variable mode, always `fixedDt` in fixed mode. `src/core/tick-driver.ts:141`
 - `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:53`
 
@@ -71,9 +71,9 @@ lightweight tick-callback rate limiter
 
 persistent elapsed and total play time
 
-- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time and a formatted display. `src/systems/time.ts:69`
+- `function createTimeSystem(options?: TimeSystemOptions): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time and a formatted display. `src/systems/time.ts:69`
 - `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:35`
-- `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:26`
+- `interface TimeSystemOptions` — Configuration for createTimeSystem. `src/systems/time.ts:26`
 
 ## Transition-distance primitives
 

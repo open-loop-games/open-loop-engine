@@ -48,7 +48,7 @@ const { compressToBase64, decompressFromBase64 } = LZString;
  * Engine-internal save-format version, stored in the envelope under `_engine.version`.
  *
  * Bumped when the engine changes how it writes save data in a way that isn't
- * driven by consumer content. Decoupled from `SaveManagerConfig.version` so
+ * driven by consumer content. Decoupled from `SaveManagerOptions.version` so
  * consumers don't have to bump their game version every time the engine
  * upgrades its envelope format. A save carrying a higher version than this
  * one is refused with `future-version`.
@@ -110,7 +110,7 @@ export function createMemoryStorage(): StorageAdapter {
 export type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>;
 
 /** Configuration for creating a save manager. */
-export interface SaveManagerConfig {
+export interface SaveManagerOptions {
   /** Unique game identifier — prefixes all storage keys to avoid conflicts. */
   gameId: string;
   /**
@@ -120,7 +120,7 @@ export interface SaveManagerConfig {
    * handlers and post-load reconcilers run inside it. Undefined = legacy
    * single-engine path, bit-for-bit compatible.
    *
-   * Normally passed through from `EngineConfig.persistenceNamespace`; the
+   * Normally passed through from `EngineOptions.persistenceNamespace`; the
    * engine is the expected caller. Direct `createSaveManager` consumers
    * only need this when manually wiring a scratch engine.
    */
@@ -228,7 +228,7 @@ export interface SaveEvents {
   }) => void;
   /**
    * A save was written by a newer build. `kind: 'game'` compares the envelope's
-   * `version` with `SaveManagerConfig.version`; `kind: 'engine'` compares its
+   * `version` with `SaveManagerOptions.version`; `kind: 'engine'` compares its
    * engine save version with this engine's, and a game can't migrate that.
    */
   'save:future-version-refused': (err: {
@@ -510,7 +510,7 @@ function parseEnvelope(raw: string): SaveEnvelope {
 /**
  * Create a save manager — orchestrates serialization, slot management,
  * migrations, and validation around the persistent-ref tree. Wired into the
- * engine automatically unless {@link EngineConfig.persistence} is `false`;
+ * engine automatically unless {@link EngineOptions.persistence} is `false`;
  * call directly only when assembling a save layer outside `createEngine`.
  *
  * Storage keys are prefixed with `gameId` (and `persistenceNamespace`, if
@@ -518,7 +518,7 @@ function parseEnvelope(raw: string): SaveEnvelope {
  * emits the {@link SaveEvents} (`save:loaded`, `save:load-failed`,
  * `save:validation-failed` and the rest) for instrumentation.
  *
- * @param config - {@link SaveManagerConfig} carrying `gameId`, version,
+ * @param options - {@link SaveManagerOptions} carrying `gameId`, version,
  *   migrations, the optional storage adapter, and slot/compression knobs.
  * @returns A {@link SaveManager} exposing `save` / `load` / `peek`, slot
  *   operations, and the `on(...)` subscription handle.
@@ -536,7 +536,7 @@ function parseEnvelope(raw: string): SaveEnvelope {
  * saves.on('save:validation-failed', (issue) => log('save issue', issue));
  * ```
  */
-export function createSaveManager(config: SaveManagerConfig): SaveManager {
+export function createSaveManager(options: SaveManagerOptions): SaveManager {
   const {
     gameId,
     persistenceNamespace,
@@ -546,7 +546,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     maxSlots = 10,
     strictValidation = isDev(),
     compressSave = true,
-  } = config;
+  } = options;
 
   // Storage key prefix carries the namespace so two engines with the same
   // gameId don't alias each other in localStorage. Undefined namespace
@@ -554,7 +554,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   const storagePrefix = persistenceNamespace ? `${gameId}:${persistenceNamespace}` : gameId;
 
   const slotsKey = `${storagePrefix}-slots`;
-  const storage: StorageAdapter = config.storageAdapter ?? {
+  const storage: StorageAdapter = options.storageAdapter ?? {
     getItem: (key) => (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null),
     setItem: (key, value) => {
       if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);

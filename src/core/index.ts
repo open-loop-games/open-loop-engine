@@ -144,7 +144,7 @@ export type { GameStateAccessorMutator } from './game-state-accessor';
 
 // === TICK DRIVER ===
 export type {
-  TickDriverConfig,
+  TickDriverOptions,
   PhaseHandlers,
   TickDriver,
   TimerProvider,
@@ -153,13 +153,13 @@ export type {
 export { createTickDriver } from './tick-driver';
 
 // === HEADLESS RUNNER ===
-export type { HeadlessConfig, HeadlessResult } from './headless';
+export type { HeadlessOptions, HeadlessResult } from './headless';
 export { runHeadless } from './headless';
 
 // === SAVE MANAGER ===
 export type {
   StorageAdapter,
-  SaveManagerConfig,
+  SaveManagerOptions,
   SaveManager,
   SaveLoadResult,
   SavePeek,

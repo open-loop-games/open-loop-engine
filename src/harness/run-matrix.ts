@@ -17,14 +17,14 @@ import { runHeadless } from '@/core/headless';
 import type { HeadlessResult } from '@/core/headless';
 import { aggregateCell } from './aggregate';
 import { createWorkPlan } from './work-plan';
-import type { CellResult, MatrixConfig, MatrixResult } from './types';
+import type { CellResult, MatrixOptions, MatrixResult } from './types';
 
 /**
  * Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner
  * order. `onRunComplete` and `onCellComplete` fire as the sweep progresses,
  * silent by default — progressive UI consumers opt in.
  *
- * @param config - {@link MatrixConfig} — cells, seeds, optional callbacks
+ * @param options - {@link MatrixOptions} — cells, seeds, optional callbacks
  *   and histogram opt-in.
  * @returns {@link MatrixResult} carrying one {@link CellResult} per cell,
  *   in input order. Empty-seed cells get a placeholder result with empty
@@ -42,10 +42,10 @@ import type { CellResult, MatrixConfig, MatrixResult } from './types';
  * result.cells[0].aggregate.metrics['gold-tracker.peak'];
  * ```
  */
-export function runMatrix(config: MatrixConfig): MatrixResult {
-  const plan = createWorkPlan(config);
-  const perCellRuns: HeadlessResult[][] = config.cells.map(() => []);
-  const cellResults: (CellResult | null)[] = config.cells.map(() => null);
+export function runMatrix(options: MatrixOptions): MatrixResult {
+  const plan = createWorkPlan(options);
+  const perCellRuns: HeadlessResult[][] = options.cells.map(() => []);
+  const cellResults: (CellResult | null)[] = options.cells.map(() => null);
 
   for (const item of plan) {
     const { cell, seed } = item;
@@ -58,26 +58,26 @@ export function runMatrix(config: MatrixConfig): MatrixResult {
       teardown: cell.teardown,
     });
     perCellRuns[item.cellIdx].push(result);
-    config.onRunComplete?.(item, result);
+    options.onRunComplete?.(item, result);
 
     if (
       cellResults[item.cellIdx] === null &&
-      perCellRuns[item.cellIdx].length === config.seeds.length
+      perCellRuns[item.cellIdx].length === options.seeds.length
     ) {
       const runs = perCellRuns[item.cellIdx];
       const cellResult: CellResult = {
         id: cell.id,
         runs,
-        aggregate: aggregateCell(runs, config.aggregate),
+        aggregate: aggregateCell(runs, options.aggregate),
       };
       cellResults[item.cellIdx] = cellResult;
-      config.onCellComplete?.(cellResult);
+      options.onCellComplete?.(cellResult);
     }
   }
 
   // Cells with zero seeds never fire onCellComplete — synthesize an empty
   // result so the MatrixResult shape stays predictable.
-  const cells: CellResult[] = config.cells.map(
+  const cells: CellResult[] = options.cells.map(
     (cell, i) =>
       cellResults[i] ?? {
         id: cell.id,
