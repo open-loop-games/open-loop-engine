@@ -220,19 +220,6 @@ export interface MatrixResult {
 }
 
 /**
- * N configurations × M seeds with no variant semantics. Thin wrapper around
- * {@link MatrixConfig} — provided separately so callers that just want a
- * batch run don't have to reach for the "cells" vocabulary.
- */
-export interface BatchConfig {
-  configs: Cell[];
-  seeds: number[];
-  onRunComplete?: (item: WorkItem, result: HeadlessResult) => void;
-  onCellComplete?: (cell: CellResult) => void;
-  aggregate?: AggregateOptions;
-}
-
-/**
  * A named config patch — the generic equivalent of a domain-specific
  * axis such as excluding upgrades. `patch` receives the baseline cell and
  * returns a new cell; the harness re-labels the returned cell with
@@ -275,7 +262,7 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
  * - `C extends Cell` (default) — fixed-tick sweep, runs via {@link runMatrix}.
  * - `C extends UntilCell` — predicate-bounded sweep, runs via
  *   {@link runMatrixUntil}. Requires {@link until} and {@link maxSimTime};
- *   `mode`/`bisectTolSec`/`stasisProbeInterval` opt-in per
+ *   `mode`/`bisectTolSec`/`stasisCheckInterval` opt-in per
  *   {@link MatrixUntilConfig}.
  *
  * Variants may be supplied flat (`variants[]`) or axis-grouped (`axes[]`,
@@ -318,8 +305,8 @@ export interface SensitivityConfig<C extends Cell | UntilCell = Cell> {
   mode?: RunMode;
   /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisProbeInterval}. Ignored when `mode !== 'event'`. */
-  stasisProbeInterval?: number;
+  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'event'`. */
+  stasisCheckInterval?: number;
 }
 
 /**
@@ -465,7 +452,7 @@ export interface RunUntilConfig {
    * subscriptions, future `TimedInput`). Default `100`. Trades ~1%
    * worst-case wall against bounded latency-to-resume for event-stepping.
    */
-  stasisProbeInterval?: number;
+  stasisCheckInterval?: number;
 }
 
 /**
@@ -576,8 +563,8 @@ export interface MatrixUntilConfig {
   mode?: RunMode;
   /** See {@link RunUntilConfig.bisectTolSec}. Ignored when `mode !== 'event'`. */
   bisectTolSec?: number;
-  /** See {@link RunUntilConfig.stasisProbeInterval}. Ignored when `mode !== 'event'`. */
-  stasisProbeInterval?: number;
+  /** See {@link RunUntilConfig.stasisCheckInterval}. Ignored when `mode !== 'event'`. */
+  stasisCheckInterval?: number;
 }
 
 /** Output of a {@link runMatrixUntil} sweep — one {@link CellResult} per input cell. */

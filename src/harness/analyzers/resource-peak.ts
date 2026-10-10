@@ -30,7 +30,7 @@ import type { Resource } from '@/core/resource';
 import { Decimal } from '@/primitives/decimal';
 
 /**
- * Metrics reported by a single {@link createResourcePeakTracker} instance.
+ * Metrics reported by a single {@link createResourcePeakAnalyzer} instance.
  *
  * @internal Engine-internal shape. Consumers read these via the metric-key
  * naming (`resource-peak:{id}.peak/.final/.avg`) rather than by
@@ -60,12 +60,12 @@ export interface ResourcePeakMetrics {
  * @example
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
- * const tracker = createResourcePeakTracker(gold);
+ * const tracker = createResourcePeakAnalyzer(gold);
  * runHeadless({ analyzers: [tracker], ... });
  * // tracker.summarize().metrics → { peak, final, avg }
  * ```
  */
-export function createResourcePeakTracker(resource: Resource): Analyzer {
+export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
   const name = `resource-peak:${resource.id}`;
   const samples: number[] = [];
   let peak = -Infinity;

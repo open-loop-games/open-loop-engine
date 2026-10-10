@@ -10,7 +10,7 @@
  * Canonical consumers today are `runUntil`'s `'event'` mode (via
  * {@link createIncrementalSnapshot}) and `runUntil`'s `'stasis-aware-tick'`
  * mode (via this one-shot merger, called per tick). Both flow through
- * `runProbe` and `runMatrixUntil`. The walker is the substrate underneath
+ * `runBeatProbe` and `runMatrixUntil`. The walker is the substrate underneath
  * the probe ecosystem, not a generic consumer-facing API.
  *
  * Broader consumer adoption (devtools panels, UI unlock hints, tutorial

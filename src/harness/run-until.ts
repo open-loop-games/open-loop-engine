@@ -99,7 +99,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   if (mode === 'event') {
     const out = runEventModeLoop(engine, config.accessor!, until, maxSimTime, tickDelta, {
       bisectTolSec: config.bisectTolSec,
-      stasisProbeInterval: config.stasisProbeInterval,
+      stasisCheckInterval: config.stasisCheckInterval,
     });
     return {
       totalTicks: out.totalTicks,

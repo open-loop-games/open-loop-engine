@@ -1,12 +1,12 @@
 /**
- * `runProbe` — the single beat-timing probe. Dispatches on
- * {@link ProbeConfig.mode} into one of `runMatrixUntil`'s three loop modes.
+ * `runBeatProbe` — the single beat-timing probe. Dispatches on
+ * {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s three loop modes.
  *
  * For each beat, drives `seeds.length` fresh engines until the predicate
  * fires (or `maxSimTime` is reached, or stasis is observed in non-tick
  * modes), aggregated into per-beat termination-time distributions.
  *
- * When {@link BeatProbe.tuningWindow} is set, the per-beat result carries
+ * When {@link Beat.tuningWindow} is set, the per-beat result carries
  * `inTuningWindow = terminationTime.p50 ∈ tuningWindow`. Pure interpretation —
  * the underlying distribution is unchanged.
  *
@@ -18,7 +18,7 @@
 import { runMatrixUntil } from '../run-matrix-until';
 import type { Engine } from '@/engine';
 import type { UntilCell, UntilPredicate } from '../types';
-import type { BeatResult, ProbeConfig } from './types';
+import type { BeatResult, BeatProbeOptions } from './types';
 
 /**
  * For each beat, drive `seeds.length` fresh engines until the beat predicate
@@ -44,7 +44,7 @@ import type { BeatResult, ProbeConfig } from './types';
  *
  * @example
  * ```ts
- * const results = runProbe({
+ * const results = runBeatProbe({
  *   buildEngine: ({ seed }) => buildProducerSimEngine(overrides, seed),
  *   beats: ARC_BEATS,
  *   seeds: [0, 1, 2, 3, 4],
@@ -56,11 +56,11 @@ import type { BeatResult, ProbeConfig } from './types';
  * }
  * ```
  */
-export function runProbe(config: ProbeConfig): BeatResult[] {
+export function runBeatProbe(config: BeatProbeOptions): BeatResult[] {
   const tickDelta = config.tickDelta ?? 1;
   const mode = config.mode ?? 'tick';
   if (mode !== 'tick' && !config.buildAccessor) {
-    throw new Error(`runProbe: mode "${mode}" requires config.buildAccessor`);
+    throw new Error(`runBeatProbe: mode "${mode}" requires config.buildAccessor`);
   }
   const out: BeatResult[] = [];
   for (const beat of config.beats) {
@@ -90,7 +90,7 @@ export function runProbe(config: ProbeConfig): BeatResult[] {
       maxSimTime: config.maxSimTime,
       mode,
       bisectTolSec: config.bisectTolSec,
-      stasisProbeInterval: config.stasisProbeInterval,
+      stasisCheckInterval: config.stasisCheckInterval,
     });
 
     const aggregate = result.cells[0].aggregate;

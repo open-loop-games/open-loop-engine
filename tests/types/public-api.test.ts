@@ -1330,7 +1330,7 @@ describe('runUntil type surface', () => {
   it('requires engine/until/maxSimTime; tickDelta and the rest default', () => {
     type Config = import('@/harness/types').RunUntilConfig;
     expectTypeOf<OptionalKeys<Config>>().toEqualTypeOf<
-      'tickDelta' | 'setup' | 'seed' | 'mode' | 'accessor' | 'bisectTolSec' | 'stasisProbeInterval'
+      'tickDelta' | 'setup' | 'seed' | 'mode' | 'accessor' | 'bisectTolSec' | 'stasisCheckInterval'
     >();
   });
 

@@ -211,7 +211,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 | Surface | Use for |
 | --- | --- |
 | `runUntil` | Predicate-bounded single-engine run. The workhorse. Dispatches on `RunMode` (`'tick'`, `'event'`, `'stasis-aware-tick'`). |
-| `runProbe` | Per-beat termination-time distributions from a seed sweep. |
+| `runBeatProbe` | Per-beat termination-time distributions from a seed sweep. |
 | `runWaypointProbe` | Snapshot-at-time across an arc per seed × waypoint; band occupation reads off the snapshot series. |
 | `runHeadless` | Fixed-tick-count run. Replayable only when you pass `seed`: the module-global RNG is entropy-seeded otherwise. |
 | `runMatrix` / `runMatrixUntil` | Cartesian runs over a parameter grid, when you want many configurations at once. |

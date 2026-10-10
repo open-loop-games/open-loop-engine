@@ -82,7 +82,7 @@ let runCounter = 0;
 
 /**
  * Build a harness `Cell` backed by a per-run engine constructed from a
- * save blob. Composable with {@link runMatrix}, {@link runBatch}, and
+ * save blob. Composable with {@link runMatrix} and
  * {@link runSensitivity}.
  *
  * The returned cell holds the current run's engine in closure and its

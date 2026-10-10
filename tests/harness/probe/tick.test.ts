@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Engine } from '@/index';
-import { runProbe } from '@/harness';
-import type { BeatProbe } from '@/harness';
+import { runBeatProbe } from '@/harness';
+import type { Beat } from '@/harness';
 
 /** Minimal engine shaped object whose counter advances one tick per simulateTick. */
 function buildTickCounterEngine(state: { tick: number }): Engine {
@@ -17,15 +17,15 @@ function buildTickCounterEngine(state: { tick: number }): Engine {
   return engine as unknown as Engine;
 }
 
-describe('runProbe', () => {
+describe('runBeatProbe', () => {
   it('fires predicate once the counter crosses the threshold (stats over all seeds)', () => {
     const sinks = new Map<number, { tick: number }>();
-    const beat: BeatProbe = {
+    const beat: Beat = {
       id: 'fires-at-5',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
     };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       buildEngine: ({ seed }) => {
         const state = { tick: 0 };
         sinks.set(seed, state);
@@ -49,7 +49,7 @@ describe('runProbe', () => {
   it('runs teardown once per (beat × seed) on the engine it built', () => {
     const built: Engine[] = [];
     const torn: [Engine, number][] = [];
-    runProbe({
+    runBeatProbe({
       buildEngine: () => {
         const engine = buildTickCounterEngine({ tick: 0 });
         built.push(engine);
@@ -72,13 +72,13 @@ describe('runProbe', () => {
   });
 
   it('preserves beat order and counts runs that hit maxSimTime', () => {
-    const neverFires: BeatProbe = { id: 'never', predicate: () => false };
-    const firesAt3: BeatProbe = {
+    const neverFires: Beat = { id: 'never', predicate: () => false };
+    const firesAt3: Beat = {
       id: 'at-3',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 3,
     };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       buildEngine: () => buildTickCounterEngine({ tick: 0 }),
       beats: [neverFires, firesAt3],
       seeds: [1, 2],
@@ -97,22 +97,22 @@ describe('runProbe', () => {
   });
 
   it('populates inTuningWindow when the beat carries a tuningWindow', () => {
-    const inside: BeatProbe = {
+    const inside: Beat = {
       id: 'inside',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
       tuningWindow: [4, 6],
     };
-    const outside: BeatProbe = {
+    const outside: Beat = {
       id: 'outside',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
       tuningWindow: [10, 20],
     };
-    const noWindow: BeatProbe = {
+    const noWindow: Beat = {
       id: 'no-window',
       predicate: (engine) => (engine as unknown as { __state: { tick: number } }).__state.tick >= 5,
     };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       buildEngine: () => buildTickCounterEngine({ tick: 0 }),
       beats: [inside, outside, noWindow],
       seeds: [1],

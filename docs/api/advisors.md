@@ -29,7 +29,7 @@ score-and-pick over a candidate list
 - `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:124`
 - `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:261`
 - `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveResource, 0) / headlineRate + cost / Δrate`, where `effectiveResource = resource − reserve`. `src/core/policy.ts:211`
-- `function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:158`
+- `function selectionPaybackPeriod<T>(getSeconds: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest beat — a per-candidate seconds figure the caller supplies, lower wins. `src/core/policy.ts:158`
 - `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:48`
 
 ## Recommendation

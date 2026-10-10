@@ -7,8 +7,8 @@
  * stateful analyzers reset between runs and can close over freshly-built
  * engine state. Parallelism is out of scope here — a pool-wiring consumer
  * maps through {@link createWorkPlan}'s output instead of reshaping this
- * loop. {@link runBatch} and {@link runSensitivity} are thin wrappers over
- * `runMatrix` for the no-variant and baseline-vs-variant cases.
+ * loop. {@link runSensitivity} is a thin wrapper over `runMatrix` for the
+ * baseline-vs-variant case.
  *
  * @cluster runners
  */

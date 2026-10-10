@@ -2,8 +2,8 @@
  * Probe substrate — types.
  *
  * A probe collects per-beat termination-time distributions from a
- * `seeds`-wide sweep. {@link runProbe} is the single shipped implementation;
- * it dispatches on {@link ProbeConfig.mode} into one of `runMatrixUntil`'s
+ * `seeds`-wide sweep. {@link runBeatProbe} is the single shipped implementation;
+ * it dispatches on {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s
  * three loop modes (`'tick'` / `'event'` / `'stasis-aware-tick'`).
  */
 
@@ -16,7 +16,7 @@ import type { MetricStats, RunContext, RunMode } from '../types';
  * spec window, just the predicate to evaluate and an optional tuning window
  * for `inTuningWindow` classification on the result.
  */
-export interface BeatProbe {
+export interface Beat {
   id: string;
   /** Predicate evaluating engine state, fired when the beat lands. */
   predicate: (engine: Engine) => boolean;
@@ -47,12 +47,12 @@ export interface BeatResult {
   /** Counts of how each seed terminated. Sums to `seeds.length`. */
   counts: { predicate: number; maxSimTime: number; unreachable: number };
   /**
-   * Echoed from {@link BeatProbe.tuningWindow} when set, so renderers can
-   * display the window without holding the originating `BeatProbe[]`.
+   * Echoed from {@link Beat.tuningWindow} when set, so renderers can
+   * display the window without holding the originating `Beat[]`.
    */
   tuningWindow?: [number, number];
   /**
-   * Present iff {@link BeatProbe.tuningWindow} is set. `true` iff
+   * Present iff {@link Beat.tuningWindow} is set. `true` iff
    * `terminationTime.p50` falls inside the window. Allows windowed-arc
    * tuning usage as a first-class probe field without a wrapper.
    */
@@ -60,13 +60,13 @@ export interface BeatResult {
 }
 
 /**
- * Configuration for {@link runProbe}. `buildEngine` is invoked per
+ * Configuration for {@link runBeatProbe}. `buildEngine` is invoked per
  * `(beat, seed)` — the probe reuses the fresh-engine contract from
  * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'tick'`
  * because event-stepping and stasis-aware-tick modes introspect content
  * through the walker.
  */
-export interface ProbeConfig {
+export interface BeatProbeOptions {
   /**
    * Build a fresh, started engine for each `(beat × seed)` run. Seeding and
    * stopping follow {@link UntilCell.buildEngine}.
@@ -84,7 +84,7 @@ export interface ProbeConfig {
    * release what `buildEngine` built. Defaults to `engine.dispose()`.
    */
   teardown?: (engine: Engine, ctx: RunContext) => void;
-  beats: BeatProbe[];
+  beats: Beat[];
   /** Seeds to run per beat. */
   seeds: number[];
   /**
@@ -106,6 +106,6 @@ export interface ProbeConfig {
   mode?: RunMode;
   /** See `RunUntilConfig.bisectTolSec`. Ignored when `mode !== 'event'`. */
   bisectTolSec?: number;
-  /** See `RunUntilConfig.stasisProbeInterval`. Ignored when `mode !== 'event'`. */
-  stasisProbeInterval?: number;
+  /** See `RunUntilConfig.stasisCheckInterval`. Ignored when `mode !== 'event'`. */
+  stasisCheckInterval?: number;
 }

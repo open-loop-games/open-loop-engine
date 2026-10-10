@@ -22,7 +22,7 @@
  *      sources (clicks, `ctx.onTick` subscribers, `TimedInput`) may still
  *      push state forward. Fast-tick at `tickDelta` without rebuilding the
  *      walker each iteration, checking the predicate per tick; every
- *      `stasisProbeInterval` ticks, rebuild once to detect exit-from-stasis.
+ *      `stasisCheckInterval` ticks, rebuild once to detect exit-from-stasis.
  *      When the fast-tick loop exhausts `maxSimTime` without exit, the run
  *      terminates `'unreachable'` if the walker's tracked dependencies held
  *      still throughout, and `'maxSimTime'` if something it can't see moved
@@ -110,7 +110,7 @@ export function resolveNextEvent(
 /** @internal */
 export interface EventModeOptions {
   bisectTolSec?: number;
-  stasisProbeInterval?: number;
+  stasisCheckInterval?: number;
 }
 
 /** @internal */
@@ -147,7 +147,7 @@ export function runEventModeLoop(
   tickDelta: number,
   options: EventModeOptions,
 ): EventModeResult {
-  const stasisProbeInterval = options.stasisProbeInterval ?? 100;
+  const stasisCheckInterval = options.stasisCheckInterval ?? 100;
   const bisectTolSec = options.bisectTolSec;
   const inc = createIncrementalSnapshot(engine, accessor);
   const registry = engine.tryInject(ResourceRegistryKey);
@@ -215,7 +215,7 @@ export function runEventModeLoop(
           steps,
           maxSimTime,
           tickDelta,
-          stasisProbeInterval,
+          stasisCheckInterval,
         ),
       );
       simTime = outcome.simTime;
@@ -370,7 +370,7 @@ function fastTickDuringStasis(
   startSteps: number,
   maxSimTime: number,
   tickDelta: number,
-  stasisProbeInterval: number,
+  stasisCheckInterval: number,
 ): FastTickOutcome {
   let simTime = startSimTime;
   let ticks = 0;
@@ -388,7 +388,7 @@ function fastTickDuringStasis(
     if (predicate({ tick: startSteps + ticks, simTime })) {
       return { simTime, ticks, exit: 'predicate' };
     }
-    if (ticks % stasisProbeInterval === 0) {
+    if (ticks % stasisCheckInterval === 0) {
       const snapshot = createTransitionSnapshot(engine, accessor);
       if (!isStasis(snapshot)) {
         return { simTime, ticks, exit: 'resume' };

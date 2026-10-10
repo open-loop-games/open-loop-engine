@@ -1,7 +1,7 @@
 /**
  * `runWaypointProbe` — snapshot-at-time per-waypoint inspector.
  *
- * Sibling of {@link runProbe}, not a subtype. For each waypoint, drives a
+ * Sibling of {@link runBeatProbe}, not a subtype. For each waypoint, drives a
  * freshly-built engine via {@link runMatrixUntil} until the waypoint's
  * `snapshotAtSec` is reached, then calls `inspect(engine)` to extract a
  * consumer-shaped snapshot. The canonical use case is methodology-#2

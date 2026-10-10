@@ -4,7 +4,7 @@
  * analyzers before they see any numbers.
  *
  * Baseline behavior:
- * - One {@link createResourcePeakTracker} per entry in the engine's
+ * - One {@link createResourcePeakAnalyzer} per entry in the engine's
  *   {@link ResourceRegistryKey} — the per-engine resource registry,
  *   auto-populated by every `createResource()` call during install/connect.
  * - A {@link createRunFinalizeAnalyzer} iff the engine has a canonical
@@ -21,7 +21,7 @@ import type { Engine } from '@/engine';
 import { ResourceRegistryKey } from '@/core/registries';
 import { CycleLogKey } from '@/systems/cycle-log';
 import { createRunFinalizeAnalyzer } from './run-finalize';
-import { createResourcePeakTracker } from './resource-peak';
+import { createResourcePeakAnalyzer } from './resource-peak';
 
 /**
  * Build a fresh analyzer pack for the given engine. Intended to be called
@@ -43,7 +43,7 @@ import { createResourcePeakTracker } from './resource-peak';
 export function defaultAnalyzerPack(engine: Engine): Analyzer[] {
   const registry = engine.tryInject(ResourceRegistryKey);
   const pack: Analyzer[] = (registry?.list() ?? []).map((entry) =>
-    createResourcePeakTracker(entry.resource),
+    createResourcePeakAnalyzer(entry.resource),
   );
   if (engine.tryInject(CycleLogKey) !== undefined) {
     pack.push(createRunFinalizeAnalyzer());

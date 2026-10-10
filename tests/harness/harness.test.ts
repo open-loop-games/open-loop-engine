@@ -6,7 +6,6 @@ import {
   computeMetricStats,
   createWorkPlan,
   diffAggregates,
-  runBatch,
   runMatrix,
   runSensitivity,
 } from '@/harness';
@@ -305,24 +304,6 @@ describe('runMatrix', () => {
       seeds: [1, 2],
     });
     expect(events).toEqual(['setup', 'teardown', 'setup', 'teardown']);
-  });
-});
-
-// --- runBatch ---
-
-describe('runBatch', () => {
-  it('is observably identical to runMatrix for a single-config case', () => {
-    const cell = fixedMetricCell('a', 7, () => [createCounterAnalyzer()]);
-    const batchResult = runBatch({
-      configs: [cell],
-      seeds: [1, 2],
-    });
-    const matrixResult = runMatrix({
-      cells: [cell],
-      seeds: [1, 2],
-    });
-    expect(batchResult.cells[0]!.aggregate).toEqual(matrixResult.cells[0]!.aggregate);
-    expect(batchResult.cells[0]!.runs.length).toBe(matrixResult.cells[0]!.runs.length);
   });
 });
 

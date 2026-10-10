@@ -149,19 +149,19 @@ export function selectionCheapest<T>(getCost: (t: T) => DecimalSource): Selectio
  * wait term to handle that case
  * (see {@link selectionHybridPayback}).
  *
- * @param getBeat - Seconds extractor. `(p) => p.purchaseBeatSeconds.value` is
+ * @param getSeconds - Seconds extractor. `(p) => p.purchaseBeatSeconds.value` is
  *   the usual source: the time the producer's whole stack takes to earn its
  *   next unit's cost, which favours tall stacks. For the marginal payback
  *   period the surveyed userscripts rank by, pass cost over the rate one more
  *   unit adds (`getCost(1) / computedRate` for a producer).
  */
-export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionPolicy<T> {
+export function selectionPaybackPeriod<T>(getSeconds: (t: T) => number): SelectionPolicy<T> {
   return {
     pick(candidates) {
       let best: T | undefined;
       let bestBeat: number | undefined;
       for (const c of candidates) {
-        const beat = getBeat(c);
+        const beat = getSeconds(c);
         if (!Number.isFinite(beat)) continue;
         if (bestBeat === undefined || beat < bestBeat) {
           best = c;

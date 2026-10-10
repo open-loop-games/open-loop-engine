@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createResource } from '@/core/resource';
 import { runHeadless } from '@/core/headless';
-import { createResourcePeakTracker } from '@/harness/analyzers/resource-peak';
+import { createResourcePeakAnalyzer } from '@/harness/analyzers/resource-peak';
 
-describe('createResourcePeakTracker', () => {
+describe('createResourcePeakAnalyzer', () => {
   it('tracks peak, final, and avg across a deterministic sample trajectory', () => {
     const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-    const tracker = createResourcePeakTracker(gold);
+    const tracker = createResourcePeakAnalyzer(gold);
 
     let tick = 0;
     const trajectory = [1, 2, 3, 4, 5, 4, 3, 2, 1, 0];
@@ -33,13 +33,13 @@ describe('createResourcePeakTracker', () => {
   it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
     const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
     const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
-    expect(createResourcePeakTracker(prestige).name).toBe('resource-peak:prestige-points');
-    expect(createResourcePeakTracker(transcend).name).toBe('resource-peak:transcend-points');
+    expect(createResourcePeakAnalyzer(prestige).name).toBe('resource-peak:prestige-points');
+    expect(createResourcePeakAnalyzer(transcend).name).toBe('resource-peak:transcend-points');
   });
 
   it('zero-tick run reports the start-of-run value for all three metrics', () => {
     const gold = createResource(42, { id: 'gold', displayName: 'gold' });
-    const tracker = createResourcePeakTracker(gold);
+    const tracker = createResourcePeakAnalyzer(gold);
 
     const result = runHeadless({
       setup: () => [tracker],
@@ -55,7 +55,7 @@ describe('createResourcePeakTracker', () => {
 
   it('resets state between sequential runs of the same instance', () => {
     const gold = createResource(0, { id: 'gold', displayName: 'gold' });
-    const tracker = createResourcePeakTracker(gold);
+    const tracker = createResourcePeakAnalyzer(gold);
 
     runHeadless({
       setup: () => {

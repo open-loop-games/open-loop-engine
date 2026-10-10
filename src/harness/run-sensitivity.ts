@@ -191,7 +191,7 @@ function runUntilPath<C extends Cell | UntilCell>(
     aggregate: config.aggregate,
     mode: config.mode,
     bisectTolSec: config.bisectTolSec,
-    stasisProbeInterval: config.stasisProbeInterval,
+    stasisCheckInterval: config.stasisCheckInterval,
   });
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {

@@ -8,8 +8,8 @@ import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { runMatrixUntil, runProbe, runUntil } from '@/harness';
-import type { BeatProbe } from '@/harness';
+import { runMatrixUntil, runBeatProbe, runUntil } from '@/harness';
+import type { Beat } from '@/harness';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -98,7 +98,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   return engine;
 }
 
-describe("runProbe({mode: 'event'})", () => {
+describe("runBeatProbe({mode: 'event'})", () => {
   it('steps by walker-visible event distance and terminates on predicate', () => {
     // Accessor reports gold=0, rate=5, cost=20 → 4s per event.
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
@@ -109,12 +109,12 @@ describe("runProbe({mode: 'event'})", () => {
     //   iter 3 (simTime=8)  → false, advance 4s
     //   iter 4 (simTime=12) → true, terminate
     let calls = 0;
-    const beat: BeatProbe = {
+    const beat: Beat = {
       id: 'fire-on-4th',
       predicate: () => ++calls >= 4,
     };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-reachable-${seed}`),
       buildAccessor: () => accessor,
@@ -132,9 +132,9 @@ describe("runProbe({mode: 'event'})", () => {
   });
 
   it('fast-ticks through no-finite-transition stasis without rebuilding walker', () => {
-    const beat: BeatProbe = { id: 'never-fires', predicate: () => false };
+    const beat: Beat = { id: 'never-fires', predicate: () => false };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: ({ seed }) => buildEmptyEngine(`event-empty-${seed}`),
       buildAccessor: () => mockAccessor(),
@@ -175,8 +175,8 @@ describe("runProbe({mode: 'event'})", () => {
     engine.use(module);
     engine.start();
 
-    const beat: BeatProbe = { id: 'flag-fires', predicate: () => flag.fired };
-    const results = runProbe({
+    const beat: Beat = { id: 'flag-fires', predicate: () => flag.fired };
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: () => engine,
       buildAccessor: () => mockAccessor(),
@@ -192,9 +192,9 @@ describe("runProbe({mode: 'event'})", () => {
 
   it('tick-fallbacks when an opaque transition is present', () => {
     const accessor = mockAccessor();
-    const beat: BeatProbe = { id: 'never-fires', predicate: () => false };
+    const beat: Beat = { id: 'never-fires', predicate: () => false };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: ({ seed }) => buildOpaqueChallengeEngine(`event-opaque-${seed}`, accessor),
       buildAccessor: () => accessor,
@@ -215,9 +215,9 @@ describe("runProbe({mode: 'event'})", () => {
     // does not execute it (no auto-purchase); the tickDelta floor carries the
     // run to the ceiling one tickDelta per advance.
     const accessor = mockAccessor({ resources: { gold: 100 }, rates: { gold: 0 } });
-    const beat: BeatProbe = { id: 'never-fires', predicate: () => false };
+    const beat: Beat = { id: 'never-fires', predicate: () => false };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-tie-${seed}`),
       buildAccessor: () => accessor,
@@ -265,8 +265,8 @@ describe("runProbe({mode: 'event'})", () => {
     // Accessor reports gold=100 and rate=0 — purchasable stays tied at
     // distance=0 every rebuild. Only the onTick handler can fire the flag.
     const accessor = mockAccessor({ resources: { gold: 100 }, rates: { gold: 0 } });
-    const beat: BeatProbe = { id: 'flag-fires', predicate: () => flag.fired };
-    const results = runProbe({
+    const beat: Beat = { id: 'flag-fires', predicate: () => flag.fired };
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
@@ -317,13 +317,13 @@ describe("runProbe({mode: 'event'})", () => {
     engine.start();
 
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 1 } });
-    const beat: BeatProbe = {
+    const beat: Beat = {
       id: 'gold-hits-10',
       predicate: () => bn(goldRef!.value).gte(10),
     };
 
     const tol = 0.5;
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
@@ -377,12 +377,12 @@ describe("runProbe({mode: 'event'})", () => {
     engine.start();
 
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 1 } });
-    const beat: BeatProbe = {
+    const beat: Beat = {
       id: 'gold-hits-10',
       predicate: () => bn(goldRef!.value).gte(10),
     };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: () => engine,
       buildAccessor: () => accessor,
@@ -458,9 +458,9 @@ describe("runProbe({mode: 'event'})", () => {
     // Same reachable snapshot as the success case, but hard-false predicate.
     // Events at 4s intervals → 25 events fill a 100s budget → maxSimTime term.
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
-    const beat: BeatProbe = { id: 'hard-false', predicate: () => false };
+    const beat: Beat = { id: 'hard-false', predicate: () => false };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'event',
       buildEngine: ({ seed }) => buildPurchasableEngine(`event-maxsim-${seed}`),
       buildAccessor: () => accessor,

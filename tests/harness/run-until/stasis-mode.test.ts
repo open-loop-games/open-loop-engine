@@ -7,8 +7,8 @@ import { createChallengeCategory } from '@/systems/challenge-category';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
-import { runProbe } from '@/harness';
-import type { BeatProbe } from '@/harness';
+import { runBeatProbe } from '@/harness';
+import type { Beat } from '@/harness';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -103,14 +103,14 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   return engine;
 }
 
-describe("runProbe({mode: 'stasis-aware-tick'})", () => {
+describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
   it('short-circuits on a constructed empty-content engine (unreachable counted)', () => {
-    const beat: BeatProbe = {
+    const beat: Beat = {
       // Hard-false — only stasis can terminate these runs.
       id: 'never-fires',
       predicate: () => false,
     };
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'stasis-aware-tick',
       buildEngine: ({ seed }) => buildEmptyEngine(`stasis-empty-${seed}`),
       buildAccessor: () => mockAccessor(),
@@ -133,7 +133,7 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
     // Positive gold rate → `upgrades.cheap.becomes-affordable` has a finite
     // distance → not stasis → probe runs until predicate fires.
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
-    const beat: BeatProbe = {
+    const beat: Beat = {
       // Fire at tick 1: we don't observe ticks on the real engine's
       // counters, so we use a simTime proxy via the until-runner. Easiest
       // is to use a `ctx`-free predicate that reads engine state directly;
@@ -146,7 +146,7 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
         return () => ++calls >= 4;
       })(),
     };
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'stasis-aware-tick',
       buildEngine: ({ seed }) => buildPurchasableEngine(`stasis-reachable-${seed}`),
       buildAccessor: () => accessor,
@@ -167,9 +167,9 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
     // stasis refuses to classify as unreachable (could be flipped by code
     // the walker can't introspect).
     const accessor = mockAccessor();
-    const beat: BeatProbe = { id: 'never-fires', predicate: () => false };
+    const beat: Beat = { id: 'never-fires', predicate: () => false };
 
-    const results = runProbe({
+    const results = runBeatProbe({
       mode: 'stasis-aware-tick',
       buildEngine: ({ seed }) => buildOpaqueChallengeEngine(`stasis-opaque-${seed}`, accessor),
       buildAccessor: () => accessor,
@@ -184,9 +184,9 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
     expect(results[0]!.terminationTime).toBeUndefined();
   });
 
-  it('agrees with runProbe on fire-time when stasis does not trigger', () => {
+  it('agrees with runBeatProbe on fire-time when stasis does not trigger', () => {
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 5 } });
-    const makeBeat = (): BeatProbe => ({
+    const makeBeat = (): Beat => ({
       id: 'count-3',
       predicate: (() => {
         let calls = 0;
@@ -194,7 +194,7 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
       })(),
     });
 
-    const stasis = runProbe({
+    const stasis = runBeatProbe({
       mode: 'stasis-aware-tick',
       buildEngine: ({ seed }) => buildPurchasableEngine(`stasis-agree-a-${seed}`),
       buildAccessor: () => accessor,
@@ -203,7 +203,7 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
       maxSimTime: 10,
       tickDelta: 1,
     });
-    const plain = runProbe({
+    const plain = runBeatProbe({
       buildEngine: ({ seed }) => buildPurchasableEngine(`stasis-agree-b-${seed}`),
       beats: [makeBeat()],
       seeds: [1],

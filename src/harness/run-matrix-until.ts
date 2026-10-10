@@ -90,7 +90,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
           mode,
           accessor,
           bisectTolSec: config.bisectTolSec,
-          stasisProbeInterval: config.stasisProbeInterval,
+          stasisCheckInterval: config.stasisCheckInterval,
         });
       } finally {
         // buildEngine returns a *started* engine (contract); with the default

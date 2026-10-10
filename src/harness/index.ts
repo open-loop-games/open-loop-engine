@@ -2,7 +2,6 @@ export * from './types';
 export { createWorkPlan } from './work-plan';
 export { computeMetricStats, diffAggregates } from './aggregate';
 export { runMatrix } from './run-matrix';
-export { runBatch } from './run-batch';
 export { runSensitivity } from './run-sensitivity';
 export { runUntil } from './run-until';
 export { runMatrixUntil } from './run-matrix-until';
@@ -13,10 +12,10 @@ export { createEngineFromSave } from './create-engine';
 export type { CreateEngineFromSaveOptions } from './create-engine';
 export type { CreateSensitivityCellOptions } from './create-sensitivity-cell';
 export {
-  createResourcePeakTracker,
+  createResourcePeakAnalyzer,
   createRunFinalizeAnalyzer,
   defaultAnalyzerPack,
-  createSeriesTracker,
+  createTimeSeriesAnalyzer,
   seriesAnalyzerPack,
 } from './analyzers';
 export {
@@ -32,11 +31,11 @@ export {
 } from './picker';
 export { applyPerturbation, type Perturbation } from './perturbation';
 export { classifyFlowChannel, getFlowChannelBoundaries, type FlowChannel } from './flow-channel';
-export { runProbe, runWaypointProbe } from './probe';
+export { runBeatProbe, runWaypointProbe } from './probe';
 export type {
-  BeatProbe,
+  Beat,
   BeatResult,
-  ProbeConfig,
+  BeatProbeOptions,
   Waypoint,
   WaypointSnapshot,
   WaypointProbeConfig,

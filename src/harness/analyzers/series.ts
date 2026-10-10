@@ -18,7 +18,7 @@
  * `t{i}` keyspace is identical across seeds, so each per-tick metric has a
  * full seed sample and the aggregate's `count` matches the seed count.
  *
- * Precision note: mirrors {@link createResourcePeakTracker} — samples convert
+ * Precision note: mirrors {@link createResourcePeakAnalyzer} — samples convert
  * via `.toNumber()` at observation time; values beyond `Number.MAX_VALUE`
  * saturate to `Infinity`.
  */
@@ -40,12 +40,12 @@ import { Decimal } from '@/primitives/decimal';
  * @example
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
- * const tracker = createSeriesTracker(gold);
+ * const tracker = createTimeSeriesAnalyzer(gold);
  * runHeadless({ analyzers: [tracker], ticks: 200, ... });
  * // tracker.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }
  * ```
  */
-export function createSeriesTracker(resource: Resource): Analyzer {
+export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
   const name = `series:${resource.id}`;
   const samples: number[] = [];
 
@@ -75,7 +75,7 @@ export function createSeriesTracker(resource: Resource): Analyzer {
 }
 
 /**
- * Build one {@link createSeriesTracker} per entry in the engine's resource
+ * Build one {@link createTimeSeriesAnalyzer} per entry in the engine's resource
  * registry — the trajectory-capturing counterpart to {@link defaultAnalyzerPack}.
  *
  * Kept separate from the default pack (rather than merged behind a flag)
@@ -85,5 +85,5 @@ export function createSeriesTracker(resource: Resource): Analyzer {
  */
 export function seriesAnalyzerPack(engine: Engine): Analyzer[] {
   const registry = engine.tryInject(ResourceRegistryKey);
-  return (registry?.list() ?? []).map((entry) => createSeriesTracker(entry.resource));
+  return (registry?.list() ?? []).map((entry) => createTimeSeriesAnalyzer(entry.resource));
 }

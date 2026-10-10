@@ -2,7 +2,7 @@
  * Deterministic live-play replay — drive a {@link TickDriver} the way production's
  * `intervalTick` does, but from a controlled clock instead of `performance.now()`.
  *
- * `runUntil` / `runProbe` deliberately decouple from the driver's live `tickRate`
+ * `runUntil` / `runBeatProbe` deliberately decouple from the driver's live `tickRate`
  * and `speedMultiplier` (caller-authoritative `tickDelta`); `processOfflineTime`
  * replays wall-clock seconds with no speed scaling. Neither reproduces the *live*
  * path. `replayLive` is the one that does: it fires `seconds × tickRate` interval
