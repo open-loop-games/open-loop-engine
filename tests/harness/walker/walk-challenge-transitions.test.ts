@@ -238,7 +238,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
     expect(challenge.maxed.value).toBe(true);
 
     // The gate is false again, and rising, but a maxed challenge never starts.
-    (accessor as { getResource: GameStateAccessor['getResource'] }).getResource = () => bn(0);
+    (accessor as { getAmount: GameStateAccessor['getAmount'] }).getAmount = () => bn(0);
     expect(
       walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'becomes-enterable'),
     ).toHaveLength(0);
@@ -451,7 +451,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
   function buildCumulativeEngine(inflow?: number) {
     let fragments!: Resource<number>;
     const accessor: GameStateAccessor = {
-      getResource: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
+      getAmount: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
       getRate: (id) => (id === 'fragments' ? bn(1) : bn(0)),
       getFlag: () => false,
       getState: () => undefined,

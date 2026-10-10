@@ -271,9 +271,6 @@ export interface AchievementCategory<
   /** Reactive count of earned achievements */
   readonly earnedCount: ComputedRef<number>;
 
-  /** Total number of registered achievements */
-  readonly totalCount: number;
-
   /** True when all registered achievements have been earned */
   readonly allEarned: ComputedRef<boolean>;
 
@@ -410,9 +407,6 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     },
 
     earnedCount,
-    get totalCount(): number {
-      return base.size;
-    },
     allEarned,
 
     get size(): number {

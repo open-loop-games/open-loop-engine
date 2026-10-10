@@ -15,7 +15,7 @@ describe('Purchasable (one-shot, limit: 1)', () => {
       limit: 1,
     });
     expect(p.active.value).toBe(false);
-    expect(Decimal.eq(p.amount.value, 0)).toBe(true);
+    expect(Decimal.eq(p.count.value, 0)).toBe(true);
   });
 
   it('can be purchased when requirements met', () => {
@@ -99,7 +99,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
       display: { title: 'Worker', description: 'Produces gold' },
       requirements: [],
     });
-    expect(Decimal.eq(p.amount.value, 0)).toBe(true);
+    expect(Decimal.eq(p.count.value, 0)).toBe(true);
     expect(p.active.value).toBe(false);
   });
 
@@ -112,7 +112,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
     });
     expect(p.canPurchase.value).toBe(true);
     p.purchase(1);
-    expect(Decimal.eq(p.amount.value, 1)).toBe(true);
+    expect(Decimal.eq(p.count.value, 1)).toBe(true);
     expect(p.active.value).toBe(true);
   });
 
@@ -125,7 +125,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
     });
     p.purchaseMax();
     expect(p.maxed.value).toBe(true);
-    expect(Decimal.eq(p.amount.value, 3)).toBe(true);
+    expect(Decimal.eq(p.count.value, 3)).toBe(true);
   });
 
   it('defaults bulkPurchase to true when limit > 1', () => {
@@ -161,15 +161,15 @@ describe('Purchasable (leveled, limit > 1)', () => {
     expect(Decimal.eq(p.effect.value, 4)).toBe(true); // 2^2 = 4
   });
 
-  it('supports initialAmount', () => {
+  it('supports initialCount', () => {
     const p = createPurchasable({
       id: 'p14',
       display: 'pre-purchased',
       requirements: [],
-      initialAmount: 5,
+      initialCount: 5,
       limit: 10,
     });
-    expect(Decimal.eq(p.amount.value, 5)).toBe(true);
+    expect(Decimal.eq(p.count.value, 5)).toBe(true);
     expect(p.active.value).toBe(true);
   });
 });
@@ -308,7 +308,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
     expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(248.832, 3);
   });
 
-  it('canPurchase and amountToPurchase reflect escalated affordability', () => {
+  it('canPurchase and countToPurchase reflect escalated affordability', () => {
     // 500 cookies, cost 100 then 120, 144, 172.8, 207.36, 248.832 ...
     // Cumulative affordable from 0 with cost 100 * 1.2^k: at most 3 levels
     // (100 + 120 + 144 = 364 ≤ 500; + 172.8 = 536.8 > 500)
@@ -369,7 +369,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
     });
 
     const bought = p.purchaseMax();
-    expect(new Decimal(p.amount.value).toNumber()).toBe(3);
+    expect(new Decimal(p.count.value).toNumber()).toBe(3);
     expect(new Decimal(bought).toNumber()).toBe(3);
     expect(new Decimal(p.effect.value).toNumber()).toBe(4);
     expect(p.maxed.value).toBe(true);
@@ -383,14 +383,14 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
       requirements: createCostRequirement({
         resource: r,
         cost: Formula.variable(0).add(100),
-        maxBulkAmount: 3,
+        maxBulkCount: 3,
       }),
       limit: 3,
       effect: (amt) => Decimal.add(amt, 1),
     });
 
     p.purchaseMax();
-    expect(new Decimal(p.amount.value).toNumber()).toBe(3);
+    expect(new Decimal(p.count.value).toNumber()).toBe(3);
     expect(p.maxed.value).toBe(true);
   });
 });
@@ -499,7 +499,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
     expect(Decimal.eq(r.value, 965)).toBe(true);
   });
 
-  it('opaque closure disables bulk purchase (maxBulkAmount = 1)', () => {
+  it('opaque closure disables bulk purchase (maxBulkCount = 1)', () => {
     const r = createResource(1e6, { id: 'r', displayName: 'r' });
     const p = createScalingPurchasable({
       id: 'closure-no-bulk',
@@ -508,8 +508,8 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
       cost: (level) => Decimal.add(10, Decimal.mul(level, 1)),
     });
 
-    // amountToPurchase caps at 1 because the cost is non-Formula.
-    expect(new Decimal(p.amountToPurchase.value).toNumber()).toBe(1);
+    // countToPurchase caps at 1 because the cost is non-Formula.
+    expect(new Decimal(p.countToPurchase.value).toNumber()).toBe(1);
   });
 
   it('geometric path remains unchanged (regression)', () => {
@@ -555,7 +555,7 @@ describe('createPurchasable — requirements as a factory over the level ref', (
         createCostRequirement({
           resource: points,
           cost: Formula.exponential(level, 10, 1.15),
-          maxBulkAmount: Decimal.dInf,
+          maxBulkCount: Decimal.dInf,
         }),
     });
 

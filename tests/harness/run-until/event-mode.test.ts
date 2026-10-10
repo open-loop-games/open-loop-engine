@@ -28,7 +28,7 @@ function mockAccessor(
   const unlocks = config.unlocks ?? {};
   const state = config.state ?? {};
   return {
-    getResource: (id) => bn(resources[id] ?? 0),
+    getAmount: (id) => bn(resources[id] ?? 0),
     getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
@@ -515,7 +515,7 @@ function buildGoldEngine(
   engine.start();
   const gold = () => bn(goldRef!.value).toNumber();
   const accessor: GameStateAccessor = {
-    getResource: () => bn(goldRef!.value),
+    getAmount: () => bn(goldRef!.value),
     getFlag: () => false,
     getState: () => undefined,
     getRate: () => bn(options.rate ?? 1),
@@ -611,7 +611,7 @@ function buildDrainedEngine(inflowFrom: number) {
   let late!: () => boolean;
   const inflow = () => (clock.value >= inflowFrom ? 1 : 0);
   const accessor: GameStateAccessor = {
-    getResource: (id) =>
+    getAmount: (id) =>
       id === 'clock' ? bn(clock.value) : id === 'fragments' ? bn(fragments.value) : bn(0),
     getRate: (id) => (id === 'clock' ? bn(1) : bn(0)),
     getInflowRate: (id) => (id === 'fragments' ? bn(inflow()) : bn(0)),

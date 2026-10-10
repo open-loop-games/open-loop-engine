@@ -90,7 +90,7 @@ function clearMissBound(price: DecimalSource): DecimalSource {
  * @param formula - Cost formula — the price of the level at its variable
  * @param resource - The resource paying for the levels
  * @param cumulativeCost - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
- * @param maxBulkAmount - Ceiling on the returned count, for "buy max" caps; a fractional cap counts the whole levels below it. Default: unbounded
+ * @param maxBulkCount - Ceiling on the returned count, for "buy max" caps; a fractional cap counts the whole levels below it. Default: unbounded
  * @returns Reactive count of affordable levels, recomputed as the resource, the
  * cost curve, and both options change — including reactive values the curve
  * reads from inside a `Formula.step` / `Formula.if` closure
@@ -99,10 +99,10 @@ export function calculateMaxAffordable(
   formula: GenericFormula,
   resource: Resource,
   cumulativeCost: Computable<boolean> = true,
-  maxBulkAmount: Computable<DecimalSource> = Decimal.dInf,
+  maxBulkCount: Computable<DecimalSource> = Decimal.dInf,
 ) {
   const computedCumulativeCost = processGetter(cumulativeCost);
-  const computedmaxBulkAmount = processGetter(maxBulkAmount);
+  const computedmaxBulkAmount = processGetter(maxBulkCount);
 
   // Change token for the cost curve. Recomputes — and so returns a *fresh*
   // object — whenever any reactive value the formula reads changes, which makes
@@ -153,11 +153,11 @@ export function calculateMaxAffordable(
       // Read first, on every path: this is the subscription to every reactive
       // input the curve reads, not just the key it is compared by.
       const token = curveToken.value;
-      const maxBulkAmount = unref(computedmaxBulkAmount);
+      const maxBulkCount = unref(computedmaxBulkAmount);
       const cumulativeCost = unref(computedCumulativeCost);
       const currentVariable = unref(formula.innermostVariable) ?? 0;
 
-      if (Decimal.eq(maxBulkAmount, 1)) {
+      if (Decimal.eq(maxBulkCount, 1)) {
         guard = null;
         // Price the level being bought, in the operation `pay` will charge it
         // in — the same question `priceOf(1)` answers on the general path, and
@@ -183,10 +183,10 @@ export function calculateMaxAffordable(
         guard !== null &&
         guard.token === token &&
         guard.cumulative === cumulativeCost &&
-        // `maxBulkAmount` defaults to `dInf`, and `processGetter` hands back the
+        // `maxBulkCount` defaults to `dInf`, and `processGetter` hands back the
         // same object each run, so identity settles the common case before the
         // comparison that has to reason about infinities.
-        (guard.maxBulk === maxBulkAmount || Decimal.eq(guard.maxBulk, maxBulkAmount)) &&
+        (guard.maxBulk === maxBulkCount || Decimal.eq(guard.maxBulk, maxBulkCount)) &&
         Decimal.eq(currentVariable, guard.variable) &&
         payable(guard.floorCost, resource.value) &&
         (Decimal.lt(resource.value, guard.ceilClear) || !payable(guard.ceilCost, resource.value))
@@ -196,7 +196,7 @@ export function calculateMaxAffordable(
 
       // --- Full recomputation ---
       // Counts are whole levels, so a fractional cap admits the levels below it.
-      const cap = Decimal.floor(maxBulkAmount);
+      const cap = Decimal.floor(maxBulkCount);
 
       // The search's last accepted and last refused counts are the answer and the
       // one past it, so the guard update below reads their prices instead of
@@ -248,7 +248,7 @@ export function calculateMaxAffordable(
         ceilClear: clearMissBound(ceilCost),
         token,
         cumulative: cumulativeCost,
-        maxBulk: maxBulkAmount,
+        maxBulk: maxBulkCount,
       };
 
       return affordable;
@@ -398,17 +398,17 @@ export function countAffordable(
  * operation so the count and the charge agree.
  *
  * @param formula - Cost formula — the price of the level at its variable
- * @param amountToBuy - Number of levels to price; a fractional amount takes every whole level below it
+ * @param count - Number of levels to price; a fractional amount takes every whole level below it
  * @param cumulativeCost - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
  * @returns The total cost, or 0 with a report when the span has no price
  */
 export function calculateCost(
   formula: GenericFormula,
-  amountToBuy: DecimalSource,
+  count: DecimalSource,
   cumulativeCost = true,
 ): DecimalSource {
   const origValue = unref(formula.innermostVariable) ?? 0;
-  const price = priceLevels(formula, origValue, amountToBuy, cumulativeCost);
+  const price = priceLevels(formula, origValue, count, cumulativeCost);
   if (price != null) return price;
   console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
   return 0;

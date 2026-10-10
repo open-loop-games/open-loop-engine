@@ -17,7 +17,7 @@ import type { Computable } from './computed';
 
 // === GATE TYPE UNION ===
 
-/** True when `accessor.getResource(resource) >= value`. Rate-aware. */
+/** True when `accessor.getAmount(resource) >= value`. Rate-aware. */
 export interface ResourceGteGate {
   kind: 'resource-gte';
   resource: string;

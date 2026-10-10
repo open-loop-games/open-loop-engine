@@ -51,9 +51,9 @@ export interface ProducerPurchaseConfig {
   /** Maximum purchasable count */
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */
-  initialAmount?: DecimalSource;
+  initialCount?: DecimalSource;
   /** Called after each purchase */
-  onPurchase?: (amount: DecimalSource) => void;
+  onPurchase?: (count: DecimalSource) => void;
   /** Whether this producer is visible in the UI. Default: `true` */
   visible?: Predicate;
   /**
@@ -314,7 +314,7 @@ function buildProducer<Def extends { id: string }>(
         baseCost: pc.baseCost,
         costScaling: pc.costScaling,
         limit: pc.limit,
-        initialAmount: pc.initialAmount,
+        initialCount: pc.initialCount,
         onPurchase: pc.onPurchase,
         visible: pc.visible,
         bulkPurchase: pc.bulkPurchase,
@@ -327,7 +327,7 @@ function buildProducer<Def extends { id: string }>(
     mapping.extraCount !== undefined ? processGetter(mapping.extraCount) : undefined;
 
   const ownedCount = computed<DecimalSource>(() =>
-    repeatable ? repeatable.amount.value : Decimal.dZero,
+    repeatable ? repeatable.count.value : Decimal.dZero,
   );
   const extraCount = computed<DecimalSource>(() =>
     processedExtraCount ? unref(processedExtraCount) : Decimal.dZero,

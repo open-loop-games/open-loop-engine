@@ -55,8 +55,8 @@ Algebraic expression trees with evaluate / invert / integrate.
 - `function arithmeticSeries(from: DecimalSource, count: DecimalSource): DecimalSource` — `Σ (from + i)` for `i` in `[0, count)` — the bare variable's own series. `src/core/formulas/series.ts:75`
 - `type BinaryFormulaInstanceOp = (other: FormulaSource) => GenericFormula` — Instance-side signature of a binary op (`formula.add(other)`). `src/core/formulas/formulas.ts:106`
 - `type BinaryFormulaOp = (value: FormulaSource, other: FormulaSource) => GenericFormula` — Signature of a two-argument formula op (e.g. `src/core/formulas/formulas.ts:101`
-- `function calculateCost(formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/affordability.ts:405`
-- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkAmount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "buy max" for repeatables and conversions. `src/core/formulas/affordability.ts:98`
+- `function calculateCost(formula: GenericFormula, count: DecimalSource, cumulativeCost?: boolean): DecimalSource` — Calculate the total cost of purchasing a specific number of levels. `src/core/formulas/affordability.ts:405`
+- `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, cumulativeCost?: Computable<boolean>, maxBulkCount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "buy max" for repeatables and conversions. `src/core/formulas/affordability.ts:98`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:72`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:25`
 - `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1365`
@@ -107,7 +107,7 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:150`
 - `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:108`
 - `type Predicate = Computable<boolean> | Gate` — A yes/no condition in any authoring form: a constant, a ref or getter over state in scope, or a Gate the engine can introspect and predict. `src/core/gate.ts:138`
-- `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:21`
+- `interface ResourceGteGate` — True when `accessor.getAmount(resource) >= value`. `src/core/gate.ts:21`
 - `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:70`
 - `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:382`
 - `function assertGateServices(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle evaluating `gate` will read. `src/systems/gate.ts:368`

@@ -46,7 +46,7 @@ describe('self-referential grants (#18)', () => {
           {
             chain,
             // Self-referential: reads back through the category's own accessor.
-            mult: () => Decimal.pow(def.factor, category.getPurchasable(def.id)?.amount.value ?? 0),
+            mult: () => Decimal.pow(def.factor, category.getPurchasable(def.id)?.count.value ?? 0),
             description: def.name,
           },
         ],
@@ -114,7 +114,7 @@ describe('self-referential grants (#18)', () => {
     // First evaluation happens before registration: the lookup misses. The
     // version-ref read inside the accessor is the only dep keeping this
     // computed invalidatable.
-    const amount = computed(() => category.getPurchasable('perk')?.amount.value ?? Decimal.dNegOne);
+    const amount = computed(() => category.getPurchasable('perk')?.count.value ?? Decimal.dNegOne);
     expect(new Decimal(amount.value).toNumber()).toBe(-1);
 
     category.register([{ id: 'perk', name: 'Perk', cost: 10, factor: 2 }]);

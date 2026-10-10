@@ -192,7 +192,7 @@ export interface SetupSweepAutoPurchaseOptions {
 function reserveClampedAmount(
   p: Purchasable,
   reserve: Decimal,
-  ceilingArg: DecimalSource = p.amountToPurchase.value,
+  ceilingArg: DecimalSource = p.countToPurchase.value,
 ): DecimalSource {
   let ceiling = ceilingArg;
 
@@ -370,11 +370,11 @@ export interface SetupPolicyAutoPurchaseOptions {
   /**
    * Bulk purchase amount per selected producer. Default: `1`.
    *
-   * The engine passes this straight to `repeatable.purchase(bulkAmount)` —
+   * The engine passes this straight to `repeatable.purchase(bulkCount)` —
    * it's up to the Purchasable to honor bulk semantics. Use `1` when you
    * want deterministic per-tick picks (policy testing, correctness).
    */
-  bulkAmount?: Computable<DecimalSource>;
+  bulkCount?: Computable<DecimalSource>;
   /**
    * Spending-discipline floor. The auto-buyer will not drive any resource a
    * purchase *spends* below this value: a candidate is screened out unless every
@@ -389,7 +389,7 @@ export interface SetupPolicyAutoPurchaseOptions {
    * `allOf` are opaque to the floor — the same limitation `Purchasable.getCost`
    * has.
    *
-   * The floor also clamps {@link bulkAmount}: candidate selection screens on
+   * The floor also clamps {@link bulkCount}: candidate selection screens on
    * the cost of a single unit, so the winning bulk buy is cut down to whatever
    * the floor admits rather than spending through it.
    *
@@ -401,7 +401,7 @@ export interface SetupPolicyAutoPurchaseOptions {
    * userscripts.
    *
    * Independent of any reserve a {@link SelectionPolicy} scores with —
-   * {@link selectionHybridPayback}'s wait term reads whatever `getResource`
+   * {@link selectionHybridPayback}'s wait term reads whatever `getAmount`
    * the consumer wired, which is a ranking heuristic, not this floor. The two
    * can disagree when cost-resource and produce-resource differ.
    */
@@ -466,7 +466,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  *    {@link SetupPolicyAutoPurchaseOptions.waitForCost | waitForCost}, the
  *    paying costs and the floor drop out of this filter.
  * 4. Pass the filtered list to `policy.pick()` and purchase the winner,
- *    clamping `bulkAmount` to what the reserve admits. A winner that can't be
+ *    clamping `bulkCount` to what the reserve admits. A winner that can't be
  *    paid buys nothing.
  * 5. Subtract `interval` from the accumulator (so beat timing stays stable)
  *    and re-scan if more drained slots remain.
@@ -486,9 +486,9 @@ export interface SetupPolicyAutoPurchaseOptions {
  *     policy: selectionHybridPayback({
  *       getCost: (p) => p.repeatable!.getCost(1),
  *       getRate: (p) => p.computedRate.value,
- *       getResource: (p) => p.resource.value,
+ *       getAmount: (p) => p.resource.value,
  *       getReserve: () => reserveRef.value,
- *       getHeadlineRate: (p) => buildings.getTotalRate(p.resource),
+ *       getTotalRate: (p) => buildings.getTotalRate(p.resource),
  *     }),
  *     waitForCost: true,
  *     interval: () => 5 / tier.value,
@@ -508,7 +508,7 @@ export function setupPolicyAutoPurchase(
   const processedPolicy = processGetter<SelectionPolicy<Producer>>(
     options.policy ?? defaultCheapestPolicy,
   );
-  const processedBulk = processGetter<DecimalSource>(options.bulkAmount ?? 1);
+  const processedBulk = processGetter<DecimalSource>(options.bulkCount ?? 1);
   const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
   const processedWaitForCost = processGetter(options.waitForCost ?? false);
   const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
@@ -553,7 +553,7 @@ export function setupPolicyAutoPurchase(
   // mutation that requires it. `selectionHybridPayback` is the only built-in
   // that reads it; consumer-defined policies can ignore the getter.
   const headlineRateByResource = new Map<Resource, Decimal>();
-  const getHeadlineRate = (producer: Producer): Decimal => {
+  const getTotalRate = (producer: Producer): Decimal => {
     const cached = headlineRateByResource.get(producer.resource);
     if (cached) return cached;
     const total = Decimal.fromValue(aggregateRate(producer.resource));
@@ -619,7 +619,7 @@ export function setupPolicyAutoPurchase(
         candidates.push(producer);
       }
 
-      const best = candidates.length > 0 ? policy.pick(candidates, { getHeadlineRate }) : undefined;
+      const best = candidates.length > 0 ? policy.pick(candidates, { getTotalRate }) : undefined;
       profileEnd('autobuy.decide', scanStart);
 
       // A pick that can't be paid — possible only under `waitForCost` — is
@@ -633,15 +633,15 @@ export function setupPolicyAutoPurchase(
         // The candidate filter above only proved that a *single* unit fits
         // under the floor, and under `waitForCost` not even that. Buying
         // `bulk` on that evidence spends straight through the reserve
-        // whenever `bulkAmount > 1`, so clamp to what the floor actually
-        // admits. Capping the ceiling at `amountToPurchase` costs nothing —
+        // whenever `bulkCount > 1`, so clamp to what the floor actually
+        // admits. Capping the ceiling at `countToPurchase` costs nothing —
         // `purchase()` re-clamps there anyway — and keeps a non-finite `bulk`
         // from making the clamp a no-op.
         const amount = useReserve
           ? reserveClampedAmount(
               buyTarget,
               reserve,
-              Decimal.min(bulk, buyTarget.amountToPurchase.value),
+              Decimal.min(bulk, buyTarget.countToPurchase.value),
             )
           : bulk;
 

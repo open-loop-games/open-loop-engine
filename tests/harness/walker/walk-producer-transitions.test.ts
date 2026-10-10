@@ -237,7 +237,7 @@ describe('walkProducerTransitions — maxed skip', () => {
       { id: 'mill', baseRate: 1, baseCost: 10, limit: 1 },
     ]);
     const repeatable = category.getProducer('mill')!.repeatable!;
-    repeatable.amount.value = 1;
+    repeatable.count.value = 1;
     expect(repeatable.maxed.value).toBe(true);
 
     const accessor = mockAccessor({ resources: { cookies: 1000 }, rates: { cookies: 2 } });

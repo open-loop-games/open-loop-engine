@@ -54,7 +54,7 @@ describe('createTimeBank — earn efficiency & cap', () => {
   });
 
   it('hard-clamps at cap, reporting only the accepted amount', () => {
-    const bank = createTimeBank({ cap: 60 });
+    const bank = createTimeBank({ capacity: 60 });
     expect(bank.deposit(50)).toBe(50);
     expect(bank.deposit(50)).toBe(10);
     expect(bank.banked.value).toBe(60);
@@ -65,7 +65,7 @@ describe('createTimeBank — earn efficiency & cap', () => {
 
   it('a lowered reactive cap does not confiscate an already-full bank on deposit', () => {
     const cap = ref(100);
-    const bank = createTimeBank({ cap });
+    const bank = createTimeBank({ capacity: cap });
     bank.deposit(100);
     cap.value = 50;
     expect(bank.deposit(10)).toBe(0);

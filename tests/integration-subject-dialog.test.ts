@@ -58,7 +58,7 @@ beforeEach(() => {
 function buildAccessor(): GameStateAccessorMutator {
   const unlocks = new Map<string, boolean>();
   return {
-    getResource: () => bn(0),
+    getAmount: () => bn(0),
     getFlag: (id) => unlocks.get(id) ?? false,
     getState: () => undefined,
     getRate: () => Decimal.dZero,

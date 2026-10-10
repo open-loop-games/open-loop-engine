@@ -196,7 +196,7 @@ The unifying rule: **your prediction never re-implements game mechanics.** The m
 
 There are two query modes against the same instance:
 
-**Frozen-state queries.** Build the engine, mutate persistent refs into a hypothetical state, and *don't tick*. Read `ProducerCategory.getTotalRate(resource)` for aggregate per-resource rate, `Purchasable.amount` / `.active` for purchase state, `Purchasable.amountToPurchase` and `getCost(n)` for what a buy would take and cost (a producer's purchasable is `producer.repeatable`), the free functions `calculateCost` / `calculateMaxAffordable` over a cost `Formula` at the core layer, and `ModifierChain` bindings with per-link contributions for attribution. The engine answers "what would cost and rate be at this state" without running gameplay — which is how a walker steps a schedule without simulating it.
+**Frozen-state queries.** Build the engine, mutate persistent refs into a hypothetical state, and *don't tick*. Read `ProducerCategory.getTotalRate(resource)` for aggregate per-resource rate, `Purchasable.amount` / `.active` for purchase state, `Purchasable.countToPurchase` and `getCost(n)` for what a buy would take and cost (a producer's purchasable is `producer.repeatable`), the free functions `calculateCost` / `calculateMaxAffordable` over a cost `Formula` at the core layer, and `ModifierChain` bindings with per-link contributions for attribution. The engine answers "what would cost and rate be at this state" without running gameplay — which is how a walker steps a schedule without simulating it.
 
 **Ticking runs.** Install the game's automation, then `runUntil` a beat predicate fires. The engine plays; the script times the beats.
 
@@ -273,7 +273,7 @@ Two rules follow, both load-bearing:
 
 The spine stays plain arithmetic. But when a spine-derived constant is wired into a live purchasable's cost or a skill's XP curve, **express the curve as a `Formula` rather than a hand-rolled closure** — `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costScaling` shorthands that are Formula-backed underneath.
 
-This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is the engine's bulk-purchase math: `calculateMaxAffordable` counts levels over a cost `Formula`, and seeds the count from its inverse where it has one. At the default `maxBulkAmount` a non-Formula cost is single-purchase only; raise it and bulk is priced linearly off the current rung, which undercharges any ladder (`CostRequirementOptions.cost`). Either way you lose the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
+This is easy to miss because a hand-rolled `Math.pow` cost function works fine on the day you write it. What you forfeit is the engine's bulk-purchase math: `calculateMaxAffordable` counts levels over a cost `Formula`, and seeds the count from its inverse where it has one. At the default `maxBulkCount` a non-Formula cost is single-purchase only; raise it and bulk is priced linearly off the current rung, which undercharges any ladder (`CostRequirementOptions.cost`). Either way you lose the "next at N" inversion a UI wants. The limitation shows up much later than the choice does, in a feature request rather than an error.
 
 The rule of thumb: if a number only ever feeds a prediction, plain arithmetic. If it becomes a cost the player pays repeatedly, `Formula`.
 

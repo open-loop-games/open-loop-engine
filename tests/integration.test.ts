@@ -26,7 +26,7 @@ describe('Integration: simple idle game loop', () => {
     for (let i = 0; i < 10; i++) addResource(gold, productionRate.mul(0.05));
 
     const accessor: GameStateAccessor = {
-      getResource: (id) => (id === 'gold' ? bn(gold.value) : bn(0)),
+      getAmount: (id) => (id === 'gold' ? bn(gold.value) : bn(0)),
       getFlag: () => false,
       getState: () => undefined,
       getRate: () => Decimal.dZero,

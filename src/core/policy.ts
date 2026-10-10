@@ -71,7 +71,7 @@ export interface HybridPaybackOptions<T> {
    */
   getRate: (t: T) => DecimalSource;
   /** Resource currently held against `t`'s cost-resource */
-  getResource: (t: T) => DecimalSource;
+  getAmount: (t: T) => DecimalSource;
   /**
    * Spending floor; `effectiveResource = resource − reserve`. Read once per
    * `pick` call. Pass `() => 0` when no reserve is configured.
@@ -84,25 +84,25 @@ export interface HybridPaybackOptions<T> {
    * candidate with a gap.
    *
    * Driver helpers (e.g. `setupPolicyAutoPurchase`) may pass their own
-   * cached version via {@link HybridPaybackContext.getHeadlineRate} on the
+   * cached version via {@link HybridPaybackContext.getTotalRate} on the
    * `ctx` argument, in which case `pick` prefers that — caching lives at
    * the call site, not on the stateless policy.
    */
-  getHeadlineRate: (t: T) => DecimalSource;
+  getTotalRate: (t: T) => DecimalSource;
 }
 
 /**
  * Per-call context that {@link selectionHybridPayback} understands. Drivers
  * pass this to `pick(candidates, ctx)` to override the policy's own
- * `getHeadlineRate` with a cached one — useful when the same resource's
+ * `getTotalRate` with a cached one — useful when the same resource's
  * headline rate is queried for many candidates per pick.
  */
 export interface HybridPaybackContext<T> {
   /**
    * Cached headline-rate getter. When present, supersedes
-   * `HybridPaybackOptions.getHeadlineRate` for the duration of the pick.
+   * `HybridPaybackOptions.getTotalRate` for the duration of the pick.
    */
-  getHeadlineRate?: (t: T) => DecimalSource;
+  getTotalRate?: (t: T) => DecimalSource;
 }
 
 // === FACTORIES ===
@@ -202,9 +202,9 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  * const policy = selectionHybridPayback<Producer>({
  *   getCost: (p) => p.repeatable!.getCost(1),
  *   getRate: (p) => p.computedRate.value,
- *   getResource: (p) => p.resource.value,
+ *   getAmount: (p) => p.resource.value,
  *   getReserve: () => 0,
- *   getHeadlineRate: (p) => buildings.getTotalRate(p.resource),
+ *   getTotalRate: (p) => buildings.getTotalRate(p.resource),
  * });
  * ```
  */
@@ -212,7 +212,7 @@ export function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): Select
   return {
     pick(candidates, ctx) {
       const ctxObj = ctx as HybridPaybackContext<T> | undefined;
-      const getHeadlineRate = ctxObj?.getHeadlineRate ?? opts.getHeadlineRate;
+      const getTotalRate = ctxObj?.getTotalRate ?? opts.getTotalRate;
       const reserve = Decimal.fromValue(opts.getReserve());
       let best: T | undefined;
       let bestScore: Decimal | undefined;
@@ -220,11 +220,11 @@ export function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): Select
         const deltaRate = Decimal.fromValue(opts.getRate(c));
         if (!deltaRate.gt(0)) continue;
         const cost = Decimal.fromValue(opts.getCost(c));
-        const effectiveResource = Decimal.sub(opts.getResource(c), reserve);
+        const effectiveResource = Decimal.sub(opts.getAmount(c), reserve);
         const gap = cost.sub(effectiveResource);
         let waitTerm: Decimal = Decimal.dZero;
         if (gap.gt(0)) {
-          const headlineRate = Decimal.fromValue(getHeadlineRate(c));
+          const headlineRate = Decimal.fromValue(getTotalRate(c));
           // No income means the gap never closes: no finite wait to score.
           if (!headlineRate.gt(0)) continue;
           waitTerm = gap.div(headlineRate);

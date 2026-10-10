@@ -90,7 +90,7 @@ function buildFixture(): {
   const unlocks = new Map<string, boolean>();
   const stateMap = new Map<string, unknown>();
   const accessor: GameStateAccessorMutator = {
-    getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
+    getAmount: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     getFlag: (id) => unlocks.get(id) ?? false,
     getState: (path) => stateMap.get(path),
@@ -202,7 +202,7 @@ describe('evaluateGate — per-kind dispatch', () => {
 
   it('count-gte reads CategoryEntrySignals.count', () => {
     const f = buildFixture();
-    f.upgEntry!.purchasable.amount.value = 3;
+    f.upgEntry!.purchasable.count.value = 3;
     expect(
       evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 3 }, f.runtime),
     ).toBe(true);
@@ -294,7 +294,7 @@ describe('evaluateGate — combinators', () => {
   it('all is true iff every child is true', () => {
     const f = buildFixture();
     f.points.value = 50;
-    f.upgEntry!.purchasable.amount.value = 2;
+    f.upgEntry!.purchasable.count.value = 2;
 
     const both: Gate = {
       kind: 'all',
@@ -305,7 +305,7 @@ describe('evaluateGate — combinators', () => {
     };
     expect(evaluateGate(both, f.runtime)).toBe(true);
 
-    f.upgEntry!.purchasable.amount.value = 1;
+    f.upgEntry!.purchasable.count.value = 1;
     expect(evaluateGate(both, f.runtime)).toBe(false);
     f.stop();
   });
@@ -572,7 +572,7 @@ function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } 
         }),
       });
       upgCat.register({ id: 'fast', name: 'Fast' });
-      upgCat.getEntry('fast')!.purchasable.amount.value = bn(3);
+      upgCat.getEntry('fast')!.purchasable.count.value = bn(3);
     },
   };
 
@@ -796,7 +796,7 @@ describe('gateToCondition — partial projection', () => {
     };
     const projected = gateToCondition(gate);
     const accessor: GameStateAccessor = {
-      getResource: (id) => (id === 'gold' ? bn(75) : bn(0)),
+      getAmount: (id) => (id === 'gold' ? bn(75) : bn(0)),
       getRate: () => Decimal.dZero,
       getFlag: () => false,
       getState: () => 'mid',

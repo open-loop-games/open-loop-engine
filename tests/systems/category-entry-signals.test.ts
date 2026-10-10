@@ -82,7 +82,7 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     expect(entry.signals.active.value).toBe(false);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(0);
 
-    entry.purchasable.amount.value = 3;
+    entry.purchasable.count.value = 3;
     expect(entry.signals.active.value).toBe(true);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(3);
   });

@@ -62,7 +62,7 @@ export interface TimeBankConfig {
    * beyond it are discarded. Can be a ref or getter for dynamic values
    * (upgradeable caps).
    */
-  cap?: Computable<number>;
+  capacity?: Computable<number>;
 }
 
 /** Banked-time reservoir returned by {@link createTimeBank}. */
@@ -105,7 +105,7 @@ export interface TimeBank {
  * ```
  */
 export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
-  const { earnEfficiency = 1, cap } = config;
+  const { earnEfficiency = 1, capacity: cap } = config;
   const bankContextId = resolveSystemPersistentContextId(config.id, 'time-bank');
   const banked = withPersistentContext(bankContextId, () =>
     persistent<number>(0, { name: 'banked' }),

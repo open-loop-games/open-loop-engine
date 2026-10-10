@@ -301,7 +301,7 @@ describe('createAchievementCategory', () => {
     ]);
 
     expect(category.earnedCount.value).toBe(0);
-    expect(category.totalCount).toBe(3);
+    expect(category.size).toBe(3);
     expect(category.allEarned.value).toBe(false);
 
     category.getAchievement('a')!.complete();
@@ -314,7 +314,7 @@ describe('createAchievementCategory', () => {
     expect(category.allEarned.value).toBe(true);
   });
 
-  it('totalCount updates with incremental registration', () => {
+  it('size updates with incremental registration', () => {
     const category = createAchievementCategory<TestDef>({
       id: 'test14',
       mapAchievement: (def) => ({
@@ -322,16 +322,16 @@ describe('createAchievementCategory', () => {
       }),
     });
 
-    expect(category.totalCount).toBe(0);
+    expect(category.size).toBe(0);
 
     category.register({ id: 'a', name: 'A', threshold: 1 });
-    expect(category.totalCount).toBe(1);
+    expect(category.size).toBe(1);
 
     category.register([
       { id: 'b', name: 'B', threshold: 2 },
       { id: 'c', name: 'C', threshold: 3 },
     ]);
-    expect(category.totalCount).toBe(3);
+    expect(category.size).toBe(3);
   });
 
   it('allEarned is false for empty category', () => {

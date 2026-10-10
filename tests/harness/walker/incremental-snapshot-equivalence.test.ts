@@ -34,7 +34,7 @@ describe('createIncrementalSnapshot — construction', () => {
     const engine = createEngine({ gameId: 'inc-no-key', persistence: false });
     engine.start();
     const accessor: GameStateAccessor = {
-      getResource: () => bn(0),
+      getAmount: () => bn(0),
       getFlag: () => false,
       getState: () => undefined,
       getRate: () => bn(0),
@@ -71,7 +71,7 @@ describe('createIncrementalSnapshot — construction', () => {
     engine.use(module);
     engine.start();
     const accessor: GameStateAccessor = {
-      getResource: () => bn(0),
+      getAmount: () => bn(0),
       getFlag: () => false,
       getState: () => undefined,
       getRate: () => bn(0),
@@ -206,13 +206,13 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
     const { upgrades, config, inc, check } = setup('inc-gate-purchasable', { gold: 25, gems: 0 });
     const fast = upgrades.getPurchasable('fast')!;
 
-    fast.amount.value = 1;
+    fast.count.value = 1;
     config.resources.gold = 5;
     inc.invalidateResource('gold');
     check('after-purchase');
     expect(inc.snapshot.purchasables.some((t) => t.defId === 'fast')).toBe(false);
 
-    fast.amount.value = 0;
+    fast.count.value = 0;
     config.resources.gold = 10;
     inc.invalidateResource('gold');
     check('after-reset');
@@ -221,7 +221,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
   it('a raised limit un-maxes a purchasable without an invalidation', () => {
     const { upgrades, upgradeLimit, inc, check } = setup('inc-gate-limit', { gold: 25, gems: 0 });
-    upgrades.getPurchasable('fast')!.amount.value = 1;
+    upgrades.getPurchasable('fast')!.count.value = 1;
     check('maxed');
 
     upgradeLimit.value = 2;
@@ -235,12 +235,12 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
     const { buildings, config, inc, check } = setup('inc-gate-producer', { gold: 40, gems: 0 });
     const mill = buildings.getProducer('mill')!.repeatable!;
 
-    mill.amount.value = 1;
+    mill.count.value = 1;
     config.resources.gold = 10;
     inc.invalidateResource('gold');
     check('after-purchase');
 
-    mill.amount.value = 0;
+    mill.count.value = 0;
     check('after-reset-without-invalidation');
     expect(inc.snapshot.producers.some((t) => t.defId === 'mill')).toBe(true);
   });

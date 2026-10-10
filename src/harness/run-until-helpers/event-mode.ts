@@ -283,7 +283,7 @@ function sampleDeps(
   const flags = new Map<string, boolean>();
   const states = new Map<string, unknown>();
   for (const id of inc.trackedResources) {
-    resources.set(id, accessor.getResource(id));
+    resources.set(id, accessor.getAmount(id));
     const total = registry?.findById(id)?.cumulative;
     if (total) totals.set(id, new Decimal(total.value));
   }

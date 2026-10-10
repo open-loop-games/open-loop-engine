@@ -48,9 +48,9 @@ export interface Requirement {
    * Pay the cost of this requirement.
    * Called when the requirement is consumed (e.g., purchasing an upgrade).
    *
-   * @param amount - Number of times to pay (for bulk purchases)
+   * @param count - Number of times to pay (for bulk purchases)
    */
-  pay?: (amount?: DecimalSource) => void;
+  pay?: (count?: DecimalSource) => void;
 
   /**
    * Human-readable description of this requirement.
@@ -92,7 +92,7 @@ export interface CostRequirementOptions {
    *   (`calculateMaxAffordable`) and closed-form summation (`calculateCost`).
    *   The only correct shape for a cost that scales on what's being bought.
    *
-   * The mispricing needs `maxBulkAmount > 1` to bite, so it can't be reached
+   * The mispricing needs `maxBulkCount > 1` to bite, so it can't be reached
    * through `createPurchasableCategory` or `createScalingPurchasable` without
    * asking for it. When a cost scales on a purchasable's own level,
    * build it as a Formula over the level ref that
@@ -119,10 +119,10 @@ export interface CostRequirementOptions {
    * `Decimal.dInf` for uncapped) only alongside a Formula cost — see
    * {@link CostRequirementOptions.cost}.
    */
-  maxBulkAmount?: Computable<DecimalSource>;
+  maxBulkCount?: Computable<DecimalSource>;
 
   /** Custom pay function (overrides default resource subtraction) */
-  pay?: (amount?: DecimalSource) => void;
+  pay?: (count?: DecimalSource) => void;
 
   /** Description for UI display */
   description?: Computable<string>;
@@ -145,10 +145,10 @@ export interface CostRequirement extends Requirement {
   cumulativeCost: MaybeRef<boolean>;
 
   /** Maximum bulk purchase amount */
-  maxBulkAmount: MaybeRef<DecimalSource>;
+  maxBulkCount: MaybeRef<DecimalSource>;
 
   /** Get the actual cost for a given amount */
-  getCost: (amount?: DecimalSource) => DecimalSource;
+  getCost: (count?: DecimalSource) => DecimalSource;
 }
 
 /**
@@ -170,16 +170,16 @@ export interface CostRequirement extends Requirement {
  * const scalingCost = createCostRequirement({
  *   resource: points,
  *   cost: Formula.variable(level).pow_base(2).mul(10), // 10 * 2^level
- *   maxBulkAmount: 10
+ *   maxBulkCount: 10
  * })
  * ```
  */
 export function createCostRequirement(options: CostRequirementOptions): CostRequirement {
-  const { resource, cost, requiresPay, cumulativeCost, maxBulkAmount, pay, description } = options;
+  const { resource, cost, requiresPay, cumulativeCost, maxBulkCount, pay, description } = options;
 
   const processedCost = isFormula(cost) ? cost : processGetter(cost);
   const processedCumulativeCost = cumulativeCost != null ? processGetter(cumulativeCost) : true;
-  const processedMaxBulk = maxBulkAmount != null ? processGetter(maxBulkAmount) : 1;
+  const processedMaxBulk = maxBulkCount != null ? processGetter(maxBulkCount) : 1;
 
   // Precomputed formula affordability — reactive via calculateMaxAffordable's own computed.
   const formulaMaxAffordable = isFormula(processedCost)
@@ -220,7 +220,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
     resource,
     cost: processedCost,
     cumulativeCost: processedCumulativeCost,
-    maxBulkAmount: processedMaxBulk,
+    maxBulkCount: processedMaxBulk,
     getCost,
 
     met,

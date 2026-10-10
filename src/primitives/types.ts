@@ -204,7 +204,7 @@ export interface WeightedItem<T> {
 /** Read-only view of game state used when evaluating conditions and resolving effects. */
 export interface GameStateAccessor {
   /** Returns the current amount of the named resource. */
-  getResource(id: string): Decimal;
+  getAmount(id: string): Decimal;
   /** Returns whether the named unlock flag is currently set. */
   getFlag(id: string): boolean;
   /** Returns the value at a dot-separated state path (e.g. `"player.phase"`). */

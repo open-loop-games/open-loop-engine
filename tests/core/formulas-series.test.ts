@@ -257,7 +257,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       resource: wallet,
       cost,
       cumulativeCost: true,
-      maxBulkAmount: 100,
+      maxBulkCount: 100,
     });
 
     expect(Decimal.eq(maxRequirementsMet(req), 3)).toBe(true);
@@ -290,7 +290,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     });
 
     // Read once at coef = 1 — this is what builds and memoizes the integral.
-    expect(Decimal.gt(p.amountToPurchase.value, 0)).toBe(true);
+    expect(Decimal.gt(p.countToPurchase.value, 0)).toBe(true);
 
     coef.value = 100;
     const bought = p.purchaseMax();
@@ -323,7 +323,7 @@ describe('a flat price is an ordinary authored value', () => {
       bulkPurchase: true,
     });
     expect(String(capped.purchaseMax())).toBe('5');
-    expect(String(capped.amount.value)).toBe('5');
+    expect(String(capped.count.value)).toBe('5');
 
     const wallet = createResource(ref<DecimalSource>(100), { displayName: 'coins' });
     const bulk = createScalingPurchasable({
@@ -352,7 +352,7 @@ describe('a flat price is an ordinary authored value', () => {
 
 describe('a single-payment purchase charges the level it counted to', () => {
   test('a cap of 1 counts the level it is buying, not the one it is on', () => {
-    // `maxBulkAmount: 1` — createCostRequirement's default — takes a fast path
+    // `maxBulkCount: 1` — createCostRequirement's default — takes a fast path
     // that skips the seed and the correction walk entirely. It still has to
     // answer the same question the general path does, and under
     // `cumulativeCost: false` it did not: it compared the balance against
@@ -372,12 +372,12 @@ describe('a single-payment purchase charges the level it counted to', () => {
         const capped = createCostRequirement({
           ...shape,
           cost: Formula.exponential(level, 10, costScaling),
-          maxBulkAmount: 1,
+          maxBulkCount: 1,
         });
         const uncapped = createCostRequirement({
           ...shape,
           cost: Formula.exponential(level, 10, costScaling),
-          maxBulkAmount: Decimal.dInf,
+          maxBulkCount: Decimal.dInf,
         });
 
         const capAnswer = maxRequirementsMet(capped);
@@ -417,7 +417,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
           resource: wallet,
           cost: Formula.exponential(level, 10, costScaling),
           cumulativeCost: false,
-          maxBulkAmount: Decimal.dInf,
+          maxBulkCount: Decimal.dInf,
         });
 
         const n = maxRequirementsMet(req);

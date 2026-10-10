@@ -87,7 +87,7 @@ export function predictAffordable(
       flags: new Set(),
       states: new Set(),
     },
-    currentValue: accessor.getResource(costId),
+    currentValue: accessor.getAmount(costId),
   };
 }
 
@@ -139,13 +139,13 @@ function emitForEntity(
   // for finite limits. `amount === limit - 1` reads off the same distance as
   // the affordability flip — one more purchase and we're at `limit`.
   const limit = unref(purchasable.limit);
-  if (Decimal.isFinite(limit) && Decimal.eq(purchasable.amount.value, Decimal.sub(limit, 1))) {
+  if (Decimal.isFinite(limit) && Decimal.eq(purchasable.count.value, Decimal.sub(limit, 1))) {
     out.push({
       transition: buildTransition(
         categoryId,
         defId,
         'purchasable-maxed',
-        purchasable.amount.value,
+        purchasable.count.value,
         distance,
       ),
       deps,

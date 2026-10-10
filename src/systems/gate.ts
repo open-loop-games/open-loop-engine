@@ -20,7 +20,7 @@
  *
  * | Kind           | Evaluator                                           | Predictor                                |
  * |----------------|-----------------------------------------------------|------------------------------------------|
- * | resource-gte   | accessor.getResource(id) >= value                   | timeUntilConditionFlip over projection   |
+ * | resource-gte   | accessor.getAmount(id) >= value                   | timeUntilConditionFlip over projection   |
  * | cumulative-gte | registry.findById(id).cumulative.value >= value     | gap in the cumulative total ÷ inflow     |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | active         | findCategoryEntrySignals(...).active                | 'opaque-predicate'                       |
@@ -176,7 +176,7 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
   switch (gate.kind) {
     case 'resource-gte':
       return Decimal.gte(
-        demand(runtime, 'accessor', gate.kind).getResource(gate.resource),
+        demand(runtime, 'accessor', gate.kind).getAmount(gate.resource),
         gate.value,
       );
     case 'cumulative-gte': {

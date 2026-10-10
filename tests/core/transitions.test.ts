@@ -28,7 +28,7 @@ function mockAccessor(
   const unlocks = config.unlocks ?? {};
   const state = config.state ?? {};
   return {
-    getResource: (id) => bn(resources[id] ?? 0),
+    getAmount: (id) => bn(resources[id] ?? 0),
     getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),

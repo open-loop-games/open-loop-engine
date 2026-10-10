@@ -73,7 +73,7 @@ export function compareState(
 /**
  * Evaluate a declarative {@link ICondition} against the given game-state
  * accessor. Recurses through `and` / `or` / `not` nodes; leaves resolve via
- * the accessor's `getResource` / `getFlag` / `getState` lookups.
+ * the accessor's `getAmount` / `getFlag` / `getState` lookups.
  *
  * @internal
  */
@@ -81,7 +81,7 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
   switch (condition.type) {
     case 'resource':
       return compareDecimal(
-        accessor.getResource(condition.target),
+        accessor.getAmount(condition.target),
         condition.operator,
         new Decimal(condition.value),
       );

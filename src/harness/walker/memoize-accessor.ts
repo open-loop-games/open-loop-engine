@@ -23,7 +23,7 @@ function cached<V>(read: (id: string) => V): (id: string) => V {
 
 export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor {
   const memo: GameStateAccessor = {
-    getResource: cached((id) => accessor.getResource(id)),
+    getAmount: cached((id) => accessor.getAmount(id)),
     getRate: cached((id) => accessor.getRate(id)),
     getFlag: cached((id) => accessor.getFlag(id)),
     getState: cached((path) => accessor.getState(path)),

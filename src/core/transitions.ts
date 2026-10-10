@@ -2,7 +2,7 @@
  * Transition-distance primitives — "when does X happen?" math over current engine state.
  *
  * Pure synchronous functions that compose condition evaluation (`@/core/conditions`),
- * accessor-read state (`getResource`, `getRate`), and Decimal arithmetic into
+ * accessor-read state (`getAmount`, `getRate`), and Decimal arithmetic into
  * structured distances. Callers bind the result into reactive views with `computed()`
  * if they need reactivity; this module itself has no Vue dependency.
  *
@@ -59,7 +59,7 @@ export type TransitionDistance =
 export interface TransitionDeps {
   /**
    * Resource ids whose amount the distance reads: the balance via
-   * `accessor.getResource(id)`, or the lifetime total a `cumulative-gte` gate reads.
+   * `accessor.getAmount(id)`, or the lifetime total a `cumulative-gte` gate reads.
    */
   resources: ReadonlySet<string>;
   /**
@@ -81,7 +81,7 @@ export interface AffordableLike {
   /** The resource that pays for this purchasable */
   resource: Resource;
   /** Cost to buy the next `amount` levels (defaults to 1) */
-  getCost: (amount?: DecimalSource) => DecimalSource;
+  getCost: (count?: DecimalSource) => DecimalSource;
 }
 
 /**
@@ -103,7 +103,7 @@ export function timeUntilResource(
   target: DecimalSource,
   accessor: GameStateAccessor,
 ): TransitionDistance {
-  const current = accessor.getResource(resourceId);
+  const current = accessor.getAmount(resourceId);
   const targetDec = Decimal.fromValue(target);
   if (Decimal.gte(current, targetDec)) {
     return { seconds: 0, reason: 'computed' };
@@ -176,7 +176,7 @@ function timeUntilResourceFlip(
   if (condition.operator === 'eq') {
     return { seconds: null, reason: 'uncomputable' };
   }
-  const current = accessor.getResource(condition.target);
+  const current = accessor.getAmount(condition.target);
   const targetDec = Decimal.fromValue(condition.value);
   const rate = accessor.getRate(condition.target);
   const currentlyTrue = evaluateCondition(condition, accessor);

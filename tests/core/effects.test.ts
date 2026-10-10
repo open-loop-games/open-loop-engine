@@ -5,7 +5,7 @@ import { resolveEffect, applyEffect, E, type GameStateMutator } from '@/core/eff
 
 function mockAccessor(): GameStateAccessor {
   return {
-    getResource: (id) => (id === 'gold' ? bn(100) : bn(0)),
+    getAmount: (id) => (id === 'gold' ? bn(100) : bn(0)),
     getFlag: () => false,
     getState: () => undefined,
     getRate: () => Decimal.dZero,
@@ -173,7 +173,7 @@ describe('applyEffect', () => {
     const gold = { amount: bn(0) };
     const unlocked = new Set<string>();
     const accessor: GameStateAccessor = {
-      getResource: (id) => (id === 'gold' ? gold.amount : bn(0)),
+      getAmount: (id) => (id === 'gold' ? gold.amount : bn(0)),
       getFlag: (id) => unlocked.has(id),
       getState: () => undefined,
       getRate: () => Decimal.dZero,

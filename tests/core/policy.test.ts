@@ -17,9 +17,9 @@ function hybridOptions(headline = 1000, resource = 0): HybridPaybackOptions<Cand
   return {
     getCost: (c) => c.cost,
     getRate: (c) => c.rate,
-    getResource: () => resource,
+    getAmount: () => resource,
     getReserve: () => 0,
-    getHeadlineRate: () => headline,
+    getTotalRate: () => headline,
   };
 }
 
@@ -72,10 +72,10 @@ describe('selectionHybridPayback', () => {
     expect(selectionHybridPayback(hybridOptions(1000)).pick([quick, slow])).toBe(quick);
   });
 
-  it('prefers a ctx getHeadlineRate over the options one', () => {
+  it('prefers a ctx getTotalRate over the options one', () => {
     const policy = selectionHybridPayback(hybridOptions(1000));
     // At 0.1/s the wait term dominates: quick 1000 + 100, slow 100 + 200.
-    expect(policy.pick([quick, slow], { getHeadlineRate: () => 0.1 })).toBe(slow);
+    expect(policy.pick([quick, slow], { getTotalRate: () => 0.1 })).toBe(slow);
   });
 
   it('skips candidates that add no rate', () => {

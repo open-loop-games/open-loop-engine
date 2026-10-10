@@ -20,7 +20,7 @@
  *       createCostRequirement({
  *         resource: gold,
  *         cost: Formula.exponential(level, def.baseCost, 1.15),
- *         maxBulkAmount: Decimal.dInf,
+ *         maxBulkCount: Decimal.dInf,
  *       }),
  *     limit: def.maxLevel,
  *     effect: (amount) => Decimal.pow(1.1, amount),
@@ -32,9 +32,9 @@
  * // Access
  * perks.getPurchasable('dmgReduce');               // Purchasable instance
  * perks.getPurchasable('dmgReduce')!.purchase(1);  // buy one level
- * // (a bare `purchase()` buys as many as are affordable, up to `maxBulkAmount`)
+ * // (a bare `purchase()` buys as many as are affordable, up to `maxBulkCount`)
  * perks.purchasedCount.value;                      // how many have been bought at least once
- * perks.totalAmount.value;                         // sum of all levels
+ * perks.totalCount.value;                         // sum of all levels
  * perks.purchaseAffordable();                      // buy-max on every affordable
  * ```
  *
@@ -156,7 +156,7 @@ export interface PurchasableCategory<
   readonly purchasedCount: ComputedRef<number>;
 
   /** Reactive sum of all purchasables' amounts (total levels across all) */
-  readonly totalAmount: ComputedRef<DecimalSource>;
+  readonly totalCount: ComputedRef<DecimalSource>;
 
   /** Reactive product of the effects of every purchasable bought at least once */
   readonly totalEffect: ComputedRef<DecimalSource>;
@@ -215,7 +215,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     buildState: mapState,
     buildSignals: (_def, purchasable) => ({
       active: purchasable.active,
-      count: computed(() => purchasable.amount.value),
+      count: computed(() => purchasable.count.value),
     }),
   });
 
@@ -223,9 +223,9 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
 
   const purchasedCount = computed(() => list().filter((p) => p.active.value).length);
 
-  const totalAmount = computed((): DecimalSource =>
+  const totalCount = computed((): DecimalSource =>
     list().reduce<DecimalSource>(
-      (sum, p) => renormIfLayer0(Decimal.add(sum, p.amount.value)),
+      (sum, p) => renormIfLayer0(Decimal.add(sum, p.count.value)),
       Decimal.dZero,
     ),
   );
@@ -280,7 +280,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     },
 
     purchasedCount,
-    totalAmount,
+    totalCount,
     totalEffect,
     allMaxed,
 

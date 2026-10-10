@@ -600,7 +600,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
 
     createReset({ thingsToReset: [upgrades] }).reset();
 
-    expect(Decimal.eq(upgrades.getPurchasable('sharpen')!.amount.value, 0)).toBe(true);
+    expect(Decimal.eq(upgrades.getPurchasable('sharpen')!.count.value, 0)).toBe(true);
     expect(Decimal.eq(gold.value, 990)).toBe(true);
     expect(maxLevel.value).toBe(3);
     expect(shown.value).toBe(true);

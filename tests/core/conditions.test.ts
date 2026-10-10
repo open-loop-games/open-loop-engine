@@ -5,7 +5,7 @@ import { evaluateCondition, extractDependencies } from '@/core/conditions';
 
 function mockAccessor(overrides: Partial<GameStateAccessor> = {}): GameStateAccessor {
   return {
-    getResource: (id) => (id === 'gold' ? bn(100) : bn(0)),
+    getAmount: (id) => (id === 'gold' ? bn(100) : bn(0)),
     getFlag: (id) => id === 'smithing',
     getState: () => undefined,
     getRate: () => Decimal.dZero,

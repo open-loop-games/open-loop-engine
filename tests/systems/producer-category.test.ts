@@ -658,10 +658,10 @@ describe('createProducerCategory', () => {
 
     const producer = category.getProducer('cursor')!;
     expect(producer.repeatable).toBeDefined();
-    expect(new Decimal(producer.repeatable!.amount.value).eq(0)).toBe(true);
+    expect(new Decimal(producer.repeatable!.count.value).eq(0)).toBe(true);
 
     producer.repeatable!.purchase(1);
-    expect(new Decimal(producer.repeatable!.amount.value).eq(1)).toBe(true);
+    expect(new Decimal(producer.repeatable!.count.value).eq(1)).toBe(true);
   });
 
   // ==========================================================================

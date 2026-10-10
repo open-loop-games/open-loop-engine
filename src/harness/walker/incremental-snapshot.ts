@@ -166,7 +166,7 @@ function updateSlot(gate: unknown[], i: number, value: unknown): boolean {
 
 function readPurchasableGate(purchasable: Purchasable | undefined, gate: unknown[]): boolean {
   // `maxed` and the `amount === limit - 1` cap check are functions of these two.
-  let moved = updateSlot(gate, 0, purchasable?.amount.value);
+  let moved = updateSlot(gate, 0, purchasable?.count.value);
   moved = updateSlot(gate, 1, purchasable && unref(purchasable.limit)) || moved;
   return moved;
 }

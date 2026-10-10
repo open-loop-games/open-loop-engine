@@ -1220,7 +1220,7 @@ describe('Buy Max', () => {
       expect(calculateCost(formula, 5, false)).compare_tolerance(6);
     });
     test('A cost curve that evaluates to NaN affords nothing', () => {
-      // `maxBulkAmount === 1` short-circuits past the seed and the correction
+      // `maxBulkCount === 1` short-circuits past the seed and the correction
       // walk. break_eternity's `gte` answered `true` against NaN, so an
       // undefined cost — `recip(0)` is NaN rather than Infinity — read as
       // affordable and handed out a free level. Corrected in
@@ -1250,7 +1250,7 @@ describe('Buy Max', () => {
         Decimal.pow(1.05, 141).mul(100),
       );
     });
-    test('Caps the count at maxBulkAmount and prices the capped target', () => {
+    test('Caps the count at maxBulkCount and prices the capped target', () => {
       const variable = Formula.variable(0);
       const formula = F.pow(1.05, variable).mul(100);
       const maxAffordable = calculateMaxAffordable(formula, resource, false, 4);
@@ -1571,8 +1571,8 @@ describe('Buy Max', () => {
       }
     });
 
-    test('raising maxBulkAmount past a capped answer invalidates the band', () => {
-      // `maxBulkAmount` is a MaybeRef and `canMaximize` exists to drive an
+    test('raising maxBulkCount past a capped answer invalidates the band', () => {
+      // `maxBulkCount` is a MaybeRef and `canMaximize` exists to drive an
       // x1/x10/x100/max toggle, so this moves whenever a player clicks one. It
       // was absent from the key entirely, and a capped band stores ceilCost as
       // Infinity — which `!payable` always accepts — so the cap check passed
@@ -1637,9 +1637,9 @@ describe('Buy Max', () => {
 
     test('a band one level below the cap keeps its ceiling', () => {
       // `capped` asks whether there is a next level to price. Testing
-      // `affordable + 1 >= maxBulkAmount` also fired one level *below* the cap,
+      // `affordable + 1 >= maxBulkCount` also fired one level *below* the cap,
       // where that next level is real and priceable; erasing its ceiling to
-      // Infinity froze the answer at maxBulkAmount - 1 for as long as the level
+      // Infinity froze the answer at maxBulkCount - 1 for as long as the level
       // held.
       const level = ref<DecimalSource>(0);
       const formula = Formula.exponential(level, 10, 1.15);

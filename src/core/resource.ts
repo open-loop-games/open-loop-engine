@@ -54,7 +54,7 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
    * {@link ResourceOptions.id} as passed, not namespaced by module, and
    * unique per engine. A wrapped ref created without an id takes its
    * `displayName`. Use this (not `displayName`) as the key when forwarding
-   * to {@link GameStateAccessor} methods like `getResource`/`getRate`.
+   * to {@link GameStateAccessor} methods like `getAmount`/`getRate`.
    */
   id: string;
   /** Human-readable name shown in UI and used for resource-registry lookups by name */

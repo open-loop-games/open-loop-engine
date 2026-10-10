@@ -73,7 +73,7 @@ describe('requirements module', () => {
 
     it('reports met=N at balance==N×cost for bulk', () => {
       const gold = createResource(new Decimal(250), { id: 'Gold', displayName: 'Gold' });
-      const req = createCostRequirement({ resource: gold, cost: 50, maxBulkAmount: 5 });
+      const req = createCostRequirement({ resource: gold, cost: 50, maxBulkCount: 5 });
       expect(Decimal.eq(unref(req.met), 5)).toBe(true);
     });
 
@@ -92,7 +92,7 @@ describe('requirements module', () => {
       bal = Decimal.add(bal, 0.000001);
       bal = Decimal.sub(bal, 0.000001);
       const gold = createResource(bal, { id: 'Gold', displayName: 'Gold' });
-      const req = createCostRequirement({ resource: gold, cost: 920000, maxBulkAmount: 5 });
+      const req = createCostRequirement({ resource: gold, cost: 920000, maxBulkCount: 5 });
       expect(Decimal.eq(unref(req.met), 5)).toBe(true);
     });
   });

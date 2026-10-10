@@ -91,13 +91,13 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
 
     // Gold has no rate, so no dep moves either way, and the gate stays false.
     const pick = shop.getPurchasable('pick')!;
-    pick.amount.value = 1;
+    pick.count.value = 1;
     inc.rebuild();
     expect(trials.getChallenge('mine')!.canEnter.value).toBe(false);
     expect(startUnlock()?.distance).toEqual({ seconds: null, reason: 'no-rate' });
     expect(inc.snapshot.all).toEqual(createTransitionSnapshot(engine, accessor).all);
 
-    pick.amount.value = 0;
+    pick.count.value = 0;
     inc.rebuild();
     expect(startUnlock()?.distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });

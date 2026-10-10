@@ -50,7 +50,7 @@ import { createPredicateResolver, type Predicate, type PredicateResolver } from 
 /** Events emitted by a {@link Purchasable} instance */
 export interface PurchasableEvents {
   /** Fired after each purchase, with the number of levels bought in this transaction */
-  purchased: (amount: DecimalSource) => void;
+  purchased: (count: DecimalSource) => void;
 }
 
 /** UI text for a purchasable. All fields accept refs/getters for dynamic content. */
@@ -102,7 +102,7 @@ export interface PurchasableOptions {
    *   createCostRequirement({
    *     resource: gold,
    *     cost: Formula.exponential(level, def.baseCost, 1.15),
-   *     maxBulkAmount: Decimal.dInf,
+   *     maxBulkCount: Decimal.dInf,
    *   })
    * ```
    *
@@ -113,11 +113,11 @@ export interface PurchasableOptions {
    * so bulk purchasing walks the real curve. Multiple resources work too —
    * return an array of cost requirements over the same `level`.
    */
-  requirements: Requirements | ((amount: MaybeRef<DecimalSource>) => Requirements);
+  requirements: Requirements | ((count: MaybeRef<DecimalSource>) => Requirements);
   /** Maximum number of purchases. Default: `Infinity` (uncapped) */
   limit?: Computable<DecimalSource>;
   /** Starting amount (useful for purchasables that begin pre-purchased). Default: `0` */
-  initialAmount?: DecimalSource;
+  initialCount?: DecimalSource;
   /**
    * Effect value or function.
    *
@@ -129,9 +129,9 @@ export interface PurchasableOptions {
    *
    * If omitted, effect defaults to `1` (identity for multiplication).
    */
-  effect?: Computable<DecimalSource> | ((amount: DecimalSource) => DecimalSource);
+  effect?: Computable<DecimalSource> | ((count: DecimalSource) => DecimalSource);
   /** Callback fired after each purchase with the number of levels bought */
-  onPurchase?: (amount: DecimalSource) => void;
+  onPurchase?: (count: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
   visible?: Predicate;
   /**
@@ -206,7 +206,7 @@ export type ScalingPurchasableEffect =
        * - `(amount: DecimalSource) => DecimalSource` — genuinely custom logic.
        *   Forward evaluation only; `effectCurve` is undefined.
        */
-      effect?: DecimalSource | ((amount: DecimalSource) => DecimalSource);
+      effect?: DecimalSource | ((count: DecimalSource) => DecimalSource);
       effectFormula?: never;
     }
   | {
@@ -245,9 +245,9 @@ export type ScalingPurchasableOptions = {
   /** Maximum number of purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
   /** Starting amount. Default: `0` */
-  initialAmount?: DecimalSource;
+  initialCount?: DecimalSource;
   /** Callback fired after each purchase */
-  onPurchase?: (amount: DecimalSource) => void;
+  onPurchase?: (count: DecimalSource) => void;
   /** Whether this purchasable is visible. Default: `true` */
   visible?: Predicate;
   /** Whether bulk purchasing is enabled. Default: `true` */
@@ -265,7 +265,7 @@ export interface Purchasable {
   /** Unique identifier */
   id: string;
   /** Current number of purchases (persistent, saved/loaded automatically) */
-  amount: Persistent<DecimalSource>;
+  count: Persistent<DecimalSource>;
   /**
    * Latch — `true` when `amount >= 1`. The primary status read for callers
    * who only care whether this is "on" (one-shot upgrades, predicate-gated
@@ -275,7 +275,7 @@ export interface Purchasable {
   /** Reactive flag — `true` when requirements are met and limit isn't reached */
   canPurchase: ComputedRef<boolean>;
   /** How many levels would be bought by a `purchase()` call (respects bulk and limit) */
-  amountToPurchase: ComputedRef<DecimalSource>;
+  countToPurchase: ComputedRef<DecimalSource>;
   /** True when amount has reached the configured limit */
   maxed: ComputedRef<boolean>;
   /** The configured purchase limit */
@@ -305,16 +305,16 @@ export interface Purchasable {
   /**
    * Buy levels. Pass an amount to cap the purchase. Omitted, it buys as many
    * as are affordable when `bulkPurchase` is on (the default for anything but
-   * a one-shot), up to the cost's `maxBulkAmount`, and one when it's off.
+   * a one-shot), up to the cost's `maxBulkCount`, and one when it's off.
    * Returns levels bought.
    */
-  purchase: (amount?: DecimalSource) => DecimalSource;
+  purchase: (count?: DecimalSource) => DecimalSource;
   /** Buy as many levels as affordable. Returns total levels bought. */
   purchaseMax: () => DecimalSource;
   /** Estimate the total cost for a given number of additional levels. Default: `1` */
-  getCost: (amount?: DecimalSource) => DecimalSource;
+  getCost: (count?: DecimalSource) => DecimalSource;
   /** Callback from options, if provided */
-  onPurchase?: (amount: DecimalSource) => void;
+  onPurchase?: (count: DecimalSource) => void;
   /** Subscribe to purchasable lifecycle events */
   on: Emittable<PurchasableEvents>['on'];
 }
@@ -325,9 +325,9 @@ export interface Purchasable {
  * Detect whether an effect option is an amount-function or a Computable.
  * Amount-functions have `length >= 1` (they take an `amount` parameter).
  */
-function isAmountFunction(
-  effect: Computable<DecimalSource> | ((amount: DecimalSource) => DecimalSource),
-): effect is (amount: DecimalSource) => DecimalSource {
+function isCountFunction(
+  effect: Computable<DecimalSource> | ((count: DecimalSource) => DecimalSource),
+): effect is (count: DecimalSource) => DecimalSource {
   return typeof effect === 'function' && effect.length >= 1;
 }
 
@@ -361,12 +361,12 @@ function buildPurchasableDisplay(
 /** Synthetic limit requirement that gates purchases at the configured cap. */
 function buildLimitRequirement(
   processedLimit: MaybeRef<DecimalSource>,
-  amount: Persistent<DecimalSource>,
+  count: Persistent<DecimalSource>,
 ): Requirement {
   return {
     met: computed((): DecimalSource => {
       const lim = unref(processedLimit);
-      const current = amount.value;
+      const current = count.value;
       return Decimal.max(Decimal.sub(lim, current), 0);
     }),
     requiresPay: false,
@@ -375,9 +375,9 @@ function buildLimitRequirement(
   };
 }
 
-/** Reactive active/maxed/canPurchase/amountToPurchase computeds. */
+/** Reactive active/maxed/canPurchase/countToPurchase computeds. */
 function buildPurchasableComputeds(
-  amount: Persistent<DecimalSource>,
+  count: Persistent<DecimalSource>,
   processedLimit: MaybeRef<DecimalSource>,
   visible: ComputedRef<boolean>,
   processedBulkPurchase: MaybeRef<boolean>,
@@ -386,13 +386,13 @@ function buildPurchasableComputeds(
   active: ComputedRef<boolean>;
   maxed: ComputedRef<boolean>;
   canPurchase: ComputedRef<boolean>;
-  amountToPurchase: ComputedRef<DecimalSource>;
+  countToPurchase: ComputedRef<DecimalSource>;
 } {
-  const active = computed((): boolean => Decimal.gte(amount.value, 1));
+  const active = computed((): boolean => Decimal.gte(count.value, 1));
 
   const maxed = computed((): boolean => {
     const lim = unref(processedLimit);
-    return Decimal.gte(amount.value, lim);
+    return Decimal.gte(count.value, lim);
   });
 
   const canPurchase = computed((): boolean => {
@@ -401,40 +401,40 @@ function buildPurchasableComputeds(
     return requirementsMet(allRequirements);
   });
 
-  const amountToPurchase = computed((): DecimalSource => {
+  const countToPurchase = computed((): DecimalSource => {
     if (!unref(processedBulkPurchase)) {
       return canPurchase.value ? 1 : 0;
     }
     return Decimal.max(1, maxRequirementsMet(allRequirements));
   });
 
-  return { active, maxed, canPurchase, amountToPurchase };
+  return { active, maxed, canPurchase, countToPurchase };
 }
 
 /** Resolve effect option (computable / amount-fn / undefined) into a single computed. */
 function buildEffectComputed(
   effect: PurchasableOptions['effect'],
-  amount: Persistent<DecimalSource>,
+  count: Persistent<DecimalSource>,
 ): ComputedRef<DecimalSource> {
   if (effect == null) {
     return computed(() => 1);
   }
-  if (isAmountFunction(effect)) {
-    return computed(() => effect(amount.value));
+  if (isCountFunction(effect)) {
+    return computed(() => effect(count.value));
   }
   const processedEffect = processGetter(effect);
   return computed(() => unref(processedEffect) ?? 1);
 }
 
 /** Cost-estimation closure that delegates to each requirement's own getCost. */
-function buildGetCost(baseReqs: Requirement[]): (purchaseAmount?: DecimalSource) => DecimalSource {
-  return function getCost(purchaseAmount: DecimalSource = 1): DecimalSource {
+function buildGetCost(baseReqs: Requirement[]): (purchaseCount?: DecimalSource) => DecimalSource {
+  return function getCost(purchaseCount: DecimalSource = 1): DecimalSource {
     let totalCost: DecimalSource = Decimal.dZero;
     for (const req of baseReqs) {
       if ('getCost' in req && typeof (req as { getCost?: unknown }).getCost === 'function') {
         totalCost = Decimal.add(
           totalCost,
-          (req as { getCost: (n: DecimalSource) => DecimalSource }).getCost(purchaseAmount),
+          (req as { getCost: (n: DecimalSource) => DecimalSource }).getCost(purchaseCount),
         );
       }
     }
@@ -458,7 +458,7 @@ function buildScalingCostRequirement(
     return createCostRequirement({
       resource: options.resource,
       cost: toFormula(options.costFormula(level)),
-      maxBulkAmount: limit ?? Decimal.dInf,
+      maxBulkCount: limit ?? Decimal.dInf,
     });
   }
 
@@ -469,7 +469,7 @@ function buildScalingCostRequirement(
     return createCostRequirement({
       resource: options.resource,
       cost: () => costFn(level.value),
-      maxBulkAmount: 1,
+      maxBulkCount: 1,
     });
   }
 
@@ -483,7 +483,7 @@ function buildScalingCostRequirement(
   return createCostRequirement({
     resource: options.resource,
     cost: Formula.exponential(level, processedBaseCost, processedCostScaling),
-    maxBulkAmount: limit ?? Decimal.dInf,
+    maxBulkCount: limit ?? Decimal.dInf,
   });
 }
 
@@ -495,13 +495,13 @@ function buildScalingEffect(
   options: ScalingPurchasableEffect,
   level: Ref<DecimalSource>,
 ): {
-  effectFn: ((amount: DecimalSource) => DecimalSource) | undefined;
+  effectFn: ((count: DecimalSource) => DecimalSource) | undefined;
   effectCurve: GenericFormula | undefined;
 } {
   const { effect, effectFormula } = options;
   const fromCurve = (curve: GenericFormula) => ({
     effectCurve: curve,
-    effectFn: (amount: DecimalSource) => new Decimal(curve.evaluate(amount)),
+    effectFn: (count: DecimalSource) => new Decimal(curve.evaluate(count)),
   });
   if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(level)));
   if (effect === undefined || typeof effect === 'function') {
@@ -515,29 +515,29 @@ function buildScalingEffect(
  * The purchasable's saved level, in a sub-context of its own so purchasables
  * grouped under one outer context (e.g. `layer0`) don't collide on `amount`.
  */
-function buildPurchasableAmount(
+function buildPurchasableCount(
   id: string,
-  initialAmount: DecimalSource | undefined,
+  initialCount: DecimalSource | undefined,
 ): { contextId: string; amount: Persistent<DecimalSource> } {
   const parentContext = getCurrentPersistentContext();
   const contextId = parentContext ? `${parentContext}:${id}` : id;
-  const amount = withPersistentContext(contextId, () =>
-    persistent<DecimalSource>(0, { name: 'amount' }),
+  const count = withPersistentContext(contextId, () =>
+    persistent<DecimalSource>(0, { name: 'count' }),
   );
 
-  if (initialAmount !== undefined) {
-    (amount as { [DefaultValue]: DecimalSource })[DefaultValue] = cloneDefault(initialAmount);
-    if (Decimal.eq(amount.value, 0)) {
-      amount.value = cloneDefault(initialAmount);
+  if (initialCount !== undefined) {
+    (count as { [DefaultValue]: DecimalSource })[DefaultValue] = cloneDefault(initialCount);
+    if (Decimal.eq(count.value, 0)) {
+      count.value = cloneDefault(initialCount);
     }
   }
-  return { contextId, amount };
+  return { contextId, amount: count };
 }
 
 /** Everything a purchasable builds over its level, once `amount` exists. */
 function assemblePurchasable(
   options: PurchasableOptions,
-  amount: Persistent<DecimalSource>,
+  count: Persistent<DecimalSource>,
   contextId: string,
   predicates: PredicateResolver,
 ): Purchasable {
@@ -555,31 +555,31 @@ function assemblePurchasable(
   // declared before the ref it reads. `Requirements` is never a function, so
   // the typeof discriminates unambiguously.
   const resolvedRequirements =
-    typeof requirements === 'function' ? requirements(amount) : requirements;
+    typeof requirements === 'function' ? requirements(count) : requirements;
   const baseReqs = Array.isArray(resolvedRequirements)
     ? resolvedRequirements
     : [resolvedRequirements];
-  const limitRequirement = buildLimitRequirement(processedLimit, amount);
+  const limitRequirement = buildLimitRequirement(processedLimit, count);
   const allRequirements: Requirements = [...baseReqs, limitRequirement];
 
-  const { active, maxed, canPurchase, amountToPurchase } = buildPurchasableComputeds(
-    amount,
+  const { active, maxed, canPurchase, countToPurchase } = buildPurchasableComputeds(
+    count,
     processedLimit,
     processedVisible,
     processedBulkPurchase,
     allRequirements,
   );
 
-  const effectComputed = buildEffectComputed(effect, amount);
+  const effectComputed = buildEffectComputed(effect, count);
   const getCost = buildGetCost(baseReqs);
   const handle = createEmitHandle<PurchasableEvents>();
 
   const purchasable: Purchasable = {
     id,
-    amount,
+    count,
     active,
     canPurchase,
-    amountToPurchase,
+    countToPurchase,
     maxed,
     limit: processedLimit,
     requirements: allRequirements,
@@ -591,14 +591,14 @@ function assemblePurchasable(
     on: handle.on,
     getCost,
 
-    purchase(purchaseAmount?: DecimalSource): DecimalSource {
+    purchase(purchaseCount?: DecimalSource): DecimalSource {
       if (!canPurchase.value) return Decimal.dZero;
 
       let toPurchase: DecimalSource;
-      if (purchaseAmount !== undefined) {
-        toPurchase = Decimal.min(purchaseAmount, amountToPurchase.value);
+      if (purchaseCount !== undefined) {
+        toPurchase = Decimal.min(purchaseCount, countToPurchase.value);
       } else if (unref(processedBulkPurchase)) {
-        toPurchase = amountToPurchase.value;
+        toPurchase = countToPurchase.value;
       } else {
         toPurchase = 1;
       }
@@ -609,7 +609,7 @@ function assemblePurchasable(
       if (!Decimal.gt(toPurchase, 0)) return Decimal.dZero;
 
       payRequirements(allRequirements, toPurchase);
-      amount.value = Decimal.add(amount.value, toPurchase);
+      count.value = Decimal.add(count.value, toPurchase);
       onPurchase?.(toPurchase);
       handle.emit('purchased', toPurchase);
 
@@ -617,7 +617,7 @@ function assemblePurchasable(
     },
 
     purchaseMax(): DecimalSource {
-      return purchasable.purchase(amountToPurchase.value);
+      return purchasable.purchase(countToPurchase.value);
     },
   };
 
@@ -653,7 +653,7 @@ function assemblePurchasable(
  *     createCostRequirement({
  *       resource: points,
  *       cost: Formula.exponential(level, 10, 1.15),
- *       maxBulkAmount: Decimal.dInf,
+ *       maxBulkCount: Decimal.dInf,
  *     }),
  *   effect: (amt) => Decimal.pow(2, amt),
  * });
@@ -664,8 +664,8 @@ export function createPurchasable(
   options: PurchasableOptions,
   predicates: PredicateResolver = createPredicateResolver(),
 ): Purchasable {
-  const { contextId, amount } = buildPurchasableAmount(options.id, options.initialAmount);
-  return assemblePurchasable(options, amount, contextId, predicates);
+  const { contextId, amount: count } = buildPurchasableCount(options.id, options.initialCount);
+  return assemblePurchasable(options, count, contextId, predicates);
 }
 
 /**
@@ -735,15 +735,15 @@ export function createScalingPurchasable(
     description,
     effectDisplay,
     limit,
-    initialAmount,
+    initialCount,
     onPurchase,
     visible,
     bulkPurchase,
   } = options;
 
-  const { contextId, amount } = buildPurchasableAmount(id, initialAmount);
-  const costRequirement = buildScalingCostRequirement(options, amount, limit);
-  const { effectFn, effectCurve } = buildScalingEffect(options, amount);
+  const { contextId, amount: count } = buildPurchasableCount(id, initialCount);
+  const costRequirement = buildScalingCostRequirement(options, count, limit);
+  const { effectFn, effectCurve } = buildScalingEffect(options, count);
 
   const purchasable = assemblePurchasable(
     {
@@ -753,7 +753,7 @@ export function createScalingPurchasable(
         description,
         effectDisplay:
           effectDisplay ??
-          (effectFn ? computed(() => `×${formatSmall(effectFn(amount.value), 2)}`) : undefined),
+          (effectFn ? computed(() => `×${formatSmall(effectFn(count.value), 2)}`) : undefined),
       },
       requirements: costRequirement,
       limit,
@@ -762,7 +762,7 @@ export function createScalingPurchasable(
       visible,
       bulkPurchase,
     },
-    amount,
+    count,
     contextId,
     predicates,
   );

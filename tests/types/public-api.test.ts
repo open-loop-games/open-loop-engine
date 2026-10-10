@@ -876,7 +876,7 @@ describe('Formula series contract', () => {
     expectTypeOf(calculateMaxAffordable)
       .parameter(3)
       .toEqualTypeOf<Computable<DecimalSource> | undefined>();
-    // @ts-expect-error — `maxBulkAmount` moved into the slot `directSum` held,
+    // @ts-expect-error — `maxBulkCount` moved into the slot `directSum` held,
     // so the old five-argument call no longer type-checks.
     calculateMaxAffordable(cost, createResource(ref(0)), true, undefined, 10);
   });
@@ -1183,7 +1183,7 @@ describe('createCostRequirement / createInventory type surface', () => {
   it('createCostRequirement requires resource and cost; the rest defaults', async () => {
     type Options = import('@/core/requirements').CostRequirementOptions;
     expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<
-      'requiresPay' | 'cumulativeCost' | 'maxBulkAmount' | 'pay' | 'description'
+      'requiresPay' | 'cumulativeCost' | 'maxBulkCount' | 'pay' | 'description'
     >();
     const { createCostRequirement } = await import('@/index');
     const resource = createResource(0, { id: 'cost-gold', displayName: 'gold' });

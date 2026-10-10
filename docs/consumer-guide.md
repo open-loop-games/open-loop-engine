@@ -59,7 +59,7 @@ const engine = createEngine({
   gameId: 'my-game',
   // Only needed if you author accessor-backed Gate kinds. Category-only games skip it.
   accessor: {
-    getResource: (id) => resourcesById[id]?.value ?? Decimal.dZero,
+    getAmount: (id) => resourcesById[id]?.value ?? Decimal.dZero,
     getRate: (id) => ratesById[id] ?? Decimal.dZero,
     getInflowRate: (id) => grossById[id] ?? Decimal.dZero, // optional; exact cumulative-gte predictions
     getFlag: (id) => flags[id] ?? false,

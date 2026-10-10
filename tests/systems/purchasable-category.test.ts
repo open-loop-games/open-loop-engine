@@ -462,7 +462,7 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     const p = category.getPurchasable('a')!;
-    expect(Decimal.eq(p.amount.value, 0)).toBe(true);
+    expect(Decimal.eq(p.count.value, 0)).toBe(true);
   });
 
   it('purchase succeeds and increments amount', () => {
@@ -492,7 +492,7 @@ describe('createPurchasableCategory (leveled)', () => {
 
     const bought = p.purchase(1);
     expect(Decimal.gte(bought, 1)).toBe(true);
-    expect(Decimal.eq(p.amount.value, 1)).toBe(true);
+    expect(Decimal.eq(p.count.value, 1)).toBe(true);
     expect(Decimal.eq(gold.value, 90)).toBe(true);
   });
 
@@ -548,12 +548,12 @@ describe('createPurchasableCategory (leveled)', () => {
     const p = category.getPurchasable('capped')!;
     p.purchase(1);
     p.purchase(1);
-    expect(Decimal.eq(p.amount.value, 2)).toBe(true);
+    expect(Decimal.eq(p.count.value, 2)).toBe(true);
     expect(p.maxed.value).toBe(true);
     expect(p.canPurchase.value).toBe(false);
   });
 
-  it('totalAmount sums all amounts', () => {
+  it('totalCount sums all counts', () => {
     const gold = createTestResource('gold', 10000);
 
     const category = createPurchasableCategory<PerkDef>({
@@ -570,13 +570,13 @@ describe('createPurchasableCategory (leveled)', () => {
       { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 10, effectPerLevel: 1.1 },
     ]);
 
-    expect(Decimal.eq(category.totalAmount.value, 0)).toBe(true);
+    expect(Decimal.eq(category.totalCount.value, 0)).toBe(true);
 
     category.getPurchasable('a')!.purchase(1);
     category.getPurchasable('a')!.purchase(1);
     category.getPurchasable('b')!.purchase(1);
 
-    expect(Decimal.eq(category.totalAmount.value, 3)).toBe(true);
+    expect(Decimal.eq(category.totalCount.value, 3)).toBe(true);
   });
 
   it('totalEffect is product of all effects', () => {
@@ -679,7 +679,7 @@ describe('createPurchasableCategory (leveled)', () => {
 
     const bought = category.purchaseAffordable();
     expect(Decimal.gt(bought, 0)).toBe(true);
-    expect(Decimal.gt(category.totalAmount.value, 0)).toBe(true);
+    expect(Decimal.gt(category.totalCount.value, 0)).toBe(true);
   });
 });
 
@@ -838,7 +838,7 @@ describe('PurchasableCategory — invertible leveled costs', () => {
           createCostRequirement({
             resource: gold,
             cost: Formula.exponential(level, def.baseCost, 1.15),
-            maxBulkAmount: Decimal.dInf,
+            maxBulkCount: Decimal.dInf,
           }),
       }),
     });
@@ -853,7 +853,7 @@ describe('PurchasableCategory — invertible leveled costs', () => {
     const spentBefore = gold.value;
     const bought = forge.purchaseMax();
     expect(Decimal.gt(bought, 1)).toBe(true);
-    expect(Decimal.eq(forge.amount.value, bought)).toBe(true);
+    expect(Decimal.eq(forge.count.value, bought)).toBe(true);
 
     // Every level bought was paid for at its own rung.
     const paid = Decimal.sub(spentBefore, gold.value);
@@ -878,12 +878,12 @@ describe('PurchasableCategory — invertible leveled costs', () => {
           createCostRequirement({
             resource: iron,
             cost: Formula.exponential(level, def.baseCost, 1.15),
-            maxBulkAmount: Decimal.dInf,
+            maxBulkCount: Decimal.dInf,
           }),
           createCostRequirement({
             resource: wood,
             cost: Formula.exponential(level, 20, 1.2),
-            maxBulkAmount: Decimal.dInf,
+            maxBulkCount: Decimal.dInf,
           }),
         ],
       }),
@@ -909,7 +909,7 @@ describe('PurchasableCategory — invertible leveled costs', () => {
           createCostRequirement({
             resource: gold,
             cost: Formula.exponential(level, def.baseCost, 1.15),
-            maxBulkAmount: Decimal.dInf,
+            maxBulkCount: Decimal.dInf,
           }),
       }),
     });
@@ -919,7 +919,7 @@ describe('PurchasableCategory — invertible leveled costs', () => {
 
     // Save load writes straight through `amount`; there is no mirror to fall
     // out of sync, so the next rung prices off the loaded level immediately.
-    forge.amount.value = 5;
+    forge.count.value = 5;
     expect(
       Decimal.eq_tolerance(forge.getCost(1), Decimal.mul(10, Decimal.pow(1.15, 5)), 1e-9),
     ).toBe(true);

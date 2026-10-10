@@ -90,7 +90,7 @@ function makeMutationPool(rng: () => number): Mutation[] {
       axis: 'entity',
       key: `upgrades.${id}`,
       apply: (_c, f) => {
-        f.upgrades.getPurchasable(id)!.amount.value = rng() < 0.5 ? 0 : 1;
+        f.upgrades.getPurchasable(id)!.count.value = rng() < 0.5 ? 0 : 1;
       },
     });
   }
@@ -106,7 +106,7 @@ function makeMutationPool(rng: () => number): Mutation[] {
       axis: 'entity',
       key: `farms.${id}`,
       apply: (_c, f) => {
-        f.buildings.getProducer(id)!.repeatable!.amount.value = Math.floor(rng() * 3);
+        f.buildings.getProducer(id)!.repeatable!.count.value = Math.floor(rng() * 3);
       },
     });
   }

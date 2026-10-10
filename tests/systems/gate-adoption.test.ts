@@ -57,7 +57,7 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
   const stateMap = new Map<string, unknown>();
   let points: Resource<number>;
   const accessor: GameStateAccessorMutator = {
-    getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
+    getAmount: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     getFlag: () => false,
     getState: (path) => stateMap.get(path),
@@ -403,7 +403,7 @@ function bootstrapAccessorless<T>(install: () => T): { result: T; stop: () => vo
         }),
       });
       upgrades.register({ id: 'farm' });
-      upgrades.getEntry('farm')!.purchasable.amount.value = new Decimal(5);
+      upgrades.getEntry('farm')!.purchasable.count.value = new Decimal(5);
     },
   };
 
@@ -515,7 +515,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
 
   it('an explicit accessor overrides the ambient one on both categories', () => {
     const override: GameStateAccessor = {
-      getResource: () => new Decimal(1000),
+      getAmount: () => new Decimal(1000),
       getRate: () => Decimal.dZero,
       getFlag: () => true,
       getState: () => undefined,
@@ -648,7 +648,7 @@ describe('createPredicateResolver', () => {
 describe('evaluatePredicate', () => {
   it('evaluates each arm against a runtime', () => {
     const accessor: GameStateAccessor = {
-      getResource: () => new Decimal(10),
+      getAmount: () => new Decimal(10),
       getRate: () => Decimal.dZero,
       getFlag: (id) => id === 'seen',
       getState: () => undefined,
@@ -853,7 +853,7 @@ describe('Predicate fields — every arm reaches the system', () => {
           display: { description: '' },
           requirements: [],
           limit: 1,
-          initialAmount: 1,
+          initialCount: 1,
           grants: [{ chain, mult: 2, description: 'Doubler', when: pointsGte(4) }],
         }),
       });

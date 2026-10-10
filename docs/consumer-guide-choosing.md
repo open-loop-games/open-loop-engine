@@ -75,7 +75,7 @@ const perks = createPurchasableCategory<PerkDef>({
       createCostRequirement({
         resource: dna,
         cost: Formula.exponential(level, def.baseCost, def.costRatio),
-        maxBulkAmount: Decimal.dInf,
+        maxBulkCount: Decimal.dInf,
       }),
     limit: def.maxLevel,
     effect: (amount) => def.effect(new Decimal(amount).toNumber()),

@@ -120,17 +120,17 @@ function createPrestigeTreeGame() {
   // --- Resets ---
   // Layer 1 reset: resets layer 0 (points + upgrades)
   const layer1Reset = createReset({
-    thingsToReset: [points, pointUpgrade1.amount, pointUpgrade2.amount],
+    thingsToReset: [points, pointUpgrade1.count, pointUpgrade2.count],
   });
 
   // Layer 2 reset: resets layers 0 and 1
   const layer2Reset = createReset({
     thingsToReset: [
       points,
-      pointUpgrade1.amount,
-      pointUpgrade2.amount,
+      pointUpgrade1.count,
+      pointUpgrade2.count,
       prestige,
-      prestigeUpgrade1.amount,
+      prestigeUpgrade1.count,
     ],
   });
 
@@ -138,10 +138,10 @@ function createPrestigeTreeGame() {
   const layer3Reset = createReset({
     thingsToReset: [
       points,
-      pointUpgrade1.amount,
-      pointUpgrade2.amount,
+      pointUpgrade1.count,
+      pointUpgrade2.count,
       prestige,
-      prestigeUpgrade1.amount,
+      prestigeUpgrade1.count,
       superPrestige,
     ],
   });

@@ -143,11 +143,11 @@ export function createInventory(options: InventoryOptions): Inventory {
   if (items) {
     withPersistentContext(id, () => {
       for (const itemId of items) {
-        const initialAmount = initial[itemId] ?? 0;
+        const initialCount = initial[itemId] ?? 0;
         // Saved as the bare item id inside the inventory's context; the
         // engine-unique id is qualified so inventories can share item ids.
         const resource = createPersistentContextScopedResource<DecimalSource>(
-          initialAmount,
+          initialCount,
           { id: `${id}/${itemId}`, displayName: itemId },
           itemId,
         );
