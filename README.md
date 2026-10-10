@@ -63,7 +63,7 @@ The engine carries its own docs — in the repo and in the installed package, un
 - **`docs/consumer-guide-choosing.md`** — which primitive is mine, when two of them overlap. The boundaries INDEX's routing table is too short to draw: producer vs gated purchasable, Cycle vs RunPool, category vs raw purchasable.
 - **`docs/consumer-guide-recipes.md`** — the worked-pattern cookbook the guide routes into: worker pools, persona rosters, spatial boards, dialog and subjects.
 - **`docs/consumer-guide-balance.md`** — how numbers get chosen and verified: the closed-form spine, the probe that contradicts it, and the loop between them.
-- **`docs/consumer-guide-balance-agents.md`** — the layer that applies when a policy agent plays the game your probe measures: calibrating the agent, what it can't measure, and the harness checks that keep a bot-driven reading honest.
+- **`docs/consumer-guide-balance-automated-player.md`** — the layer that applies when a policy agent plays the game your probe measures: calibrating the agent, what it can't measure, and the harness checks that keep a bot-driven reading honest.
 
 - **`docs/domain-map.md`** — `ol-domain-map`, the bin that generates a vocabulary map of _your_ game's domain types from their structure.
 

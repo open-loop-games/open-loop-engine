@@ -14,8 +14,8 @@ import type { Persistent, Serializable } from '@/core/persistence';
 
 // === TYPES ===
 
-/** Options for {@link createRetentionPolicy} — split refs into `keep` (verbatim) and `retain` (transformed). */
-export interface RetentionPolicyOptions {
+/** Options for {@link createRetention} — split refs into `keep` (verbatim) and `retain` (transformed). */
+export interface RetentionOptions {
   /** Refs that should not be reset — restored to their pre-reset value */
   keep?: Persistent[];
   /**
@@ -27,10 +27,10 @@ export interface RetentionPolicyOptions {
 
 /**
  * Snapshot/restore pair that selectively preserves persistent refs across a
- * reset. Created by {@link createRetentionPolicy}; consumers call `snapshot()`
+ * reset. Created by {@link createRetention}; consumers call `snapshot()`
  * before the reset fires and `restore()` after.
  */
-export interface RetentionPolicy {
+export interface Retention {
   /** Snapshot all retained values. Call before reset fires. */
   snapshot(): void;
   /** Restore retained values. Call after reset fires. */
@@ -66,7 +66,7 @@ export function fractional(fraction: DecimalSource): (value: any) => any {
  *
  * @example
  * ```ts
- * const policy = createRetentionPolicy({
+ * const policy = createRetention({
  *   keep: [totalEarned, achievements],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
  * });
@@ -77,7 +77,7 @@ export function fractional(fraction: DecimalSource): (value: any) => any {
  * policy.restore();
  * ```
  */
-export function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy {
+export function createRetention(options: RetentionOptions): Retention {
   const { keep = [], retain = new Map() } = options;
   const snapshots = new Map<Persistent, Serializable>();
 

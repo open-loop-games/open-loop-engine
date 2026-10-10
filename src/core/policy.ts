@@ -10,7 +10,7 @@
  * - `SelectionPolicy` (this file) — *stateless selector*. Given a
  *   pre-filtered candidate list, scores and returns the winner. No
  *   internal state; pure function-shape consumed as configuration.
- * - {@link RecommendationDef} — *scored candidate*. IS one of many
+ * - {@link Recommender} — *scored candidate*. IS one of many
  *   candidates the recommendation system arbitrates between; the system
  *   filters via `canApply`, scores via `score`, runs `recommend()` on the
  *   winner.

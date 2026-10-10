@@ -15,14 +15,14 @@
  * - Auto-apply mode for full automation (T6 Optimizer pattern)
  * - Advisory mode for surfacing suggestions (T5 Advisor pattern)
  *
- * `RecommendationDef` is the inter-cycle sibling of {@link FillStrategy}:
+ * `Recommender` is the inter-cycle sibling of {@link FillStrategy}:
  * FillStrategy picks the next action *within* a cycle; recommendation defs
  * pick the configuration *between* cycles.
  *
  * @see {@link createCycleLog} for the per-cycle metric source
  * @see {@link createBestOf} for per-metric best tracking with snapshots
  * @see {@link createCycle} for the lifecycle this wires into
- * @see ./recommendation-strategies.ts for built-in def factories
+ * @see ./recommenders.ts for built-in recommender factories
  * @see {@link createRuleAdvisor} for the intra-session sibling — same advisory
  *   shape, but re-fired on consumer signals (rule edits, encounter changes)
  *   instead of `cycle.afterEnd`, and emits a ranked list of independent
@@ -73,7 +73,7 @@ export interface RecommendationMetricComparison {
 /** Structured explanation of why a recommendation was made */
 export interface RecommendationRationale {
   /** Which def produced this recommendation */
-  strategyId: string;
+  recommenderId: string;
   /** Per-metric comparison: current performance vs projected with recommended config */
   metrics: Record<string, RecommendationMetricComparison>;
   /** Human-readable summary for UI display (consumer-provided via def) */
@@ -95,7 +95,7 @@ export interface RecommendationResult {
  *
  * Evaluation order: `canApply` → `score` (if applicable) → `recommend` (winner only).
  */
-export interface RecommendationDef {
+export interface Recommender {
   /** Unique def identifier */
   id: string;
   /**
@@ -108,7 +108,7 @@ export interface RecommendationDef {
    * returns `true`. On ties, the first-registered def wins.
    *
    * Scores are compared raw across every registered def, so defs sharing a
-   * system must score on one scale. The built-in `createBestReplayDef` scores
+   * system must score on one scale. The built-in `createBestReplayRecommender` scores
    * log10 improvement: log10 of the metric's best minus log10 of the last
    * cycle's, each magnitude floored at 1, in the metric's BestOf mode (value
    * for `'absolute'`, rate for `'perSecond'`). A custom def sharing a system
@@ -125,7 +125,7 @@ export interface RecommendationDef {
 /** A produced recommendation stored by the system */
 export interface Recommendation {
   /** Which def produced this */
-  strategyId: string;
+  recommenderId: string;
   /** The proposed configuration snapshot */
   snapshot: Serializable;
   /** Structured explanation data */
@@ -138,10 +138,10 @@ export interface Recommendation {
 
 /** Serialized form stored in persistent — DecimalSource values as strings */
 interface SerializedRecommendation {
-  strategyId: string;
+  recommenderId: string;
   snapshot: Serializable;
   rationale: {
-    strategyId: string;
+    recommenderId: string;
     metrics: Record<string, { current: string; projected: string; delta: string }>;
     summary: string;
   };
@@ -199,7 +199,7 @@ export interface RecommendationSystemOptions {
    * Definitions to register at construction time; a repeated `id` throws.
    * Additional defs can be added later via `.register()`.
    */
-  defs?: RecommendationDef[];
+  recommenders?: Recommender[];
 
   /**
    * Called each `evaluate()` to provide game-specific state for def
@@ -232,16 +232,16 @@ export interface RecommendationSystem {
   readonly autoApply: Persistent<boolean>;
 
   /** Registered definitions (ordered; first-registered wins on tie) */
-  readonly defs: readonly RecommendationDef[];
+  readonly recommenders: readonly Recommender[];
 
   /**
    * Register an additional def at runtime. Throws if a def with the same
    * `id` is already registered; `unregister` it first to replace it.
    */
-  register(def: RecommendationDef): void;
+  register(recommender: Recommender): void;
 
   /** Remove a def by id. No-op if not found. */
-  unregister(defId: string): void;
+  unregister(recommenderId: string): void;
 
   /**
    * Run the full evaluation cycle synchronously:
@@ -291,10 +291,10 @@ function serialize(rec: Recommendation): SerializedRecommendation {
     };
   }
   return {
-    strategyId: rec.strategyId,
+    recommenderId: rec.recommenderId,
     snapshot: rec.snapshot,
     rationale: {
-      strategyId: rec.rationale.strategyId,
+      recommenderId: rec.rationale.recommenderId,
       metrics: serializedMetrics,
       summary: rec.rationale.summary,
     },
@@ -313,10 +313,10 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
     };
   }
   return {
-    strategyId: raw.strategyId,
+    recommenderId: raw.recommenderId,
     snapshot: raw.snapshot,
     rationale: {
-      strategyId: raw.rationale.strategyId,
+      recommenderId: raw.rationale.recommenderId,
       metrics,
       summary: raw.rationale.summary,
     },
@@ -347,14 +347,14 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  *   cycleLog: myCycleLog,
  *   bestOf: myBestOf,
  *   // Snapshots are opaque `State`; keep one shape across these callbacks
- *   // and bestOf's captureStrategy.
+ *   // and bestOf's captureConfig.
  *   getCurrentSnapshot: () => currentLoadout.snapshot(),
  *   applySnapshot: (snap) => currentLoadout.restore(snap),
  *   // Each def scores log10 improvement of its metric's best over the
  *   // last cycle, so the metric with the most ground to recover wins.
  *   defs: [
- *     createBestReplayDef('gold'),
- *     createBestReplayDef('xp', { threshold: 100 }),
+ *     createBestReplayRecommender('gold'),
+ *     createBestReplayRecommender('xp', { threshold: 100 }),
  *   ],
  * });
  *
@@ -377,7 +377,7 @@ export function createRecommendationSystem(
     bestOf,
     getCurrentSnapshot,
     applySnapshot,
-    defs: initialDefs,
+    recommenders: initialRecommenders,
     getGameState: getState,
   } = options;
 
@@ -394,16 +394,16 @@ export function createRecommendationSystem(
   const handle = createEmitHandle<RecommendationSystemEvents>();
 
   // --- Def registry ---
-  const registeredDefs: RecommendationDef[] = [];
-  function registerDef(def: RecommendationDef): void {
-    if (registeredDefs.some((s) => s.id === def.id)) {
+  const registeredRecommenders: Recommender[] = [];
+  function registerRecommender(def: Recommender): void {
+    if (registeredRecommenders.some((s) => s.id === def.id)) {
       throw new Error(
         `RecommendationSystem "${contextId}": duplicate recommendation def id "${def.id}". Unregister the existing def before registering its replacement.`,
       );
     }
-    registeredDefs.push(def);
+    registeredRecommenders.push(def);
   }
-  for (const def of initialDefs ?? []) registerDef(def);
+  for (const recommender of initialRecommenders ?? []) registerRecommender(recommender);
 
   // --- Deserialized view ---
   const lastRecommendation = computed<Recommendation | null>(() => {
@@ -428,12 +428,12 @@ export function createRecommendationSystem(
   }
 
   function evaluate(): Recommendation | null {
-    if (registeredDefs.length === 0) return null;
+    if (registeredRecommenders.length === 0) return null;
 
     const ctx = buildContext();
     if (!ctx) return null;
 
-    const applicable = registeredDefs.filter((s) => s.canApply(ctx));
+    const applicable = registeredRecommenders.filter((s) => s.canApply(ctx));
     if (applicable.length === 0) return null;
 
     // Score and pick highest (first-registered wins ties via strict >)
@@ -450,7 +450,7 @@ export function createRecommendationSystem(
 
     const result = winner.recommend(ctx);
     const rec: Recommendation = {
-      strategyId: winner.id,
+      recommenderId: winner.id,
       snapshot: result.snapshot,
       rationale: result.rationale,
       timestamp: Date.now(),
@@ -483,15 +483,15 @@ export function createRecommendationSystem(
   const system: RecommendationSystem = {
     lastRecommendation,
     autoApply,
-    get defs() {
-      return registeredDefs as readonly RecommendationDef[];
+    get recommenders() {
+      return registeredRecommenders as readonly Recommender[];
     },
 
-    register: registerDef,
+    register: registerRecommender,
 
     unregister(defId: string) {
-      const idx = registeredDefs.findIndex((s) => s.id === defId);
-      if (idx >= 0) registeredDefs.splice(idx, 1);
+      const idx = registeredRecommenders.findIndex((s) => s.id === defId);
+      if (idx >= 0) registeredRecommenders.splice(idx, 1);
     },
 
     evaluate,

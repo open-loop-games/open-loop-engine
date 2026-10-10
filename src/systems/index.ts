@@ -138,13 +138,13 @@ export * from './auto-purchase';
 // SkillCategory: batch-register Skills from content definitions.
 // Retention: policies for what persists between cycles.
 // CycleLog: per-cycle metric delta ring buffer for analytics.
-// BestOf: per-metric best-of-run tracking with strategy snapshots.
+// BestOf: per-metric best-of-run tracking with config snapshots.
 // Recommendation: score-based inter-cycle strategy arbitration over CycleLog + BestOf data.
 export * from './cycle';
 export * from './cycle-log';
 export * from './best-of';
 export * from './recommendation';
-export * from './recommendation-strategies';
+export * from './recommenders';
 export * from './skill';
 export * from './skill-category';
 export * from './retention';

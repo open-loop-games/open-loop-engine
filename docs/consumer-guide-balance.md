@@ -2,7 +2,7 @@
 
 How numbers get chosen and verified in a game built on `@open-loop/engine`. Read this before touching a balance constant or writing your first probe.
 
-This is the third companion to [consumer-guide.md](./consumer-guide.md). The guide explains **how to compose** the engine; [consumer-guide-recipes.md](./consumer-guide-recipes.md) holds the worked shapes consumers assemble from it; this file holds the discipline for **what the numbers should be** and how you know. It has a companion of its own — [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md), for when a policy agent is what plays the game your probe measures. It is engineering process over the engine's harness, not game-design theory — the theory lives upstream, per § Cite-out.
+This is the third companion to [consumer-guide.md](./consumer-guide.md). The guide explains **how to compose** the engine; [consumer-guide-recipes.md](./consumer-guide-recipes.md) holds the worked shapes consumers assemble from it; this file holds the discipline for **what the numbers should be** and how you know. It has a companion of its own — [consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md), for when a policy agent is what plays the game your probe measures. It is engineering process over the engine's harness, not game-design theory — the theory lives upstream, per § Cite-out.
 
 It deliberately does not describe any consumer's directory layout. What things are called and where they sit is your repo's business.
 
@@ -115,7 +115,7 @@ None carries a magnitude, which is why none decays into a widened bound, and all
 
 Where a policy plays the game for the probe — an automation tier, an opponent bot, a persona standing in for a player — every number is read *through* that agent, and a defect in it is indistinguishable from a defect in the design. It arrives as a balance finding with plausible magnitudes rather than as "the bot is bad", survives sweeps, and gets a design decision built on top of it. Unit specs on the policy do not catch it, because they assert plumbing and plumbing stays true of an agent deciding exactly wrongly.
 
-That layer has its own file: [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) — calibrating on named situations, joining every optimized quantity to a realized counterpart, proving a scoring term has spread before tuning its weight, what a converging policy structurally cannot measure, personas as a coverage axis, and the three harness checks (one brain, restore parity, pipeline liveness).
+That layer has its own file: [consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md) — calibrating on named situations, joining every optimized quantity to a realized counterpart, proving a scoring term has spread before tuning its weight, what a converging policy structurally cannot measure, personas as a coverage axis, and the three harness checks (one brain, restore parity, pipeline liveness).
 
 ## Making a pass cheap
 
@@ -131,7 +131,7 @@ A balance pass is bottlenecked on **grading** — deciding what a set of numbers
 
 **Widen along the axis that actually varies.** A read narrower than the thing that moves it reports the wrong shape in either direction, understating a real effect as readily as manufacturing one. Which axis carries the variance is a property of your game: seeds where the arc is stochastic, distinct trajectories where personas diverge, content variants where the runtime is deterministic and seeds only prove the harness repeats. Where the sim is deterministic, repeating a cell measures nothing and averaging cells measures less. What *does* carry noise is anything measured on a machine doing other things — wall-clock above all, where a number that moved once has not moved.
 
-**Bank states rather than replaying arcs.** Most questions concern one phase of a run, and replaying the arc to reach it is the largest avoidable cost in a pass. Keep named mid-arc saves, stand probes up from them, and share the set with whatever QA or dev-panel picker the game has so it stays honest by being used. Two guards: a banked state travels the restore path and owes restore parity ([consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) § Verify the instrument), and a fixture must leave the decision under test *free* — a bank seeded so richly that the choice is already made, or an opening inflated until the constraint stops binding, measures a game nobody plays.
+**Bank states rather than replaying arcs.** Most questions concern one phase of a run, and replaying the arc to reach it is the largest avoidable cost in a pass. Keep named mid-arc saves, stand probes up from them, and share the set with whatever QA or dev-panel picker the game has so it stays honest by being used. Two guards: a banked state travels the restore path and owes restore parity ([consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md) § Verify the instrument), and a fixture must leave the decision under test *free* — a bank seeded so richly that the choice is already made, or an opening inflated until the constraint stops binding, measures a game nobody plays.
 
 **Name your verification tiers, and say which one you ran.** Write down the ladder your game has — a seconds-long unit and calibration tier, a minutes-long fixture tier, the full arc, the grid across personas — with what each covers and costs, then pick the shallowest that covers what the change could move. Part of the value is the ordering; most of it is the shared vocabulary, because "fixture tier green, grid pending" is a handoff and "I ran some probes" is not.
 
@@ -305,5 +305,5 @@ This guide owns process over the engine. Theory and prescription live upstream, 
 | What engine primitive does X? | `docs/api/INDEX.md`, then the routed tier file |
 | How do I compose the engine at all? | [consumer-guide.md](./consumer-guide.md) |
 | What's the worked shape for this composition? | [consumer-guide-recipes.md](./consumer-guide-recipes.md) |
-| My probe's numbers come out of a bot-driven run — now what? | [consumer-guide-balance-agents.md](./consumer-guide-balance-agents.md) |
+| My probe's numbers come out of a bot-driven run — now what? | [consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md) |
 | How do I run the process? | this file |

@@ -14,7 +14,7 @@
  *   wired to a reset's `afterReset` event for tracking time-since-last-reset
  *
  * Inline `keep`/`retain` options on `createReset` are shorthand for
- * {@link createRetentionPolicy} — drop down to a standalone retention policy
+ * {@link createRetention} — drop down to a standalone retention policy
  * when the policy needs to outlive any single Reset.
  */
 
@@ -35,7 +35,7 @@ import {
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
 import { Resettable } from '@/core/resettable';
-import { createRetentionPolicy } from './retention';
+import { createRetention } from './retention';
 import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
@@ -116,14 +116,14 @@ export interface ResetOptions {
 
   /**
    * Refs that should survive the reset unchanged.
-   * Inline shorthand for {@link createRetentionPolicy}'s `keep` option.
+   * Inline shorthand for {@link createRetention}'s `keep` option.
    */
   keep?: Persistent[];
 
   /**
    * Refs with custom retention transforms applied after reset.
    * The transform receives the pre-reset value and returns the post-reset value.
-   * Inline shorthand for {@link createRetentionPolicy}'s `retain` option.
+   * Inline shorthand for {@link createRetention}'s `retain` option.
    *
    * @example retain: new Map([[skillLevel, fractional(0.1)]])
    */
@@ -235,7 +235,7 @@ function resolveScope(
  *   via the persistent ref registry
  *
  * Inline `keep`/`retain` options provide retention without a separate
- * {@link createRetentionPolicy} call.
+ * {@link createRetention} call.
  *
  * @param options - Configuration for the reset (scope, retention, hooks)
  * @returns A Reset object with `resolvedScope` for composable nesting
@@ -280,7 +280,7 @@ export function createReset(options: ResetOptions): Reset {
 
   // Build retention policy if keep/retain provided
   const hasRetention = (keep && keep.length > 0) || (retain && retain.size > 0);
-  const retention = hasRetention ? createRetentionPolicy({ keep, retain }) : undefined;
+  const retention = hasRetention ? createRetention({ keep, retain }) : undefined;
 
   const warnedModules = new Set<string>();
   function warnUnknownModule(moduleId: string): void {

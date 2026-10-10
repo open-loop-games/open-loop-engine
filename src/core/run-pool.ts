@@ -6,7 +6,7 @@
  * an opaque `step()` method. The pool does not drive ticks — consumers invoke
  * `handle.step()` on their own cadence (per-run interval, shared game loop,
  * batch catch-up, etc.). On step returning false, the pool applies its
- * `deathPolicy` (or the per-run `onDeath` override) and fires lifecycle
+ * `deathDisposition` (or the per-run `onDeath` override) and fires lifecycle
  * events:
  *
  * - `'destroyed'` — handle leaves the pool (the `'destroy'` disposition).
@@ -43,7 +43,7 @@ export type RunStep = () => boolean;
 /**
  * Outcome of a run's death, returned synchronously from a per-instance
  * `onDeath` callback. When no callback is registered, the pool applies its
- * `deathPolicy` (`'destroy'` → `'destroyed'`; `'park'` → `'parked'`).
+ * `deathDisposition` (`'destroy'` → `'destroyed'`; `'park'` → `'parked'`).
  */
 export type RunDeathOutcome = 'destroyed' | 'parked' | { readonly restartedWith: RunStep };
 
@@ -83,14 +83,14 @@ export interface RunHandle<Id = string> {
 /**
  * Registration payload for {@link RunPool.addRun}: a stable id, the
  * per-tick `step` function, and an optional `onDeath` override that
- * supersedes the pool's `deathPolicy` for this specific instance.
+ * supersedes the pool's `deathDisposition` for this specific instance.
  */
 export interface RunRegistration<Id = string> {
   readonly id: Id;
   readonly step: RunStep;
   /**
    * Optional per-instance death override. When present, its return value
-   * wins over the pool's `deathPolicy`.
+   * wins over the pool's `deathDisposition`.
    */
   readonly onDeath?: () => RunDeathOutcome;
 }
@@ -120,7 +120,7 @@ export interface RunPoolEvents<Id = string> {
 }
 
 /**
- * Configuration for {@link createRunPool}. `deathPolicy` picks the
+ * Configuration for {@link createRunPool}. `deathDisposition` picks the
  * post-death disposition (`'destroy'` vs `'park'`); the
  * optional `maxRuns` caps concurrent runs.
  */
@@ -133,7 +133,7 @@ export interface RunPoolOptions {
    * - `'destroy'` — handle is removed from the pool (the run is gone).
    * - `'park'` — handle stays with `alive=false` (the run can be restarted).
    */
-  readonly deathPolicy: 'destroy' | 'park';
+  readonly deathDisposition: 'destroy' | 'park';
   /**
    * Optional hard cap on concurrent runs. `addRun` throws when
    * exceeding. Default: unlimited. `0` is treated as valid-but-empty
@@ -150,7 +150,7 @@ export interface RunPoolOptions {
  */
 export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
   readonly id: string;
-  readonly deathPolicy: 'destroy' | 'park';
+  readonly deathDisposition: 'destroy' | 'park';
   /**
    * Read-only view of all registered handles in insertion order. Array
    * identity changes on add/remove; stable between no-op reads.
@@ -186,7 +186,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
 /**
  * Creates a persistent pool of opaque runs with lifecycle events.
  *
- * @param options - Pool configuration including `id`, `deathPolicy`, and
+ * @param options - Pool configuration including `id`, `deathDisposition`, and
  *   optional `maxRuns` cap
  * @returns A pool with `addRun`/`getRun`/`removeRun`/`reset`
  *   operations, reactive `instances` and `liveCount`, and typed event
@@ -194,7 +194,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  *
  * @example
  * ```ts
- * const pool = createRunPool({ id: 'runs', deathPolicy: 'destroy' });
+ * const pool = createRunPool({ id: 'runs', deathDisposition: 'destroy' });
  *
  * const handle = pool.addRun({
  *   id: 'run-1',
@@ -209,7 +209,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * ```
  */
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
-  const { id: poolId, deathPolicy, maxRuns: maxRuns = Infinity } = options;
+  const { id: poolId, deathDisposition, maxRuns = Infinity } = options;
 
   // Pool-level persistence: the per-id aliveness map, in the pool's own
   // context so it's in the registry at save-load time — `addRun` is
@@ -309,7 +309,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
 
   function resolveOutcome(entry: Entry): RunDeathOutcome {
     if (entry.onDeath) return entry.onDeath();
-    return deathPolicy === 'destroy' ? 'destroyed' : 'parked';
+    return deathDisposition === 'destroy' ? 'destroyed' : 'parked';
   }
 
   function dispatchDeath(h: RunHandle<Id>, outcome: RunDeathOutcome): void {
@@ -411,10 +411,10 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
 
   const pool: RunPool<Id> = {
     id: poolId,
-    deathPolicy,
+    deathDisposition,
     runs: instances,
     liveCount,
-    addRun: addRun,
+    addRun,
     getRun(id: Id): RunHandle<Id> | undefined {
       return entries.get(id)?.handle;
     },

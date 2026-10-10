@@ -6,7 +6,7 @@ Anything that crosses a session boundary or a prestige reset — `withPersistent
 
 - `withPersistentContext` / `persistent` — create save-owned refs under stable namespaces.
 - `createReset` with `resetPersistentContexts` — reset module/category scopes without manually listing every ref.
-- `createRetentionPolicy`, `keep`, and `retain` — carry values across prestige resets.
+- `createRetention`, `keep`, and `retain` — carry values across prestige resets.
 - `createSaveManager` — multi-slot save/load, migration, validation, import, and export.
 - `processOfflineTime` — replay elapsed time through the game loop in bounded chunks.
 - `createTimeBank` with `createBankedAcceleration` / `burstDischarge` — bank time into a reservoir and spend it as a live speed boost or an instant fast-forward (the banking offline-progress family).
@@ -71,10 +71,10 @@ opt-in interface for objects that can yield their resettable contents to a reset
 
 Retention policy for declarative carryover across resets
 
-- `function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy` — Creates a declarative retention policy for carrying values across resets. `src/systems/retention.ts:80`
+- `function createRetention(options: RetentionOptions): Retention` — Creates a declarative retention policy for carrying values across resets. `src/systems/retention.ts:80`
 - `function fractional(fraction: DecimalSource): (value: any) => any` — Create a fractional retention transform. `src/systems/retention.ts:49`
-- `interface RetentionPolicy` — Snapshot/restore pair that selectively preserves persistent refs across a reset. `src/systems/retention.ts:33`
-- `interface RetentionPolicyOptions` — Options for createRetentionPolicy — split refs into `keep` (verbatim) and `retain` (transformed). `src/systems/retention.ts:18`
+- `interface Retention` — Snapshot/restore pair that selectively preserves persistent refs across a reset. `src/systems/retention.ts:33`
+- `interface RetentionOptions` — Options for createRetention — split refs into `keep` (verbatim) and `retain` (transformed). `src/systems/retention.ts:18`
 
 ## Save Manager
 

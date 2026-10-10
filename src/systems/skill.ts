@@ -31,7 +31,7 @@
  *   listeners. Optional `onLevelUp` creation-time sugar auto-subscribes.
  *   Events fire only on gameplay XP gain, not on save-load or direct xp mutation
  * - Reset integration: consumer includes skill.xp in thingsToReset or
- *   RetentionPolicy as needed
+ *   Retention as needed
  */
 
 import { computed, watch, unref, type ComputedRef, type MaybeRef } from 'vue';
@@ -136,7 +136,7 @@ export type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions;
 /** Fields present on all skills regardless of mode */
 export interface SkillBase {
   id: string;
-  /** Current XP — include in loop's thingsToReset or RetentionPolicy as needed */
+  /** Current XP — include in loop's thingsToReset or Retention as needed */
   readonly xp: Persistent<DecimalSource>;
   /** Current level, computed reactively from xp via xpToLevel */
   readonly level: ComputedRef<DecimalSource>;

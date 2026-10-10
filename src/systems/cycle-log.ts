@@ -13,7 +13,7 @@
  * - `finalized` event for downstream consumers (e.g. best-of tracking)
  *
  * @see {@link createCycle} for the Cycle lifecycle this composes with
- * @see {@link createRetentionPolicy} for a similar snapshot/restore pattern
+ * @see {@link createRetention} for a similar snapshot/restore pattern
  */
 
 import { effectScope, onScopeDispose, ref, watch, type Ref } from 'vue';

@@ -4,9 +4,9 @@ import { Decimal } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
 import { persistent, beginPersistentContext, endPersistentContext } from '@/core/persistence';
 import { createReset } from '@/systems/reset';
-import { createRetentionPolicy, fractional } from '@/systems/retention';
+import { createRetention, fractional } from '@/systems/retention';
 
-describe('createRetentionPolicy', () => {
+describe('createRetention', () => {
   it('keep preserves refs through reset', () => {
     beginPersistentContext('ret-keep');
     const gold = createResource(bn(0), { id: 'Gold', displayName: 'Gold' });
@@ -17,7 +17,7 @@ describe('createRetentionPolicy', () => {
     addResource(gold, 100);
     prestige.value = 42;
 
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       keep: [prestige, discoveries],
     });
 
@@ -49,7 +49,7 @@ describe('createRetentionPolicy', () => {
     addResource(skillLevel, 100);
     xp.value = 5000;
 
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       retain: new Map([[skillLevel, fractional(0.3)]]),
     });
 
@@ -81,7 +81,7 @@ describe('createRetentionPolicy', () => {
     bonus.value = 2;
 
     // Groundhog style: bonus = previous + level/10
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       retain: new Map([[bonus, (v: number) => v + level.value / 10]]),
     });
 
@@ -113,7 +113,7 @@ describe('createRetentionPolicy', () => {
     partial.value = 200;
     temp.value = 500;
 
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       keep: [permanent],
       retain: new Map([[partial, fractional(0.5)]]),
     });
@@ -142,7 +142,7 @@ describe('createRetentionPolicy', () => {
 
     counter.value = 10;
 
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       keep: [counter],
     });
 
@@ -162,7 +162,7 @@ describe('createRetentionPolicy', () => {
 
     addResource(bigResource, bn('1e100'));
 
-    const retention = createRetentionPolicy({
+    const retention = createRetention({
       retain: new Map([[bigResource, fractional(0.1)]]),
     });
 
@@ -203,7 +203,7 @@ describe('createRetentionPolicy', () => {
 
     val.value = 42;
 
-    const retention = createRetentionPolicy({});
+    const retention = createRetention({});
 
     retention.snapshot();
     val.value = 0;

@@ -4,12 +4,12 @@
  * Sugar factory for the most common recommendation pattern found across
  * incremental games with cycle mechanics:
  *
- * - {@link createBestReplayDef} — "replay the best-known config for this metric"
+ * - {@link createBestReplayRecommender} — "replay the best-known config for this metric"
  *   (a best route, a combat loadout), optionally gated on a goal threshold
  *
  * A thin wrapper over {@link BestOf} data. Games with more complex needs
  * (adaptive responses, trend detection, route generation) implement custom
- * defs against the {@link RecommendationDef} interface.
+ * defs against the {@link Recommender} interface.
  *
  * @see {@link createRecommendationSystem} for the system these register with
  * @see {@link createBestOf} for the data source these read from
@@ -18,13 +18,13 @@
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import type { RecommendationDef, RecommendationContext } from './recommendation';
+import type { Recommender, RecommendationContext } from './recommendation';
 import type { BestOfEntry } from './best-of';
 
 // === TYPES ===
 
-/** Options for {@link createBestReplayDef} */
-export interface BestReplayDefOptions {
+/** Options for {@link createBestReplayRecommender} */
+export interface BestReplayRecommenderOptions {
   /** Override the def id. Default: `best-replay:${metricKey}` */
   id?: string;
   /**
@@ -70,31 +70,31 @@ function ratePerSecond(value: DecimalSource, elapsed: number): Decimal {
  * value for `'absolute'`, the per-second rate for `'perSecond'`. A best the
  * last cycle matched scores 0 and stays applicable.
  *
- * Requires that {@link BestOf} was created with a `captureStrategy` callback
+ * Requires that {@link BestOf} was created with a `captureConfig` callback
  * so that strategy snapshots are recorded alongside best entries.
  *
  * @param metricKey - The BestOf metric key to optimize for
  * @param options - Optional id override, minimum cycle count and goal threshold
- * @returns A {@link RecommendationDef} ready to register
+ * @returns A {@link Recommender} ready to register
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   // ...
  *   defs: [
- *     createBestReplayDef('gold'),
- *     createBestReplayDef('xp', { minRuns: 3 }),
+ *     createBestReplayRecommender('gold'),
+ *     createBestReplayRecommender('xp', { minRuns: 3 }),
  *     // Quiet until the best run has produced 1000 damage.
- *     createBestReplayDef('damage', { id: 'goal:damage', threshold: 1000 }),
+ *     createBestReplayRecommender('damage', { id: 'goal:damage', threshold: 1000 }),
  *   ],
  * });
  * ```
  */
-export function createBestReplayDef(
+export function createBestReplayRecommender(
   metricKey: string,
-  options?: BestReplayDefOptions,
-): RecommendationDef {
-  const strategyId = options?.id ?? `best-replay:${metricKey}`;
+  options?: BestReplayRecommenderOptions,
+): Recommender {
+  const recommenderId = options?.id ?? `best-replay:${metricKey}`;
   const minRuns = options?.minRuns ?? 1;
   const threshold = options?.threshold;
 
@@ -102,7 +102,7 @@ export function createBestReplayDef(
     const entry = ctx.bestOf.entries.value[metricKey];
     if (!entry) return null;
     if (entry.status !== 'valid') return null;
-    if (entry.strategySnapshot == null) return null;
+    if (entry.configSnapshot == null) return null;
     return entry;
   }
 
@@ -114,7 +114,7 @@ export function createBestReplayDef(
   }
 
   return {
-    id: strategyId,
+    id: recommenderId,
 
     canApply(ctx: RecommendationContext): boolean {
       if (ctx.cycle.count.value < minRuns) return false;
@@ -141,9 +141,9 @@ export function createBestReplayDef(
       const delta = Decimal.sub(projected, current);
 
       return {
-        snapshot: entry.strategySnapshot!,
+        snapshot: entry.configSnapshot!,
         rationale: {
-          strategyId,
+          recommenderId,
           metrics: {
             [metricKey]: {
               current,

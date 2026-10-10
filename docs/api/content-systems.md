@@ -158,7 +158,7 @@ core primitive for managing a collection of opaque, addressable "runs" with inde
 - `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — spawned clones, loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:151`
 - `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:99`
 - `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:127`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addRun: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:88`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addRun: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathDisposition` for this specific instance. `src/core/run-pool.ts:88`
 - `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:41`
 
 ## Skill

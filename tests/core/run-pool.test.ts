@@ -23,7 +23,7 @@ import {
 // ---------------------------------------------------------------------------
 
 function makePool<Id = string>(
-  opts: Partial<RunPoolOptions> & { deathPolicy: 'destroy' | 'park' },
+  opts: Partial<RunPoolOptions> & { deathDisposition: 'destroy' | 'park' },
 ): RunPool<Id> {
   const id = opts.id ?? `pool-${Math.random().toString(36).slice(2, 8)}`;
   beginPersistentContext(id);
@@ -45,14 +45,14 @@ function deadStep(): boolean {
 // ---------------------------------------------------------------------------
 
 describe('RunPool — construction', () => {
-  it('exposes id and deathPolicy', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
-    expect(pool.deathPolicy).toBe('destroy');
+  it('exposes id and deathDisposition', () => {
+    const pool = makePool({ deathDisposition: 'destroy' });
+    expect(pool.deathDisposition).toBe('destroy');
     expect(typeof pool.id).toBe('string');
   });
 
   it('starts with no instances and liveCount=0', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     expect(pool.runs.value).toEqual([]);
     expect(pool.liveCount.value).toBe(0);
   });
@@ -60,14 +60,14 @@ describe('RunPool — construction', () => {
   it('round-trips instance aliveness through save/load', () => {
     const ctxId = `round-trip-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
-    const pool = createRunPool({ id: ctxId, deathPolicy: 'park' });
+    const pool = createRunPool({ id: ctxId, deathDisposition: 'park' });
     endPersistentContext();
 
     // Three instances — two alive, one parked.
     pool.addRun({ id: 'a', step: aliveStep });
     pool.addRun({ id: 'b', step: aliveStep });
     const c = pool.addRun({ id: 'c', step: deadStep });
-    c.step(); // parks (deathPolicy=park, no onDeath)
+    c.step(); // parks (deathDisposition=park, no onDeath)
 
     expect(pool.liveCount.value).toBe(2);
     expect(c.alive.value).toBe(false);
@@ -78,7 +78,7 @@ describe('RunPool — construction', () => {
     // addRun path that motivated the refactor.
     const ctxId2 = `round-trip-2-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId2);
-    const pool2 = createRunPool({ id: ctxId2, deathPolicy: 'park' });
+    const pool2 = createRunPool({ id: ctxId2, deathDisposition: 'park' });
     endPersistentContext();
 
     deserializePersistents(getAllPersistentRefs(), {
@@ -101,7 +101,7 @@ describe('RunPool — construction', () => {
   it('saves only the aliveness of each id; the game re-adds its handles after a load', () => {
     const ctxId = `saved-shape-${Math.random().toString(36).slice(2, 8)}`;
     const pool = withPersistentContext(ctxId, () =>
-      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+      createRunPool({ id: ctxId, deathDisposition: 'park' }),
     );
     pool.addRun({ id: 'a', step: aliveStep });
     expect(serializePersistents(getAllPersistentRefs())[ctxId]).toEqual({
@@ -116,7 +116,7 @@ describe('RunPool — construction', () => {
     // the new map values.
     const ctxId = `mid-session-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
-    const pool = createRunPool({ id: ctxId, deathPolicy: 'park' });
+    const pool = createRunPool({ id: ctxId, deathDisposition: 'park' });
     endPersistentContext();
 
     pool.addRun({ id: 'a', step: aliveStep });
@@ -138,7 +138,7 @@ describe('RunPool — construction', () => {
   it('a mid-session load flips a handle once the load has settled', () => {
     const ctxId = `settled-${Math.random().toString(36).slice(2, 8)}`;
     const pool = withPersistentContext(ctxId, () =>
-      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+      createRunPool({ id: ctxId, deathDisposition: 'park' }),
     );
     const handle = pool.addRun({ id: 'a', step: aliveStep });
     const loadingAtFlip: boolean[] = [];
@@ -155,7 +155,7 @@ describe('RunPool — construction', () => {
   it('a destroyed handle stays dead through a later load that revives its id', () => {
     const ctxId = `destroyed-load-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
-    const pool = createRunPool({ id: ctxId, deathPolicy: 'destroy' });
+    const pool = createRunPool({ id: ctxId, deathDisposition: 'destroy' });
     endPersistentContext();
 
     const clone = pool.addRun({ id: 'clone-1', step: deadStep });
@@ -174,7 +174,7 @@ describe('RunPool — teardown', () => {
   it('dispose() stops the load re-seed and keeps the saved map registered', () => {
     const ctxId = `dispose-${Math.random().toString(36).slice(2, 8)}`;
     const pool = withPersistentContext(ctxId, () =>
-      createRunPool({ id: ctxId, deathPolicy: 'park' }),
+      createRunPool({ id: ctxId, deathDisposition: 'park' }),
     );
     const handle = pool.addRun({ id: 'a', step: aliveStep });
     pool.dispose();
@@ -191,7 +191,7 @@ describe('RunPool — teardown', () => {
     const ctxId = `scoped-${Math.random().toString(36).slice(2, 8)}`;
     const scope = effectScope();
     const pool = scope.run(() =>
-      withPersistentContext(ctxId, () => createRunPool({ id: ctxId, deathPolicy: 'park' })),
+      withPersistentContext(ctxId, () => createRunPool({ id: ctxId, deathDisposition: 'park' })),
     )!;
     const handle = pool.addRun({ id: 'a', step: aliveStep });
     scope.stop();
@@ -210,7 +210,7 @@ describe('RunPool — teardown', () => {
 
 describe('RunPool — addRun / removeRun', () => {
   it('fires instance:added with the returned handle', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     let added: RunHandle | null = null;
     pool.on('run:added', (h) => {
       added = h;
@@ -223,25 +223,25 @@ describe('RunPool — addRun / removeRun', () => {
   });
 
   it('throws on duplicate id', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     pool.addRun({ id: 'x', step: aliveStep });
     expect(() => pool.addRun({ id: 'x', step: aliveStep })).toThrow(/duplicate/i);
   });
 
   it('enforces maxRuns cap', () => {
-    const pool = makePool({ deathPolicy: 'destroy', maxRuns: 2 });
+    const pool = makePool({ deathDisposition: 'destroy', maxRuns: 2 });
     pool.addRun({ id: 'a', step: aliveStep });
     pool.addRun({ id: 'b', step: aliveStep });
     expect(() => pool.addRun({ id: 'c', step: aliveStep })).toThrow(/maxRuns/i);
   });
 
   it('treats maxRuns:0 as valid-but-empty (always throws)', () => {
-    const pool = makePool({ deathPolicy: 'destroy', maxRuns: 0 });
+    const pool = makePool({ deathDisposition: 'destroy', maxRuns: 0 });
     expect(() => pool.addRun({ id: 'a', step: aliveStep })).toThrow(/maxRuns/i);
   });
 
   it('removeRun fires instance:died then instance:removed', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: aliveStep });
     const events: string[] = [];
     pool.on('run:died', (_h, o) => events.push(`died:${typeof o === 'string' ? o : 'restart'}`));
@@ -253,7 +253,7 @@ describe('RunPool — addRun / removeRun', () => {
   });
 
   it('removeRun on unknown id is a no-op', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     let fired = 0;
     pool.on('run:removed', () => fired++);
     pool.removeRun('nope');
@@ -261,7 +261,7 @@ describe('RunPool — addRun / removeRun', () => {
   });
 
   it('instances.value reference is stable between no-op reads', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     pool.addRun({ id: 'x', step: aliveStep });
     const view1 = pool.runs.value;
     const view2 = pool.runs.value;
@@ -269,7 +269,7 @@ describe('RunPool — addRun / removeRun', () => {
   });
 
   it('instances.value reference changes on mutation', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     pool.addRun({ id: 'x', step: aliveStep });
     const view1 = pool.runs.value;
     pool.addRun({ id: 'y', step: aliveStep });
@@ -283,9 +283,9 @@ describe('RunPool — addRun / removeRun', () => {
 // Step routing — 'destroy' policy
 // ---------------------------------------------------------------------------
 
-describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
+describe("RunPool — step routing (deathDisposition: 'destroy')", () => {
   it('step returning true fires no events', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: aliveStep });
     let fired = 0;
     pool.on('run:died', () => fired++);
@@ -295,7 +295,7 @@ describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
   });
 
   it('step returning false fires died then removed, handle gone', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     const events: string[] = [];
     pool.on('run:died', (_h, o) => events.push(`died:${o as string}`));
@@ -307,7 +307,7 @@ describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
   });
 
   it('step on already-dead handle is a silent no-op', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     handle.step();
     let fired = 0;
@@ -321,9 +321,9 @@ describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
 // Step routing — 'park' policy
 // ---------------------------------------------------------------------------
 
-describe("RunPool — step routing (deathPolicy: 'park')", () => {
+describe("RunPool — step routing (deathDisposition: 'park')", () => {
   it('step returning false parks the handle (alive=false, stays in pool)', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     const events: string[] = [];
     pool.on('run:died', (_h, o) => events.push(`died:${o as string}`));
@@ -335,7 +335,7 @@ describe("RunPool — step routing (deathPolicy: 'park')", () => {
   });
 
   it('subsequent step on parked handle returns false without events', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     handle.step();
     let fired = 0;
@@ -351,7 +351,7 @@ describe("RunPool — step routing (deathPolicy: 'park')", () => {
 
 describe('RunPool — onDeath outcomes', () => {
   it("'destroyed' outcome from onDeath override (against 'park' pool)", () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const handle = pool.addRun({
       id: 'x',
       step: deadStep,
@@ -362,7 +362,7 @@ describe('RunPool — onDeath outcomes', () => {
   });
 
   it("'parked' outcome from onDeath override (against 'destroy' pool)", () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({
       id: 'x',
       step: deadStep,
@@ -374,7 +374,7 @@ describe('RunPool — onDeath outcomes', () => {
   });
 
   it("'restartedWith' swaps the step in-place; alive stays true", () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     let calls = 0;
     const firstStep: RunStep = () => {
       calls++;
@@ -409,7 +409,7 @@ describe('RunPool — onDeath outcomes', () => {
 
 describe('RunPool — reset', () => {
   it('fires pool:reset and is synchronous', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     let fired = 0;
     pool.on('pool:reset', () => fired++);
     pool.reset();
@@ -417,7 +417,7 @@ describe('RunPool — reset', () => {
   });
 
   it('handler can re-arm parked handles via handle.restart()', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const a = pool.addRun({ id: 'a', step: deadStep });
     const b = pool.addRun({ id: 'b', step: deadStep });
     a.step();
@@ -436,7 +436,7 @@ describe('RunPool — reset', () => {
   });
 
   it('handle.restart on a live handle is a no-op', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: aliveStep });
     let fired = 0;
     pool.on('run:restarted', () => fired++);
@@ -451,7 +451,7 @@ describe('RunPool — reset', () => {
 
 describe('RunPool — firing-order invariants', () => {
   it("on instance:died('destroyed'): alive=false, handle still in instances.value", () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedAlive: boolean | null = null;
     let observedPresent: boolean | null = null;
@@ -465,7 +465,7 @@ describe('RunPool — firing-order invariants', () => {
   });
 
   it("on instance:died('parked'): alive=false, handle still present", () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedAlive: boolean | null = null;
     let observedPresent: boolean | null = null;
@@ -479,7 +479,7 @@ describe('RunPool — firing-order invariants', () => {
   });
 
   it('on instance:died(restartedWith): alive=true, handle still present', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({
       id: 'x',
       step: deadStep,
@@ -497,7 +497,7 @@ describe('RunPool — firing-order invariants', () => {
   });
 
   it('on instance:removed: handle no longer in instances.value', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedPresent: boolean | null = null;
     pool.on('run:removed', (h) => {
@@ -514,7 +514,7 @@ describe('RunPool — firing-order invariants', () => {
 
 describe('RunPool — re-entrancy', () => {
   it('addRun from inside instance:died handler lands before instance:removed', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const events: string[] = [];
     pool.on('run:died', (h) => {
       events.push(`died:${h.id}`);
@@ -540,7 +540,7 @@ describe('RunPool — re-entrancy', () => {
 
 describe('RunPool — edge cases', () => {
   it('step() throwing propagates, aliveness unchanged', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({
       id: 'x',
       step: () => {
@@ -553,7 +553,7 @@ describe('RunPool — edge cases', () => {
   });
 
   it('pool.reset during a step is synchronous and safe', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     let resetFired = 0;
     pool.on('pool:reset', () => resetFired++);
     const handle = pool.addRun({
@@ -568,7 +568,7 @@ describe('RunPool — edge cases', () => {
   });
 
   it('destroy() is idempotent', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const handle = pool.addRun({ id: 'x', step: aliveStep });
     handle.destroy();
     let fired = 0;
@@ -578,7 +578,7 @@ describe('RunPool — edge cases', () => {
   });
 
   it('a destroyed handle leaves alone the new handle that reuses its id', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     const old = pool.addRun({ id: 'x', step: aliveStep });
     old.destroy();
     const next = pool.addRun({ id: 'x', step: aliveStep });
@@ -596,7 +596,7 @@ describe('RunPool — edge cases', () => {
 
 describe('RunPool — reactivity', () => {
   it('liveCount reacts to step-death and restart', () => {
-    const pool = makePool({ deathPolicy: 'park' });
+    const pool = makePool({ deathDisposition: 'park' });
     const observed: number[] = [];
     const scope = effectScope();
     scope.run(() => {
@@ -618,7 +618,7 @@ describe('RunPool — reactivity', () => {
   });
 
   it('watchEffect on instances.value fires on add/remove', () => {
-    const pool = makePool({ deathPolicy: 'destroy' });
+    const pool = makePool({ deathDisposition: 'destroy' });
     let runs = 0;
     const scope = effectScope();
     scope.run(() => {

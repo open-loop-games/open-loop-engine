@@ -1146,7 +1146,7 @@ describe('Systems — required options vs what defaults', () => {
 
   it('createRecommendationSystem requires cycle/cycleLog/bestOf/getCurrentSnapshot/applySnapshot', () => {
     type Options = import('@/systems/recommendation').RecommendationSystemOptions;
-    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'defs' | 'getGameState'>();
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'recommenders' | 'getGameState'>();
   });
 
   it('createProducerCategory requires id/mapProducer/registerTick; mapState defaults', () => {
@@ -1467,12 +1467,12 @@ describe('Removed surface stays removed', () => {
     >().toEqualTypeOf<false>();
   });
 
-  it('createGoalDef is gone — createBestReplayDef takes the threshold', () => {
+  it('createGoalDef is gone — createBestReplayRecommender takes the threshold', () => {
     type Keys = keyof typeof import('@/index');
     expectTypeOf<'createGoalDef' extends Keys ? true : false>().toEqualTypeOf<false>();
-    // @ts-expect-error — folded into BestReplayDefOptions.
+    // @ts-expect-error — folded into BestReplayRecommenderOptions.
     type _GoalDefOptions = import('@/index').GoalDefOptions;
-    expectTypeOf<import('@/index').BestReplayDefOptions['threshold']>().toEqualTypeOf<
+    expectTypeOf<import('@/index').BestReplayRecommenderOptions['threshold']>().toEqualTypeOf<
       DecimalSource | undefined
     >();
   });

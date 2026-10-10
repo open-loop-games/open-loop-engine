@@ -95,13 +95,13 @@ export interface CycleOptions {
 
   /**
    * Refs that should survive the cycle reset unchanged.
-   * @see {@link createRetentionPolicy}
+   * @see {@link createRetention}
    */
   keep?: Persistent[];
 
   /**
    * Refs with custom retention transforms applied after reset.
-   * @see {@link createRetentionPolicy}
+   * @see {@link createRetention}
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   retain?: Map<Persistent, (value: any) => any>;

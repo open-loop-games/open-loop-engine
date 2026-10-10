@@ -17,7 +17,7 @@
  *   `pick(candidates) → T | undefined`. Noun form (`selection*`) per the
  *   constructor-as-data carve-out — call sites read as configuration
  *   (`policy: selectionHybridPayback({ ... })`).
- * - `RecommendationDef` ({@link ../systems/recommendation}) — *scored
+ * - `Recommender` ({@link ../systems/recommendation}) — *scored
  *   candidate*. The recommendation system filters defs via `canApply`,
  *   scores them, and runs `recommend()` on the winner each loop boundary.
  *

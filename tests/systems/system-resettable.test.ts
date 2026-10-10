@@ -168,7 +168,7 @@ const cases: Case[] = [
   },
   {
     name: 'run pool',
-    build: () => createRunPool({ id: 'm-pool', deathPolicy: 'park' }),
+    build: () => createRunPool({ id: 'm-pool', deathDisposition: 'park' }),
     dirty: (pool: ReturnType<typeof createRunPool>) =>
       void pool.addRun({ id: 'a', step: () => false }).step(),
   },

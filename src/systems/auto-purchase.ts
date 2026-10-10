@@ -620,7 +620,7 @@ export function setupPolicyAutoPurchase(
       }
 
       const best = candidates.length > 0 ? policy.pick(candidates, { getTotalRate }) : undefined;
-      profileEnd('autobuy.decide', scanStart);
+      profileEnd('auto-purchase.decide', scanStart);
 
       // A pick that can't be paid — possible only under `waitForCost` — is
       // what the policy is saving toward, so the slot buys nothing: falling
@@ -646,7 +646,7 @@ export function setupPolicyAutoPurchase(
           : bulk;
 
         if (Decimal.gt(amount, 0)) {
-          profile('autobuy.purchase', () => buyTarget.purchase(amount));
+          profile('auto-purchase.purchase', () => buyTarget.purchase(amount));
         }
       }
 

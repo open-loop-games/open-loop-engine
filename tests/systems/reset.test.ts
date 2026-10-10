@@ -702,7 +702,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       const time = createTimeSystem();
       const bank = createTimeBank();
       const bestOf = createBestOf({ id: 'm-best', metrics: { gold: { mode: 'absolute' } } });
-      const pool = createRunPool({ id: 'm-pool', deathPolicy: 'park' });
+      const pool = createRunPool({ id: 'm-pool', deathDisposition: 'park' });
       const tiers = createAutomationTiers({ tiers: AUTOMATION_TIER_DEFS });
       const cycleLog = createCycleLog({ cycle, metrics: {} });
       const recs = buildRecommendationStack(cycle, cycleLog, bestOf);

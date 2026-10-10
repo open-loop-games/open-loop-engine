@@ -36,18 +36,18 @@ score-and-pick over a candidate list
 
 inter-cycle arbitration across registered defs
 
-- `interface BestReplayDefOptions` `src/systems/recommendation-strategies.ts:27`
-- `function createBestReplayDef(metricKey: string, options?: BestReplayDefOptions): RecommendationDef` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommendation-strategies.ts:93`
+- `interface BestReplayRecommenderOptions` `src/systems/recommenders.ts:27`
+- `function createBestReplayRecommender(metricKey: string, options?: BestReplayRecommenderOptions): Recommender` — Create a def that replays the configuration that produced the best value for a given metric. `src/systems/recommenders.ts:93`
 - `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered defs after each cycle restart and surfaces or auto-applies the winning configuration. `src/systems/recommendation.ts:370`
 - `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:126`
 - `interface RecommendationContext` — The evaluation context passed to every def's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:53`
-- `interface RecommendationDef` — A recommendation definition. `src/systems/recommendation.ts:98`
 - `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:67`
 - `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:74`
 - `interface RecommendationResult` — The output of a def's `recommend()` method. `src/systems/recommendation.ts:84`
 - `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:219`
 - `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:153`
 - `interface RecommendationSystemOptions` — Configuration for createRecommendationSystem. `src/systems/recommendation.ts:163`
+- `interface Recommender` — A recommendation definition. `src/systems/recommendation.ts:98`
 
 ## Rule advisor
 

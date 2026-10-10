@@ -6,14 +6,14 @@ import { beginPersistentContext, endPersistentContext } from '@/core/persistence
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf, type BestOfMetricDef } from '@/systems/best-of';
-import { createBestReplayDef } from '@/systems/recommendation-strategies';
+import { createBestReplayRecommender } from '@/systems/recommenders';
 import type { RecommendationContext } from '@/systems/recommendation';
 import { createManualTicks } from '../helpers/manual-ticks';
 
 /** Build a full Cycle + CycleLog + BestOf stack and run N cycles to populate data */
 function createPopulatedStack(
   prefix: string,
-  opts?: { captureStrategy?: boolean; metric?: BestOfMetricDef },
+  opts?: { captureConfig?: boolean; metric?: BestOfMetricDef },
 ) {
   const tick = createManualTicks();
 
@@ -36,8 +36,8 @@ function createPopulatedStack(
     id: `${prefix}-best`,
     metrics: { gold: opts?.metric ?? { mode: 'absolute' } },
     cycleLog,
-    captureStrategy:
-      opts?.captureStrategy !== false ? () => ({ queue: ['spell-a', 'spell-b'] }) : undefined,
+    captureConfig:
+      opts?.captureConfig !== false ? () => ({ queue: ['spell-a', 'spell-b'] }) : undefined,
   });
 
   /** Run a cycle cycle: set gold, tick, end. String gold allows values past the double range. */
@@ -62,26 +62,26 @@ function createPopulatedStack(
   return { tick, gold, cycle, cycleLog, bestOf, runCycle, buildContext };
 }
 
-describe('createBestReplayDef', () => {
+describe('createBestReplayRecommender', () => {
   // ==========================================================================
   // canApply
   // ==========================================================================
 
   it('canApply returns false when no best entry exists', () => {
     const { buildContext } = createPopulatedStack('br-noentry');
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
 
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
-  it('canApply returns false when entry has no strategySnapshot', () => {
+  it('canApply returns false when entry has no configSnapshot', () => {
     const { runCycle, buildContext } = createPopulatedStack('br-nosnap', {
-      captureStrategy: false,
+      captureConfig: false,
     });
 
     runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
@@ -91,7 +91,7 @@ describe('createBestReplayDef', () => {
     runCycle(100, 5);
     bestOf.invalidate('gold');
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.canApply(buildContext())).toBe(false);
   });
 
@@ -100,7 +100,7 @@ describe('createBestReplayDef', () => {
 
     runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.canApply(buildContext())).toBe(true);
   });
 
@@ -109,7 +109,7 @@ describe('createBestReplayDef', () => {
 
     runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold', { minRuns: 3 });
+    const strategy = createBestReplayRecommender('gold', { minRuns: 3 });
     // cycle.count is 1 after one completed cycle
     expect(strategy.canApply(buildContext())).toBe(false);
 
@@ -127,7 +127,7 @@ describe('createBestReplayDef', () => {
 
     runCycle(50, 5);
 
-    const strategy = createBestReplayDef('gold', { threshold: 100 });
+    const strategy = createBestReplayRecommender('gold', { threshold: 100 });
     expect(strategy.canApply(buildContext())).toBe(false);
 
     runCycle(150, 5);
@@ -144,7 +144,7 @@ describe('createBestReplayDef', () => {
     runCycle(200, 10);
     runCycle(50, 5);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     // Bounded log10 magnitudes, so unbounded quantities can't overflow toNumber().
     expect(strategy.score(buildContext())).toBeCloseTo(Math.log10(200) - Math.log10(50), 10);
   });
@@ -157,7 +157,7 @@ describe('createBestReplayDef', () => {
     runCycle(100, 5); // best: 20/s
     runCycle(40, 4); // last: 10/s
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.score(buildContext())).toBeCloseTo(Math.log10(2), 10);
   });
 
@@ -169,7 +169,7 @@ describe('createBestReplayDef', () => {
     runCycle(100, 5); // best: projected 200
     runCycle(50, 5); // last: 50 observed
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.score(buildContext())).toBeCloseTo(Math.log10(200) - Math.log10(50), 10);
   });
 
@@ -178,7 +178,7 @@ describe('createBestReplayDef', () => {
 
     runCycle(200, 10);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     const ctx = buildContext();
     expect(strategy.canApply(ctx)).toBe(true);
     expect(strategy.score(ctx)).toBe(0);
@@ -192,7 +192,7 @@ describe('createBestReplayDef', () => {
     runCycle(100, 5); // best: 20/s
     runCycle(10, 0); // last: no rate
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     expect(strategy.score(buildContext())).toBeCloseTo(Math.log10(20), 10);
   });
 
@@ -202,12 +202,12 @@ describe('createBestReplayDef', () => {
     const low = createPopulatedStack('br-huge-low');
     low.runCycle('1e400', 10);
     low.runCycle('1e350', 10);
-    const scoreLow = createBestReplayDef('gold').score(low.buildContext());
+    const scoreLow = createBestReplayRecommender('gold').score(low.buildContext());
 
     const high = createPopulatedStack('br-huge-high');
     high.runCycle('1e500', 10);
     high.runCycle('1e350', 10);
-    const scoreHigh = createBestReplayDef('gold').score(high.buildContext());
+    const scoreHigh = createBestReplayRecommender('gold').score(high.buildContext());
 
     expect(Number.isFinite(scoreLow)).toBe(true);
     expect(Number.isFinite(scoreHigh)).toBe(true);
@@ -218,12 +218,12 @@ describe('createBestReplayDef', () => {
   // recommend
   // ==========================================================================
 
-  it('recommend returns the stored strategySnapshot', () => {
+  it('recommend returns the stored configSnapshot', () => {
     const { runCycle, buildContext } = createPopulatedStack('br-rec');
 
     runCycle(150, 5);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     const ctx = buildContext();
     const result = strategy.recommend(ctx);
 
@@ -238,11 +238,11 @@ describe('createBestReplayDef', () => {
     // Second cycle: gold = 50 (worse, doesn't beat best)
     runCycle(50, 5);
 
-    const strategy = createBestReplayDef('gold');
+    const strategy = createBestReplayRecommender('gold');
     const ctx = buildContext();
     const result = strategy.recommend(ctx);
 
-    expect(result.rationale.strategyId).toBe('best-replay:gold');
+    expect(result.rationale.recommenderId).toBe('best-replay:gold');
     expect(result.rationale.metrics.gold).toBeDefined();
     // Current should be last cycle's delta (50)
     expect(Decimal.eq(result.rationale.metrics.gold.current, 50)).toBe(true);
@@ -256,10 +256,10 @@ describe('createBestReplayDef', () => {
     const { runCycle, buildContext } = createPopulatedStack('br-custom-id');
     runCycle(100, 5);
 
-    const strategy = createBestReplayDef('gold', { id: 'my-replay' });
+    const strategy = createBestReplayRecommender('gold', { id: 'my-replay' });
     expect(strategy.id).toBe('my-replay');
 
     const result = strategy.recommend(buildContext());
-    expect(result.rationale.strategyId).toBe('my-replay');
+    expect(result.rationale.recommenderId).toBe('my-replay');
   });
 });

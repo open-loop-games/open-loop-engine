@@ -334,21 +334,21 @@ describe('createBestOf', () => {
   // Strategy snapshots
   // ==========================================================================
 
-  it('captureStrategy is called on new best', () => {
+  it('captureConfig is called on new best', () => {
     const capture = vi.fn(() => ({ queue: ['mine', 'smelt'] }));
     const bestOf = createBestOf({
       id: 'bo-snap-capture',
       metrics: { gold: { mode: 'absolute' } },
-      captureStrategy: capture,
+      captureConfig: capture,
     });
 
     bestOf.submit({ key: 'gold', value: 100, elapsed: 10, runNumber: 0 });
 
     expect(capture).toHaveBeenCalledOnce();
-    expect(bestOf.entries.value.gold!.strategySnapshot).toEqual({ queue: ['mine', 'smelt'] });
+    expect(bestOf.entries.value.gold!.configSnapshot).toEqual({ queue: ['mine', 'smelt'] });
   });
 
-  it('strategySnapshot is undefined when captureStrategy not provided', () => {
+  it('configSnapshot is undefined when captureConfig not provided', () => {
     const bestOf = createBestOf({
       id: 'bo-snap-none',
       metrics: { gold: { mode: 'absolute' } },
@@ -356,15 +356,15 @@ describe('createBestOf', () => {
 
     bestOf.submit({ key: 'gold', value: 100, elapsed: 10, runNumber: 0 });
 
-    expect(bestOf.entries.value.gold!.strategySnapshot).toBeUndefined();
+    expect(bestOf.entries.value.gold!.configSnapshot).toBeUndefined();
   });
 
-  it('manual snapshot overrides captureStrategy', () => {
+  it('manual snapshot overrides captureConfig', () => {
     const capture = vi.fn(() => ({ queue: ['auto'] }));
     const bestOf = createBestOf({
       id: 'bo-snap-override',
       metrics: { gold: { mode: 'absolute' } },
-      captureStrategy: capture,
+      captureConfig: capture,
     });
 
     bestOf.submit({
@@ -372,11 +372,11 @@ describe('createBestOf', () => {
       value: 100,
       elapsed: 10,
       runNumber: 0,
-      strategySnapshot: { queue: ['manual'] },
+      configSnapshot: { queue: ['manual'] },
     });
 
     expect(capture).not.toHaveBeenCalled();
-    expect(bestOf.entries.value.gold!.strategySnapshot).toEqual({ queue: ['manual'] });
+    expect(bestOf.entries.value.gold!.configSnapshot).toEqual({ queue: ['manual'] });
   });
 
   // ==========================================================================

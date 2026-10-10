@@ -92,7 +92,7 @@ export interface BestOfEntry {
   /** When this record was set (Unix ms) */
   timestamp: number;
   /** Consumer-provided opaque configuration snapshot, or undefined */
-  strategySnapshot: Serializable | undefined;
+  configSnapshot: Serializable | undefined;
   /** Current validity — stale entries are beaten by any new submission */
   status: BestOfStatus;
 }
@@ -105,7 +105,7 @@ interface SerializedBestOfEntry {
   elapsed: number;
   runNumber: number;
   timestamp: number;
-  strategySnapshot: Serializable | undefined;
+  configSnapshot: Serializable | undefined;
   status: BestOfStatus;
 }
 
@@ -119,8 +119,8 @@ export interface BestOfCandidate {
   elapsed: number;
   /** Cycle number */
   runNumber: number;
-  /** Override for strategy snapshot (takes precedence over captureStrategy) */
-  strategySnapshot?: Serializable;
+  /** Override for strategy snapshot (takes precedence over captureConfig) */
+  configSnapshot?: Serializable;
 }
 
 /** Events emitted by a {@link BestOf} instance */
@@ -141,7 +141,7 @@ export interface BestOfOptions {
   cycleLog?: CycleLog;
 
   /** Called to capture the current strategy/config when a new best is recorded */
-  captureStrategy?: () => Serializable;
+  captureConfig?: () => Serializable;
 }
 
 /**
@@ -195,7 +195,7 @@ function serialize(entry: BestOfEntry): SerializedBestOfEntry {
     elapsed: entry.elapsed,
     runNumber: entry.runNumber,
     timestamp: entry.timestamp,
-    strategySnapshot: entry.strategySnapshot,
+    configSnapshot: entry.configSnapshot,
     status: entry.status,
   };
 }
@@ -208,7 +208,7 @@ function deserialize(raw: SerializedBestOfEntry): BestOfEntry {
     elapsed: raw.elapsed,
     runNumber: raw.runNumber,
     timestamp: raw.timestamp,
-    strategySnapshot: raw.strategySnapshot,
+    configSnapshot: raw.configSnapshot,
     status: raw.status,
   };
 }
@@ -243,7 +243,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  *     xp: { mode: 'absolute' },
  *   },
  *   cycleLog: myCycleLog,
- *   captureStrategy: () => ({ queue: actionQueue.serialize() }),
+ *   captureConfig: () => ({ queue: actionQueue.serialize() }),
  * });
  *
  * bestOf.on('bestImproved', (key, entry) => {
@@ -252,7 +252,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
  * ```
  */
 export function createBestOf(options: BestOfOptions): BestOf {
-  const { id, metrics, cycleLog, captureStrategy } = options;
+  const { id, metrics, cycleLog, captureConfig } = options;
 
   // --- Reactive state ---
   const store = withPersistentContext(id, () =>
@@ -383,7 +383,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
     }
 
     const snapshot =
-      candidate.strategySnapshot !== undefined ? candidate.strategySnapshot : captureStrategy?.();
+      candidate.configSnapshot !== undefined ? candidate.configSnapshot : captureConfig?.();
 
     const entry: BestOfEntry = {
       value: candidateValue,
@@ -392,7 +392,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
       elapsed: candidate.elapsed,
       runNumber: candidate.runNumber,
       timestamp: Date.now(),
-      strategySnapshot: snapshot,
+      configSnapshot: snapshot,
       status: 'valid',
     };
 

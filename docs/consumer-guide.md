@@ -186,7 +186,7 @@ const prestigeReset = createReset({
 });
 ```
 
-A `Resource` returned by `createResource` is itself the `Persistent` handle (`Resource<T> & Persistent<T>`), so pass it directly to `keep` / `retain` — no `.amount` indirection. Inline `keep`/`retain` is shorthand for `createRetentionPolicy`; drop to the standalone factory only when the same policy spans more than one reset.
+A `Resource` returned by `createResource` is itself the `Persistent` handle (`Resource<T> & Persistent<T>`), so pass it directly to `keep` / `retain` — no `.amount` indirection. Inline `keep`/`retain` is shorthand for `createRetention`; drop to the standalone factory only when the same policy spans more than one reset.
 
 ### Category systems scope their own persistence
 

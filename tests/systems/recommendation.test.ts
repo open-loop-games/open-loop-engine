@@ -6,11 +6,7 @@ import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
 import { createRecommendationSystem } from '@/systems/recommendation';
-import type {
-  RecommendationDef,
-  Recommendation,
-  RecommendationContext,
-} from '@/systems/recommendation';
+import type { Recommender, Recommendation, RecommendationContext } from '@/systems/recommendation';
 import { createManualTicks } from '../helpers/manual-ticks';
 
 /** Create a minimal Cycle + CycleLog + BestOf stack for testing */
@@ -36,21 +32,21 @@ function createTestStack(prefix: string) {
     id: `${prefix}-best`,
     metrics: { gold: { mode: 'absolute' } },
     cycleLog,
-    captureStrategy: () => ({ queue: 'test-snapshot' }),
+    captureConfig: () => ({ queue: 'test-snapshot' }),
   });
 
   return { tick, gold, cycle, cycleLog, bestOf };
 }
 
 /** A simple strategy factory for tests */
-function makeStrategy(overrides: Partial<RecommendationDef> & { id: string }): RecommendationDef {
+function makeStrategy(overrides: Partial<Recommender> & { id: string }): Recommender {
   return {
     canApply: () => true,
     score: () => 1,
     recommend: () => ({
       snapshot: { config: overrides.id },
       rationale: {
-        strategyId: overrides.id,
+        recommenderId: overrides.id,
         metrics: {},
         summary: `Apply ${overrides.id}`,
       },
@@ -77,7 +73,7 @@ describe('createRecommendationSystem', () => {
 
     expect(recs.lastRecommendation.value).toBeNull();
     expect(recs.autoApply.value).toBe(false);
-    expect(recs.defs).toHaveLength(0);
+    expect(recs.recommenders).toHaveLength(0);
   });
 
   it('pre-registers strategies from options', () => {
@@ -91,12 +87,12 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [s1, s2],
+      recommenders: [s1, s2],
     });
 
-    expect(recs.defs).toHaveLength(2);
-    expect(recs.defs[0].id).toBe('a');
-    expect(recs.defs[1].id).toBe('b');
+    expect(recs.recommenders).toHaveLength(2);
+    expect(recs.recommenders[0].id).toBe('a');
+    expect(recs.recommenders[1].id).toBe('b');
   });
 
   // ==========================================================================
@@ -126,7 +122,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'nope', canApply: () => false })],
+      recommenders: [makeStrategy({ id: 'nope', canApply: () => false })],
     });
 
     expect(recs.evaluate()).toBeNull();
@@ -141,12 +137,12 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'winner' })],
+      recommenders: [makeStrategy({ id: 'winner' })],
     });
 
     const result = recs.evaluate();
     expect(result).not.toBeNull();
-    expect(result!.strategyId).toBe('winner');
+    expect(result!.recommenderId).toBe('winner');
     expect(result!.applied).toBe(false);
     expect(result!.snapshot).toEqual({ config: 'winner' });
   });
@@ -160,7 +156,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({ id: 'low', score: () => 1 }),
         makeStrategy({ id: 'high', score: () => 10 }),
         makeStrategy({ id: 'mid', score: () => 5 }),
@@ -168,7 +164,7 @@ describe('createRecommendationSystem', () => {
     });
 
     const result = recs.evaluate();
-    expect(result!.strategyId).toBe('high');
+    expect(result!.recommenderId).toBe('high');
   });
 
   it('first-registered wins on score tie', () => {
@@ -180,14 +176,14 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({ id: 'first', score: () => 5 }),
         makeStrategy({ id: 'second', score: () => 5 }),
       ],
     });
 
     const result = recs.evaluate();
-    expect(result!.strategyId).toBe('first');
+    expect(result!.recommenderId).toBe('first');
   });
 
   it('skips strategies where canApply returns false', () => {
@@ -199,14 +195,14 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({ id: 'blocked', canApply: () => false, score: () => 100 }),
         makeStrategy({ id: 'available', score: () => 1 }),
       ],
     });
 
     const result = recs.evaluate();
-    expect(result!.strategyId).toBe('available');
+    expect(result!.recommenderId).toBe('available');
   });
 
   // ==========================================================================
@@ -225,7 +221,7 @@ describe('createRecommendationSystem', () => {
       getCurrentSnapshot: () => ({ loadout: 'fire' }),
       applySnapshot: () => {},
       getGameState: () => ({ goal: 'gold' }),
-      defs: [
+      recommenders: [
         makeStrategy({
           id: 'spy',
           canApply: (ctx) => {
@@ -256,7 +252,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({
           id: 'spy',
           canApply: (ctx) => {
@@ -286,14 +282,14 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('recommended', (rec) => received.push(rec));
     recs.evaluate();
 
     expect(received).toHaveLength(1);
-    expect(received[0].strategyId).toBe('a');
+    expect(received[0].recommenderId).toBe('a');
   });
 
   it('does not emit recommend when no strategy applies', () => {
@@ -307,7 +303,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'skip', canApply: () => false })],
+      recommenders: [makeStrategy({ id: 'skip', canApply: () => false })],
     });
 
     recs.on('recommended', (rec) => received.push(rec));
@@ -331,7 +327,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.evaluate();
@@ -351,7 +347,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.autoApply.value = true;
@@ -375,7 +371,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.autoApply.value = true;
@@ -405,7 +401,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('applied', (rec) => applyEvents.push(rec));
@@ -446,7 +442,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: applySpy,
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.autoApply.value = true;
@@ -472,7 +468,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('dismissed', () => {
@@ -521,7 +517,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'auto' })],
+      recommenders: [makeStrategy({ id: 'auto' })],
     });
 
     recs.on('recommended', (rec) => received.push(rec));
@@ -533,7 +529,7 @@ describe('createRecommendationSystem', () => {
     cycle.end();
 
     expect(received).toHaveLength(1);
-    expect(received[0].strategyId).toBe('auto');
+    expect(received[0].recommenderId).toBe('auto');
   });
 
   it('dispose() stops auto-evaluation on subsequent restarts', () => {
@@ -547,7 +543,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.on('recommended', (rec) => received.push(rec));
@@ -580,7 +576,7 @@ describe('createRecommendationSystem', () => {
 
     recs.register(makeStrategy({ id: 'late' }));
     const result = recs.evaluate();
-    expect(result!.strategyId).toBe('late');
+    expect(result!.recommenderId).toBe('late');
   });
 
   it('register() throws on a repeated id and keeps the first def', () => {
@@ -592,13 +588,13 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     expect(() => recs.register(makeStrategy({ id: 'a', score: () => 999 }))).toThrow(
       /duplicate recommendation def id "a"/,
     );
-    expect(recs.defs).toHaveLength(1);
+    expect(recs.recommenders).toHaveLength(1);
   });
 
   it('a repeated id among the initial defs throws at construction', () => {
@@ -611,7 +607,7 @@ describe('createRecommendationSystem', () => {
         bestOf,
         getCurrentSnapshot: () => ({}),
         applySnapshot: () => {},
-        defs: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'a' })],
+        recommenders: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'a' })],
       }),
     ).toThrow(/duplicate recommendation def id "a"/);
   });
@@ -625,12 +621,12 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'b' })],
+      recommenders: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'b' })],
     });
 
     recs.unregister('a');
-    expect(recs.defs).toHaveLength(1);
-    expect(recs.defs[0].id).toBe('b');
+    expect(recs.recommenders).toHaveLength(1);
+    expect(recs.recommenders[0].id).toBe('b');
   });
 
   it('unregister() is a no-op for unknown ids', () => {
@@ -642,11 +638,11 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [makeStrategy({ id: 'a' })],
+      recommenders: [makeStrategy({ id: 'a' })],
     });
 
     recs.unregister('nonexistent');
-    expect(recs.defs).toHaveLength(1);
+    expect(recs.recommenders).toHaveLength(1);
   });
 
   // ==========================================================================
@@ -662,13 +658,13 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({
           id: 'persisted',
           recommend: () => ({
             snapshot: { loadout: 'fire' },
             rationale: {
-              strategyId: 'persisted',
+              recommenderId: 'persisted',
               metrics: {
                 gold: { current: '10', projected: '20', delta: '10' },
               },
@@ -682,7 +678,7 @@ describe('createRecommendationSystem', () => {
     recs.evaluate();
     const rec = recs.lastRecommendation.value;
     expect(rec).not.toBeNull();
-    expect(rec!.strategyId).toBe('persisted');
+    expect(rec!.recommenderId).toBe('persisted');
     expect(rec!.snapshot).toEqual({ loadout: 'fire' });
     expect(rec!.rationale.summary).toBe('Use fire loadout');
     expect(rec!.rationale.metrics.gold).toEqual({
@@ -707,7 +703,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({}),
       applySnapshot: () => {},
-      defs: [
+      recommenders: [
         makeStrategy({
           id: 'counter',
           recommend: () => {
@@ -715,7 +711,7 @@ describe('createRecommendationSystem', () => {
             return {
               snapshot: { n: callCount },
               rationale: {
-                strategyId: 'counter',
+                recommenderId: 'counter',
                 metrics: {},
                 summary: `Call ${callCount}`,
               },

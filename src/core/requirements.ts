@@ -481,7 +481,7 @@ export function getRequirementDescriptions(requirements: Requirements): string[]
   return reqs.map((r) => unref(r.description)).filter((d): d is string => d != null);
 }
 
-// === PAY STRATEGIES ===
+// === PAY FUNCTIONS ===
 
 /**
  * Pay strategy: divide resource instead of subtract.
