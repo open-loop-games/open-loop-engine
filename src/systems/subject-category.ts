@@ -70,9 +70,9 @@ export interface VectorFieldDef<Dims extends string = string> {
  * Per-subject overrides typically replace `advanceWhen` to give each subject its
  * own protocol; the tier list itself is schema-frozen.
  */
-export interface TierFieldDef {
-  kind: 'tier';
-  tiers: readonly string[];
+export interface LadderFieldDef {
+  kind: 'ladder';
+  rungs: readonly string[];
   initial?: number;
   advanceWhen?: ReadonlyArray<Predicate | undefined>;
 }
@@ -95,7 +95,12 @@ export interface EnumFieldDef<V extends string = string> {
 }
 
 /** Discriminated field def — every schema field is one of these. */
-export type FieldDef = ScalarFieldDef | VectorFieldDef | TierFieldDef | FlagFieldDef | EnumFieldDef;
+export type FieldDef =
+  | ScalarFieldDef
+  | VectorFieldDef
+  | LadderFieldDef
+  | FlagFieldDef
+  | EnumFieldDef;
 
 /** A schema describes the shared field shape every registered subject carries. */
 export type FieldSchema = Record<string, FieldDef>;
@@ -132,7 +137,7 @@ export interface VectorFieldInstance<Dims extends string = string> extends Emitt
   add(dim: Dims, delta: number): void;
 }
 
-interface TierFieldEvents {
+interface LadderFieldEvents {
   /**
    * Fires on any tier-index change via `setIndex` — including regressions
    * (`to < from`), despite the name. Read `from`/`to` to distinguish direction.
@@ -140,13 +145,13 @@ interface TierFieldEvents {
   advanced: (info: { from: number; to: number }) => void;
 }
 
-/** Live tier-ladder accessor built from a {@link TierFieldDef}. */
-export interface TierFieldInstance extends Emittable<TierFieldEvents> {
-  readonly kind: 'tier';
+/** Live tier-ladder accessor built from a {@link LadderFieldDef}. */
+export interface LadderFieldInstance extends Emittable<LadderFieldEvents> {
+  readonly kind: 'ladder';
   readonly ref: Persistent<number>;
-  readonly tiers: readonly string[];
+  readonly rungs: readonly string[];
   getIndex(): number;
-  getTier(): string | undefined;
+  getRung(): string | undefined;
   /**
    * Try to advance one tier. Evaluates `advanceWhen[currentIndex]` before
    * incrementing. Returns the new tier name, or `null` when blocked / already
@@ -194,8 +199,8 @@ export type FieldInstance<F extends FieldDef> = F extends ScalarFieldDef
   ? ScalarFieldInstance
   : F extends VectorFieldDef<infer Dims>
     ? VectorFieldInstance<Dims>
-    : F extends TierFieldDef
-      ? TierFieldInstance
+    : F extends LadderFieldDef
+      ? LadderFieldInstance
       : F extends FlagFieldDef
         ? FlagFieldInstance
         : F extends EnumFieldDef<infer V>
@@ -213,7 +218,7 @@ export type PerSubjectOverride<F extends FieldDef> = F extends ScalarFieldDef
   ? { initial?: number }
   : F extends VectorFieldDef<infer Dims>
     ? { initialPerDim?: Partial<Record<Dims, number>> }
-    : F extends TierFieldDef
+    : F extends LadderFieldDef
       ? { initial?: number; advanceWhen?: ReadonlyArray<Predicate | undefined> }
       : F extends FlagFieldDef
         ? { initial?: boolean }
@@ -300,8 +305,8 @@ function clampVectorDim(schema: VectorFieldDef, dim: string, v: number): number 
   return Math.min(cfg?.max ?? Infinity, Math.max(cfg?.min ?? -Infinity, v));
 }
 
-function clampTierIndex(schema: TierFieldDef, i: number): number {
-  return Math.max(0, Math.min(schema.tiers.length - 1, Math.floor(i)));
+function clampRungIndex(schema: LadderFieldDef, i: number): number {
+  return Math.max(0, Math.min(schema.rungs.length - 1, Math.floor(i)));
 }
 
 function buildScalarField(
@@ -374,18 +379,18 @@ function buildVectorField<Dims extends string>(
   return { kind: 'vector', refs, get, set, add, on: events.on };
 }
 
-function buildTierField(
+function buildLadderField(
   fieldName: string,
-  schema: TierFieldDef,
-  override: PerSubjectOverride<TierFieldDef> | undefined,
+  schema: LadderFieldDef,
+  override: PerSubjectOverride<LadderFieldDef> | undefined,
   predicates: PredicateResolver,
   subjectId: string,
-): TierFieldInstance {
-  if (schema.tiers.length === 0) {
-    throw new Error(`Subject tier field "${fieldName}" must declare at least one tier`);
+): LadderFieldInstance {
+  if (schema.rungs.length === 0) {
+    throw new Error(`Subject ladder field "${fieldName}" must declare at least one rung`);
   }
   const initial = override?.initial ?? schema.initial ?? 0;
-  const maxIndex = schema.tiers.length - 1;
+  const maxIndex = schema.rungs.length - 1;
   const gates = (override?.advanceWhen ?? schema.advanceWhen)?.map((gate, i) =>
     gate === undefined
       ? undefined
@@ -396,16 +401,16 @@ function buildTierField(
         ),
   );
 
-  const clampIndex = (i: number): number => clampTierIndex(schema, i);
+  const clampIndex = (i: number): number => clampRungIndex(schema, i);
   // Clamp the authored initial index into [0, maxIndex] (setIndex clamps; a raw
-  // seed would let an out-of-range initial produce an undefined getTier()).
+  // seed would let an out-of-range initial produce an undefined getRung()).
   const ref = persistent<number>(clampIndex(initial), { name: fieldName });
-  const events = createEmitHandle<TierFieldEvents>();
+  const events = createEmitHandle<LadderFieldEvents>();
   function getIndex(): number {
     return ref.value;
   }
-  function getTier(): string | undefined {
-    return schema.tiers[ref.value];
+  function getRung(): string | undefined {
+    return schema.rungs[ref.value];
   }
   function setIndex(index: number): void {
     const next = clampIndex(index);
@@ -426,15 +431,15 @@ function buildTierField(
       if (!holds) return null;
     }
     setIndex(current + 1);
-    return schema.tiers[current + 1] ?? null;
+    return schema.rungs[current + 1] ?? null;
   }
 
   return {
-    kind: 'tier',
+    kind: 'ladder',
     ref,
-    tiers: schema.tiers,
+    rungs: schema.rungs,
     getIndex,
-    getTier,
+    getRung,
     tryAdvance,
     setIndex,
     on: events.on,
@@ -523,11 +528,11 @@ function buildField(
         schema,
         override as PerSubjectOverride<VectorFieldDef> | undefined,
       );
-    case 'tier':
-      return buildTierField(
+    case 'ladder':
+      return buildLadderField(
         fieldName,
         schema,
-        override as PerSubjectOverride<TierFieldDef> | undefined,
+        override as PerSubjectOverride<LadderFieldDef> | undefined,
         predicates,
         subjectId,
       );
@@ -563,9 +568,9 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
         ref.value = clampVectorDim(schema, dim, ref.value);
       }
       return;
-    case 'tier': {
-      const ref = (field as TierFieldInstance).ref;
-      ref.value = clampTierIndex(schema, ref.value);
+    case 'ladder': {
+      const ref = (field as LadderFieldInstance).ref;
+      ref.value = clampRungIndex(schema, ref.value);
       return;
     }
     case 'enum': {
@@ -597,7 +602,7 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  * // Many subjects, one tier field per subject (molcremental shape)
  * const npcs = createSubjectCategory({
  *   id: 'npc-trust',
- *   fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend', 'confidant'] } },
+ *   fields: { trust: { kind: 'ladder', rungs: ['stranger', 'friend', 'confidant'] } },
  * });
  *
  * npcs.register({

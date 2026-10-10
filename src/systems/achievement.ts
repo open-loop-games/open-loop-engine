@@ -8,7 +8,7 @@
  * earned. A save load restores `earned` as state: it fires no `onComplete`.
  *
  * The category factory {@link createAchievementCategory} is the consumer
- * front door for batch-registering achievements; its `registerTiered`
+ * front door for batch-registering achievements; its `registerLadder`
  * method fans one tracked value into a run of threshold-gated tiers.
  * {@link createAchievement} is engine-internal.
  *
@@ -154,7 +154,7 @@ export interface AchievementEvents {
 /**
  * Engine-internal raw Achievement factory. Consumers reach this through
  * {@link createAchievementCategory} (the L2 front door); tier ladders go
- * through `category.registerTiered({...})`.
+ * through `category.registerLadder({...})`.
  *
  * A once-and-stay-earned milestone with optional reactive effect and
  * auto-completing requirement watch.

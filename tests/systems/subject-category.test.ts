@@ -144,7 +144,7 @@ describe('createSubjectCategory', () => {
         const cat = createSubjectCategory({
           id: 'npc-trust',
           fields: {
-            trust: { kind: 'tier', tiers: ['stranger', 'acquaintance', 'student', 'trusted'] },
+            trust: { kind: 'ladder', rungs: ['stranger', 'acquaintance', 'student', 'trusted'] },
           },
         });
         cat.register({
@@ -161,11 +161,11 @@ describe('createSubjectCategory', () => {
         });
         return cat.get('mentor-rask')!;
       });
-      expect(rask.fields.trust.getTier()).toBe('stranger');
+      expect(rask.fields.trust.getRung()).toBe('stranger');
 
       // Gate not satisfied — advance is blocked.
       expect(rask.fields.trust.tryAdvance()).toBeNull();
-      expect(rask.fields.trust.getTier()).toBe('stranger');
+      expect(rask.fields.trust.getRung()).toBe('stranger');
 
       // Satisfy first gate, advance to acquaintance.
       accessor.setFlag('knowledge-rask-approach', true);
@@ -203,7 +203,7 @@ describe('createSubjectCategory', () => {
 
         const cat = createSubjectCategory({
           id: 'npc-standing',
-          fields: { trust: { kind: 'tier', tiers: ['stranger', 'known'] } },
+          fields: { trust: { kind: 'ladder', rungs: ['stranger', 'known'] } },
         });
         cat.register({
           id: 'mentor-rask',
@@ -228,7 +228,7 @@ describe('createSubjectCategory', () => {
       withGameStateAccessor(buildAccessor(), () => {
         const cat = createSubjectCategory({
           id: 'rank',
-          fields: { rank: { kind: 'tier', tiers: ['novice', 'apprentice', 'master'] } },
+          fields: { rank: { kind: 'ladder', rungs: ['novice', 'apprentice', 'master'] } },
         });
         cat.register({ id: 'mages-guild' });
         const g = cat.get('mages-guild')!;
@@ -243,7 +243,7 @@ describe('createSubjectCategory', () => {
       withGameStateAccessor(buildAccessor(), () => {
         const cat = createSubjectCategory({
           id: 'rank',
-          fields: { rank: { kind: 'tier', tiers: ['novice', 'apprentice', 'master'] } },
+          fields: { rank: { kind: 'ladder', rungs: ['novice', 'apprentice', 'master'] } },
         });
         cat.register({
           id: 'mages-guild',
@@ -259,7 +259,7 @@ describe('createSubjectCategory', () => {
         const g = cat.get('mages-guild')!;
         // tryAdvance would be blocked, but setIndex bypasses
         g.fields.rank.setIndex(2);
-        expect(g.fields.rank.getTier()).toBe('master');
+        expect(g.fields.rank.getRung()).toBe('master');
       });
     });
   });
@@ -391,14 +391,14 @@ describe('createSubjectCategory', () => {
       expect(cat.get('fluffy')!.fields.bond.get()).toBe(100);
     });
 
-    it('clamps an out-of-range tier initial so getTier() is defined', () => {
+    it('clamps an out-of-range tier initial so getRung() is defined', () => {
       const cat = createSubjectCategory({
         id: 'guilds',
-        fields: { rank: { kind: 'tier', tiers: ['novice', 'apprentice', 'master'], initial: 9 } },
+        fields: { rank: { kind: 'ladder', rungs: ['novice', 'apprentice', 'master'], initial: 9 } },
       });
       cat.register({ id: 'mages' });
       expect(cat.get('mages')!.fields.rank.getIndex()).toBe(2);
-      expect(cat.get('mages')!.fields.rank.getTier()).toBe('master');
+      expect(cat.get('mages')!.fields.rank.getRung()).toBe('master');
     });
 
     it('honors an explicit null enum override against a non-null schema default', () => {
@@ -437,7 +437,7 @@ describe('createSubjectCategory', () => {
             dimensions: ['calm'],
             dimensionConfig: { calm: { initial: -5, min: 0 } },
           },
-          rank: { kind: 'tier', tiers: ['a', 'b'], initial: 5 },
+          rank: { kind: 'ladder', rungs: ['a', 'b'], initial: 5 },
         },
       });
       cat.register({ id: 'fresh' });
@@ -460,7 +460,7 @@ describe('createSubjectCategory', () => {
         fields: {
           trust: { kind: 'scalar', min: 0, max: 50 },
           mood: { kind: 'vector', dimensions: ['calm'], dimensionConfig: { calm: { max: 10 } } },
-          rank: { kind: 'tier', tiers: ['a', 'b', 'c'] },
+          rank: { kind: 'ladder', rungs: ['a', 'b', 'c'] },
           path: { kind: 'enum', values: ['light', 'dark'], initial: 'light' },
         },
       });
@@ -481,7 +481,7 @@ describe('createSubjectCategory', () => {
 
       expect(f.trust.get()).toBe(50);
       expect(f.mood.get('calm')).toBe(10);
-      expect(f.rank.getTier()).toBe('c');
+      expect(f.rank.getRung()).toBe('c');
       expect(f.path.get()).toBe('light');
       expect(changed).not.toHaveBeenCalled();
     });

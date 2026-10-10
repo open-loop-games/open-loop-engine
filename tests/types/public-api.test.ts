@@ -64,7 +64,7 @@ import type { Persistent } from '@/core/persistence';
 import type { SkillCategory, SkillCategoryOptions } from '@/systems/skill-category';
 import type {
   AchievementCategory,
-  BaseTieredAchievementDef,
+  BaseLadderAchievementDef,
   AchievementLadderOptions,
 } from '@/systems/achievement-category';
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
@@ -83,7 +83,7 @@ import type {
   SubjectDef,
   FieldDef,
   ScalarFieldInstance,
-  TierFieldInstance,
+  LadderFieldInstance,
   FlagFieldInstance,
   EnumFieldInstance,
 } from '@/systems/subject-category';
@@ -474,19 +474,19 @@ describe('Subject category surface type pins', () => {
     const cat = createSubjectCategory({
       id: 'npcs',
       fields: {
-        trust: { kind: 'tier', tiers: ['stranger', 'friend'] } as const,
+        trust: { kind: 'ladder', rungs: ['stranger', 'friend'] } as const,
       },
     });
-    // get() returns the typed SubjectInstance; fields.trust narrows to TierFieldInstance
+    // get() returns the typed SubjectInstance; fields.trust narrows to LadderFieldInstance
     // without runtime narrowing helpers — the schema literal drives inference.
     const inst = cat.get('x');
-    expectTypeOf(inst?.fields.trust).toEqualTypeOf<TierFieldInstance | undefined>();
+    expectTypeOf(inst?.fields.trust).toEqualTypeOf<LadderFieldInstance | undefined>();
   });
 
   it('FieldDef discriminated union covers all 5 field kinds', () => {
     type Kinds = FieldDef['kind'];
     // Compile-time enumeration — any drift from these 5 values fails here.
-    expectTypeOf<Kinds>().toEqualTypeOf<'scalar' | 'vector' | 'tier' | 'flag' | 'enum'>();
+    expectTypeOf<Kinds>().toEqualTypeOf<'scalar' | 'vector' | 'ladder' | 'flag' | 'enum'>();
   });
 
   it('SubjectInstance.fields preserves per-kind accessor shape for each schema field', async () => {
@@ -495,7 +495,7 @@ describe('Subject category surface type pins', () => {
       id: 'entity',
       fields: {
         trust: { kind: 'scalar', min: 0, max: 100 } as const,
-        rank: { kind: 'tier', tiers: ['a', 'b', 'c'] } as const,
+        rank: { kind: 'ladder', rungs: ['a', 'b', 'c'] } as const,
         met: { kind: 'flag' } as const,
         path: { kind: 'enum', values: ['scientific', 'cooperative'] as const },
       },
@@ -503,7 +503,7 @@ describe('Subject category surface type pins', () => {
     const e = cat.get('the-entity');
     // Each field narrows to its kind-specific instance — no getRun<K> ceremony.
     expectTypeOf(e?.fields.trust).toEqualTypeOf<ScalarFieldInstance | undefined>();
-    expectTypeOf(e?.fields.rank).toEqualTypeOf<TierFieldInstance | undefined>();
+    expectTypeOf(e?.fields.rank).toEqualTypeOf<LadderFieldInstance | undefined>();
     expectTypeOf(e?.fields.met).toEqualTypeOf<FlagFieldInstance | undefined>();
     expectTypeOf(e?.fields.path).toEqualTypeOf<
       EnumFieldInstance<'scientific' | 'cooperative'> | undefined
@@ -511,7 +511,7 @@ describe('Subject category surface type pins', () => {
   });
 
   it('SubjectDef.fields override accepts the per-kind partial shape', () => {
-    type S = { trust: { kind: 'tier'; tiers: readonly ['a', 'b'] } };
+    type S = { trust: { kind: 'ladder'; rungs: readonly ['a', 'b'] } };
     type Def = SubjectDef<S>;
     // Per-subject override on a tier field accepts initial + advanceWhen only — schema-frozen
     // tiers list isn't overridable. If the override shape regresses to a broader type,
@@ -909,7 +909,7 @@ describe('Formula first-passage contract', () => {
   });
 });
 
-describe('registerTiered spec — buildDef optionality', () => {
+describe('registerLadder spec — buildDef optionality', () => {
   /** Keys of `T` that may be omitted. */
   type OptionalKeys<T> = {
     [K in keyof T]-?: object extends Pick<T, K> ? K : never;
@@ -928,7 +928,7 @@ describe('registerTiered spec — buildDef optionality', () => {
       goal: () => boolean;
     }
     expectTypeOf<
-      OptionalKeys<AchievementLadderOptions<BaseTieredAchievementDef>>
+      OptionalKeys<AchievementLadderOptions<BaseLadderAchievementDef>>
     >().toEqualTypeOf<'buildDef'>();
     expectTypeOf<
       OptionalKeys<AchievementLadderOptions<StructuralTwin>>
@@ -936,7 +936,7 @@ describe('registerTiered spec — buildDef optionality', () => {
 
     // Extra fields that are themselves optional lose nothing when the callback
     // is omitted, so they stay on the optional branch.
-    interface LooselyWidened extends BaseTieredAchievementDef {
+    interface LooselyWidened extends BaseLadderAchievementDef {
       effect?: number;
     }
     expectTypeOf<
@@ -949,7 +949,7 @@ describe('registerTiered spec — buildDef optionality', () => {
     // left the callback optional here and every tier's `effect` silently
     // resolved to `undefined` — observable only when a tier was earned, far
     // from the registration that caused it.
-    interface WidenedDef extends BaseTieredAchievementDef {
+    interface WidenedDef extends BaseLadderAchievementDef {
       effect: number;
     }
     expectTypeOf<OptionalKeys<AchievementLadderOptions<WidenedDef>>>().toBeNever();
@@ -1221,21 +1221,21 @@ describe('Achievement and challenge categories — required options and generics
     expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'accessor' | 'mapState'>();
   });
 
-  it('registerTiered returns Achievement<T>[], T defaulting to number', async () => {
+  it('registerLadder returns Achievement<T>[], T defaulting to number', async () => {
     const { createAchievementCategory } = await import('@/index');
-    const cat = createAchievementCategory<BaseTieredAchievementDef>({
-      id: 'registerTiered-pin',
+    const cat = createAchievementCategory<BaseLadderAchievementDef>({
+      id: 'registerLadder-pin',
       mapAchievement: (def) => ({
         display: { title: def.title, description: def.description },
         goal: def.goal,
         effect: def.effect,
       }),
     });
-    const tiers = cat.registerTiered({
+    const tiers = cat.registerLadder({
       baseId: 'gold',
       baseName: 'Gold',
       getValue: () => 0,
-      tiers: [{ threshold: 10, suffix: 'I' }],
+      rungs: [{ threshold: 10, suffix: 'I' }],
     });
     expectTypeOf(tiers).toEqualTypeOf<import('@/systems/achievement').Achievement<number>[]>();
   });
@@ -1545,7 +1545,7 @@ describe('Systems predicate fields take Predicate', () => {
     expectTypeOf<Opt<import('@/index').AchievementOptions['goal']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['visible']>>().toEqualTypeOf<P>();
     expectTypeOf<Opt<import('@/index').AchievementOptions['hidden']>>().toEqualTypeOf<P>();
-    expectTypeOf<Opt<import('@/index').TierFieldDef['advanceWhen']>>().toEqualTypeOf<
+    expectTypeOf<Opt<import('@/index').LadderFieldDef['advanceWhen']>>().toEqualTypeOf<
       ReadonlyArray<P | undefined>
     >();
     expectTypeOf<Opt<Grant['when']>>().toEqualTypeOf<P>();

@@ -14,12 +14,12 @@
  *   id: 'perks',
  *   mapPurchasable: (def) => ({
  *     display: { title: def.name, description: `Level up ${def.name}` },
- *     // `level` is the perk's own amount ref — a Formula over it stays
- *     // invertible, so buy-max prices each level at its own rung.
- *     requirements: (level) =>
+ *     // `count` is the perk's own count ref — a Formula over it stays
+ *     // invertible, so purchase max prices each count at its own step.
+ *     requirements: (count) =>
  *       createCostRequirement({
  *         resource: gold,
- *         cost: Formula.exponential(level, def.baseCost, 1.15),
+ *         cost: Formula.exponential(count, def.baseCost, 1.15),
  *         maxBulkCount: Decimal.dInf,
  *       }),
  *     limit: def.maxLevel,

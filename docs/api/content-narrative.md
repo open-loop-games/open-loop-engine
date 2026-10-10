@@ -37,23 +37,23 @@ authored conversation graphs and the engine-native runtime that walks them. The 
 
 addressable subjects with typed multi-field state
 
-- `function createSubjectCategory<S extends FieldSchema>(options: SubjectCategoryOptions<S>): SubjectCategory<S>` — Create a subject category. `src/systems/subject-category.ts:636`
+- `function createSubjectCategory<S extends FieldSchema>(options: SubjectCategoryOptions<S>): SubjectCategory<S>` — Create a subject category. `src/systems/subject-category.ts:641`
 - `interface EnumFieldDef<V extends string = string>` — Single nullable enum value per subject. `src/systems/subject-category.ts:91`
-- `interface EnumFieldInstance<V extends string = string> extends Emittable<EnumFieldEvents<V>>` — Live nullable-enum accessor built from an EnumFieldDef. `src/systems/subject-category.ts:182`
-- `type FieldDef = ScalarFieldDef | VectorFieldDef | TierFieldDef | FlagFieldDef | EnumFieldDef` — Discriminated field def — every schema field is one of these. `src/systems/subject-category.ts:98`
-- `type FieldInstance<F extends FieldDef>` — Mapped type — produces the right accessor per field kind without runtime narrowing. `src/systems/subject-category.ts:193`
-- `type FieldSchema = Record<string, FieldDef>` — A schema describes the shared field shape every registered subject carries. `src/systems/subject-category.ts:101`
+- `interface EnumFieldInstance<V extends string = string> extends Emittable<EnumFieldEvents<V>>` — Live nullable-enum accessor built from an EnumFieldDef. `src/systems/subject-category.ts:187`
+- `type FieldDef = ScalarFieldDef | VectorFieldDef | LadderFieldDef | FlagFieldDef | EnumFieldDef` — Discriminated field def — every schema field is one of these. `src/systems/subject-category.ts:98`
+- `type FieldInstance<F extends FieldDef>` — Mapped type — produces the right accessor per field kind without runtime narrowing. `src/systems/subject-category.ts:198`
+- `type FieldSchema = Record<string, FieldDef>` — A schema describes the shared field shape every registered subject carries. `src/systems/subject-category.ts:106`
 - `interface FlagFieldDef` — Single persistent boolean per subject. `src/systems/subject-category.ts:81`
-- `interface FlagFieldInstance extends Emittable<FlagFieldEvents>` — Live boolean accessor built from a FlagFieldDef. `src/systems/subject-category.ts:169`
-- `type PerSubjectOverride<F extends FieldDef>` — Per-subject overrides — only the obviously-per-subject bits (initial values, tier gates). `src/systems/subject-category.ts:212`
+- `interface FlagFieldInstance extends Emittable<FlagFieldEvents>` — Live boolean accessor built from a FlagFieldDef. `src/systems/subject-category.ts:174`
+- `interface LadderFieldDef` — Ordered tier ladder with per-transition advancement gates. `src/systems/subject-category.ts:73`
+- `interface LadderFieldInstance extends Emittable<LadderFieldEvents>` — Live tier-ladder accessor built from a LadderFieldDef. `src/systems/subject-category.ts:149`
+- `type PerSubjectOverride<F extends FieldDef>` — Per-subject overrides — only the obviously-per-subject bits (initial values, tier gates). `src/systems/subject-category.ts:217`
 - `interface ScalarFieldDef` — Single persistent number per subject. `src/systems/subject-category.ts:52`
-- `interface ScalarFieldInstance extends Emittable<ScalarFieldEvents>` — Live scalar accessor built from a ScalarFieldDef. `src/systems/subject-category.ts:110`
-- `interface SubjectCategory<S extends FieldSchema> extends ResettableObject` — Container that registers subjects against a shared schema and builds the matching typed instance for each. `src/systems/subject-category.ts:267`
-- `interface SubjectCategoryEntry<S extends FieldSchema>` — One entry inside a SubjectCategory — authored def + live instance. `src/systems/subject-category.ts:240`
-- `interface SubjectCategoryOptions<S extends FieldSchema>` `src/systems/subject-category.ts:247`
-- `interface SubjectDef<S extends FieldSchema>` — Authoring shape for one subject in a SubjectCategory. `src/systems/subject-category.ts:227`
-- `interface SubjectInstance<S extends FieldSchema>` — Live subject — typed field accessors keyed by schema field name. `src/systems/subject-category.ts:234`
-- `interface TierFieldDef` — Ordered tier ladder with per-transition advancement gates. `src/systems/subject-category.ts:73`
-- `interface TierFieldInstance extends Emittable<TierFieldEvents>` — Live tier-ladder accessor built from a TierFieldDef. `src/systems/subject-category.ts:144`
+- `interface ScalarFieldInstance extends Emittable<ScalarFieldEvents>` — Live scalar accessor built from a ScalarFieldDef. `src/systems/subject-category.ts:115`
+- `interface SubjectCategory<S extends FieldSchema> extends ResettableObject` — Container that registers subjects against a shared schema and builds the matching typed instance for each. `src/systems/subject-category.ts:272`
+- `interface SubjectCategoryEntry<S extends FieldSchema>` — One entry inside a SubjectCategory — authored def + live instance. `src/systems/subject-category.ts:245`
+- `interface SubjectCategoryOptions<S extends FieldSchema>` `src/systems/subject-category.ts:252`
+- `interface SubjectDef<S extends FieldSchema>` — Authoring shape for one subject in a SubjectCategory. `src/systems/subject-category.ts:232`
+- `interface SubjectInstance<S extends FieldSchema>` — Live subject — typed field accessors keyed by schema field name. `src/systems/subject-category.ts:239`
 - `interface VectorFieldDef<Dims extends string = string>` — N persistent numbers per subject, one per named dimension. `src/systems/subject-category.ts:61`
-- `interface VectorFieldInstance<Dims extends string = string> extends Emittable<VectorFieldEvents<Dims>>` — Live vector accessor built from a VectorFieldDef. `src/systems/subject-category.ts:125`
+- `interface VectorFieldInstance<Dims extends string = string> extends Emittable<VectorFieldEvents<Dims>>` — Live vector accessor built from a VectorFieldDef. `src/systems/subject-category.ts:130`

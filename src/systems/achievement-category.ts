@@ -107,19 +107,19 @@ export interface AchievementCategoryEntry<Def extends { id: string }, State = vo
 }
 
 /**
- * Minimum Def shape that {@link AchievementCategory.registerTiered}'s default
+ * Minimum Def shape that {@link AchievementCategory.registerLadder}'s default
  * `buildDef` can synthesize without a consumer callback. Extend this when
  * authoring a Def type that participates in tier registration but doesn't
  * carry consumer-specific fields beyond the base authoring contract.
  *
  * @typeParam T - Type of the tier's `effect` value
  */
-export interface BaseTieredAchievementDef<T = unknown> {
+export interface BaseLadderAchievementDef<T = unknown> {
   id: string;
   title: string;
   description: string;
   goal: () => boolean;
-  /** The tier's {@link TieredAchievementTier.effect}, for `mapAchievement` to forward. */
+  /** The tier's {@link AchievementRung.effect}, for `mapAchievement` to forward. */
   effect?: T;
 }
 
@@ -127,7 +127,7 @@ export interface BaseTieredAchievementDef<T = unknown> {
  * One tier in a {@link AchievementLadderOptions}. Each tier becomes one
  * Achievement registered into the category.
  */
-export interface TieredAchievementTier<T = number> {
+export interface AchievementRung<T = number> {
   /**
    * The value `getValue()` must reach to earn this tier.
    *
@@ -146,7 +146,7 @@ export interface TieredAchievementTier<T = number> {
 }
 
 /**
- * Spec for {@link AchievementCategory.registerTiered}. Fans a single
+ * Spec for {@link AchievementCategory.registerLadder}. Fans a single
  * value-getter into N threshold-gated achievements, each registered into the
  * category via the standard `register()` path.
  */
@@ -158,39 +158,39 @@ export interface AchievementLadderBaseOptions<T = number> {
   /** Reactive getter for the tracked value compared against each tier's threshold. */
   getValue: () => DecimalSource;
   /** Ordered list of thresholds, each producing one achievement. */
-  tiers: ReadonlyArray<TieredAchievementTier<T>>;
+  rungs: ReadonlyArray<AchievementRung<T>>;
 }
 
 /**
  * Parameters passed to a {@link AchievementLadderOptions.buildDef} callback.
  * The base authoring fields (`id`/`title`/`description`/`requirement`) are
- * synthesized from the tier spec; tier metadata (`tierIndex`, `tier`) is
+ * synthesized from the tier spec; tier metadata (`rungIndex`, `tier`) is
  * available for consumer Def fields that need it.
  */
-export interface TieredAchievementBuildDefParams<T = number> {
+export interface AchievementLadderBuildDefParams<T = number> {
   id: string;
   title: string;
   description: string;
   goal: () => boolean;
-  tierIndex: number;
-  tier: TieredAchievementTier<T>;
+  rungIndex: number;
+  rung: AchievementRung<T>;
 }
 
 /**
- * `buildDef` callback type for the `registerTiered` spec. Required when the
+ * `buildDef` callback type for the `registerLadder` spec. Required when the
  * category's `Def` carries required fields beyond
- * {@link BaseTieredAchievementDef}; optional when `Def` is the base shape
+ * {@link BaseLadderAchievementDef}; optional when `Def` is the base shape
  * (default builds a base-shape Def).
  */
-export type TieredAchievementBuildDef<Def, T = number> = (
-  params: TieredAchievementBuildDefParams<T>,
+export type AchievementLadderBuildDef<Def, T = number> = (
+  params: AchievementLadderBuildDefParams<T>,
 ) => Def;
 
 /**
- * `registerTiered` parameter type. Carries the spec plus a `buildDef` that
+ * `registerLadder` parameter type. Carries the spec plus a `buildDef` that
  * is *optional* (default = identity over base fields) only when `Def` is
  * the base shape, and *required* the moment `Def` widens beyond
- * {@link BaseTieredAchievementDef}.
+ * {@link BaseLadderAchievementDef}.
  *
  * The test is mutual assignability, not one-way `extends`: a superset Def
  * still satisfies `Def extends Base`, so a one-way test leaves the callback
@@ -205,11 +205,11 @@ export type TieredAchievementBuildDef<Def, T = number> = (
  * distributivity does not close it — assignability holds either way.
  */
 export type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOptions<T> &
-  (Def extends BaseTieredAchievementDef
-    ? BaseTieredAchievementDef<T> extends Def
-      ? { buildDef?: TieredAchievementBuildDef<Def, T> }
-      : { buildDef: TieredAchievementBuildDef<Def, T> }
-    : { buildDef: TieredAchievementBuildDef<Def, T> });
+  (Def extends BaseLadderAchievementDef
+    ? BaseLadderAchievementDef<T> extends Def
+      ? { buildDef?: AchievementLadderBuildDef<Def, T> }
+      : { buildDef: AchievementLadderBuildDef<Def, T> }
+    : { buildDef: AchievementLadderBuildDef<Def, T> });
 
 /**
  * An achievement category — batch-registered Achievements with a shared shape.
@@ -251,7 +251,7 @@ export interface AchievementCategory<
    * @returns The tier achievements in tier order, suitable for binding
    *   directly (e.g. `getEarnedCount(tiers)`) without re-querying.
    */
-  registerTiered<T = number>(options: AchievementLadderOptions<Def, T>): Achievement<T>[];
+  registerLadder<T = number>(options: AchievementLadderOptions<Def, T>): Achievement<T>[];
 
   /** Get the Achievement instance for a definition ID */
   getAchievement(id: string): Achievement | undefined;
@@ -337,14 +337,14 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     register: base.register,
     getDef: base.getDef,
 
-    registerTiered<T = number>(spec: AchievementLadderOptions<Def, T>): Achievement<T>[] {
-      const { baseId, baseName, getValue, tiers } = spec;
-      const buildDef = (spec as { buildDef?: TieredAchievementBuildDef<Def, T> }).buildDef;
+    registerLadder<T = number>(spec: AchievementLadderOptions<Def, T>): Achievement<T>[] {
+      const { baseId, baseName, getValue, rungs: tiers } = spec;
+      const buildDef = (spec as { buildDef?: AchievementLadderBuildDef<Def, T> }).buildDef;
 
       const defs: Def[] = [];
       for (let index = 0; index < tiers.length; index++) {
         const tier = tiers[index];
-        const tierId = `${baseId}-${index + 1}`;
+        const rungId = `${baseId}-${index + 1}`;
         const isFormulaThreshold = tier.threshold instanceof Formula;
         const evalThreshold = (): DecimalSource =>
           isFormulaThreshold
@@ -352,13 +352,13 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
             : (tier.threshold as DecimalSource);
         const formatted = formatThreshold(new Decimal(evalThreshold()));
 
-        const params: TieredAchievementBuildDefParams<T> = {
-          id: tierId,
+        const params: AchievementLadderBuildDefParams<T> = {
+          id: rungId,
           title: `${baseName} ${tier.suffix}`,
           description: tier.description ?? `Reach ${formatted}`,
           goal: () => Decimal.gte(getValue(), evalThreshold()),
-          tierIndex: index,
-          tier,
+          rungIndex: index,
+          rung: tier,
         };
 
         const def = buildDef
@@ -425,7 +425,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
 // === INTERNAL HELPERS ===
 
 /**
- * Format a {@link TieredAchievementTier} threshold for the default tier
+ * Format a {@link AchievementRung} threshold for the default tier
  * description: exponential for values ≥ 1e9, `"X.YM"` ≥ 1e6, `"X.YK"`
  * ≥ 1e3, integer otherwise.
  */

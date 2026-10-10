@@ -101,7 +101,7 @@ export * from './purchasable-category';
 // === ACHIEVEMENTS ===
 // Milestone tracking with auto-unlock conditions and tiered rewards.
 // AchievementCategory: batch-register Achievements from content definitions,
-// with `registerTiered` fanning one tracked value into threshold-gated tiers.
+// with `registerLadder` fanning one tracked value into threshold-gated tiers.
 // Raw `createAchievement` is @internal — consumers use the category factory.
 export {
   getCombinedAchievementEffect,
@@ -239,12 +239,12 @@ export {
   type PerSubjectOverride,
   type ScalarFieldDef,
   type VectorFieldDef,
-  type TierFieldDef,
+  type LadderFieldDef,
   type FlagFieldDef,
   type EnumFieldDef,
   type ScalarFieldInstance,
   type VectorFieldInstance,
-  type TierFieldInstance,
+  type LadderFieldInstance,
   type FlagFieldInstance,
   type EnumFieldInstance,
 } from './subject-category';

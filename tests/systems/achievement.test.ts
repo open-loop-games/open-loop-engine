@@ -4,7 +4,7 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createAchievement, getCombinedAchievementEffect } from '@/systems/achievement';
 import {
   createAchievementCategory,
-  type BaseTieredAchievementDef,
+  type BaseLadderAchievementDef,
 } from '@/systems/achievement-category';
 import {
   deserializePersistents,
@@ -66,9 +66,9 @@ describe('Achievement', () => {
 });
 
 // Helper: build a category that maps the base tiered Def directly into
-// AchievementOptions for `registerTiered` tests.
+// AchievementOptions for `registerLadder` tests.
 function makeTieredCategory(id: string) {
-  return createAchievementCategory<BaseTieredAchievementDef>({
+  return createAchievementCategory<BaseLadderAchievementDef>({
     id,
     mapAchievement: (def) => ({
       display: { title: def.title, description: def.description },
@@ -77,15 +77,15 @@ function makeTieredCategory(id: string) {
   });
 }
 
-describe('AchievementCategory.registerTiered', () => {
+describe('AchievementCategory.registerLadder', () => {
   it('earns tiers in order as static thresholds are crossed', async () => {
     const gold = ref<DecimalSource>(0);
     const cat = makeTieredCategory('gold-hoarder-cat');
-    const achievements = cat.registerTiered({
+    const achievements = cat.registerLadder({
       baseId: 'gold-hoarder',
       baseName: 'Gold Hoarder',
       getValue: () => gold.value,
-      tiers: [
+      rungs: [
         { threshold: 100, suffix: 'I' },
         { threshold: 1000, suffix: 'II' },
         { threshold: 10000, suffix: 'III' },
@@ -108,11 +108,11 @@ describe('AchievementCategory.registerTiered', () => {
     const dynamicThreshold = Formula.variable(prestige).pow(2).mul(100);
 
     const cat = makeTieredCategory('scaling-hoarder-cat');
-    const [ach] = cat.registerTiered({
+    const [ach] = cat.registerLadder({
       baseId: 'scaling-hoarder',
       baseName: 'Scaling Hoarder',
       getValue: () => gold.value,
-      tiers: [{ threshold: dynamicThreshold, suffix: 'I' }],
+      rungs: [{ threshold: dynamicThreshold, suffix: 'I' }],
     });
 
     // prestige=1 → threshold=100
@@ -125,11 +125,11 @@ describe('AchievementCategory.registerTiered', () => {
     const prestige2 = ref<DecimalSource>(2);
     const threshold2 = Formula.variable(prestige2).pow(2).mul(100);
     const cat2 = makeTieredCategory('scaling-hoarder-2-cat');
-    const [ach2] = cat2.registerTiered({
+    const [ach2] = cat2.registerLadder({
       baseId: 'scaling-hoarder-2',
       baseName: 'Scaling Hoarder',
       getValue: () => gold2.value,
-      tiers: [{ threshold: threshold2, suffix: 'I' }],
+      rungs: [{ threshold: threshold2, suffix: 'I' }],
     });
     gold2.value = 300; // under 400
     await nextTick();
@@ -140,7 +140,7 @@ describe('AchievementCategory.registerTiered', () => {
   });
 
   it("carries each tier's effect through the default def to mapAchievement", () => {
-    const cat = createAchievementCategory<BaseTieredAchievementDef<number>>({
+    const cat = createAchievementCategory<BaseLadderAchievementDef<number>>({
       id: 'tier-effect-cat',
       mapAchievement: (def) => ({
         display: { title: def.title },
@@ -148,11 +148,11 @@ describe('AchievementCategory.registerTiered', () => {
         effect: def.effect,
       }),
     });
-    const tiers = cat.registerTiered({
+    const tiers = cat.registerLadder({
       baseId: 'tier-effect',
       baseName: 'Tier Effect',
       getValue: () => 50,
-      tiers: [
+      rungs: [
         { threshold: 10, suffix: 'I', effect: 2 },
         { threshold: 20, suffix: 'II', effect: 3 },
       ],
@@ -166,11 +166,11 @@ describe('AchievementCategory.registerTiered', () => {
     const gold = ref<DecimalSource>(0);
     const staticFormula = Formula.constant(new Decimal(250));
     const cat = makeTieredCategory('const-formula-cat');
-    const [ach] = cat.registerTiered({
+    const [ach] = cat.registerLadder({
       baseId: 'const-formula',
       baseName: 'Const Formula',
       getValue: () => gold.value,
-      tiers: [{ threshold: staticFormula, suffix: 'I' }],
+      rungs: [{ threshold: staticFormula, suffix: 'I' }],
     });
     gold.value = 249;
     await nextTick();

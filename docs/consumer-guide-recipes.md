@@ -233,7 +233,7 @@ Per-subject overrides cover only the obviously-per-subject bits (initial values,
 // Many subjects, one field per subject — molcremental-style per-NPC trust ladder
 const npcs = createSubjectCategory({
   id: 'npc-trust',
-  fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend', 'confidant'] } },
+  fields: { trust: { kind: 'ladder', rungs: ['stranger', 'friend', 'confidant'] } },
 });
 npcs.register({
   id: 'mentor-rask',

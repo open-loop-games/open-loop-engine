@@ -21,16 +21,16 @@ milestone tracking with auto-unlock and tiered rewards
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:62`
 - `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:38`
 - `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:147`
-- `interface AchievementLadderBaseOptions<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:153`
-- `type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOptions<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef<T> extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:207`
+- `interface AchievementLadderBaseOptions<T = number>` — Spec for AchievementCategory.registerLadder. `src/systems/achievement-category.ts:153`
+- `type AchievementLadderBuildDef<Def, T = number> = (params: AchievementLadderBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerLadder` spec. `src/systems/achievement-category.ts:185`
+- `interface AchievementLadderBuildDefParams<T = number>` — Parameters passed to a AchievementLadderOptions.buildDef callback. `src/systems/achievement-category.ts:170`
+- `type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOptions<T> & (Def extends BaseLadderAchievementDef ? BaseLadderAchievementDef<T> extends Def ? { buildDef?: AchievementLadderBuildDef<Def, T>; } : { buildDef: AchievementLadderBuildDef<Def, T>; } : { buildDef: AchievementLadderBuildDef<Def, T>; })` — `registerLadder` parameter type. `src/systems/achievement-category.ts:207`
 - `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
-- `interface BaseTieredAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:117`
+- `interface AchievementRung<T = number>` — One tier in a AchievementLadderOptions. `src/systems/achievement-category.ts:130`
+- `interface BaseLadderAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerLadder's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:117`
 - `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:304`
 - `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:257`
 - `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:273`
-- `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:185`
-- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a AchievementLadderOptions.buildDef callback. `src/systems/achievement-category.ts:170`
-- `interface TieredAchievementTier<T = number>` — One tier in a AchievementLadderOptions. `src/systems/achievement-category.ts:130`
 
 ## Action Category
 

@@ -153,8 +153,8 @@ describe('Scenario 2 — multi-loop persistence', () => {
           id: 'npc-trust',
           fields: {
             trust: {
-              kind: 'tier',
-              tiers: ['stranger', 'acquaintance', 'student', 'trusted'],
+              kind: 'ladder',
+              rungs: ['stranger', 'acquaintance', 'student', 'trusted'],
             },
           },
         }),
@@ -340,7 +340,7 @@ describe('Scenario 4 — save round-trip', () => {
       const cat = createSubjectCategory({
         id: 'npc-trust',
         fields: {
-          trust: { kind: 'tier', tiers: ['stranger', 'acquaintance', 'student', 'trusted'] },
+          trust: { kind: 'ladder', rungs: ['stranger', 'acquaintance', 'student', 'trusted'] },
         },
       });
       cat.register({ id: 'mentor-rask' });

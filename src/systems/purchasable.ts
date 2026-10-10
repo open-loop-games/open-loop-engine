@@ -98,10 +98,10 @@ export interface PurchasableOptions {
    * scales on the thing being bought:
    *
    * ```ts
-   * requirements: (level) =>
+   * requirements: (count) =>
    *   createCostRequirement({
    *     resource: gold,
-   *     cost: Formula.exponential(level, def.baseCost, 1.15),
+   *     cost: Formula.exponential(count, def.baseCost, 1.15),
    *     maxBulkCount: Decimal.dInf,
    *   })
    * ```
@@ -142,7 +142,7 @@ export interface PurchasableOptions {
 }
 
 /** Formula factory over a purchasable's level — receives the engine-owned level ref. */
-type LevelCurve = (level: MaybeRef<DecimalSource>) => FormulaSource;
+type CountCurve = (count: MaybeRef<DecimalSource>) => FormulaSource;
 
 /**
  * Cost configuration for {@link ScalingPurchasableOptions}. Discriminated
@@ -173,7 +173,7 @@ export type ScalingPurchasableCost =
        * and bulk-purchase math via `calculateMaxAffordable`. A plain value
        * returned instead prices every level at that value.
        */
-      costFormula: LevelCurve;
+      costFormula: CountCurve;
       baseCost?: never;
       costScaling?: never;
       cost?: never;
@@ -184,7 +184,7 @@ export type ScalingPurchasableCost =
        * re-read whenever the level changes. Single-purchase only — bulk math
        * needs a Formula.
        */
-      cost: (level: DecimalSource) => DecimalSource;
+      cost: (count: DecimalSource) => DecimalSource;
       baseCost?: never;
       costScaling?: never;
       costFormula?: never;
@@ -216,7 +216,7 @@ export type ScalingPurchasableEffect =
        * non-exponential curves (linear, polynomial, soft-capped) that still
        * need invertibility.
        */
-      effectFormula: LevelCurve;
+      effectFormula: CountCurve;
       effect?: never;
     };
 
@@ -451,13 +451,13 @@ function buildGetCost(baseReqs: Requirement[]): (purchaseCount?: DecimalSource) 
  */
 function buildScalingCostRequirement(
   options: ScalingPurchasableOptions,
-  level: Ref<DecimalSource>,
+  count: Ref<DecimalSource>,
   limit: Computable<DecimalSource> | undefined,
 ): Requirement {
   if (options.costFormula !== undefined) {
     return createCostRequirement({
       resource: options.resource,
-      cost: toFormula(options.costFormula(level)),
+      cost: toFormula(options.costFormula(count)),
       maxBulkCount: limit ?? Decimal.dInf,
     });
   }
@@ -468,7 +468,7 @@ function buildScalingCostRequirement(
     const costFn = options.cost;
     return createCostRequirement({
       resource: options.resource,
-      cost: () => costFn(level.value),
+      cost: () => costFn(count.value),
       maxBulkCount: 1,
     });
   }
@@ -482,7 +482,7 @@ function buildScalingCostRequirement(
   const processedCostScaling = processGetter(options.costScaling);
   return createCostRequirement({
     resource: options.resource,
-    cost: Formula.exponential(level, processedBaseCost, processedCostScaling),
+    cost: Formula.exponential(count, processedBaseCost, processedCostScaling),
     maxBulkCount: limit ?? Decimal.dInf,
   });
 }
@@ -493,7 +493,7 @@ function buildScalingCostRequirement(
  */
 function buildScalingEffect(
   options: ScalingPurchasableEffect,
-  level: Ref<DecimalSource>,
+  count: Ref<DecimalSource>,
 ): {
   effectFn: ((count: DecimalSource) => DecimalSource) | undefined;
   effectCurve: GenericFormula | undefined;
@@ -503,12 +503,12 @@ function buildScalingEffect(
     effectCurve: curve,
     effectFn: (count: DecimalSource) => new Decimal(curve.evaluate(count)),
   });
-  if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(level)));
+  if (effectFormula !== undefined) return fromCurve(toFormula(effectFormula(count)));
   if (effect === undefined || typeof effect === 'function') {
     return { effectCurve: undefined, effectFn: effect };
   }
   // A static base auto-wraps as `base^amount`, an invertible Formula.
-  return fromCurve(Formula.variable(level).pow_base(effect));
+  return fromCurve(Formula.variable(count).pow_base(effect));
 }
 
 /**
@@ -647,12 +647,12 @@ function assemblePurchasable(
  * const generator = createPurchasable({
  *   id: 'generator',
  *   display: { description: 'Point Generator' },
- *   // Factory form — `level` is this purchasable's own amount ref, so the
- *   // cost is a Formula and `purchaseMax` walks the curve rung by rung.
- *   requirements: (level) =>
+ *   // Factory form — `count` is this purchasable's own count ref, so the
+ *   // cost is a Formula and `purchaseMax` walks the curve step by step.
+ *   requirements: (count) =>
  *     createCostRequirement({
  *       resource: points,
- *       cost: Formula.exponential(level, 10, 1.15),
+ *       cost: Formula.exponential(count, 10, 1.15),
  *       maxBulkCount: Decimal.dInf,
  *     }),
  *   effect: (amt) => Decimal.pow(2, amt),
@@ -675,7 +675,7 @@ export function createPurchasable(
  * Cost configuration is a discriminated union (see {@link ScalingPurchasableCost}):
  * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ amount`.
  * - **Formula**: `costFormula` takes a Formula factory (invertible, bulk-aware).
- * - **Function**: `cost` takes a plain `(level) => Decimal` function
+ * - **Function**: `cost` takes a plain `(count) => Decimal` function
  *   (single-purchase) for cost shapes no Formula expresses.
  *
  * The effect follows the same split: `effect` takes a static base or a plain
@@ -707,8 +707,8 @@ export function createPurchasable(
  *   id: 'forge',
  *   description: 'Forge',
  *   resource: ore,
- *   costFormula: (level) => Formula.variable(level).pow(2).add(100),
- *   effectFormula: (level) => Formula.variable(level).mul(0.5).add(1),
+ *   costFormula: (count) => Formula.variable(count).pow(2).add(100),
+ *   effectFormula: (count) => Formula.variable(count).mul(0.5).add(1),
  * });
  * ```
  *
@@ -718,10 +718,10 @@ export function createPurchasable(
  *   id: 'crystal',
  *   description: 'Crystal upgrade',
  *   resource: prestigeShards,
- *   cost: (level) => Decimal.pow(10,
+ *   cost: (count) => Decimal.pow(10,
  *     baseLogCost + costIncrement * (0.5 * Math.pow(Decimal.sub(level, 0.5).toNumber(), 2) - 1/8)
  *   ),
- *   effect: (level) => Decimal.pow(2, level),
+ *   effect: (count) => Decimal.pow(2, count),
  * });
  * ```
  */

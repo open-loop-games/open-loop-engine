@@ -501,7 +501,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
       api.points.value = 10;
       return createSubjectCategory({
         id: 'npcs',
-        fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'] } },
+        fields: { trust: { kind: 'ladder', rungs: ['stranger', 'friend'] } },
       });
     });
 
@@ -533,7 +533,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
       const subjects = createSubjectCategory({
         id: 'npcs',
         accessor: override,
-        fields: { trust: { kind: 'tier', tiers: ['stranger', 'friend'] } },
+        fields: { trust: { kind: 'ladder', rungs: ['stranger', 'friend'] } },
       });
       subjects.register({
         id: 'rask',
@@ -833,7 +833,7 @@ describe('Predicate fields — every arm reaches the system', () => {
     const npcs = createSubjectCategory({
       id: 'npcs',
       fields: {
-        trust: { kind: 'tier', tiers: ['stranger', 'friend'], advanceWhen: [() => open.value] },
+        trust: { kind: 'ladder', rungs: ['stranger', 'friend'], advanceWhen: [() => open.value] },
       },
     });
     npcs.register({ id: 'rask' });
@@ -940,7 +940,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     const npcs = createSubjectCategory({
       id: 'npcs',
       fields: {
-        trust: { kind: 'tier', tiers: ['stranger', 'friend'], advanceWhen: [unwiredFlag] },
+        trust: { kind: 'ladder', rungs: ['stranger', 'friend'], advanceWhen: [unwiredFlag] },
       },
     });
     expect(() => npcs.register({ id: 'rask' })).toThrow(/tier 'trust' advanceWhen\[0\]: /);
