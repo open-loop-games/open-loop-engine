@@ -55,6 +55,7 @@
     "docs/api",
     "AGENTS.md",
     "CHANGELOG.md",
+    "THIRD-PARTY-NOTICES.md",
     ".claude/CLAUDE.md",
     "scripts/build-domain-map.mjs",
     "scripts/lib/domain-extract.mjs",

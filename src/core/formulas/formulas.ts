@@ -16,7 +16,8 @@
  * ```
  *
  * Buy-max counting and bulk pricing over a cost curve live in `affordability.ts`.
- * Ported from Profectus/TMG with significant refactoring.
+ * Ported from Profectus (MIT) with significant refactoring; its notice is in
+ * `THIRD-PARTY-NOTICES.md`.
  */
 
 import { NonPersistent } from '../persistence';
