@@ -301,7 +301,7 @@ describe('setupSweepAutoPurchase', () => {
       id: 'levels',
       requirements: createCostRequirement({ resource: cookies, cost: 100 }),
       limit: 3,
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
 
     setupSweepAutoPurchase([levels], { enabled: true, interval: 2 }, registerTick);

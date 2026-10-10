@@ -668,7 +668,7 @@ describe('createPurchasableCategory (leveled)', () => {
         display: { description: def.name },
         requirements: createCostRequirement({ resource: gold, cost: def.baseCost }),
         limit: def.maxLevel,
-        bulkPurchase: false,
+        purchaseMaxByDefault: false,
       }),
     });
 

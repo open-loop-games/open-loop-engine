@@ -60,7 +60,7 @@ export interface ProducerPurchaseConfig {
    * Whether a bare `repeatable.purchase()` buys as many as affordable rather
    * than one; `purchase(1)` buys one either way. Default: `true`
    */
-  bulkPurchase?: Computable<boolean>;
+  purchaseMaxByDefault?: Computable<boolean>;
 }
 
 /**
@@ -317,7 +317,7 @@ function buildProducer<Def extends { id: string }>(
         initialCount: pc.initialCount,
         onPurchase: pc.onPurchase,
         visible: pc.visible,
-        bulkPurchase: pc.bulkPurchase,
+        purchaseMaxByDefault: pc.purchaseMaxByDefault,
       },
       predicates,
     );

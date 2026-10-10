@@ -2,11 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { beginPersistentContext, endPersistentContext, isPersistent } from '@/core/persistence';
-import {
-  createTimedProgress,
-  resourceConsumedAt,
-  stepProgressiveCosts,
-} from '@/core/timed-progress';
+import { createTimedProgress, resourcePaidAt, stepProgressiveCosts } from '@/core/timed-progress';
 
 type TickFn = (dt: number) => void;
 
@@ -490,7 +486,7 @@ describe('stepProgressiveCosts — single cost', () => {
   it('heals a prevProgress carrying a sub-epsilon float artifact', () => {
     // An already-broken save where state.progress was previously written just
     // above an integer threshold (e.g. 298000.00000000006 instead of 298000).
-    // The consumer asks resourceConsumedAt(state.progress, dur, amt) with raw
+    // The consumer asks resourcePaidAt(state.progress, dur, amt) with raw
     // number args for dur/amt and gets the full cost as consumed; the
     // primitive must agree internally rather than wrapping dur/amt and
     // splitting its view by a fraction of a unit. The next tick advances
@@ -587,7 +583,7 @@ describe('stepProgressiveCosts — multiple costs', () => {
   });
 });
 
-describe('stepProgressiveCosts — invariant parity with resourceConsumedAt', () => {
+describe('stepProgressiveCosts — invariant parity with resourcePaidAt', () => {
   it('each delta matches the consumedAt difference between prev and capped', () => {
     const costs = [
       { amount: 10, available: () => 5 },
@@ -601,8 +597,8 @@ describe('stepProgressiveCosts — invariant parity with resourceConsumedAt', ()
       costs,
     });
     for (let i = 0; i < costs.length; i++) {
-      const before = resourceConsumedAt(12, 100, costs[i].amount);
-      const after = resourceConsumedAt(step.cappedProgress, 100, costs[i].amount);
+      const before = resourcePaidAt(12, 100, costs[i].amount);
+      const after = resourcePaidAt(step.cappedProgress, 100, costs[i].amount);
       const expected = Decimal.sub(after, before);
       expect(Decimal.eq(step.deltas[i], Decimal.max(expected, 0))).toBe(true);
     }
@@ -650,7 +646,7 @@ describe('stepProgressiveCosts — calls available() lazily only once per entry'
 });
 
 describe('stepProgressiveCosts — never requests more than the balance', () => {
-  // `maxUnits · duration / amount` and resourceConsumedAt's `progress / (duration / amount)`
+  // `maxUnits · duration / amount` and resourcePaidAt's `progress / (duration / amount)`
   // round independently, so the cap can land a few ulps past the threshold where ceil
   // charges one unit more than the caller holds. Swept over the integer grid the
   // over-request showed up on, from a standing start and from a previous cap.
@@ -661,8 +657,8 @@ describe('stepProgressiveCosts — never requests more than the balance', () => 
       needed: d,
       costs: [{ amount: a, available: () => avail }],
     });
-    const before = resourceConsumedAt(prev, d, a);
-    const after = resourceConsumedAt(step.cappedProgress, d, a);
+    const before = resourcePaidAt(prev, d, a);
+    const after = resourcePaidAt(step.cappedProgress, d, a);
     return { step, before, after };
   }
 

@@ -41,7 +41,7 @@ describe('Inventory', () => {
         baseCapacity: 100,
         initial: { wood: 20 },
       });
-      const removed = inv.remove('wood', 8);
+      const removed = inv.subtract('wood', 8);
       expect(removed.eq(8)).toBe(true);
       expect(inv.get('wood').eq(12)).toBe(true);
     });
@@ -52,7 +52,7 @@ describe('Inventory', () => {
         baseCapacity: 100,
         initial: { wood: 5 },
       });
-      const removed = inv.remove('wood', 20);
+      const removed = inv.subtract('wood', 20);
       expect(removed.eq(5)).toBe(true);
       expect(inv.get('wood').eq(0)).toBe(true);
     });

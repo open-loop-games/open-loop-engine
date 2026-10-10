@@ -60,14 +60,14 @@ describe('Purchasable (one-shot, limit: 1)', () => {
     expect(called).toBe(true);
   });
 
-  it('defaults bulkPurchase to false when limit is 1', () => {
+  it('defaults purchaseMaxByDefault to false when limit is 1', () => {
     const p = createPurchasable({
       id: 'p5',
       display: 'one-shot',
       requirements: [],
       limit: 1,
     });
-    expect(p.bulkPurchase).toBe(false);
+    expect(p.purchaseMaxByDefault).toBe(false);
   });
 
   it('defaults showAmount to false when limit is 1', () => {
@@ -108,7 +108,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
       id: 'p9',
       display: { title: 'Free', description: 'Free repeatable' },
       requirements: [],
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
     expect(p.canPurchase.value).toBe(true);
     p.purchase(1);
@@ -128,13 +128,13 @@ describe('Purchasable (leveled, limit > 1)', () => {
     expect(Decimal.eq(p.count.value, 3)).toBe(true);
   });
 
-  it('defaults bulkPurchase to true when limit > 1', () => {
+  it('defaults purchaseMaxByDefault to true when limit > 1', () => {
     const p = createPurchasable({
       id: 'p11',
       display: 'leveled',
       requirements: [],
     });
-    expect(p.bulkPurchase).toBe(true);
+    expect(p.purchaseMaxByDefault).toBe(true);
   });
 
   it('defaults showAmount to true when limit > 1', () => {
@@ -152,7 +152,7 @@ describe('Purchasable (leveled, limit > 1)', () => {
       display: 'effect test',
       requirements: [],
       effect: (amount) => Decimal.pow(2, amount),
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
     expect(Decimal.eq(p.effect.value, 1)).toBe(true); // 2^0 = 1
     p.purchase(1);
@@ -405,7 +405,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
       description: 'superexp',
       resource: r,
       cost: (level) => Decimal.pow(10, Decimal.add(1, Decimal.pow(level, 2))),
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
 
     expect(Decimal.eq(p.getCost(1), 10)).toBe(true); // 10^(1+0) at level 0
@@ -422,7 +422,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
       description: 'closure pay',
       resource: r,
       cost: (level) => Decimal.add(100, Decimal.mul(level, 50)),
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
 
     p.purchase();
@@ -536,7 +536,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
       description: 'reactive',
       resource: r,
       cost: (level) => Decimal.add(100, Decimal.mul(level, 100)),
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
 
     expect(p.canPurchase.value).toBe(false); // 50 < 100

@@ -313,7 +313,7 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
  * Use for progressive-cost tracking where a resource drains at discrete
  * thresholds spread evenly across a duration.
  */
-export function resourceConsumedAt(
+export function resourcePaidAt(
   progress: DecimalSource,
   needed: DecimalSource,
   amount: DecimalSource,
@@ -324,17 +324,17 @@ export function resourceConsumedAt(
   return Decimal.ceil(Decimal.div(progress, interval));
 }
 
-/** The furthest progress {@link resourceConsumedAt} charges at most `units` for. */
+/** The furthest progress {@link resourcePaidAt} charges at most `units` for. */
 function progressForUnits(units: Decimal, duration: DecimalSource, amount: DecimalSource): Decimal {
   // (units * duration) / amount, not units * (duration / amount): the latter
   // rounds the intermediate ratio and lands further off the threshold.
   let prog = units.mul(duration).div(amount);
-  // The product and resourceConsumedAt's own `progress / (duration / amount)`
+  // The product and resourcePaidAt's own `progress / (duration / amount)`
   // round independently, so `prog` can sit a few ulps past the threshold, where
   // ceil charges `units + 1` — one more than the caller holds. Walk it back
   // until the helper agrees; charging is monotone in progress, and prog reaches
   // 0 (charged 0) before the step does, so the loop ends.
-  for (let step = 1e-15; resourceConsumedAt(prog, duration, amount).gt(units); step *= 10) {
+  for (let step = 1e-15; resourcePaidAt(prog, duration, amount).gt(units); step *= 10) {
     prog = prog.sub(prog.abs().mul(step));
   }
   return prog;
@@ -377,7 +377,7 @@ export interface ProgressiveCostStep {
  * fully covered, and return the final progress plus the per-entry deltas the
  * caller should remove.
  *
- * This wraps the canonical pattern around {@link resourceConsumedAt}: each
+ * This wraps the canonical pattern around {@link resourcePaidAt}: each
  * cost drains at `ceil(progress / (duration / amount))` thresholds, and an
  * insufficient balance caps progress at the threshold of unit
  * `prevConsumed + floor(available)` — so no delta ever exceeds its entry's
@@ -397,14 +397,14 @@ export interface ProgressiveCostStep {
  *   duration: def.duration,
  *   costs: def.costs.map((c) => ({
  *     amount: c.amount,
- *     available: () => inventory.balance(c.resourceId),
+ *     available: () => inventory.get(c.resourceId),
  *   })),
  * });
  *
  * if (step.stalled) return 'stalled';
  * state.progress.value = step.cappedProgress;
  * def.costs.forEach((c, i) => {
- *   if (step.deltas[i].gt(0)) inventory.remove(c.resourceId, step.deltas[i]);
+ *   if (step.deltas[i].gt(0)) inventory.subtract(c.resourceId, step.deltas[i]);
  * });
  * ```
  *
@@ -445,7 +445,7 @@ export function stepProgressiveCosts(opts: {
   const prev = new Decimal(prevProgress);
   let capped = new Decimal(proposedProgress);
 
-  // `resourceConsumedAt` is called with `duration` and `cost.amount` in their
+  // `resourcePaidAt` is called with `duration` and `cost.amount` in their
   // original DecimalSource form (not re-wrapped). Decimal.div between two
   // already-wrapped Decimals can introduce a tiny precision artifact in the
   // intermediate `duration/amount`, splitting this primitive's view of
@@ -454,15 +454,15 @@ export function stepProgressiveCosts(opts: {
   for (const cost of costs) {
     if (Decimal.lte(cost.amount, 0)) continue;
 
-    const prevConsumed = resourceConsumedAt(prev, duration, cost.amount);
-    const wouldConsume = resourceConsumedAt(capped, duration, cost.amount);
+    const prevConsumed = resourcePaidAt(prev, duration, cost.amount);
+    const wouldConsume = resourcePaidAt(capped, duration, cost.amount);
     const needed = wouldConsume.sub(prevConsumed);
     if (needed.lte(0)) continue;
 
     const available = new Decimal(cost.available());
     if (available.lt(needed)) {
       // Floor `available` so maxUnits stays on the same integer-threshold grid
-      // that resourceConsumedAt's ceil produces. Without it, a fractional
+      // that resourcePaidAt's ceil produces. Without it, a fractional
       // available propagates into maxProg and the later ceil rounds back up,
       // making the delta over-request by up to one unit (delta > available).
       const maxProg = progressForUnits(prevConsumed.add(available.floor()), duration, cost.amount);
@@ -474,8 +474,8 @@ export function stepProgressiveCosts(opts: {
 
   const deltas: Decimal[] = costs.map((cost) => {
     if (Decimal.lte(cost.amount, 0)) return Decimal.dZero;
-    const prevConsumed = resourceConsumedAt(prev, duration, cost.amount);
-    const newConsumed = resourceConsumedAt(capped, duration, cost.amount);
+    const prevConsumed = resourcePaidAt(prev, duration, cost.amount);
+    const newConsumed = resourcePaidAt(capped, duration, cost.amount);
     const delta = new Decimal(Decimal.sub(newConsumed, prevConsumed));
     return delta.lte(0) ? Decimal.dZero : delta;
   });

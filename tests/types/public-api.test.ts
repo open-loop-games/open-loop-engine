@@ -990,7 +990,7 @@ describe('PurchasableOptions.requirements — factory arm', () => {
 // return's key literal/generic types.
 
 describe('Purchasable factories — id and options shape', () => {
-  it('createPurchasable requires id/display/requirements; effect/limit/bulkPurchase default', async () => {
+  it('createPurchasable requires id/display/requirements; effect/limit/purchaseMaxByDefault default', async () => {
     const { createPurchasable } = await import('@/systems/purchasable');
     type Options = Parameters<typeof createPurchasable>[0];
     // id is the save key for `amount` — widening it to optional would silently
@@ -1105,7 +1105,7 @@ describe('createCycle / createTimeBank / createSequencer type surface', () => {
     expectTypeOf(cycle).toMatchTypeOf<import('@/systems/cycle').Cycle>();
   });
 
-  it('createTimeBank: the whole config is optional — id/earnEfficiency/cap all default', async () => {
+  it('createTimeBank: the whole config is optional — id/depositEfficiency/cap all default', async () => {
     const { createTimeBank } = await import('@/index');
     const bank = createTimeBank();
     expectTypeOf(bank).toEqualTypeOf<import('@/systems/time-bank').TimeBank>();

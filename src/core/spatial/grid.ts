@@ -24,7 +24,7 @@
  *
  * Events:
  * - `cellChanged(x, y, prev, next)` — game-logic mutations via `set()`.
- * - `bulkChanged()` — one coarse signal per `fill()` or `restore()`.
+ * - `gridChanged()` — one coarse signal per `fill()` or `restore()`.
  * - `fovUpdated(deltaIn, deltaOut)` — one batched event per `commit()`.
  * - `maskChanged(mask)` — coarse signal that a whole bitmap may have
  *   changed outside the FOV path: once per `markMaskChanged(mask)`, and once
@@ -103,7 +103,7 @@ export const HEX_AXIAL_DELTAS: readonly GridOffset[] = [
 export interface SpatialGridEvents<T> {
   cellChanged: (x: number, y: number, prev: T, next: T) => void;
   /** One coarse signal per bulk mutation (`fill()`, `restore()`). No per-cell payload. */
-  bulkChanged: () => void;
+  gridChanged: () => void;
   fovUpdated: (deltaIn: GridCoord[], deltaOut: GridCoord[]) => void;
   maskChanged: (mask: 'passable' | 'explored' | 'visible') => void;
 }
@@ -219,13 +219,13 @@ export interface SpatialGrid<T> {
    * Writes a value to (x, y) without emitting `cellChanged`. For tick-rate
    * internal writers (influence-map accumulation and kin) where a per-cell
    * event per write is pure overhead; pair with a coarser signal the
-   * consumer owns (a layer-level event, or `fill()`'s `bulkChanged`).
+   * consumer owns (a layer-level event, or `fill()`'s `gridChanged`).
    * Bounds-checked like `set()`. Throws if out of bounds.
    */
   setSilent(x: number, y: number, value: T): void;
   /**
    * Overwrites every cell in one row-major pass: each cell becomes
-   * `mapper(x, y, current)`. Emits a single `bulkChanged` event instead of
+   * `mapper(x, y, current)`. Emits a single `gridChanged` event instead of
    * one `cellChanged` per cell — the batch counterpart to `set()` for
    * full-grid mutations (zero-fill, decay passes, map generation).
    */
@@ -382,7 +382,7 @@ export interface SpatialGrid<T> {
   /**
    * Replace the grid's state from a snapshot. Width/height must match
    * construction; a version other than 1 throws. Once every cell, bitmap and
-   * count has landed, emits one `bulkChanged` and then one `maskChanged` per
+   * count has landed, emits one `gridChanged` and then one `maskChanged` per
    * bitmap (passable, explored, visible), so a renderer repaints a loaded
    * board the same way it repaints a `fill()` — no per-cell `cellChanged`.
    */
@@ -600,7 +600,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
           cells[i] = mapper(x, y, cells[i]);
         }
       }
-      handle.emit('bulkChanged');
+      handle.emit('gridChanged');
     },
 
     inBounds,
@@ -853,7 +853,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         cells[i] = toRaw(serialized.cells[i]);
       }
       recountMasks();
-      handle.emit('bulkChanged');
+      handle.emit('gridChanged');
       handle.emit('maskChanged', 'passable');
       handle.emit('maskChanged', 'explored');
       handle.emit('maskChanged', 'visible');

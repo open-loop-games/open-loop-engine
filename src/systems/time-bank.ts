@@ -20,7 +20,7 @@
  *
  * Earn *policy* — which elapsed time counts, log curves over offline excess,
  * borrow-against-future ledgers — stays consumer-side: compute seconds, call
- * `deposit()`. The one engine-owned earn source is `bankLiveOverflow` on the
+ * `deposit()`. The one engine-owned earn source is `depositLiveOverflow` on the
  * acceleration wrapper, which banks the dropped seconds `TickDriver` reports
  * via `onDeltaOverflow` when a tab-hide outruns `maxDeltaTime`.
  *
@@ -56,7 +56,7 @@ export interface TimeBankConfig {
    * range: 1, 0.7, 2/3.
    * Can be a ref or getter for dynamic values (upgradeable efficiency).
    */
-  earnEfficiency?: Computable<number>;
+  depositEfficiency?: Computable<number>;
   /**
    * Reservoir ceiling in seconds (default unlimited). Hard clamp — deposits
    * beyond it are discarded. Can be a ref or getter for dynamic values
@@ -76,7 +76,7 @@ export interface TimeBank {
    */
   banked: Persistent<number>;
   /**
-   * Add seconds to the reservoir, scaled by `earnEfficiency` and clamped at
+   * Add seconds to the reservoir, scaled by `depositEfficiency` and clamped at
    * `cap`. Returns the seconds actually banked. Non-positive input is a no-op.
    */
   deposit(seconds: number): number;
@@ -105,7 +105,7 @@ export interface TimeBank {
  * ```
  */
 export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
-  const { earnEfficiency = 1, capacity: cap } = config;
+  const { depositEfficiency = 1, capacity: cap } = config;
   const bankContextId = resolveSystemPersistentContextId(config.id, 'time-bank');
   const banked = withPersistentContext(bankContextId, () =>
     persistent<number>(0, { id: 'banked' }),
@@ -115,7 +115,7 @@ export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
     banked,
     deposit(seconds) {
       if (!(seconds > 0)) return 0;
-      const earned = seconds * resolveComputable(earnEfficiency);
+      const earned = seconds * resolveComputable(depositEfficiency);
       const before = banked.value;
       const ceiling = cap === undefined ? Infinity : resolveComputable(cap);
       // max(before, …) so a cap lowered below the current balance only
@@ -158,7 +158,7 @@ export interface BankedAccelerationConfig {
    * - `'full'` — the whole accelerated dt: banked seconds are raw sim-seconds
    *   delivered at speed. Deliberately lossier.
    */
-  drainMode?: 'excess' | 'full';
+  withdrawMode?: 'excess' | 'full';
   /**
    * Predicate re-resolved each tick; while false, acceleration and drain
    * suspend (driver back at baseline) without ending the spend. For "only
@@ -171,7 +171,7 @@ export interface BankedAccelerationConfig {
    * outruns `maxDeltaTime`, by chaining onto `onDeltaOverflow`. The one
    * engine-owned earn source; everything else deposits explicitly.
    */
-  bankLiveOverflow?: boolean;
+  depositLiveOverflow?: boolean;
 }
 
 /** Spend-loop handle returned by {@link createBankedAcceleration}. */
@@ -211,14 +211,14 @@ export interface BankedAcceleration {
  *   tickDriver: engine.tickDriver,
  *   bank,
  *   spendMultiplier: () => rateLadder[selectedRate.value],
- *   bankLiveOverflow: true,
+ *   depositLiveOverflow: true,
  * });
  * bank.deposit(offlineSeconds); // on load, instead of simulating
  * accel.startSpending();        // player toggles the boost
  * ```
  */
 export function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration {
-  const { tickDriver, bank, spendMultiplier, drainMode = 'excess', when: gate } = config;
+  const { tickDriver, bank, spendMultiplier, withdrawMode = 'excess', when: gate } = config;
   const spendGate = createPredicateResolver().adopt(gate, true, 'createBankedAcceleration gate');
 
   const isSpending = ref(false);
@@ -249,7 +249,7 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
     // dt / (baseline × appliedBonus).
     if (appliedBonus > 1) {
       const excess = baseline > 0 ? (dt * (appliedBonus - 1)) / (baseline * appliedBonus) : 0;
-      const drain = drainMode === 'full' ? dt : excess;
+      const drain = withdrawMode === 'full' ? dt : excess;
       const paid = bank.withdraw(drain);
       if (paid < drain) {
         stopSpending();
@@ -263,7 +263,7 @@ export function createBankedAcceleration(config: BankedAccelerationConfig): Bank
   });
 
   let restoreOverflow: (() => void) | undefined;
-  if (config.bankLiveOverflow) {
+  if (config.depositLiveOverflow) {
     const prior = tickDriver.onDeltaOverflow;
     tickDriver.onDeltaOverflow = (droppedSeconds) => {
       prior?.(droppedSeconds);

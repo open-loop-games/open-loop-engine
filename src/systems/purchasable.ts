@@ -138,7 +138,7 @@ export interface PurchasableOptions {
    * Whether bulk purchasing (buy-max) is enabled.
    * Default: `false` when limit is 1, `true` otherwise.
    */
-  bulkPurchase?: Computable<boolean>;
+  purchaseMaxByDefault?: Computable<boolean>;
 }
 
 /** Formula factory over a purchasable's level — receives the engine-owned level ref. */
@@ -251,7 +251,7 @@ export type ScalingPurchasableOptions = {
   /** Whether this purchasable is visible. Default: `true` */
   visible?: Predicate;
   /** Whether bulk purchasing is enabled. Default: `true` */
-  bulkPurchase?: Computable<boolean>;
+  purchaseMaxByDefault?: Computable<boolean>;
 } & ScalingPurchasableCost &
   ScalingPurchasableEffect;
 
@@ -301,10 +301,10 @@ export interface Purchasable {
   /** Whether this purchasable is currently visible */
   visible: ComputedRef<boolean>;
   /** Whether bulk purchasing is enabled */
-  bulkPurchase: MaybeRef<boolean>;
+  purchaseMaxByDefault: MaybeRef<boolean>;
   /**
    * Buy levels. Pass an amount to cap the purchase. Omitted, it buys as many
-   * as are affordable when `bulkPurchase` is on (the default for anything but
+   * as are affordable when `purchaseMaxByDefault` is on (the default for anything but
    * a one-shot), up to the cost's `maxBulkCount`, and one when it's off.
    * Returns levels bought.
    */
@@ -380,7 +380,7 @@ function buildPurchasableComputeds(
   count: Persistent<DecimalSource>,
   processedLimit: MaybeRef<DecimalSource>,
   visible: ComputedRef<boolean>,
-  processedBulkPurchase: MaybeRef<boolean>,
+  processedPurchaseMaxByDefault: MaybeRef<boolean>,
   allRequirements: Requirements,
 ): {
   active: ComputedRef<boolean>;
@@ -402,7 +402,7 @@ function buildPurchasableComputeds(
   });
 
   const countToPurchase = computed((): DecimalSource => {
-    if (!unref(processedBulkPurchase)) {
+    if (!unref(processedPurchaseMaxByDefault)) {
       return canPurchase.value ? 1 : 0;
     }
     return Decimal.max(1, maxRequirementsMet(allRequirements));
@@ -541,12 +541,14 @@ function assemblePurchasable(
   contextId: string,
   predicates: PredicateResolver,
 ): Purchasable {
-  const { id, display, requirements, limit, effect, onPurchase, visible, bulkPurchase } = options;
+  const { id, display, requirements, limit, effect, onPurchase, visible, purchaseMaxByDefault } =
+    options;
 
   const processedLimit = limit != null ? toMaybeRef(limit) : Decimal.dInf;
   const isOneShot = Decimal.eq(unref(processedLimit), 1);
   const processedVisible = predicates.adopt(visible, true, `purchasable '${id}' visible`).holds;
-  const processedBulkPurchase = bulkPurchase != null ? toMaybeRef(bulkPurchase) : !isOneShot;
+  const processedPurchaseMaxByDefault =
+    purchaseMaxByDefault != null ? toMaybeRef(purchaseMaxByDefault) : !isOneShot;
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
 
@@ -566,7 +568,7 @@ function assemblePurchasable(
     count,
     processedLimit,
     processedVisible,
-    processedBulkPurchase,
+    processedPurchaseMaxByDefault,
     allRequirements,
   );
 
@@ -586,7 +588,7 @@ function assemblePurchasable(
     display: resolvedDisplay,
     effect: effectComputed,
     visible: processedVisible,
-    bulkPurchase: processedBulkPurchase,
+    purchaseMaxByDefault: processedPurchaseMaxByDefault,
     onPurchase,
     on: handle.on,
     getCost,
@@ -597,7 +599,7 @@ function assemblePurchasable(
       let toPurchase: DecimalSource;
       if (purchaseCount !== undefined) {
         toPurchase = Decimal.min(purchaseCount, countToPurchase.value);
-      } else if (unref(processedBulkPurchase)) {
+      } else if (unref(processedPurchaseMaxByDefault)) {
         toPurchase = countToPurchase.value;
       } else {
         toPurchase = 1;
@@ -622,7 +624,7 @@ function assemblePurchasable(
   };
 
   // A reset walk stops at the purchasable's own context: a ref passed as
-  // `limit`, `visible` or `bulkPurchase` belongs to whoever created it.
+  // `limit`, `visible` or `purchaseMaxByDefault` belongs to whoever created it.
   return attachPersistentContextReset(purchasable, contextId);
 }
 
@@ -738,7 +740,7 @@ export function createScalingPurchasable(
     initialCount,
     onPurchase,
     visible,
-    bulkPurchase,
+    purchaseMaxByDefault,
   } = options;
 
   const { contextId, amount: count } = buildPurchasableCount(id, initialCount);
@@ -760,7 +762,7 @@ export function createScalingPurchasable(
       effect: effectFn,
       onPurchase,
       visible,
-      bulkPurchase,
+      purchaseMaxByDefault,
     },
     count,
     contextId,

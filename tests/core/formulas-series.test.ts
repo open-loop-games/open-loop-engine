@@ -182,7 +182,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
           resource: bulkWallet,
           baseCost,
           costScaling,
-          bulkPurchase: true,
+          purchaseMaxByDefault: true,
         });
         const boughtInBulk = bulk.purchaseMax();
 
@@ -223,7 +223,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
         resource: wallet,
         baseCost: 10,
         costScaling,
-        bulkPurchase: true,
+        purchaseMaxByDefault: true,
       });
       const bought = p.purchaseMax();
       const spent = Decimal.sub(1e6, wallet.value);
@@ -286,7 +286,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
       description: 'a cost curve whose slope is a modifier',
       resource: wallet,
       costFormula: (level) => Formula.variable(level).mul(coef).add(5),
-      bulkPurchase: true,
+      purchaseMaxByDefault: true,
     });
 
     // Read once at coef = 1 — this is what builds and memoizes the integral.
@@ -320,7 +320,7 @@ describe('a flat price is an ordinary authored value', () => {
       baseCost: 10,
       costScaling: 1,
       limit: 5,
-      bulkPurchase: true,
+      purchaseMaxByDefault: true,
     });
     expect(String(capped.purchaseMax())).toBe('5');
     expect(String(capped.count.value)).toBe('5');
@@ -332,7 +332,7 @@ describe('a flat price is an ordinary authored value', () => {
       resource: wallet,
       baseCost: 10,
       costScaling: 1,
-      bulkPurchase: true,
+      purchaseMaxByDefault: true,
     });
     expect(String(bulk.purchaseMax())).toBe('10');
     expect(String(wallet.value)).toBe('0');
@@ -343,7 +343,7 @@ describe('a flat price is an ordinary authored value', () => {
       resource: createResource(ref<DecimalSource>(100), { displayName: 'coins' }),
       baseCost: 10,
       costScaling: 1,
-      bulkPurchase: false,
+      purchaseMaxByDefault: false,
     });
     expect(single.canPurchase.value).toBe(true);
     expect(String(single.purchase())).toBe('1');

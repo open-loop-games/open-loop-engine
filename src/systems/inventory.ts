@@ -2,7 +2,7 @@
  * Inventory system — game-dev-friendly wrapper over ResourceBag
  *
  * Provides per-item capacity via modifier chains, with intuitive
- * vocabulary (add/remove/canFit/isFull) instead of raw bag operations.
+ * vocabulary (add/subtract/canFit/isFull) instead of raw bag operations.
  */
 
 import { computed, type ComputedRef } from 'vue';
@@ -54,7 +54,7 @@ export interface Inventory {
   // --- Item operations ---
   get(itemId: string): Decimal;
   add(itemId: string, amount: DecimalSource): Decimal;
-  remove(itemId: string, amount: DecimalSource): Decimal;
+  subtract(itemId: string, amount: DecimalSource): Decimal;
   has(itemId: string, amount: DecimalSource): boolean;
   hasAll(requirements: Record<string, DecimalSource>): boolean;
   canFit(itemId: string, amount: DecimalSource): boolean;
@@ -186,7 +186,7 @@ export function createInventory(options: InventoryOptions): Inventory {
       }
     },
 
-    remove(itemId: string, amount: DecimalSource): Decimal {
+    subtract(itemId: string, amount: DecimalSource): Decimal {
       return bag.subtract(itemId, amount);
     },
 

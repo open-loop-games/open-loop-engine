@@ -59,7 +59,6 @@ seedable pseudo-random number generator and weighted-item picker
 the fundamental currency of incremental games
 
 - `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:390`
-- `function bulkTransfer(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal>` — Transfer multiple resource types between bags in one operation. `src/core/resource-bag.ts:456`
 - `type CapacitySource = DecimalSource | (() => DecimalSource)` — A capacity value that can be static or a reactive getter. `src/core/resource-bag.ts:18`
 - `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource (non-persistent). `src/core/resource.ts:142`
 - `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game currency. `src/core/resource.ts:169`
@@ -74,6 +73,7 @@ the fundamental currency of incremental games
 - `interface ResourceOptions` — Configuration for createResource. `src/core/resource.ts:97`
 - `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:424`
 - `interface SubtractResourceOptions` `src/core/resource.ts:405`
+- `function transferAmountsBetweenBags(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal>` — Transfer multiple resource types between bags in one operation. `src/core/resource-bag.ts:456`
 - `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's available stock and the destination's remaining capacity. `src/core/resource-bag.ts:431`
 - `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:376`
 

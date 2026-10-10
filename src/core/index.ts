@@ -196,7 +196,7 @@ export { processOfflineTime } from './offline';
 
 // === RESOURCE BAG ===
 export type { ResourceBag, ResourceBagOptions, CapacitySource } from './resource-bag';
-export { createResourceBag, transferBetweenBags, bulkTransfer } from './resource-bag';
+export { createResourceBag, transferBetweenBags, transferAmountsBetweenBags } from './resource-bag';
 
 // === OVERRIDE REGISTRY ===
 export type { OverrideRegistry, TuningRegistry } from './override-registry';
@@ -257,7 +257,7 @@ export type {
   ProgressiveCostEntry,
   ProgressiveCostStep,
 } from './timed-progress';
-export { createTimedProgress, resourceConsumedAt, stepProgressiveCosts } from './timed-progress';
+export { createTimedProgress, resourcePaidAt, stepProgressiveCosts } from './timed-progress';
 
 // === SEQUENCER STRATEGIES ===
 export type { ConditionalRule } from './sequencer-strategies';

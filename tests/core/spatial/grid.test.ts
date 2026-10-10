@@ -97,11 +97,11 @@ describe('createSpatialGrid — fill', () => {
     expect(grid.at(2, 1)).toBe(13);
   });
 
-  it('emits one bulkChanged and zero cellChanged per call', () => {
+  it('emits one gridChanged and zero cellChanged per call', () => {
     const grid = createSpatialGrid<number>({ width: 4, height: 4, initializer: () => 0 });
     let bulk = 0;
     let perCell = 0;
-    grid.on('bulkChanged', () => bulk++);
+    grid.on('gridChanged', () => bulk++);
     grid.on('cellChanged', () => perCell++);
     grid.fill(() => 7);
     grid.fill((_x, _y, v) => v * 2);
@@ -883,7 +883,7 @@ describe('createSpatialGrid — serialize / restore', () => {
     expect(Array.from(restored.visible)).toEqual(Array.from(original.visible));
   });
 
-  it('restore() emits one bulkChanged and one maskChanged per bitmap, after state lands', () => {
+  it('restore() emits one gridChanged and one maskChanged per bitmap, after state lands', () => {
     const source = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
     source.passable[0] = 1;
     source.set(1, 0, { kind: 'wall' });
@@ -893,12 +893,12 @@ describe('createSpatialGrid — serialize / restore', () => {
     const events: string[] = [];
     grid.on('cellChanged', () => events.push('cellChanged'));
     grid.on('fovUpdated', () => events.push('fovUpdated'));
-    grid.on('bulkChanged', () => events.push(`bulkChanged:${grid.at(1, 0).kind}`));
+    grid.on('gridChanged', () => events.push(`gridChanged:${grid.at(1, 0).kind}`));
     grid.on('maskChanged', (mask) => events.push(`maskChanged:${mask}:${grid.passableCount}`));
     grid.restore(snapshot);
 
     expect(events).toEqual([
-      'bulkChanged:wall',
+      'gridChanged:wall',
       'maskChanged:passable:1',
       'maskChanged:explored:1',
       'maskChanged:visible:1',

@@ -9,7 +9,7 @@ import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 import {
   createResourceBag,
   transferBetweenBags,
-  bulkTransfer,
+  transferAmountsBetweenBags,
   sumAmountsAsDecimal,
 } from '@/core/resource-bag';
 
@@ -310,11 +310,11 @@ describe('ResourceBag', () => {
     });
   });
 
-  describe('bulkTransfer', () => {
+  describe('transferAmountsBetweenBags', () => {
     it('partial: transfers as much as possible per type', () => {
       const from = createResourceBag({ initial: { wood: 10, iron: 3 } });
       const to = createResourceBag();
-      const result = bulkTransfer(from, to, { wood: 5, iron: 10 });
+      const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 10 });
       expect(new Decimal(result['wood']).eq(5)).toBe(true);
       expect(new Decimal(result['iron']).eq(3)).toBe(true);
     });
@@ -322,7 +322,7 @@ describe('ResourceBag', () => {
     it('allOrNothing: succeeds when all fit', () => {
       const from = createResourceBag({ initial: { wood: 10, iron: 10 } });
       const to = createResourceBag();
-      const result = bulkTransfer(from, to, { wood: 5, iron: 3 }, true);
+      const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 3 }, true);
       expect(new Decimal(result['wood']).eq(5)).toBe(true);
       expect(new Decimal(result['iron']).eq(3)).toBe(true);
       expect(from.get('wood').eq(5)).toBe(true);
@@ -332,7 +332,7 @@ describe('ResourceBag', () => {
     it('allOrNothing: fails when any type insufficient', () => {
       const from = createResourceBag({ initial: { wood: 10, iron: 1 } });
       const to = createResourceBag();
-      const result = bulkTransfer(from, to, { wood: 5, iron: 3 }, true);
+      const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 3 }, true);
       expect(Object.keys(result).length).toBe(0);
       expect(from.get('wood').eq(10)).toBe(true);
       expect(from.get('iron').eq(1)).toBe(true);
@@ -341,7 +341,7 @@ describe('ResourceBag', () => {
     it('allOrNothing: fails when target capacity insufficient', () => {
       const from = createResourceBag({ initial: { wood: 10, iron: 10 } });
       const to = createResourceBag({ capacity: 6, overflow: 'block' });
-      const result = bulkTransfer(from, to, { wood: 5, iron: 5 }, true);
+      const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 5 }, true);
       expect(Object.keys(result).length).toBe(0);
       expect(from.get('wood').eq(10)).toBe(true);
     });

@@ -453,7 +453,7 @@ export function transferBetweenBags(
  * total exceeds destination capacity), nothing moves. Otherwise each type is
  * clamped independently via {@link transferBetweenBags}.
  */
-export function bulkTransfer(
+export function transferAmountsBetweenBags(
   from: ResourceBag,
   to: ResourceBag,
   amounts: Record<string, DecimalSource>,

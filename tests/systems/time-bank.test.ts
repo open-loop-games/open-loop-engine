@@ -38,15 +38,15 @@ describe('createTimeBank — deposit / withdraw', () => {
 });
 
 describe('createTimeBank — earn efficiency & cap', () => {
-  it('scales deposits by earnEfficiency', () => {
-    const bank = createTimeBank({ earnEfficiency: 0.7 });
+  it('scales deposits by depositEfficiency', () => {
+    const bank = createTimeBank({ depositEfficiency: 0.7 });
     expect(bank.deposit(100)).toBeCloseTo(70, 10);
     expect(bank.banked.value).toBeCloseTo(70, 10);
   });
 
-  it('earnEfficiency accepts a getter for dynamic values', () => {
+  it('depositEfficiency accepts a getter for dynamic values', () => {
     const eff = ref(0.5);
-    const bank = createTimeBank({ earnEfficiency: () => eff.value });
+    const bank = createTimeBank({ depositEfficiency: () => eff.value });
     bank.deposit(10);
     eff.value = 1;
     bank.deposit(10);
@@ -120,7 +120,7 @@ describe('createBankedAcceleration — spend loop', () => {
     expect(bank.banked.value).toBeCloseTo(100 - 4, 6); // (5 - 1) real seconds, not 8
   });
 
-  it("drainMode 'full' charges the whole accelerated dt", () => {
+  it("withdrawMode 'full' charges the whole accelerated dt", () => {
     const { driver } = probeDriver();
     const bank = createTimeBank();
     bank.deposit(100);
@@ -128,7 +128,7 @@ describe('createBankedAcceleration — spend loop', () => {
       tickDriver: driver,
       bank,
       spendMultiplier: 10,
-      drainMode: 'full',
+      withdrawMode: 'full',
     });
     accel.startSpending();
     for (let i = 0; i < 20; i++) driver.processInterval(0.05); // 1 real second → 10 sim-seconds
@@ -188,7 +188,7 @@ describe('createBankedAcceleration — spend loop', () => {
     expect(driver.speedMultiplier).toBe(2);
   });
 
-  it('bankLiveOverflow deposits dropped seconds, chaining any prior handler', () => {
+  it('depositLiveOverflow deposits dropped seconds, chaining any prior handler', () => {
     const { driver } = probeDriver();
     let prior = 0;
     driver.onDeltaOverflow = (d) => {
@@ -199,7 +199,7 @@ describe('createBankedAcceleration — spend loop', () => {
       tickDriver: driver,
       bank,
       spendMultiplier: 10,
-      bankLiveOverflow: true,
+      depositLiveOverflow: true,
     });
     driver.processInterval(3.5); // maxDeltaTime 1 → 2.5 dropped
     expect(bank.banked.value).toBeCloseTo(2.5, 6);

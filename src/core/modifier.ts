@@ -32,9 +32,9 @@ import { profile, profileEnd, profileStart } from './profiler';
  */
 export interface Modifier {
   /** Transform the input value forward (e.g., add, multiply, exponentiate) */
-  apply: (gain: DecimalSource) => DecimalSource;
+  apply: (value: DecimalSource) => DecimalSource;
   /** Reverse the transformation. Required for inversion-based features (next-at, time-until). */
-  invert?: (gain: DecimalSource) => DecimalSource;
+  invert?: (value: DecimalSource) => DecimalSource;
   /** When `false`, this modifier is skipped in apply/invert chains. Can be a ref for reactive toggling. */
   enabled?: MaybeRef<boolean>;
   /**
