@@ -86,7 +86,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       const challenges = createChallengeCategory({ id: 'trials', accessor });
       challenges.register({
         id: 'bronze',
-        name: 'Bronze',
+        displayName: 'Bronze',
         canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
@@ -633,12 +633,12 @@ function buildDrainedEngine(inflowFrom: number) {
       boards.register([
         {
           id: 'early',
-          name: 'Early',
+          displayName: 'Early',
           visible: { kind: 'resource-gte', resource: 'clock', value: 2 },
         },
         {
           id: 'late',
-          name: 'Late',
+          displayName: 'Late',
           visible: { kind: 'cumulative-gte', resource: 'fragments', value: 10 },
         },
       ]);
@@ -691,8 +691,8 @@ describe("runUntil({mode: 'event'}) — cumulative-gte under a drain", () => {
 
 describe("runUntil({mode: 'event'}) guards", () => {
   const trackerAnalyzer = () => ({
-    name: 'tracker',
-    summarize: () => ({ name: 'tracker', metrics: {} }),
+    id: 'tracker',
+    summarize: () => ({ id: 'tracker', metrics: {} }),
   });
 
   it('throws when setup returns analyzers', () => {
@@ -731,7 +731,7 @@ describe("runUntil({mode: 'event'}) guards", () => {
         mode: 'event',
         cells: [
           {
-            name: 'with-analyzers',
+            id: 'with-analyzers',
             buildEngine: () => {
               const { engine } = buildGoldEngine();
               built = engine;

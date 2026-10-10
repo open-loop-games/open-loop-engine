@@ -66,7 +66,7 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 /** Definition for a temporary effect, registered at startup. */
 export interface TemporaryEffectDef {
   id: string;
-  name?: string;
+  displayName?: string;
   /**
    * Base duration in seconds. Can be reactive for dynamic durations. Must be
    * finite: `register` and `apply` throw otherwise, since the saved
@@ -249,7 +249,7 @@ export function createTemporaryEffectSystem(
   // Persistence
   const contextId = `temp-effect:${options.id}`;
   const savedState = withPersistentContext(contextId, () =>
-    persistent<EffectSnapshot[]>([], { name: 'savedState' }),
+    persistent<EffectSnapshot[]>([], { id: 'savedState' }),
   );
   /** The array `syncSavedState` last wrote, so a hydration that left it alone is skipped. */
   let lastSynced = savedState.value;

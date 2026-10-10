@@ -80,28 +80,28 @@ interface ScopedOverrides<T> {
  */
 export interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }> {
   /** Human-readable registry name (passed to `createOverrideRegistry`). */
-  readonly name: string;
+  readonly id: string;
 
   /**
    * Register a default implementation. No-op if the key already has a base value.
    * Called by vanilla modules during install.
    */
-  setDefault<K extends keyof T & string>(name: K, fn: T[K]): void;
+  setDefault<K extends keyof T & string>(key: K, fn: T[K]): void;
 
   /**
    * Permanently override a value (sets regardless of existing base).
    * Called by mod modules during install.
    */
-  override<K extends keyof T & string>(name: K, fn: T[K]): void;
+  override<K extends keyof T & string>(key: K, fn: T[K]): void;
 
   /**
    * Resolve a key: check scope stack top-down, then base map.
    * @throws If the key is not found in any scope or the base map
    */
-  get<K extends keyof T & string>(name: K): T[K];
+  get<K extends keyof T & string>(key: K): T[K];
 
   /** Check if a key exists in any scope or the base map */
-  has(name: keyof T & string): boolean;
+  has(key: keyof T & string): boolean;
 
   /**
    * Snapshot of base-map keys — the design-time tuning surface declared
@@ -168,17 +168,17 @@ function overridesKey<T>(scope: ScopedOverrides<T>, key: keyof T & string): bool
 /**
  * Create a new override registry.
  *
- * @param name - Human-readable name for error messages (e.g., "game-overrides")
+ * @param id - Human-readable name for error messages (e.g., "game-overrides")
  */
 export function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }>(
-  name: string,
+  id: string,
 ): OverrideRegistry<T> {
   const base = new Map<string, (...args: never[]) => unknown>();
   const scopedOverrides: ScopedOverrides<T>[] = [];
   const overrideVersion = ref(0);
 
   return {
-    name,
+    id,
     overrideVersion,
     setDefault<K extends keyof T & string>(key: K, fn: T[K]): void {
       if (!base.has(key)) {
@@ -201,7 +201,7 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
 
       const fn = base.get(key);
       if (fn === undefined) {
-        throw new Error(`[${name}] Override "${key}" not registered`);
+        throw new Error(`[${id}] Override "${key}" not registered`);
       }
       return fn as T[K];
     },
@@ -254,7 +254,7 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
  * ambient (tests, throwaway scripts) silently skip registration; the
  * primitive still works, just isn't picker-discoverable.
  *
- * @param name - Human-readable registry name. Used as the registry-name
+ * @param id - Human-readable registry name. Used as the registry-name
  *   prefix in `TunablePickerEntry.label`.
  * @returns A {@link TuningRegistry} — same shape as `OverrideRegistry`
  *   with the value type narrowed to `() => DecimalSource`.
@@ -271,8 +271,8 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
  * );
  * ```
  */
-export function createTuningRegistry(name: string): TuningRegistry {
-  const registry = createOverrideRegistry<Record<string, () => DecimalSource>>(name);
+export function createTuningRegistry(id: string): TuningRegistry {
+  const registry = createOverrideRegistry<Record<string, () => DecimalSource>>(id);
   const ambient = _currentTuningRegistries;
   if (ambient) ambient.add(registry);
   return registry;

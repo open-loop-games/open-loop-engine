@@ -74,7 +74,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       const challenges = createChallengeCategory({ id: 'trials', accessor });
       challenges.register({
         id: 'bronze',
-        name: 'Bronze',
+        displayName: 'Bronze',
         // FlagCondition → walker emits `reason: 'opaque-predicate'`.
         canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,

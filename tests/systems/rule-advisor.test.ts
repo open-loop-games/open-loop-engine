@@ -29,13 +29,13 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
       aggregate: (h) => h.reduce((acc, e) => acc + e.value, 0),
       analyzers: [
         (sum) => [
-          { key: 'sum', severity: 'info' as const, summary: `sum=${sum}`, payload: { tag: 'sum' } },
+          { id: 'sum', severity: 'info' as const, summary: `sum=${sum}`, payload: { tag: 'sum' } },
         ],
         (sum) =>
           sum > 5
             ? [
                 {
-                  key: 'big',
+                  id: 'big',
                   severity: 'warning' as const,
                   summary: 'big',
                   payload: { tag: 'big' },
@@ -46,7 +46,7 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
     });
 
     const out = advisor.reevaluate();
-    expect(out.map((s) => s.key)).toEqual(['big', 'sum']); // warning sorts before info
+    expect(out.map((s) => s.id)).toEqual(['big', 'sum']); // warning sorts before info
     expect(out[0]!.summary).toBe('big');
     expect(out[1]!.summary).toBe('sum=6');
   });
@@ -67,16 +67,16 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
       aggregate: () => undefined,
       analyzers: [
         () => [
-          { key: 'i1', severity: 'info' as const, summary: '', payload: undefined },
-          { key: 'w1', severity: 'warning' as const, summary: '', payload: undefined },
+          { id: 'i1', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'w1', severity: 'warning' as const, summary: '', payload: undefined },
         ],
         () => [
-          { key: 'w2', severity: 'warning' as const, summary: '', payload: undefined },
-          { key: 'i2', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'w2', severity: 'warning' as const, summary: '', payload: undefined },
+          { id: 'i2', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['w1', 'w2', 'i1', 'i2']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['w1', 'w2', 'i1', 'i2']);
   });
 });
 
@@ -95,7 +95,7 @@ describe('createRuleAdvisor — historySource branches', () => {
         return h.length;
       },
       analyzers: [
-        (n) => [{ key: 'count', severity: 'info' as const, summary: `n=${n}`, payload: undefined }],
+        (n) => [{ id: 'count', severity: 'info' as const, summary: `n=${n}`, payload: undefined }],
       ],
     });
     advisor.reevaluate();
@@ -132,14 +132,14 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
       analyzers: [
         () =>
           [
-            { key: 'a', severity: 'info' as const, summary: '', payload: { weight: 1 } },
-            { key: 'b', severity: 'info' as const, summary: '', payload: { weight: 5 } },
-            { key: 'c', severity: 'info' as const, summary: '', payload: { weight: 3 } },
+            { id: 'a', severity: 'info' as const, summary: '', payload: { weight: 1 } },
+            { id: 'b', severity: 'info' as const, summary: '', payload: { weight: 5 } },
+            { id: 'c', severity: 'info' as const, summary: '', payload: { weight: 3 } },
           ] satisfies readonly Suggestion<P>[],
       ],
       rank: (a, b) => b.payload.weight - a.payload.weight,
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['b', 'c', 'a']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['b', 'c', 'a']);
   });
 
   it('caps the emitted list at maxSuggestions (number form)', () => {
@@ -149,7 +149,7 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
       analyzers: [
         () =>
           Array.from({ length: 5 }, (_, i) => ({
-            key: `k${i}`,
+            id: `k${i}`,
             severity: 'info' as const,
             summary: '',
             payload: undefined,
@@ -157,7 +157,7 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
       ],
       maxSuggestions: 2,
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k0', 'k1']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['k0', 'k1']);
   });
 
   it('reads maxSuggestions getter on each reevaluate', () => {
@@ -167,15 +167,15 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
       aggregate: () => undefined,
       analyzers: [
         () => [
-          { key: 'a', severity: 'info' as const, summary: '', payload: undefined },
-          { key: 'b', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
       maxSuggestions: () => cap.value,
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['a']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['a']);
     cap.value = 2;
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['a', 'b']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['a', 'b']);
   });
 });
 
@@ -195,11 +195,11 @@ describe('createRuleAdvisor — analyzer context', () => {
       analyzers: [
         (sum, ctx) =>
           sum > ctx.threshold
-            ? [{ key: 'over', severity: 'warning' as const, summary: 'over', payload: undefined }]
+            ? [{ id: 'over', severity: 'warning' as const, summary: 'over', payload: undefined }]
             : [],
       ],
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['over']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['over']);
   });
 
   it('re-reads a getter context on every reevaluate', () => {
@@ -211,13 +211,13 @@ describe('createRuleAdvisor — analyzer context', () => {
       analyzers: [
         (sum, ctx) =>
           sum > ctx.threshold
-            ? [{ key: 'over', severity: 'info' as const, summary: '', payload: undefined }]
+            ? [{ id: 'over', severity: 'info' as const, summary: '', payload: undefined }]
             : [],
       ],
     });
     expect(advisor.reevaluate()).toEqual([]); // 10 < 100
     threshold = 5;
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['over']); // 10 > 5
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['over']); // 10 > 5
   });
 
   it('passes undefined when context is omitted (TContext defaults to undefined)', () => {
@@ -256,7 +256,7 @@ describe('createRuleAdvisor — aggregator context', () => {
       },
       analyzers: [
         (sum) => [
-          { key: 'sum', severity: 'info' as const, summary: `sum=${sum}`, payload: undefined },
+          { id: 'sum', severity: 'info' as const, summary: `sum=${sum}`, payload: undefined },
         ],
       ],
     });
@@ -272,7 +272,7 @@ describe('createRuleAdvisor — aggregator context', () => {
       context: () => ({ multiplier }),
       aggregate: (h, ctx) => (h[0] ?? 0) * ctx.multiplier,
       analyzers: [
-        (n) => [{ key: 'n', severity: 'info' as const, summary: `n=${n}`, payload: undefined }],
+        (n) => [{ id: 'n', severity: 'info' as const, summary: `n=${n}`, payload: undefined }],
       ],
     });
     expect(advisor.reevaluate()[0]!.summary).toBe('n=5');
@@ -306,8 +306,8 @@ describe('createRuleAdvisor — dismiss + reset', () => {
       aggregate: () => undefined,
       analyzers: [
         () => [
-          { key: 'a', severity: 'info' as const, summary: '', payload: undefined },
-          { key: 'b', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
     });
@@ -320,25 +320,25 @@ describe('createRuleAdvisor — dismiss + reset', () => {
 
     advisor.dismiss('a');
 
-    expect(advisor.suggestions.map((s) => s.key)).toEqual(['b']);
+    expect(advisor.suggestions.map((s) => s.id)).toEqual(['b']);
     expect(onDismissed).toHaveBeenCalledWith('a');
-    expect(onSuggestions).toHaveBeenCalledWith([expect.objectContaining({ key: 'b' })]);
+    expect(onSuggestions).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })]);
 
     // Survives reevaluate
     advisor.reevaluate();
-    expect(advisor.suggestions.map((s) => s.key)).toEqual(['b']);
+    expect(advisor.suggestions.map((s) => s.id)).toEqual(['b']);
 
     // reset() restores
     advisor.reset();
     advisor.reevaluate();
-    expect(advisor.suggestions.map((s) => s.key)).toEqual(['a', 'b']);
+    expect(advisor.suggestions.map((s) => s.id)).toEqual(['a', 'b']);
   });
 
   it('dismiss is idempotent and silent for repeat keys', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
       aggregate: () => undefined,
-      analyzers: [() => [{ key: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
+      analyzers: [() => [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
     });
     advisor.reevaluate();
 
@@ -355,15 +355,15 @@ describe('createRuleAdvisor — dismiss + reset', () => {
       aggregate: () => undefined,
       analyzers: [
         () => [
-          { key: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
-          { key: 'k2', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
+          { id: 'k2', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
       maxSuggestions: 1,
     });
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k1']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['k1']);
     advisor.dismiss('k1');
-    expect(advisor.reevaluate().map((s) => s.key)).toEqual(['k2']);
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['k2']);
   });
 
   it('backfills the dismissed slot at once, without waiting for reevaluate', () => {
@@ -372,8 +372,8 @@ describe('createRuleAdvisor — dismiss + reset', () => {
       aggregate: () => undefined,
       analyzers: [
         () => [
-          { key: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
-          { key: 'k2', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
+          { id: 'k2', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
       maxSuggestions: 1,
@@ -384,8 +384,8 @@ describe('createRuleAdvisor — dismiss + reset', () => {
     advisor.on('suggestionsUpdated', onSuggestions);
     advisor.dismiss('k1');
 
-    expect(advisor.suggestions.map((s) => s.key)).toEqual(['k2']);
-    expect(onSuggestions).toHaveBeenCalledWith([expect.objectContaining({ key: 'k2' })]);
+    expect(advisor.suggestions.map((s) => s.id)).toEqual(['k2']);
+    expect(onSuggestions).toHaveBeenCalledWith([expect.objectContaining({ id: 'k2' })]);
   });
 });
 
@@ -402,9 +402,9 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
       analyzers: [
         () => [
           ...(produceA
-            ? [{ key: 'a', severity: 'info' as const, summary: '', payload: undefined }]
+            ? [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]
             : []),
-          { key: 'b', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
     });
@@ -427,7 +427,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
       analyzers: [
         () =>
           producing
-            ? [{ key: 'a', severity: 'info' as const, summary: '', payload: undefined }]
+            ? [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]
             : [],
       ],
     });
@@ -443,7 +443,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
       aggregate: () => undefined,
-      analyzers: [() => [{ key: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
+      analyzers: [() => [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
     });
     advisor.reevaluate();
 
@@ -457,7 +457,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
 
   it('does NOT fire accepted after reset() (caller signals "context changed, do not count")', () => {
     let analyzerOutput: readonly Suggestion<undefined>[] = [
-      { key: 'a', severity: 'info' as const, summary: '', payload: undefined },
+      { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
     ];
     const advisor = createRuleAdvisor({
       historySource: () => [],
@@ -485,8 +485,8 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
         () =>
           producing
             ? [
-                { key: 'a', severity: 'info' as const, summary: '', payload: undefined },
-                { key: 'b', severity: 'info' as const, summary: '', payload: undefined },
+                { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
+                { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
               ]
             : [],
       ],
@@ -510,9 +510,9 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
       analyzers: [
         () => [
           ...(urgent
-            ? [{ key: 'k0', severity: 'warning' as const, summary: '', payload: undefined }]
+            ? [{ id: 'k0', severity: 'warning' as const, summary: '', payload: undefined }]
             : []),
-          { key: 'k1', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'k1', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
       maxSuggestions: 1,
@@ -522,7 +522,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     const onAccepted = vi.fn();
     advisor.on('accepted', onAccepted);
     urgent = true;
-    expect(advisor.reevaluate('edit').map((s) => s.key)).toEqual(['k0']);
+    expect(advisor.reevaluate('edit').map((s) => s.id)).toEqual(['k0']);
     expect(onAccepted).not.toHaveBeenCalled();
   });
 });
@@ -539,8 +539,8 @@ describe('createRuleAdvisor — onAggregate', () => {
       aggregate: () => 42,
       analyzers: [
         () => [
-          { key: 'a', severity: 'info' as const, summary: '', payload: undefined },
-          { key: 'b', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
         ],
       ],
       maxSuggestions: 1,
@@ -637,7 +637,7 @@ describe('createRuleAdvisor — spell-compiler shape (windowed profile aggregati
           profile.avgOtherwiseShare > 0.5
             ? [
                 {
-                  key: 'narrow-otherwise',
+                  id: 'narrow-otherwise',
                   severity: 'warning',
                   summary: `OTHERWISE handled ${Math.round(profile.avgOtherwiseShare * 100)}% of casts`,
                   payload: { kind: 'narrow-otherwise' },
@@ -647,7 +647,7 @@ describe('createRuleAdvisor — spell-compiler shape (windowed profile aggregati
         (profile, rs): readonly Suggestion<RuleSuggestionPayload>[] => {
           analyzerSawRules = rs.rules;
           return Object.entries(profile.deadRuleHits).map(([idxStr, hits]) => ({
-            key: `dead-rule:${idxStr}`,
+            id: `dead-rule:${idxStr}`,
             severity: 'info' as const,
             summary: `Rule ${idxStr} dead across ${hits} cycles`,
             payload: { kind: 'dead-rule' as const, ruleIndex: Number(idxStr) },
@@ -659,7 +659,7 @@ describe('createRuleAdvisor — spell-compiler shape (windowed profile aggregati
     });
 
     const out = advisor.reevaluate();
-    expect(out.map((s) => s.key)).toEqual(['narrow-otherwise', 'dead-rule:2']);
+    expect(out.map((s) => s.id)).toEqual(['narrow-otherwise', 'dead-rule:2']);
     expect(analyzerSawRules).toEqual(ruleSet.rules);
   });
 });
@@ -704,7 +704,7 @@ describe('createRuleAdvisor — Cookie Monster shape (window=1 degenerate case)'
           return snap.buildings.map((b) => {
             const pp = Math.max(b.price - snap.bank, 0) / b.cps + b.price / b.bonus;
             return {
-              key: `pp:${b.id}`,
+              id: `pp:${b.id}`,
               severity: 'info' as const,
               summary: `${b.id}: PP ${pp.toFixed(1)}`,
               payload: { buildingId: b.id, pp },
@@ -730,14 +730,14 @@ describe('createRuleAdvisor — live suggestions', () => {
       analyzers: [
         (n) =>
           Array.from({ length: n }, (_, i) => ({
-            key: `k${i}`,
+            id: `k${i}`,
             severity: 'info' as const,
             summary: '',
             payload: undefined,
           })),
       ],
     });
-    const keys = computed(() => advisor.suggestions.map((s) => s.key).join(','));
+    const keys = computed(() => advisor.suggestions.map((s) => s.id).join(','));
     expect(keys.value).toBe('');
     history.value = [1, 2];
     advisor.reevaluate();

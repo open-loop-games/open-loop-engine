@@ -77,9 +77,9 @@ describe('createCategoryBase — batch registration', () => {
     >({
       id: 'retry',
       buildState: () => {
-        const count = persistent<DecimalSource>(0, { name: 'count' });
-        persistent<DecimalSource>(0, { name: 'best', lifetime: true });
-        withPersistentContext('retry/a/inner', () => persistent(0, { name: 'progress' }));
+        const count = persistent<DecimalSource>(0, { id: 'count' });
+        persistent<DecimalSource>(0, { id: 'best', lifetime: true });
+        withPersistentContext('retry/a/inner', () => persistent(0, { id: 'progress' }));
         if (attempts++ === 0) throw new Error('builder blew up');
         return { count };
       },

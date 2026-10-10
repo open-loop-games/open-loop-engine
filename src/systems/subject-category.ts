@@ -318,7 +318,7 @@ function buildScalarField(
   const clamp = (v: number): number => clampScalar(schema, v);
   // Clamp the authored initial too — set() clamps, but a raw seed would let a
   // field sit outside its declared [min, max] until the first set().
-  const ref = persistent<number>(clamp(initial), { name: fieldName });
+  const ref = persistent<number>(clamp(initial), { id: fieldName });
   const events = createEmitHandle<ScalarFieldEvents>();
   function get(): number {
     return ref.value;
@@ -358,7 +358,7 @@ function buildVectorField<Dims extends string>(
     const cfg = schema.dimensionConfig?.[dim];
     // Clamp the authored initial to the dim's range (set() clamps; a raw seed would not).
     const initial = clampForDim(dim, override?.initialPerDim?.[dim] ?? cfg?.initial ?? 0);
-    refs.set(dim, persistent<number>(initial, { name: `${fieldName}/${dim}` }));
+    refs.set(dim, persistent<number>(initial, { id: `${fieldName}/${dim}` }));
   }
   function get(dim: Dims): number {
     return refs.get(dim)?.value ?? schema.dimensionConfig?.[dim]?.initial ?? 0;
@@ -404,7 +404,7 @@ function buildLadderField(
   const clampIndex = (i: number): number => clampRungIndex(schema, i);
   // Clamp the authored initial index into [0, maxIndex] (setIndex clamps; a raw
   // seed would let an out-of-range initial produce an undefined getRung()).
-  const ref = persistent<number>(clampIndex(initial), { name: fieldName });
+  const ref = persistent<number>(clampIndex(initial), { id: fieldName });
   const events = createEmitHandle<LadderFieldEvents>();
   function getIndex(): number {
     return ref.value;
@@ -452,7 +452,7 @@ function buildFlagField(
   override: PerSubjectOverride<FlagFieldDef> | undefined,
 ): FlagFieldInstance {
   const initial = override?.initial ?? schema.initial ?? false;
-  const ref = persistent<boolean>(initial, { name: fieldName });
+  const ref = persistent<boolean>(initial, { id: fieldName });
   const events = createEmitHandle<FlagFieldEvents>();
 
   function get(): boolean {
@@ -487,7 +487,7 @@ function buildEnumField<V extends string>(
   // Store as `string | null` so the generic `V` doesn't need to satisfy
   // SerializableConstraint structurally — V extends string, so the narrowed
   // Persistent<V | null> surface is sound on read.
-  const ref = persistent<string | null>(initial, { name: fieldName }) as Persistent<V | null>;
+  const ref = persistent<string | null>(initial, { id: fieldName }) as Persistent<V | null>;
   const events = createEmitHandle<EnumFieldEvents<V>>();
 
   function get(): V | null {

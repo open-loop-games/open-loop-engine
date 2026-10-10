@@ -101,7 +101,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
       (c) =>
         c.register({
           id: 'secret',
-          name: 'Secret',
+          displayName: 'Secret',
           visible: { kind: 'resource-gte', resource: 'gold', value: 100 },
         }),
       accessor,
@@ -124,7 +124,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
     const shown = ref(false);
     const engine = buildEngineWithChallenges(
       'vis-ref',
-      (c) => c.register({ id: 'secret', name: 'Secret', visible: shown }),
+      (c) => c.register({ id: 'secret', displayName: 'Secret', visible: shown }),
       accessor,
     );
 
@@ -142,7 +142,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
       (c) =>
         c.register({
           id: 's',
-          name: 'S',
+          displayName: 'S',
           visible: { kind: 'resource-gte', resource: 'gold', value: 100 },
           // Closure-form goal keeps other emissions off while we assert visibility silence.
           goal: () => false,
@@ -160,7 +160,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
       (c) =>
         c.register({
           id: 'always',
-          name: 'Always',
+          displayName: 'Always',
           visible: true,
           goal: () => false,
         }),
@@ -183,7 +183,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
       (c) =>
         c.register({
           id: 'gated',
-          name: 'Gated',
+          displayName: 'Gated',
           canEnter: { kind: 'resource-gte', resource: 'mana', value: 20 },
         }),
       accessor,
@@ -204,7 +204,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
       (c) =>
         c.register({
           id: 'c',
-          name: 'C',
+          displayName: 'C',
           canEnter: { kind: 'resource-gte', resource: 'gold', value: 100 },
           goal: () => false,
         }),
@@ -227,7 +227,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
       (c) =>
         c.register({
           id: 'c',
-          name: 'C',
+          displayName: 'C',
           canEnter: { kind: 'resource-gte', resource: 'gold', value: 100 },
         }),
       accessor,
@@ -251,7 +251,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
       (c) =>
         c.register({
           id: 'c',
-          name: 'C',
+          displayName: 'C',
           canEnter: { kind: 'count-gte', category: 'upgrades', entry: 'farm', value: 3 },
         }),
       accessor,
@@ -270,7 +270,7 @@ describe('walkChallengeTransitions — becomes-enterable', () => {
       (c) =>
         c.register({
           id: 'open',
-          name: 'Open',
+          displayName: 'Open',
           canEnter: true,
           goal: () => false,
         }),
@@ -293,7 +293,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
       (c) =>
         c.register({
           id: 'survive',
-          name: 'Survive',
+          displayName: 'Survive',
           goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         }),
       accessor,
@@ -324,7 +324,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
       (c) =>
         c.register({
           id: 'both',
-          name: 'Both',
+          displayName: 'Both',
           // AND currently-false → max over child flip-to-true distances.
           // a reaches 10 in 10s; b reaches 10 in 5s; max = 10s.
           goal: {
@@ -353,7 +353,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
       (c) =>
         c.register({
           id: 'manual',
-          name: 'Manual',
+          displayName: 'Manual',
           goal: () => false,
         }),
       accessor,
@@ -376,7 +376,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
       (c) =>
         c.register({
           id: 'done',
-          name: 'Done',
+          displayName: 'Done',
           goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         }),
       accessor,
@@ -395,7 +395,7 @@ describe('walkChallengeTransitions — goal-complete', () => {
       (c) =>
         c.register({
           id: 'idle',
-          name: 'Idle',
+          displayName: 'Idle',
           goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         }),
       accessor,
@@ -417,7 +417,7 @@ describe('walkChallengeTransitions — challenge-maxed', () => {
       (c) =>
         c.register({
           id: 'grind',
-          name: 'Grind',
+          displayName: 'Grind',
           goal: { kind: 'resource-gte', resource: 'xp', value: 10 },
           completionLimit: 2,
         }),
@@ -466,7 +466,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
         const boards = createChallengeCategory({ id: 'boards', accessor });
         boards.register({
           id: 'b',
-          name: 'B',
+          displayName: 'B',
           visible: { kind: 'cumulative-gte', resource: 'fragments', value: 50 },
         });
       },
@@ -535,7 +535,7 @@ describe("runUntil 'stasis-aware' — opaque challenge fields", () => {
           accessor,
           registerTick: (cb) => ctx.onTick(cb),
         });
-        trials.register({ id: 't', name: 'T', goal: () => points.value >= 5 });
+        trials.register({ id: 't', displayName: 'T', goal: () => points.value >= 5 });
         const challenge = trials.getChallenge('t')!;
         challenge.enter();
         completed = () => challenge.completed.value;

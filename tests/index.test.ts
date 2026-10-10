@@ -217,7 +217,7 @@ describe('persistenceNamespace — forkable engine isolation', () => {
     const mod: EngineModule = {
       id: 'economy',
       install() {
-        refs.gold = persistent(initial, { name: 'gold' });
+        refs.gold = persistent(initial, { id: 'gold' });
       },
     };
     return { mod, refs };
@@ -307,7 +307,7 @@ describe('dispose() — persistent-context teardown', () => {
     const mod: EngineModule = {
       id: 'scoreboard',
       install() {
-        refs.score = persistent(0, { name: 'score' });
+        refs.score = persistent(0, { id: 'score' });
       },
     };
     return { mod, refs };
@@ -374,7 +374,7 @@ describe('dispose() — persistent-context teardown', () => {
     engine.use({
       id: 'disp-mod',
       install(ctx) {
-        persistent(0, { name: 'n' });
+        persistent(0, { id: 'n' });
         watch(outside, () => calls.watch++, { flush: 'sync' });
         ctx.onTick(() => calls.tick++);
         ctx.on('testPing', () => calls.event++);
@@ -1261,7 +1261,7 @@ describe('EngineConfig.strictValidation', () => {
     return {
       id,
       install() {
-        persistent(0, { name: 'count' });
+        persistent(0, { id: 'count' });
       },
     };
   }
@@ -1346,7 +1346,7 @@ describe('save safety', () => {
     const storage = createMemoryStorage();
     const timers = capturingTimers();
     const engine = createEngine({ gameId: 'late', storageAdapter: storage, timerProvider: timers });
-    engine.use({ id: 'late-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'late-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     timers.fire(30000);
     expect(storage.getItem('late-slot-0')).toBeNull();
@@ -1359,7 +1359,7 @@ describe('save safety', () => {
   it('warns once when the first tick runs before any load', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const engine = createEngine({ gameId: 'unloaded', storageAdapter: createMemoryStorage() });
-    engine.use({ id: 'unloaded-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'unloaded-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     engine.tickDriver.processInterval(0.05);
     engine.tickDriver.processInterval(0.05);
@@ -1376,7 +1376,7 @@ describe('save safety', () => {
       autoSaveInterval: 0,
       storageAdapter: createMemoryStorage(),
     });
-    engine.use({ id: 'sim-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'sim-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     engine.tickDriver.processInterval(0.05);
     expect(warn).not.toHaveBeenCalled();
@@ -1387,7 +1387,7 @@ describe('save safety', () => {
   it('does not warn when load() runs before the first tick', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const engine = createEngine({ gameId: 'loaded', storageAdapter: createMemoryStorage() });
-    engine.use({ id: 'loaded-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'loaded-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     engine.load();
     engine.tickDriver.processInterval(0.05);
@@ -1408,7 +1408,7 @@ describe('save safety', () => {
       storageAdapter: storage,
       timerProvider: timers,
     });
-    engine.use({ id: 'safe-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'safe-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     expect(engine.load().success).toBe(false);
     timers.fire(30000);
@@ -1424,7 +1424,7 @@ describe('save safety', () => {
     engine.use({
       id: 'hooks-mod',
       install(ctx) {
-        persistent(0, { name: 'gold' });
+        persistent(0, { id: 'gold' });
         ctx.onLoad((result) => loads.push(result));
         ctx.onSave(() => saves++);
       },
@@ -1454,7 +1454,7 @@ describe('save safety', () => {
       storageAdapter: createMemoryStorage(),
       timerProvider: timers,
     });
-    engine.use({ id: 'written-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'written-mod', install: () => void persistent(0, { id: 'gold' }) });
     engine.start();
     engine.load();
     const written = vi.fn();
@@ -1470,7 +1470,7 @@ describe('save safety', () => {
 
   it('load() before start() throws instead of reporting a load that hydrated nothing', () => {
     const engine = createEngine({ gameId: 'early', storageAdapter: createMemoryStorage() });
-    engine.use({ id: 'early-mod', install: () => void persistent(0, { name: 'gold' }) });
+    engine.use({ id: 'early-mod', install: () => void persistent(0, { id: 'gold' }) });
     expect(() => engine.load()).toThrow(/start\(\)/);
   });
 
@@ -1500,14 +1500,14 @@ describe('load order — engine reconcilers run after onLoad', () => {
     const mod: EngineModule = {
       id: 'game',
       install(ctx) {
-        roster = persistent(['a'], { name: 'roster' });
+        roster = persistent(['a'], { id: 'roster' });
         derived = [...roster.value];
         ctx.onLoad(() => {
           order.push('onLoad');
           derived = [...roster.value];
         });
         category = createChallengeCategory({ id: 'ch', overrideRegistry: rules });
-        category.register([{ id: 'c1', name: 'C1', overrides: { mult: () => 2 } }]);
+        category.register([{ id: 'c1', displayName: 'C1', overrides: { mult: () => 2 } }]);
       },
       connect() {
         watch(
@@ -1619,7 +1619,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
         const ch = withPersistentContext('bare', () =>
           createChallengeCategory({ id: 'ch', overrideRegistry: rules }),
         );
-        ch.register([{ id: 'c1', name: 'C1', overrides: { mult: () => 2 } }]);
+        ch.register([{ id: 'c1', displayName: 'C1', overrides: { mult: () => 2 } }]);
         return ch;
       }),
     )!;

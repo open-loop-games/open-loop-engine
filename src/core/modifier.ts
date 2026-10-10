@@ -422,7 +422,7 @@ export interface BindOptions {
    * (e.g. a lookup that misses because its target registers later) freezes
    * its computed permanently, so pass this whenever the text is known.
    */
-  description?: string;
+  text?: string;
   /** Free-form attribution tags surfaced through {@link ModifierChain.bindings}. */
   tags?: readonly string[];
 }
@@ -720,11 +720,11 @@ export function createModifierChain(id: string): ModifierChain {
       const scope = getCurrentFullPersistentContext();
       let bindingId = opts.id;
       if (bindingId == null) {
-        const descText = opts.description ?? resolveDescriptionText(modifier);
+        const descText = opts.text ?? resolveDescriptionText(modifier);
         if (descText == null) {
           throw new Error(
-            `chain.bind on "${chain.id}": cannot auto-derive binding id — modifier has ` +
-              `no description and no explicit \`id\` was provided.`,
+            `chain.bind on "${chain.id}": cannot auto-derive binding id — no \`text\`, ` +
+              `the modifier has no description, and no explicit \`id\` was provided.`,
           );
         }
         bindingId = scope == null ? descText : `${scope}/${descText}`;

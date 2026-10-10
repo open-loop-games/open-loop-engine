@@ -554,7 +554,7 @@ describe('ResourceBag', () => {
       const wood = createResource<DecimalSource>(0, { id: 'wood' });
       endPersistentContext();
       beginPersistentContext('bag-cap-bonus');
-      const capBonus = persistent<number>(0, { name: 'bonus' });
+      const capBonus = persistent<number>(0, { id: 'bonus' });
       endPersistentContext();
       const bag = createResourceBag({ capacity: () => 10 + capBonus.value });
       bag.link('wood', wood);

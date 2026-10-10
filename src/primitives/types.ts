@@ -2,7 +2,7 @@ import type { Decimal, DecimalSource } from './decimal';
 
 /** Modifies a numeric resource by adding, subtracting, multiplying, or setting its value. */
 export interface ResourceEffect {
-  type: 'resource';
+  kind: 'resource';
   target: string;
   /** Arithmetic operation to apply to the resource's current amount. */
   operation: 'add' | 'subtract' | 'multiply' | 'set';
@@ -12,7 +12,7 @@ export interface ResourceEffect {
 
 /** Sets an unlock flag to true or false, controlling feature/content visibility. */
 export interface FlagEffect {
-  type: 'flag';
+  kind: 'flag';
   target: string;
   /** Whether the target should become unlocked (`true`) or locked (`false`). */
   value: boolean;
@@ -20,15 +20,15 @@ export interface FlagEffect {
 
 /** Writes an arbitrary value to a dot-path in game state (e.g. `"player.phase"`). */
 export interface StateEffect {
-  type: 'state';
+  kind: 'state';
   /** Dot-separated path into game state (e.g. `"player.phase"`). */
-  target: string;
+  path: string;
   value: unknown;
 }
 
 /** Groups multiple effects into one, applied in order as a single unit. */
 export interface CompositeEffect {
-  type: 'composite';
+  kind: 'composite';
   effects: IEffect[];
 }
 
@@ -42,7 +42,7 @@ export interface CompositeEffect {
  * @internal
  */
 export interface BranchEffect {
-  type: 'branch';
+  kind: 'branch';
   condition: ICondition;
   /** Effect applied when the condition is true. */
   then: IEffect;
@@ -76,7 +76,7 @@ export type IEffectInternal = IEffect | BranchEffect;
  * @internal
  */
 export interface ResourceCondition {
-  type: 'resource';
+  kind: 'resource';
   target: string;
   /** Comparison applied as `resource.amount <operator> value`. */
   operator: 'gte' | 'lte' | 'gt' | 'lt' | 'eq';
@@ -89,7 +89,7 @@ export interface ResourceCondition {
  * @internal
  */
 export interface FlagCondition {
-  type: 'flag';
+  kind: 'flag';
   target: string;
 }
 
@@ -98,9 +98,9 @@ export interface FlagCondition {
  * @internal
  */
 export interface StateCondition {
-  type: 'state';
+  kind: 'state';
   /** Dot-separated path into game state (e.g. `"player.phase"`). */
-  target: string;
+  path: string;
   /** Comparison operator applied as `state[target] <operator> value`. */
   operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
   value: unknown;
@@ -111,7 +111,7 @@ export interface StateCondition {
  * @internal
  */
 export interface AllCondition {
-  type: 'all';
+  kind: 'all';
   conditions: ICondition[];
 }
 
@@ -120,7 +120,7 @@ export interface AllCondition {
  * @internal
  */
 export interface AnyCondition {
-  type: 'any';
+  kind: 'any';
   conditions: ICondition[];
 }
 
@@ -129,7 +129,7 @@ export interface AnyCondition {
  * @internal
  */
 export interface NotCondition {
-  type: 'not';
+  kind: 'not';
   condition: ICondition;
 }
 
@@ -156,14 +156,14 @@ export type ICondition =
 
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */
 export interface AnalyzerResult {
-  name: string;
+  id: string;
   /** Scalar measurements collected during the run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
   metrics: Record<string, number | string | boolean>;
 }
 
 /** Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. */
 export interface Analyzer {
-  name: string;
+  id: string;
   /** Called once before the first tick. Use to initialize accumulators. */
   onStart?(): void;
   /** Called after each tick. `tick` is the zero-based tick index. */

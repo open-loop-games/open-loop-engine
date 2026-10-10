@@ -43,7 +43,7 @@ import { ref } from 'vue';
  */
 export interface ContentRegistry<T extends { id: string }> {
   /** Human-readable name, included in error messages */
-  readonly name: string;
+  readonly id: string;
 
   /**
    * Register a single entry or an array of entries.
@@ -132,7 +132,7 @@ const ABSENT: unique symbol = Symbol('absent');
 /**
  * Create a new content registry for a specific content type.
  *
- * @param name - Human-readable name for error messages (e.g., "zones", "actions")
+ * @param registryId - Human-readable id for error messages (e.g., "zones", "actions")
  * @returns A new empty {@link ContentRegistry}
  *
  * @example
@@ -142,8 +142,10 @@ const ABSENT: unique symbol = Symbol('absent');
  * skills.register({ id: 'mining', name: 'Mining', maxLevel: 99 });
  * ```
  */
-export function createContentRegistry<T extends { id: string }>(name: string): ContentRegistry<T> {
-  return createContentRegistryHandle<T>(name).registry;
+export function createContentRegistry<T extends { id: string }>(
+  registryId: string,
+): ContentRegistry<T> {
+  return createContentRegistryHandle<T>(registryId).registry;
 }
 
 /**
@@ -152,7 +154,7 @@ export function createContentRegistry<T extends { id: string }>(name: string): C
  * @internal
  */
 export function createContentRegistryHandle<T extends { id: string }>(
-  name: string,
+  registryId: string,
 ): ContentRegistryHandle<T> {
   const store = new Map<string, T>();
   // Read barrier for the plain store: every read touches it, every write bumps it.
@@ -188,13 +190,13 @@ export function createContentRegistryHandle<T extends { id: string }>(
     const seen = new Set<string>();
     for (const entry of entries) {
       if (entry.id === '') {
-        throw new Error(`[${name}] Cannot register entry with empty id`);
+        throw new Error(`[${registryId}] Cannot register entry with empty id`);
       }
       if (seen.has(entry.id)) {
-        throw new Error(`[${name}] Duplicate entry id in batch: "${entry.id}"`);
+        throw new Error(`[${registryId}] Duplicate entry id in batch: "${entry.id}"`);
       }
       if (store.has(entry.id)) {
-        throw new Error(`[${name}] Duplicate entry id: "${entry.id}"`);
+        throw new Error(`[${registryId}] Duplicate entry id: "${entry.id}"`);
       }
       seen.add(entry.id);
     }
@@ -204,7 +206,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
   // the entry filed under an id it no longer carries.
   function assertKeepsId(verb: string, id: string, partial: object): void {
     if (Object.hasOwn(partial, 'id') && (partial as { id?: unknown }).id !== id) {
-      throw new Error(`[${name}] Cannot change the id of "${id}" by ${verb}`);
+      throw new Error(`[${registryId}] Cannot change the id of "${id}" by ${verb}`);
     }
   }
 
@@ -215,7 +217,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
   }
 
   const registry: ContentRegistry<T> = {
-    name,
+    id: registryId,
 
     register(entryOrEntries: T | T[]): void {
       const entries = Array.isArray(entryOrEntries) ? entryOrEntries : [entryOrEntries];
@@ -230,7 +232,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
     patch(id: string, partial: Partial<Omit<T, 'id'>>): void {
       const existing = store.get(id);
       if (!existing) {
-        throw new Error(`[${name}] Cannot patch unknown id: "${id}"`);
+        throw new Error(`[${registryId}] Cannot patch unknown id: "${id}"`);
       }
       assertKeepsId('patch', id, partial);
       const base = bases.get(id);
@@ -260,7 +262,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
       // Validate every patch before applying any
       for (const [id, partial] of Object.entries(patches)) {
         if (!store.has(id)) {
-          throw new Error(`[${name}] Cannot pushPatches unknown id: "${id}"`);
+          throw new Error(`[${registryId}] Cannot pushPatches unknown id: "${id}"`);
         }
         assertKeepsId('pushPatches', id, partial);
       }

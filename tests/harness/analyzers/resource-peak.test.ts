@@ -33,8 +33,8 @@ describe('createResourcePeakAnalyzer', () => {
   it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
     const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
     const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
-    expect(createResourcePeakAnalyzer(prestige).name).toBe('resource-peak:prestige-points');
-    expect(createResourcePeakAnalyzer(transcend).name).toBe('resource-peak:transcend-points');
+    expect(createResourcePeakAnalyzer(prestige).id).toBe('resource-peak:prestige-points');
+    expect(createResourcePeakAnalyzer(transcend).id).toBe('resource-peak:transcend-points');
   });
 
   it('zero-tick run reports the start-of-run value for all three metrics', () => {

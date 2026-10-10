@@ -161,8 +161,8 @@ describe('save-validation', () => {
     it('passes clean data through unchanged', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-clean');
-      const a = persistent(0, { name: 'a' });
-      const b = persistent('x', { name: 'b' });
+      const a = persistent(0, { id: 'a' });
+      const b = persistent('x', { id: 'b' });
       endPersistentContext();
       a.value = 5;
       b.value = 'y';
@@ -178,9 +178,9 @@ describe('save-validation', () => {
     it('a stored null and a layer-2 Decimal survive a strict JSON round-trip', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-edges');
-      const stance = persistent<string | null>('ally', { name: 'stance' });
-      const cells = persistent<(string | null)[]>(['wall', 'floor'], { name: 'cells' });
-      const points = persistent(new Decimal(0), { name: 'points' });
+      const stance = persistent<string | null>('ally', { id: 'stance' });
+      const cells = persistent<(string | null)[]>(['wall', 'floor'], { id: 'cells' });
+      const points = persistent(new Decimal(0), { id: 'points' });
       endPersistentContext();
       stance.value = null;
       cells.value = ['wall', null];
@@ -197,7 +197,7 @@ describe('save-validation', () => {
     it('self-heals bad leaves in non-strict mode by deleting them', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-heal');
-      const n = persistent(0, { name: 'n' });
+      const n = persistent(0, { id: 'n' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -221,8 +221,8 @@ describe('save-validation', () => {
     it('strict mode marks ok:false but still reports all issues in one pass', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-strict');
-      persistent(0, { name: 'a' });
-      persistent('x', { name: 'b' });
+      persistent(0, { id: 'a' });
+      persistent('x', { id: 'b' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -244,8 +244,8 @@ describe('save-validation', () => {
     it('missing leaves are not an error (new-ref self-heal via deserialize default)', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-missing');
-      persistent(0, { name: 'existing' });
-      persistent(0, { name: 'added-later' });
+      persistent(0, { id: 'existing' });
+      persistent(0, { id: 'added-later' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -260,7 +260,7 @@ describe('save-validation', () => {
     it('validates Decimal refs with Decimal-instance default', () => {
       resetAllPersistentContexts();
       beginPersistentContext('vd-decimal');
-      persistent<Decimal>(new Decimal(0), { name: 'gold' });
+      persistent<Decimal>(new Decimal(0), { id: 'gold' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();

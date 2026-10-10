@@ -3,34 +3,34 @@ import type { IEffect, CompositeEffect, ResourceCondition, AllCondition } from '
 
 describe('Primitive types', () => {
   it('IEffect discriminated union works', () => {
-    const effect: IEffect = { type: 'resource', target: 'gold', operation: 'add', value: 10 };
-    expect(effect.type).toBe('resource');
+    const effect: IEffect = { kind: 'resource', target: 'gold', operation: 'add', value: 10 };
+    expect(effect.kind).toBe('resource');
   });
   it('Composite effect nests correctly', () => {
     const effect: CompositeEffect = {
-      type: 'composite',
+      kind: 'composite',
       effects: [
-        { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-        { type: 'flag', target: 'smithing', value: true },
+        { kind: 'resource', target: 'gold', operation: 'add', value: 10 },
+        { kind: 'flag', target: 'smithing', value: true },
       ],
     };
     expect(effect.effects).toHaveLength(2);
   });
   it('ICondition discriminated union works', () => {
     const cond: ResourceCondition = {
-      type: 'resource',
+      kind: 'resource',
       target: 'gold',
       operator: 'gte',
       value: 100,
     };
-    expect(cond.type).toBe('resource');
+    expect(cond.kind).toBe('resource');
   });
   it('Composite condition nests', () => {
     const cond: AllCondition = {
-      type: 'all',
+      kind: 'all',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'flag', target: 'smithing' },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'flag', target: 'smithing' },
       ],
     };
     expect(cond.conditions).toHaveLength(2);

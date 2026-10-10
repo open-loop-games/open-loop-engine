@@ -70,7 +70,7 @@ describe('self-referential grants (#18)', () => {
     const descriptionSpy = vi.fn(() => 'Spied');
 
     chain.bind({
-      description: 'Spied',
+      text: 'Spied',
       modifier: createMultiplicativeModifier({
         multiplier: 2,
         description: descriptionSpy,

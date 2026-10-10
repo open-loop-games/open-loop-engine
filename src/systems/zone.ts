@@ -48,7 +48,7 @@ import { createContentRegistry, type ContentRegistry } from './content-registry'
 export interface ZoneDef {
   id: string;
   /** Display name */
-  name: string;
+  displayName: string;
   /**
    * Sort order for display (lower = first). Zones without one sort after every
    * zone that has one; ties keep registration order.
@@ -156,8 +156,8 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
   // --- Persistent state ---
   const contextId = resolveSystemPersistentContextId(id, 'zone');
   const { unlocked, current } = withPersistentContext(contextId, () => ({
-    unlocked: persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
-    current: persistent<string>(defaultUnlocked[0] ?? '', { name: 'current' }),
+    unlocked: persistent<string[]>([...defaultUnlocked], { id: 'unlocked' }),
+    current: persistent<string>(defaultUnlocked[0] ?? '', { id: 'current' }),
   }));
 
   const handle = createEmitHandle<ZoneSystemEvents>();

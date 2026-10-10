@@ -153,7 +153,7 @@ export function timeUntilConditionFlip(
   condition: ICondition,
   accessor: GameStateAccessor,
 ): TransitionDistance {
-  switch (condition.type) {
+  switch (condition.kind) {
     case 'resource':
       return timeUntilResourceFlip(condition, accessor);
     case 'all':

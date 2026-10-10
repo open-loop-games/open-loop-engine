@@ -63,11 +63,11 @@ describe('Headless Runner', () => {
   it('calls analyzer lifecycle hooks', () => {
     const events: string[] = [];
     const analyzer: Analyzer = {
-      name: 'test',
+      id: 'test',
       onStart: () => events.push('start'),
       onTick: (t) => events.push(`tick-${t}`),
       onEnd: () => events.push('end'),
-      summarize: () => ({ name: 'test', metrics: {} }),
+      summarize: () => ({ id: 'test', metrics: {} }),
     };
     const result = runHeadless({ setup: () => [analyzer], tick: () => {}, ticks: 3 });
     expect(events).toEqual(['start', 'tick-0', 'tick-1', 'tick-2', 'end']);
@@ -88,11 +88,11 @@ describe('Headless Runner', () => {
   it('runs setup before onStart so analyzers see post-setup engine state', () => {
     const order: string[] = [];
     const analyzer: Analyzer = {
-      name: 'test',
+      id: 'test',
       onStart: () => order.push('onStart'),
       onTick: () => order.push('tick'),
       onEnd: () => order.push('onEnd'),
-      summarize: () => ({ name: 'test', metrics: {} }),
+      summarize: () => ({ id: 'test', metrics: {} }),
     };
     runHeadless({
       setup: () => {
@@ -113,7 +113,7 @@ describe('Headless Runner', () => {
     const calls: string[] = [];
     runHeadless({
       setup: () => [
-        { name: 'a', summarize: () => (calls.push('summarize'), { name: 'a', metrics: {} }) },
+        { id: 'a', summarize: () => (calls.push('summarize'), { id: 'a', metrics: {} }) },
       ],
       tick: () => {},
       ticks: 1,
@@ -140,7 +140,7 @@ describe('Headless Runner', () => {
         runHeadless({
           setup: () => [
             {
-              name: 'a',
+              id: 'a',
               summarize: () => {
                 throw new Error('analyzer blew up');
               },

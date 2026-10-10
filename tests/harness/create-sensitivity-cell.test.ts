@@ -13,7 +13,7 @@ function makeGoldModule(initial: number) {
   const mod: EngineModule = {
     id: 'economy',
     install() {
-      refs.gold = persistent(initial, { name: 'gold' });
+      refs.gold = persistent(initial, { id: 'gold' });
     },
   };
   return { mod, refs };
@@ -49,13 +49,13 @@ function makeLiveSave(gold: number): string {
 function createGoldPeakAnalyzer(getGold: () => number): Analyzer {
   let peak = 0;
   return {
-    name: 'gold-peak',
+    id: 'gold-peak',
     onTick: () => {
       const v = getGold();
       if (v > peak) peak = v;
     },
     summarize: (): AnalyzerResult => ({
-      name: 'gold-peak',
+      id: 'gold-peak',
       metrics: { peak },
     }),
   };
@@ -127,7 +127,7 @@ describe('createSensitivityCell', () => {
   ) {
     const modFactory = makeGoldModule;
     return createSensitivityCell({
-      name,
+      id: name,
       saveText,
       modules: () => {
         const { mod, refs } = modFactory(0);
@@ -159,7 +159,7 @@ describe('createSensitivityCell', () => {
 
     const result = runSensitivity({
       baseline: baselineCell,
-      variants: [{ name: 'perturbed', patch: () => perturbCell }],
+      variants: [{ id: 'perturbed', patch: () => perturbCell }],
       seeds: [1, 2, 3],
     });
 
@@ -180,7 +180,7 @@ describe('createSensitivityCell', () => {
     const goldBySeed: number[] = [];
 
     const cell = createSensitivityCell({
-      name: 'seeded',
+      id: 'seeded',
       saveText: blob,
       modules: () => {
         const { mod, refs } = makeGoldModule(0);
@@ -218,7 +218,7 @@ describe('createSensitivityCell', () => {
 
     const result = runSensitivity({
       baseline,
-      variants: [{ name: 'shadow', patch: () => shadow }],
+      variants: [{ id: 'shadow', patch: () => shadow }],
       seeds: [1],
     });
 
@@ -239,7 +239,7 @@ describe('createSensitivityCell', () => {
     try {
       runSensitivity({
         baseline,
-        variants: [{ name: 'variant', patch: () => variant }],
+        variants: [{ id: 'variant', patch: () => variant }],
         seeds: [1, 2, 3],
       });
       expect(setIntervalSpy).not.toHaveBeenCalled();
@@ -253,14 +253,14 @@ describe('createSensitivityCell', () => {
     // Each counts the refs its run's engine still holds under `economy`.
     const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
-      name: 'disposal',
+      id: 'disposal',
       saveText: blob,
       modules: () => [
         {
           id: 'economy',
           install() {
             heldRefs.push(bindPersistenceNamespace(() => getPersistentRefs('economy')?.size ?? 0));
-            persistent(0, { name: 'gold' });
+            persistent(0, { id: 'gold' });
           },
         },
       ],
@@ -280,14 +280,14 @@ describe('createSensitivityCell', () => {
     const blob = makeLiveSave(5);
     const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
-      name: 'teardown',
+      id: 'teardown',
       saveText: blob,
       modules: () => [
         {
           id: 'economy',
           install() {
             heldRefs.push(bindPersistenceNamespace(() => getPersistentRefs('economy')?.size ?? 0));
-            persistent(0, { name: 'gold' });
+            persistent(0, { id: 'gold' });
           },
         },
       ],

@@ -102,7 +102,7 @@ describe('Reset', () => {
   it('a nested reset settles once, as the outermost reset ends', () => {
     const scope = effectScope();
     const flag = withPersistentContext('reset-nested-settle', () =>
-      persistent(false, { name: 'flag', lifetime: true }),
+      persistent(false, { id: 'flag', lifetime: true }),
     );
     const achievement = scope.run(() =>
       createAchievement({
@@ -581,8 +581,8 @@ describe('Reset — Resettable protocol on category wrappers', () => {
   it('a purchasable category resets its purchases and no ref its options name', () => {
     const gold = createResource(1000, { id: 'reset-cat-gold' });
     const [maxLevel, shown] = withPersistentContext('reset-cat-elsewhere', () => [
-      persistent(1, { name: 'maxLevel' }),
-      persistent(false, { name: 'shown' }),
+      persistent(1, { id: 'maxLevel' }),
+      persistent(false, { id: 'shown' }),
     ]);
     const upgrades = createPurchasableCategory<{ id: string }>({
       id: 'reset-cat-upgrades',
@@ -717,7 +717,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       });
       achievements.register({ id: 'first' });
       const challenges = createChallengeCategory({ id: 'm-challenges' });
-      challenges.register({ id: 'hard', name: 'Hard' });
+      challenges.register({ id: 'hard', displayName: 'Hard' });
       return { cycle, time, bank, bestOf, pool, tiers, recs, dialog, achievements, challenges };
     });
   }

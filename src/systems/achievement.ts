@@ -191,8 +191,8 @@ export function createAchievement<T = unknown>(
   const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/achievement:${id}` : `achievement:${id}`;
   const { earned, earnedAt } = withPersistentContext(contextId, () => ({
-    earned: persistent<boolean>(false, { name: 'earned', lifetime: true }),
-    earnedAt: persistent<number | null>(null, { name: 'earnedAt', lifetime: true }),
+    earned: persistent<boolean>(false, { id: 'earned', lifetime: true }),
+    earnedAt: persistent<number | null>(null, { id: 'earnedAt', lifetime: true }),
   }));
 
   const adoptedRequirement = predicates.adopt(requirement, true, `achievement '${id}' goal`);

@@ -10,8 +10,8 @@ export const noopRegisterTick = () => () => {};
 
 /** The two-tier `manual` / `basic` ladder reset.test.ts and system-resettable.test.ts both build. */
 export const AUTOMATION_TIER_DEFS = [
-  { id: 'manual', name: 'Manual', order: 0 },
-  { id: 'basic', name: 'Basic', order: 1 },
+  { id: 'manual', displayName: 'Manual', order: 0 },
+  { id: 'basic', displayName: 'Basic', order: 1 },
 ];
 
 /** A stateless GameStateAccessorMutator stub for a DialogSession under test. */

@@ -307,7 +307,7 @@ export function setupSweepAutoPurchase(
   // mid-run `importSave` would otherwise leave the throttle phase out of sync
   // with the resources and purchase counts it was just restored alongside.
   const accumulator = persistent<number>(0, {
-    name: accumulatorName(
+    id: accumulatorName(
       'sweepAutoPurchaseAccumulator',
       options.id,
       Array.isArray(purchasables) ? undefined : purchasables,
@@ -540,7 +540,7 @@ export function setupPolicyAutoPurchase(
   // replay) would leave the accumulator out of sync with the resources and
   // purchase counts that were just restored.
   const accumulator = persistent<number>(0, {
-    name: accumulatorName(
+    id: accumulatorName(
       'policyAutoPurchaseAccumulator',
       options.id,
       Array.isArray(producers) ? undefined : producers,

@@ -8,12 +8,12 @@ import { runMatrix } from '@/harness';
 function createLoopCounterAnalyzer(): Analyzer {
   let finalized = 0;
   return {
-    name: 'cycle-counter',
+    id: 'cycle-counter',
     onRunFinalize: () => {
       finalized += 1;
     },
     summarize: (): AnalyzerResult => ({
-      name: 'cycle-counter',
+      id: 'cycle-counter',
       metrics: { finalized },
     }),
   };
@@ -29,7 +29,7 @@ describe('runMatrix composition with direct CycleLog finalize subscription', () 
     const result = runMatrix({
       cells: [
         {
-          name: 'five-cycles',
+          id: 'five-cycles',
           setup: () => {
             const analyzers = [createLoopCounterAnalyzer()];
             const cycle = createCycle({

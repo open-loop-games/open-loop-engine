@@ -45,7 +45,7 @@ export interface RunContext {
  * return `[]`.
  */
 export interface Cell {
-  name: string;
+  id: string;
   setup: (ctx: RunContext) => Analyzer[];
   tick: (dt: number) => void;
   /** Total number of ticks to simulate for this cell. */
@@ -191,7 +191,7 @@ export interface CellAggregate {
  * {@link RunUntilResult} from the until-runners, which carries `terminated`.
  */
 export interface CellResult<R extends HeadlessResult = HeadlessResult> {
-  name: string;
+  id: string;
   runs: R[];
   aggregate: CellAggregate;
 }
@@ -231,7 +231,7 @@ export interface MatrixResult {
  * sweeps. Defaults to `Cell` for source-compatible fixed-tick callers.
  */
 export interface Variant<C extends Cell | UntilCell = Cell> {
-  name: string;
+  id: string;
   patch: (baseline: C) => C;
 }
 
@@ -246,7 +246,7 @@ export interface Variant<C extends Cell | UntilCell = Cell> {
  * but keeps the axis identity legible at the call site.
  */
 export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
-  name: string;
+  id: string;
   values: V[];
   /** Apply this axis's value to the baseline cell, producing a new cell. */
   patch: (baseline: C, value: V) => C;
@@ -322,12 +322,12 @@ export interface MetricDelta {
 
 /**
  * One variant's contribution to a {@link SensitivityResult}. `name` is the
- * variant identity (forced from {@link Variant.name}, not whatever the
+ * variant identity (forced from {@link Variant.id}, not whatever the
  * `patch` function chose). `cell` is the variant's raw matrix output;
  * `deltas` is the per-metric diff against the baseline cell.
  */
 export interface SensitivityVariantResult {
-  name: string;
+  id: string;
   cell: CellResult;
   /**
    * Per-metric deltas vs the baseline cell, from {@link diffAggregates}:
@@ -497,7 +497,7 @@ export interface RunUntilResult {
  * engine per run so per-run state bleed can't happen.
  */
 export interface UntilCell {
-  name: string;
+  id: string;
   /**
    * Build a fresh engine for this `(cell, seed)`. Consumers typically call
    * `createEngine` or `createEngineFromSave` here; the engine must be

@@ -53,7 +53,7 @@ export interface AutomationTierDef {
   /** Unique tier identifier (e.g., 'manual', 'basic', 'advanced'); a repeat throws. */
   id: string;
   /** Display name for the tier. */
-  name: string;
+  displayName: string;
   /**
    * Numeric sort order. Lower = earlier tier. Must be unique across tiers.
    * Tier 0 is typically the "no automation" baseline.
@@ -192,7 +192,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   // --- Persistent state ---
   const contextId = resolveSystemPersistentContextId(id, 'automation');
   const unlocked = withPersistentContext(contextId, () =>
-    persistent<string[]>([...defaultUnlocked], { name: 'unlocked', lifetime: true }),
+    persistent<string[]>([...defaultUnlocked], { id: 'unlocked', lifetime: true }),
   );
 
   const handle = createEmitHandle<AutomationTiersEvents>();

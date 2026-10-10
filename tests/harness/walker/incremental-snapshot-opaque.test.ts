@@ -31,7 +31,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
       id: 'inc-opaque',
       install() {
         trials = createChallengeCategory({ id: 'trials', accessor });
-        trials.register({ id: 'boss', name: 'Boss', goal: () => world.bossDefeated });
+        trials.register({ id: 'boss', displayName: 'Boss', goal: () => world.bossDefeated });
       },
     };
     const engine = createEngine({ gameId: 'inc-opaque', persistence: false });
@@ -69,7 +69,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
         trials = createChallengeCategory({ id: 'trials', accessor });
         trials.register({
           id: 'mine',
-          name: 'Mine',
+          displayName: 'Mine',
           canEnter: {
             kind: 'all',
             of: [

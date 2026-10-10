@@ -102,7 +102,7 @@ export const CheckNaN = Symbol('CheckNaN');
  * save-data key in {@link getAllPersistentRefs}. When unset, the key falls back
  * to iteration order — a dev-mode warning is emitted so the gap is observable.
  */
-export const PersistentName = Symbol('PersistentName');
+export const PersistentId = Symbol('PersistentId');
 
 /**
  * Explicit Zod schema for this ref's runtime save validation. When unset, the
@@ -138,7 +138,7 @@ export type Persistent<T = Serializable> = Ref<T> & {
   readonly [PersistentAlias]: PersistentAlias<T>;
   [SaveDataPath]: string[] | undefined;
   readonly [CheckNaN]: boolean;
-  [PersistentName]: string | undefined;
+  [PersistentId]: string | undefined;
   readonly [PersistentSchema]: unknown;
   readonly [PersistentDecimal]: boolean;
   readonly [Lifetime]: boolean;
@@ -540,7 +540,7 @@ export interface PersistentOptions<T = unknown> {
    * Stable name for this ref inside its persistent context, used as the
    * save-data key. Required when you want rename-safe saves.
    */
-  name?: string;
+  id?: string;
   /**
    * Mark the ref as Decimal-valued for schema derivation. Set this when the
    * default is a `number`/`string` DecimalSource rather than a Decimal instance
@@ -651,7 +651,7 @@ export function persistent<T>(
     [PersistentAlias]: alias,
     [SaveDataPath]: undefined,
     [CheckNaN]: checkNaN,
-    [PersistentName]: undefined,
+    [PersistentId]: undefined,
     [PersistentSchema]: schema,
     [PersistentDecimal]: decimal,
     [Lifetime]: lifetime,
@@ -662,8 +662,8 @@ export function persistent<T>(
   if (currentContext) {
     persistentRefs[currentContext].add(persistent);
     refContextId.set(persistent, currentContext);
-    if (options.name !== undefined) {
-      setPersistentName(persistent as Persistent, options.name);
+    if (options.id !== undefined) {
+      setPersistentId(persistent as Persistent, options.id);
     }
   } else {
     console.warn(
@@ -690,28 +690,28 @@ export function persistent<T>(
  * by collector factories ({@link createDefStates}, category `mapState`)
  * that know the enclosing field name after the factory returns.
  */
-export function setPersistentName(ref: Persistent, name: string): void {
+export function setPersistentId(ref: Persistent, id: string): void {
   const contextId = refContextId.get(ref);
   if (!contextId || !(contextId in persistentRefs)) {
     throw new Error(
-      'setPersistentName: ref is not registered to a context. ' +
-        'Call setPersistentName only on refs created inside a persistent context.',
+      'setPersistentId: ref is not registered to a context. ' +
+        'Call setPersistentId only on refs created inside a persistent context.',
     );
   }
-  const existing = ref[PersistentName];
-  if (existing === name) return;
+  const existing = ref[PersistentId];
+  if (existing === id) return;
   // Collision check: walk live refs in the context. Deriving on demand avoids
   // drift between a cached name set and the live refs Set when callers clear
   // the context (test teardown, etc.).
   for (const other of persistentRefs[contextId]) {
     if (other === ref || other[Deleted]) continue;
-    if (other[PersistentName] === name) {
+    if (other[PersistentId] === id) {
       throw new Error(
-        `Persistent name collision in context "${contextId}": "${name}" is already in use.`,
+        `Persistent id collision in context "${contextId}": "${id}" is already in use.`,
       );
     }
   }
-  ref[PersistentName] = name;
+  ref[PersistentId] = id;
 }
 
 /**
@@ -1041,8 +1041,8 @@ export function createDefStates<D, K, S>(
       // keys stay stable across field reorders and new-field additions.
       if (state !== null && typeof state === 'object') {
         for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
-          if (isPersistent(value) && value[PersistentName] === undefined) {
-            setPersistentName(value, `${String(defKey)}.${fieldName}`);
+          if (isPersistent(value) && value[PersistentId] === undefined) {
+            setPersistentId(value, `${String(defKey)}.${fieldName}`);
           }
         }
       }
@@ -1116,7 +1116,7 @@ export function getAllPersistentRefs(persistenceNamespace?: string): Map<string,
     let hadUnnamed = false;
     for (const ref of refs) {
       if (ref[Deleted]) continue;
-      const name = ref[PersistentName];
+      const name = ref[PersistentId];
       if (name !== undefined) {
         const key = `${contextId}.${name}`;
         ref[SaveDataPath] = [contextId, ...name.split('.')];

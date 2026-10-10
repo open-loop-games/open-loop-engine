@@ -10,10 +10,10 @@ import {
 import { saveAndClear } from '../helpers/save-roundtrip';
 
 const TIERS = [
-  { id: 'manual', name: 'Manual', order: 0 },
-  { id: 'basic', name: 'Basic Auto', order: 1 },
-  { id: 'conditional', name: 'Conditionals', order: 2 },
-  { id: 'priority', name: 'Priorities', order: 3 },
+  { id: 'manual', displayName: 'Manual', order: 0 },
+  { id: 'basic', displayName: 'Basic Auto', order: 1 },
+  { id: 'conditional', displayName: 'Conditionals', order: 2 },
+  { id: 'priority', displayName: 'Priorities', order: 3 },
 ];
 
 describe('AutomationTiers', () => {
@@ -29,9 +29,9 @@ describe('AutomationTiers', () => {
   it('creates with tiers sorted by order', () => {
     const at = createAutomationTiers({
       tiers: [
-        { id: 'c', name: 'C', order: 2 },
-        { id: 'a', name: 'A', order: 0 },
-        { id: 'b', name: 'B', order: 1 },
+        { id: 'c', displayName: 'C', order: 2 },
+        { id: 'a', displayName: 'A', order: 0 },
+        { id: 'b', displayName: 'B', order: 1 },
       ],
     });
     expect(at.tiers.map((t) => t.id)).toEqual(['a', 'b', 'c']);
@@ -58,8 +58,8 @@ describe('AutomationTiers', () => {
     expect(() =>
       createAutomationTiers({
         tiers: [
-          { id: 'basic', name: 'Basic', order: 0 },
-          { id: 'basic', name: 'Basic II', order: 1 },
+          { id: 'basic', displayName: 'Basic', order: 0 },
+          { id: 'basic', displayName: 'Basic II', order: 1 },
         ],
       }),
     ).toThrow(/duplicate automation tier id "basic"/);
@@ -163,8 +163,8 @@ describe('AutomationTiers', () => {
   it('auto-unlocks tier when requirement is immediately true', () => {
     const at = createAutomationTiers({
       tiers: [
-        { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, unlockWhen: () => true },
+        { id: 'manual', displayName: 'Manual', order: 0 },
+        { id: 'basic', displayName: 'Basic', order: 1, unlockWhen: () => true },
       ],
     });
     expect(at.isUnlocked('basic')).toBe(true);
@@ -175,8 +175,8 @@ describe('AutomationTiers', () => {
     const flag = ref(false);
     const at = createAutomationTiers({
       tiers: [
-        { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
+        { id: 'manual', displayName: 'Manual', order: 0 },
+        { id: 'basic', displayName: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     expect(at.isUnlocked('basic')).toBe(false);
@@ -191,8 +191,8 @@ describe('AutomationTiers', () => {
     const flag = ref(false);
     const at = createAutomationTiers({
       tiers: [
-        { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
+        { id: 'manual', displayName: 'Manual', order: 0 },
+        { id: 'basic', displayName: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     const events: string[] = [];
@@ -209,8 +209,8 @@ describe('AutomationTiers', () => {
     const flag = ref(false);
     const at = createAutomationTiers({
       tiers: [
-        { id: 'manual', name: 'Manual', order: 0 },
-        { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
+        { id: 'manual', displayName: 'Manual', order: 0 },
+        { id: 'basic', displayName: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
     expect(at.isUnlocked('basic')).toBe(false);
@@ -226,17 +226,17 @@ describe('AutomationTiers', () => {
 });
 
 describe('AutomationTiers — a met requirement is a level, not an edge', () => {
-  const BASIC = { id: 'basic', name: 'Basic', order: 1 };
-  const EXTRA = { id: 'extra', name: 'Extra', order: 2 };
+  const BASIC = { id: 'basic', displayName: 'Basic', order: 1 };
+  const EXTRA = { id: 'extra', displayName: 'Extra', order: 2 };
 
   /** One session: gold registers before the tiers, as a module's resources do. */
-  function buildSession(tierDefs: { id: string; name: string; order: number }[]) {
+  function buildSession(tierDefs: { id: string; displayName: string; order: number }[]) {
     const events: string[] = [];
     return withPersistentContext('m', () => {
-      const gold = persistent<number>(0, { name: 'gold' });
+      const gold = persistent<number>(0, { id: 'gold' });
       const tiers = createAutomationTiers({
         tiers: [
-          { id: 'manual', name: 'Manual', order: 0 },
+          { id: 'manual', displayName: 'Manual', order: 0 },
           ...tierDefs.map((t) => ({ ...t, unlockWhen: () => gold.value >= 10 })),
         ],
       });

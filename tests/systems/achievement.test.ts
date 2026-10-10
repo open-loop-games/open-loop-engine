@@ -186,7 +186,7 @@ describe('Achievement — a load restores state, it does not earn', () => {
   function buildSession(ids: string[]) {
     const log: string[] = [];
     return withPersistentContext('m', () => {
-      const gold = persistent<number>(0, { name: 'gold' });
+      const gold = persistent<number>(0, { id: 'gold' });
       const achievements = createAchievementCategory<{ id: string }>({
         id: 'ach',
         mapAchievement: (def) => ({

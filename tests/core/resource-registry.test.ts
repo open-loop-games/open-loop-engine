@@ -51,16 +51,16 @@ describe('engine-scoped resource registry', () => {
     engine.stop();
   });
 
-  it('findByName returns the registered resource', () => {
+  it('findByDisplayName returns the registered resource', () => {
     const engine = testEngine('reg-find');
     engine.use(goldModule('gold'));
     engine.start();
 
     const registry = engine.tryInject(ResourceRegistryKey)!;
-    const gold = registry.findByName('gold');
+    const gold = registry.findByDisplayName('gold');
     expect(gold).toBeDefined();
     expect(gold!.displayName).toBe('gold');
-    expect(registry.findByName('nonexistent')).toBeUndefined();
+    expect(registry.findByDisplayName('nonexistent')).toBeUndefined();
 
     engine.stop();
   });

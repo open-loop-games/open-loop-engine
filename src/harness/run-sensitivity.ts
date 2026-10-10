@@ -43,9 +43,9 @@ import type {
  * @example Fixed-tick
  * ```ts
  * const result = runSensitivity({
- *   baseline: { name: 'baseline', setup: () => [createGoldTracker()], tick, ticks: 1000 },
+ *   baseline: { id: 'baseline', setup: () => [createGoldTracker()], tick, ticks: 1000 },
  *   variants: [
- *     { name: 'fast-gold', patch: (b) => ({ ...b, setup: () => [createFastGoldTracker()] }) },
+ *     { id: 'fast-gold', patch: (b) => ({ ...b, setup: () => [createFastGoldTracker()] }) },
  *   ],
  *   seeds: [1, 2, 3],
  * });
@@ -57,9 +57,9 @@ import type {
  * as an `UntilCell`, so name the shape; axis values reach `patch` untyped.
  * ```ts
  * const result = runSensitivity<UntilCell>({
- *   baseline: { name: 'baseline', buildEngine: (ctx) => buildEngine(ctx) },
+ *   baseline: { id: 'baseline', buildEngine: (ctx) => buildEngine(ctx) },
  *   axes: [{
- *     name: 'meta-cost',
+ *     id: 'meta-cost',
  *     values: [0.85, 1.15],
  *     patch: (b, v) => ({
  *       ...b,
@@ -110,7 +110,7 @@ function expandVariants<C extends Cell | UntilCell>(config: SensitivityConfig<C>
     const next: AxisEntry[][] = [];
     for (const prefix of product) {
       for (const value of axis.values) {
-        next.push([...prefix, { axisName: axis.name, value, patch: axis.patch }]);
+        next.push([...prefix, { axisName: axis.id, value, patch: axis.patch }]);
       }
     }
     product.length = 0;
@@ -121,7 +121,7 @@ function expandVariants<C extends Cell | UntilCell>(config: SensitivityConfig<C>
   for (const combo of product) {
     const name = combo.map((e) => `${e.axisName}=${String(e.value)}`).join(' × ');
     out.push({
-      name,
+      id: name,
       patch: (baseline) => {
         let cell = baseline;
         for (const entry of combo) {
@@ -144,7 +144,7 @@ function runFixedTickPath(
   config: SensitivityConfig<Cell>,
   variants: Variant<Cell>[],
 ): SensitivityResult {
-  const variantCells: Cell[] = variants.map((v) => ({ ...v.patch(config.baseline), name: v.name }));
+  const variantCells: Cell[] = variants.map((v) => ({ ...v.patch(config.baseline), id: v.id }));
   const cells: Cell[] = [config.baseline, ...variantCells];
   const matrix = runMatrix({
     cells,
@@ -156,7 +156,7 @@ function runFixedTickPath(
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
     const cell = matrix.cells[i + 1];
-    return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
+    return { id: v.id, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
   });
   return { baseline: baselineResult, variants: variantResults };
 }
@@ -178,7 +178,7 @@ function runUntilPath<C extends Cell | UntilCell>(
   const untilVariants = variants as unknown as Variant<UntilCell>[];
   const variantCells: UntilCell[] = untilVariants.map((v) => ({
     ...v.patch(untilBaseline),
-    name: v.name,
+    id: v.id,
   }));
   const cells: UntilCell[] = [untilBaseline, ...variantCells];
   const matrix = runMatrixUntil({
@@ -196,7 +196,7 @@ function runUntilPath<C extends Cell | UntilCell>(
   const baselineResult = matrix.cells[0];
   const variantResults: SensitivityVariantResult[] = variants.map((v, i) => {
     const cell = matrix.cells[i + 1];
-    return { name: v.name, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
+    return { id: v.id, cell, deltas: diffAggregates(cell.aggregate, baselineResult.aggregate) };
   });
   return { baseline: baselineResult, variants: variantResults };
 }

@@ -30,7 +30,7 @@ import {
   deferHydration,
   filterDefaultedRefs,
   withPersistenceNamespace,
-  PersistentName,
+  PersistentId,
   DefaultValue,
   SaveDataPath,
   type Persistent,
@@ -139,7 +139,7 @@ export interface SaveManagerConfig {
    * Display name for the default slot (id 0). Default: 'Autosave'. Only a
    * label: the engine's autosave writes the active slot, not slot 0.
    */
-  defaultSlotName?: string;
+  defaultSlotDisplayName?: string;
   /** Maximum number of save slots. Default: 10 */
   maxSlots?: number;
   /**
@@ -184,7 +184,7 @@ export interface SavePeek {
 /** A named save slot */
 export interface SaveSlot {
   id: number;
-  name: string;
+  displayName: string;
 }
 
 /**
@@ -309,11 +309,11 @@ export interface SaveManager extends Emittable<SaveEvents> {
   /** All save slots (id + name) */
   readonly slots: readonly SaveSlot[];
   /** Create a new slot. Returns the new slot's ID. */
-  createSlot(name?: string): number;
+  createSlot(displayName?: string): number;
   /** Delete a slot by ID. Throws if it's the active slot. */
   deleteSlot(slotId: number): void;
   /** Rename a slot */
-  renameSlot(slotId: number, name: string): void;
+  renameSlot(slotId: number, displayName: string): void;
   /** Switch the active slot. save/load/peek/etc. will operate on this slot. */
   selectSlot(slotId: number): void;
   /** Peek any slot's metadata without switching or deserializing */
@@ -335,7 +335,7 @@ export interface SaveManager extends Emittable<SaveEvents> {
    */
   releaseSlot(slotId: number): void;
   /** Find a slot by name. Returns the slot or undefined if not found. */
-  findSlotByName(name: string): SaveSlot | undefined;
+  findSlotByDisplayName(name: string): SaveSlot | undefined;
   /** Set a callback that provides metadata to include in save envelopes. */
   setMetadataProvider(fn: () => Record<string, unknown>): void;
 
@@ -441,7 +441,7 @@ function migrateIndexToNamed(
       const ref = contextRefs[i];
       const oldVal = (bucket as Record<string, unknown>)[String(i)];
       if (oldVal === undefined) continue;
-      const newKey = ref[PersistentName] ?? ref[SaveDataPath]![1];
+      const newKey = ref[PersistentId] ?? ref[SaveDataPath]![1];
       if (!looseTypeMatch(ref[DefaultValue], oldVal)) {
         console.warn(
           `[save] Legacy key migration type mismatch at "${contextId}.${i}" → "${contextId}.${newKey}": ` +
@@ -542,7 +542,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     persistenceNamespace,
     saveVersion: version = 1,
     migrations = {},
-    defaultSlotName = 'Autosave',
+    defaultSlotDisplayName = 'Autosave',
     maxSlots = 10,
     strictValidation = isDev(),
     compressSave = true,
@@ -611,7 +611,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     const legacyKey = `${storagePrefix}-save`;
     const legacyData = storage.getItem(legacyKey);
     if (legacyData && _slots.length === 0) {
-      _slots.push({ id: 0, name: defaultSlotName });
+      _slots.push({ id: 0, displayName: defaultSlotDisplayName });
       storage.setItem(slotStorageKey(0), legacyData);
       storage.removeItem(legacyKey);
       saveSlotIndex();
@@ -624,7 +624,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
 
   // Ensure default slot exists
   if (_slots.length === 0) {
-    _slots.push({ id: 0, name: defaultSlotName });
+    _slots.push({ id: 0, displayName: defaultSlotDisplayName });
     saveSlotIndex();
   }
 
@@ -860,7 +860,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     }
     const nextId = Math.max(..._slots.map((s) => s.id)) + 1;
     const slotName = name ?? `Save ${nextId}`;
-    _slots.push({ id: nextId, name: slotName });
+    _slots.push({ id: nextId, displayName: slotName });
     saveSlotIndex();
     return nextId;
   }
@@ -938,7 +938,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
     renameSlot(slotId: number, name: string): void {
       const slot = _slots.find((s) => s.id === slotId);
       if (!slot) throw new Error(`Save slot ${slotId} not found`);
-      slot.name = name;
+      slot.displayName = name;
       saveSlotIndex();
     },
 
@@ -966,8 +966,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       _protectedSlots.delete(slotId);
     },
 
-    findSlotByName(name: string): SaveSlot | undefined {
-      return _slots.find((s) => s.name === name);
+    findSlotByDisplayName(name: string): SaveSlot | undefined {
+      return _slots.find((s) => s.displayName === name);
     },
 
     setMetadataProvider(fn: () => Record<string, unknown>): void {

@@ -69,8 +69,8 @@ export interface TimeSystem {
 export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
   const contextId = resolveSystemPersistentContextId(config.id, 'time');
   const { elapsed, totalPlayTime } = withPersistentContext(contextId, () => ({
-    elapsed: persistent(0, { name: 'elapsed' }),
-    totalPlayTime: persistent(0, { name: 'totalPlayTime', lifetime: true }),
+    elapsed: persistent(0, { id: 'elapsed' }),
+    totalPlayTime: persistent(0, { id: 'totalPlayTime', lifetime: true }),
   }));
   const time: TimeSystem = {
     elapsed,

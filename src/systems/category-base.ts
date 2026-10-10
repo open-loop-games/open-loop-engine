@@ -19,8 +19,8 @@ import {
   withPersistentContext,
   deletePersistentContextRefs,
   isPersistent,
-  setPersistentName,
-  PersistentName,
+  setPersistentId,
+  PersistentId,
 } from '@/core/persistence';
 import type { Grant } from '@/core/modifier';
 import { runInEffectScope } from '@/core/common';
@@ -207,8 +207,8 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
         // context (`${categoryId}/${def.id}`), so the field name alone is unique.
         if (state !== null && typeof state === 'object') {
           for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
-            if (isPersistent(value) && value[PersistentName] === undefined) {
-              setPersistentName(value, fieldName);
+            if (isPersistent(value) && value[PersistentId] === undefined) {
+              setPersistentId(value, fieldName);
             }
           }
         }
@@ -320,7 +320,7 @@ export function setupDeclarativeBindings(
         ? grant.description
         : `${role}/${grant.description}`;
     for (const chain of grantChains(grant))
-      chain.bind({ active: composedActive, modifier, description });
+      chain.bind({ active: composedActive, modifier, text: description });
   }
 }
 

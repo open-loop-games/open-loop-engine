@@ -26,7 +26,7 @@ import type { Cell, RunContext } from './types';
  * `perturb` hook, and the analyzer factory used by every run of this cell.
  */
 export interface CreateSensitivityCellOptions {
-  name: string;
+  id: string;
   /** Exported save string — treated as an immutable snapshot across runs. */
   saveText: string;
   /**
@@ -113,7 +113,7 @@ let runCounter = 0;
  */
 export function createSensitivityCell(options: CreateSensitivityCellOptions): Cell {
   const {
-    name,
+    id: name,
     saveText,
     modules,
     perturb,
@@ -166,7 +166,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
   };
 
   return {
-    name,
+    id: name,
     setup,
     tick: tickAdapter,
     teardown,

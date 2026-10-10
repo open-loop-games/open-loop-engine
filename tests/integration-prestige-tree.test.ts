@@ -527,11 +527,11 @@ describe('Integration: Prestige Tree layer chain', () => {
       let superPrestigeCount = 0;
 
       const tracker: Analyzer = {
-        name: 'prestige-tracker',
+        id: 'prestige-tracker',
         onTick: () => {},
         onEnd: () => {},
         summarize: () => ({
-          name: 'prestige-tracker',
+          id: 'prestige-tracker',
           metrics: { prestiges: prestigeCount, superPrestiges: superPrestigeCount },
         }),
       };

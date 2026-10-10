@@ -32,10 +32,10 @@ describe('Integration: simple idle game loop', () => {
       getRate: () => Decimal.dZero,
     };
 
-    const cond: ICondition = { type: 'resource', target: 'gold', operator: 'gte', value: 0.5 };
+    const cond: ICondition = { kind: 'resource', target: 'gold', operator: 'gte', value: 0.5 };
     expect(evaluateCondition(cond, accessor)).toBe(true);
 
-    const effect: IEffect = { type: 'resource', target: 'gold', operation: 'multiply', value: 2 };
+    const effect: IEffect = { kind: 'resource', target: 'gold', operation: 'multiply', value: 2 };
     const resolved = resolveEffect(effect, accessor);
     expect(resolved).toHaveLength(1);
     expect(resolved[0].operation).toBe('multiply');
@@ -50,10 +50,10 @@ describe('Integration: simple idle game loop', () => {
   it('headless with analyzer tracks metrics', () => {
     let tickGold = 0;
     const tracker: Analyzer = {
-      name: 'gold-tracker',
+      id: 'gold-tracker',
       onTick: () => {},
       onEnd: () => {},
-      summarize: () => ({ name: 'gold-tracker', metrics: { maxGold: tickGold } }),
+      summarize: () => ({ id: 'gold-tracker', metrics: { maxGold: tickGold } }),
     };
     runHeadless({
       setup: () => [tracker],

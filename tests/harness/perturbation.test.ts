@@ -638,7 +638,7 @@ describe('applyPerturbation — tunable source', () => {
     engine.start();
 
     const reg = [...engine.tryInject(TuningRegistriesKey)!].find(
-      (r) => r.name === 'producer-tuning',
+      (r) => r.id === 'producer-tuning',
     )!;
     const read = () => reg.get('upgrades/foo/cost')();
 
@@ -676,9 +676,7 @@ describe('applyPerturbation — tunable source', () => {
     engine.use(mod);
     engine.start();
 
-    const reg = [...engine.tryInject(TuningRegistriesKey)!].find(
-      (r) => r.name === 'balance-tuning',
-    )!;
+    const reg = [...engine.tryInject(TuningRegistriesKey)!].find((r) => r.id === 'balance-tuning')!;
     const read = () => reg.get('threshold')();
     const entry = walkTunables(engine).find((e) => e.key === 'threshold')!;
 
@@ -692,7 +690,7 @@ describe('applyPerturbation — tunable source', () => {
   });
 
   it('perturbing a scratch engine does not stomp the live engine', () => {
-    // Cross-engine safety check: TunablePickerAddress holds a registryName
+    // Cross-engine safety check: TunablePickerAddress holds a registryId
     // string (not a registry reference). applyPerturbation resolves the
     // registry against whichever engine it's called on. Live registry stays
     // untouched when the scratch fork is perturbed.
@@ -726,9 +724,9 @@ describe('applyPerturbation — tunable source', () => {
     const entry = walkTunables(live).find((e) => e.key === 'foo')!;
     expect(entry).toBeDefined();
 
-    const liveReg = [...live.tryInject(TuningRegistriesKey)!].find((r) => r.name === 'iso-tuning')!;
+    const liveReg = [...live.tryInject(TuningRegistriesKey)!].find((r) => r.id === 'iso-tuning')!;
     const scratchReg = [...scratch.tryInject(TuningRegistriesKey)!].find(
-      (r) => r.name === 'iso-tuning',
+      (r) => r.id === 'iso-tuning',
     )!;
     expect(liveReg).not.toBe(scratchReg);
     const readLive = () => liveReg.get('foo')();

@@ -123,7 +123,7 @@ export function createRoundRobinStrategy<M = void>(
   getCandidates: () => SequencerItem<M>[],
 ): FillStrategy<M> {
   const contextId = `strategy:${id}`;
-  const index = withPersistentContext(contextId, () => persistent<number>(0, { name: 'index' }));
+  const index = withPersistentContext(contextId, () => persistent<number>(0, { id: 'index' }));
 
   const strategy: FillStrategy<M> = {
     next() {

@@ -267,7 +267,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   // but order-dependent — see `persistentContextId`.
   const driverContextId = config.persistentContextId ?? `tick-driver_${++tickDriverCounter}`;
   const accumulator = withPersistentContext(driverContextId, () =>
-    persistent<number>(0, { name: 'accumulator' }),
+    persistent<number>(0, { id: 'accumulator' }),
   );
 
   const timers: TimerProvider = config.timerProvider ?? {

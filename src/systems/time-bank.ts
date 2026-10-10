@@ -108,7 +108,7 @@ export function createTimeBank(config: TimeBankConfig = {}): TimeBank {
   const { earnEfficiency = 1, capacity: cap } = config;
   const bankContextId = resolveSystemPersistentContextId(config.id, 'time-bank');
   const banked = withPersistentContext(bankContextId, () =>
-    persistent<number>(0, { name: 'banked' }),
+    persistent<number>(0, { id: 'banked' }),
   );
 
   const bank: TimeBank = {

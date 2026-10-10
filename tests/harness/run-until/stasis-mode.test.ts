@@ -90,7 +90,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       const challenges = createChallengeCategory({ id: 'trials', accessor });
       challenges.register({
         id: 'bronze',
-        name: 'Bronze',
+        displayName: 'Bronze',
         // FlagCondition → opaque-predicate distance, no computable horizon.
         canEnter: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,

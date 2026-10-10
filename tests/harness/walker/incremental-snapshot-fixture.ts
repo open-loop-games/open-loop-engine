@@ -136,14 +136,14 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
       trials.register([
         {
           id: 'bronze',
-          name: 'Bronze',
+          displayName: 'Bronze',
           visible: { kind: 'resource-gte', resource: 'gold', value: 10 },
           canEnter: {
             kind: 'all',
             of: [
               { kind: 'resource-gte', resource: 'gems', value: 5 },
               { kind: 'flag', id: 'bronze-unlock' },
-              { kind: 'state', key: 'trial.seen', operator: 'eq', value: true },
+              { kind: 'state', path: 'trial.seen', operator: 'eq', value: true },
             ],
           },
           goal: { kind: 'resource-gte', resource: 'gems', value: 10 },
@@ -151,13 +151,13 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
         },
         {
           id: 'silver',
-          name: 'Silver',
+          displayName: 'Silver',
           canEnter: { kind: 'flag', id: 'silver-unlock' },
           goal: {
             kind: 'any',
             of: [
               { kind: 'resource-gte', resource: 'gold', value: 500 },
-              { kind: 'state', key: 'trial.retired', operator: 'eq', value: true },
+              { kind: 'state', path: 'trial.retired', operator: 'eq', value: true },
             ],
           },
         },

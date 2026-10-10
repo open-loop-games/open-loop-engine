@@ -82,7 +82,7 @@ describe('OverrideRegistry', () => {
 
   it('exposes its name', () => {
     const reg = createOverrideRegistry<Record<string, () => number>>('producer-tuning');
-    expect(reg.name).toBe('producer-tuning');
+    expect(reg.id).toBe('producer-tuning');
   });
 });
 
@@ -91,7 +91,7 @@ describe('createTuningRegistry', () => {
     const reg = createTuningRegistry('producer-tuning');
     reg.setDefault('foo', () => 42);
     expect(reg.get('foo')()).toBe(42);
-    expect(reg.name).toBe('producer-tuning');
+    expect(reg.id).toBe('producer-tuning');
   });
 
   it('auto-registers into the ambient set when called within withTuningRegistries', () => {
@@ -101,7 +101,7 @@ describe('createTuningRegistry', () => {
       createTuningRegistry('b');
     });
     expect(set.size).toBe(2);
-    expect([...set].map((r) => r.name).sort()).toEqual(['a', 'b']);
+    expect([...set].map((r) => r.id).sort()).toEqual(['a', 'b']);
   });
 
   it('silently skips registration when called outside withTuningRegistries', () => {
@@ -122,8 +122,8 @@ describe('createTuningRegistry', () => {
       });
       createTuningRegistry('outer-b');
     });
-    expect([...outer].map((r) => r.name).sort()).toEqual(['outer-a', 'outer-b']);
-    expect([...inner].map((r) => r.name)).toEqual(['inner-a']);
+    expect([...outer].map((r) => r.id).sort()).toEqual(['outer-a', 'outer-b']);
+    expect([...inner].map((r) => r.id)).toEqual(['inner-a']);
   });
 });
 
@@ -189,7 +189,7 @@ describe('tunable pilot: Purchasable effect routed through registry', () => {
     const reg = createOverrideRegistry<Record<string, () => Decimal>>('tuning');
 
     beginPersistentContext('pilot-purchasable');
-    const amount = persistent<number>(3, { name: 'amount' });
+    const amount = persistent<number>(3, { id: 'amount' });
     endPersistentContext();
 
     // Consumer-side wiring: the `effect` passed into createPurchasable is a

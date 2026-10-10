@@ -34,7 +34,7 @@ function buildTestEngine(state: TestState): Engine {
  *  (via the shared module-level capture below). */
 function makeCell(name: string, stateSink: Map<number, TestState>, tickDelta = 0.1): UntilCell {
   return {
-    name,
+    id: name,
     buildEngine: ({ seed }) => {
       const state: TestState = { tick: 0, lastDt: 0 };
       stateSink.set(seed, state);
@@ -47,9 +47,9 @@ function makeCell(name: string, stateSink: Map<number, TestState>, tickDelta = 0
 /** Trivial analyzer that records final tick count per run. */
 function createTickRecorder(state: TestState): Analyzer {
   return {
-    name: 'tick-recorder',
+    id: 'tick-recorder',
     summarize: (): AnalyzerResult => ({
-      name: 'tick-recorder',
+      id: 'tick-recorder',
       metrics: { finalTick: state.tick },
     }),
   };
@@ -60,7 +60,7 @@ describe('runMatrixUntil', () => {
     const stops: string[] = [];
     let built = 0;
     const cell: UntilCell = {
-      name: 'leaky',
+      id: 'leaky',
       buildEngine: ({ seed }) => {
         const state: TestState = { tick: 0, lastDt: 0 };
         const id = `run-${seed}-${built++}`;
@@ -86,7 +86,7 @@ describe('runMatrixUntil', () => {
   it('runs the cell teardown once per run, after onRunComplete, on the run it built', () => {
     const events: string[] = [];
     const cell: UntilCell = {
-      name: 'disposable',
+      id: 'disposable',
       buildEngine: ({ seed }) => {
         const engine = {
           id: seed,
@@ -118,7 +118,7 @@ describe('runMatrixUntil', () => {
   it('disposes each run engine after onRunComplete when the cell passes no teardown', () => {
     const events: string[] = [];
     const cell: UntilCell = {
-      name: 'default-dispose',
+      id: 'default-dispose',
       buildEngine: ({ seed }) =>
         ({
           tickDriver: { advanceTime: () => {} },
@@ -141,7 +141,7 @@ describe('runMatrixUntil', () => {
       runMatrixUntil({
         cells: [
           {
-            name: 'throws',
+            id: 'throws',
             buildEngine: () =>
               ({
                 tickDriver: {
@@ -167,7 +167,7 @@ describe('runMatrixUntil', () => {
       runMatrixUntil({
         cells: [
           {
-            name: 'draws-at-build',
+            id: 'draws-at-build',
             buildEngine: ({ seed }) => {
               draws.set(seed, random());
               return buildTestEngine({ tick: 0, lastDt: 0 });
@@ -213,7 +213,7 @@ describe('runMatrixUntil', () => {
     const result = runMatrixUntil({
       cells: [
         {
-          name: 'fast',
+          id: 'fast',
           buildEngine: ({ seed }) => {
             const state: TestState = { tick: 0, lastDt: 0 };
             sinkA.set(seed, state);
@@ -222,7 +222,7 @@ describe('runMatrixUntil', () => {
           tickDelta: 0.1,
         },
         {
-          name: 'slow',
+          id: 'slow',
           buildEngine: ({ seed }) => {
             const state: TestState = { tick: 0, lastDt: 0 };
             sinkB.set(seed, state);
@@ -273,7 +273,7 @@ describe('runMatrixUntil', () => {
     const result = runMatrixUntil({
       cells: [
         {
-          name: 'a',
+          id: 'a',
           buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           tickDelta: 0.1,
         },
@@ -311,7 +311,7 @@ describe('runMatrixUntil', () => {
     const result = runMatrixUntil({
       cells: [
         {
-          name: 'a',
+          id: 'a',
           buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           tickDelta: 0.1,
         },
@@ -335,8 +335,8 @@ describe('runMatrixUntil', () => {
     const cellEvents: string[] = [];
     runMatrixUntil({
       cells: [
-        { name: 'a', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
-        { name: 'b', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
+        { id: 'a', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
+        { id: 'b', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
       ],
       seeds: [10, 20],
       until: ({ iteration: tick }) => tick >= 1,
@@ -345,7 +345,7 @@ describe('runMatrixUntil', () => {
         runEvents.push([item.cellIdx, item.seedIdx]);
         expect(result.terminated).toBe('predicate');
       },
-      onCellComplete: (cell: CellResult) => cellEvents.push(cell.name),
+      onCellComplete: (cell: CellResult) => cellEvents.push(cell.id),
     });
     expect(runEvents).toEqual([
       [0, 0],
@@ -361,7 +361,7 @@ describe('runMatrixUntil', () => {
     const result = runMatrixUntil({
       cells: [
         {
-          name: 'a',
+          id: 'a',
           buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }),
           analyzers: (engine, ctx) => {
             seenSeeds.push(ctx.seed);
@@ -386,7 +386,7 @@ describe('runMatrixUntil', () => {
 
   it('synthesizes an empty result for cells with zero seeds', () => {
     const result = runMatrixUntil({
-      cells: [{ name: 'empty', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }) }],
+      cells: [{ id: 'empty', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }) }],
       seeds: [],
       until: () => true,
       maxSimTime: 1,
@@ -402,7 +402,7 @@ describe('runMatrixUntil', () => {
 
   it('runMatrix output still omits termination fields (no regression)', () => {
     const result = runMatrix({
-      cells: [{ name: 'a', setup: () => [], tick: () => {}, ticks: 3 }],
+      cells: [{ id: 'a', setup: () => [], tick: () => {}, ticks: 3 }],
       seeds: [1, 2],
     });
     const agg = result.cells[0]!.aggregate;

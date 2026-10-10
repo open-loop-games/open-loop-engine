@@ -78,7 +78,7 @@ export function compareState(
  * @internal
  */
 export function evaluateCondition(condition: ICondition, accessor: GameStateAccessor): boolean {
-  switch (condition.type) {
+  switch (condition.kind) {
     case 'resource':
       return compareDecimal(
         accessor.getAmount(condition.target),
@@ -88,11 +88,7 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
     case 'flag':
       return accessor.getFlag(condition.target);
     case 'state':
-      return compareState(
-        accessor.getStateAt(condition.target),
-        condition.operator,
-        condition.value,
-      );
+      return compareState(accessor.getStateAt(condition.path), condition.operator, condition.value);
     case 'all':
       return condition.conditions.every((c) => evaluateCondition(c, accessor));
     case 'any':
@@ -103,7 +99,7 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
 }
 
 function collectDependencies(condition: ICondition, deps: string[]): void {
-  switch (condition.type) {
+  switch (condition.kind) {
     case 'resource':
       deps.push(`resources.${condition.target}.amount`);
       break;
@@ -111,7 +107,7 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
       deps.push(`flags.${condition.target}`);
       break;
     case 'state':
-      deps.push(condition.target);
+      deps.push(condition.path);
       break;
     case 'all':
     case 'any':
@@ -153,21 +149,21 @@ export const C = {
     operator: ResourceCondition['operator'],
     value: DecimalSource,
   ): ResourceCondition {
-    return { type: 'resource', target, operator, value };
+    return { kind: 'resource', target, operator, value };
   },
   flag(target: string): FlagCondition {
-    return { type: 'flag', target };
+    return { kind: 'flag', target };
   },
-  state(target: string, operator: StateCondition['operator'], value: unknown): StateCondition {
-    return { type: 'state', target, operator, value };
+  state(path: string, operator: StateCondition['operator'], value: unknown): StateCondition {
+    return { kind: 'state', path: path, operator, value };
   },
   all(...conditions: ICondition[]): AllCondition {
-    return { type: 'all', conditions };
+    return { kind: 'all', conditions };
   },
   any(...conditions: ICondition[]): AnyCondition {
-    return { type: 'any', conditions };
+    return { kind: 'any', conditions };
   },
   not(condition: ICondition): NotCondition {
-    return { type: 'not', condition };
+    return { kind: 'not', condition };
   },
 };

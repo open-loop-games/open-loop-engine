@@ -67,7 +67,7 @@ export function runBeatProbe(config: BeatProbeOptions): BeatResult[] {
     let engineForPredicate: Engine | undefined;
 
     const cell: UntilCell = {
-      name: beat.id,
+      id: beat.id,
       tickDelta,
       buildEngine: (ctx) => {
         const engine = config.buildEngine(ctx);

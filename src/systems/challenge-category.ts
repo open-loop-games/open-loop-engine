@@ -69,7 +69,7 @@ export interface ChallengeDef<
   >,
 > {
   id: string;
-  name: string;
+  displayName: string;
 
   /**
    * Visibility gate — hidden challenges don't appear in UI. Default: `true`
@@ -383,8 +383,8 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
     }
 
     if (def.contentPatches) {
-      for (const [registryName, patches] of Object.entries(def.contentPatches)) {
-        const reg = contentRegistries[registryName];
+      for (const [registryId, patches] of Object.entries(def.contentPatches)) {
+        const reg = contentRegistries[registryId];
         if (reg) {
           cleanups.push(reg.pushPatches(patches));
         }
@@ -426,8 +426,8 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
         );
       }
 
-      const active = persistent<boolean>(false, { name: 'entered', lifetime: true });
-      const completions = persistent<number>(0, { name: 'completions', lifetime: true });
+      const active = persistent<boolean>(false, { id: 'entered', lifetime: true });
+      const completions = persistent<number>(0, { id: 'completions', lifetime: true });
       const limit = def.completionLimit ?? 1;
 
       const completed = computed(() => completions.value > 0);

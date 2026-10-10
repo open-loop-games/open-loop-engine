@@ -173,7 +173,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   beginPersistentContext(contextId);
   const stateRef: Persistent<SerializedDialogAdapter> = persistent<SerializedDialogAdapter>(
     { activeGraphId: undefined, activeNodeId: undefined, visitCounts: {} },
-    { name: 'state', lifetime: true },
+    { id: 'state', lifetime: true },
   );
   endPersistentContext();
 

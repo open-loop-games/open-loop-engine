@@ -210,7 +210,7 @@ export interface ModDef {
   /** Unique identifier stored in the save */
   id: string;
   /** Display name for the mod picker UI */
-  name: string;
+  displayName: string;
   /** Optional description shown in the mod picker */
   description?: string;
   /** Highlight this mod in the picker (e.g., "Recommended") */

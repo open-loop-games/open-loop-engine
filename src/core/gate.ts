@@ -69,7 +69,7 @@ export interface ActiveGate {
  */
 export interface StateGate {
   kind: 'state';
-  key: string;
+  path: string;
   operator: StateCondition['operator'];
   value: unknown;
 }
@@ -141,8 +141,9 @@ export type Predicate = Computable<boolean> | Gate;
 
 /**
  * Type guard for {@link Gate}. Discriminates a Gate object from
- * `Computable<boolean>` (boolean / Ref / getter) and from `ICondition`
- * (which has a `type` discriminant, not `kind`).
+ * `Computable<boolean>` (boolean / Ref / getter). An `ICondition` shares
+ * several `kind` values, so this guard cannot tell the two apart; only a
+ * {@link Predicate} reaches it, and an `ICondition` is never one.
  *
  * Used by adoption sites that accept {@link Predicate} fields to dispatch on
  * the Gate arm before falling through to the computable branch.
@@ -253,17 +254,17 @@ export function forEachGateLeaf(
 export function gateToCondition(gate: Gate): ICondition {
   switch (gate.kind) {
     case 'resource-gte':
-      return { type: 'resource', target: gate.resource, operator: 'gte', value: gate.value };
+      return { kind: 'resource', target: gate.resource, operator: 'gte', value: gate.value };
     case 'state':
-      return { type: 'state', target: gate.key, operator: gate.operator, value: gate.value };
+      return { kind: 'state', path: gate.path, operator: gate.operator, value: gate.value };
     case 'flag':
-      return { type: 'flag', target: gate.id };
+      return { kind: 'flag', target: gate.id };
     case 'all':
-      return { type: 'all', conditions: gate.of.map(gateToCondition) };
+      return { kind: 'all', conditions: gate.of.map(gateToCondition) };
     case 'any':
-      return { type: 'any', conditions: gate.of.map(gateToCondition) };
+      return { kind: 'any', conditions: gate.of.map(gateToCondition) };
     case 'not':
-      return { type: 'not', condition: gateToCondition(gate.of) };
+      return { kind: 'not', condition: gateToCondition(gate.of) };
     case 'count-gte':
     case 'active':
     case 'cumulative-gte':

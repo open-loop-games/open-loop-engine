@@ -414,10 +414,10 @@ describe('createCycleLog', () => {
   it('log.on(finalized, ...) delivers one onRunFinalize call per cycle over a headless run', () => {
     const entries: CycleLogEntry[] = [];
     const loopAnalyzer: Analyzer = {
-      name: 'cycle-counter',
+      id: 'cycle-counter',
       onRunFinalize: (entry) => entries.push(entry as CycleLogEntry),
       summarize: () => ({
-        name: 'cycle-counter',
+        id: 'cycle-counter',
         metrics: { cycles: entries.length },
       }),
     };
@@ -425,11 +425,11 @@ describe('createCycleLog', () => {
     // Separate tick-only analyzer to verify coexistence with cycle-aware analyzers
     let tickCount = 0;
     const tickAnalyzer: Analyzer = {
-      name: 'ticker',
+      id: 'ticker',
       onTick: () => {
         tickCount++;
       },
-      summarize: () => ({ name: 'ticker', metrics: { ticks: tickCount } }),
+      summarize: () => ({ id: 'ticker', metrics: { ticks: tickCount } }),
     };
 
     const { registerTick } = createManualTicks();
@@ -462,9 +462,9 @@ describe('createCycleLog', () => {
   it('unsubscribe returned by log.on removes the finalized subscription', () => {
     const entries: CycleLogEntry[] = [];
     const analyzer: Analyzer = {
-      name: 'x',
+      id: 'x',
       onRunFinalize: (entry) => entries.push(entry as CycleLogEntry),
-      summarize: () => ({ name: 'x', metrics: {} }),
+      summarize: () => ({ id: 'x', metrics: {} }),
     };
 
     const { registerTick } = createManualTicks();
@@ -486,8 +486,8 @@ describe('createCycleLog — the baseline follows loads and resets', () => {
   function build() {
     const { registerTick } = createManualTicks();
     return withPersistentContext('m', () => {
-      const strength = persistent<number>(0, { name: 'strength', lifetime: true });
-      const gold = persistent<number>(0, { name: 'gold' });
+      const strength = persistent<number>(0, { id: 'strength', lifetime: true });
+      const gold = persistent<number>(0, { id: 'gold' });
       const cycle = createCycle({ registerTick });
       const log = createCycleLog({ cycle, metrics: { strength, gold } });
       return { strength, gold, cycle, log };
@@ -531,8 +531,8 @@ describe('createCycleLog — the baseline follows loads and resets', () => {
   it('a load that leaves a metric at its value keeps its growth so far', () => {
     const { registerTick } = createManualTicks();
     const { a, cycle, log } = withPersistentContext('parts', () => {
-      const a = persistent<number>(0, { name: 'a' });
-      const b = persistent<number>(0, { name: 'b' });
+      const a = persistent<number>(0, { id: 'a' });
+      const b = persistent<number>(0, { id: 'b' });
       const cycle = createCycle({ registerTick });
       const log = createCycleLog({ cycle, metrics: { power: () => a.value + b.value } });
       return { a, cycle, log };

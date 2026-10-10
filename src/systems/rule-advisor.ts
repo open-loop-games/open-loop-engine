@@ -46,7 +46,7 @@ import type { CycleLog, CycleLogEntry } from './cycle-log';
  */
 export interface Suggestion<TPayload = unknown> {
   /** Stable identity for dismissal + inferred-acceptance tracking. */
-  key: string;
+  id: string;
   /** Sort tier in the default ranker (warnings beat infos). */
   severity: 'info' | 'warning';
   /** Human-readable summary text. Caller-formatted. */
@@ -192,7 +192,7 @@ export interface RuleAdvisorEvents<TPayload> {
   /** Fired after each `reevaluate()` with the new visible suggestion list. */
   suggestionsUpdated: (suggestions: readonly Suggestion<TPayload>[]) => void;
   /** Fired when `dismiss(key)` is called for a key not already dismissed. */
-  dismissed: (key: string) => void;
+  dismissed: (id: string) => void;
   /**
    * Fired when a `reevaluate()` finds the analyzers no longer produce one or
    * more previously-visible, undismissed keys — the inferred-acceptance
@@ -237,7 +237,7 @@ export interface RuleAdvisor<TPayload> {
    * immediately — the next-ranked suggestion from the last `reevaluate`
    * takes its slot — and emits `'dismissed'`.
    */
-  dismiss(key: string): void;
+  dismiss(id: string): void;
 
   /**
    * Clear the dismissal set AND the last-visible-keys cache. Use when the
@@ -364,10 +364,10 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
 
   function project(cap: number): void {
     visible.value = capList(
-      ranked.filter((s) => !dismissed.has(s.key)),
+      ranked.filter((s) => !dismissed.has(s.id)),
       cap,
     );
-    lastVisibleKeys = visible.value.map((s) => s.key);
+    lastVisibleKeys = visible.value.map((s) => s.id);
   }
 
   function reevaluate(trigger?: string): readonly Suggestion<TPayload>[] {
@@ -388,7 +388,7 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
 
     // Acceptance means the analyzers stopped producing the key; one a
     // higher-ranked suggestion pushed below the cap is still being produced.
-    const producedKeys = new Set(merged.map((s) => s.key));
+    const producedKeys = new Set(merged.map((s) => s.id));
 
     const acceptedKeys: string[] = [];
     for (const key of lastVisibleKeys) {

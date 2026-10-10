@@ -66,7 +66,7 @@ export function runMatrix(config: MatrixConfig): MatrixResult {
     ) {
       const runs = perCellRuns[item.cellIdx];
       const cellResult: CellResult = {
-        name: cell.name,
+        id: cell.id,
         runs,
         aggregate: aggregateCell(runs, config.aggregate),
       };
@@ -80,7 +80,7 @@ export function runMatrix(config: MatrixConfig): MatrixResult {
   const cells: CellResult[] = config.cells.map(
     (cell, i) =>
       cellResults[i] ?? {
-        name: cell.name,
+        id: cell.id,
         runs: perCellRuns[i],
         aggregate: { metrics: {} },
       },

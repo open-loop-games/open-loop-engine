@@ -31,7 +31,7 @@
  * Storage and the ambient triad are factored into {@link ./named-registry}.
  * Chain and effect-system are direct {@link NamedRegistry} aliases; the
  * resource registry wraps a NamedRegistry of entries because its public
- * lookup surface (`list` / `findByName` / `findById`) differs and each
+ * lookup surface (`list` / `findByDisplayName` / `findById`) differs and each
  * entry carries the persistence context that created it.
  *
  * @cluster registries
@@ -203,7 +203,7 @@ export interface ResourceRegistry {
    * O(n) — display-name lookup is a debug / discovery convenience, not a
    * hot path.
    */
-  findByName(displayName: string): Resource | undefined;
+  findByDisplayName(displayName: string): Resource | undefined;
   /** The resource registered under `id` ({@link Resource.id}), or `undefined`. */
   findById(id: string): Resource | undefined;
 }
@@ -243,7 +243,7 @@ export function createResourceRegistry(): ResourceRegistry {
     list() {
       return inner.all();
     },
-    findByName(displayName) {
+    findByDisplayName(displayName) {
       return inner.all().find((e) => e.resource.displayName === displayName)?.resource;
     },
     findById(id) {

@@ -19,7 +19,7 @@ import { gateToCondition, type Gate } from './gate';
 /** A fully resolved effect with all formulas evaluated — ready for mutation. */
 export interface ResolvedEffect {
   /** Discriminant matching the source IEffect type ('resource', 'flag', 'state'). */
-  type: string;
+  kind: string;
   /** ID of the resource, flag, or state path being mutated. */
   target: string;
   /** The operation to apply ('add', 'subtract', 'set', etc.). */
@@ -68,20 +68,20 @@ export function resolveEffect(
   effect: IEffectInternal,
   accessor: GameStateAccessor,
 ): ResolvedEffect[] {
-  switch (effect.type) {
+  switch (effect.kind) {
     case 'resource':
       return [
         {
-          type: 'resource',
+          kind: 'resource',
           target: effect.target,
           operation: effect.operation,
           value: resolveValue(effect.value),
         },
       ];
     case 'flag':
-      return [{ type: 'flag', target: effect.target, operation: 'set', value: effect.value }];
+      return [{ kind: 'flag', target: effect.target, operation: 'set', value: effect.value }];
     case 'state':
-      return [{ type: 'state', target: effect.target, operation: 'set', value: effect.value }];
+      return [{ kind: 'state', target: effect.path, operation: 'set', value: effect.value }];
     case 'composite':
       return effect.effects.flatMap((e) => resolveEffect(e, accessor));
     case 'branch': {
@@ -105,7 +105,7 @@ export function applyEffect(
   accessor: GameStateAccessor,
   mutator: GameStateMutator,
 ): void {
-  switch (effect.type) {
+  switch (effect.kind) {
     case 'composite':
       for (const child of effect.effects) applyEffect(child, accessor, mutator);
       return;
@@ -121,7 +121,7 @@ export function applyEffect(
       mutator.setFlag(effect.target, effect.value);
       return;
     case 'state':
-      mutator.setStateAt(effect.target, effect.value);
+      mutator.setStateAt(effect.path, effect.value);
       return;
   }
 }
@@ -149,16 +149,16 @@ export const E = {
     operation: ResourceEffect['operation'],
     value: DecimalSource | { evaluate(): DecimalSource },
   ): ResourceEffect {
-    return { type: 'resource', target, operation, value };
+    return { kind: 'resource', target, operation, value };
   },
   flag(target: string, value = true): FlagEffect {
-    return { type: 'flag', target, value };
+    return { kind: 'flag', target, value };
   },
-  state(target: string, value: unknown): StateEffect {
-    return { type: 'state', target, value };
+  state(path: string, value: unknown): StateEffect {
+    return { kind: 'state', path: path, value };
   },
   composite(...effects: IEffect[]): CompositeEffect {
-    return { type: 'composite', effects };
+    return { kind: 'composite', effects };
   },
   /**
    * Build a conditional effect — `then` applies when `gate` evaluates true,
@@ -180,7 +180,7 @@ export const E = {
    */
   branch(gate: Gate, then: IEffect, otherwise?: IEffect): IEffect {
     return {
-      type: 'branch',
+      kind: 'branch',
       condition: gateToCondition(gate),
       then,
       else: otherwise,

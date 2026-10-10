@@ -51,7 +51,7 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 /** Definition for a conditional effect, registered at startup. */
 export interface ConditionalEffectDef {
   id: string;
-  name?: string;
+  displayName?: string;
   /**
    * Reactive predicate controlling whether bindings are applied.
    * System watches this: `false → true` applies bindings, `true → false` removes them.

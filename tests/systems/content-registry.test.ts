@@ -17,7 +17,7 @@ describe('ContentRegistry', () => {
 
   it('creates a registry with the given name', () => {
     const reg = make();
-    expect(reg.name).toBe('test');
+    expect(reg.id).toBe('test');
   });
 
   it('starts empty', () => {

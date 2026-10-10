@@ -45,8 +45,8 @@ describe('walkTunables', () => {
     }
 
     const fooCost = entries.find((e) => e.key === 'foo/cost')!;
-    expect(fooCost.registryName).toBe('archetype-a');
-    expect(fooCost.address.registryName).toBe('archetype-a');
+    expect(fooCost.registryId).toBe('archetype-a');
+    expect(fooCost.address.registryId).toBe('archetype-a');
 
     engine.stop();
   });
@@ -70,7 +70,7 @@ describe('walkTunables', () => {
     engine.start();
 
     const registries = engine.tryInject(TuningRegistriesKey)!;
-    const reg = [...registries].find((r) => r.name === 'scoped')!;
+    const reg = [...registries].find((r) => r.id === 'scoped')!;
     const cleanup = reg.pushOverrides('challenge', {
       'scope-only/key': () => 999,
     });

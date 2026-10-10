@@ -385,10 +385,10 @@ export function createRecommendationSystem(
   const contextId = resolveSystemPersistentContextId(id, 'recommendation');
   const { storedRecommendation, autoApply } = withPersistentContext(contextId, () => ({
     storedRecommendation: persistent<SerializedRecommendation | null>(null, {
-      name: 'storedRecommendation',
+      id: 'storedRecommendation',
       lifetime: true,
     }),
-    autoApply: persistent<boolean>(false, { name: 'autoApply', lifetime: true }),
+    autoApply: persistent<boolean>(false, { id: 'autoApply', lifetime: true }),
   }));
 
   const handle = createEmitHandle<RecommendationSystemEvents>();

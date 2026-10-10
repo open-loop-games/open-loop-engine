@@ -22,8 +22,8 @@ the typed cross-category accumulator the engine self-publishes for external intr
 
 generic typed registry with scoped push/pop, plus the typed `TuningRegistry` narrow that opts a registry into the picker's tuning-surface enumeration
 
-- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(name: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:173`
-- `function createTuningRegistry(name: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:274`
+- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(id: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:173`
+- `function createTuningRegistry(id: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:274`
 - `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:81`
 - `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:402`
 - `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:158`

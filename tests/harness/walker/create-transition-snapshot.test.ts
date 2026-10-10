@@ -135,7 +135,7 @@ function buildMergeEngine(gameId: string, accessor: GameStateAccessor) {
       });
       challenges.register({
         id: 'bronze',
-        name: 'Bronze',
+        displayName: 'Bronze',
         canEnter: { kind: 'resource-gte', resource: 'gems', value: 5 }, // gems rate 1/s → 5s
         goal: { kind: 'resource-gte', resource: 'gems', value: 10 },
       });
@@ -220,7 +220,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
         const challenges = createChallengeCategory({ id: 'trials', accessor });
         challenges.register({
           id: 'bronze',
-          name: 'Bronze',
+          displayName: 'Bronze',
           canEnter: { kind: 'resource-gte', resource: 'gems', value: 5 },
           goal: () => false,
         });

@@ -135,7 +135,7 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
   const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/${id}` : id;
   return withPersistentContext(contextId, (): TimedProgressState => ({
-    progress: persistent<DecimalSource>(0, { name: 'progress' }),
+    progress: persistent<DecimalSource>(0, { id: 'progress' }),
     contextId,
   }));
 }

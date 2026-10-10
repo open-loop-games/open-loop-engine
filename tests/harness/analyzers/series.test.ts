@@ -34,8 +34,8 @@ describe('createTimeSeriesAnalyzer', () => {
   it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
     const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
     const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
-    expect(createTimeSeriesAnalyzer(prestige).name).toBe('series:prestige-points');
-    expect(createTimeSeriesAnalyzer(transcend).name).toBe('series:transcend-points');
+    expect(createTimeSeriesAnalyzer(prestige).id).toBe('series:prestige-points');
+    expect(createTimeSeriesAnalyzer(transcend).id).toBe('series:transcend-points');
   });
 
   it('zero-tick run reports a single-point series', () => {

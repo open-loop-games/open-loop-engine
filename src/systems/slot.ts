@@ -185,7 +185,7 @@ export function createSlot(options: SlotOptions): Slot {
   // --- Persistence ---
   const contextId = `slot:${id}`;
   const _selected = withPersistentContext(contextId, () =>
-    persistent<string[]>([], { name: 'selected' }),
+    persistent<string[]>([], { id: 'selected' }),
   );
 
   // --- Events ---

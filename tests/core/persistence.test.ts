@@ -11,8 +11,8 @@ import {
   createDefStates,
   getPersistentRefs,
   getPersistentContextRefs,
-  setPersistentName,
-  PersistentName,
+  setPersistentId,
+  PersistentId,
   isAtDefault,
   filterDefaultedRefs,
   resetAllPersistentContexts,
@@ -170,7 +170,7 @@ describe('Persistence', () => {
       // must reach it, or consumers storing a small struct in one ref get
       // strings back and break on the first Decimal method call.
       beginPersistentContext('test-nested-decimal');
-      const stats = persistent({ hp: new Decimal(10), mana: new Decimal(5) }, { name: 'stats' });
+      const stats = persistent({ hp: new Decimal(10), mana: new Decimal(5) }, { id: 'stats' });
       endPersistentContext();
 
       stats.value = { hp: new Decimal(99), mana: new Decimal('1e42') };
@@ -192,7 +192,7 @@ describe('Persistence', () => {
       // so a homogeneous Decimal array round-trips even when it grows past the
       // default's length.
       beginPersistentContext('test-nested-decimal-array');
-      const bag = persistent<Decimal[]>([new Decimal(0)], { name: 'bag' });
+      const bag = persistent<Decimal[]>([new Decimal(0)], { id: 'bag' });
       endPersistentContext();
 
       bag.value = [new Decimal(1), new Decimal(2), new Decimal('1e9')];
@@ -212,7 +212,7 @@ describe('Persistence', () => {
   describe('DecimalSource refs with a number default', () => {
     it('revives a Decimal saved under a number default, past the number range too', () => {
       beginPersistentContext('test-decimalsource-number-default');
-      const xp = persistent<DecimalSource>(0, { name: 'xp' });
+      const xp = persistent<DecimalSource>(0, { id: 'xp' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -228,7 +228,7 @@ describe('Persistence', () => {
 
     it('keeps a plain number a number, and non-finite markers numbers', () => {
       beginPersistentContext('test-decimalsource-plain');
-      const n = persistent<DecimalSource>(0, { name: 'n' });
+      const n = persistent<DecimalSource>(0, { id: 'n' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -243,7 +243,7 @@ describe('Persistence', () => {
 
     it('leaves non-numeric text under a number default as text', () => {
       beginPersistentContext('test-number-default-text');
-      const tag = persistent<number | string>(0, { name: 'tag' });
+      const tag = persistent<number | string>(0, { id: 'tag' });
       endPersistentContext();
 
       tag.value = 'boss';
@@ -262,11 +262,11 @@ describe('Persistence', () => {
     // collapsing `modA::gold` and `modB::gold` to the same save key.
     it('two contexts sharing a tail id stay distinct in the unnamespaced case', () => {
       beginPersistentContext('strip-modA::gold');
-      const aRef = persistent(bn(0), { name: 'cumulative' });
+      const aRef = persistent(bn(0), { id: 'cumulative' });
       endPersistentContext();
 
       beginPersistentContext('strip-modB::gold');
-      const bRef = persistent(bn(0), { name: 'cumulative' });
+      const bRef = persistent(bn(0), { id: 'cumulative' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -279,7 +279,7 @@ describe('Persistence', () => {
     it('only the recorded namespace prefix is stripped, not arbitrary `::`', () => {
       withPersistenceNamespace('strip-ns', () => {
         beginPersistentContext('modX::gold');
-        const ref = persistent(bn(0), { name: 'cumulative' });
+        const ref = persistent(bn(0), { id: 'cumulative' });
         endPersistentContext();
 
         const refs = getAllPersistentRefs('strip-ns');
@@ -291,15 +291,15 @@ describe('Persistence', () => {
   describe('stable named keys', () => {
     it('persistent({ name }) stores the name on the ref', () => {
       beginPersistentContext('test-named-basic');
-      const p = persistent(0, { name: 'score' });
+      const p = persistent(0, { id: 'score' });
       endPersistentContext();
-      expect(p[PersistentName]).toBe('score');
+      expect(p[PersistentId]).toBe('score');
     });
 
     it('getAllPersistentRefs keys named refs as `${context}.${name}`', () => {
       beginPersistentContext('test-named-keys');
-      persistent(0, { name: 'score' });
-      persistent(false, { name: 'alive' });
+      persistent(0, { id: 'score' });
+      persistent(false, { id: 'alive' });
       endPersistentContext();
 
       const refs = getAllPersistentRefs();
@@ -310,8 +310,8 @@ describe('Persistence', () => {
     it('reordering named persistent() calls preserves save round-trip', () => {
       // Build v1: count then label
       beginPersistentContext('test-reorder');
-      const count1 = persistent(0, { name: 'count' });
-      const label1 = persistent('', { name: 'label' });
+      const count1 = persistent(0, { id: 'count' });
+      const label1 = persistent('', { id: 'label' });
       endPersistentContext();
       count1.value = 42;
       label1.value = 'hello';
@@ -324,8 +324,8 @@ describe('Persistence', () => {
       refs?.clear();
 
       beginPersistentContext('test-reorder');
-      const label2 = persistent('', { name: 'label' });
-      const count2 = persistent(0, { name: 'count' });
+      const label2 = persistent('', { id: 'label' });
+      const count2 = persistent(0, { id: 'count' });
       endPersistentContext();
 
       deserializePersistents(getAllPersistentRefs(), snapshot);
@@ -334,36 +334,36 @@ describe('Persistence', () => {
       expect(label2.value).toBe('hello');
     });
 
-    it('setPersistentName throws on collision within a context', () => {
+    it('setPersistentId throws on collision within a context', () => {
       beginPersistentContext('test-collision');
-      const a = persistent(0, { name: 'score' });
+      const a = persistent(0, { id: 'score' });
       const b = persistent(0);
       endPersistentContext();
 
-      expect(() => setPersistentName(b, 'score')).toThrow(/collision.*test-collision.*score/);
+      expect(() => setPersistentId(b, 'score')).toThrow(/collision.*test-collision.*score/);
       // a retains its name
-      expect(a[PersistentName]).toBe('score');
+      expect(a[PersistentId]).toBe('score');
     });
 
-    it('setPersistentName is idempotent for the same name', () => {
+    it('setPersistentId is idempotent for the same name', () => {
       beginPersistentContext('test-idempotent');
-      const p = persistent(0, { name: 'x' });
+      const p = persistent(0, { id: 'x' });
       endPersistentContext();
-      expect(() => setPersistentName(p, 'x')).not.toThrow();
-      expect(p[PersistentName]).toBe('x');
+      expect(() => setPersistentId(p, 'x')).not.toThrow();
+      expect(p[PersistentId]).toBe('x');
     });
 
     it('renaming frees the old name for reuse', () => {
       beginPersistentContext('test-rename');
-      const a = persistent(0, { name: 'foo' });
+      const a = persistent(0, { id: 'foo' });
       const b = persistent(0);
       endPersistentContext();
 
-      setPersistentName(a, 'bar');
+      setPersistentId(a, 'bar');
       // 'foo' is now free
-      expect(() => setPersistentName(b, 'foo')).not.toThrow();
-      expect(a[PersistentName]).toBe('bar');
-      expect(b[PersistentName]).toBe('foo');
+      expect(() => setPersistentId(b, 'foo')).not.toThrow();
+      expect(a[PersistentId]).toBe('bar');
+      expect(b[PersistentId]).toBe('foo');
     });
 
     it('unnamed refs fall back to iteration-index keys with a dev warning', () => {
@@ -509,8 +509,8 @@ describe('default-value pruning', () => {
 
   it('filterDefaultedRefs drops defaulted entries and keeps mutated ones', () => {
     beginPersistentContext('prune-filter');
-    persistent(0, { name: 'def' });
-    const set = persistent(0, { name: 'set' });
+    persistent(0, { id: 'def' });
+    const set = persistent(0, { id: 'set' });
     endPersistentContext();
     set.value = 42;
 
@@ -796,7 +796,7 @@ describe('save-key shape', () => {
 
     resetAllPersistentContexts();
     withPersistentContext('mod', () => {
-      persistent(2, { name: 'gold' });
+      persistent(2, { id: 'gold' });
       persistent(1);
     });
     expect([...getAllPersistentRefs().keys()].sort()).toEqual(['mod.0', 'mod.gold']);

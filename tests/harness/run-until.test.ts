@@ -70,7 +70,7 @@ function createLifecycleAnalyzer(): Analyzer {
   let ends = 0;
   const tickIndices: number[] = [];
   return {
-    name: 'lifecycle',
+    id: 'lifecycle',
     onStart: () => {
       starts += 1;
     },
@@ -82,7 +82,7 @@ function createLifecycleAnalyzer(): Analyzer {
       ends += 1;
     },
     summarize: (): AnalyzerResult => ({
-      name: 'lifecycle',
+      id: 'lifecycle',
       metrics: {
         starts,
         ticks,

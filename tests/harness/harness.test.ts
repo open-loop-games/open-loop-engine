@@ -20,12 +20,12 @@ function createCounterAnalyzer(): Analyzer {
   let ticks = 0;
   let summarized = 0;
   return {
-    name: 'counter',
+    id: 'counter',
     onTick: () => {
       ticks += 1;
     },
     summarize: (): AnalyzerResult => ({
-      name: 'counter',
+      id: 'counter',
       metrics: { ticks, summarize: ++summarized },
     }),
   };
@@ -40,7 +40,7 @@ function fixedMetricCell(
   analyzers: () => Analyzer[] = () => [],
 ): Cell {
   return {
-    name,
+    id: name,
     setup: () => analyzers(),
     tick: () => {},
     ticks: metric,
@@ -81,7 +81,7 @@ function runWithMetric(
   return {
     totalTicks: 0,
     elapsedSimulated: 0,
-    analyzerResults: [{ name, metrics }],
+    analyzerResults: [{ id: name, metrics }],
   };
 }
 
@@ -156,8 +156,8 @@ describe('aggregateCell', () => {
         totalTicks: 0,
         elapsedSimulated: 0,
         analyzerResults: [
-          { name: 'a', metrics: { x: 10 } },
-          { name: 'b', metrics: { x: 100 } },
+          { id: 'a', metrics: { x: 10 } },
+          { id: 'b', metrics: { x: 100 } },
         ],
       },
     ];
@@ -245,7 +245,7 @@ describe('runMatrix', () => {
       cells: [fixedMetricCell('a', 1), fixedMetricCell('b', 1)],
       seeds: [10, 20],
       onRunComplete: (item: WorkItem) => runEvents.push([item.cellIdx, item.seedIdx]),
-      onCellComplete: (cell: CellResult) => cellEvents.push(cell.name),
+      onCellComplete: (cell: CellResult) => cellEvents.push(cell.id),
     });
     expect(runEvents).toEqual([
       [0, 0],
@@ -274,10 +274,10 @@ describe('runMatrix', () => {
     runMatrix({
       cells: [
         {
-          name: 'probe',
+          id: 'probe',
           setup: ({ seed }) => {
             const analyzer = createCounterAnalyzer();
-            seen.push({ name: analyzer.name, seed });
+            seen.push({ name: analyzer.id, seed });
             return [analyzer];
           },
           tick: () => {},
@@ -315,14 +315,14 @@ describe('runSensitivity', () => {
     const result = runSensitivity({
       baseline,
       variants: [
-        { name: 'double', patch: (b) => ({ ...b, ticks: b.ticks * 2 }) },
-        { name: 'half', patch: (b) => ({ ...b, ticks: b.ticks / 2 }) },
+        { id: 'double', patch: (b) => ({ ...b, ticks: b.ticks * 2 }) },
+        { id: 'half', patch: (b) => ({ ...b, ticks: b.ticks / 2 }) },
       ],
       seeds: [1, 2, 3],
     });
     expect(result.baseline.aggregate.metrics['counter.ticks']!.avg).toBe(10);
     expect(result.variants).toHaveLength(2);
-    expect(result.variants[0]!.name).toBe('double');
+    expect(result.variants[0]!.id).toBe('double');
     expect(result.variants[0]!.deltas['counter.ticks']).toEqual({
       absolute: 10,
       relative: 1,
@@ -335,10 +335,10 @@ describe('runSensitivity', () => {
   it('forces variant cell names to match the Variant.name', () => {
     const result = runSensitivity({
       baseline: fixedMetricCell('baseline', 1),
-      variants: [{ name: 'forced-label', patch: (b) => ({ ...b, name: 'ignored' }) }],
+      variants: [{ id: 'forced-label', patch: (b) => ({ ...b, id: 'ignored' }) }],
       seeds: [1],
     });
-    expect(result.variants[0]!.cell.name).toBe('forced-label');
+    expect(result.variants[0]!.cell.id).toBe('forced-label');
   });
 
   it('expands axes into one variant per value', () => {
@@ -347,7 +347,7 @@ describe('runSensitivity', () => {
       baseline,
       axes: [
         {
-          name: 'ticks',
+          id: 'ticks',
           values: [5, 20],
           patch: (b, v) => ({ ...b, ticks: v as number }),
         },
@@ -355,8 +355,8 @@ describe('runSensitivity', () => {
       seeds: [1],
     });
     expect(result.variants).toHaveLength(2);
-    expect(result.variants[0]!.name).toBe('ticks=5');
-    expect(result.variants[1]!.name).toBe('ticks=20');
+    expect(result.variants[0]!.id).toBe('ticks=5');
+    expect(result.variants[1]!.id).toBe('ticks=20');
   });
 
   it('expands multiple axes as a cartesian product', () => {
@@ -364,12 +364,12 @@ describe('runSensitivity', () => {
     const result = runSensitivity({
       baseline,
       axes: [
-        { name: 'a', values: [1, 2], patch: (b) => b },
-        { name: 'b', values: ['x', 'y'], patch: (b) => b },
+        { id: 'a', values: [1, 2], patch: (b) => b },
+        { id: 'b', values: ['x', 'y'], patch: (b) => b },
       ],
       seeds: [1],
     });
-    expect(result.variants.map((v) => v.name)).toEqual([
+    expect(result.variants.map((v) => v.id)).toEqual([
       'a=1 × b=x',
       'a=1 × b=y',
       'a=2 × b=x',
@@ -381,11 +381,11 @@ describe('runSensitivity', () => {
     const baseline = fixedMetricCell('baseline', 10);
     const result = runSensitivity({
       baseline,
-      variants: [{ name: 'flat', patch: (b) => b }],
-      axes: [{ name: 'axis', values: [1, 2], patch: (b) => b }],
+      variants: [{ id: 'flat', patch: (b) => b }],
+      axes: [{ id: 'axis', values: [1, 2], patch: (b) => b }],
       seeds: [1],
     });
-    expect(result.variants.map((v) => v.name)).toEqual(['flat', 'axis=1', 'axis=2']);
+    expect(result.variants.map((v) => v.id)).toEqual(['flat', 'axis=1', 'axis=2']);
   });
 
   it('switches to predicate-bounded mode when `until` is set', () => {
@@ -402,7 +402,7 @@ describe('runSensitivity', () => {
       }) as unknown as Engine;
     let state: S = { tick: 0 };
     const baseline: UntilCell = {
-      name: 'baseline',
+      id: 'baseline',
       buildEngine: () => {
         state = { tick: 0 };
         return buildEngine(1);
@@ -413,7 +413,7 @@ describe('runSensitivity', () => {
       baseline,
       variants: [
         {
-          name: 'fast',
+          id: 'fast',
           patch: (b) => ({
             ...b,
             buildEngine: () => {
@@ -452,7 +452,7 @@ describe('runSensitivity', () => {
 
   it('throws when until is set without maxSimTime', () => {
     const baseline: UntilCell = {
-      name: 'baseline',
+      id: 'baseline',
       buildEngine: () => ({ tickDriver: { advanceTime: () => {} } }) as unknown as Engine,
     };
     expect(() =>

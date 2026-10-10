@@ -51,18 +51,18 @@ export interface CategoryEntryVisit {
 }
 
 interface WalkableCategory {
-  readonly registry: { readonly name: string };
+  readonly registry: { readonly id: string };
   getAll(): ReadonlyArray<{ readonly def: { readonly id: string } }>;
 }
 
 function isWalkableCategory(value: unknown): value is WalkableCategory {
   if (!value || typeof value !== 'object') return false;
   const v = value as Partial<WalkableCategory>;
-  const registry = v.registry as { name?: unknown } | undefined;
+  const registry = v.registry as { id?: unknown } | undefined;
   return (
     typeof registry === 'object' &&
     registry !== null &&
-    typeof registry.name === 'string' &&
+    typeof registry.id === 'string' &&
     typeof v.getAll === 'function'
   );
 }
@@ -87,7 +87,7 @@ export function forEachCategoryEntry(
     if (!Array.isArray(slice)) continue;
     for (const maybeCategory of slice) {
       if (!isWalkableCategory(maybeCategory)) continue;
-      const categoryId = maybeCategory.registry.name;
+      const categoryId = maybeCategory.registry.id;
       for (const entity of maybeCategory.getAll()) {
         visitor({ categoryKey: key, categoryId, defId: entity.def.id, entry: entity });
       }

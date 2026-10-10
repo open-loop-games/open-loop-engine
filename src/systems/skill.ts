@@ -229,10 +229,10 @@ function buildSkillState(
   const contextId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
   return withPersistentContext(contextId, () => ({
     contextId,
-    xp: persistent<DecimalSource>(0, { name: 'xp' }),
+    xp: persistent<DecimalSource>(0, { id: 'xp' }),
     lifetimeBonus: isLevelDriven
       ? null
-      : persistent<DecimalSource>(0, { name: 'lifetimeBonus', lifetime: true }),
+      : persistent<DecimalSource>(0, { id: 'lifetimeBonus', lifetime: true }),
   }));
 }
 

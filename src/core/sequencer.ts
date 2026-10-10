@@ -417,10 +417,10 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // === PERSISTENT STATE ===
 
   const { current, rawItems, paused, rawCursor } = withPersistentContext(id, () => ({
-    current: persistent<string>('', { name: 'current' }),
-    rawItems: persistent<string>('', { name: 'rawItems' }),
-    paused: persistent<boolean>(false, { name: 'paused' }),
-    rawCursor: isList ? persistent<number>(0, { name: 'rawCursor' }) : null,
+    current: persistent<string>('', { id: 'current' }),
+    rawItems: persistent<string>('', { id: 'rawItems' }),
+    paused: persistent<boolean>(false, { id: 'paused' }),
+    rawCursor: isList ? persistent<number>(0, { id: 'rawCursor' }) : null,
   }));
 
   // === ITEMS VIEW + SERIALIZATION ===

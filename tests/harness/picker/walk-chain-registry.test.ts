@@ -55,7 +55,7 @@ describe('walkChainRegistry', () => {
     expect(entries[0].address).toMatchObject({
       walker: 'chain-registry',
       chainId: 'empty-chain',
-      variant: 'chain-apply',
+      kind: 'chain-apply',
     });
     expect(entries[0].indexInChain).toBe(-1);
 

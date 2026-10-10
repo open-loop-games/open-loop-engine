@@ -34,14 +34,14 @@ export function walkTunables(engine: Engine): TunablePickerEntry[] {
     for (const key of registry.getBaseKeys()) {
       entries.push({
         kind: 'tunable',
-        registryName: registry.name,
+        registryId: registry.id,
         key,
         address: {
           walker: 'tunable',
-          registryName: registry.name,
+          registryId: registry.id,
           key,
         },
-        label: `${registry.name}/${key}`,
+        label: `${registry.id}/${key}`,
       });
     }
   }

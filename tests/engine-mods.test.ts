@@ -28,10 +28,10 @@ describe('engine mod support', () => {
       gameId: 'test',
       persistence: false,
       mods: [
-        { id: 'vanilla', name: 'Vanilla', modules: [{ id: 'vanilla-mod', install() {} }] },
+        { id: 'vanilla', displayName: 'Vanilla', modules: [{ id: 'vanilla-mod', install() {} }] },
         {
           id: 'omsi',
-          name: 'OMSI',
+          displayName: 'OMSI',
           recommended: true,
           modules: [{ id: 'omsi-mod', install() {} }],
         },
@@ -51,7 +51,7 @@ describe('engine mod support', () => {
     const engine = createEngine({
       gameId: 'test',
       persistence: false,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
     });
     engine.selectMod('omsi');
     expect(engine.activeModId).toBe('omsi');
@@ -66,7 +66,7 @@ describe('engine mod support', () => {
     const engine = createEngine({
       gameId: 'test',
       persistence: false,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
     });
     engine.start();
     expect(() => engine.selectMod('omsi')).toThrow('Cannot select mod after start()');
@@ -91,7 +91,7 @@ describe('engine mod support', () => {
     const engine = createEngine({
       gameId: 'test',
       persistence: false,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [baseMod, omsiMod] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [baseMod, omsiMod] }],
     });
     engine.selectMod('omsi');
     engine.start();
@@ -114,7 +114,7 @@ describe('engine mod support', () => {
       mods: [
         {
           id: 'omsi',
-          name: 'OMSI',
+          displayName: 'OMSI',
           modules: [
             {
               id: 'omsi-mod',
@@ -141,7 +141,7 @@ describe('engine mod support', () => {
       mods: [
         {
           id: 'omsi',
-          name: 'OMSI',
+          displayName: 'OMSI',
           modules: [
             {
               id: 'omsi-zones',
@@ -174,8 +174,8 @@ describe('engine mod support', () => {
       gameId: 'test',
       persistence: false,
       mods: [
-        { id: 'omsi', name: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] },
-        { id: 'lloyd', name: 'Lloyd', modules: [{ id: 'lloyd-mod', install() {} }] },
+        { id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] },
+        { id: 'lloyd', displayName: 'Lloyd', modules: [{ id: 'lloyd-mod', install() {} }] },
       ],
     });
     engine.selectMod('omsi');
@@ -203,7 +203,7 @@ describe('engine mod support', () => {
     const engine = createEngine({
       gameId: 'test',
       persistence: false,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [baseMod, omsiMod] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [baseMod, omsiMod] }],
     });
     engine.selectMod('omsi');
     engine.start();
@@ -225,7 +225,7 @@ describe('engine mod support', () => {
     const engine = createEngine({
       gameId: 'test',
       storageAdapter: storage,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
     });
     engine.selectMod('omsi');
     engine.start();
@@ -240,7 +240,7 @@ describe('engine mod support', () => {
     const engine2 = createEngine({
       gameId: 'test',
       storageAdapter: storage,
-      mods: [{ id: 'omsi', name: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
+      mods: [{ id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] }],
     });
     const peek = engine2.peekSave();
     expect(peek).not.toBeNull();

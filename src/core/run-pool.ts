@@ -217,7 +217,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
   // dynamic instances created post-load pick up their saved alive state (no
   // resurrection of dead clones).
   const { aliveStates } = withPersistentContext(poolId, () => ({
-    aliveStates: persistent<Record<string, boolean>>({}, { name: 'aliveStates', lifetime: true }),
+    aliveStates: persistent<Record<string, boolean>>({}, { id: 'aliveStates', lifetime: true }),
   }));
 
   // In-memory collection state: `handleArray` holds insertion order, and

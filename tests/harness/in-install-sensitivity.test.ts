@@ -82,7 +82,7 @@ describe('in-install sensitivity integration', () => {
     const blobBefore = stripTimestamp(blob);
 
     const baseline = createSensitivityCell({
-      name: 'baseline',
+      id: 'baseline',
       saveText: blob,
       modules: () => [createToyModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
@@ -91,7 +91,7 @@ describe('in-install sensitivity integration', () => {
     });
 
     const variant = createSensitivityCell({
-      name: 'variant',
+      id: 'variant',
       saveText: blob,
       modules: () => [createToyModule()],
       perturb: (engine) => {
@@ -107,7 +107,7 @@ describe('in-install sensitivity integration', () => {
 
     const result = runSensitivity({
       baseline,
-      variants: [{ name: 'variant', patch: () => variant }],
+      variants: [{ id: 'variant', patch: () => variant }],
       seeds: [1, 2],
     });
 
@@ -172,7 +172,7 @@ describe('in-install sensitivity integration', () => {
     const blob = source.saveManager!.exportSave();
 
     const baseline = createSensitivityCell({
-      name: 'baseline',
+      id: 'baseline',
       saveText: blob,
       modules: () => [makeEmptyChainModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
@@ -181,7 +181,7 @@ describe('in-install sensitivity integration', () => {
     });
 
     const variant = createSensitivityCell({
-      name: 'variant',
+      id: 'variant',
       saveText: blob,
       modules: () => [makeEmptyChainModule()],
       perturb: (engine) => {
@@ -194,7 +194,7 @@ describe('in-install sensitivity integration', () => {
 
     const result = runSensitivity({
       baseline,
-      variants: [{ name: 'variant', patch: () => variant }],
+      variants: [{ id: 'variant', patch: () => variant }],
       seeds: [1, 2],
     });
 
@@ -263,7 +263,7 @@ describe('in-install sensitivity integration', () => {
     const blob = source.saveManager!.exportSave();
 
     const cell = createSensitivityCell({
-      name: 'cycle',
+      id: 'cycle',
       saveText: blob,
       modules: () => [createLoopGoldModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),

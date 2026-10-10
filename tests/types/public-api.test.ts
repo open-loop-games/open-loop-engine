@@ -746,13 +746,13 @@ describe('runSensitivity', () => {
     const { runSensitivity } = await import('@/harness');
     type Fn = typeof runSensitivity;
     // Calling with no type argument infers from the baseline. Both shapes type-check.
-    const cellBaseline = { name: 'b', setup: () => [], tick: () => {}, ticks: 1 };
-    const untilBaseline = { name: 'b', buildEngine: () => ({}) as Engine };
+    const cellBaseline = { id: 'b', setup: () => [], tick: () => {}, ticks: 1 };
+    const untilBaseline = { id: 'b', buildEngine: () => ({}) as Engine };
 
     expectTypeOf<Fn>().toBeFunction();
     expectTypeOf(runSensitivity({ baseline: cellBaseline, seeds: [1] })).toMatchTypeOf<{
       baseline: { aggregate: { metrics: Record<string, unknown> } };
-      variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
+      variants: ReadonlyArray<{ id: string; deltas: Record<string, unknown> }>;
     }>();
     expectTypeOf(
       runSensitivity({
@@ -763,7 +763,7 @@ describe('runSensitivity', () => {
       }),
     ).toMatchTypeOf<{
       baseline: { aggregate: { metrics: Record<string, unknown> } };
-      variants: ReadonlyArray<{ name: string; deltas: Record<string, unknown> }>;
+      variants: ReadonlyArray<{ id: string; deltas: Record<string, unknown> }>;
     }>();
   });
 
@@ -788,10 +788,10 @@ describe('runSensitivity', () => {
     // back to the default `Cell`; the documented call names `UntilCell`.
     const buildEngine = (_ctx: RunContext, _opts?: { mul: number }) => ({}) as Engine;
     expectTypeOf(runSensitivity<UntilCell>).toBeCallableWith({
-      baseline: { name: 'b', buildEngine: (ctx) => buildEngine(ctx) },
+      baseline: { id: 'b', buildEngine: (ctx) => buildEngine(ctx) },
       axes: [
         {
-          name: 'mul',
+          id: 'mul',
           values: [0.5, 2],
           patch: (b, v) => ({ ...b, buildEngine: (ctx) => buildEngine(ctx, { mul: v as number }) }),
         },

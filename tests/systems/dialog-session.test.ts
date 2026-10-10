@@ -97,7 +97,7 @@ const greetingGraph: DialogGraph = {
     {
       id: 'training',
       text: 'Rask grunts. "Show me precision first."',
-      onEnter: [{ type: 'state', target: 'rel.npc-trust.rask.tier', value: 1 }],
+      onEnter: [{ kind: 'state', path: 'rel.npc-trust.rask.tier', value: 1 }],
     },
     {
       id: 'secret',
@@ -150,7 +150,7 @@ describe('createDialogSession', () => {
       id: 'loop-with-effect',
       entry: 'a',
       nodes: [
-        { id: 'a', text: 'A', next: 'b', onEnter: [{ type: 'state', target: 'met', value: 1 }] },
+        { id: 'a', text: 'A', next: 'b', onEnter: [{ kind: 'state', path: 'met', value: 1 }] },
         { id: 'b', text: 'B', next: 'a' },
       ],
     };
@@ -309,7 +309,7 @@ describe('createDialogSession', () => {
           choices: [{ id: 'offer', text: 'Offer', visible: { kind: 'flag', id: 'offer-open' } }],
           next: 'b',
         },
-        { id: 'b', text: 'B', onEnter: [{ type: 'state', target: 'met-b', value: 1 }] },
+        { id: 'b', text: 'B', onEnter: [{ kind: 'state', path: 'met-b', value: 1 }] },
       ],
     };
     const session = buildSession([graph], { id: 'lapsed', accessor });

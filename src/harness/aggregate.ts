@@ -142,7 +142,7 @@ export function aggregateCell(runs: HeadlessResult[], options?: AggregateOptions
     for (const ar of run.analyzerResults) {
       for (const [key, value] of Object.entries(ar.metrics)) {
         if (typeof value !== 'number') continue;
-        const fullKey = `${ar.name}.${key}`;
+        const fullKey = `${ar.id}.${key}`;
         (samples[fullKey] ??= []).push(value);
       }
     }

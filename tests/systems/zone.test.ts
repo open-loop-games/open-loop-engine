@@ -14,8 +14,8 @@ describe('ZoneSystem', () => {
   it('registers initial zones', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town', order: 0 },
-        { id: 'forest', name: 'Forest', order: 1 },
+        { id: 'town', displayName: 'Town', order: 0 },
+        { id: 'forest', displayName: 'Forest', order: 1 },
       ],
     });
     expect(zs.registry.size).toBe(2);
@@ -26,8 +26,8 @@ describe('ZoneSystem', () => {
   it('defaults first zone as initially unlocked and current', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
     });
     expect(zs.unlocked.value).toEqual(['town']);
@@ -37,8 +37,8 @@ describe('ZoneSystem', () => {
   it('respects explicit initiallyUnlocked', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
       initiallyUnlocked: ['town', 'forest'],
     });
@@ -51,8 +51,8 @@ describe('ZoneSystem', () => {
   it('unlocks a zone', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
     });
     expect(zs.isUnlocked('forest')).toBe(false);
@@ -63,7 +63,7 @@ describe('ZoneSystem', () => {
 
   it('unlock is idempotent', () => {
     const zs = createZoneSystem({
-      zones: [{ id: 'town', name: 'Town' }],
+      zones: [{ id: 'town', displayName: 'Town' }],
     });
     zs.unlock('town');
     zs.unlock('town');
@@ -73,8 +73,8 @@ describe('ZoneSystem', () => {
   it('emits unlocked event', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
     });
     const unlocked: string[] = [];
@@ -93,8 +93,8 @@ describe('ZoneSystem', () => {
   it('selects an unlocked zone', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
       initiallyUnlocked: ['town', 'forest'],
     });
@@ -106,8 +106,8 @@ describe('ZoneSystem', () => {
   it('rejects selecting a locked zone', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
     });
     const result = zs.select('forest');
@@ -117,7 +117,7 @@ describe('ZoneSystem', () => {
 
   it('selecting current zone returns true without emitting', () => {
     const zs = createZoneSystem({
-      zones: [{ id: 'town', name: 'Town' }],
+      zones: [{ id: 'town', displayName: 'Town' }],
     });
     const selected: string[] = [];
     zs.on('selected', (id) => selected.push(id));
@@ -130,8 +130,8 @@ describe('ZoneSystem', () => {
   it('emits selected event with previous zone', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
       initiallyUnlocked: ['town', 'forest'],
     });
@@ -147,9 +147,9 @@ describe('ZoneSystem', () => {
   it('returns zones sorted by order', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'c', name: 'C', order: 2 },
-        { id: 'a', name: 'A', order: 0 },
-        { id: 'b', name: 'B', order: 1 },
+        { id: 'c', displayName: 'C', order: 2 },
+        { id: 'a', displayName: 'A', order: 0 },
+        { id: 'b', displayName: 'B', order: 1 },
       ],
     });
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['a', 'b', 'c']);
@@ -158,8 +158,8 @@ describe('ZoneSystem', () => {
   it('zones without order sort after those with order', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'no-order', name: 'No Order' },
-        { id: 'first', name: 'First', order: 0 },
+        { id: 'no-order', displayName: 'No Order' },
+        { id: 'first', displayName: 'First', order: 0 },
       ],
     });
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['first', 'no-order']);
@@ -168,13 +168,13 @@ describe('ZoneSystem', () => {
   it('ordered picks up a zone registered or patched after its first read', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town', order: 0 },
-        { id: 'wild', name: 'Wild', order: 1 },
+        { id: 'town', displayName: 'Town', order: 0 },
+        { id: 'wild', displayName: 'Wild', order: 1 },
       ],
     });
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['town', 'wild']);
 
-    zs.registry.register({ id: 'volcano', name: 'Volcano', order: -1 });
+    zs.registry.register({ id: 'volcano', displayName: 'Volcano', order: -1 });
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['volcano', 'town', 'wild']);
 
     zs.registry.patch('wild', { order: -5 });
@@ -184,9 +184,9 @@ describe('ZoneSystem', () => {
   it('zones without order keep registration order among themselves', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'b', name: 'B' },
-        { id: 'a', name: 'A' },
-        { id: 'first', name: 'First', order: 0 },
+        { id: 'b', displayName: 'B' },
+        { id: 'a', displayName: 'A' },
+        { id: 'first', displayName: 'First', order: 0 },
       ],
     });
     expect(zs.ordered.value.map((z) => z.id)).toEqual(['first', 'b', 'a']);
@@ -197,9 +197,9 @@ describe('ZoneSystem', () => {
   it('resets unlocked zones to initial set', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
-        { id: 'caves', name: 'Caves' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
+        { id: 'caves', displayName: 'Caves' },
       ],
       initiallyUnlocked: ['town'],
     });
@@ -214,8 +214,8 @@ describe('ZoneSystem', () => {
   it('resetUnlocks moves selection to first unlocked if current becomes locked', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
     });
     zs.unlock('forest');
@@ -229,8 +229,8 @@ describe('ZoneSystem', () => {
   it('resetUnlocks keeps selection if still unlocked', () => {
     const zs = createZoneSystem({
       zones: [
-        { id: 'town', name: 'Town' },
-        { id: 'forest', name: 'Forest' },
+        { id: 'town', displayName: 'Town' },
+        { id: 'forest', displayName: 'Forest' },
       ],
       initiallyUnlocked: ['town'],
     });
@@ -244,19 +244,19 @@ describe('ZoneSystem', () => {
 
   it('registry is accessible for mod extension', () => {
     const zs = createZoneSystem({
-      zones: [{ id: 'town', name: 'Town' }],
+      zones: [{ id: 'town', displayName: 'Town' }],
     });
-    zs.registry.register({ id: 'volcano', name: 'Volcano', order: 10 });
+    zs.registry.register({ id: 'volcano', displayName: 'Volcano', order: 10 });
     expect(zs.registry.size).toBe(2);
-    expect(zs.registry.get('volcano')?.name).toBe('Volcano');
+    expect(zs.registry.get('volcano')?.displayName).toBe('Volcano');
   });
 
   it('mods can patch zone definitions', () => {
     const zs = createZoneSystem({
-      zones: [{ id: 'town', name: 'Town', order: 0 }],
+      zones: [{ id: 'town', displayName: 'Town', order: 0 }],
     });
-    zs.registry.patch('town', { name: 'Enchanted Town' });
-    expect(zs.registry.get('town')?.name).toBe('Enchanted Town');
+    zs.registry.patch('town', { displayName: 'Enchanted Town' });
+    expect(zs.registry.get('town')?.displayName).toBe('Enchanted Town');
   });
 
   // --- Type guard ---

@@ -256,7 +256,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
   // --- Reactive state ---
   const store = withPersistentContext(id, () =>
-    persistent<Record<string, SerializedBestOfEntry | null>>({}, { name: 'store', lifetime: true }),
+    persistent<Record<string, SerializedBestOfEntry | null>>({}, { id: 'store', lifetime: true }),
   );
 
   const handle = createEmitHandle<BestOfEvents>();

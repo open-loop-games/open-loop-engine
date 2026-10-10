@@ -177,13 +177,13 @@ describe('Achievement adoption — requirement accepts Gate', () => {
 describe('ChallengeCategory adoption — visible / canEnter / goal accept Gate', () => {
   it('Gate-typed goal flips canComplete reactively', () => {
     const { result, stop } = bootstrap(() => {
-      const cat = createChallengeCategory<{ id: string; name: string; goal?: any }>({
+      const cat = createChallengeCategory<{ id: string; displayName: string; goal?: any }>({
         id: 'challenges',
         mutuallyExclusive: false,
       });
       cat.register({
         id: 'reach-50',
-        name: 'Reach 50',
+        displayName: 'Reach 50',
         goal: { kind: 'resource-gte', resource: 'points', value: 50 },
       });
       const ch = cat.getChallenge('reach-50')!;
@@ -198,13 +198,13 @@ describe('ChallengeCategory adoption — visible / canEnter / goal accept Gate',
 
   it('Gate-typed goal completes when state mutates inside install', () => {
     const { result, stop } = bootstrap((api) => {
-      const cat = createChallengeCategory<{ id: string; name: string; goal?: any }>({
+      const cat = createChallengeCategory<{ id: string; displayName: string; goal?: any }>({
         id: 'challenges',
         mutuallyExclusive: false,
       });
       cat.register({
         id: 'reach-25',
-        name: 'Reach 25',
+        displayName: 'Reach 25',
         goal: { kind: 'resource-gte', resource: 'points', value: 25 },
       });
       const ch = cat.getChallenge('reach-25')!;
@@ -223,7 +223,7 @@ describe('ChallengeCategory adoption — visible / canEnter / goal accept Gate',
       api.points.value = 5;
       const cat = createChallengeCategory<{
         id: string;
-        name: string;
+        displayName: string;
         visible?: any;
         canEnter?: any;
         goal?: () => boolean;
@@ -233,7 +233,7 @@ describe('ChallengeCategory adoption — visible / canEnter / goal accept Gate',
       });
       cat.register({
         id: 'locked',
-        name: 'Locked',
+        displayName: 'Locked',
         visible: { kind: 'resource-gte', resource: 'points', value: 10 },
         canEnter: { kind: 'resource-gte', resource: 'points', value: 10 },
       });
@@ -466,7 +466,7 @@ describe('createGateRequirement — no ambient accessor', () => {
             kind: 'all',
             of: [
               { kind: 'count-gte', category: 'producers', entry: 'farm', value: 1 },
-              { kind: 'state', key: 'phase', operator: 'eq', value: 'idle' },
+              { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
             ],
           },
         }),
@@ -637,7 +637,7 @@ describe('createPredicateResolver', () => {
   it('assert checks a Gate held elsewhere without adopting it', () => {
     const predicates = createPredicateResolver({});
     expect(() =>
-      predicates.assert({ kind: 'state', key: 'k', operator: 'eq', value: 1 }, 'node'),
+      predicates.assert({ kind: 'state', path: 'k', operator: 'eq', value: 1 }, 'node'),
     ).toThrow(/^node: .*state/);
     expect(() =>
       predicates.assert({ kind: 'not', of: { kind: 'all', of: [] } }, 'node'),
@@ -699,7 +699,7 @@ describe('Predicate fields — every arm reaches the system', () => {
       const cat = createChallengeCategory<ChallengeDef>({ id: 'trials', mutuallyExclusive: false });
       cat.register({
         id: 't',
-        name: 'T',
+        displayName: 'T',
         visible: shown,
         canEnter: () => shown.value,
         goal: shown,
@@ -751,8 +751,8 @@ describe('Predicate fields — every arm reaches the system', () => {
       tiers: createAutomationTiers({
         id: 'auto',
         tiers: [
-          { id: 'manual', name: 'Manual', order: 0 },
-          { id: 'basic', name: 'Basic', order: 1, unlockWhen: pointsGte(7) },
+          { id: 'manual', displayName: 'Manual', order: 0 },
+          { id: 'basic', displayName: 'Basic', order: 1, unlockWhen: pointsGte(7) },
         ],
       }),
     }));
@@ -882,7 +882,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
   it('challenge visible, canEnter and goal', () => {
     for (const field of ['visible', 'canEnter', 'goal'] as const) {
       const cat = createChallengeCategory<ChallengeDef>({ id: `c-${field}` });
-      expect(() => cat.register({ id: 'c', name: 'C', [field]: unwiredFlag })).toThrow(
+      expect(() => cat.register({ id: 'c', displayName: 'C', [field]: unwiredFlag })).toThrow(
         new RegExp(`challenge 'c' ${field}: `),
       );
     }
@@ -900,7 +900,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     ).toThrow(/endCondition: /);
     expect(() =>
       createAutomationTiers({
-        tiers: [{ id: 'basic', name: 'Basic', order: 0, unlockWhen: unwiredFlag }],
+        tiers: [{ id: 'basic', displayName: 'Basic', order: 0, unlockWhen: unwiredFlag }],
       }),
     ).toThrow(/automation tier 'basic' unlockWhen: /);
     expect(() =>

@@ -54,7 +54,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
   }
 
   return {
-    name,
+    id: name,
     onStart() {
       samples.length = 0;
     },
@@ -69,7 +69,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
       for (let i = 0; i < samples.length; i++) {
         metrics[`t${i}`] = samples[i]!;
       }
-      return { name, metrics };
+      return { id: name, metrics };
     },
   };
 }

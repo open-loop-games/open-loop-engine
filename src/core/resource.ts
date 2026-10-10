@@ -188,9 +188,9 @@ export function createResource<T>(
 export function createPersistentContextScopedResource<T>(
   defaultValue: T & SerializableConstraint<T>,
   options: PersistentResourceOptions,
-  saveName: string,
+  persistentId: string,
 ): Resource<T> & Persistent<T> {
-  return buildResource(defaultValue, options, saveName) as Resource<T> & Persistent<T>;
+  return buildResource(defaultValue, options, persistentId) as Resource<T> & Persistent<T>;
 }
 
 // A capped ResourceBag linked to a resource clamps each write back to its cap,
@@ -231,7 +231,7 @@ export function registerResourceClamp(
 function buildResource<T>(
   defaultValue: T | Ref<T>,
   options: ResourceOptions,
-  saveName?: string,
+  persistentId?: string,
 ): Resource<T> {
   const { displayName = 'points', precision = 0, small = false, id } = options;
   // Single ambient-context read shared by the tracker setup below and the
@@ -251,7 +251,7 @@ function buildResource<T>(
       small,
     });
   } else {
-    const name = saveName ?? id;
+    const name = persistentId ?? id;
     if (name?.includes('.')) {
       throw new Error(
         `Resource id "${name}" contains ".", which save paths split on. Use another separator, such as "-".`,
@@ -265,7 +265,7 @@ function buildResource<T>(
     // resolve that check, so the call goes through the unchecked shape.
     const persistentResource = (persistent as (d: T, o: PersistentOptions<T>) => Persistent<T>)(
       defaultValue,
-      { name },
+      { id: name },
     );
     Object.assign(persistentResource[PersistentAlias], metadata);
     resource = Object.assign(persistentResource, metadata);
@@ -291,11 +291,11 @@ function buildResource<T>(
         // semantic these refs advertise. To wipe lifetime stats on a hard
         // reset, hand the tracker ref to `thingsToReset` directly.
         const cumulative = persistent<DecimalSource>(initial, {
-          name: 'cumulative',
+          id: 'cumulative',
           lifetime: true,
         });
         const best = persistent<DecimalSource>(initial, {
-          name: 'best',
+          id: 'best',
           lifetime: true,
         });
 

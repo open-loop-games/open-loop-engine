@@ -54,7 +54,7 @@ interface ProdDef {
 }
 interface ChalDef {
   id: string;
-  name: string;
+  displayName: string;
   goal?: () => boolean;
 }
 
@@ -138,7 +138,7 @@ function buildFixture(): {
       prodCat.register({ id: 'click' });
 
       chalCat = createChallengeCategory<ChalDef>({ id: 'challenges', mutuallyExclusive: false });
-      chalCat.register({ id: 'no-x', name: 'No X', goal: () => true });
+      chalCat.register({ id: 'no-x', displayName: 'No X', goal: () => true });
     },
   };
 
@@ -228,18 +228,18 @@ describe('evaluateGate — per-kind dispatch', () => {
     const f = buildFixture();
     f.setStateAt('phase', 'idle');
     expect(
-      evaluateGate({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' }, f.runtime),
+      evaluateGate({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' }, f.runtime),
     ).toBe(true);
     expect(
-      evaluateGate({ kind: 'state', key: 'phase', operator: 'neq', value: 'idle' }, f.runtime),
+      evaluateGate({ kind: 'state', path: 'phase', operator: 'neq', value: 'idle' }, f.runtime),
     ).toBe(false);
 
     f.setStateAt('progress', 7);
     expect(
-      evaluateGate({ kind: 'state', key: 'progress', operator: 'gte', value: 5 }, f.runtime),
+      evaluateGate({ kind: 'state', path: 'progress', operator: 'gte', value: 5 }, f.runtime),
     ).toBe(true);
     expect(
-      evaluateGate({ kind: 'state', key: 'progress', operator: 'lt', value: 5 }, f.runtime),
+      evaluateGate({ kind: 'state', path: 'progress', operator: 'lt', value: 5 }, f.runtime),
     ).toBe(false);
     f.stop();
   });
@@ -383,7 +383,7 @@ describe('timeUntilGateFlip — dispatch table', () => {
         .reason,
     ).toBe('opaque-predicate');
     expect(
-      timeUntilGateFlip({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' }, f.runtime)
+      timeUntilGateFlip({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' }, f.runtime)
         .reason,
     ).toBe('opaque-predicate');
     expect(timeUntilGateFlip({ kind: 'flag', id: 'knowledge-rask' }, f.runtime).reason).toBe(
@@ -632,7 +632,7 @@ describe('evaluateGate — no ambient accessor', () => {
     for (const gate of [
       { kind: 'resource-gte', resource: 'points', value: 1 },
       { kind: 'flag', id: 'some-flag' },
-      { kind: 'state', key: 'phase', operator: 'eq', value: 'idle' },
+      { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
     ] as Gate[]) {
       expect(() => evaluateGate(gate, f.runtime)).toThrow(
         new RegExp(`accessor.*${gate.kind}|${gate.kind}.*accessor`),
@@ -701,7 +701,7 @@ describe('getRequiredGateServices', () => {
   it('accessor-backed leaves demand the accessor only', () => {
     expect(handles({ kind: 'resource-gte', resource: 'gold', value: 50 })).toEqual(['accessor']);
     expect(handles({ kind: 'flag', id: 'knowledge-rask' })).toEqual(['accessor']);
-    expect(handles({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' })).toEqual([
+    expect(handles({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' })).toEqual([
       'accessor',
     ]);
   });
@@ -751,7 +751,7 @@ describe('getRequiredGateServices', () => {
 describe('gateToCondition — partial projection', () => {
   it('rate-aware leaf → ResourceCondition', () => {
     expect(gateToCondition({ kind: 'resource-gte', resource: 'gold', value: 50 })).toEqual({
-      type: 'resource',
+      kind: 'resource',
       target: 'gold',
       operator: 'gte',
       value: 50,
@@ -771,14 +771,14 @@ describe('gateToCondition — partial projection', () => {
   });
 
   it('state → StateCondition', () => {
-    expect(gateToCondition({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' })).toEqual(
-      { type: 'state', target: 'phase', operator: 'eq', value: 'idle' },
-    );
+    expect(
+      gateToCondition({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' }),
+    ).toEqual({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' });
   });
 
   it('flag → FlagCondition (1:1, name-preserving projection)', () => {
     expect(gateToCondition({ kind: 'flag', id: 'knowledge-rask' })).toEqual({
-      type: 'flag',
+      kind: 'flag',
       target: 'knowledge-rask',
     });
   });
@@ -790,7 +790,7 @@ describe('gateToCondition — partial projection', () => {
         { kind: 'resource-gte', resource: 'gold', value: 50 },
         {
           kind: 'not',
-          of: { kind: 'state', key: 'phase', operator: 'eq', value: 'starting' },
+          of: { kind: 'state', path: 'phase', operator: 'eq', value: 'starting' },
         },
       ],
     };

@@ -37,7 +37,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  * identity.
  *
  * Tunable entries are emitted directly into the `tunables` group, keyed
- * by `(registryName, key)` at construction time. They never collide with
+ * by `(registryId, key)` at construction time. They never collide with
  * modifier entries — perturbation dispatches by `entry.kind` so the two
  * layers stay independent.
  *
@@ -55,7 +55,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  *   if (entry.kind === 'modifier') {
  *     render(entry.label, entry.chain.id);
  *   } else {
- *     render(entry.label, entry.registryName);
+ *     render(entry.label, entry.registryId);
  *   }
  * }
  * ```

@@ -41,7 +41,7 @@ interface ProdDef {
 
 interface ChalDef {
   id: string;
-  name: string;
+  displayName: string;
   goal?: () => boolean;
 }
 
@@ -130,7 +130,7 @@ describe('CategoryEntrySignals — per-category derivation', () => {
       id: 'challenges',
       mutuallyExclusive: false,
     });
-    cat.register({ id: 'no-x', name: 'No X', goal: () => true });
+    cat.register({ id: 'no-x', displayName: 'No X', goal: () => true });
 
     const entry = cat.getEntry('no-x')!;
     expect(entry.signals.active.value).toBe(false);

@@ -26,7 +26,7 @@
  *   `registry.pushOverrides('perturbation', { [key]: () => transformed })`.
  *   Cleanup is the scope's idempotent cleanup function. Registry lookup
  *   happens at apply time via `engine.tryInject(TuningRegistriesKey)` — the
- *   entry carries `registryName: string`, not a registry reference, so
+ *   entry carries `registryId: string`, not a registry reference, so
  *   perturbing a scratch sensitivity-fork doesn't stomp the live engine.
  *
  * The modifier wrapper composes on top of the original
@@ -127,8 +127,8 @@ function applyTunablePerturbation(
 ): () => void {
   const registries = engine.tryInject(TuningRegistriesKey);
   if (!registries) throw new Error('TuningRegistriesKey not provided on engine');
-  const registry = [...registries].find((r) => r.name === entry.registryName);
-  if (!registry) throw new Error(`tuning registry "${entry.registryName}" not found`);
+  const registry = [...registries].find((r) => r.id === entry.registryId);
+  if (!registry) throw new Error(`tuning registry "${entry.registryId}" not found`);
 
   // Capture baseline at apply time — reads through whatever scopes are
   // currently active so re-perturbing while a perturbation is already
@@ -158,7 +158,7 @@ function applyModifierPerturbation(
       if (!registry) throw new Error('ChainRegistryKey not provided on engine');
       const chain = registry.get(address.chainId);
       if (!chain) throw new Error(`chain "${address.chainId}" not found`);
-      if (address.variant === 'chain-apply') {
+      if (address.kind === 'chain-apply') {
         return appendChainWrapper(chain, perturbation);
       }
       const target = resolveChainTarget(chain, entry.modifier, address.modifierIndex);

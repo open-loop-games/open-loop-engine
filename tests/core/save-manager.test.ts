@@ -156,7 +156,7 @@ describe('SaveManager — slot management', () => {
   it('creates default slot 0 on construction', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
     expect(mgr.slots).toHaveLength(1);
-    expect(mgr.slots[0]).toEqual({ id: 0, name: 'Autosave' });
+    expect(mgr.slots[0]).toEqual({ id: 0, displayName: 'Autosave' });
     expect(mgr.activeSlotId).toBe(0);
   });
 
@@ -164,9 +164,9 @@ describe('SaveManager — slot management', () => {
     const mgr = createSaveManager({
       gameId: 'test',
       storageAdapter: createMapStorage(),
-      defaultSlotName: 'Main',
+      defaultSlotDisplayName: 'Main',
     });
-    expect(mgr.slots[0].name).toBe('Main');
+    expect(mgr.slots[0].displayName).toBe('Main');
   });
 
   it('createSlot adds a new slot with auto-increment ID', () => {
@@ -174,13 +174,13 @@ describe('SaveManager — slot management', () => {
     const id = mgr.createSlot('Manual Save');
     expect(id).toBe(1);
     expect(mgr.slots).toHaveLength(2);
-    expect(mgr.slots[1]).toEqual({ id: 1, name: 'Manual Save' });
+    expect(mgr.slots[1]).toEqual({ id: 1, displayName: 'Manual Save' });
   });
 
   it('createSlot uses default name if none provided', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
     const id = mgr.createSlot();
-    expect(mgr.slots.find((s) => s.id === id)?.name).toBe('Save 1');
+    expect(mgr.slots.find((s) => s.id === id)?.displayName).toBe('Save 1');
   });
 
   it('createSlot throws when max slots reached', () => {
@@ -270,7 +270,7 @@ describe('SaveManager — slot management', () => {
   it('renameSlot changes the slot name', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
     mgr.renameSlot(0, 'My Save');
-    expect(mgr.slots[0].name).toBe('My Save');
+    expect(mgr.slots[0].displayName).toBe('My Save');
   });
 
   it('renameSlot throws for unknown slot', () => {
@@ -312,8 +312,8 @@ describe('SaveManager — slot management', () => {
 
     const mgr2 = createSaveManager({ gameId: 'test', storageAdapter: storage });
     expect(mgr2.slots).toHaveLength(2);
-    expect(mgr2.slots[0].name).toBe('Main');
-    expect(mgr2.slots[1].name).toBe('Saved Slot');
+    expect(mgr2.slots[0].displayName).toBe('Main');
+    expect(mgr2.slots[1].displayName).toBe('Saved Slot');
   });
 });
 
@@ -330,7 +330,7 @@ describe('SaveManager — slot-to-slot copy', () => {
 
     const newId = mgr.duplicateSlot(0, 'Branch');
     expect(newId).toBe(1);
-    expect(mgr.slots.find((s) => s.id === newId)?.name).toBe('Branch');
+    expect(mgr.slots.find((s) => s.id === newId)?.displayName).toBe('Branch');
     expect(storage.getItem(`test-slot-${newId}`)).toBe(srcBytes);
     expect(mgr.activeSlotId).toBe(0); // active slot unchanged
   });
@@ -521,19 +521,19 @@ describe('SaveManager — legacy migration', () => {
     expect(storage.getItem('test-slot-0')).toBe(legacyEnvelope);
     // Slot index should exist
     expect(mgr.slots).toHaveLength(1);
-    expect(mgr.slots[0]).toEqual({ id: 0, name: 'Autosave' });
+    expect(mgr.slots[0]).toEqual({ id: 0, displayName: 'Autosave' });
   });
 
   it('does not migrate if slot index already exists', () => {
     const storage = createMapStorage();
     storage.setItem('test-save', 'old-data');
-    storage.setItem('test-slots', JSON.stringify([{ id: 0, name: 'Existing' }]));
+    storage.setItem('test-slots', JSON.stringify([{ id: 0, displayName: 'Existing' }]));
 
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage });
 
     // Legacy key should NOT be touched
     expect(storage.getItem('test-save')).toBe('old-data');
-    expect(mgr.slots[0].name).toBe('Existing');
+    expect(mgr.slots[0].displayName).toBe('Existing');
   });
 });
 
@@ -542,7 +542,7 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'ev', storageAdapter: storage });
     beginPersistentContext('ev-ctx');
-    const score = persistent(0, { name: 'score' });
+    const score = persistent(0, { id: 'score' });
     endPersistentContext();
     score.value = 1; // avoid pruning so data stays non-empty
     mgr.save();
@@ -566,12 +566,12 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
       },
     };
     storage.setItem('v1legacy-slot-0', JSON.stringify(v1Envelope));
-    storage.setItem('v1legacy-slots', JSON.stringify([{ id: 0, name: 'Autosave' }]));
+    storage.setItem('v1legacy-slots', JSON.stringify([{ id: 0, displayName: 'Autosave' }]));
 
     const mgr = createSaveManager({ gameId: 'v1legacy', storageAdapter: storage });
     beginPersistentContext('v1legacy-ctx');
-    const score = persistent(0, { name: 'score' });
-    const label = persistent('', { name: 'label' });
+    const score = persistent(0, { id: 'score' });
+    const label = persistent('', { id: 'label' });
     endPersistentContext();
 
     const result = mgr.load();
@@ -596,11 +596,11 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
       },
     };
     storage.setItem('v1decimal-slot-0', JSON.stringify(v1Envelope));
-    storage.setItem('v1decimal-slots', JSON.stringify([{ id: 0, name: 'Autosave' }]));
+    storage.setItem('v1decimal-slots', JSON.stringify([{ id: 0, displayName: 'Autosave' }]));
 
     const mgr = createSaveManager({ gameId: 'v1decimal', storageAdapter: storage });
     beginPersistentContext('v1decimal-ctx');
-    const score = persistent(bn(0), { name: 'score' });
+    const score = persistent(bn(0), { id: 'score' });
     endPersistentContext();
 
     const result = mgr.load();
@@ -623,12 +623,12 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
       },
     };
     storage.setItem('v1mismatch-slot-0', JSON.stringify(v1Envelope));
-    storage.setItem('v1mismatch-slots', JSON.stringify([{ id: 0, name: 'Autosave' }]));
+    storage.setItem('v1mismatch-slots', JSON.stringify([{ id: 0, displayName: 'Autosave' }]));
 
     const mgr = createSaveManager({ gameId: 'v1mismatch', storageAdapter: storage });
     beginPersistentContext('v1mismatch-ctx');
-    const score = persistent(0, { name: 'score' });
-    const label = persistent('default', { name: 'label' });
+    const score = persistent(0, { id: 'score' });
+    const label = persistent('default', { id: 'label' });
     endPersistentContext();
 
     const result = mgr.load();
@@ -657,7 +657,7 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
     );
     const mgr = createSaveManager({ gameId: 'v1mixed', storageAdapter: storage });
     beginPersistentContext('v1mixed-ctx');
-    const named = persistent(0, { name: 'named' });
+    const named = persistent(0, { id: 'named' });
     const unnamed = persistent(0);
     endPersistentContext();
 
@@ -730,8 +730,8 @@ describe('SaveManager — default-value pruning round-trip', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr', storageAdapter: storage, compressSave: false });
     beginPersistentContext('pr-ctx');
-    persistent(0, { name: 'score' });
-    persistent('hero', { name: 'name' });
+    persistent(0, { id: 'score' });
+    persistent('hero', { id: 'name' });
     endPersistentContext();
     mgr.save();
 
@@ -743,8 +743,8 @@ describe('SaveManager — default-value pruning round-trip', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr2', storageAdapter: storage });
     beginPersistentContext('pr2-ctx');
-    const score = persistent(0, { name: 'score' });
-    const name = persistent('hero', { name: 'name' });
+    const score = persistent(0, { id: 'score' });
+    const name = persistent('hero', { id: 'name' });
     endPersistentContext();
     mgr.save();
 
@@ -761,8 +761,8 @@ describe('SaveManager — default-value pruning round-trip', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr3', storageAdapter: storage, compressSave: false });
     beginPersistentContext('pr3-ctx');
-    const a = persistent(0, { name: 'a' });
-    const b = persistent(0, { name: 'b' });
+    const a = persistent(0, { id: 'a' });
+    const b = persistent(0, { id: 'b' });
     endPersistentContext();
     a.value = 42;
     mgr.save();
@@ -782,8 +782,8 @@ describe('SaveManager — default-value pruning round-trip', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr4', storageAdapter: storage, compressSave: false });
     beginPersistentContext('pr4-ctx');
-    const gold = persistent(bn(0), { name: 'gold' });
-    const xp = persistent(bn(0), { name: 'xp' });
+    const gold = persistent(bn(0), { id: 'gold' });
+    const xp = persistent(bn(0), { id: 'xp' });
     endPersistentContext();
     // Different Decimal instance, same value — should still prune
     gold.value = bn(0).add(0);
@@ -830,7 +830,7 @@ describe('SaveManager — engine v3 compression', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'cz', storageAdapter: storage });
     beginPersistentContext('cz-ctx');
-    const v = persistent(0, { name: 'x' });
+    const v = persistent(0, { id: 'x' });
     endPersistentContext();
     v.value = 42;
     mgr.save();
@@ -846,8 +846,8 @@ describe('SaveManager — engine v3 compression', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'cz2', storageAdapter: storage });
     beginPersistentContext('cz2-ctx');
-    const score = persistent(0, { name: 'score' });
-    const name = persistent('hero', { name: 'name' });
+    const score = persistent(0, { id: 'score' });
+    const name = persistent('hero', { id: 'name' });
     endPersistentContext();
     score.value = 999;
     name.value = 'archer';
@@ -863,7 +863,7 @@ describe('SaveManager — engine v3 compression', () => {
   it('round-trips compressed envelope through exportSave/importSave', () => {
     const mgr = createSaveManager({ gameId: 'cz3', storageAdapter: createMapStorage() });
     beginPersistentContext('cz3-ctx');
-    const v = persistent(0, { name: 'v' });
+    const v = persistent(0, { id: 'v' });
     endPersistentContext();
     v.value = 13;
 
@@ -883,7 +883,7 @@ describe('SaveManager — engine v3 compression', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'cz4', storageAdapter: storage, compressSave: false });
     beginPersistentContext('cz4-ctx');
-    const v = persistent(0, { name: 'v' });
+    const v = persistent(0, { id: 'v' });
     endPersistentContext();
     v.value = 7;
     mgr.save();
@@ -902,7 +902,7 @@ describe('SaveManager — engine v3 compression', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'cz5', storageAdapter: storage, saveVersion: 4 });
     beginPersistentContext('cz5-ctx');
-    const v = persistent(0, { name: 'v' });
+    const v = persistent(0, { id: 'v' });
     endPersistentContext();
     v.value = 99;
     mgr.modId = 'modA';
@@ -932,7 +932,7 @@ describe('SaveManager — engine v3 compression', () => {
     );
     const mgr = createSaveManager({ gameId: 'cz6', storageAdapter: storage });
     beginPersistentContext('cz6-ctx');
-    persistent(0, { name: 'v' });
+    persistent(0, { id: 'v' });
     endPersistentContext();
 
     const failed = vi.fn();
@@ -957,7 +957,7 @@ describe('SaveManager — engine v3 compression', () => {
     );
     const mgr = createSaveManager({ gameId: 'lv2', storageAdapter: storage });
     beginPersistentContext('lv2-ctx');
-    const score = persistent(0, { name: 'score' });
+    const score = persistent(0, { id: 'score' });
     endPersistentContext();
 
     const result = mgr.load();
@@ -976,10 +976,10 @@ describe('SaveManager — engine v3 compression', () => {
         data: { 'lv1-ctx': { '0': 77 } },
       }),
     );
-    storage.setItem('lv1-slots', JSON.stringify([{ id: 0, name: 'Autosave' }]));
+    storage.setItem('lv1-slots', JSON.stringify([{ id: 0, displayName: 'Autosave' }]));
     const mgr = createSaveManager({ gameId: 'lv1', storageAdapter: storage });
     beginPersistentContext('lv1-ctx');
-    const score = persistent(0, { name: 'score' });
+    const score = persistent(0, { id: 'score' });
     endPersistentContext();
 
     const result = mgr.load();
@@ -1248,7 +1248,7 @@ describe('SaveManager — events', () => {
         compressSave: false,
       });
       beginPersistentContext('evt-val-heal-ctx');
-      const count = persistent(0, { name: 'count' });
+      const count = persistent(0, { id: 'count' });
       endPersistentContext();
       count.value = 10;
       mgr.save();
@@ -1284,7 +1284,7 @@ describe('SaveManager — events', () => {
         compressSave: false,
       });
       beginPersistentContext('evt-val-strict-ctx');
-      const count = persistent(0, { name: 'count' });
+      const count = persistent(0, { id: 'count' });
       endPersistentContext();
       count.value = 10;
       mgr.save();
@@ -1321,8 +1321,8 @@ describe('SaveManager — events', () => {
         strictValidation: true,
       });
       beginPersistentContext('evt-val-clean-ctx');
-      const count = persistent(0, { name: 'count' });
-      const label = persistent('', { name: 'label' });
+      const count = persistent(0, { id: 'count' });
+      const label = persistent('', { id: 'label' });
       endPersistentContext();
       count.value = 42;
       label.value = 'hello';
@@ -1367,7 +1367,7 @@ describe('SaveManager — envelope shape at the boundary', () => {
   ])('importSave refuses %s as a parse error and leaves state alone', (_label, raw) => {
     const mgr = createSaveManager({ gameId: 'shape', storageAdapter: createMapStorage() });
     beginPersistentContext(`shape-ctx-${_label}`);
-    const x = persistent(0, { name: 'x' });
+    const x = persistent(0, { id: 'x' });
     endPersistentContext();
     x.value = 4;
     const failed = vi.fn();
@@ -1391,7 +1391,7 @@ describe('SaveManager — envelope shape at the boundary', () => {
     const storage = createMapStorage();
     storage.setItem('shape-idx-slots', '{}');
     const mgr = createSaveManager({ gameId: 'shape-idx', storageAdapter: storage });
-    expect(mgr.slots).toEqual([{ id: 0, name: 'Autosave' }]);
+    expect(mgr.slots).toEqual([{ id: 0, displayName: 'Autosave' }]);
   });
 });
 
@@ -1407,7 +1407,7 @@ describe('SaveManager — failed-load slot protection', () => {
     const raw = futureSlot('prot', storage);
     const mgr = createSaveManager({ gameId: 'prot', storageAdapter: storage });
     beginPersistentContext('prot-ctx');
-    const gold = persistent(0, { name: 'gold' });
+    const gold = persistent(0, { id: 'gold' });
     endPersistentContext();
 
     const protectedEvt = vi.fn();
@@ -1496,7 +1496,7 @@ describe('createMemoryStorage', () => {
   it('drives a SaveManager round-trip end-to-end', () => {
     const mgr = createSaveManager({ gameId: 'mem', storageAdapter: createMemoryStorage() });
     beginPersistentContext('mem-test');
-    const gold = persistent(0, { name: 'gold' });
+    const gold = persistent(0, { id: 'gold' });
     endPersistentContext();
     gold.value = 42;
     mgr.save();
@@ -1583,7 +1583,7 @@ describe('SaveManager live reads', () => {
   it('slots recomputes on create, rename and delete', async () => {
     const { computed } = await import('vue');
     const mgr = make();
-    const names = computed(() => mgr.slots.map((s) => s.name).join(','));
+    const names = computed(() => mgr.slots.map((s) => s.displayName).join(','));
     expect(names.value).toBe('Autosave');
     const id = mgr.createSlot('A');
     expect(names.value).toBe('Autosave,A');

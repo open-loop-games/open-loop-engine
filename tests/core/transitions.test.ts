@@ -158,7 +158,7 @@ describe('timeUntilAffordable', () => {
 describe('timeUntilConditionFlip — resource six-way truth table', () => {
   // gte — currently-false (current < target): needs rate > 0
   it('gte currently-false + positive rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'gte', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'gte', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 60 }, rates: { gold: 4 } }),
@@ -167,14 +167,14 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
   });
 
   it('gte currently-false + zero rate → no-rate', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'gte', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'gte', value: 100 };
     const d = timeUntilConditionFlip(c, mockAccessor({ resources: { gold: 60 } }));
     expect(d).toEqual({ seconds: null, reason: 'no-rate' });
   });
 
   // gte — currently-true (current >= target): flip-to-false needs rate < 0
   it('gte currently-true + negative rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'gte', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'gte', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 150 }, rates: { gold: -5 } }),
@@ -183,7 +183,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
   });
 
   it('gte currently-true + positive rate → no-rate (never flips back)', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'gte', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'gte', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 150 }, rates: { gold: 5 } }),
@@ -193,7 +193,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
   // gt — strict variant, same direction as gte
   it('gt currently-false + positive rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'gt', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'gt', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 60 }, rates: { gold: 2 } }),
@@ -204,7 +204,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
   // lte — currently-false (current > target): flip-to-true needs rate < 0
   it('lte currently-false + negative rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'lte', value: 50 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'lte', value: 50 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 100 }, rates: { gold: -10 } }),
@@ -213,7 +213,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
   });
 
   it('lte currently-false + positive rate → no-rate', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'lte', value: 50 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'lte', value: 50 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 100 }, rates: { gold: 1 } }),
@@ -223,7 +223,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
   // lte — currently-true (current <= target): flip-to-false needs rate > 0
   it('lte currently-true + positive rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'lte', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'lte', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 60 }, rates: { gold: 4 } }),
@@ -233,7 +233,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
   // lt — strict variant
   it('lt currently-true + positive rate → computed', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'lt', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'lt', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 60 }, rates: { gold: 4 } }),
@@ -243,7 +243,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
   // eq — always uncomputable
   it('eq → uncomputable', () => {
-    const c: ICondition = { type: 'resource', target: 'gold', operator: 'eq', value: 100 };
+    const c: ICondition = { kind: 'resource', target: 'gold', operator: 'eq', value: 100 };
     const d = timeUntilConditionFlip(
       c,
       mockAccessor({ resources: { gold: 50 }, rates: { gold: 1 } }),
@@ -254,13 +254,13 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
 describe('timeUntilConditionFlip — opaque predicates', () => {
   it('unlock → opaque-predicate', () => {
-    const c: ICondition = { type: 'flag', target: 'smithing' };
+    const c: ICondition = { kind: 'flag', target: 'smithing' };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });
 
   it('state → opaque-predicate', () => {
-    const c: ICondition = { type: 'state', target: 'phase', operator: 'eq', value: 'combat' };
+    const c: ICondition = { kind: 'state', path: 'phase', operator: 'eq', value: 'combat' };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });
@@ -269,10 +269,10 @@ describe('timeUntilConditionFlip — opaque predicates', () => {
 describe('timeUntilConditionFlip — and combinator', () => {
   it('currently-false: max over currently-false children (all computable)', () => {
     const c: ICondition = {
-      type: 'all',
+      kind: 'all',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 50 },
       ],
     };
     // gold: needs 60 at rate 4 → 15s; wood: needs 30 at rate 3 → 10s. Max = 15.
@@ -285,10 +285,10 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('currently-false: ignores currently-true children', () => {
     const c: ICondition = {
-      type: 'all',
+      kind: 'all',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 50 },
       ],
     };
     // gold currently false (40 < 100, rate 4 → 15s); wood currently true (80 >= 50, rate 0).
@@ -302,10 +302,10 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('currently-true: min over children (any flip breaks AND)', () => {
     const c: ICondition = {
-      type: 'all',
+      kind: 'all',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 50 },
       ],
     };
     // Both true. Flip-to-false needs rate < 0. gold at 150 rate -5 → 10s; wood at 80 rate -6 → 5s.
@@ -318,10 +318,10 @@ describe('timeUntilConditionFlip — and combinator', () => {
 
   it('strict-null: any null-distance child propagates null with reason', () => {
     const c: ICondition = {
-      type: 'all',
+      kind: 'all',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'flag', target: 'smithing' },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'flag', target: 'smithing' },
       ],
     };
     // gold computable (15s); unlock opaque. AND currently false (unlock is false).
@@ -334,7 +334,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
   });
 
   it('empty children → uncomputable', () => {
-    const c: ICondition = { type: 'all', conditions: [] };
+    const c: ICondition = { kind: 'all', conditions: [] };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'uncomputable' });
   });
@@ -343,10 +343,10 @@ describe('timeUntilConditionFlip — and combinator', () => {
 describe('timeUntilConditionFlip — or combinator', () => {
   it('currently-false: min over all children (any child flipping satisfies OR)', () => {
     const c: ICondition = {
-      type: 'any',
+      kind: 'any',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 50 },
       ],
     };
     const d = timeUntilConditionFlip(
@@ -358,10 +358,10 @@ describe('timeUntilConditionFlip — or combinator', () => {
 
   it('currently-true: max over currently-true children (all must flip)', () => {
     const c: ICondition = {
-      type: 'any',
+      kind: 'any',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 50 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 50 },
       ],
     };
     // Both currently true. Flip-to-false needs all to flip.
@@ -374,10 +374,10 @@ describe('timeUntilConditionFlip — or combinator', () => {
 
   it('currently-true: ignores currently-false children (they stay false, assumed)', () => {
     const c: ICondition = {
-      type: 'any',
+      kind: 'any',
       conditions: [
-        { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'resource', target: 'wood', operator: 'gte', value: 500 },
+        { kind: 'resource', target: 'gold', operator: 'gte', value: 100 },
+        { kind: 'resource', target: 'wood', operator: 'gte', value: 500 },
       ],
     };
     // gold currently true (150 >= 100, rate -5 → 10s); wood currently false (80 < 500, rate 0).
@@ -393,8 +393,8 @@ describe('timeUntilConditionFlip — or combinator', () => {
 describe('timeUntilConditionFlip — not combinator', () => {
   it('NOT currently-true: inner flips to false', () => {
     const c: ICondition = {
-      type: 'not',
-      condition: { type: 'resource', target: 'gold', operator: 'lt', value: 100 },
+      kind: 'not',
+      condition: { kind: 'resource', target: 'gold', operator: 'lt', value: 100 },
     };
     // inner lt currently false (150 < 100 is false), NOT currently true. Flip needs inner to become true.
     // inner lt currently-false needs rate < 0. 150 down to 100 at rate -5 → 10s.
@@ -406,7 +406,7 @@ describe('timeUntilConditionFlip — not combinator', () => {
   });
 
   it('NOT of opaque → opaque-predicate', () => {
-    const c: ICondition = { type: 'not', condition: { type: 'flag', target: 'smithing' } };
+    const c: ICondition = { kind: 'not', condition: { kind: 'flag', target: 'smithing' } };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });

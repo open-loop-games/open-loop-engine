@@ -115,7 +115,7 @@ export function runWaypointProbe<T>(config: WaypointProbeConfig<T>): WaypointSna
     runMatrixUntil({
       cells: [
         {
-          name: waypoint.id,
+          id: waypoint.id,
           tickDelta: config.tickDelta,
           buildEngine: (ctx) => (engine = config.buildEngine(ctx)),
           teardown: config.teardown,

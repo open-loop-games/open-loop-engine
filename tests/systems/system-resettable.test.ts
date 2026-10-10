@@ -81,8 +81,8 @@ const cases: Case[] = [
     build: () =>
       createZoneSystem({
         zones: [
-          { id: 'town', name: 'Town', order: 0 },
-          { id: 'cave', name: 'Cave', order: 1 },
+          { id: 'town', displayName: 'Town', order: 0 },
+          { id: 'cave', displayName: 'Cave', order: 1 },
         ],
       }),
     dirty: (zones: ReturnType<typeof createZoneSystem>) => {

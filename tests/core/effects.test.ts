@@ -15,7 +15,7 @@ function mockAccessor(): GameStateAccessor {
 describe('resolveEffect', () => {
   it('resolves resource add', () => {
     const r = resolveEffect(
-      { type: 'resource', target: 'gold', operation: 'add', value: 50 },
+      { kind: 'resource', target: 'gold', operation: 'add', value: 50 },
       mockAccessor(),
     );
     expect(r).toHaveLength(1);
@@ -24,37 +24,37 @@ describe('resolveEffect', () => {
   });
   it('resolves composite into flat list', () => {
     const e: IEffect = {
-      type: 'composite',
+      kind: 'composite',
       effects: [
-        { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-        { type: 'flag', target: 'x', value: true },
+        { kind: 'resource', target: 'gold', operation: 'add', value: 10 },
+        { kind: 'flag', target: 'x', value: true },
       ],
     };
     expect(resolveEffect(e, mockAccessor())).toHaveLength(2);
   });
   it('conditional true branch', () => {
     const e: IEffectInternal = {
-      type: 'branch',
-      condition: { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
-      then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
-      else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
+      kind: 'branch',
+      condition: { kind: 'resource', target: 'gold', operator: 'gte', value: 50 },
+      then: { kind: 'resource', target: 'gems', operation: 'add', value: 1 },
+      else: { kind: 'resource', target: 'dust', operation: 'add', value: 1 },
     };
     expect(resolveEffect(e, mockAccessor())[0].target).toBe('gems');
   });
   it('conditional false branch', () => {
     const e: IEffectInternal = {
-      type: 'branch',
-      condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
-      then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
-      else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
+      kind: 'branch',
+      condition: { kind: 'resource', target: 'gold', operator: 'gte', value: 999 },
+      then: { kind: 'resource', target: 'gems', operation: 'add', value: 1 },
+      else: { kind: 'resource', target: 'dust', operation: 'add', value: 1 },
     };
     expect(resolveEffect(e, mockAccessor())[0].target).toBe('dust');
   });
   it('conditional no else returns empty', () => {
     const e: IEffectInternal = {
-      type: 'branch',
-      condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
-      then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
+      kind: 'branch',
+      condition: { kind: 'resource', target: 'gold', operator: 'gte', value: 999 },
+      then: { kind: 'resource', target: 'gems', operation: 'add', value: 1 },
     };
     expect(resolveEffect(e, mockAccessor())).toHaveLength(0);
   });
@@ -62,7 +62,7 @@ describe('resolveEffect', () => {
   it('evaluates formula values to concrete DecimalSource', () => {
     const formula = { evaluate: () => bn(42) };
     const r = resolveEffect(
-      { type: 'resource', target: 'gold', operation: 'add', value: formula },
+      { kind: 'resource', target: 'gold', operation: 'add', value: formula },
       mockAccessor(),
     );
     expect(r).toHaveLength(1);
@@ -71,7 +71,7 @@ describe('resolveEffect', () => {
 
   it('passes through plain DecimalSource unchanged', () => {
     const r = resolveEffect(
-      { type: 'resource', target: 'gold', operation: 'add', value: 77 },
+      { kind: 'resource', target: 'gold', operation: 'add', value: 77 },
       mockAccessor(),
     );
     expect(new Decimal(r[0].value as number).eq(77)).toBe(true);
@@ -102,7 +102,7 @@ describe('applyEffect', () => {
   it('calls applyResourceOp for resource effects', () => {
     const mutator = mockMutator();
     applyEffect(
-      { type: 'resource', target: 'gold', operation: 'add', value: 100 },
+      { kind: 'resource', target: 'gold', operation: 'add', value: 100 },
       mockAccessor(),
       mutator,
     );
@@ -115,7 +115,7 @@ describe('applyEffect', () => {
 
   it('calls setFlag for unlock effects', () => {
     const mutator = mockMutator();
-    applyEffect({ type: 'flag', target: 'forest', value: true }, mockAccessor(), mutator);
+    applyEffect({ kind: 'flag', target: 'forest', value: true }, mockAccessor(), mutator);
     expect(mutator.calls).toHaveLength(1);
     expect(mutator.calls[0].method).toBe('setFlag');
     expect(mutator.calls[0].args).toEqual(['forest', true]);
@@ -123,11 +123,7 @@ describe('applyEffect', () => {
 
   it('calls setStateAt for state effects', () => {
     const mutator = mockMutator();
-    applyEffect(
-      { type: 'state', target: 'quest:main', value: 'complete' },
-      mockAccessor(),
-      mutator,
-    );
+    applyEffect({ kind: 'state', path: 'quest:main', value: 'complete' }, mockAccessor(), mutator);
     expect(mutator.calls).toHaveLength(1);
     expect(mutator.calls[0].method).toBe('setStateAt');
     expect(mutator.calls[0].args).toEqual(['quest:main', 'complete']);
@@ -137,11 +133,11 @@ describe('applyEffect', () => {
     const mutator = mockMutator();
     applyEffect(
       {
-        type: 'composite',
+        kind: 'composite',
         effects: [
-          { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-          { type: 'flag', target: 'x', value: true },
-          { type: 'state', target: 'flag', value: 1 },
+          { kind: 'resource', target: 'gold', operation: 'add', value: 10 },
+          { kind: 'flag', target: 'x', value: true },
+          { kind: 'state', path: 'flag', value: 1 },
         ],
       },
       mockAccessor(),
@@ -157,10 +153,10 @@ describe('applyEffect', () => {
     const mutator = mockMutator();
     applyEffect(
       {
-        type: 'branch',
-        condition: { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
-        then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
-        else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
+        kind: 'branch',
+        condition: { kind: 'resource', target: 'gold', operator: 'gte', value: 50 },
+        then: { kind: 'resource', target: 'gems', operation: 'add', value: 1 },
+        else: { kind: 'resource', target: 'dust', operation: 'add', value: 1 },
       },
       mockAccessor(),
       mutator,
@@ -200,7 +196,7 @@ describe('applyEffect', () => {
     const mutator = mockMutator();
     const formula = { evaluate: () => bn(99) };
     applyEffect(
-      { type: 'resource', target: 'gold', operation: 'add', value: formula },
+      { kind: 'resource', target: 'gold', operation: 'add', value: formula },
       mockAccessor(),
       mutator,
     );

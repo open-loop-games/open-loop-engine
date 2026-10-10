@@ -522,7 +522,7 @@ function buildPurchasableCount(
   const parentContext = getCurrentPersistentContext();
   const contextId = parentContext ? `${parentContext}:${id}` : id;
   const count = withPersistentContext(contextId, () =>
-    persistent<DecimalSource>(0, { name: 'count' }),
+    persistent<DecimalSource>(0, { id: 'count' }),
   );
 
   if (initialCount !== undefined) {

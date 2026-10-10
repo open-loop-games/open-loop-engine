@@ -30,7 +30,7 @@ export function createRunFinalizeAnalyzer(): Analyzer {
   let lastEntry: FinalizeEntry | null = null;
 
   return {
-    name: 'run-finalize',
+    id: 'run-finalize',
     onStart() {
       runs = 0;
       lastEntry = null;
@@ -48,7 +48,7 @@ export function createRunFinalizeAnalyzer(): Analyzer {
         }
       }
       return {
-        name: 'run-finalize',
+        id: 'run-finalize',
         metrics,
       };
     },

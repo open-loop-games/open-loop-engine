@@ -250,9 +250,9 @@ export function createCycle(options: CycleOptions): Cycle {
 
   const contextId = resolveSystemPersistentContextId(id, 'cycle');
   const { count, bestTime, elapsed } = withPersistentContext(contextId, () => ({
-    count: persistent(0, { name: 'count', lifetime: true }),
-    bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),
-    elapsed: persistent(0, { name: 'elapsed' }),
+    count: persistent(0, { id: 'count', lifetime: true }),
+    bestTime: persistent(Infinity, { id: 'bestTime', lifetime: true }),
+    elapsed: persistent(0, { id: 'elapsed' }),
   }));
 
   const running = ref(false);

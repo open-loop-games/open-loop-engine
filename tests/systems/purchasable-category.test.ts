@@ -758,7 +758,7 @@ describe('createPurchasableCategory grants', () => {
   it('AND-composes per-entry `when` override with the implicit active signal', () => {
     const gold = createTestResource('grants-g3', 1000);
     const chain = createModifierChain('compose-g3');
-    const secondGate = persistent<boolean>(false, { name: 'second-gate-g3' });
+    const secondGate = persistent<boolean>(false, { id: 'second-gate-g3' });
 
     const category = createPurchasableCategory<UpgradeDef>({
       id: 'pc-grants3',

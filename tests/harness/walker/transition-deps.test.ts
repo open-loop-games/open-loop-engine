@@ -211,7 +211,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const engine = buildEngine((c) => {
       c.register({
         id: 'secret',
-        name: 'Secret',
+        displayName: 'Secret',
         visible: {
           kind: 'all',
           of: [
@@ -242,12 +242,12 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const engine = buildEngine((c) => {
       c.register({
         id: 'gated',
-        name: 'Gated',
+        displayName: 'Gated',
         canEnter: {
           kind: 'any',
           of: [
             { kind: 'resource-gte', resource: 'mana', value: 20 },
-            { kind: 'state', key: 'player.phase', operator: 'eq', value: 'combat' },
+            { kind: 'state', path: 'player.phase', operator: 'eq', value: 'combat' },
           ],
         },
       });
@@ -269,7 +269,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const engine = buildEngine((c) => {
       c.register({
         id: 'survive',
-        name: 'Survive',
+        displayName: 'Survive',
         // Challenge succeeds once xp drops below 100.
         goal: {
           kind: 'not',
@@ -296,7 +296,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const engine = buildEngine((c) => {
       c.register({
         id: 'once',
-        name: 'Once',
+        displayName: 'Once',
         goal: { kind: 'resource-gte', resource: 'xp', value: 100 },
         completionLimit: 1,
       });
@@ -322,7 +322,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     const engine = buildEngine((c) => {
       c.register({
         id: 'deep',
-        name: 'Deep',
+        displayName: 'Deep',
         visible: {
           kind: 'all',
           of: [
@@ -340,7 +340,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
               kind: 'all',
               of: [
                 { kind: 'flag', id: 'smithing' },
-                { kind: 'state', key: 'player.phase', operator: 'eq', value: 'combat' },
+                { kind: 'state', path: 'player.phase', operator: 'eq', value: 'combat' },
               ],
             },
           ],

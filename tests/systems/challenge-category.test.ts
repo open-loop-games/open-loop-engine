@@ -37,7 +37,7 @@ describe('ChallengeDef.goal callback form', () => {
 
     challenges.register({
       id: 'reach-ten',
-      name: 'Reach Ten',
+      displayName: 'Reach Ten',
       goal: () => progress.value >= 10,
     });
 
@@ -64,7 +64,7 @@ describe('ChallengeDef declarative bindings', () => {
 
     challenges.register({
       id: 'halved',
-      name: 'Halved',
+      displayName: 'Halved',
       goal: () => false,
       restricts: [{ chain, mult: 0.5, description: 'rate-halve' }],
     });
@@ -88,7 +88,7 @@ describe('ChallengeDef declarative bindings', () => {
 
     challenges.register({
       id: 'trade',
-      name: 'Trade',
+      displayName: 'Trade',
       goal: () => true,
       restricts: [{ chain, mult: 0.5, description: 'rate' }],
       rewards: [{ chain, mult: 3, description: 'rate' }],
@@ -113,7 +113,7 @@ describe('ChallengeDef declarative bindings', () => {
 
     challenges.register({
       id: 'beat',
-      name: 'Beat',
+      displayName: 'Beat',
       goal: () => true,
       rewards: [{ chain, mult: 2, description: 'perk' }],
     });
@@ -140,7 +140,7 @@ describe('ChallengeDef declarative bindings', () => {
 
     challenges.register({
       id: 'simple',
-      name: 'Simple',
+      displayName: 'Simple',
       goal: () => true,
       completionEffects: [],
     });
@@ -179,14 +179,14 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     challenges.register([
       {
         id: 'zombie',
-        name: 'Zombie',
+        displayName: 'Zombie',
         overrides: { combat: () => 0 },
         contentPatches: { actions: { buy: { cost: 1 } } },
         ...hooks('zombie'),
       },
       {
         id: 'other',
-        name: 'Other',
+        displayName: 'Other',
         overrides: { combat: () => 5 },
         ...hooks('other'),
       },
@@ -312,7 +312,7 @@ describe('ChallengeCategory — completionEffects need a mutator', () => {
     expect(() =>
       challenges.register({
         id: 'grant',
-        name: 'Grant',
+        displayName: 'Grant',
         completionEffects: [E.resource('gold', 'add', 1)],
       }),
     ).toThrow(/completionEffects/);

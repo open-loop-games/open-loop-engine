@@ -38,8 +38,8 @@ describe('system save keys', () => {
 
   it('systems sharing a module each get their own context under it', () => {
     withPersistentContext('realm', () => {
-      createZoneSystem({ zones: [{ id: 'town', name: 'Town', order: 0 }] });
-      createAutomationTiers({ tiers: [{ id: 'manual', name: 'Manual', order: 0 }] });
+      createZoneSystem({ zones: [{ id: 'town', displayName: 'Town', order: 0 }] });
+      createAutomationTiers({ tiers: [{ id: 'manual', displayName: 'Manual', order: 0 }] });
       createCycle({ thingsToReset: [], registerTick });
       createTimeBank();
       createTimeSystem();

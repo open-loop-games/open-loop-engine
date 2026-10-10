@@ -61,7 +61,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
     for (const cell of config.cells) {
       if (!cell.buildAccessor) {
         throw new Error(
-          `runMatrixUntil: mode "${mode}" requires UntilCell.buildAccessor on every cell (missing on "${cell.name}")`,
+          `runMatrixUntil: mode "${mode}" requires UntilCell.buildAccessor on every cell (missing on "${cell.id}")`,
         );
       }
     }
@@ -113,7 +113,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
     ) {
       const runs = perCellRuns[item.cellIdx];
       const cellResult: CellResult<RunUntilResult> = {
-        name: cell.name,
+        id: cell.id,
         runs,
         aggregate: aggregateUntilCell(runs, config.aggregate),
       };
@@ -127,7 +127,7 @@ export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
   const cells: CellResult<RunUntilResult>[] = config.cells.map(
     (cell, i) =>
       cellResults[i] ?? {
-        name: cell.name,
+        id: cell.id,
         runs: perCellRuns[i],
         aggregate: {
           metrics: {},

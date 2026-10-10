@@ -77,7 +77,7 @@ export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
   }
 
   return {
-    name,
+    id: name,
     onStart() {
       samples.length = 0;
       peak = -Infinity;
@@ -90,7 +90,7 @@ export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
       const final = samples[samples.length - 1];
       const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
       return {
-        name,
+        id: name,
         metrics: { peak, final, avg },
       };
     },

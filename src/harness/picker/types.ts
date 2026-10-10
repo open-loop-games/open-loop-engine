@@ -54,7 +54,7 @@ export type ModifierPickerAddress =
       /** The {@link ModifierChain.id} */
       chainId: string;
       /** Targets one existing modifier by its position in the chain. */
-      variant: 'modifier-index';
+      kind: 'modifier-index';
       /**
        * Position of this modifier within the chain's `modifiers` array at
        * snapshot time. Perturbation prefers the entry's `modifier` while it
@@ -73,11 +73,11 @@ export type ModifierPickerAddress =
        * later via purchases/binds.
        */
       chainId: string;
-      variant: 'chain-apply';
+      kind: 'chain-apply';
     };
 
 /**
- * Address of a `TunablePickerEntry`. Carries `registryName` (string) rather
+ * Address of a `TunablePickerEntry`. Carries `registryId` (string) rather
  * than a direct registry reference — perturbation resolves the registry
  * against whichever engine it's called on via
  * `engine.tryInject(TuningRegistriesKey)`, so a perturbation discovered against
@@ -88,7 +88,7 @@ export type ModifierPickerAddress =
 export interface TunablePickerAddress {
   walker: 'tunable';
   /** `TuningRegistry.name` — used to look up the registry at perturb time. */
-  registryName: string;
+  registryId: string;
   /** Key within the registry. */
   key: string;
 }
@@ -132,13 +132,13 @@ export interface ModifierPickerEntry {
  * engine's `TuningRegistriesKey`. Perturbation pushes a scope on the owning
  * registry rather than mutating a chain.
  *
- * `registryName` is a string by design — see {@link TunablePickerAddress}
+ * `registryId` is a string by design — see {@link TunablePickerAddress}
  * for the scratch-engine safety rationale.
  */
 export interface TunablePickerEntry {
   kind: 'tunable';
   /** `TuningRegistry.name` — used to look up the registry at perturb time. */
-  registryName: string;
+  registryId: string;
   /** Key within the registry. */
   key: string;
   /** Stable address for this entry. */
@@ -161,7 +161,7 @@ export type PickerEntry = ModifierPickerEntry | TunablePickerEntry;
  * Modifier entries are deduplicated by `Modifier` object identity across
  * `content` and `chain-registry` walkers — a single `Modifier` instance
  * appears in exactly one of `content` / `chains`. Tunable entries are
- * unique by `(registryName, key)` and never collide with modifier entries.
+ * unique by `(registryId, key)` and never collide with modifier entries.
  */
 export interface PickerSnapshot {
   /** All entries after deduplication, in walker order. */

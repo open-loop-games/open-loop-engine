@@ -43,7 +43,7 @@ describe('defaultAnalyzerPack', () => {
 
     const pack = defaultAnalyzerPack(engine);
 
-    const names = pack.map((a) => a.name).sort();
+    const names = pack.map((a) => a.id).sort();
     expect(names).toEqual(['resource-peak:gems', 'resource-peak:gold']);
     engine.stop();
   });
@@ -67,7 +67,7 @@ describe('defaultAnalyzerPack', () => {
     engine.start();
 
     const pack = defaultAnalyzerPack(engine);
-    const names = pack.map((a) => a.name);
+    const names = pack.map((a) => a.id);
     expect(names).toContain('run-finalize');
     expect(names).toContain('resource-peak:gold');
     engine.stop();
@@ -81,7 +81,7 @@ describe('defaultAnalyzerPack', () => {
     engine.start();
 
     const pack = defaultAnalyzerPack(engine);
-    expect(pack.map((a) => a.name)).toEqual(['resource-peak:gold']);
+    expect(pack.map((a) => a.id)).toEqual(['resource-peak:gold']);
     engine.stop();
   });
 
@@ -116,8 +116,8 @@ describe('defaultAnalyzerPack', () => {
     const packA = defaultAnalyzerPack(engineA);
     const packB = defaultAnalyzerPack(engineB);
 
-    expect(packA.map((a) => a.name)).toEqual(['resource-peak:gold']);
-    expect(packB.map((a) => a.name)).toEqual(['resource-peak:gems']);
+    expect(packA.map((a) => a.id)).toEqual(['resource-peak:gold']);
+    expect(packB.map((a) => a.id)).toEqual(['resource-peak:gems']);
 
     engineA.stop();
     engineB.stop();

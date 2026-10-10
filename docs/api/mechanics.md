@@ -102,9 +102,9 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:34`
 - `interface FlagGate` — True when `accessor.getFlag(id)` returns true. `src/core/gate.ts:90`
 - `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | ActiveGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:121`
-- `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:174`
-- `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:192`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:150`
+- `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:175`
+- `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:193`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:151`
 - `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:108`
 - `type Predicate = Computable<boolean> | Gate` — A yes/no condition in any authoring form: a constant, a ref or getter over state in scope, or a Gate the engine can introspect and predict. `src/core/gate.ts:138`
 - `interface ResourceGteGate` — True when `accessor.getAmount(resource) >= value`. `src/core/gate.ts:21`

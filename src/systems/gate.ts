@@ -196,7 +196,7 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
     }
     case 'state':
       return compareState(
-        demand(runtime, 'accessor', gate.kind).getStateAt(gate.key),
+        demand(runtime, 'accessor', gate.kind).getStateAt(gate.path),
         gate.operator,
         gate.value,
       );
@@ -238,7 +238,7 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
   switch (gate.kind) {
     case 'resource-gte':
       return timeUntilConditionFlip(
-        { type: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
+        { kind: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
         demand(runtime, 'accessor', gate.kind),
       );
     case 'cumulative-gte':
@@ -284,7 +284,7 @@ export function collectGateDeps(gate: Gate): TransitionDeps {
         deps.flags.add(leaf.id);
         return;
       case 'state':
-        deps.states.add(leaf.key);
+        deps.states.add(leaf.path);
         return;
       case 'count-gte':
       case 'active':
