@@ -12,10 +12,10 @@
  * the genre-standard loop and every existing consumer.
  *
  * Fixed mode (`tickMode: 'fixed'`): accumulates real elapsed dt (scaled by
- * speedMultiplier), then drains the accumulator by calling `processTick(stepSize)`
- * repeatedly until the remainder is below stepSize. `maxStepsPerTick` caps per-interval
+ * speedMultiplier), then drains the accumulator by calling `processTick(fixedDt)`
+ * repeatedly until the remainder is below fixedDt. `maxTicksPerInterval` caps per-interval
  * sub-steps; residual above the cap is dropped (optionally reported via
- * `onStepsOverflow`), never banked. For consumers whose tick math presumes a small
+ * `onTicksOverflow`), never banked. For consumers whose tick math presumes a small
  * constant dt (e.g. 120ms steps, tick-counter decay).
  *
  * EWMA: An exponentially-weighted moving average tracks mean raw dt in both modes.
@@ -23,15 +23,15 @@
  * the accumulator does.
  *
  * Speed control: `speedMultiplier` scales dt before passing to callbacks during live play.
- * Both the timer loop and `tickRaw()` (the injected-clock live path used by replay) apply
- * it. `simulateTick()` and `stepOnce()` do NOT — offline processing and tests stay
+ * Both the timer loop and `processInterval()` (the injected-clock live path used by replay) apply
+ * it. `advanceTime()` and `tickOnce()` do NOT — offline processing and tests stay
  * wall-clock faithful and deterministic.
  *
- * Offline catchup: `simulateTick()` in fixed mode also uses the accumulator but is NOT
- * bounded by `maxStepsPerTick` — that cap is live-play overspill protection only.
+ * Offline catchup: `advanceTime()` in fixed mode also uses the accumulator but is NOT
+ * bounded by `maxTicksPerInterval` — that cap is live-play overspill protection only.
  * Offline work is bounded upstream by `processOfflineTime`'s `maxOfflineSeconds`.
  *
- * Deterministic replay: fixed mode + seeded RNG + `stepOnce()` produces bit-identical
+ * Deterministic replay: fixed mode + seeded RNG + `tickOnce()` produces bit-identical
  * sequences across tab-performance profiles. Variable mode cannot.
  *
  * Variable dt with setInterval is the genre standard. EWMA lag compensation
@@ -62,10 +62,10 @@ export interface TimerProvider {
  */
 export interface TickDriverConfig {
   /** Ticks per second (default 20). Controls the setInterval cadence. */
-  tickRate?: number;
+  intervalRate?: number;
   /**
    * Maximum seconds of game time per tick (default 1). Live variable-mode play clamps
-   * to it; `simulateTick` splits a longer dt into several ticks instead.
+   * to it; `advanceTime` splits a longer dt into several ticks instead.
    */
   maxDeltaTime?: number;
   /** Initial speed multiplier (default 1). Scales dt during live play only. */
@@ -73,33 +73,33 @@ export interface TickDriverConfig {
   /**
    * dt handling mode. `'variable'` (default) passes real elapsed dt to callbacks once
    * per interval — genre standard, arbitrary dt supported. `'fixed'` accumulates real
-   * elapsed dt and drains at `stepSize` per sub-tick — for source-faithful ports whose
+   * elapsed dt and drains at `fixedDt` per sub-tick — for source-faithful ports whose
    * tick math presumes a small constant dt (clamp-on-overshoot jobs, decay formulas
    * authored against a 20ms or 120ms step).
    */
   tickMode?: 'variable' | 'fixed';
   /**
-   * Seconds per sub-tick in fixed mode. Defaults to `1 / tickRate`. Unused in variable
+   * Seconds per sub-tick in fixed mode. Defaults to `1 / intervalRate`. Unused in variable
    * mode. Typical values: 0.020, 0.120.
    */
-  stepSize?: number;
+  fixedDt?: number;
   /**
    * Cap on sub-ticks drained per `intervalTick` invocation in fixed mode (default 100).
    * Overspill protection for frozen-tab wakeups — residual above the cap is dropped and
-   * the accumulator resets to 0. Does NOT apply to `simulateTick` or `stepOnce`.
+   * the accumulator resets to 0. Does NOT apply to `advanceTime` or `tickOnce`.
    */
-  maxStepsPerTick?: number;
+  maxTicksPerInterval?: number;
   /**
-   * Diagnostic callback fired when fixed-mode `intervalTick` drops sub-steps because
-   * the accumulator exceeded `maxStepsPerTick * stepSize`. Receives the floor of
-   * dropped-steps count. Default: no-op. Never throws on overflow.
+   * Diagnostic callback fired when a fixed-mode interval drops ticks because
+   * the accumulator exceeded `maxTicksPerInterval * fixedDt`. Receives the floor of
+   * dropped-ticks count. Default: no-op. Never throws on overflow.
    */
-  onStepsOverflow?: (droppedSteps: number) => void;
+  onTicksOverflow?: (droppedTicks: number) => void;
   /**
    * Diagnostic callback fired in variable mode when raw dt exceeds `maxDeltaTime`, i.e.
    * the loop clamped because a long tab-hide or hitch produced more wall time than the
    * loop will simulate in one interval. Receives the dropped seconds
-   * (`rawDt - maxDeltaTime`). Default: no-op. Never throws. Mirrors `onStepsOverflow`
+   * (`rawDt - maxDeltaTime`). Default: no-op. Never throws. Mirrors `onTicksOverflow`
    * for consumers that bank overflow (time-bank patterns) instead of discarding it.
    */
   onDeltaOverflow?: (droppedSeconds: number) => void;
@@ -135,14 +135,14 @@ export interface PhaseHooks {
 
 /**
  * Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real
- * (speed-scaled, capped) elapsed time in variable mode, always `stepSize` in
+ * (speed-scaled, capped) elapsed time in variable mode, always `fixedDt` in
  * fixed mode.
  */
 export type TickCallback = (dt: number) => void;
 
 /**
  * The TickDriver instance returned by {@link createTickDriver}. Exposes
- * start/stop control, deterministic `stepOnce` / `simulateTick` entry points
+ * start/stop control, deterministic `tickOnce` / `advanceTime` entry points
  * for tests and offline processing, named-phase hooks, and live-settable
  * overflow diagnostics.
  */
@@ -152,25 +152,25 @@ export interface TickDriver {
    * Run one live tick from an injected `rawDt` — the speed-aware path the timer
    * loop runs internally, exposed for deterministic replay. Applies the EWMA
    * update, the `maxDeltaTime` cap (firing `onDeltaOverflow`), `speedMultiplier`,
-   * and in fixed mode the `maxStepsPerTick`-bounded accumulator drain (firing
-   * `onStepsOverflow`). `intervalTick` is exactly this fed the wall clock; the
+   * and in fixed mode the `maxTicksPerInterval`-bounded accumulator drain (firing
+   * `onTicksOverflow`). `intervalTick` is exactly this fed the wall clock; the
    * harness `replayLive` drives it from a controlled clock. Contrast
-   * `simulateTick`, the offline/test path: no speed scaling, no `maxStepsPerTick`.
+   * `advanceTime`, the offline/test path: no speed scaling, no `maxTicksPerInterval`.
    */
-  tickRaw(rawDt: number): void;
+  processInterval(rawDt: number): void;
   /**
    * Feed raw seconds through the loop (for offline processing). Does NOT apply
-   * speedMultiplier. In fixed mode, drains the accumulator at `stepSize` per sub-tick
-   * with no `maxStepsPerTick` cap (offline is bounded upstream by `processOfflineTime`).
+   * speedMultiplier. In fixed mode, drains the accumulator at `fixedDt` per sub-tick
+   * with no `maxTicksPerInterval` cap (offline is bounded upstream by `processOfflineTime`).
    * In variable mode, a `rawDt` above `maxDeltaTime` runs as the fewest equal ticks
    * under the cap, so every second fed in is simulated and `onDeltaOverflow` never fires.
    */
-  simulateTick(rawDt: number): void;
+  advanceTime(rawDt: number): void;
   /**
-   * Process exactly one tick. Deterministic — for tests and headless. dt is `stepSize`
-   * in fixed mode, `1 / tickRate` (tickInterval) in variable mode.
+   * Process exactly one tick. Deterministic — for tests and headless. dt is `fixedDt`
+   * in fixed mode, `1 / intervalRate` (tickInterval) in variable mode.
    */
-  stepOnce(): void;
+  tickOnce(): void;
   start(): void;
   stop(): void;
   registerPhase(name: string, hooks: PhaseHooks): void;
@@ -178,15 +178,15 @@ export interface TickDriver {
   exitPhase(name: string): void;
   readonly running: boolean;
   /** Ticks per second. Setter restarts the interval if running. */
-  tickRate: number;
-  /** Scales dt during live play. Does not affect simulateTick or stepOnce. */
+  intervalRate: number;
+  /** Scales dt during live play. Does not affect advanceTime or tickOnce. */
   speedMultiplier: number;
   /**
    * Live-settable diagnostic callback for fixed-mode sub-step drop (see config field).
    * Consumers that need the grant closure built after the loop exists can set this
    * post-create; setting to `undefined` clears it.
    */
-  onStepsOverflow: ((droppedSteps: number) => void) | undefined;
+  onTicksOverflow: ((droppedTicks: number) => void) | undefined;
   /**
    * Live-settable diagnostic callback for variable-mode raw-dt clamp (see config field).
    */
@@ -197,7 +197,7 @@ export interface TickDriver {
    * your own cadence.
    */
   readonly deltaMean: number;
-  /** Per-tick dt cap (seconds). Variable-mode `simulateTick` splits a longer dt into ticks under it. */
+  /** Per-tick dt cap (seconds). Variable-mode `advanceTime` splits a longer dt into ticks under it. */
   readonly maxDeltaTime: number;
 }
 
@@ -205,10 +205,10 @@ export interface TickDriver {
 const FILTER_STRENGTH = 20;
 
 /**
- * Tolerance for the fixed-mode accumulator's `>= stepSize` compare. Iterative subtraction
+ * Tolerance for the fixed-mode accumulator's `>= fixedDt` compare. Iterative subtraction
  * accumulates FP error — e.g. draining 1.0 by 0.02 fifty times can leave the accumulator
  * at ~0.01999999999999986 after iteration 49, which would fail a strict compare and drop
- * the final sub-step. Sized well below any realistic stepSize (minimum ~0.001 s = 1000 Hz)
+ * the final sub-step. Sized well below any realistic fixedDt (minimum ~0.001 s = 1000 Hz)
  * to round only numerical noise into the intended step count.
  */
 const ACCUMULATOR_EPSILON = 1e-9;
@@ -224,42 +224,42 @@ const SPLIT_QUOTIENT_EPSILON = 1e-12;
  * a choice of variable-dt (default) or fixed-step accumulator mode.
  *
  * @param config - Driver configuration: tick rate, max delta, speed multiplier, `tickMode`
- *   (`'variable'` or `'fixed'`), plus fixed-mode knobs (`stepSize`, `maxStepsPerTick`,
- *   `onStepsOverflow`) and an optional custom timer provider for Web Workers or testing.
+ *   (`'variable'` or `'fixed'`), plus fixed-mode knobs (`fixedDt`, `maxTicksPerInterval`,
+ *   `onTicksOverflow`) and an optional custom timer provider for Web Workers or testing.
  * @returns A TickDriver that can be started/stopped, supports per-phase enter/exit/tick
- *   hooks, and exposes `simulateTick()` / `stepOnce()` for deterministic testing.
+ *   hooks, and exposes `advanceTime()` / `tickOnce()` for deterministic testing.
  *
  * @example
  * ```ts
  * // Variable mode (genre default)
- * const tickDriver = createTickDriver({ tickRate: 20 });
+ * const tickDriver = createTickDriver({ intervalRate: 20 });
  * tickDriver.onTick((dt) => updateResources(dt));
  * tickDriver.registerPhase('combat', { onTick: (dt) => tickCombat(dt) });
  * tickDriver.start();
  *
  * // Fixed mode (source-faithful ports)
  * const fixed = createTickDriver({
- *   tickRate: 50,
+ *   intervalRate: 50,
  *   tickMode: 'fixed',
- *   stepSize: 0.020, // 20 ms sub-tick
- *   maxStepsPerTick: 100,
+ *   fixedDt: 0.020, // 20 ms sub-tick
+ *   maxTicksPerInterval: 100,
  * });
  * ```
  */
 export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
-  const tickRate = shallowRef(config.tickRate ?? 20);
+  const intervalRate = shallowRef(config.intervalRate ?? 20);
   const maxDeltaTime = config.maxDeltaTime ?? 1;
-  let tickInterval = 1 / tickRate.value;
+  let tickInterval = 1 / intervalRate.value;
   const speedMultiplier = shallowRef(config.speedMultiplier ?? 1);
   const tickMode = config.tickMode ?? 'variable';
-  const stepSize = config.stepSize ?? 1 / tickRate.value;
-  const maxStepsPerTick = config.maxStepsPerTick ?? 100;
-  let onStepsOverflow = config.onStepsOverflow;
+  const fixedDt = config.fixedDt ?? 1 / intervalRate.value;
+  const maxTicksPerInterval = config.maxTicksPerInterval ?? 100;
+  let onTicksOverflow = config.onTicksOverflow;
   let onDeltaOverflow = config.onDeltaOverflow;
 
   // Fixed-mode time-integrated accumulator. Persistent so `importSave` restores
   // it alongside the rest of engine state; closure-local state would leave a
-  // sub-tick (≤ `stepSize`) remainder desynced from resources after a mid-run
+  // sub-tick (≤ `fixedDt`) remainder desynced from resources after a mid-run
   // snapshot restore, breaking deterministic-replay and bisection flows.
   // Unused in variable mode; value stays 0 so the context key costs nothing.
   // A caller-supplied id (the engine's namespaced `'tick-driver'`) is a stable
@@ -314,8 +314,8 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   // Speed-aware live-tick body, shared by the timer loop and deterministic
   // replay. The single home for the live dt math: EWMA, maxDeltaTime cap,
   // speedMultiplier scaling, and the fixed-mode accumulator drain bounded by
-  // maxStepsPerTick.
-  function tickRaw(rawDt: number): void {
+  // maxTicksPerInterval.
+  function processInterval(rawDt: number): void {
     if (rawDt <= 0) return;
 
     // EWMA: track mean raw delta for diagnostics and lag detection (both modes)
@@ -328,16 +328,16 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
 
     if (tickMode === 'fixed') {
       accumulator.value += cappedDt * speedMultiplier.value;
-      let steps = 0;
-      while (accumulator.value + ACCUMULATOR_EPSILON >= stepSize && steps < maxStepsPerTick) {
-        processTick(stepSize);
-        accumulator.value -= stepSize;
-        steps++;
+      let ticks = 0;
+      while (accumulator.value + ACCUMULATOR_EPSILON >= fixedDt && ticks < maxTicksPerInterval) {
+        processTick(fixedDt);
+        accumulator.value -= fixedDt;
+        ticks++;
       }
-      if (accumulator.value + ACCUMULATOR_EPSILON >= stepSize) {
-        const droppedSteps = Math.floor(accumulator.value / stepSize);
+      if (accumulator.value + ACCUMULATOR_EPSILON >= fixedDt) {
+        const droppedTicks = Math.floor(accumulator.value / fixedDt);
         accumulator.value = 0;
-        onStepsOverflow?.(droppedSteps);
+        onTicksOverflow?.(droppedTicks);
       }
       return;
     }
@@ -350,15 +350,15 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     const now = performance.now();
     const rawDt = (now - lastTime) / 1000;
     lastTime = now;
-    tickRaw(rawDt);
+    processInterval(rawDt);
   }
 
-  function simulateTick(rawDt: number): void {
+  function advanceTime(rawDt: number): void {
     if (tickMode === 'fixed') {
       accumulator.value += rawDt;
-      while (accumulator.value + ACCUMULATOR_EPSILON >= stepSize) {
-        processTick(stepSize);
-        accumulator.value -= stepSize;
+      while (accumulator.value + ACCUMULATOR_EPSILON >= fixedDt) {
+        processTick(fixedDt);
+        accumulator.value -= fixedDt;
       }
       return;
     }
@@ -375,7 +375,7 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
   function startInterval(): void {
     lastTime = performance.now();
     deltaMean = tickInterval;
-    intervalId = timers.setInterval(intervalTick, Math.round(1000 / tickRate.value));
+    intervalId = timers.setInterval(intervalTick, Math.round(1000 / intervalRate.value));
   }
 
   function stopInterval(): void {
@@ -398,13 +398,13 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
 
   return {
     onTick,
-    tickRaw,
-    simulateTick,
+    processInterval,
+    advanceTime,
     maxDeltaTime,
     start,
     stop,
-    stepOnce() {
-      processTick(tickMode === 'fixed' ? stepSize : tickInterval);
+    tickOnce() {
+      processTick(tickMode === 'fixed' ? fixedDt : tickInterval);
     },
     registerPhase(name, hooks) {
       phases.set(name, hooks);
@@ -424,11 +424,11 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     get running() {
       return running.value;
     },
-    get tickRate() {
-      return tickRate.value;
+    get intervalRate() {
+      return intervalRate.value;
     },
-    set tickRate(value: number) {
-      tickRate.value = value;
+    set intervalRate(value: number) {
+      intervalRate.value = value;
       tickInterval = 1 / value;
       if (running.value) {
         stopInterval();
@@ -441,11 +441,11 @@ export function createTickDriver(config: TickDriverConfig = {}): TickDriver {
     set speedMultiplier(value: number) {
       speedMultiplier.value = value;
     },
-    get onStepsOverflow() {
-      return onStepsOverflow;
+    get onTicksOverflow() {
+      return onTicksOverflow;
     },
-    set onStepsOverflow(fn) {
-      onStepsOverflow = fn;
+    set onTicksOverflow(fn) {
+      onTicksOverflow = fn;
     },
     get onDeltaOverflow() {
       return onDeltaOverflow;

@@ -8,11 +8,6 @@ describe('Time System', () => {
     t.tick(0.05);
     expect(t.elapsed.value).toBeCloseTo(0.1, 5);
   });
-  it('supports speed multiplier', () => {
-    const t = createTimeSystem({ speedMultiplier: 2 });
-    t.tick(0.05);
-    expect(t.elapsed.value).toBeCloseTo(0.1, 5);
-  });
   it('resets elapsed without affecting totalPlayTime', () => {
     const t = createTimeSystem();
     t.tick(0.05);

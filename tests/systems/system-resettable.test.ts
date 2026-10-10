@@ -177,7 +177,7 @@ const cases: Case[] = [
     build: () => {
       const ticks = createManualTicks();
       return Object.assign(
-        createTimedProgress({ id: 'craft', duration: 10, registerTick: ticks.registerTick }),
+        createTimedProgress({ id: 'craft', needed: 10, registerTick: ticks.registerTick }),
         { ticks },
       );
     },

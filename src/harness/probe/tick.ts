@@ -25,11 +25,11 @@ import type { BeatResult, BeatProbeOptions } from './types';
  * fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is
  * observed), aggregated into per-beat termination-time distributions.
  *
- * Mode dispatch (`config.mode`, default `'tick'`):
- * - `'tick'` — fixed-tick loop, content-blind. Default.
+ * Mode dispatch (`config.mode`, default `'uniform'`):
+ * - `'uniform'` — fixed-tick loop, content-blind. Default.
  * - `'event'` — walker-visible event-stepping for live-rate-insufficient legs.
  *   Requires `config.buildAccessor`.
- * - `'stasis-aware-tick'` — per-tick stasis check; terminates with
+ * - `'stasis-aware'` — per-tick stasis check; terminates with
  *   `counts.unreachable` for seeds the walker confirms cannot fire. Requires
  *   `config.buildAccessor`.
  *
@@ -58,8 +58,8 @@ import type { BeatResult, BeatProbeOptions } from './types';
  */
 export function runBeatProbe(config: BeatProbeOptions): BeatResult[] {
   const tickDelta = config.tickDelta ?? 1;
-  const mode = config.mode ?? 'tick';
-  if (mode !== 'tick' && !config.buildAccessor) {
+  const mode = config.mode ?? 'uniform';
+  if (mode !== 'uniform' && !config.buildAccessor) {
     throw new Error(`runBeatProbe: mode "${mode}" requires config.buildAccessor`);
   }
   const out: BeatResult[] = [];

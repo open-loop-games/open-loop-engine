@@ -3,11 +3,11 @@ import type { Engine } from '@/index';
 import { runBeatProbe } from '@/harness';
 import type { Beat } from '@/harness';
 
-/** Minimal engine shaped object whose counter advances one tick per simulateTick. */
+/** Minimal engine shaped object whose counter advances one tick per advanceTime. */
 function buildTickCounterEngine(state: { tick: number }): Engine {
   const engine = {
     tickDriver: {
-      simulateTick: (_dt: number) => {
+      advanceTime: (_dt: number) => {
         state.tick += 1;
       },
     },

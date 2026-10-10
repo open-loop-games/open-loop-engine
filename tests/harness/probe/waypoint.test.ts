@@ -3,11 +3,11 @@ import type { Engine } from '@/index';
 import { random } from '@/primitives/rng';
 import { runWaypointProbe } from '@/harness';
 
-/** Minimal engine whose counter advances one tick per simulateTick(dt) call. */
+/** Minimal engine whose counter advances one tick per advanceTime(dt) call. */
 function buildTickCounterEngine(state: { tick: number; simTime: number }): Engine {
   const engine = {
     tickDriver: {
-      simulateTick: (dt: number) => {
+      advanceTime: (dt: number) => {
         state.tick += 1;
         state.simTime += dt;
       },
@@ -98,7 +98,7 @@ describe('runWaypointProbe', () => {
       const id = built++;
       return {
         id,
-        tickDriver: { simulateTick: () => {} },
+        tickDriver: { advanceTime: () => {} },
         stop: () => events.push(`stop:${id}`),
       } as unknown as Engine;
     };

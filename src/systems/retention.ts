@@ -46,9 +46,9 @@ export interface RetentionPolicy {
  *
  * @example retain.set(skillLevel, fractional(0.3)) // keep 30%
  */
-export function fractional(rate: DecimalSource): (value: any) => any {
+export function fractional(fraction: DecimalSource): (value: any) => any {
   return (value: any) =>
-    typeof value === 'number' ? value * toNumber(rate) : Decimal.mul(value, rate);
+    typeof value === 'number' ? value * toNumber(fraction) : Decimal.mul(value, fraction);
 }
 
 // === FACTORIES ===

@@ -305,7 +305,7 @@ function buildResource<T>(
         // between two landed amounts.
         let landed = initial;
 
-        // flush: 'sync' so sim harnesses driving engine.tickDriver.stepOnce()
+        // flush: 'sync' so sim harnesses driving engine.tickDriver.tickOnce()
         // in a tight loop (no microtask boundary between ticks) still observe
         // updates on the same tick the source resource changed.
         watch(

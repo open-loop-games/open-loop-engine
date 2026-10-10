@@ -164,7 +164,7 @@ export function runEventModeLoop(
   let before = sample();
 
   while (true) {
-    if (predicate({ tick: steps, simTime })) {
+    if (predicate({ iteration: steps, simTime })) {
       terminated = 'predicate';
       break;
     }
@@ -180,9 +180,9 @@ export function runEventModeLoop(
           ? { saveText: engine.saveManager!.exportSave(), rng: getRNGState() }
           : null;
       const advanceStart = profileStart();
-      engine.tickDriver.simulateTick(result.dt);
+      engine.tickDriver.advanceTime(result.dt);
       profileEnd('runUntil.event.advance', advanceStart);
-      if (checkpoint !== null && predicate({ tick: steps, simTime: simTime + result.dt })) {
+      if (checkpoint !== null && predicate({ iteration: steps, simTime: simTime + result.dt })) {
         // Predicate flipped during this advance. Restore + replay sub-intervals
         // to narrow the fire time to within `bisectTolSec`; otherwise the
         // top-of-loop check on the next iteration would record
@@ -241,7 +241,7 @@ export function runEventModeLoop(
       const dt = Math.min(tickDelta, remaining);
       if (dt <= 0) break;
       const opaqueStart = profileStart();
-      engine.tickDriver.simulateTick(dt);
+      engine.tickDriver.advanceTime(dt);
       profileEnd('runUntil.event.opaqueTick', opaqueStart);
       simTime += dt;
       before = commitDeps(inc, sample, before);
@@ -379,13 +379,13 @@ function fastTickDuringStasis(
     const remaining = maxSimTime - simTime;
     const dt = Math.min(tickDelta, remaining);
     if (dt <= 0) break;
-    engine.tickDriver.simulateTick(dt);
+    engine.tickDriver.advanceTime(dt);
     simTime += dt;
     ticks++;
 
     // `startSteps + ticks` keeps ctx.tick run-absolute — consistent with the
     // main loop's `steps`, not a per-entry local counter restarting at 1.
-    if (predicate({ tick: startSteps + ticks, simTime })) {
+    if (predicate({ iteration: startSteps + ticks, simTime })) {
       return { simTime, ticks, exit: 'predicate' };
     }
     if (ticks % stasisCheckInterval === 0) {
@@ -421,25 +421,25 @@ function bisectTerminationTime(
   while (high - low > tolSec) {
     const mid = (low + high) / 2;
     restore();
-    engine.tickDriver.simulateTick(mid);
+    engine.tickDriver.advanceTime(mid);
     // `mid` is relative to the checkpoint (the advance's start); the predicate
     // reads run-absolute `simTime`, so feed it `baseSimTime + mid`. Passing the
     // raw `mid` here silently defeats bisection for any simTime-reading
     // predicate — the exact idiom in runUntil's @example.
-    if (predicate({ tick: baseSteps, simTime: baseSimTime + mid })) high = mid;
+    if (predicate({ iteration: baseSteps, simTime: baseSimTime + mid })) high = mid;
     else low = mid;
   }
   // Leave the engine at the smallest dt for which the predicate is true so
   // the run ends in the fired state rather than a bisect intermediate.
   restore();
-  engine.tickDriver.simulateTick(high);
+  engine.tickDriver.advanceTime(high);
   return high;
 }
 
 /**
  * True when the snapshot is in a state that mechanically cannot produce a
  * predicate-firing transition — no opaque-predicates, no finite distances.
- * Used by `'stasis-aware-tick'` mode in `runUntil` to short-circuit unreachable
+ * Used by `'stasis-aware'` mode in `runUntil` to short-circuit unreachable
  * runs. Conservative: any opaque-predicate distance aborts the classification
  * (false-negatives preferred over false-positives).
  *

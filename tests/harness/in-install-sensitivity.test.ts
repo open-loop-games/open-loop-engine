@@ -86,7 +86,7 @@ describe('in-install sensitivity integration', () => {
       saveText: blob,
       modules: () => [createToyModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 20,
     });
 
@@ -101,7 +101,7 @@ describe('in-install sensitivity integration', () => {
         chain!.add(createMultiplicativeModifier({ multiplier: 3 }));
       },
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 20,
     });
 
@@ -176,7 +176,7 @@ describe('in-install sensitivity integration', () => {
       saveText: blob,
       modules: () => [makeEmptyChainModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 20,
     });
 
@@ -188,7 +188,7 @@ describe('in-install sensitivity integration', () => {
         applyPerturbation(engine, entry, { kind: 'scalar-multiply', factor: 5 });
       },
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 20,
     });
 
@@ -267,7 +267,7 @@ describe('in-install sensitivity integration', () => {
       saveText: blob,
       modules: () => [createLoopGoldModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: TOTAL_TICKS,
     });
 

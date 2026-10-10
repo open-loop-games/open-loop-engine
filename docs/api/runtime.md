@@ -49,7 +49,7 @@ worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes:
 
 - `function createTickDriver(config?: TickDriverConfig): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:249`
 - `interface PhaseHooks` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:130`
-- `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real (speed-scaled, capped) elapsed time in variable mode, always `stepSize` in fixed mode. `src/core/tick-driver.ts:141`
+- `type TickCallback = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real (speed-scaled, capped) elapsed time in variable mode, always `fixedDt` in fixed mode. `src/core/tick-driver.ts:141`
 - `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:149`
 - `interface TickDriverConfig` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:63`
 - `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:53`
@@ -70,10 +70,10 @@ lightweight tick-callback rate limiter
 
 ## Time tracking
 
-persistent elapsed/total play time and reactive speed multiplier
+persistent elapsed and total play time
 
-- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time, speed multiplier, and formatted display. `src/systems/time.ts:82`
-- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:43`
+- `function createTimeSystem(config?: TimeSystemConfig): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time and a formatted display. `src/systems/time.ts:69`
+- `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:35`
 - `interface TimeSystemConfig` — Configuration for createTimeSystem. `src/systems/time.ts:26`
 
 ## Transition-distance primitives

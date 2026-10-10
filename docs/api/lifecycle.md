@@ -72,7 +72,7 @@ opt-in interface for objects that can yield their resettable contents to a reset
 Retention policy for declarative carryover across resets
 
 - `function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy` — Creates a declarative retention policy for carrying values across resets. `src/systems/retention.ts:80`
-- `function fractional(rate: DecimalSource): (value: any) => any` — Create a fractional retention transform. `src/systems/retention.ts:49`
+- `function fractional(fraction: DecimalSource): (value: any) => any` — Create a fractional retention transform. `src/systems/retention.ts:49`
 - `interface RetentionPolicy` — Snapshot/restore pair that selectively preserves persistent refs across a reset. `src/systems/retention.ts:33`
 - `interface RetentionPolicyOptions` — Options for createRetentionPolicy — split refs into `keep` (verbatim) and `retain` (transformed). `src/systems/retention.ts:18`
 

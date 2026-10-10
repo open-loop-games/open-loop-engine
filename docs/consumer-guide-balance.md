@@ -210,7 +210,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 
 | Surface | Use for |
 | --- | --- |
-| `runUntil` | Predicate-bounded single-engine run. The workhorse. Dispatches on `RunMode` (`'tick'`, `'event'`, `'stasis-aware-tick'`). |
+| `runUntil` | Predicate-bounded single-engine run. The workhorse. Dispatches on `RunMode` (`'uniform'`, `'event'`, `'stasis-aware'`). |
 | `runBeatProbe` | Per-beat termination-time distributions from a seed sweep. |
 | `runWaypointProbe` | Snapshot-at-time across an arc per seed × waypoint; band occupation reads off the snapshot series. |
 | `runHeadless` | Fixed-tick-count run. Replayable only when you pass `seed`: the module-global RNG is entropy-seeded otherwise. |
@@ -242,9 +242,9 @@ Default to `1` for arc probes. Drop lower only when sub-second timing is part of
 
 The engine's `maxDeltaTime` (default `1`) bounds the speedup, not the timing. A step larger than the cap reaches the engine as several equal calls under it — every reported second is simulated, but past the cap coarsening stops buying speed. Raise `maxDeltaTime` on the probe engine to coarsen further.
 
-### `stasis-aware-tick`
+### `stasis-aware`
 
-`runUntil({ mode: 'stasis-aware-tick' })` short-circuits ticking when the game has stopped progressing, turning a probe that would burn to `maxSimTime` into one that terminates early and honestly.
+`runUntil({ mode: 'stasis-aware' })` short-circuits ticking when the game has stopped progressing, turning a probe that would burn to `maxSimTime` into one that terminates early and honestly.
 
 The adoption condition is structural, not a heuristic: **the accessor faithfully captures the engine's income channels if and only if there is no out-of-band rate channel it can't see.**
 

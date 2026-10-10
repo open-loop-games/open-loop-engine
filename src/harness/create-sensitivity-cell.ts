@@ -60,7 +60,7 @@ export interface CreateSensitivityCellOptions {
   /**
    * Drives the engine one tick. Receives the engine built in this run
    * plus the harness-provided dt. Typical shapes:
-   * `(engine) => engine.tickDriver.stepOnce()` or a consumer-specific handler.
+   * `(engine) => engine.tickDriver.tickOnce()` or a consumer-specific handler.
    */
   tick: (engine: Engine, dt: number) => void;
   ticks: number;
@@ -106,7 +106,7 @@ let runCounter = 0;
  *   name: 'baseline',
  *   saveText: blob,
  *   modules: () => [createGoldModule()],
- *   tick: (engine) => engine.tickDriver.stepOnce(),
+ *   tick: (engine) => engine.tickDriver.tickOnce(),
  *   ticks: 1000,
  * });
  * ```

@@ -560,7 +560,7 @@ describe('persistence', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
     first.system.activate('haste');
-    for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
+    for (let s = 0; s < 12; s++) first.engine.tickDriver.advanceTime(1);
     first.engine.save();
     first.engine.dispose();
 
@@ -574,7 +574,7 @@ describe('persistence', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
     first.system.activate('haste');
-    for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
+    for (let s = 0; s < 12; s++) first.engine.tickDriver.advanceTime(1);
     first.engine.save();
     first.engine.dispose();
 

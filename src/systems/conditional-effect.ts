@@ -254,7 +254,7 @@ export function createConditionalEffectSystem(
       };
 
       // flush: 'sync' so a predicate that flips mid-run binds/unbinds its
-      // modifiers on the same synchronous step. Headless sims drive stepOnce()
+      // modifiers on the same synchronous step. Headless sims drive tickOnce()
       // in a tight loop with no microtask boundary, so a default (pre) flush
       // would leave the effect a step or more late. Mirrors achievement.ts /
       // automation.ts / resource-bag link watchers.

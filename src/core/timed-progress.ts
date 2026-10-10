@@ -58,9 +58,9 @@ export type TimedProgressOptions = TimedProgressBaseOptions &
 /** Options every {@link createTimedProgress} tracker shares. */
 export interface TimedProgressBaseOptions {
   /** Total progress needed before `onComplete` fires. */
-  duration: Computable<DecimalSource>;
+  needed: Computable<DecimalSource>;
   /** Progress gained per second (default 1). */
-  speed?: Computable<DecimalSource>;
+  rate?: Computable<DecimalSource>;
   /** Tick registration function — tracker self-wires its tick. */
   registerTick: RegisterTick;
   /**
@@ -91,9 +91,9 @@ export interface TimedProgress {
   /** Accumulated progress. Persistent unless `ephemeral: true`. */
   progress: Ref<DecimalSource>;
   /** Total progress for one completion cycle. */
-  duration: MaybeRef<DecimalSource>;
+  needed: MaybeRef<DecimalSource>;
   /** Progress gained per second. */
-  speed: MaybeRef<DecimalSource>;
+  rate: MaybeRef<DecimalSource>;
   /**
    * Progress advanced by the most recent tick, held until the next one. Zero
    * after a tick that didn't advance (speed or dt ≤ 0) and after `reset()`.
@@ -141,14 +141,14 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
 }
 
 interface ProcessedTimedProgressOptions {
-  duration: MaybeRef<DecimalSource>;
-  speed: MaybeRef<DecimalSource>;
+  needed: MaybeRef<DecimalSource>;
+  rate: MaybeRef<DecimalSource>;
 }
 
 function buildProcessedOptions(options: TimedProgressOptions): ProcessedTimedProgressOptions {
   return {
-    duration: toMaybeRef(options.duration),
-    speed: options.speed != null ? toMaybeRef(options.speed) : 1,
+    needed: toMaybeRef(options.needed),
+    rate: options.rate != null ? toMaybeRef(options.rate) : 1,
   };
 }
 
@@ -160,15 +160,15 @@ function buildComputeds(
   timeRemaining: ComputedRef<DecimalSource>;
 } {
   const percentComplete = computed((): number => {
-    const dur = new Decimal(unref(processed.duration));
+    const dur = new Decimal(unref(processed.needed));
     if (dur.lte(0)) return 0;
     return new Decimal(state.progress.value).div(dur).clamp(0, 1).toNumber();
   });
 
   const timeRemaining = computed((): DecimalSource => {
-    const dur = new Decimal(unref(processed.duration));
+    const dur = new Decimal(unref(processed.needed));
     const remaining = dur.sub(state.progress.value).max(0);
-    const spd = new Decimal(unref(processed.speed));
+    const spd = new Decimal(unref(processed.rate));
     if (spd.lte(0)) return Decimal.dInf;
     return remaining.div(spd);
   });
@@ -196,7 +196,7 @@ interface TimedProgressTickContext {
 function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
   const { state, latch, tickProgressDelta, processed, onProgress, onComplete } = ctx;
 
-  const spd = new Decimal(unref(processed.speed));
+  const spd = new Decimal(unref(processed.rate));
   if (spd.lte(0)) {
     tickProgressDelta.value = 0;
     return;
@@ -210,7 +210,7 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
   }
 
   const next = prev.add(delta);
-  const dur = new Decimal(unref(processed.duration));
+  const dur = new Decimal(unref(processed.needed));
 
   // Fire onComplete once per completion, so a consumer that parks progress
   // past duration without resetting isn't called again on every tick. The
@@ -287,8 +287,8 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
   const timedProgress: TimedProgress = {
     id: actualId,
     progress: state.progress,
-    duration: processed.duration,
-    speed: processed.speed,
+    needed: processed.needed,
+    rate: processed.rate,
     tickProgressDelta,
     percentComplete,
     timeRemaining,
@@ -315,12 +315,12 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
  */
 export function resourceConsumedAt(
   progress: DecimalSource,
-  duration: DecimalSource,
+  needed: DecimalSource,
   amount: DecimalSource,
 ): Decimal {
   if (Decimal.lte(progress, 0)) return Decimal.dZero;
-  if (Decimal.gte(progress, duration)) return new Decimal(amount);
-  const interval = Decimal.div(duration, amount);
+  if (Decimal.gte(progress, needed)) return new Decimal(amount);
+  const interval = Decimal.div(needed, amount);
   return Decimal.ceil(Decimal.div(progress, interval));
 }
 
@@ -438,10 +438,10 @@ export interface ProgressiveCostStep {
 export function stepProgressiveCosts(opts: {
   prevProgress: DecimalSource;
   proposedProgress: DecimalSource;
-  duration: DecimalSource;
+  needed: DecimalSource;
   costs: readonly ProgressiveCostEntry[];
 }): ProgressiveCostStep {
-  const { prevProgress, proposedProgress, duration, costs } = opts;
+  const { prevProgress, proposedProgress, needed: duration, costs } = opts;
   const prev = new Decimal(prevProgress);
   let capped = new Decimal(proposedProgress);
 

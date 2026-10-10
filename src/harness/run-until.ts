@@ -3,21 +3,21 @@
  *
  * `runHeadless` takes a tick callback and a fixed tick budget. `runUntil`
  * takes an `Engine` and a predicate, driving the engine via
- * `engine.tickDriver.simulateTick(tickDelta)` until the predicate fires or
+ * `engine.tickDriver.advanceTime(tickDelta)` until the predicate fires or
  * `maxSimTime` is reached. Headless beat-timing tests (archetype sim
  * suites) are the canonical consumer — they want "how long does it take
  * for state X to hold?" rather than "what does state look like after N
  * ticks?".
  *
  * tickDelta is caller-authoritative: each iteration advances the engine by
- * exactly `tickDelta` seconds via `simulateTick`, which respects fixed-mode
+ * exactly `tickDelta` seconds via `advanceTime`, which respects fixed-mode
  * accumulator semantics for source-faithful ports. A `tickDelta` above the
  * driver's `maxDeltaTime` runs as several engine ticks under the cap, so
  * reported sim-time is always simulated sim-time. This
- * decouples the harness from the engine's live `tickRate` — coarsening
+ * decouples the harness from the engine's live `intervalRate` — coarsening
  * tickDelta at the harness level is a real speedup, not a reporting phantom,
- * up to the cap. (`stepOnce()` exists for deterministic-replay paths that
- * want the engine's own stepSize regardless of caller dt; `runUntil`
+ * up to the cap. (`tickOnce()` exists for deterministic-replay paths that
+ * want the engine's own fixedDt regardless of caller dt; `runUntil`
  * deliberately does not call it.)
  *
  * The predicate receives an {@link UntilContext} snapshot (`tick`,
@@ -28,11 +28,11 @@
  *
  * Run mode (`config.mode`):
  *
- * - `'tick'` (default) — fixed-tick loop above. Content-blind.
+ * - `'uniform'` (default) — fixed-tick loop above. Content-blind.
  * - `'event'` — walker-visible event-stepping with fast-tick fallbacks.
  *   Requires `config.accessor`, and takes no analyzers. Predicate fire-time
  *   can be resolved within an advance via `config.bisectTolSec`.
- * - `'stasis-aware-tick'` — fixed-tick loop with a per-tick stasis check.
+ * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check.
  *   When the walker reports no finite or opaque-predicate transition,
  *   terminates with `terminated: 'unreachable'`. Requires `config.accessor`.
  *
@@ -48,7 +48,7 @@ import { floorSteps } from './sim-time';
 import type { RunUntilConfig, RunUntilResult } from './types';
 
 /**
- * Drive `config.engine` via `engine.tickDriver.simulateTick(tickDelta)` until
+ * Drive `config.engine` via `engine.tickDriver.advanceTime(tickDelta)` until
  * `config.until` returns `true` or `config.maxSimTime` sim-seconds have
  * elapsed, whichever comes first. Returns the tick count, elapsed sim-time,
  * termination reason, and analyzer results.
@@ -79,8 +79,8 @@ import type { RunUntilConfig, RunUntilResult } from './types';
 export function runUntil(config: RunUntilConfig): RunUntilResult {
   const { engine, until, maxSimTime } = config;
   const tickDelta = config.tickDelta ?? 0.05;
-  const mode = config.mode ?? 'tick';
-  if (mode !== 'tick' && !config.accessor) {
+  const mode = config.mode ?? 'uniform';
+  if (mode !== 'uniform' && !config.accessor) {
     throw new Error(`runUntil: mode "${mode}" requires config.accessor`);
   }
   if (mode === 'event' && config.bisectTolSec !== undefined && !engine.saveManager) {
@@ -116,11 +116,11 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
   const accessor = config.accessor;
 
   while (tick <= maxTicks) {
-    if (until({ tick, simTime: tick * tickDelta })) {
+    if (until({ iteration: tick, simTime: tick * tickDelta })) {
       terminated = 'predicate';
       break;
     }
-    if (mode === 'stasis-aware-tick') {
+    if (mode === 'stasis-aware') {
       const snapshot = createTransitionSnapshot(engine, accessor!);
       if (isStasis(snapshot)) {
         terminated = 'unreachable';
@@ -128,7 +128,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
       }
     }
     if (tick === maxTicks) break;
-    engine.tickDriver.simulateTick(tickDelta);
+    engine.tickDriver.advanceTime(tickDelta);
     tick++;
     for (const a of analyzers) a.onTick?.(tick - 1);
   }

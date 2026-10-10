@@ -519,7 +519,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
 // stasis detection over opaque challenge fields
 // ---------------------------------------------------------------------------
 
-describe("runUntil 'stasis-aware-tick' — opaque challenge fields", () => {
+describe("runUntil 'stasis-aware' — opaque challenge fields", () => {
   it('reaches a closure goal that an onTick drives instead of calling it unreachable', () => {
     const points = ref(0);
     let completed!: () => boolean;
@@ -548,7 +548,7 @@ describe("runUntil 'stasis-aware-tick' — opaque challenge fields", () => {
     const result = runUntil({
       engine,
       accessor,
-      mode: 'stasis-aware-tick',
+      mode: 'stasis-aware',
       until: completed,
       maxSimTime: 20,
       tickDelta: 1,

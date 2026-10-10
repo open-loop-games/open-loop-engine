@@ -13,21 +13,21 @@ import type { Engine } from '@/engine';
 /**
  * Run-loop mode shared by {@link runUntil} and {@link runMatrixUntil}.
  *
- * - `'tick'` (default) — fixed-tick `simulateTick(tickDelta)` loop, predicate
+ * - `'uniform'` (default) — fixed-tick `advanceTime(tickDelta)` loop, predicate
  *   evaluated each iteration. Content-blind.
  * - `'event'` — walker-visible event-stepping. Builds an {@link createIncrementalSnapshot}
  *   per iteration, advances by the smallest finite transition distance, falls
  *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`.
  *   Predicate fire-time can be resolved within an advance via
  *   {@link RunUntilConfig.bisectTolSec}. Requires an accessor — modes other
- *   than `'tick'` introspect content through the walker — and takes no
+ *   than `'uniform'` introspect content through the walker — and takes no
  *   analyzers, since advances are variable-length.
- * - `'stasis-aware-tick'` — fixed-tick loop with a per-tick stasis check via
+ * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check via
  *   {@link createTransitionSnapshot}. When the snapshot reports no finite or
  *   opaque-predicate transition, the run terminates with `terminated: 'unreachable'`.
  *   Requires an accessor.
  */
-export type RunMode = 'tick' | 'event' | 'stasis-aware-tick';
+export type RunMode = 'uniform' | 'event' | 'stasis-aware';
 
 /**
  * Context passed to a {@link Cell}'s `setup` function. Carries the seed in
@@ -173,7 +173,7 @@ export interface CellAggregate {
    * Count of runs by termination reason. `predicate + maxSimTime + unreachable`
    * always equals the seed count for a {@link runMatrixUntil} cell.
    * `unreachable` is non-zero only for runs in `'event'` or
-   * `'stasis-aware-tick'` mode that observed stasis.
+   * `'stasis-aware'` mode that observed stasis.
    */
   terminationCounts?: { predicate: number; maxSimTime: number; unreachable: number };
   /**
@@ -298,7 +298,7 @@ export interface SensitivityConfig<C extends Cell | UntilCell = Cell> {
   /** Sim-seconds ceiling per run. Required when {@link until} is set. */
   maxSimTime?: number;
   /**
-   * Run mode applied uniformly to every cell. Defaults to `'tick'`.
+   * Run mode applied uniformly to every cell. Defaults to `'uniform'`.
    * Only meaningful when {@link until} is set; ignored otherwise. See
    * {@link RunMode}.
    */
@@ -352,7 +352,7 @@ export interface SensitivityResult {
 // =============================================================================
 // Until-runners — predicate-driven alternatives to the fixed-tick primitives.
 // Engine-aware (consume `Engine` directly and call
-// `engine.tickDriver.simulateTick(tickDelta)`), in contrast to the decoupled
+// `engine.tickDriver.advanceTime(tickDelta)`), in contrast to the decoupled
 // `tick`-callback shape of {@link runHeadless} and {@link runMatrix}. The
 // matrix variant's headline output is the distribution of *termination times*
 // — when each seed's predicate fired — surfaced as first-class fields on
@@ -371,7 +371,7 @@ export interface UntilContext {
    * Loop iterations completed so far — one per `tickDelta` step in the tick
    * modes. In event mode it counts advances and fast-ticks, each of any length.
    */
-  tick: number;
+  iteration: number;
   /**
    * Simulated seconds elapsed so far. Equals `tick * tickDelta` in tick mode;
    * in event mode advances are variable-length (plus fast-ticks), so it tracks
@@ -388,14 +388,14 @@ export type UntilPredicate = (ctx: UntilContext) => boolean;
 
 /**
  * Configuration for a single predicate-bounded run. The engine is consumed
- * directly — `runUntil` drives it via `engine.tickDriver.simulateTick(tickDelta)`
+ * directly — `runUntil` drives it via `engine.tickDriver.advanceTime(tickDelta)`
  * rather than a consumer-supplied tick callback. The engine must be started
  * (`engine.start()`) before calling `runUntil`.
  */
 export interface RunUntilConfig {
   /** Engine to drive. Must be started before the call. */
   engine: Engine;
-  /** Termination predicate. Evaluated once before every simulateTick, including tick 0. */
+  /** Termination predicate. Evaluated once before every advanceTime, including tick 0. */
   until: UntilPredicate;
   /**
    * Upper bound on simulated time, in seconds. Required — prevents runaway
@@ -406,10 +406,10 @@ export interface RunUntilConfig {
   /**
    * Seconds of sim-time per tick. Defaults to `0.05` (matches
    * {@link runHeadless}). The engine advances by exactly this amount per
-   * iteration, independent of its live `tickRate`. Variable-mode engines
+   * iteration, independent of its live `intervalRate`. Variable-mode engines
    * process one tick at this dt, or equal ticks under `maxDeltaTime` when it
    * exceeds the cap — so coarsening is a real speedup only up to the cap;
-   * fixed-mode engines drain the accumulator at their internal `stepSize`
+   * fixed-mode engines drain the accumulator at their internal `fixedDt`
    * until `tickDelta` is consumed. In event mode it is the minimum advance
    * and the fast-tick step.
    */
@@ -424,12 +424,12 @@ export interface RunUntilConfig {
   /** Optional RNG seed; seeds the global Alea instance before `setup`. */
   seed?: number;
   /**
-   * Run mode. Defaults to `'tick'`. See {@link RunMode}. Modes other than
-   * `'tick'` require {@link accessor} to be set; throws at entry otherwise.
+   * Run mode. Defaults to `'uniform'`. See {@link RunMode}. Modes other than
+   * `'uniform'` require {@link accessor} to be set; throws at entry otherwise.
    */
   mode?: RunMode;
   /**
-   * Read-side accessor used by `'event'` and `'stasis-aware-tick'` modes to
+   * Read-side accessor used by `'event'` and `'stasis-aware'` modes to
    * resolve resource amounts, rates, unlocks, and state paths into walker
    * transition distances. Must read the same state the engine ticks against.
    */
@@ -478,7 +478,7 @@ export interface RunUntilResult {
    * - `'predicate'` — the `until` predicate fired.
    * - `'maxSimTime'` — the sim-time ceiling was reached without the predicate
    *   firing.
-   * - `'unreachable'` — `'event'` or `'stasis-aware-tick'` mode observed
+   * - `'unreachable'` — `'event'` or `'stasis-aware'` mode observed
    *   stasis (no walker-visible transition can mechanically push state
    *   forward) before the predicate fired or the ceiling was reached.
    *   Conservative: opaque-predicate transitions block this classification.
@@ -510,7 +510,7 @@ export interface UntilCell {
   buildEngine: (ctx: RunContext) => Engine;
   /**
    * Read-side accessor factory. Required when {@link MatrixUntilConfig.mode}
-   * is `'event'` or `'stasis-aware-tick'` — those modes introspect content
+   * is `'event'` or `'stasis-aware'` — those modes introspect content
    * through the walker. Called once per `(cell, seed)` alongside
    * `buildEngine`. The accessor must read the same state the engine ticks
    * against; stasis/event resolution is only as sound as the distances the
@@ -555,8 +555,8 @@ export interface MatrixUntilConfig {
   onCellComplete?: (cell: CellResult<RunUntilResult>) => void;
   aggregate?: AggregateOptions;
   /**
-   * Run mode applied uniformly to every cell. Defaults to `'tick'`. When
-   * `'event'` or `'stasis-aware-tick'`, every {@link UntilCell} must supply
+   * Run mode applied uniformly to every cell. Defaults to `'uniform'`. When
+   * `'event'` or `'stasis-aware'`, every {@link UntilCell} must supply
    * {@link UntilCell.buildAccessor}; the runner throws at entry otherwise.
    * See {@link RunMode}.
    */

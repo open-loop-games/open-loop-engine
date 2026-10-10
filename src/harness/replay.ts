@@ -2,18 +2,18 @@
  * Deterministic live-play replay — drive a {@link TickDriver} the way production's
  * `intervalTick` does, but from a controlled clock instead of `performance.now()`.
  *
- * `runUntil` / `runBeatProbe` deliberately decouple from the driver's live `tickRate`
+ * `runUntil` / `runBeatProbe` deliberately decouple from the driver's live `intervalRate`
  * and `speedMultiplier` (caller-authoritative `tickDelta`); `processOfflineTime`
  * replays wall-clock seconds with no speed scaling. Neither reproduces the *live*
- * path. `replayLive` is the one that does: it fires `seconds × tickRate` interval
- * ticks, each calling `driver.tickRaw(1 / tickRate)` — the same speed-aware live
+ * path. `replayLive` is the one that does: it fires `seconds × intervalRate` interval
+ * ticks, each calling `driver.processInterval(1 / intervalRate)` — the same speed-aware live
  * body `intervalTick` runs per interval, just fed an injected clock. The dt math
- * (cap, `speedMultiplier`, fixed-mode accumulator) lives in `tickRaw`, so replay
+ * (cap, `speedMultiplier`, fixed-mode accumulator) lives in `processInterval`, so replay
  * reproduces live play by invoking it rather than re-deriving the formula; the two
  * cannot drift apart.
  *
  * Speed is applied the live way — by setting `driver.speedMultiplier` for the
- * duration of the replay (restored on exit) — not by pre-scaling dt. `tickRaw`
+ * duration of the replay (restored on exit) — not by pre-scaling dt. `processInterval`
  * folds it in exactly where the timer loop does.
  *
  * This makes the fixed-mode speed-invariance guarantee testable: equal game-time
@@ -33,7 +33,7 @@ export interface ReplayLiveOptions {
   seconds: number;
   /**
    * Speed multiplier. Set on `driver.speedMultiplier` for the duration of the
-   * replay (its prior value is restored on exit) so `tickRaw` scales dt exactly
+   * replay (its prior value is restored on exit) so `processInterval` scales dt exactly
    * as the live loop does. Default 1. Total simulated game-time is `seconds × speed`.
    */
   speed?: number;
@@ -51,21 +51,21 @@ export interface ReplayLiveOptions {
  * Replay `seconds` of live play at `speed` through `driver`, reproducing
  * `intervalTick`'s dt math deterministically.
  *
- * @returns the number of interval ticks fired (`floor(seconds × tickRate)`). The
+ * @returns the number of interval ticks fired (`floor(seconds × intervalRate)`). The
  *   sub-tick count (relevant in fixed mode) is observed via {@link createTickCounter},
  *   not returned here.
  */
 export async function replayLive(driver: TickDriver, options: ReplayLiveOptions): Promise<number> {
   const speed = options.speed ?? 1;
-  const tickRate = driver.tickRate;
-  const tickInterval = 1 / tickRate;
+  const intervalRate = driver.intervalRate;
+  const tickInterval = 1 / intervalRate;
   const intervalTicks = Math.max(0, floorSteps(options.seconds, tickInterval));
 
   const prevSpeed = driver.speedMultiplier;
   driver.speedMultiplier = speed;
   try {
     for (let i = 0; i < intervalTicks; i++) {
-      driver.tickRaw(tickInterval);
+      driver.processInterval(tickInterval);
       if (options.afterTick) await options.afterTick();
     }
   } finally {

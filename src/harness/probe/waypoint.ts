@@ -70,7 +70,7 @@ export interface WaypointProbeConfig<T> {
   /** Seeds to run per waypoint. Defaults to `[0]` for deterministic single-engine probes. */
   seeds?: number[];
   /**
-   * Sim-seconds advanced per `simulateTick` iteration, as
+   * Sim-seconds advanced per `advanceTime` iteration, as
    * {@link UntilCell.tickDelta}. Defaults to `0.05`; coarsen for
    * long-horizon waypoints (minutes–hours of sim-time).
    */

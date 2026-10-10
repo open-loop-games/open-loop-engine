@@ -652,8 +652,8 @@ describe('createActionCategory — TSDoc example', () => {
     const engine = createEngine({ gameId: 'action-example', persistence: false });
     engine.use(magic);
     engine.start();
-    engine.tickDriver.simulateTick(1);
-    engine.tickDriver.simulateTick(1);
+    engine.tickDriver.advanceTime(1);
+    engine.tickDriver.advanceTime(1);
     engine.stop();
 
     expect(out!.getState('fireball')!.timesCast.value).toBe(1);

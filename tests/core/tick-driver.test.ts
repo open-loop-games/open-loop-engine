@@ -4,123 +4,123 @@ import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 
 describe('TickDriver', () => {
   it('onTick registers callback', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(0.05);
+    tickDriver.advanceTime(0.05);
     expect(fn).toHaveBeenCalledWith(0.05);
   });
   it('unsubscribe removes callback', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     const unsub = tickDriver.onTick(fn);
     unsub();
-    tickDriver.simulateTick(0.05);
+    tickDriver.advanceTime(0.05);
     expect(fn).not.toHaveBeenCalled();
   });
   it('multiple callbacks called in order', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const order: number[] = [];
     tickDriver.onTick(() => order.push(1));
     tickDriver.onTick(() => order.push(2));
-    tickDriver.simulateTick(0.05);
+    tickDriver.advanceTime(0.05);
     expect(order).toEqual([1, 2]);
   });
   it('a callback that unsubscribes itself does not skip the next callback', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const log: string[] = [];
     const unsubA = tickDriver.onTick(() => {
       log.push('A');
       unsubA();
     });
     tickDriver.onTick(() => log.push('B'));
-    tickDriver.stepOnce();
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
+    tickDriver.tickOnce();
     expect(log).toEqual(['A', 'B', 'B']);
   });
-  it('simulateTick splits a delta above maxDeltaTime into equal ticks under the cap', () => {
+  it('advanceTime splits a delta above maxDeltaTime into equal ticks under the cap', () => {
     const overflow = vi.fn();
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       maxDeltaTime: 1,
       onDeltaOverflow: overflow,
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(2.5);
+    tickDriver.advanceTime(2.5);
     expect(fn).toHaveBeenCalledTimes(3);
     for (const [dt] of fn.mock.calls) expect(dt).toBeCloseTo(2.5 / 3, 12);
     expect(overflow).not.toHaveBeenCalled();
   });
-  it('simulateTick does not add a tick for a quotient a rounding error above an integer', () => {
+  it('advanceTime does not add a tick for a quotient a rounding error above an integer', () => {
     // 2.1 / 0.7 is 3.0000000000000004, which a bare Math.ceil turns into 4.
-    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 0.7 });
+    const tickDriver = createTickDriver({ intervalRate: 20, maxDeltaTime: 0.7 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(2.1);
+    tickDriver.advanceTime(2.1);
     expect(fn).toHaveBeenCalledTimes(3);
   });
-  it('simulateTick passes raw dt when under maxDeltaTime', () => {
-    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
+  it('advanceTime passes raw dt when under maxDeltaTime', () => {
+    const tickDriver = createTickDriver({ intervalRate: 20, maxDeltaTime: 1 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(0.3);
+    tickDriver.advanceTime(0.3);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(0.3);
   });
-  it('stepOnce processes exactly one tick at tickInterval', () => {
-    const tickDriver = createTickDriver({ tickRate: 10 });
+  it('tickOnce processes exactly one tick at tickInterval', () => {
+    const tickDriver = createTickDriver({ intervalRate: 10 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(0.1);
   });
-  it('tickRate is mutable and updates tick interval', () => {
-    const tickDriver = createTickDriver({ tickRate: 10 });
+  it('intervalRate is mutable and updates tick interval', () => {
+    const tickDriver = createTickDriver({ intervalRate: 10 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    expect(tickDriver.tickRate).toBe(10);
+    expect(tickDriver.intervalRate).toBe(10);
 
-    tickDriver.tickRate = 20;
-    expect(tickDriver.tickRate).toBe(20);
+    tickDriver.intervalRate = 20;
+    expect(tickDriver.intervalRate).toBe(20);
 
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
     expect(fn).toHaveBeenCalledWith(0.05);
   });
-  it('simulateTick does not apply speedMultiplier', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+  it('advanceTime does not apply speedMultiplier', () => {
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
     tickDriver.speedMultiplier = 3;
-    tickDriver.simulateTick(0.05);
+    tickDriver.advanceTime(0.05);
     // dt should NOT be scaled by speedMultiplier
     expect(fn).toHaveBeenCalledWith(0.05);
   });
-  it('stepOnce does not apply speedMultiplier', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+  it('tickOnce does not apply speedMultiplier', () => {
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
     tickDriver.speedMultiplier = 2;
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
     expect(fn).toHaveBeenCalledWith(0.05);
   });
   it('speedMultiplier getter/setter', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     expect(tickDriver.speedMultiplier).toBe(1);
     tickDriver.speedMultiplier = 5;
     expect(tickDriver.speedMultiplier).toBe(5);
   });
   it('speedMultiplier from config', () => {
-    const tickDriver = createTickDriver({ tickRate: 20, speedMultiplier: 3 });
+    const tickDriver = createTickDriver({ intervalRate: 20, speedMultiplier: 3 });
     expect(tickDriver.speedMultiplier).toBe(3);
   });
   it('deltaMean initializes to 0', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     expect(tickDriver.deltaMean).toBe(0);
   });
   it('registerPhase tracks phase state', () => {
-    const tickDriver = createTickDriver({ tickRate: 20 });
+    const tickDriver = createTickDriver({ intervalRate: 20 });
     let active = false;
     tickDriver.registerPhase('combat', {
       onEnter: () => {
@@ -139,7 +139,7 @@ describe('TickDriver', () => {
     const mockSetInterval = vi.fn().mockReturnValue(42);
     const mockClearInterval = vi.fn();
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       timerProvider: {
         setInterval: mockSetInterval,
         clearInterval: mockClearInterval,
@@ -151,11 +151,11 @@ describe('TickDriver', () => {
     tickDriver.stop();
     expect(mockClearInterval).toHaveBeenCalledWith(42);
   });
-  it('changing tickRate restarts interval when running', () => {
+  it('changing intervalRate restarts interval when running', () => {
     const mockSetInterval = vi.fn().mockReturnValue(1);
     const mockClearInterval = vi.fn();
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       timerProvider: {
         setInterval: mockSetInterval,
         clearInterval: mockClearInterval,
@@ -164,7 +164,7 @@ describe('TickDriver', () => {
     tickDriver.start();
     expect(mockSetInterval).toHaveBeenCalledTimes(1);
 
-    tickDriver.tickRate = 10;
+    tickDriver.intervalRate = 10;
     // Should have cleared old interval and started new one
     expect(mockClearInterval).toHaveBeenCalledTimes(1);
     expect(mockSetInterval).toHaveBeenCalledTimes(2);
@@ -181,7 +181,7 @@ describe('TickDriver', () => {
     });
     const onOverflow = vi.fn();
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       maxDeltaTime: 1,
       onDeltaOverflow: onOverflow,
       timerProvider: { setInterval: mockSetInterval, clearInterval: vi.fn() },
@@ -209,7 +209,7 @@ describe('TickDriver', () => {
     });
     const onOverflow = vi.fn();
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       maxDeltaTime: 1,
       onDeltaOverflow: onOverflow,
       timerProvider: { setInterval: mockSetInterval, clearInterval: vi.fn() },
@@ -235,7 +235,7 @@ describe('TickDriver', () => {
       return 1;
     });
     const tickDriver = createTickDriver({
-      tickRate: 20,
+      intervalRate: 20,
       maxDeltaTime: 1,
       timerProvider: { setInterval: mockSetInterval, clearInterval: vi.fn() },
     });
@@ -258,84 +258,84 @@ describe('TickDriver', () => {
 });
 
 describe('TickDriver — fixed mode (accumulator)', () => {
-  it('simulateTick drains the accumulator at stepSize', () => {
+  it('advanceTime drains the accumulator at fixedDt', () => {
     const tickDriver = createTickDriver({
-      tickRate: 50,
+      intervalRate: 50,
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
 
-    // 0.1 s of simulation at 0.02 stepSize = 5 sub-ticks.
-    tickDriver.simulateTick(0.1);
+    // 0.1 s of simulation at 0.02 fixedDt = 5 sub-ticks.
+    tickDriver.advanceTime(0.1);
     expect(fn).toHaveBeenCalledTimes(5);
     expect(fn).toHaveBeenNthCalledWith(1, 0.02);
     expect(fn).toHaveBeenNthCalledWith(5, 0.02);
   });
 
-  it('simulateTick banks sub-stepSize residual across calls', () => {
+  it('advanceTime banks sub-fixedDt residual across calls', () => {
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
 
     // 0.015 + 0.015 = 0.030 → 1 full sub-tick, 0.010 left banked.
-    tickDriver.simulateTick(0.015);
+    tickDriver.advanceTime(0.015);
     expect(fn).toHaveBeenCalledTimes(0);
-    tickDriver.simulateTick(0.015);
+    tickDriver.advanceTime(0.015);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(0.02);
   });
 
-  it('simulateTick is NOT bounded by maxStepsPerTick (offline is upstream-bounded)', () => {
+  it('advanceTime is NOT bounded by maxTicksPerInterval (offline is upstream-bounded)', () => {
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
-      maxStepsPerTick: 10, // Deliberately low to prove simulateTick ignores it.
+      fixedDt: 0.02,
+      maxTicksPerInterval: 10, // Deliberately low to prove advanceTime ignores it.
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
 
-    // 1 second / 0.02 stepSize = 50 sub-ticks — far more than maxStepsPerTick.
-    tickDriver.simulateTick(1);
+    // 1 second / 0.02 fixedDt = 50 sub-ticks — far more than maxTicksPerInterval.
+    tickDriver.advanceTime(1);
     expect(fn).toHaveBeenCalledTimes(50);
   });
 
-  it('simulateTick does not apply speedMultiplier in fixed mode', () => {
+  it('advanceTime does not apply speedMultiplier in fixed mode', () => {
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
       speedMultiplier: 5,
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
 
-    tickDriver.simulateTick(0.1);
+    tickDriver.advanceTime(0.1);
     // Wall-clock faithful: 0.1 / 0.02 = 5 sub-ticks, NOT 25.
     expect(fn).toHaveBeenCalledTimes(5);
   });
 
-  it('stepOnce uses stepSize in fixed mode', () => {
+  it('tickOnce uses fixedDt in fixed mode', () => {
     const tickDriver = createTickDriver({
-      tickRate: 50,
+      intervalRate: 50,
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
     });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(0.02);
   });
 
-  it('stepOnce defaults stepSize to 1/tickRate in fixed mode without explicit stepSize', () => {
-    const tickDriver = createTickDriver({ tickRate: 50, tickMode: 'fixed' });
+  it('tickOnce defaults fixedDt to 1/intervalRate in fixed mode without explicit fixedDt', () => {
+    const tickDriver = createTickDriver({ intervalRate: 50, tickMode: 'fixed' });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.stepOnce();
+    tickDriver.tickOnce();
     expect(fn).toHaveBeenCalledWith(0.02);
   });
 
@@ -347,7 +347,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     });
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
       speedMultiplier: 10,
       timerProvider: {
         setInterval: mockSetInterval,
@@ -370,7 +370,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     nowSpy.mockRestore();
   });
 
-  it('intervalTick drops residual above maxStepsPerTick and fires onStepsOverflow', () => {
+  it('intervalTick drops residual above maxTicksPerInterval and fires onTicksOverflow', () => {
     let scheduledCallback: (() => void) | null = null;
     const mockSetInterval = vi.fn((cb: () => void) => {
       scheduledCallback = cb;
@@ -379,11 +379,11 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     const onOverflow = vi.fn();
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
-      maxStepsPerTick: 10,
+      fixedDt: 0.02,
+      maxTicksPerInterval: 10,
       speedMultiplier: 100, // 50 ms real × 100 = 5 s effective → 250 sub-ticks uncapped.
       maxDeltaTime: 10, // Keep raw-dt cap out of the way.
-      onStepsOverflow: onOverflow,
+      onTicksOverflow: onOverflow,
       timerProvider: {
         setInterval: mockSetInterval,
         clearInterval: vi.fn(),
@@ -407,7 +407,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     nowSpy.mockRestore();
   });
 
-  it('onStepsOverflow is live-settable after tickDriver creation', () => {
+  it('onTicksOverflow is live-settable after tickDriver creation', () => {
     let scheduledCallback: (() => void) | null = null;
     const mockSetInterval = vi.fn((cb: () => void) => {
       scheduledCallback = cb;
@@ -415,15 +415,15 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     });
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
-      maxStepsPerTick: 10,
+      fixedDt: 0.02,
+      maxTicksPerInterval: 10,
       speedMultiplier: 100,
       maxDeltaTime: 10,
       timerProvider: { setInterval: mockSetInterval, clearInterval: vi.fn() },
     });
     tickDriver.onTick(() => {});
     const fn = vi.fn();
-    tickDriver.onStepsOverflow = fn;
+    tickDriver.onTicksOverflow = fn;
 
     const nowSpy = vi.spyOn(performance, 'now');
     nowSpy.mockReturnValue(0);
@@ -438,7 +438,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     nowSpy.mockRestore();
   });
 
-  it('intervalTick does not fire onStepsOverflow when accumulator drains naturally', () => {
+  it('intervalTick does not fire onTicksOverflow when accumulator drains naturally', () => {
     let scheduledCallback: (() => void) | null = null;
     const mockSetInterval = vi.fn((cb: () => void) => {
       scheduledCallback = cb;
@@ -447,9 +447,9 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     const onOverflow = vi.fn();
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
-      maxStepsPerTick: 100,
-      onStepsOverflow: onOverflow,
+      fixedDt: 0.02,
+      maxTicksPerInterval: 100,
+      onTicksOverflow: onOverflow,
       timerProvider: {
         setInterval: mockSetInterval,
         clearInterval: vi.fn(),
@@ -472,7 +472,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
     const order: string[] = [];
     const tickDriver = createTickDriver({
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
     });
     tickDriver.registerPhase('combat', {
       onEnter: () => order.push('enter'),
@@ -483,7 +483,7 @@ describe('TickDriver — fixed mode (accumulator)', () => {
 
     tickDriver.enterPhase('combat');
     // 3 sub-ticks in a single drain.
-    tickDriver.simulateTick(0.06);
+    tickDriver.advanceTime(0.06);
     tickDriver.exitPhase('combat');
 
     expect(order).toEqual([
@@ -499,10 +499,10 @@ describe('TickDriver — fixed mode (accumulator)', () => {
   });
 
   it('variable mode remains the default when tickMode is omitted', () => {
-    const tickDriver = createTickDriver({ tickRate: 20, maxDeltaTime: 1 });
+    const tickDriver = createTickDriver({ intervalRate: 20, maxDeltaTime: 1 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
-    tickDriver.simulateTick(0.3);
+    tickDriver.advanceTime(0.3);
     // Variable behavior: one tick of the raw dt, not six 0.05 sub-steps.
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(0.3);
@@ -511,11 +511,11 @@ describe('TickDriver — fixed mode (accumulator)', () => {
   it('fixed-mode accumulator round-trips through exportSave/importSave', () => {
     // Regression: the fixed-mode sub-step accumulator must be persistent so
     // `importSave` restores it. Observed via behavior — after
-    // restoring a snapshot whose accumulator sits just below `stepSize`, a
-    // follow-up `simulateTick(dt)` with `dt` that crosses the threshold must
+    // restoring a snapshot whose accumulator sits just below `fixedDt`, a
+    // follow-up `advanceTime(dt)` with `dt` that crosses the threshold must
     // still fire one sub-tick. A closure-local accumulator would instead
     // carry the post-snapshot remainder, shifting the threshold crossing.
-    const tickDriver = createTickDriver({ tickMode: 'fixed', stepSize: 0.02, tickRate: 50 });
+    const tickDriver = createTickDriver({ tickMode: 'fixed', fixedDt: 0.02, intervalRate: 50 });
     const fn = vi.fn();
     tickDriver.onTick(fn);
     const mgr = createSaveManager({
@@ -523,21 +523,21 @@ describe('TickDriver — fixed mode (accumulator)', () => {
       storageAdapter: createMemoryStorage(),
     });
 
-    // Accumulator 0.015 — below stepSize, no sub-tick yet.
-    tickDriver.simulateTick(0.015);
+    // Accumulator 0.015 — below fixedDt, no sub-tick yet.
+    tickDriver.advanceTime(0.015);
     expect(fn).toHaveBeenCalledTimes(0);
 
     const snapshot = mgr.exportSave();
 
-    // Forward path: 0.015 + 0.01 = 0.025 ≥ stepSize → one sub-tick, leave 0.005.
-    tickDriver.simulateTick(0.01);
+    // Forward path: 0.015 + 0.01 = 0.025 ≥ fixedDt → one sub-tick, leave 0.005.
+    tickDriver.advanceTime(0.01);
     expect(fn).toHaveBeenCalledTimes(1);
 
     // Restore. If the accumulator round-tripped, it's 0.015 again and the next
     // 0.01 tick fires another sub-tick (total 2). Without restore, it would be
     // 0.005 and the same 0.01 tick would leave 0.015 without firing (total 1).
     expect(mgr.importSave(snapshot).success).toBe(true);
-    tickDriver.simulateTick(0.01);
+    tickDriver.advanceTime(0.01);
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });
@@ -545,25 +545,25 @@ describe('TickDriver — fixed mode (accumulator)', () => {
 describe('TickDriver live reads', () => {
   it('speedMultiplier recomputes on set', async () => {
     const { computed } = await import('vue');
-    const td = createTickDriver({ tickRate: 20 });
+    const td = createTickDriver({ intervalRate: 20 });
     const speed = computed(() => td.speedMultiplier);
     expect(speed.value).toBe(1);
     td.speedMultiplier = 4;
     expect(speed.value).toBe(4);
   });
 
-  it('tickRate recomputes on set', async () => {
+  it('intervalRate recomputes on set', async () => {
     const { computed } = await import('vue');
-    const td = createTickDriver({ tickRate: 20 });
-    const rate = computed(() => td.tickRate);
+    const td = createTickDriver({ intervalRate: 20 });
+    const rate = computed(() => td.intervalRate);
     expect(rate.value).toBe(20);
-    td.tickRate = 50;
+    td.intervalRate = 50;
     expect(rate.value).toBe(50);
   });
 
   it('running recomputes on start and stop', async () => {
     const { computed } = await import('vue');
-    const td = createTickDriver({ tickRate: 20 });
+    const td = createTickDriver({ intervalRate: 20 });
     const running = computed(() => td.running);
     expect(running.value).toBe(false);
     td.start();

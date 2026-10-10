@@ -8,14 +8,14 @@ import type { TickDriver } from './tick-driver';
 export interface OfflineProgressOptions {
   /** Maximum offline seconds to process (default: 259200 = 3 days) */
   maxOfflineSeconds?: number;
-  /** Seconds per simulateTick call (default: 1). A chunk above the driver's maxDeltaTime runs as several ticks. */
+  /** Seconds per advanceTime call (default: 1). A chunk above the driver's maxDeltaTime runs as several ticks. */
   chunkSize?: number;
 }
 
 /**
  * Process offline elapsed time by feeding it through the TickDriver in chunks.
  *
- * Each chunk is passed to `tickDriver.simulateTick()`, which passes the dt directly to
+ * Each chunk is passed to `tickDriver.advanceTime()`, which passes the dt directly to
  * tick callbacks (no speedMultiplier applied — offline processing is wall-clock faithful).
  *
  * @returns Actual seconds processed: `elapsedSeconds` clamped to `[0, maxOfflineSeconds]`, with NaN read as 0.
@@ -38,11 +38,11 @@ export function processOfflineTime(
 
   let remaining = capped;
   while (remaining >= chunkSize) {
-    tickDriver.simulateTick(chunkSize);
+    tickDriver.advanceTime(chunkSize);
     remaining -= chunkSize;
   }
   if (remaining > 0) {
-    tickDriver.simulateTick(remaining);
+    tickDriver.advanceTime(remaining);
   }
 
   return capped;

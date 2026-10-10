@@ -230,22 +230,22 @@ export interface ModDef {
  */
 export interface EngineConfig {
   gameId: string;
-  tickRate?: number;
+  intervalRate?: number;
   maxDeltaTime?: number;
   /** Initial speed multiplier (default 1). Scales dt during live play. */
   speedMultiplier?: number;
   /**
    * dt handling mode. `'variable'` (default) passes real elapsed dt to callbacks.
-   * `'fixed'` accumulates and drains at `stepSize` per sub-tick — for source-faithful
+   * `'fixed'` accumulates and drains at `fixedDt` per sub-tick — for source-faithful
    * ports with clamp-on-overshoot tick math. See `createTickDriver` for details.
    */
   tickMode?: 'variable' | 'fixed';
-  /** Seconds per sub-tick in fixed mode. Defaults to `1 / tickRate`. */
-  stepSize?: number;
+  /** Seconds per sub-tick in fixed mode. Defaults to `1 / intervalRate`. */
+  fixedDt?: number;
   /** Cap on sub-ticks per `intervalTick` in fixed mode (default 100). Live-play overspill protection. */
-  maxStepsPerTick?: number;
-  /** Diagnostic callback when fixed-mode `intervalTick` drops sub-steps. */
-  onStepsOverflow?: (droppedSteps: number) => void;
+  maxTicksPerInterval?: number;
+  /** Diagnostic callback when a fixed-mode interval drops ticks. */
+  onTicksOverflow?: (droppedTicks: number) => void;
   /**
    * Diagnostic callback when a variable-mode tick's raw dt exceeds
    * `maxDeltaTime`; receives the dropped seconds, for banking them.
@@ -404,7 +404,7 @@ export interface Engine {
    * {@link EngineConfig.autoSaveInterval} but is mutable at runtime —
    * setting it re-arms the autosave timer with the new period (or stops
    * it when set to 0). No effect when `persistence: false` was passed to
-   * {@link createEngine}. Symmetric to `engine.tickDriver.tickRate`.
+   * {@link createEngine}. Symmetric to `engine.tickDriver.intervalRate`.
    */
   autoSaveInterval: number;
 }
@@ -424,7 +424,7 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  *
  * @example
  * ```ts
- * const engine = createEngine({ gameId: 'my-game', tickRate: 20 });
+ * const engine = createEngine({ gameId: 'my-game', intervalRate: 20 });
  * engine.use(resourceModule);
  * engine.use(combatModule);
  * engine.start(); // installs modules, so their persistent refs exist
@@ -450,13 +450,13 @@ export function createEngine(config: EngineConfig): Engine {
   // default bucket — excluded from its own save (open-loop-engine#9).
   const tickDriver = withPersistenceNamespace(config.persistenceNamespace, () =>
     createTickDriver({
-      tickRate: config.tickRate,
+      intervalRate: config.intervalRate,
       maxDeltaTime: config.maxDeltaTime,
       speedMultiplier: config.speedMultiplier,
       tickMode: config.tickMode,
-      stepSize: config.stepSize,
-      maxStepsPerTick: config.maxStepsPerTick,
-      onStepsOverflow: config.onStepsOverflow,
+      fixedDt: config.fixedDt,
+      maxTicksPerInterval: config.maxTicksPerInterval,
+      onTicksOverflow: config.onTicksOverflow,
       onDeltaOverflow: config.onDeltaOverflow,
       timerProvider: config.timerProvider,
       persistentContextId: 'tick-driver',
@@ -770,7 +770,7 @@ export function createEngine(config: EngineConfig): Engine {
     set autoSaveInterval(value: number) {
       autoSaveInterval = value;
       // Re-arm the timer: stop the old (if any), start the new (if running
-      // and value > 0). Mirrors tickDriver.tickRate's restart-when-running shape.
+      // and value > 0). Mirrors tickDriver.intervalRate's restart-when-running shape.
       const wasRunning = autoSaveTimer !== null;
       stopAutoSaveTimer();
       if (wasRunning || (installed && tickDriver.running)) {

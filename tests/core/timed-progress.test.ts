@@ -31,7 +31,7 @@ describe('createTimedProgress — construction', () => {
     beginPersistentContext(ctxId);
     const tp = createTimedProgress({
       id: ctxId,
-      duration: 10,
+      needed: 10,
       registerTick: bus.registerTick,
     });
     endPersistentContext();
@@ -45,7 +45,7 @@ describe('createTimedProgress — construction', () => {
   it('auto-generates an id when none provided', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 10,
+      needed: 10,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -62,12 +62,12 @@ describe('createTimedProgress — construction', () => {
     beginPersistentContext('module-install');
     const attack = createTimedProgress({
       id: 'attack',
-      duration: 10,
+      needed: 10,
       registerTick: bus.registerTick,
     });
     const defend = createTimedProgress({
       id: 'defend',
-      duration: 10,
+      needed: 10,
       registerTick: bus.registerTick,
     });
     endPersistentContext();
@@ -83,8 +83,8 @@ describe('createTimedProgress — tick advancement', () => {
   it('accumulates progress at speed * dt each tick', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 100,
-      speed: 5,
+      needed: 100,
+      rate: 5,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -104,8 +104,8 @@ describe('createTimedProgress — tick advancement', () => {
     const bus = makeTickBus();
     const spd = ref<DecimalSource>(2);
     const tp = createTimedProgress({
-      duration: 100,
-      speed: () => spd.value,
+      needed: 100,
+      rate: () => spd.value,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -122,8 +122,8 @@ describe('createTimedProgress — tick advancement', () => {
     const bus = makeTickBus();
     let calls = 0;
     const tp = createTimedProgress({
-      duration: 100,
-      speed: 0,
+      needed: 100,
+      rate: 0,
       ephemeral: true,
       registerTick: bus.registerTick,
       onProgress: () => {
@@ -140,8 +140,8 @@ describe('createTimedProgress — tick advancement', () => {
   it('percentComplete reflects progress / duration clamped to [0,1]', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 1,
+      needed: 10,
+      rate: 1,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -158,8 +158,8 @@ describe('createTimedProgress — onComplete boundary', () => {
     const bus = makeTickBus();
     const completions: DecimalSource[] = [];
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 4,
+      needed: 10,
+      rate: 4,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: (overflow) => completions.push(overflow),
@@ -178,8 +178,8 @@ describe('createTimedProgress — onComplete boundary', () => {
     const bus = makeTickBus();
     let fires = 0;
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 20,
+      needed: 10,
+      rate: 20,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: () => {
@@ -198,8 +198,8 @@ describe('createTimedProgress — onComplete boundary', () => {
     const duration = ref<DecimalSource>(10);
     let fires = 0;
     const tp = createTimedProgress({
-      duration: () => duration.value,
-      speed: 1,
+      needed: () => duration.value,
+      rate: 1,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: () => {
@@ -220,7 +220,7 @@ describe('createTimedProgress — onComplete boundary', () => {
     const duration = ref<DecimalSource>(2);
     let fires = 0;
     const tp = createTimedProgress({
-      duration: () => duration.value,
+      needed: () => duration.value,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: () => {
@@ -239,7 +239,7 @@ describe('createTimedProgress — onComplete boundary', () => {
     const bus = makeTickBus();
     let fires = 0;
     const tp = createTimedProgress({
-      duration: 10,
+      needed: 10,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: () => {
@@ -257,8 +257,8 @@ describe('createTimedProgress — onComplete boundary', () => {
     const bus = makeTickBus();
     let fires = 0;
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 20,
+      needed: 10,
+      rate: 20,
       ephemeral: true,
       registerTick: bus.registerTick,
       onComplete: () => {
@@ -277,8 +277,8 @@ describe('createTimedProgress — onComplete boundary', () => {
     const bus = makeTickBus();
     const deltas: DecimalSource[] = [];
     const tp = createTimedProgress({
-      duration: 100,
-      speed: 3,
+      needed: 100,
+      rate: 3,
       ephemeral: true,
       registerTick: bus.registerTick,
       onProgress: (d) => deltas.push(d),
@@ -296,8 +296,8 @@ describe('createTimedProgress — reset and dispose', () => {
   it('reset() clears progress and tickProgressDelta', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 2,
+      needed: 10,
+      rate: 2,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -312,8 +312,8 @@ describe('createTimedProgress — reset and dispose', () => {
   it('dispose() unsubscribes from the tick loop', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 10,
-      speed: 1,
+      needed: 10,
+      rate: 1,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -330,13 +330,13 @@ describe('createTimedProgress — reset and dispose', () => {
     try {
       const first = createTimedProgress({
         id: 'job',
-        duration: 10,
+        needed: 10,
         registerTick: bus.registerTick,
       });
       first.dispose();
       const second = createTimedProgress({
         id: 'job',
-        duration: 10,
+        needed: 10,
         registerTick: bus.registerTick,
       });
       expect(isPersistent(second.progress)).toBe(true);
@@ -351,7 +351,7 @@ describe('createTimedProgress — persistence', () => {
   it('ephemeral: true uses plain refs (not persistent)', () => {
     const bus = makeTickBus();
     const tp = createTimedProgress({
-      duration: 10,
+      needed: 10,
       ephemeral: true,
       registerTick: bus.registerTick,
     });
@@ -364,7 +364,7 @@ describe('createTimedProgress — persistence', () => {
     beginPersistentContext('tp-persist');
     const tp = createTimedProgress({
       id: 'tp-persist',
-      duration: 10,
+      needed: 10,
       registerTick: bus.registerTick,
     });
     endPersistentContext();
@@ -382,7 +382,7 @@ describe('stepProgressiveCosts — no costs', () => {
     const step = stepProgressiveCosts({
       prevProgress: 3,
       proposedProgress: 7,
-      duration: 10,
+      needed: 10,
       costs: [],
     });
     expect(Decimal.eq(step.cappedProgress, 7)).toBe(true);
@@ -394,7 +394,7 @@ describe('stepProgressiveCosts — no costs', () => {
     const step = stepProgressiveCosts({
       prevProgress: 5,
       proposedProgress: 5,
-      duration: 10,
+      needed: 10,
       costs: [],
     });
     expect(Decimal.eq(step.cappedProgress, 5)).toBe(true);
@@ -407,7 +407,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 10,
-      duration: 10,
+      needed: 10,
       costs: [{ amount: 10, available: () => 10 }],
     });
     expect(Decimal.eq(step.cappedProgress, 10)).toBe(true);
@@ -421,7 +421,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 10,
-      duration: 10,
+      needed: 10,
       costs: [{ amount: 10, available: () => 4 }],
     });
     expect(Decimal.eq(step.cappedProgress, 4)).toBe(true);
@@ -433,7 +433,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 2,
       proposedProgress: 5,
-      duration: 10,
+      needed: 10,
       costs: [{ amount: 10, available: () => 0 }],
     });
     // prevConsumed(2, 10, 10) = ceil(2/1) = 2; available=0 → maxProg=(2+0)*1=2
@@ -446,7 +446,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 8,
-      duration: 10,
+      needed: 10,
       costs: [{ amount: 0, available: () => 0 }],
     });
     expect(Decimal.eq(step.cappedProgress, 8)).toBe(true);
@@ -461,7 +461,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 10,
-      duration: 10,
+      needed: 10,
       costs: [{ amount: 10, available: () => 0.7 }],
     });
     expect(Decimal.eq(step.cappedProgress, 0)).toBe(true);
@@ -481,7 +481,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 300000,
-      duration: 300000,
+      needed: 300000,
       costs: [{ amount: 150, available: () => 149 }],
     });
     expect(Decimal.eq(step.cappedProgress, 298000)).toBe(true);
@@ -499,7 +499,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 298000.00000000006,
       proposedProgress: 300000,
-      duration: 300000,
+      needed: 300000,
       costs: [{ amount: 150, available: () => 0 }],
     });
     expect(step.stalled).toBe(false);
@@ -514,7 +514,7 @@ describe('stepProgressiveCosts — single cost', () => {
     const step = stepProgressiveCosts({
       prevProgress: 5,
       proposedProgress: 35,
-      duration: 100,
+      needed: 100,
       costs: [{ amount: 10, available: () => 1.7 }],
     });
     expect(Decimal.eq(step.cappedProgress, 20)).toBe(true);
@@ -531,7 +531,7 @@ describe('stepProgressiveCosts — multiple costs', () => {
     const step = stepProgressiveCosts({
       prevProgress: 40,
       proposedProgress: 60,
-      duration: 100,
+      needed: 100,
       costs: [
         { amount: 10, available: () => 5 },
         { amount: 20, available: () => 2 },
@@ -551,7 +551,7 @@ describe('stepProgressiveCosts — multiple costs', () => {
     const step = stepProgressiveCosts({
       prevProgress: 51,
       proposedProgress: 52,
-      duration: 100,
+      needed: 100,
       costs: [
         { amount: 10, available: () => 10 }, // prev consumed 6, would 6 → 0
         { amount: 100, available: () => 100 }, // interval 1 → prev 51, would 52 → 1
@@ -574,13 +574,13 @@ describe('stepProgressiveCosts — multiple costs', () => {
     const stepA = stepProgressiveCosts({
       prevProgress: 40,
       proposedProgress: 60,
-      duration: 100,
+      needed: 100,
       costs: costsA,
     });
     const stepB = stepProgressiveCosts({
       prevProgress: 40,
       proposedProgress: 60,
-      duration: 100,
+      needed: 100,
       costs: costsB,
     });
     expect(Decimal.eq(stepA.cappedProgress, stepB.cappedProgress)).toBe(true);
@@ -597,7 +597,7 @@ describe('stepProgressiveCosts — invariant parity with resourceConsumedAt', ()
     const step = stepProgressiveCosts({
       prevProgress: 12,
       proposedProgress: 45,
-      duration: 100,
+      needed: 100,
       costs,
     });
     for (let i = 0; i < costs.length; i++) {
@@ -615,7 +615,7 @@ describe('stepProgressiveCosts — calls available() lazily only once per entry'
     stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 5,
-      duration: 10,
+      needed: 10,
       costs: [
         {
           amount: 0,
@@ -634,7 +634,7 @@ describe('stepProgressiveCosts — calls available() lazily only once per entry'
     stepProgressiveCosts({
       prevProgress: 0,
       proposedProgress: 10,
-      duration: 10,
+      needed: 10,
       costs: [
         {
           amount: 10,
@@ -658,7 +658,7 @@ describe('stepProgressiveCosts — never requests more than the balance', () => 
     const step = stepProgressiveCosts({
       prevProgress: prev,
       proposedProgress: d,
-      duration: d,
+      needed: d,
       costs: [{ amount: a, available: () => avail }],
     });
     const before = resourceConsumedAt(prev, d, a);
@@ -700,7 +700,7 @@ describe('stepProgressiveCosts — never requests more than the balance', () => 
           const step = stepProgressiveCosts({
             prevProgress: prog,
             proposedProgress: Decimal.min(Decimal.add(prog, duration.div(97)), duration),
-            duration,
+            needed: duration,
             costs: [{ amount: a, available: () => stock }],
           });
           if (step.deltas[0].gt(stock)) {

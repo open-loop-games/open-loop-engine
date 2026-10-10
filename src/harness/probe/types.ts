@@ -4,7 +4,7 @@
  * A probe collects per-beat termination-time distributions from a
  * `seeds`-wide sweep. {@link runBeatProbe} is the single shipped implementation;
  * it dispatches on {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s
- * three loop modes (`'tick'` / `'event'` / `'stasis-aware-tick'`).
+ * three loop modes (`'uniform'` / `'event'` / `'stasis-aware'`).
  */
 
 import type { Engine } from '@/engine';
@@ -36,7 +36,7 @@ export interface Beat {
  * Per-beat termination-time distribution from a `seeds`-wide sweep.
  *
  * `counts.unreachable` is non-zero only when the probe ran in `'event'` or
- * `'stasis-aware-tick'` mode and a seed terminated with
+ * `'stasis-aware'` mode and a seed terminated with
  * `RunUntilResult.terminated === 'unreachable'`. Tick-mode probes always
  * report `unreachable: 0` — tick-mode is content-blind.
  */
@@ -62,7 +62,7 @@ export interface BeatResult {
 /**
  * Configuration for {@link runBeatProbe}. `buildEngine` is invoked per
  * `(beat, seed)` — the probe reuses the fresh-engine contract from
- * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'tick'`
+ * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'uniform'`
  * because event-stepping and stasis-aware-tick modes introspect content
  * through the walker.
  */
@@ -74,7 +74,7 @@ export interface BeatProbeOptions {
   buildEngine: (ctx: RunContext) => Engine;
   /**
    * Build a read-side accessor for a freshly-built engine. Required when
-   * `mode !== 'tick'`. Called once per `(beat, seed)` alongside
+   * `mode !== 'uniform'`. Called once per `(beat, seed)` alongside
    * `buildEngine`; the accessor must read the same state the engine ticks
    * against.
    */
@@ -99,8 +99,8 @@ export interface BeatProbeOptions {
    */
   tickDelta?: number;
   /**
-   * Run mode. Defaults to `'tick'`. `'event'` event-steps via the walker
-   * (attacks never-fires cost for live-rate-insufficient legs); `'stasis-aware-tick'`
+   * Run mode. Defaults to `'uniform'`. `'event'` event-steps via the walker
+   * (attacks never-fires cost for live-rate-insufficient legs); `'stasis-aware'`
    * short-circuits unreachable runs with a per-tick walker check. See {@link RunMode}.
    */
   mode?: RunMode;

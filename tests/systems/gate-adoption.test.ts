@@ -764,7 +764,7 @@ describe('Predicate fields — every arm reaches the system', () => {
   });
 
   it('time-bank spend gate takes a Gate', () => {
-    const driver = createTickDriver({ tickRate: 20 });
+    const driver = createTickDriver({ intervalRate: 20 });
     const { result, stop } = bootstrap((api) => {
       const bank = createTimeBank();
       bank.deposit(100);
@@ -780,7 +780,7 @@ describe('Predicate fields — every arm reaches the system', () => {
     result.accel.startSpending();
     expect(driver.speedMultiplier).toBe(1);
     result.api.points.value = 1;
-    driver.tickRaw(0.05);
+    driver.processInterval(0.05);
     expect(driver.speedMultiplier).toBe(10);
     result.accel.dispose();
     stop();
@@ -905,7 +905,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
     ).toThrow(/automation tier 'basic' unlockWhen: /);
     expect(() =>
       createBankedAcceleration({
-        tickDriver: createTickDriver({ tickRate: 20 }),
+        tickDriver: createTickDriver({ intervalRate: 20 }),
         bank: createTimeBank(),
         spendMultiplier: 2,
         when: unwiredFlag,

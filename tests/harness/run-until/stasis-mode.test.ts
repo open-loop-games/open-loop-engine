@@ -103,7 +103,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
   return engine;
 }
 
-describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
+describe("runBeatProbe({mode: 'stasis-aware'})", () => {
   it('short-circuits on a constructed empty-content engine (unreachable counted)', () => {
     const beat: Beat = {
       // Hard-false — only stasis can terminate these runs.
@@ -111,7 +111,7 @@ describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
       predicate: () => false,
     };
     const results = runBeatProbe({
-      mode: 'stasis-aware-tick',
+      mode: 'stasis-aware',
       buildEngine: ({ seed }) => buildEmptyEngine(`stasis-empty-${seed}`),
       buildAccessor: () => mockAccessor(),
       beats: [beat],
@@ -147,7 +147,7 @@ describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
       })(),
     };
     const results = runBeatProbe({
-      mode: 'stasis-aware-tick',
+      mode: 'stasis-aware',
       buildEngine: ({ seed }) => buildPurchasableEngine(`stasis-reachable-${seed}`),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -170,7 +170,7 @@ describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
     const beat: Beat = { id: 'never-fires', predicate: () => false };
 
     const results = runBeatProbe({
-      mode: 'stasis-aware-tick',
+      mode: 'stasis-aware',
       buildEngine: ({ seed }) => buildOpaqueChallengeEngine(`stasis-opaque-${seed}`, accessor),
       buildAccessor: () => accessor,
       beats: [beat],
@@ -195,7 +195,7 @@ describe("runBeatProbe({mode: 'stasis-aware-tick'})", () => {
     });
 
     const stasis = runBeatProbe({
-      mode: 'stasis-aware-tick',
+      mode: 'stasis-aware',
       buildEngine: ({ seed }) => buildPurchasableEngine(`stasis-agree-a-${seed}`),
       buildAccessor: () => accessor,
       beats: [makeBeat()],

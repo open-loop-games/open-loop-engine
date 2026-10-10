@@ -326,14 +326,14 @@ describe('TickDriverConfig type surface', () => {
   });
 
   it('pins fixed-mode numeric knobs as optional numbers', () => {
-    expectTypeOf<TickDriverConfig['stepSize']>().toEqualTypeOf<number | undefined>();
-    expectTypeOf<TickDriverConfig['maxStepsPerTick']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverConfig['fixedDt']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<TickDriverConfig['maxTicksPerInterval']>().toEqualTypeOf<number | undefined>();
   });
 
-  it('pins onStepsOverflow as a diagnostic callback, not a thrown-error channel', () => {
+  it('pins onTicksOverflow as a diagnostic callback, not a thrown-error channel', () => {
     // The overflow path is non-fatal — the callback signature shape records that
     // consumers receive a dropped-steps count and return nothing.
-    expectTypeOf<TickDriverConfig['onStepsOverflow']>().toEqualTypeOf<
+    expectTypeOf<TickDriverConfig['onTicksOverflow']>().toEqualTypeOf<
       ((droppedSteps: number) => void) | undefined
     >();
   });
@@ -1089,8 +1089,8 @@ describe('createTimedProgress — id required unless ephemeral', () => {
     const registerTick = (_cb: (dt: number) => void) => () => {};
     // @ts-expect-error — id is required once `ephemeral` is absent or false;
     // an untagged tracker has nowhere to save `progress`.
-    createTimedProgress({ duration: 10, registerTick });
-    const tp = createTimedProgress({ duration: 10, registerTick, ephemeral: true });
+    createTimedProgress({ needed: 10, registerTick });
+    const tp = createTimedProgress({ needed: 10, registerTick, ephemeral: true });
     expectTypeOf(tp).toEqualTypeOf<import('@/core/timed-progress').TimedProgress>();
   });
 });

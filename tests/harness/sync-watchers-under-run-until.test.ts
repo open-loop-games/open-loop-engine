@@ -7,7 +7,7 @@ import type { Engine } from '@/index';
 
 /**
  * Regression pins: engine primitives that internally use `watch()` must keep
- * firing under sim harnesses that drive `engine.tickDriver.simulateTick(dt)` in a
+ * firing under sim harnesses that drive `engine.tickDriver.advanceTime(dt)` in a
  * tight loop. Vue's default async scheduler never flushes inside such a
  * loop — so `Resource.cumulative` / `Resource.best` and `createAchievement`
  * use `flush: 'sync'`.
@@ -16,10 +16,10 @@ import type { Engine } from '@/index';
  * trackers / un-earned achievements.
  */
 
-// Minimal engine shape runUntil needs — simulateTick is the only method it calls.
+// Minimal engine shape runUntil needs — advanceTime is the only method it calls.
 function buildStepEngine(onStep: () => void): Engine {
   return {
-    tickDriver: { simulateTick: (_dt: number) => onStep() },
+    tickDriver: { advanceTime: (_dt: number) => onStep() },
   } as unknown as Engine;
 }
 
@@ -39,7 +39,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
 
     const result = runUntil({
       engine,
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 1,
       tickDelta: 0.05,
     });
@@ -68,7 +68,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
 
     runUntil({
       engine,
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 1,
       tickDelta: 0.05,
     });
@@ -102,7 +102,7 @@ describe('watch-based primitives under runUntil (sync flush)', () => {
 
     expect(result.terminated).toBe('predicate');
     expect(ach.earned.value).toBe(true);
-    // Score hits 100 on tick 5 (after stepOnce runs with tick=4 → sets 100).
+    // Score hits 100 on tick 5 (after tickOnce runs with tick=4 → sets 100).
     expect(earnedAtTick).toBe(5);
   });
 });

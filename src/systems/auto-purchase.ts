@@ -428,7 +428,7 @@ export interface SetupPolicyAutoPurchaseOptions {
   waitForCost?: Computable<boolean>;
   /**
    * Safety cap on drain-loop iterations per tick handler invocation
-   * (default `10000`). Mirrors {@link createTickDriver}'s `maxStepsPerTick`:
+   * (default `10000`). Mirrors {@link createTickDriver}'s `maxTicksPerInterval`:
    * protects against pathological combinations of tiny `interval` and large
    * `dt` (24h offline catch-up + 1e-6s interval = millions of iterations
    * that would freeze the thread). When the cap is hit, the loop bails and
@@ -535,7 +535,7 @@ export function setupPolicyAutoPurchase(
 
   // Time-integrated accumulator: drains by `dt` each tick, so it must
   // round-trip with the rest of engine state under `importSave`. Closure-local
-  // `let` state survives `simulateTick` but not `importSave`, so a mid-run
+  // `let` state survives `advanceTime` but not `importSave`, so a mid-run
   // snapshot restore (solver bisection, devtools time-rewind, deterministic
   // replay) would leave the accumulator out of sync with the resources and
   // purchase counts that were just restored.
@@ -591,7 +591,7 @@ export function setupPolicyAutoPurchase(
     // purchase attempt per tick with the accumulator cleared.
     //
     // `iterations < maxIterationsPerTick` mirrors createTickDriver's
-    // maxStepsPerTick safety cap — pathological combos (tiny interval +
+    // maxTicksPerInterval safety cap — pathological combos (tiny interval +
     // long offline catch-up dt) would otherwise drain millions of times
     // synchronously and freeze the thread.
     let iterations = 0;

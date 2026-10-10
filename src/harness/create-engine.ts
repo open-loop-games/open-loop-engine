@@ -52,7 +52,7 @@ let scratchCounter = 0;
  * loads, and it installs the modules, starts the engine and imports the save.
  *
  * The engine gets a no-op timer, so `start()` arms no real `setInterval`:
- * drive it with `tickDriver.stepOnce()` / `simulateTick`, or a harness
+ * drive it with `tickDriver.tickOnce()` / `advanceTime`, or a harness
  * runner. Pass `config.timerProvider` for a self-ticking one (then stop it
  * yourself). The caller owns the engine: its namespaced persistent refs stay
  * in the process-wide registry until `engine.dispose()`, so dropping the

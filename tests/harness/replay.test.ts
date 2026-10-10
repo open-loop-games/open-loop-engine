@@ -3,8 +3,8 @@ import { createTickDriver } from '@/core/tick-driver';
 import { replayLive, createTickCounter } from '@/harness/replay';
 
 describe('replayLive', () => {
-  it('fires floor(seconds * tickRate) interval ticks', async () => {
-    const driver = createTickDriver({ tickRate: 20 });
+  it('fires floor(seconds * intervalRate) interval ticks', async () => {
+    const driver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     driver.onTick(fn);
     const ticks = await replayLive(driver, { seconds: 3 });
@@ -12,15 +12,15 @@ describe('replayLive', () => {
     expect(fn).toHaveBeenCalledTimes(60);
   });
 
-  it('counts the final interval when seconds × tickRate lands a hair under an integer', async () => {
+  it('counts the final interval when seconds × intervalRate lands a hair under an integer', async () => {
     // 4.35 * 100 is 434.99999999999994 in binary floating point.
-    const driver = createTickDriver({ tickRate: 100 });
+    const driver = createTickDriver({ intervalRate: 100 });
     const ticks = await replayLive(driver, { seconds: 4.35 });
     expect(ticks).toBe(435);
   });
 
   it('clamps negative seconds to zero', async () => {
-    const driver = createTickDriver({ tickRate: 20 });
+    const driver = createTickDriver({ intervalRate: 20 });
     const fn = vi.fn();
     driver.onTick(fn);
     const ticks = await replayLive(driver, { seconds: -5 });
@@ -29,18 +29,18 @@ describe('replayLive', () => {
   });
 
   it('feeds tickInterval * speed per interval tick (variable mode)', async () => {
-    const driver = createTickDriver({ tickRate: 20 });
+    const driver = createTickDriver({ intervalRate: 20 });
     const dts: number[] = [];
     driver.onTick((dt) => dts.push(dt));
     await replayLive(driver, { seconds: 1, speed: 4 });
-    // 20 interval ticks; tickRaw caps the raw interval (1/20 = 0.05 < maxDeltaTime)
+    // 20 interval ticks; processInterval caps the raw interval (1/20 = 0.05 < maxDeltaTime)
     // then scales by speedMultiplier: dt = 0.05 * 4 = 0.2
     expect(dts).toHaveLength(20);
     for (const dt of dts) expect(dt).toBeCloseTo(0.2, 9);
   });
 
   it('sets driver.speedMultiplier during replay and restores it after', async () => {
-    const driver = createTickDriver({ tickRate: 20, speedMultiplier: 3 });
+    const driver = createTickDriver({ intervalRate: 20, speedMultiplier: 3 });
     let observed = 0;
     driver.onTick(() => {
       observed = driver.speedMultiplier;
@@ -51,7 +51,7 @@ describe('replayLive', () => {
   });
 
   it('awaits afterTick between ticks', async () => {
-    const driver = createTickDriver({ tickRate: 10 });
+    const driver = createTickDriver({ intervalRate: 10 });
     const order: string[] = [];
     driver.onTick(() => order.push('tick'));
     await replayLive(driver, {
@@ -70,11 +70,11 @@ describe('replayLive', () => {
     const GAME_SECONDS = 60;
     const SPEED = 20;
 
-    const driver1 = createTickDriver({ tickRate: 50, tickMode: 'fixed', stepSize: 0.02 });
+    const driver1 = createTickDriver({ intervalRate: 50, tickMode: 'fixed', fixedDt: 0.02 });
     const counter1 = createTickCounter(driver1);
     await replayLive(driver1, { seconds: GAME_SECONDS, speed: 1 });
 
-    const driverN = createTickDriver({ tickRate: 50, tickMode: 'fixed', stepSize: 0.02 });
+    const driverN = createTickDriver({ intervalRate: 50, tickMode: 'fixed', fixedDt: 0.02 });
     const counterN = createTickCounter(driverN);
     await replayLive(driverN, { seconds: GAME_SECONDS / SPEED, speed: SPEED });
 
@@ -86,7 +86,7 @@ describe('replayLive', () => {
 
 describe('createTickCounter', () => {
   it('counts onTick fires, resets, and disposes', async () => {
-    const driver = createTickDriver({ tickRate: 20 });
+    const driver = createTickDriver({ intervalRate: 20 });
     const counter = createTickCounter(driver);
 
     await replayLive(driver, { seconds: 1 });

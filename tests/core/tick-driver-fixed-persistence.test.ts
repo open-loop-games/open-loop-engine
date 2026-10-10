@@ -26,7 +26,7 @@ describe('fixed-mode accumulator survives a namespaced save/reload', () => {
       gameId: 'g',
       persistenceNamespace: 'alpha',
       tickMode: 'fixed',
-      stepSize: 0.02,
+      fixedDt: 0.02,
     });
     engine.start();
 
@@ -48,13 +48,13 @@ describe('fixed-mode accumulator survives a namespaced save/reload', () => {
         gameId: 'g',
         persistenceNamespace: 'alpha',
         tickMode: 'fixed',
-        stepSize: 0.02,
+        fixedDt: 0.02,
         storageAdapter: storage,
       });
 
     const a = make();
     a.start();
-    a.tickDriver.simulateTick(0.05); // drains two 0.02 sub-steps, banks 0.01
+    a.tickDriver.advanceTime(0.05); // drains two 0.02 sub-steps, banks 0.01
     a.save();
     a.dispose();
 
@@ -67,7 +67,7 @@ describe('fixed-mode accumulator survives a namespaced save/reload', () => {
     // starts at 0 and 0.011 < 0.02 fires nothing.
     let ticks = 0;
     b.tickDriver.onTick(() => ticks++);
-    b.tickDriver.simulateTick(0.011);
+    b.tickDriver.advanceTime(0.011);
     expect(ticks).toBe(1);
 
     b.dispose();

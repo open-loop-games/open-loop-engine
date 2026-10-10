@@ -4,7 +4,7 @@ import { createTimeBank, createBankedAcceleration, burstDischarge } from '@/syst
 import { createTickDriver } from '@/core/tick-driver';
 
 function probeDriver() {
-  const driver = createTickDriver({ tickRate: 20 });
+  const driver = createTickDriver({ intervalRate: 20 });
   let simSeconds = 0;
   driver.onTick((dt) => {
     simSeconds += dt;
@@ -103,7 +103,7 @@ describe('createBankedAcceleration — spend loop', () => {
     bank.deposit(100);
     const accel = createBankedAcceleration({ tickDriver: driver, bank, spendMultiplier: 10 });
     accel.startSpending();
-    for (let i = 0; i < 20; i++) driver.tickRaw(0.05); // 1 real second
+    for (let i = 0; i < 20; i++) driver.processInterval(0.05); // 1 real second
     expect(sim()).toBeCloseTo(10, 6); // 10 sim-seconds delivered
     expect(bank.banked.value).toBeCloseTo(100 - 9, 6); // paid only the excess
   });
@@ -115,7 +115,7 @@ describe('createBankedAcceleration — spend loop', () => {
     bank.deposit(100);
     const accel = createBankedAcceleration({ tickDriver: driver, bank, spendMultiplier: 5 });
     accel.startSpending();
-    for (let i = 0; i < 20; i++) driver.tickRaw(0.05); // 1 real second
+    for (let i = 0; i < 20; i++) driver.processInterval(0.05); // 1 real second
     expect(sim()).toBeCloseTo(10, 6); // 2x baseline × 5x boost
     expect(bank.banked.value).toBeCloseTo(100 - 4, 6); // (5 - 1) real seconds, not 8
   });
@@ -131,7 +131,7 @@ describe('createBankedAcceleration — spend loop', () => {
       drainMode: 'full',
     });
     accel.startSpending();
-    for (let i = 0; i < 20; i++) driver.tickRaw(0.05); // 1 real second → 10 sim-seconds
+    for (let i = 0; i < 20; i++) driver.processInterval(0.05); // 1 real second → 10 sim-seconds
     expect(bank.banked.value).toBeCloseTo(100 - 10, 6);
   });
 
@@ -141,7 +141,7 @@ describe('createBankedAcceleration — spend loop', () => {
     bank.deposit(1); // ~2 ticks of excess at 10x (0.45/tick)
     const accel = createBankedAcceleration({ tickDriver: driver, bank, spendMultiplier: 10 });
     accel.startSpending();
-    for (let i = 0; i < 10; i++) driver.tickRaw(0.05);
+    for (let i = 0; i < 10; i++) driver.processInterval(0.05);
     expect(accel.isSpending.value).toBe(false);
     expect(driver.speedMultiplier).toBe(1);
     expect(bank.banked.value).toBe(0);
@@ -159,18 +159,18 @@ describe('createBankedAcceleration — spend loop', () => {
       when: gate,
     });
     accel.startSpending();
-    driver.tickRaw(0.05); // accelerated tick: 0.5 sim, drains 0.45
+    driver.processInterval(0.05); // accelerated tick: 0.5 sim, drains 0.45
     gate.value = false;
-    driver.tickRaw(0.05); // drains for the accelerated tick, then suspends
+    driver.processInterval(0.05); // drains for the accelerated tick, then suspends
     const bankedAtSuspend = bank.banked.value;
-    driver.tickRaw(0.05); // suspended: 1x, no drain
-    driver.tickRaw(0.05);
+    driver.processInterval(0.05); // suspended: 1x, no drain
+    driver.processInterval(0.05);
     expect(bank.banked.value).toBe(bankedAtSuspend);
     expect(driver.speedMultiplier).toBe(1);
     expect(accel.isSpending.value).toBe(true);
     gate.value = true;
-    driver.tickRaw(0.05); // re-arms 10x for the next tick
-    driver.tickRaw(0.05); // accelerated again
+    driver.processInterval(0.05); // re-arms 10x for the next tick
+    driver.processInterval(0.05); // accelerated again
     expect(driver.speedMultiplier).toBe(10);
     expect(bank.banked.value).toBeLessThan(bankedAtSuspend);
     expect(sim()).toBeGreaterThan(0);
@@ -201,7 +201,7 @@ describe('createBankedAcceleration — spend loop', () => {
       spendMultiplier: 10,
       bankLiveOverflow: true,
     });
-    driver.tickRaw(3.5); // maxDeltaTime 1 → 2.5 dropped
+    driver.processInterval(3.5); // maxDeltaTime 1 → 2.5 dropped
     expect(bank.banked.value).toBeCloseTo(2.5, 6);
     expect(prior).toBeCloseTo(2.5, 6);
   });
@@ -212,7 +212,7 @@ describe('createBankedAcceleration — spend loop', () => {
     bank.deposit(100);
     const accel = createBankedAcceleration({ tickDriver: driver, bank, spendMultiplier: 10 });
     accel.startSpending();
-    driver.tickRaw(0.05);
+    driver.processInterval(0.05);
     const simulated = burstDischarge(bank, driver, { fraction: 0.5 });
     // Burst replays wall-clock faithful — no speedMultiplier applied.
     expect(simulated).toBeCloseTo((100 - 0.45) / 2, 6);
@@ -232,7 +232,7 @@ describe('createBankedAcceleration — spend loop', () => {
     expect(driver.speedMultiplier).toBe(1);
     expect(accel.isSpending.value).toBe(false);
     const before = bank.banked.value;
-    driver.tickRaw(0.05);
+    driver.processInterval(0.05);
     expect(bank.banked.value).toBe(before);
   });
 });

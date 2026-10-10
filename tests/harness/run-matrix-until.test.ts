@@ -8,7 +8,7 @@ import type { CellResult, MatrixUntilWorkItem, RunUntilResult, UntilCell } from 
 // --- helpers ---
 
 /** Engine whose internal counter closes over the builder's local state,
- *  then increments on each simulateTick. The builder also exposes the
+ *  then increments on each advanceTime. The builder also exposes the
  *  counter via a shared `state` object so analyzers and the predicate can
  *  read it. Each buildEngine() call returns a fresh (engine, state) pair. */
 interface TestState {
@@ -19,7 +19,7 @@ interface TestState {
 function buildTestEngine(state: TestState): Engine {
   const engine = {
     tickDriver: {
-      simulateTick: (dt: number) => {
+      advanceTime: (dt: number) => {
         state.tick += 1;
         state.lastDt = dt;
       },
@@ -28,7 +28,7 @@ function buildTestEngine(state: TestState): Engine {
   return engine as unknown as Engine;
 }
 
-/** UntilCell whose engine advances one tick per simulateTick and whose
+/** UntilCell whose engine advances one tick per advanceTime and whose
  *  state is recorded into a per-cell aggregator for analyzer metrics. The
  *  `terminate_at_tick` parameter controls when the predicate should fire
  *  (via the shared module-level capture below). */
@@ -65,7 +65,7 @@ describe('runMatrixUntil', () => {
         const state: TestState = { tick: 0, lastDt: 0 };
         const id = `run-${seed}-${built++}`;
         const engine = {
-          tickDriver: { simulateTick: () => (state.tick += 1) },
+          tickDriver: { advanceTime: () => (state.tick += 1) },
           stop: () => stops.push(id),
         };
         return engine as unknown as Engine;
@@ -75,7 +75,7 @@ describe('runMatrixUntil', () => {
     runMatrixUntil({
       cells: [cell],
       seeds: [1, 2, 3],
-      until: ({ tick }) => tick >= 3,
+      until: ({ iteration: tick }) => tick >= 3,
       maxSimTime: 10,
     });
     // One stop() per (cell × seed) run — none left ticking.
@@ -90,7 +90,7 @@ describe('runMatrixUntil', () => {
       buildEngine: ({ seed }) => {
         const engine = {
           id: seed,
-          tickDriver: { simulateTick: () => {} },
+          tickDriver: { advanceTime: () => {} },
           stop: () => events.push(`stop:${seed}`),
         };
         return engine as unknown as Engine;
@@ -121,7 +121,7 @@ describe('runMatrixUntil', () => {
       name: 'default-dispose',
       buildEngine: ({ seed }) =>
         ({
-          tickDriver: { simulateTick: () => {} },
+          tickDriver: { advanceTime: () => {} },
           dispose: () => events.push(`dispose:${seed}`),
         }) as unknown as Engine,
     };
@@ -145,7 +145,7 @@ describe('runMatrixUntil', () => {
             buildEngine: () =>
               ({
                 tickDriver: {
-                  simulateTick: () => {
+                  advanceTime: () => {
                     throw new Error('tick failed');
                   },
                 },
@@ -191,7 +191,7 @@ describe('runMatrixUntil', () => {
     const result = runMatrixUntil({
       cells: [cellA],
       seeds: [1, 2, 3],
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 10,
     });
     expect(result.cells).toHaveLength(1);
@@ -236,7 +236,7 @@ describe('runMatrixUntil', () => {
       // the predicate; because predicates close over state indirectly,
       // we use a tick threshold that differs by cell name via the current
       // tick index.
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 10,
     });
     // Both cells terminate at tick 5 (sim-time 0.5) for every seed.
@@ -282,18 +282,18 @@ describe('runMatrixUntil', () => {
       until: (() => {
         // Predicate closes over a per-call counter. Since createWorkPlan runs
         // cells outer, seeds inner, and runUntil evaluates predicate each tick
-        // starting from tick 0, use ctx.tick >= threshold keyed by the seed
+        // starting from iteration 0, use ctx.iteration >= threshold keyed by the seed
         // via an external seed counter.
         let seedIdx = 0;
         const thresholds = [1, 2, 3, 20];
         let current = thresholds[0]!;
         // Track which run we're in via maxSimTime re-evaluation boundaries.
-        return (ctx: { tick: number; simTime: number }): boolean => {
-          if (ctx.tick === 0) {
+        return (ctx: { iteration: number; simTime: number }): boolean => {
+          if (ctx.iteration === 0) {
             current = thresholds[seedIdx]!;
             seedIdx += 1;
           }
-          return ctx.tick >= current;
+          return ctx.iteration >= current;
         };
       })(),
       maxSimTime: 1,
@@ -318,7 +318,7 @@ describe('runMatrixUntil', () => {
       ],
       seeds: [1, 2, 3],
       // Every run fires at tick 5 → sim-time 0.5.
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 1,
       aggregate: { terminationTimeHistogram: { edges: [0, 0.25, 0.75, 1] } },
     });
@@ -339,7 +339,7 @@ describe('runMatrixUntil', () => {
         { name: 'b', buildEngine: () => buildTestEngine({ tick: 0, lastDt: 0 }), tickDelta: 0.1 },
       ],
       seeds: [10, 20],
-      until: ({ tick }) => tick >= 1,
+      until: ({ iteration: tick }) => tick >= 1,
       maxSimTime: 1,
       onRunComplete: (item: MatrixUntilWorkItem, result: RunUntilResult) => {
         runEvents.push([item.cellIdx, item.seedIdx]);
@@ -374,7 +374,7 @@ describe('runMatrixUntil', () => {
         },
       ],
       seeds: [7, 8, 9],
-      until: ({ tick }) => tick >= 3,
+      until: ({ iteration: tick }) => tick >= 3,
       maxSimTime: 1,
     });
     expect(seenSeeds).toEqual([7, 8, 9]);

@@ -70,7 +70,7 @@ describe('activation', () => {
   });
 
   it('applies bindings synchronously under a sim (no flush boundary)', () => {
-    // A headless sim drives stepOnce() in a tight loop with no microtask
+    // A headless sim drives tickOnce() in a tight loop with no microtask
     // boundary between steps. The active-predicate watch must fire on a 'sync'
     // flush so a mid-run activation binds its modifiers immediately — otherwise
     // the effect is silently a step (or more) late in the sim.

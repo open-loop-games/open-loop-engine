@@ -227,7 +227,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | TM2 | **interval** | one timer firing of the live loop, which runs one or more ticks (`processInterval`); a throttle's gap between firings | interval tick |
 | TM3 | **interval rate** | timer firings per second (`intervalRate`) | tick rate, TPS |
 | TM4 | **iteration** | one pass of a balance-harness loop | tick, for an iteration; tick mode, for a run mode |
-| TM5 | **advance time**, **advance** | feed seconds through the loop as ticks (`advanceTime`); bare: move a position (a cursor, a pointer, a rung) | simulateTick; offline processing, for the replay path |
+| TM5 | **advance time**, **advance** | feed seconds through the loop as ticks (`advanceTime`); bare: move a position (a cursor, a pointer, a rung) | advanceTime; offline processing, for the replay path |
 | TM6 | **dt**, **raw dt**, **fixed dt** | the game seconds one tick advances; the wall-clock seconds one interval measured; the dt of every fixed-mode tick | elapsed time, delta, step size |
 | TM7 | **game time**, **sim-time**, **sim-seconds**, **wall-clock time**, **play time** | seconds the engine simulated, scaled by game speed; game time in a balance-harness run, in sim-seconds; elapsed time on the system clock; how long the player has played | real, real time, simulated time, play-clock |
 | TM8 | **offline** | time away: time the game was not running, replayed on return | absence, idle |

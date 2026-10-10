@@ -140,7 +140,7 @@ describe('createSensitivityCell', () => {
       },
       perturb,
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 20,
     });
   }
@@ -197,7 +197,7 @@ describe('createSensitivityCell', () => {
         goldBySeed.push(economy?._refs.gold?.value ?? NaN);
       },
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 1,
     });
 
@@ -264,7 +264,7 @@ describe('createSensitivityCell', () => {
           },
         },
       ],
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 1,
     });
     for (const seed of [1, 2, 3]) cell.setup({ seed });
@@ -291,7 +291,7 @@ describe('createSensitivityCell', () => {
           },
         },
       ],
-      tick: (engine) => engine.tickDriver.stepOnce(),
+      tick: (engine) => engine.tickDriver.tickOnce(),
       ticks: 1,
     });
     runMatrix({ cells: [cell], seeds: [1, 2] });

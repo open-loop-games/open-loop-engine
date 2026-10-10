@@ -96,7 +96,7 @@ describe('createEngine', () => {
       maxDeltaTime: 1,
       onDeltaOverflow: (s) => dropped.push(s),
     });
-    engine.tickDriver.tickRaw(3);
+    engine.tickDriver.processInterval(3);
     expect(dropped).toEqual([2]);
   });
   it('validates module dependencies', () => {
@@ -388,7 +388,7 @@ describe('dispose() — persistent-context teardown', () => {
     engine.dispose();
 
     outside.value++;
-    engine.tickDriver.stepOnce();
+    engine.tickDriver.tickOnce();
     emitFromOutside!();
     mgr.load();
     expect(calls).toEqual({ watch: 0, tick: 0, event: 0, load: 0 });
@@ -1361,8 +1361,8 @@ describe('save safety', () => {
     const engine = createEngine({ gameId: 'unloaded', storageAdapter: createMemoryStorage() });
     engine.use({ id: 'unloaded-mod', install: () => void persistent(0, { name: 'gold' }) });
     engine.start();
-    engine.tickDriver.tickRaw(0.05);
-    engine.tickDriver.tickRaw(0.05);
+    engine.tickDriver.processInterval(0.05);
+    engine.tickDriver.processInterval(0.05);
     expect(warn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0][0]).toMatch(/before load\(\)/);
     engine.dispose();
@@ -1378,7 +1378,7 @@ describe('save safety', () => {
     });
     engine.use({ id: 'sim-mod', install: () => void persistent(0, { name: 'gold' }) });
     engine.start();
-    engine.tickDriver.tickRaw(0.05);
+    engine.tickDriver.processInterval(0.05);
     expect(warn).not.toHaveBeenCalled();
     engine.dispose();
     warn.mockRestore();
@@ -1390,7 +1390,7 @@ describe('save safety', () => {
     engine.use({ id: 'loaded-mod', install: () => void persistent(0, { name: 'gold' }) });
     engine.start();
     engine.load();
-    engine.tickDriver.tickRaw(0.05);
+    engine.tickDriver.processInterval(0.05);
     expect(warn).not.toHaveBeenCalled();
     engine.dispose();
     warn.mockRestore();

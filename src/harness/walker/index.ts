@@ -8,7 +8,7 @@
  * they get consistent ordering and never have to re-sort across sources.
  *
  * Canonical consumers today are `runUntil`'s `'event'` mode (via
- * {@link createIncrementalSnapshot}) and `runUntil`'s `'stasis-aware-tick'`
+ * {@link createIncrementalSnapshot}) and `runUntil`'s `'stasis-aware'`
  * mode (via this one-shot merger, called per tick). Both flow through
  * `runBeatProbe` and `runMatrixUntil`. The walker is the substrate underneath
  * the probe ecosystem, not a generic consumer-facing API.

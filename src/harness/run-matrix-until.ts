@@ -56,8 +56,8 @@ import type { CellResult, MatrixUntilConfig, MatrixUntilResult, RunUntilResult }
  * ```
  */
 export function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult {
-  const mode = config.mode ?? 'tick';
-  if (mode !== 'tick') {
+  const mode = config.mode ?? 'uniform';
+  if (mode !== 'uniform') {
     for (const cell of config.cells) {
       if (!cell.buildAccessor) {
         throw new Error(

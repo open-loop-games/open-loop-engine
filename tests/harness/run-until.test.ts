@@ -7,7 +7,7 @@ import { runUntil } from '@/harness';
 // --- helpers ---
 
 /** Minimal Engine shape for testing harness behavior in isolation.
- *  Only `engine.tickDriver.simulateTick` is exercised by runUntil; the rest of
+ *  Only `engine.tickDriver.advanceTime` is exercised by runUntil; the rest of
  *  the Engine surface is irrelevant here. A monotonic counter gives
  *  predicates something to close over; the stub also records the most
  *  recent dt so tests can pin the caller's tickDelta reaches the engine. */
@@ -21,7 +21,7 @@ function createTestEngine(): Engine & {
   const dts: number[] = [];
   const engine = {
     tickDriver: {
-      simulateTick: (dt: number) => {
+      advanceTime: (dt: number) => {
         tickCount += 1;
         lastDt = dt;
         dts.push(dt);
@@ -112,7 +112,7 @@ describe('runUntil', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
-      until: ({ tick }) => tick >= 5,
+      until: ({ iteration: tick }) => tick >= 5,
       maxSimTime: 10,
       tickDelta: 0.1,
     });
@@ -149,7 +149,7 @@ describe('runUntil', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
-      until: ({ tick }) => tick >= 3,
+      until: ({ iteration: tick }) => tick >= 3,
       maxSimTime: 1,
     });
     expect(result.elapsedSimulated).toBeCloseTo(0.15, 10);
@@ -159,7 +159,7 @@ describe('runUntil', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
-      until: ({ tick }) => tick >= 3,
+      until: ({ iteration: tick }) => tick >= 3,
       maxSimTime: 1,
       tickDelta: 0.1,
       setup: () => [createLifecycleAnalyzer()],
@@ -187,30 +187,30 @@ describe('runUntil', () => {
     expect(metrics.ends).toBe(1);
   });
 
-  it('passes tick and simTime in the predicate context', () => {
+  it('passes iteration and simTime in the predicate context', () => {
     const engine = createTestEngine();
-    const seen: Array<{ tick: number; simTime: number }> = [];
+    const seen: Array<{ iteration: number; simTime: number }> = [];
     runUntil({
       engine,
       until: (ctx) => {
         seen.push(ctx);
-        return ctx.tick >= 2;
+        return ctx.iteration >= 2;
       },
       maxSimTime: 1,
       tickDelta: 0.1,
     });
     expect(seen).toEqual([
-      { tick: 0, simTime: 0 },
-      { tick: 1, simTime: 0.1 },
-      { tick: 2, simTime: 0.2 },
+      { iteration: 0, simTime: 0 },
+      { iteration: 1, simTime: 0.1 },
+      { iteration: 2, simTime: 0.2 },
     ]);
   });
 
-  it("forwards caller's tickDelta to engine.tickDriver.simulateTick", () => {
+  it("forwards caller's tickDelta to engine.tickDriver.advanceTime", () => {
     const engine = createTestEngine();
     runUntil({
       engine,
-      until: ({ tick }) => tick >= 3,
+      until: ({ iteration: tick }) => tick >= 3,
       maxSimTime: 10,
       tickDelta: 0.25,
     });
@@ -223,7 +223,7 @@ describe('runUntil', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
-      until: ({ tick }) => tick >= 1,
+      until: ({ iteration: tick }) => tick >= 1,
       maxSimTime: 1,
     });
     expect(result.analyzerResults).toEqual([]);

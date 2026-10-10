@@ -60,7 +60,7 @@ Walk engine state to enumerate addressable choices for solvers / UIs.
 
 ## Probes
 
-Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`tick` / `event` / `stasis-aware-tick`) inherited from `runMatrixUntil`.
+Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `event` / `stasis-aware`) inherited from `runMatrixUntil`.
 
 - `interface Beat` — One beat's predicate + identity. `src/harness/probe/types.ts:19`
 - `interface BeatProbeOptions` — Configuration for runBeatProbe. `src/harness/probe/types.ts:69`
@@ -88,7 +88,7 @@ reduces raw per-run results into per-metric stats, optional histograms, and (for
 - `function runMatrix(config: MatrixConfig): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
 - `function runMatrixUntil(config: MatrixUntilConfig): MatrixUntilResult` — Sync cartesian run over `cells × seeds` where each run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:58`
 - `function runSensitivity<C extends Cell | UntilCell = Cell>(config: SensitivityConfig<C>): SensitivityResult` — Run baseline plus every variant, then compute per-variant `{ absolute, relative }` deltas against the baseline per metric. `src/harness/run-sensitivity.ts:76`
-- `function runUntil(config: RunUntilConfig): RunUntilResult` — Drive `config.engine` via `engine.tickDriver.simulateTick(tickDelta)` until `config.until` returns `true` or `config.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:79`
+- `function runUntil(config: RunUntilConfig): RunUntilResult` — Drive `config.engine` via `engine.tickDriver.advanceTime(tickDelta)` until `config.until` returns `true` or `config.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:79`
 - `interface TickCounter` — A live sub-tick counter returned by createTickCounter. `src/harness/replay.ts:78`
 
 ## Solvers
@@ -118,7 +118,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:110`
 - `interface MetricStats` — Numeric summary of one metric across a cell's runs. `src/harness/types.ts:90`
 - `interface RunContext` — Context passed to a Cell's `setup` function. `src/harness/types.ts:37`
-- `type RunMode = 'tick' | 'event' | 'stasis-aware-tick'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
+- `type RunMode = 'uniform' | 'event' | 'stasis-aware'` — Run-loop mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
 - `interface RunUntilConfig` — Configuration for a single predicate-bounded run. `src/harness/types.ts:395`
 - `interface RunUntilResult` — Result of a predicate-bounded run. `src/harness/types.ts:463`
 - `interface SensitivityConfig<C extends Cell | UntilCell = Cell>` — Baseline-plus-variants sweep config consumed by runSensitivity. `src/harness/types.ts:275`

@@ -319,7 +319,7 @@ export interface BurstDischargeOptions {
    * to the full discharge amount so no withdrawn time is silently dropped —
    * override with care.
    */
-  offline?: OfflineProgressOptions;
+  replay?: OfflineProgressOptions;
 }
 
 /**
@@ -356,7 +356,7 @@ export function burstDischarge(
   try {
     return processOfflineTime(tickDriver, seconds, {
       maxOfflineSeconds: seconds,
-      ...options.offline,
+      ...options.replay,
     });
   } finally {
     burstInFlight = false;
