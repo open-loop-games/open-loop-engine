@@ -180,8 +180,8 @@ export function selectionPaybackPeriod<T>(getBeat: (t: T) => number): SelectionP
  *
  * The first term dominates while the player is saving toward something
  * expensive — it collapses to zero the moment the candidate is affordable,
- * handing the decision to the pure payback term. A common auto-buy
- * userscript formula.
+ * handing the decision to the pure payback term. Auto-buy userscripts
+ * commonly use this formula.
  *
  * The wait term only scores candidates the driver offers before they're
  * affordable: under `setupPolicyAutoPurchase` that takes `waitForCost`.

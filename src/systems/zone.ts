@@ -11,7 +11,8 @@
  * - {@link createZoneSystem} — the sole factory
  *
  * Navigation-agnostic: the system tracks which zones are unlocked and which
- * is selected. Whether the UI shows a zone picker or auto-advances is a consumer decision.
+ * is selected. Whether the UI shows a zone picker or auto-advances is a
+ * consumer decision.
  *
  * @example
  * ```ts

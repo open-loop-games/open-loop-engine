@@ -410,11 +410,11 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
  * const buildings = createProducerCategory<BuildingDef>({
  *   id: 'buildings',
  *   mapProducer: (def) => ({
- *     resource: cookies,
+ *     resource: gold,
  *     baseRate: def.baseRate,
  *     trigger: 'continuous',
  *     purchase: {
- *       costResource: cookies,
+ *       costResource: gold,
  *       baseCost: def.baseCost,
  *       costScaling: 1.15,
  *     },
@@ -422,11 +422,11 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
  *   registerTick: ctx.onTick,
  * });
  *
- * // The cookie itself: manual producer, no purchase count
+ * // The click itself: manual producer, no purchase count
  * const clicks = createProducerCategory<ClickDef>({
  *   id: 'clicks',
  *   mapProducer: (def) => ({
- *     resource: cookies,
+ *     resource: gold,
  *     baseRate: 1,
  *     trigger: 'manual',
  *   }),

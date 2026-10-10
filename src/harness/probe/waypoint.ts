@@ -10,8 +10,8 @@
  * `inspect` callback.
  *
  * One engine per (waypoint × seed). Default `seeds: [0]` runs a single
- * deterministic engine per waypoint; pass a wider seed list when waypoint-time variance across seeds
- * matters.
+ * deterministic engine per waypoint; pass a wider seed list when waypoint-time
+ * variance across seeds matters.
  */
 
 import { runMatrixUntil } from '../run-matrix-until';

@@ -201,7 +201,7 @@ export interface EngineModule {
 /**
  * A selectable game mod — metadata plus the module to install when active.
  *
- * Mods are game variants selected at new-game creation (an alternate rule set chosen before play begins).
+ * Mods are game variants, each an alternate rule set selected at new-game creation.
  * Only one mod is active per save. `selectMod()` pushes the mod's full
  * module list into the engine's registration list; `start()` then installs
  * them alongside any modules the consumer added via `use()`.

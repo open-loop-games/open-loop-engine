@@ -34,7 +34,8 @@
  * Deterministic replay: fixed mode + seeded RNG + `stepOnce()` produces bit-identical
  * sequences across tab-performance profiles. Variable mode cannot.
  *
- * Variable dt with setInterval is the genre standard. EWMA lag compensation uses 200 TPS and filterStrength=20. Fixed mode is an opt-in
+ * Variable dt with setInterval is the genre standard. EWMA lag compensation
+ * runs at a typical 200 TPS with filterStrength=20. Fixed mode is an opt-in
  * for source-faithful ports and tick-drift diagnostics.
  */
 
