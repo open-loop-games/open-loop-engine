@@ -14,7 +14,7 @@ import { isFunction } from './common';
  * Uses `Readonly<Ref<T>>` instead of `Ref<T>` so that subtype refs work naturally:
  * `ComputedRef<Decimal>` satisfies `Computable<DecimalSource>` without wrapping.
  *
- * Use in option interfaces (the input side). After {@link processGetter}, the
+ * Use in option interfaces (the input side). After {@link toMaybeRef}, the
  * result is a standard `MaybeRef<T>` compatible with Vue's `unref()`.
  */
 export type Computable<T> = T | Readonly<Ref<T>> | (() => T);
@@ -27,7 +27,7 @@ export type MaybeGetter<T> = T | (() => T);
 /**
  * Unwrap a {@link Computable} to its current value in a single step.
  *
- * Unlike {@link processGetter} (which wraps getters in `computed()`), this
+ * Unlike {@link toMaybeRef} (which wraps getters in `computed()`), this
  * evaluates eagerly — suitable for one-shot reads, not reactive chains.
  *
  * @param value - A raw value, ref, or getter function
@@ -55,12 +55,12 @@ export function resolveComputable<T>(value: Computable<T>): T {
  *
  * @example
  * ```ts
- * const staticValue = processGetter(5)                       // 5
- * const reactive = processGetter(() => count.value * 2)      // ComputedRef<number>
- * const passthrough = processGetter(someComputedRef)          // same ref
+ * const staticValue = toMaybeRef(5)                       // 5
+ * const reactive = toMaybeRef(() => count.value * 2)      // ComputedRef<number>
+ * const passthrough = toMaybeRef(someComputedRef)          // same ref
  * ```
  */
-export function processGetter<T>(obj: Computable<T>): MaybeRef<T> {
+export function toMaybeRef<T>(obj: Computable<T>): MaybeRef<T> {
   if (isFunction(obj) && obj.length === 0) {
     return computed(obj);
   }

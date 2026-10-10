@@ -30,7 +30,7 @@ function mockAccessor(
   return {
     getAmount: (id) => bn(resources[id] ?? 0),
     getFlag: (id) => unlocks[id] ?? false,
-    getState: (path) => state[path],
+    getStateAt: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
 }

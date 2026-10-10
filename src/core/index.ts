@@ -97,10 +97,10 @@ export {
 
 // === PERSISTENCE ===
 export type {
-  State,
-  StatePrimitive,
-  StateConstraint,
-  IfState,
+  Serializable,
+  SerializablePrimitive,
+  SerializableConstraint,
+  IfSerializable,
   Persistent,
   PersistentAlias,
   PersistentOptions,
@@ -295,7 +295,7 @@ export type {
   SpatialGraphOptions,
   SpatialGraphEvents,
   SpatialGraphSnapshot,
-  ScopeState,
+  ScopeStatus,
   ScopeStack,
   ScopeStackOptions,
   ScopeStackEvents,
@@ -303,7 +303,7 @@ export type {
   InfluenceSource,
   FalloffFunction,
   InfluenceLayerOptions,
-  InfluenceLayerReader,
+  InfluenceLayerView,
   InfluenceLayer,
 } from './spatial';
 export { createSpatialGrid, createSpatialGraph, createScopeStack } from './spatial';
@@ -320,7 +320,7 @@ export {
 
 // === COMPUTED / REACTIVITY HELPERS ===
 export type { MaybeGetter, Computable } from './computed';
-export { processGetter, resolveComputable } from './computed';
+export { toMaybeRef, resolveComputable } from './computed';
 
 // === PERSISTENCE CONTEXT SCOPING ===
 // withPersistentContext is the scoping entry point for custom category

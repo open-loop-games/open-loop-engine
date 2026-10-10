@@ -10,7 +10,7 @@
  */
 
 import { Decimal, toNumber, type DecimalSource } from '@/primitives/decimal';
-import type { Persistent, State } from '@/core/persistence';
+import type { Persistent, Serializable } from '@/core/persistence';
 
 // === TYPES ===
 
@@ -79,7 +79,7 @@ export function fractional(rate: DecimalSource): (value: any) => any {
  */
 export function createRetentionPolicy(options: RetentionPolicyOptions): RetentionPolicy {
   const { keep = [], retain = new Map() } = options;
-  const snapshots = new Map<Persistent, State>();
+  const snapshots = new Map<Persistent, Serializable>();
 
   return {
     snapshot() {

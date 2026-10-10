@@ -485,7 +485,7 @@ function buildEnumField<V extends string>(
     );
   }
   // Store as `string | null` so the generic `V` doesn't need to satisfy
-  // StateConstraint structurally — V extends string, so the narrowed
+  // SerializableConstraint structurally — V extends string, so the narrowed
   // Persistent<V | null> surface is sound on read.
   const ref = persistent<string | null>(initial, { name: fieldName }) as Persistent<V | null>;
   const events = createEmitHandle<EnumFieldEvents<V>>();

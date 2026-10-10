@@ -25,7 +25,7 @@
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | active         | findCategoryEntrySignals(...).active                | 'opaque-predicate'                       |
  * | flag           | accessor.getFlag(id)                                | 'opaque-predicate'                       |
- * | state          | compareState(accessor.getState(...), op, val)       | 'opaque-predicate'                       |
+ * | state          | compareState(accessor.getStateAt(...), op, val)     | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
  * `gateToCondition` partial-projects accessor-backed Gates (and their
@@ -196,7 +196,7 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
     }
     case 'state':
       return compareState(
-        demand(runtime, 'accessor', gate.kind).getState(gate.key),
+        demand(runtime, 'accessor', gate.kind).getStateAt(gate.key),
         gate.operator,
         gate.value,
       );

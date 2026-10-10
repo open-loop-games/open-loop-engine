@@ -259,7 +259,7 @@ Cross-cutting concerns the field kinds don't carry — time decay, propagation (
 
 ### When dialog and subjects connect
 
-Both surfaces share the engine's predicate / effect machinery, through state paths **your accessor implements**. The engine resolves no subject path: a `state` Gate hands its key to your `GameStateAccessor.getState`, and `E.state` hands its path to your mutator's `setState`. Pick a convention — `{categoryId}.{subjectId}.{fieldName}`, plus `.{dim}` for a vector dimension, reads well — and map it onto the category:
+Both surfaces share the engine's predicate / effect machinery, through state paths **your accessor implements**. The engine resolves no subject path: a `state` Gate hands its key to your `GameStateAccessor.getStateAt`, and `E.state` hands its path to your mutator's `setStateAt`. Pick a convention — `{categoryId}.{subjectId}.{fieldName}`, plus `.{dim}` for a vector dimension, reads well — and map it onto the category:
 
 ```ts
 getState: (path) => {
@@ -267,7 +267,7 @@ getState: (path) => {
   if (cat === 'npc-trust') return npcs.get(subjectId)?.fields.trust.getIndex();
   // ...other roots
 },
-setState: (path, value) => {
+setStateAt: (path, value) => {
   const [cat, subjectId] = path.split('.');
   if (cat === 'npc-trust') npcs.get(subjectId)?.fields.trust.setIndex(value as number);
 },

@@ -208,7 +208,7 @@ export interface GameStateAccessor {
   /** Returns whether the named unlock flag is currently set. */
   getFlag(id: string): boolean;
   /** Returns the value at a dot-separated state path (e.g. `"player.phase"`). */
-  getState(path: string): unknown;
+  getStateAt(path: string): unknown;
   /**
    * Returns the current net flow rate for the named resource, in resource-units per second.
    *

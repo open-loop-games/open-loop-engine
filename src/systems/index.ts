@@ -301,7 +301,7 @@ export type {
   Emittable,
   Computable,
   MaybeGetter,
-  State,
+  Serializable,
   Persistent,
   PersistentAlias,
   GameStateMutator,

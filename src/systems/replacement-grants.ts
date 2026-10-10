@@ -13,7 +13,7 @@
 
 import { unref, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import {
   createAdditiveModifier,
   createExponentialModifier,
@@ -104,8 +104,8 @@ export interface ReplacementGrantsOptions {
  */
 export function replacementGrants(options: ReplacementGrantsOptions): Grant[] {
   const { chain, cancel, replacement, description } = options;
-  const cancelSrc = processGetter(cancel);
-  const replacementSrc = processGetter(replacement);
+  const cancelSrc = toMaybeRef(cancel);
+  const replacementSrc = toMaybeRef(replacement);
 
   return [
     {

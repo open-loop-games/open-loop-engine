@@ -60,13 +60,13 @@ function buildAccessor(): GameStateAccessorMutator {
   return {
     getAmount: () => bn(0),
     getFlag: (id) => unlocks.get(id) ?? false,
-    getState: () => undefined,
+    getStateAt: () => undefined,
     getRate: () => Decimal.dZero,
     applyResourceOp: () => {},
     setFlag: (id, v) => {
       unlocks.set(id, v);
     },
-    setState: () => {},
+    setStateAt: () => {},
   };
 }
 

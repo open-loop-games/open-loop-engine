@@ -15,7 +15,7 @@
 import type { Resource } from '../resource';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from '../computed';
+import { toMaybeRef, type Computable } from '../computed';
 import { profile, profileStart, profileEnd } from '../profiler';
 import { computed, unref } from 'vue';
 import { captureInversionFailures, representationFloor } from './inversion';
@@ -101,8 +101,8 @@ export function calculateMaxAffordable(
   cumulativeCost: Computable<boolean> = true,
   maxBulkCount: Computable<DecimalSource> = Decimal.dInf,
 ) {
-  const computedCumulativeCost = processGetter(cumulativeCost);
-  const computedmaxBulkAmount = processGetter(maxBulkCount);
+  const computedCumulativeCost = toMaybeRef(cumulativeCost);
+  const computedmaxBulkAmount = toMaybeRef(maxBulkCount);
 
   // Change token for the cost curve. Recomputes — and so returns a *fresh*
   // object — whenever any reactive value the formula reads changes, which makes
@@ -183,7 +183,7 @@ export function calculateMaxAffordable(
         guard !== null &&
         guard.token === token &&
         guard.cumulative === cumulativeCost &&
-        // `maxBulkCount` defaults to `dInf`, and `processGetter` hands back the
+        // `maxBulkCount` defaults to `dInf`, and `toMaybeRef` hands back the
         // same object each run, so identity settles the common case before the
         // comparison that has to reason about infinities.
         (guard.maxBulk === maxBulkCount || Decimal.eq(guard.maxBulk, maxBulkCount)) &&

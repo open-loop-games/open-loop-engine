@@ -5,7 +5,7 @@ import {
   resetAllPersistentContexts,
   withLoadingSave,
   type Persistent,
-  type State,
+  type Serializable,
 } from '@/core/persistence';
 import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
@@ -46,13 +46,13 @@ function buildAccessor(state: Record<string, unknown> = {}): GameStateAccessorMu
   return {
     getAmount: () => bn(0),
     getFlag: (id) => unlocks.get(id) ?? false,
-    getState: (path) => state[path],
+    getStateAt: (path) => state[path],
     getRate: () => Decimal.dZero,
     applyResourceOp: () => {},
     setFlag: (id, v) => {
       unlocks.set(id, v);
     },
-    setState: (path, v) => {
+    setStateAt: (path, v) => {
       state[path] = v;
     },
   };
@@ -68,7 +68,7 @@ function buildSession(
   return withEngine(accessor, () => createDialogSession({ id, graphs }));
 }
 
-function savedState(id: string): Persistent<State> {
+function savedState(id: string): Persistent<Serializable> {
   return getAllPersistentRefs().get(`dialog-sessions/${id}.state`)!;
 }
 
@@ -145,7 +145,7 @@ describe('createDialogSession', () => {
 
   it('throws on a cycle before re-entering a node, leaving the saved state in step', () => {
     const accessor = buildAccessor();
-    const setStateSpy = vi.spyOn(accessor, 'setState');
+    const setStateSpy = vi.spyOn(accessor, 'setStateAt');
     const graph: DialogGraph = {
       id: 'loop-with-effect',
       entry: 'a',
@@ -216,7 +216,7 @@ describe('createDialogSession', () => {
 
   it('writes choice outcomes via the mutator', () => {
     const accessor = buildAccessor();
-    const setStateSpy = vi.spyOn(accessor, 'setState');
+    const setStateSpy = vi.spyOn(accessor, 'setStateAt');
     const session = buildSession([greetingGraph], { accessor });
     session.start('rask-greeting');
     session.choose('ask-training');
@@ -298,7 +298,7 @@ describe('createDialogSession', () => {
   it('advances a node whose choices were gated off after it presented them', () => {
     const accessor = buildAccessor();
     accessor.setFlag('offer-open', true);
-    const setStateSpy = vi.spyOn(accessor, 'setState');
+    const setStateSpy = vi.spyOn(accessor, 'setStateAt');
     const graph: DialogGraph = {
       id: 'lapsed-offer',
       entry: 'a',

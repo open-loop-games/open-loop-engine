@@ -49,19 +49,19 @@ Stack navigator over a recursive `SpatialGraph` — tracks which nested child gr
 - `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:91`
 - `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:67`
 - `interface ScopeStackSnapshot` — Plain-object snapshot of the stack's navigation state. `src/core/spatial/scope-stack.ts:85`
-- `type ScopeState = string` — Caller-owned scope-state label. `src/core/spatial/scope-stack.ts:64`
+- `type ScopeStatus = string` — Caller-owned scope-state label. `src/core/spatial/scope-stack.ts:64`
 
 ## Influence layer
 
 Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric grid into an influence map.
 
-- `function composeInfluenceLayers(readers: readonly InfluenceLayerReader[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerReader` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:480`
+- `function composeInfluenceLayers(views: readonly InfluenceLayerView[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerView` — Combine multiple influence-layer readers into a derived reader. `src/core/spatial/influence-layer.ts:480`
 - `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Wrap a `SpatialGrid<number>` with an influence-map lifecycle. `src/core/spatial/influence-layer.ts:288`
 - `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:250`
 - `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff curve applied per cell during accumulation. `src/core/spatial/influence-layer.ts:99`
 - `const gaussianFalloff: FalloffFunction` — Gaussian falloff `exp(-(d/r)^2 * 2)`, Euclidean `d`. `src/core/spatial/influence-layer.ts:243`
 - `interface InfluenceLayer` — Lifecycle handle for an influence layer. `src/core/spatial/influence-layer.ts:186`
 - `interface InfluenceLayerOptions` — Options accepted by createInfluenceLayer. `src/core/spatial/influence-layer.ts:102`
-- `interface InfluenceLayerReader` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:144`
+- `interface InfluenceLayerView` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:144`
 - `interface InfluenceSource` — A point source contributing influence to the layer. `src/core/spatial/influence-layer.ts:56`
 - `const linearFalloff: FalloffFunction` — Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. `src/core/spatial/influence-layer.ts:236`

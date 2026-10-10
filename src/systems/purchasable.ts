@@ -20,7 +20,7 @@
 
 import { computed, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import {
   persistent,
   type Persistent,
@@ -344,15 +344,15 @@ function buildPurchasableDisplay(
   if (typeof display === 'object' && display !== null && 'description' in display) {
     const disp = display;
     return {
-      title: processGetter(disp.title),
-      description: processGetter(disp.description),
-      effectDisplay: processGetter(disp.effectDisplay),
+      title: toMaybeRef(disp.title),
+      description: toMaybeRef(disp.description),
+      effectDisplay: toMaybeRef(disp.effectDisplay),
       showAmount: disp.showAmount ?? !isOneShot,
     };
   }
   return {
     title: undefined,
-    description: processGetter(display as Computable<string>),
+    description: toMaybeRef(display as Computable<string>),
     effectDisplay: undefined,
     showAmount: !isOneShot,
   };
@@ -422,7 +422,7 @@ function buildEffectComputed(
   if (isCountFunction(effect)) {
     return computed(() => effect(count.value));
   }
-  const processedEffect = processGetter(effect);
+  const processedEffect = toMaybeRef(effect);
   return computed(() => unref(processedEffect) ?? 1);
 }
 
@@ -473,13 +473,13 @@ function buildScalingCostRequirement(
     });
   }
 
-  // Geometric path. processGetter so a tunable()/ref baseCost or costScaling
+  // Geometric path. toMaybeRef so a tunable()/ref baseCost or costScaling
   // flows reactively into the Formula. Formula sources accept
   // MaybeRef<DecimalSource>, so the exponential re-evaluates when either
   // underlying ref updates (e.g., OverrideRegistry scope push swapping a
   // tuning knob).
-  const processedBaseCost = processGetter(options.baseCost);
-  const processedCostScaling = processGetter(options.costScaling);
+  const processedBaseCost = toMaybeRef(options.baseCost);
+  const processedCostScaling = toMaybeRef(options.costScaling);
   return createCostRequirement({
     resource: options.resource,
     cost: Formula.exponential(count, processedBaseCost, processedCostScaling),
@@ -543,10 +543,10 @@ function assemblePurchasable(
 ): Purchasable {
   const { id, display, requirements, limit, effect, onPurchase, visible, bulkPurchase } = options;
 
-  const processedLimit = limit != null ? processGetter(limit) : Decimal.dInf;
+  const processedLimit = limit != null ? toMaybeRef(limit) : Decimal.dInf;
   const isOneShot = Decimal.eq(unref(processedLimit), 1);
   const processedVisible = predicates.adopt(visible, true, `purchasable '${id}' visible`).holds;
-  const processedBulkPurchase = bulkPurchase != null ? processGetter(bulkPurchase) : !isOneShot;
+  const processedBulkPurchase = bulkPurchase != null ? toMaybeRef(bulkPurchase) : !isOneShot;
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
 

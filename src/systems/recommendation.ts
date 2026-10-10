@@ -36,7 +36,7 @@ import {
   withPersistentContext,
   resolveSystemPersistentContextId,
   type Persistent,
-  type State,
+  type Serializable,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
@@ -58,9 +58,9 @@ export interface RecommendationContext {
   /** The Cycle instance (access count, elapsed, etc.) */
   cycle: Cycle;
   /** Current game configuration snapshot, from `getCurrentSnapshot()` */
-  currentSnapshot: State;
-  /** Consumer-provided game state for strategy evaluation, from `getState()` */
-  state: Record<string, unknown>;
+  currentSnapshot: Serializable;
+  /** Consumer-provided game state for strategy evaluation, from `getGameState()` */
+  gameState: Record<string, unknown>;
 }
 
 /** Per-metric comparison data in a recommendation's rationale */
@@ -83,7 +83,7 @@ export interface RecommendationRationale {
 /** The output of a def's `recommend()` method */
 export interface RecommendationResult {
   /** The proposed configuration to apply next cycle (opaque to the engine) */
-  snapshot: State;
+  snapshot: Serializable;
   /** Structured explanation data */
   rationale: RecommendationRationale;
 }
@@ -127,7 +127,7 @@ export interface Recommendation {
   /** Which def produced this */
   strategyId: string;
   /** The proposed configuration snapshot */
-  snapshot: State;
+  snapshot: Serializable;
   /** Structured explanation data */
   rationale: RecommendationRationale;
   /** When this was generated (Unix ms) */
@@ -139,7 +139,7 @@ export interface Recommendation {
 /** Serialized form stored in persistent — DecimalSource values as strings */
 interface SerializedRecommendation {
   strategyId: string;
-  snapshot: State;
+  snapshot: Serializable;
   rationale: {
     strategyId: string;
     metrics: Record<string, { current: string; projected: string; delta: string }>;
@@ -187,13 +187,13 @@ export interface RecommendationSystemOptions {
    * Called to read the current game configuration as an opaque snapshot.
    * Populates {@link RecommendationContext.currentSnapshot}.
    */
-  getCurrentSnapshot: () => State;
+  getCurrentSnapshot: () => Serializable;
 
   /**
    * Called to apply a recommended snapshot to the live game state.
    * Only called when `autoApply` is enabled or the consumer calls `.apply()`.
    */
-  applySnapshot: (snapshot: State) => void;
+  applySnapshot: (snapshot: Serializable) => void;
 
   /**
    * Definitions to register at construction time; a repeated `id` throws.
@@ -203,9 +203,9 @@ export interface RecommendationSystemOptions {
 
   /**
    * Called each `evaluate()` to provide game-specific state for def
-   * evaluation. Populates {@link RecommendationContext.state}.
+   * evaluation. Populates {@link RecommendationContext.gameState}.
    */
-  getState?: () => Record<string, unknown>;
+  getGameState?: () => Record<string, unknown>;
 }
 
 /**
@@ -378,7 +378,7 @@ export function createRecommendationSystem(
     getCurrentSnapshot,
     applySnapshot,
     defs: initialDefs,
-    getState,
+    getGameState: getState,
   } = options;
 
   // --- Persistence ---
@@ -423,7 +423,7 @@ export function createRecommendationSystem(
       bestOf: resolved,
       cycle,
       currentSnapshot: getCurrentSnapshot(),
-      state: getState?.() ?? {},
+      gameState: getState?.() ?? {},
     };
   }
 

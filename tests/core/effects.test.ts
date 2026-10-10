@@ -7,7 +7,7 @@ function mockAccessor(): GameStateAccessor {
   return {
     getAmount: (id) => (id === 'gold' ? bn(100) : bn(0)),
     getFlag: () => false,
-    getState: () => undefined,
+    getStateAt: () => undefined,
     getRate: () => Decimal.dZero,
   };
 }
@@ -92,8 +92,8 @@ function mockMutator(): GameStateMutator & { calls: Array<{ method: string; args
     setFlag(id, value) {
       calls.push({ method: 'setFlag', args: [id, value] });
     },
-    setState(path, value) {
-      calls.push({ method: 'setState', args: [path, value] });
+    setStateAt(path, value) {
+      calls.push({ method: 'setStateAt', args: [path, value] });
     },
   };
 }
@@ -121,7 +121,7 @@ describe('applyEffect', () => {
     expect(mutator.calls[0].args).toEqual(['forest', true]);
   });
 
-  it('calls setState for state effects', () => {
+  it('calls setStateAt for state effects', () => {
     const mutator = mockMutator();
     applyEffect(
       { type: 'state', target: 'quest:main', value: 'complete' },
@@ -129,7 +129,7 @@ describe('applyEffect', () => {
       mutator,
     );
     expect(mutator.calls).toHaveLength(1);
-    expect(mutator.calls[0].method).toBe('setState');
+    expect(mutator.calls[0].method).toBe('setStateAt');
     expect(mutator.calls[0].args).toEqual(['quest:main', 'complete']);
   });
 
@@ -150,7 +150,7 @@ describe('applyEffect', () => {
     expect(mutator.calls).toHaveLength(3);
     expect(mutator.calls[0].method).toBe('applyResourceOp');
     expect(mutator.calls[1].method).toBe('setFlag');
-    expect(mutator.calls[2].method).toBe('setState');
+    expect(mutator.calls[2].method).toBe('setStateAt');
   });
 
   it('handles conditional effects', () => {
@@ -175,7 +175,7 @@ describe('applyEffect', () => {
     const accessor: GameStateAccessor = {
       getAmount: (id) => (id === 'gold' ? gold.amount : bn(0)),
       getFlag: (id) => unlocked.has(id),
-      getState: () => undefined,
+      getStateAt: () => undefined,
       getRate: () => Decimal.dZero,
     };
     const mutator: GameStateMutator = {
@@ -183,7 +183,7 @@ describe('applyEffect', () => {
         gold.amount = gold.amount.add(value);
       },
       setFlag: (id) => unlocked.add(id),
-      setState: () => {},
+      setStateAt: () => {},
     };
     applyEffect(
       E.composite(

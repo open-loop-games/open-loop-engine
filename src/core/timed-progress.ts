@@ -20,7 +20,7 @@
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from './computed';
+import { toMaybeRef, type Computable } from './computed';
 import {
   deletePersistent,
   getCurrentPersistentContext,
@@ -147,8 +147,8 @@ interface ProcessedTimedProgressOptions {
 
 function buildProcessedOptions(options: TimedProgressOptions): ProcessedTimedProgressOptions {
   return {
-    duration: processGetter(options.duration),
-    speed: options.speed != null ? processGetter(options.speed) : 1,
+    duration: toMaybeRef(options.duration),
+    speed: options.speed != null ? toMaybeRef(options.speed) : 1,
   };
 }
 

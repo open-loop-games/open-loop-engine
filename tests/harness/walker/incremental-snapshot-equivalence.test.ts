@@ -36,7 +36,7 @@ describe('createIncrementalSnapshot — construction', () => {
     const accessor: GameStateAccessor = {
       getAmount: () => bn(0),
       getFlag: () => false,
-      getState: () => undefined,
+      getStateAt: () => undefined,
       getRate: () => bn(0),
     };
     const inc = createIncrementalSnapshot(engine, accessor);
@@ -73,7 +73,7 @@ describe('createIncrementalSnapshot — construction', () => {
     const accessor: GameStateAccessor = {
       getAmount: () => bn(0),
       getFlag: () => false,
-      getState: () => undefined,
+      getStateAt: () => undefined,
       getRate: () => bn(0),
     };
     const inc = createIncrementalSnapshot(engine, accessor);

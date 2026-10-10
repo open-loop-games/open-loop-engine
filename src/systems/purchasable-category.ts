@@ -65,7 +65,7 @@ import type { Grant } from '@/core/modifier';
  * @typeParam State - Per-instance state created alongside each Purchasable.
  *   Use `void` if no extra state is needed.
  */
-export interface PurchasableCategoryOptions<Def extends { id: string }, State = void> {
+export interface PurchasableCategoryOptions<Def extends { id: string }, DefState = void> {
   /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
   id: string;
 
@@ -101,14 +101,14 @@ export interface PurchasableCategoryOptions<Def extends { id: string }, State = 
    *
    * Omit if no extra state is needed.
    */
-  mapState?: (def: Def, purchasable: Purchasable) => State;
+  mapState?: (def: Def, purchasable: Purchasable) => DefState;
 }
 
 /** A registered entry: definition + Purchasable instance + optional state + introspection signals */
-export interface PurchasableCategoryEntry<Def extends { id: string }, State = void> {
+export interface PurchasableCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly purchasable: Purchasable;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals: CategoryEntrySignals;
 }
 
@@ -120,7 +120,7 @@ export interface PurchasableCategoryEntry<Def extends { id: string }, State = vo
  */
 export interface PurchasableCategory<
   Def extends { id: string },
-  State = void,
+  DefState = void,
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -141,16 +141,16 @@ export interface PurchasableCategory<
   getPurchasable(id: string): Purchasable | undefined;
 
   /** Get the per-instance state for a definition ID */
-  getState(id: string): State | undefined;
+  getState(id: string): DefState | undefined;
 
   /** Get the definition for an ID (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + purchasable + state) */
-  getEntry(id: string): PurchasableCategoryEntry<Def, State> | undefined;
+  getEntry(id: string): PurchasableCategoryEntry<Def, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): PurchasableCategoryEntry<Def, State>[];
+  getAll(): PurchasableCategoryEntry<Def, DefState>[];
 
   /** Reactive count of purchasables that have been bought at least once (amount >= 1) */
   readonly purchasedCount: ComputedRef<number>;
@@ -198,13 +198,13 @@ export interface PurchasableCategory<
  * upgrades.purchaseAffordable(); // buy all we can
  * ```
  */
-export function createPurchasableCategory<Def extends { id: string }, State = void>(
-  options: PurchasableCategoryOptions<Def, State>,
-): PurchasableCategory<Def, State> {
+export function createPurchasableCategory<Def extends { id: string }, DefState = void>(
+  options: PurchasableCategoryOptions<Def, DefState>,
+): PurchasableCategory<Def, DefState> {
   const { id, mapPurchasable, mapState } = options;
   const predicates = createPredicateResolver();
 
-  const base: CategoryBase<Def, Purchasable, State> = createCategoryBase({
+  const base: CategoryBase<Def, Purchasable, DefState> = createCategoryBase({
     id,
     buildInstance: (def) => {
       const { grants, ...opts } = mapPurchasable(def);
@@ -245,7 +245,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     return l.length > 0 && l.every((p) => p.maxed.value);
   });
 
-  const category: PurchasableCategory<Def, State> = {
+  const category: PurchasableCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -255,11 +255,11 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
       return base.getEntry(id)?.instance;
     },
 
-    getState(id: string): State | undefined {
+    getState(id: string): DefState | undefined {
       return base.getEntry(id)?.state;
     },
 
-    getEntry(id: string): PurchasableCategoryEntry<Def, State> | undefined {
+    getEntry(id: string): PurchasableCategoryEntry<Def, DefState> | undefined {
       const entry = base.getEntry(id);
       if (!entry) return undefined;
       return {
@@ -270,7 +270,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
       };
     },
 
-    getAll(): PurchasableCategoryEntry<Def, State>[] {
+    getAll(): PurchasableCategoryEntry<Def, DefState>[] {
       return base.getAll().map((e) => ({
         def: e.def,
         purchasable: e.instance,

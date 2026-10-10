@@ -596,7 +596,7 @@ describe('createDefStates', () => {
   });
 });
 
-describe('StateConstraint — typed interfaces without index signatures', () => {
+describe('SerializableConstraint — typed interfaces without index signatures', () => {
   interface LoadoutEntry {
     name: string;
     loops: number;

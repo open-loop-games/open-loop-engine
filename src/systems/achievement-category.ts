@@ -59,7 +59,7 @@ import type { GameStateAccessor } from '@/primitives/types';
  * @typeParam State - Per-instance state created alongside each Achievement.
  *   Use `void` if no extra state is needed.
  */
-export interface AchievementCategoryOptions<Def extends { id: string }, State = void> {
+export interface AchievementCategoryOptions<Def extends { id: string }, DefState = void> {
   /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
   id: string;
 
@@ -95,14 +95,14 @@ export interface AchievementCategoryOptions<Def extends { id: string }, State = 
    *
    * Omit if no extra state is needed.
    */
-  mapState?: (def: Def, achievement: Achievement) => State;
+  mapState?: (def: Def, achievement: Achievement) => DefState;
 }
 
 /** A registered entry: definition + Achievement instance + optional state + introspection signals */
-export interface AchievementCategoryEntry<Def extends { id: string }, State = void> {
+export interface AchievementCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly achievement: Achievement;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals: CategoryEntrySignals;
 }
 
@@ -219,7 +219,7 @@ export type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOpt
  */
 export interface AchievementCategory<
   Def extends { id: string },
-  State = void,
+  DefState = void,
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -257,16 +257,16 @@ export interface AchievementCategory<
   getAchievement(id: string): Achievement | undefined;
 
   /** Get the per-instance state for a definition ID */
-  getState(id: string): State | undefined;
+  getState(id: string): DefState | undefined;
 
   /** Get the definition for an ID (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + achievement + state) */
-  getEntry(id: string): AchievementCategoryEntry<Def, State> | undefined;
+  getEntry(id: string): AchievementCategoryEntry<Def, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): AchievementCategoryEntry<Def, State>[];
+  getAll(): AchievementCategoryEntry<Def, DefState>[];
 
   /** Reactive count of earned achievements */
   readonly earnedCount: ComputedRef<number>;
@@ -301,13 +301,13 @@ export interface AchievementCategory<
  * achievements.earnedCount.value; // reactive
  * ```
  */
-export function createAchievementCategory<Def extends { id: string }, State = void>(
-  options: AchievementCategoryOptions<Def, State>,
-): AchievementCategory<Def, State> {
+export function createAchievementCategory<Def extends { id: string }, DefState = void>(
+  options: AchievementCategoryOptions<Def, DefState>,
+): AchievementCategory<Def, DefState> {
   const { id, accessor, mapAchievement, mapState } = options;
   const predicates = createPredicateResolver({ accessor });
 
-  const base: CategoryBase<Def, Achievement, State> = createCategoryBase({
+  const base: CategoryBase<Def, Achievement, DefState> = createCategoryBase({
     id,
     buildInstance: (def) => {
       const { grants, ...opts } = mapAchievement(def);
@@ -331,7 +331,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     return all.length > 0 && all.every((e) => e.instance.earned.value);
   });
 
-  const category: AchievementCategory<Def, State> = {
+  const category: AchievementCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -382,11 +382,11 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
       return base.getEntry(id)?.instance;
     },
 
-    getState(id: string): State | undefined {
+    getState(id: string): DefState | undefined {
       return base.getEntry(id)?.state;
     },
 
-    getEntry(id: string): AchievementCategoryEntry<Def, State> | undefined {
+    getEntry(id: string): AchievementCategoryEntry<Def, DefState> | undefined {
       const entry = base.getEntry(id);
       if (!entry) return undefined;
       return {
@@ -397,7 +397,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
       };
     },
 
-    getAll(): AchievementCategoryEntry<Def, State>[] {
+    getAll(): AchievementCategoryEntry<Def, DefState>[] {
       return base.getAll().map((e) => ({
         def: e.def,
         achievement: e.instance,

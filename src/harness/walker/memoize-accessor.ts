@@ -26,7 +26,7 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
     getAmount: cached((id) => accessor.getAmount(id)),
     getRate: cached((id) => accessor.getRate(id)),
     getFlag: cached((id) => accessor.getFlag(id)),
-    getState: cached((path) => accessor.getState(path)),
+    getStateAt: cached((path) => accessor.getStateAt(path)),
   };
   // Only where the source serves it: an absent hook is what tells a
   // predictor to fall back to the net rate.

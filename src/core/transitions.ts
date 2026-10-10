@@ -69,7 +69,7 @@ export interface TransitionDeps {
   rates: ReadonlySet<string>;
   /** Flag ids read via `accessor.getFlag(id)`. */
   flags: ReadonlySet<string>;
-  /** Dot-paths read via `accessor.getState(path)`. */
+  /** Dot-paths read via `accessor.getStateAt(path)`. */
   states: ReadonlySet<string>;
 }
 

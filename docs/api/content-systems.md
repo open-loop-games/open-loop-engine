@@ -16,9 +16,9 @@ The validated incremental primitives, each a typed registration surface over the
 milestone tracking with auto-unlock and tiered rewards
 
 - `interface Achievement<T = unknown>` — A live achievement instance created by createAchievement. `src/systems/achievement.ts:103`
-- `interface AchievementCategory<Def extends { id: string; }, State = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:220`
-- `interface AchievementCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:102`
-- `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:62`
+- `interface AchievementCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — An achievement category — batch-registered Achievements with a shared shape. `src/systems/achievement-category.ts:220`
+- `interface AchievementCategoryEntry<Def extends { id: string; }, DefState = void>` — A registered entry: definition + Achievement instance + optional state + introspection signals. `src/systems/achievement-category.ts:102`
+- `interface AchievementCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/achievement-category.ts:62`
 - `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:38`
 - `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:147`
 - `interface AchievementLadderBaseOptions<T = number>` — Spec for AchievementCategory.registerLadder. `src/systems/achievement-category.ts:153`
@@ -28,7 +28,7 @@ milestone tracking with auto-unlock and tiered rewards
 - `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
 - `interface AchievementRung<T = number>` — One tier in a AchievementLadderOptions. `src/systems/achievement-category.ts:130`
 - `interface BaseLadderAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerLadder's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:117`
-- `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:304`
+- `function createAchievementCategory<Def extends { id: string; }, DefState = void>(options: AchievementCategoryOptions<Def, DefState>): AchievementCategory<Def, DefState>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:304`
 - `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:257`
 - `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:273`
 
@@ -36,16 +36,16 @@ milestone tracking with auto-unlock and tiered rewards
 
 batch-registered ordered-execution queue with per-execution state machine
 
-- `interface ActionCategory<Def extends { id: string; }, State = void, Payload = void> extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>>` — An action category — registered queue with per-execution state machine. `src/systems/action-category.ts:178`
+- `interface ActionCategory<Def extends { id: string; }, DefState = void, Payload = void> extends ResettableObject, Emittable<ActionCategoryEvents<Def, DefState, Payload>>` — An action category — registered queue with per-execution state machine. `src/systems/action-category.ts:182`
 - `interface ActionCategoryContext` — Context passed to `mapAction` at registration time. `src/systems/action-category.ts:126`
-- `interface ActionCategoryEntry<Def extends { id: string; }, State, Payload>` — A registered entry: definition + per-def state + the current per-execution metadata when this def is the running item. `src/systems/action-category.ts:91`
-- `interface ActionCategoryEvents<Def extends { id: string; }, State, Payload>` — Events emitted by an ActionCategory. `src/systems/action-category.ts:131`
-- `interface ActionCategoryOptions<Def extends { id: string; }, State = void, Payload = void>` `src/systems/action-category.ts:148`
+- `interface ActionCategoryEntry<Def extends { id: string; }, DefState, Payload>` — A registered entry: definition + per-def state + the current per-execution metadata when this def is the running item. `src/systems/action-category.ts:91`
+- `interface ActionCategoryEvents<Def extends { id: string; }, DefState, Payload>` — Events emitted by an ActionCategory. `src/systems/action-category.ts:131`
+- `interface ActionCategoryOptions<Def extends { id: string; }, DefState = void, Payload = void>` `src/systems/action-category.ts:148`
 - `interface ActionItemMetadata<Payload>` — Sequencer-item metadata shape for an ActionCategory. `src/systems/action-category.ts:69`
-- `type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 'failed'` — Per-execution lifecycle state. `src/systems/action-category.ts:60`
-- `interface ActionMapping<Def extends { id: string; }, State, Payload>` — Return type of the `mapAction` callback. `src/systems/action-category.ts:102`
-- `interface ActionTickContext<Def extends { id: string; }, State, Payload>` — Context passed to a mapping's `tick` closure. `src/systems/action-category.ts:81`
-- `function createActionCategory<Def extends { id: string; }, State = void, Payload = void>(options: ActionCategoryOptions<Def, State, Payload>): ActionCategory<Def, State, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:328`
+- `type ActionItemStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'failed'` — Per-execution lifecycle state. `src/systems/action-category.ts:60`
+- `interface ActionMapping<Def extends { id: string; }, DefState, Payload>` — Return type of the `mapAction` callback. `src/systems/action-category.ts:102`
+- `interface ActionTickContext<Def extends { id: string; }, DefState, Payload>` — Context passed to a mapping's `tick` closure. `src/systems/action-category.ts:81`
+- `function createActionCategory<Def extends { id: string; }, DefState = void, Payload = void>(options: ActionCategoryOptions<Def, DefState, Payload>): ActionCategory<Def, DefState, Payload>` — Create an action category — batch registration of typed action defs into an ordered-execution queue with per-execution state machine. `src/systems/action-category.ts:332`
 
 ## Automation tiers
 
@@ -77,11 +77,11 @@ per-metric best-of-run recording
 batch-create Challenges from content definitions
 
 - `interface Challenge` — A challenge instance with persistent state and lifecycle methods. `src/systems/challenge-category.ts:157`
-- `interface ChallengeCategory<Def extends ChallengeDef, State = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:288`
-- `interface ChallengeCategoryEntry<Def extends ChallengeDef, State = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:210`
-- `interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void>` `src/systems/challenge-category.ts:223`
+- `interface ChallengeCategory<Def extends ChallengeDef, DefState = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:288`
+- `interface ChallengeCategoryEntry<Def extends ChallengeDef, DefState = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:210`
+- `interface ChallengeCategoryOptions<Def extends ChallengeDef, DefState = void>` `src/systems/challenge-category.ts:223`
 - `interface ChallengeDef<Overrides extends { [K in keyof Overrides]: (...args: never[]) => unknown; } = Record<string, (...args: never[]) => unknown>>` — Definition for a challenge. `src/systems/challenge-category.ts:65`
-- `function createChallengeCategory<Def extends ChallengeDef, State = void>(options: ChallengeCategoryOptions<Def, State>): ChallengeCategory<Def, State>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:347`
+- `function createChallengeCategory<Def extends ChallengeDef, DefState = void>(options: ChallengeCategoryOptions<Def, DefState>): ChallengeCategory<Def, DefState>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:347`
 
 ## Cycle
 
@@ -116,12 +116,12 @@ game-dev-friendly wrapper over ResourceBag
 
 batch-create Producers from content definitions
 
-- `function createProducerCategory<Def extends { id: string; }, State = void>(options: ProducerCategoryOptions<Def, State>): ProducerCategory<Def, State>` — Create a producer category — batch registration of Producers from definitions. `src/systems/producer-category.ts:437`
+- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from definitions. `src/systems/producer-category.ts:437`
 - `interface Producer` — A producer instance — generates resources continuously or on demand. `src/systems/producer-category.ts:153`
-- `interface ProducerCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:241`
+- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:241`
 - `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:35`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Producer instance + optional state + introspection signals. `src/systems/producer-category.ts:228`
-- `interface ProducerCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/producer-category.ts:123`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A registered entry: definition + Producer instance + optional state + introspection signals. `src/systems/producer-category.ts:228`
+- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:123`
 - `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:70`
 - `interface ProducerPurchaseConfig` — Purchase configuration for producers that can be bought multiple times. `src/systems/producer-category.ts:44`
 
@@ -131,12 +131,12 @@ unified purchase primitives for incremental games
 
 Two consumer entry points: `createPurchasableCategory` batch-registers from content definitions and is the default; `createScalingPurchasable` is the per-instance escape hatch for leveled costs. `createPurchasable` is the raw factory both lower into. A cost that scales on the item's own level goes through the factory form of `requirements`, which receives the live level ref — a getter reading the level back out misprices bulk purchases. See consumer-guide.md §Choosing among purchasable primitives.
 
-- `function createPurchasableCategory<Def extends { id: string; }, State = void>(options: PurchasableCategoryOptions<Def, State>): PurchasableCategory<Def, State>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:201`
+- `function createPurchasableCategory<Def extends { id: string; }, DefState = void>(options: PurchasableCategoryOptions<Def, DefState>): PurchasableCategory<Def, DefState>` — Create a purchasable category — batch registration of Purchasables from definitions. `src/systems/purchasable-category.ts:201`
 - `function createScalingPurchasable(options: ScalingPurchasableOptions, predicates?: PredicateResolver): Purchasable` — Create a purchasable with leveled cost scaling — the L3 escape hatch for per-instance customized leveled purchases. `src/systems/purchasable.ts:728`
 - `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:264`
-- `interface PurchasableCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:121`
-- `interface PurchasableCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:108`
-- `interface PurchasableCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/purchasable-category.ts:68`
+- `interface PurchasableCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:121`
+- `interface PurchasableCategoryEntry<Def extends { id: string; }, DefState = void>` — A registered entry: definition + Purchasable instance + optional state + introspection signals. `src/systems/purchasable-category.ts:108`
+- `interface PurchasableCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/purchasable-category.ts:68`
 - `interface PurchasableDisplay` — UI text for a purchasable. `src/systems/purchasable.ts:57`
 - `interface PurchasableEvents` — Events emitted by a Purchasable instance. `src/systems/purchasable.ts:51`
 - `interface PurchasableOptions` — Full options for createPurchasable — the engine-internal raw factory. `src/systems/purchasable.ts:84`
@@ -170,16 +170,16 @@ Skill helper for dual-tier loop incremental skills
 - `function createSkill(options: AccumulatorSkillOptions): AccumulatorSkill` — Create a skill with XP tracking, computed level, and a reactive modifier. `src/systems/skill.ts:371`
 - `function createSkill(options: LevelDrivenSkillOptions): LevelDrivenSkill` `src/systems/skill.ts:372`
 - `function createSkill(options: SkillOptions): Skill` `src/systems/skill.ts:373`
-- `function createSkillCategory<Def extends { id: string; }, State = void>(options: SkillCategoryOptions<Def, State>): SkillCategory<Def, State>` — Create a skill category — batch registration of Skills from definitions. `src/systems/skill-category.ts:181`
+- `function createSkillCategory<Def extends { id: string; }, DefState = void>(options: SkillCategoryOptions<Def, DefState>): SkillCategory<Def, DefState>` — Create a skill category — batch registration of Skills from definitions. `src/systems/skill-category.ts:184`
 - `function getSkillProgress(skill: Skill): number` — Progress fraction (0–1) within the current level, for progress bar display. `src/systems/skill.ts:468`
 - `function getSkillXPWindow(skill: Skill): { current: Decimal; needed: Decimal; }` — XP window for "N / M" display — how much XP into the current level and how much the current level spans. `src/systems/skill.ts:485`
 - `interface LevelDrivenSkill extends SkillBase` — Level-driven skill — modifier = levelToMultiplier(level), no accumulator. `src/systems/skill.ts:166`
 - `interface LevelDrivenSkillOptions extends SkillOptionsBase` — Level-driven mode — modifier tracks level reactively. `src/systems/skill.ts:123`
 - `type Skill = LevelDrivenSkill | AccumulatorSkill` — A Skill in either mode — discriminated by the presence of `lifetimeBonus`. `src/systems/skill.ts:204`
 - `interface SkillBase` — Fields present on all skills regardless of mode. `src/systems/skill.ts:137`
-- `interface SkillCategory<Def extends { id: string; }, State = void> extends ResettableObject` — A skill category — batch-registered Skills with a shared shape. `src/systems/skill-category.ts:104`
-- `interface SkillCategoryEntry<Def extends { id: string; }, State = void>` — A registered entry: definition + Skill instance + optional state + introspection signals. `src/systems/skill-category.ts:91`
-- `interface SkillCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/skill-category.ts:60`
+- `interface SkillCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A skill category — batch-registered Skills with a shared shape. `src/systems/skill-category.ts:104`
+- `interface SkillCategoryEntry<Def extends { id: string; }, DefState = void>` — A registered entry: definition + Skill instance + optional state + introspection signals. `src/systems/skill-category.ts:91`
+- `interface SkillCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/skill-category.ts:60`
 - `type SkillCurve = (variable: MaybeRef<DecimalSource>) => FormulaSource` — Factory that binds a Formula to an engine-owned reactive variable. `src/systems/skill.ts:76`
 - `interface SkillEvents` — Events emitted by a Skill instance. `src/systems/skill.ts:62`
 - `type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions` — Discriminated union of createSkill option shapes — accumulator (XP banks for retention) vs level-driven (level multiplies a curve). `src/systems/skill.ts:134`

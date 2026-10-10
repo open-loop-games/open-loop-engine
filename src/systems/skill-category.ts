@@ -57,7 +57,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * @typeParam State - Per-instance state created alongside each Skill.
  *   Use `void` if no extra state is needed.
  */
-export interface SkillCategoryOptions<Def extends { id: string }, State = void> {
+export interface SkillCategoryOptions<Def extends { id: string }, DefState = void> {
   /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
   id: string;
 
@@ -84,14 +84,14 @@ export interface SkillCategoryOptions<Def extends { id: string }, State = void> 
    *
    * Omit if no extra state is needed.
    */
-  mapState?: (def: Def, skill: Skill) => State;
+  mapState?: (def: Def, skill: Skill) => DefState;
 }
 
 /** A registered entry: definition + Skill instance + optional state + introspection signals */
-export interface SkillCategoryEntry<Def extends { id: string }, State = void> {
+export interface SkillCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly skill: Skill;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals: CategoryEntrySignals;
 }
 
@@ -101,7 +101,10 @@ export interface SkillCategoryEntry<Def extends { id: string }, State = void> {
  * @typeParam Def - Content definition type
  * @typeParam State - Per-instance state type (void if none)
  */
-export interface SkillCategory<Def extends { id: string }, State = void> extends ResettableObject {
+export interface SkillCategory<
+  Def extends { id: string },
+  DefState = void,
+> extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
   /**
@@ -121,16 +124,16 @@ export interface SkillCategory<Def extends { id: string }, State = void> extends
   getSkill(id: string): Skill | undefined;
 
   /** Get the per-instance state for a definition ID */
-  getState(id: string): State | undefined;
+  getState(id: string): DefState | undefined;
 
   /** Get the definition for an ID (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + skill + state) */
-  getEntry(id: string): SkillCategoryEntry<Def, State> | undefined;
+  getEntry(id: string): SkillCategoryEntry<Def, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): SkillCategoryEntry<Def, State>[];
+  getAll(): SkillCategoryEntry<Def, DefState>[];
 
   /**
    * Get the modifier for a skill — shorthand for `getSkill(id)?.modifier`.
@@ -178,12 +181,12 @@ export interface SkillCategory<Def extends { id: string }, State = void> extends
  * chain.add(skills.getModifier('combat')!);
  * ```
  */
-export function createSkillCategory<Def extends { id: string }, State = void>(
-  options: SkillCategoryOptions<Def, State>,
-): SkillCategory<Def, State> {
+export function createSkillCategory<Def extends { id: string }, DefState = void>(
+  options: SkillCategoryOptions<Def, DefState>,
+): SkillCategory<Def, DefState> {
   const { id, mapSkill, mapState } = options;
 
-  const base: CategoryBase<Def, Skill, State> = createCategoryBase({
+  const base: CategoryBase<Def, Skill, DefState> = createCategoryBase({
     id,
     buildInstance: (def) => {
       return createSkill({ ...mapSkill(def), id: def.id });
@@ -195,7 +198,7 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
     }),
   });
 
-  const category: SkillCategory<Def, State> = {
+  const category: SkillCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -205,11 +208,11 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
       return base.getEntry(id)?.instance;
     },
 
-    getState(id: string): State | undefined {
+    getState(id: string): DefState | undefined {
       return base.getEntry(id)?.state;
     },
 
-    getEntry(id: string): SkillCategoryEntry<Def, State> | undefined {
+    getEntry(id: string): SkillCategoryEntry<Def, DefState> | undefined {
       const entry = base.getEntry(id);
       if (!entry) return undefined;
       return {
@@ -220,7 +223,7 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
       };
     },
 
-    getAll(): SkillCategoryEntry<Def, State>[] {
+    getAll(): SkillCategoryEntry<Def, DefState>[] {
       return base.getAll().map((e) => ({
         def: e.def,
         skill: e.instance,

@@ -11,7 +11,7 @@ import { createReset } from '@/systems/reset';
 import {
   createActionCategory,
   type ActionCategory,
-  type ActionItemState,
+  type ActionItemStatus,
 } from '@/systems/action-category';
 import { createEngine, type EngineModule } from '@/engine';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
@@ -248,15 +248,15 @@ describe('createActionCategory — lifecycle state machine', () => {
     const { category, driver } = makeCategory();
     category.register({ id: 'fast', baseTicks: 1 });
 
-    const transitions: Array<[ActionItemState, ActionItemState]> = [];
-    category.on('itemStateChanged', (_e, from, to) => {
+    const transitions: Array<[ActionItemStatus, ActionItemStatus]> = [];
+    category.on('itemStatusChanged', (_e, from, to) => {
       transitions.push([from, to]);
     });
 
     category.enqueue('fast', { payload: { count: 1 } });
     // enqueue auto-starts (startOnEnqueue defaults true), so 'started' has fired
     // already → lifecycle should be 'running'.
-    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(category.currentItem?.status).toBe('running');
     expect(transitions[transitions.length - 1]).toEqual(['pending', 'running']);
 
     driver.tick(2);
@@ -264,34 +264,34 @@ describe('createActionCategory — lifecycle state machine', () => {
     expect(transitions.some(([_, to]) => to === 'completed')).toBe(true);
   });
 
-  it('emits itemStateChanged after the transition commits, so listeners see and keep new state', () => {
+  it('emits itemStatusChanged after the transition commits, so listeners see and keep new state', () => {
     const { category } = makeCategory();
     category.register({ id: 'chop', baseTicks: 10 });
 
-    const seen: Array<ActionItemState | undefined> = [];
-    category.on('itemStateChanged', (_e, _from, to) => {
-      seen.push(category.currentItem?.lifecycle);
+    const seen: Array<ActionItemStatus | undefined> = [];
+    category.on('itemStatusChanged', (_e, _from, to) => {
+      seen.push(category.currentItem?.status);
       if (to === 'running') category.setItemProgress('chop', 0.5);
     });
 
     category.enqueue('chop', { payload: { count: 1 } });
     expect(seen).toEqual(['running']);
-    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(category.currentItem?.status).toBe('running');
     expect(category.currentItem?.progress).toBe(0.5);
   });
 
-  it('emits completed once when setItemState(completed) precedes sequencer.complete()', () => {
+  it('emits completed once when setItemStatus(completed) precedes sequencer.complete()', () => {
     const { category } = makeCategory();
     category.register({ id: 'x', baseTicks: 10 });
     let completes = 0;
     let toCompleted = 0;
     category.on('completed', () => completes++);
-    category.on('itemStateChanged', (_e, _from, to) => {
+    category.on('itemStatusChanged', (_e, _from, to) => {
       if (to === 'completed') toCompleted++;
     });
 
     category.enqueue('x', { payload: { count: 1 } });
-    category.setItemState('x', 'completed');
+    category.setItemStatus('x', 'completed');
     category.sequencer.complete();
 
     expect(completes).toBe(1);
@@ -303,12 +303,12 @@ describe('createActionCategory — lifecycle state machine', () => {
     category.register({ id: 'fragile', baseTicks: 10 });
     category.enqueue('fragile', { payload: { count: 1 } });
 
-    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(category.currentItem?.status).toBe('running');
     expect(category.currentItem?.attempt).toBe(0);
 
     category.setItemError('fragile', { message: 'broke' });
 
-    expect(category.currentItem?.lifecycle).toBe('failed');
+    expect(category.currentItem?.status).toBe('failed');
     expect(category.currentItem?.attempt).toBe(1);
     expect(category.currentItem?.error?.message).toBe('broke');
   });
@@ -319,12 +319,12 @@ describe('createActionCategory — lifecycle state machine', () => {
     category.enqueue('recovers', { payload: { count: 1 } });
     category.setItemError('recovers', { message: 'oops' });
     expect(category.currentItem?.error?.message).toBe('oops');
-    expect(category.currentItem?.lifecycle).toBe('failed');
+    expect(category.currentItem?.status).toBe('failed');
 
     category.setItemError('recovers', null);
     expect(category.currentItem?.error).toBeUndefined();
     // Lifecycle stays at 'failed' — clearing the error doesn't auto-revive.
-    expect(category.currentItem?.lifecycle).toBe('failed');
+    expect(category.currentItem?.status).toBe('failed');
   });
 });
 
@@ -555,7 +555,7 @@ describe('createActionCategory — list mode', () => {
     category.enqueue('blocked');
     category.enqueue('ok');
 
-    expect(category.sequencer.items.value.map((i) => i.metadata.lifecycle)).toEqual([
+    expect(category.sequencer.items.value.map((i) => i.metadata.status)).toEqual([
       'failed',
       'running',
     ]);
@@ -580,7 +580,7 @@ describe('createActionCategory — list mode', () => {
 
     const first = runTicks();
     expect(first).toBe(16);
-    expect(category.sequencer.items.value.map((i) => i.metadata.lifecycle)).toEqual([
+    expect(category.sequencer.items.value.map((i) => i.metadata.status)).toEqual([
       'completed',
       'completed',
       'completed',
@@ -588,9 +588,9 @@ describe('createActionCategory — list mode', () => {
 
     category.replay();
     expect(category.sequencer.cursor).toBe(0);
-    expect(category.currentItem?.lifecycle).toBe('running');
+    expect(category.currentItem?.status).toBe('running');
     expect(
-      category.sequencer.items.value.map((i) => [i.metadata.progress, i.metadata.lifecycle]),
+      category.sequencer.items.value.map((i) => [i.metadata.progress, i.metadata.status]),
     ).toEqual([
       [0, 'running'],
       [0, 'pending'],

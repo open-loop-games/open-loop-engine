@@ -60,10 +60,10 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
     getAmount: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     getFlag: () => false,
-    getState: (path) => stateMap.get(path),
+    getStateAt: (path) => stateMap.get(path),
     applyResourceOp: () => {},
     setFlag: () => {},
-    setState: (path, value) => stateMap.set(path, value),
+    setStateAt: (path, value) => stateMap.set(path, value),
   };
 
   let captured: T;
@@ -78,7 +78,7 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
           return points;
         },
         setRate: (id, rate) => rates.set(id, rate),
-        setState: (path, value) => stateMap.set(path, value),
+        setStateAt: (path, value) => stateMap.set(path, value),
       });
     },
   };
@@ -96,7 +96,7 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
 interface BootstrapApi {
   readonly points: Resource<number>;
   setRate: (id: string, rate: Decimal) => void;
-  setState: (path: string, value: unknown) => void;
+  setStateAt: (path: string, value: unknown) => void;
 }
 
 // ============================================================================
@@ -518,7 +518,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
       getAmount: () => new Decimal(1000),
       getRate: () => Decimal.dZero,
       getFlag: () => true,
-      getState: () => undefined,
+      getStateAt: () => undefined,
     };
     const { result, stop } = bootstrap(() => {
       const achievements = createAchievementCategory<{ id: string }>({
@@ -651,7 +651,7 @@ describe('evaluatePredicate', () => {
       getAmount: () => new Decimal(10),
       getRate: () => Decimal.dZero,
       getFlag: (id) => id === 'seen',
-      getState: () => undefined,
+      getStateAt: () => undefined,
     };
     expect(evaluatePredicate(true, {})).toBe(true);
     expect(evaluatePredicate(ref(false), {})).toBe(false);
@@ -964,7 +964,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
           },
         ],
         accessor: noAccessor,
-        mutator: { applyResourceOp: () => {}, setFlag: () => {}, setState: () => {} },
+        mutator: { applyResourceOp: () => {}, setFlag: () => {}, setStateAt: () => {} },
       }),
     ).toThrow(/dialog 'g' node 'a' condition: /);
   });

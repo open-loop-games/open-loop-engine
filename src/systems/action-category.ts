@@ -21,7 +21,7 @@
  * sequencer's saved queue, current item, cursor and pause flag, and fires no
  * `cancelled`, so run it only where losing the queue is intended.
  *
- * ID-addressed verbs (`setItemState` / `tickItemProgress` / `setItemError` /
+ * ID-addressed verbs (`setItemStatus` / `tickItemProgress` / `setItemError` /
  * `patchItemPayload`) target the current item if its defId matches, else
  * linear-scan `sequencer.items.value` for the first match. Queues <~20 per
  * consumer annotation — indexed lookup is a `TODO(expansion)`.
@@ -54,10 +54,10 @@ import { getCurrentEngineCategories } from './engine-categories';
 
 /**
  * Per-execution lifecycle state. Set by the engine on sequencer events and via
- * the `setItemState` verb. No `cancelled` terminal — cancellation removes the
+ * the `setItemStatus` verb. No `cancelled` terminal — cancellation removes the
  * entry from the queue (observable via `onCancel`).
  */
-export type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 'failed';
+export type ActionItemStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'failed';
 
 /**
  * Sequencer-item metadata shape for an ActionCategory. Engine-managed slots
@@ -69,7 +69,7 @@ export type ActionItemState = 'pending' | 'running' | 'waiting' | 'completed' | 
 export interface ActionItemMetadata<Payload> {
   readonly defId: string;
   payload: Payload;
-  lifecycle: ActionItemState;
+  status: ActionItemStatus;
   /** Single value or named-bars record. Plain number; Decimal stays in `entry.state`. */
   progress: number | Record<string, number>;
   attempt: number;
@@ -78,19 +78,19 @@ export interface ActionItemMetadata<Payload> {
 }
 
 /** Context passed to a mapping's `tick` closure. */
-export interface ActionTickContext<Def extends { id: string }, State, Payload> {
-  readonly entry: ActionCategoryEntry<Def, State, Payload>;
+export interface ActionTickContext<Def extends { id: string }, DefState, Payload> {
+  readonly entry: ActionCategoryEntry<Def, DefState, Payload>;
   readonly dt: number;
-  readonly category: ActionCategory<Def, State, Payload>;
+  readonly category: ActionCategory<Def, DefState, Payload>;
 }
 
 /**
  * A registered entry: definition + per-def state + the current per-execution
  * metadata when this def is the running item.
  */
-export interface ActionCategoryEntry<Def extends { id: string }, State, Payload> {
+export interface ActionCategoryEntry<Def extends { id: string }, DefState, Payload> {
   readonly def: Def;
-  readonly state: State;
+  readonly state: DefState;
   /** Per-execution metadata when this def is the currently dispatched item, else null. */
   readonly current: ActionItemMetadata<Payload> | null;
   readonly signals: CategoryEntrySignals;
@@ -99,19 +99,19 @@ export interface ActionCategoryEntry<Def extends { id: string }, State, Payload>
 }
 
 /** Return type of the `mapAction` callback. Describes per-def behavior + signals. */
-export interface ActionMapping<Def extends { id: string }, State, Payload> {
+export interface ActionMapping<Def extends { id: string }, DefState, Payload> {
   /**
    * Per-def tick body. Called once per engine tick when this def is the
    * sequencer's current item. Mutate engine slots via the verbs on `ctx.category`;
    * call `ctx.category.sequencer.complete()` (or `.repeat()`) when this execution finishes.
    */
-  tick?: (ctx: ActionTickContext<Def, State, Payload>) => void;
+  tick?: (ctx: ActionTickContext<Def, DefState, Payload>) => void;
   /**
    * Per-def pre-run gate. Composed into the internal sequencer's `canStart` —
    * the engine looks up the entry by `currentItem.metadata.defId` and invokes
    * this if present, defaulting to `'now'` otherwise.
    */
-  canStart?: (entry: ActionCategoryEntry<Def, State, Payload>) => StartResult;
+  canStart?: (entry: ActionCategoryEntry<Def, DefState, Payload>) => StartResult;
   /** Required: unlock/count signals for the engine's CategoryEntrySignals cross-cut. */
   signals: CategoryEntrySignals;
   /**
@@ -128,24 +128,28 @@ export interface ActionCategoryContext {
 }
 
 /** Events emitted by an {@link ActionCategory}. Subscribe via `category.on()`. */
-export interface ActionCategoryEvents<Def extends { id: string }, State, Payload> {
+export interface ActionCategoryEvents<Def extends { id: string }, DefState, Payload> {
   /**
    * Fired once per execution when an item reaches `'completed'`, through
-   * `setItemState` or `sequencer.complete()`, whichever comes first.
+   * `setItemStatus` or `sequencer.complete()`, whichever comes first.
    */
-  completed: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
+  completed: (entry: ActionCategoryEntry<Def, DefState, Payload>) => void;
   /** Fired on every lifecycle transition for any item. */
-  itemStateChanged: (
-    entry: ActionCategoryEntry<Def, State, Payload>,
-    from: ActionItemState,
-    to: ActionItemState,
+  itemStatusChanged: (
+    entry: ActionCategoryEntry<Def, DefState, Payload>,
+    from: ActionItemStatus,
+    to: ActionItemStatus,
   ) => void;
   /** Fired when an item is cancelled via `cancel()` (entry exits the queue). */
-  cancelled: (entry: ActionCategoryEntry<Def, State, Payload>) => void;
+  cancelled: (entry: ActionCategoryEntry<Def, DefState, Payload>) => void;
 }
 
 /** Options for {@link createActionCategory}. */
-export interface ActionCategoryOptions<Def extends { id: string }, State = void, Payload = void> {
+export interface ActionCategoryOptions<
+  Def extends { id: string },
+  DefState = void,
+  Payload = void,
+> {
   /** Persistence context id. Each def gets `{id}/{def.id}` via createCategoryBase. */
   id: string;
   /**
@@ -158,9 +162,9 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
    * registration time, in the caller's persistent context — unlike `mapState`,
    * not the def's.
    */
-  mapAction: (def: Def, ctx: ActionCategoryContext) => ActionMapping<Def, State, Payload>;
+  mapAction: (def: Def, ctx: ActionCategoryContext) => ActionMapping<Def, DefState, Payload>;
   /** Optional per-def state factory. Called inside the def's persistent context. */
-  mapState?: (def: Def) => State;
+  mapState?: (def: Def) => DefState;
   /** Tick registration (typically `ctx.onTick`). */
   registerTick: RegisterTick;
   /**
@@ -175,8 +179,8 @@ export interface ActionCategoryOptions<Def extends { id: string }, State = void,
 }
 
 /** An action category — registered queue with per-execution state machine. */
-export interface ActionCategory<Def extends { id: string }, State = void, Payload = void>
-  extends ResettableObject, Emittable<ActionCategoryEvents<Def, State, Payload>> {
+export interface ActionCategory<Def extends { id: string }, DefState = void, Payload = void>
+  extends ResettableObject, Emittable<ActionCategoryEvents<Def, DefState, Payload>> {
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
@@ -189,9 +193,9 @@ export interface ActionCategory<Def extends { id: string }, State = void, Payloa
 
   register(defs: Def | Def[]): void;
   getDef(id: string): Def | undefined;
-  getEntry(id: string): ActionCategoryEntry<Def, State, Payload> | undefined;
-  getAll(): ActionCategoryEntry<Def, State, Payload>[];
-  getState(id: string): State | undefined;
+  getEntry(id: string): ActionCategoryEntry<Def, DefState, Payload> | undefined;
+  getAll(): ActionCategoryEntry<Def, DefState, Payload>[];
+  getState(id: string): DefState | undefined;
   readonly size: number;
 
   // --- Queue surface (defId-addressed wrappers) ---
@@ -236,7 +240,7 @@ export interface ActionCategory<Def extends { id: string }, State = void, Payloa
   // TODO(expansion): replace linear-scan lookup with Map<defId, index> when a
   // consumer surfaces a queue routinely > 100. Today corpus queues <~20.
 
-  setItemState(defId: string, state: ActionItemState): void;
+  setItemStatus(defId: string, status: ActionItemStatus): void;
   setItemProgress(defId: string, value: number | Record<string, number>): void;
   tickItemProgress(defId: string, delta: number | Record<string, number>): void;
   setItemError(defId: string, error: { message: string } | null): void;
@@ -252,7 +256,7 @@ export interface ActionCategory<Def extends { id: string }, State = void, Payloa
    */
   onItemChange(
     defId: string,
-    fn: (entry: ActionCategoryEntry<Def, State, Payload>) => void,
+    fn: (entry: ActionCategoryEntry<Def, DefState, Payload>) => void,
   ): () => void;
 
   // --- Modifier chain access ---
@@ -275,7 +279,7 @@ function buildInitialMetadata<Payload>(
   return {
     defId,
     payload,
-    lifecycle: 'pending',
+    status: 'pending',
     progress: initialProgress,
     attempt: 0,
     error: undefined,
@@ -325,9 +329,9 @@ function buildInitialMetadata<Payload>(
  * spells.enqueue('fireball');
  * ```
  */
-export function createActionCategory<Def extends { id: string }, State = void, Payload = void>(
-  options: ActionCategoryOptions<Def, State, Payload>,
-): ActionCategory<Def, State, Payload> {
+export function createActionCategory<Def extends { id: string }, DefState = void, Payload = void>(
+  options: ActionCategoryOptions<Def, DefState, Payload>,
+): ActionCategory<Def, DefState, Payload> {
   const {
     id: categoryId,
     mode = 'queue',
@@ -338,21 +342,21 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     maxSize,
   } = options;
 
-  const mappings = new Map<string, ActionMapping<Def, State, Payload>>();
+  const mappings = new Map<string, ActionMapping<Def, DefState, Payload>>();
   const rateChains = new Map<string, ModifierChain>();
   // The batch registerWithMapping is registering, keyed by def object.
-  let stagedMappings: Map<Def, ActionMapping<Def, State, Payload>> | undefined;
+  let stagedMappings: Map<Def, ActionMapping<Def, DefState, Payload>> | undefined;
   const mapCtx: ActionCategoryContext = { registerTick };
 
-  const handle = createEmitHandle<ActionCategoryEvents<Def, State, Payload>>();
+  const handle = createEmitHandle<ActionCategoryEvents<Def, DefState, Payload>>();
   const itemChangeHandlers = new Map<
     string,
-    Set<(entry: ActionCategoryEntry<Def, State, Payload>) => void>
+    Set<(entry: ActionCategoryEntry<Def, DefState, Payload>) => void>
   >();
 
   // --- Build base + per-def wiring -----------------------------------------
 
-  const base: CategoryBase<Def, void, State> = createCategoryBase<Def, void, State>({
+  const base: CategoryBase<Def, void, DefState> = createCategoryBase<Def, void, DefState>({
     id: categoryId,
     buildState: mapState ? (def) => mapState(def) : undefined,
     buildSignals: (def, _instance, _state) => {
@@ -375,7 +379,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   const baseRegister = base.register;
   function registerWithMapping(defs: Def | Def[]): void {
     const arr = Array.isArray(defs) ? defs : [defs];
-    const staged = new Map<Def, ActionMapping<Def, State, Payload>>();
+    const staged = new Map<Def, ActionMapping<Def, DefState, Payload>>();
     // `mapAction` runs in the caller's persistent context, not the def's:
     // opening the def's here would move the save keys of any refs it creates.
     for (const def of arr) staged.set(def, mapAction(def, mapCtx));
@@ -462,7 +466,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   function makeEntry(
     defId: string,
     currentMeta: ActionItemMetadata<Payload> | null,
-  ): ActionCategoryEntry<Def, State, Payload> | undefined {
+  ): ActionCategoryEntry<Def, DefState, Payload> | undefined {
     const baseEntry = base.getEntry(defId);
     if (!baseEntry) return undefined;
     return {
@@ -474,7 +478,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     };
   }
 
-  function getEntry(defId: string): ActionCategoryEntry<Def, State, Payload> | undefined {
+  function getEntry(defId: string): ActionCategoryEntry<Def, DefState, Payload> | undefined {
     return makeEntry(defId, getCurrentMetadataIfDefId(defId));
   }
 
@@ -482,19 +486,19 @@ export function createActionCategory<Def extends { id: string }, State = void, P
 
   function transitionLifecycle(
     defId: string,
-    next: ActionItemState,
+    next: ActionItemStatus,
     extra?: (m: ActionItemMetadata<Payload>) => Partial<ActionItemMetadata<Payload>>,
   ): void {
     // Emit only once the patch is committed: a listener reading the category
     // must see the new lifecycle, and one that calls a verb must not have its
     // write overwritten by this patch's spread of the stale metadata.
-    const transition: { from?: ActionItemState; patched?: ActionItemMetadata<Payload> } = {};
+    const transition: { from?: ActionItemStatus; patched?: ActionItemMetadata<Payload> } = {};
     patchByDefId(defId, (m) => {
-      const from = m.lifecycle;
+      const from = m.status;
       if (from === next && !extra) return m;
       const patched: ActionItemMetadata<Payload> = {
         ...m,
-        lifecycle: next,
+        status: next,
         ...(extra ? extra(m) : {}),
       };
       if (from !== next) {
@@ -506,7 +510,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     if (transition.from === undefined || !transition.patched) return;
     const entry = makeEntry(defId, transition.patched);
     if (!entry) return;
-    handle.emit('itemStateChanged', entry, transition.from, next);
+    handle.emit('itemStatusChanged', entry, transition.from, next);
     if (next === 'completed') handle.emit('completed', entry);
   }
 
@@ -525,16 +529,16 @@ export function createActionCategory<Def extends { id: string }, State = void, P
   sequencer.on('completed', (item) => {
     // The sequencer has already cleared `current` (and popped the item in
     // queue mode), so the verbs can't reach it; build the terminal entry by
-    // hand. An item already set 'completed' through `setItemState` has emitted
+    // hand. An item already set 'completed' through `setItemStatus` has emitted
     // both events, and `completed` fires once per execution.
     const meta = item.metadata;
-    if (meta.lifecycle === 'completed') {
+    if (meta.status === 'completed') {
       fireItemChange(meta.defId);
       return;
     }
     const terminal: ActionItemMetadata<Payload> = {
       ...meta,
-      lifecycle: 'completed',
+      status: 'completed',
       timing: { ...meta.timing, completedAt: Date.now() },
     };
     // A list keeps the item, one slot behind the advanced cursor: record the
@@ -545,7 +549,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
-    handle.emit('itemStateChanged', entry, meta.lifecycle, 'completed');
+    handle.emit('itemStatusChanged', entry, meta.status, 'completed');
     handle.emit('completed', entry);
     fireItemChange(meta.defId);
   });
@@ -560,7 +564,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     // Skip means canStart returned 'never'. Surface as terminal 'failed' so UI
     // can show the skip in the same channel as explicit setItemError.
     const meta = item.metadata;
-    const terminal: ActionItemMetadata<Payload> = { ...meta, lifecycle: 'failed' };
+    const terminal: ActionItemMetadata<Payload> = { ...meta, status: 'failed' };
     // A list keeps the skipped item one slot behind the cursor, which advances
     // before `skipped` fires: record the terminal state there or it reads 'pending'.
     if (mode === 'list') {
@@ -569,8 +573,8 @@ export function createActionCategory<Def extends { id: string }, State = void, P
     }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
-    if (meta.lifecycle !== 'failed') {
-      handle.emit('itemStateChanged', entry, meta.lifecycle, 'failed');
+    if (meta.status !== 'failed') {
+      handle.emit('itemStatusChanged', entry, meta.status, 'failed');
     }
     fireItemChange(meta.defId);
   });
@@ -597,7 +601,7 @@ export function createActionCategory<Def extends { id: string }, State = void, P
 
   // --- Public category surface ---------------------------------------------
 
-  const category: ActionCategory<Def, State, Payload> = {
+  const category: ActionCategory<Def, DefState, Payload> = {
     id: categoryId,
     registry: base.registry,
     register: registerWithMapping,
@@ -662,8 +666,8 @@ export function createActionCategory<Def extends { id: string }, State = void, P
       return sequencer.currentItem?.metadata ?? null;
     },
 
-    setItemState(defId, state) {
-      transitionLifecycle(defId, state);
+    setItemStatus(defId, status) {
+      transitionLifecycle(defId, status);
     },
 
     setItemProgress(defId, value) {

@@ -61,7 +61,7 @@ import type { Unsubscribe } from './types';
  * vocabulary without engine churn. Plain `string` rather than a literal union
  * plus `(string & {})`, so a consumer's `state === 'stable'` check narrows.
  */
-export type ScopeState = string;
+export type ScopeStatus = string;
 
 /** Options accepted by {@link createScopeStack}. */
 export interface ScopeStackOptions<N, E> {
@@ -74,7 +74,7 @@ export interface ScopeStackOptions<N, E> {
    * Omit to make `recalculateAt` a no-op — useful for consumers that only
    * want navigation without derived state.
    */
-  readonly recalculate?: (graph: SpatialGraph<N, E>, path: readonly string[]) => ScopeState;
+  readonly recalculate?: (graph: SpatialGraph<N, E>, path: readonly string[]) => ScopeStatus;
 }
 
 /**
@@ -91,7 +91,7 @@ export interface ScopeStackSnapshot {
 export interface ScopeStackEvents {
   'scope:entered': (nodeId: string, depth: number) => void;
   'scope:exited': (nodeId: string, depth: number) => void;
-  'scope:recalculated': (path: readonly string[], state: ScopeState) => void;
+  'scope:recalculated': (path: readonly string[], status: ScopeStatus) => void;
 }
 
 /** Navigation cursor over a recursive graph-of-graphs. */
@@ -141,7 +141,7 @@ export interface ScopeStack<N, E> {
    */
   recalculateAt(path: readonly string[]): void;
   /** Last cached state at `path`, or `undefined` if never recalculated. */
-  stateAt(path: readonly string[]): ScopeState | undefined;
+  statusAt(path: readonly string[]): ScopeStatus | undefined;
 
   // Events ------------------------------------------------------------------
 
@@ -188,7 +188,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
   const path: string[] = [];
   const graphStack: SpatialGraph<N, E>[] = [options.root];
   const subscriptions: Unsubscribe[] = [];
-  const stateCache = new Map<string, ScopeState>();
+  const statusCache = new Map<string, ScopeStatus>();
   const handle = createEmitHandle<ScopeStackEvents>();
 
   function pathKey(p: readonly string[]): string {
@@ -254,8 +254,8 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
     const snapshot = p.slice();
     const state = options.recalculate(graph, snapshot);
     const key = pathKey(snapshot);
-    const prev = stateCache.get(key);
-    stateCache.set(key, state);
+    const prev = statusCache.get(key);
+    statusCache.set(key, state);
     handle.emit('scope:recalculated', snapshot, state);
     if (prev === state) return;
     if (snapshot.length === 0) return;
@@ -309,8 +309,8 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
 
     recalculateAt,
 
-    stateAt(p: readonly string[]): ScopeState | undefined {
-      return stateCache.get(pathKey(p));
+    statusAt(p: readonly string[]): ScopeStatus | undefined {
+      return statusCache.get(pathKey(p));
     },
 
     on(event, handler) {
@@ -333,7 +333,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
         graphStack.pop();
         subscriptions.pop()?.();
       }
-      stateCache.clear();
+      statusCache.clear();
 
       let cur: SpatialGraph<N, E> = options.root;
       for (const id of snapshot.path) {

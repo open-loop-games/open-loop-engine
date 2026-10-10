@@ -10,7 +10,7 @@
  */
 
 import { computed, unref, type ComputedRef } from 'vue';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
 import { addResource, type Resource } from '@/core/resource';
@@ -120,7 +120,7 @@ export interface ProducerMapping {
  * @typeParam State - Per-instance state created alongside each Producer.
  *   Use `void` if no extra state is needed.
  */
-export interface ProducerCategoryOptions<Def extends { id: string }, State = void> {
+export interface ProducerCategoryOptions<Def extends { id: string }, DefState = void> {
   /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
   id: string;
 
@@ -138,7 +138,7 @@ export interface ProducerCategoryOptions<Def extends { id: string }, State = voi
    * Called inside the definition's persistent context, so `persistent()` calls
    * here are scoped to `{categoryId}/{def.id}`.
    */
-  mapState?: (def: Def, producer: Producer) => State;
+  mapState?: (def: Def, producer: Producer) => DefState;
 
   /** Tick registration function (typically ctx.onTick from the engine) */
   registerTick: RegisterTick;
@@ -225,10 +225,10 @@ export interface Producer {
 }
 
 /** A registered entry: definition + Producer instance + optional state + introspection signals */
-export interface ProducerCategoryEntry<Def extends { id: string }, State = void> {
+export interface ProducerCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly producer: Producer;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals: CategoryEntrySignals;
 }
 
@@ -240,7 +240,7 @@ export interface ProducerCategoryEntry<Def extends { id: string }, State = void>
  */
 export interface ProducerCategory<
   Def extends { id: string },
-  State = void,
+  DefState = void,
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -262,16 +262,16 @@ export interface ProducerCategory<
   getProducer(id: string): Producer | undefined;
 
   /** Get the per-instance state for a definition ID */
-  getState(id: string): State | undefined;
+  getState(id: string): DefState | undefined;
 
   /** Get the definition for an ID (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + producer + state) */
-  getEntry(id: string): ProducerCategoryEntry<Def, State> | undefined;
+  getEntry(id: string): ProducerCategoryEntry<Def, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): ProducerCategoryEntry<Def, State>[];
+  getAll(): ProducerCategoryEntry<Def, DefState>[];
 
   /**
    * Aggregate production rate across all continuous producers targeting a resource.
@@ -324,7 +324,7 @@ function buildProducer<Def extends { id: string }>(
   }
 
   const processedExtraCount =
-    mapping.extraCount !== undefined ? processGetter(mapping.extraCount) : undefined;
+    mapping.extraCount !== undefined ? toMaybeRef(mapping.extraCount) : undefined;
 
   const ownedCount = computed<DecimalSource>(() =>
     repeatable ? repeatable.count.value : Decimal.dZero,
@@ -434,14 +434,14 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
  * });
  * ```
  */
-export function createProducerCategory<Def extends { id: string }, State = void>(
-  options: ProducerCategoryOptions<Def, State>,
-): ProducerCategory<Def, State> {
+export function createProducerCategory<Def extends { id: string }, DefState = void>(
+  options: ProducerCategoryOptions<Def, DefState>,
+): ProducerCategory<Def, DefState> {
   const { id: categoryId, mapProducer, mapState, registerTick } = options;
   const ctx: ProducerCategoryContext = { registerTick };
   const predicates = createPredicateResolver();
 
-  const base: CategoryBase<Def, Producer, State> = createCategoryBase({
+  const base: CategoryBase<Def, Producer, DefState> = createCategoryBase({
     id: categoryId,
     buildInstance: (def) => buildProducer(def, categoryId, mapProducer, ctx, predicates),
     buildState: mapState,
@@ -455,7 +455,7 @@ export function createProducerCategory<Def extends { id: string }, State = void>
     profileLabel: 'producer.continuous.tick',
   });
 
-  const category: ProducerCategory<Def, State> = {
+  const category: ProducerCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
     register: base.register,

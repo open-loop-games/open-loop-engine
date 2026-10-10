@@ -73,7 +73,7 @@ function buildFixture(): {
   points: ReturnType<typeof createResource<number>>;
   setRate: (id: string, rate: Decimal) => void;
   setFlag: (id: string, value: boolean) => void;
-  setState: (path: string, value: unknown) => void;
+  setStateAt: (path: string, value: unknown) => void;
   stop: () => void;
 } {
   let categories: EngineCategories | undefined;
@@ -93,10 +93,10 @@ function buildFixture(): {
     getAmount: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
     getFlag: (id) => unlocks.get(id) ?? false,
-    getState: (path) => stateMap.get(path),
+    getStateAt: (path) => stateMap.get(path),
     applyResourceOp: () => {},
     setFlag: (id, value) => unlocks.set(id, value),
-    setState: (path, value) => stateMap.set(path, value),
+    setStateAt: (path, value) => stateMap.set(path, value),
   };
 
   const game: EngineModule = {
@@ -165,7 +165,7 @@ function buildFixture(): {
     points: points!,
     setRate: (id, rate) => rates.set(id, rate),
     setFlag: (id, value) => unlocks.set(id, value),
-    setState: (path, value) => stateMap.set(path, value),
+    setStateAt: (path, value) => stateMap.set(path, value),
     stop: () => engine.stop(),
   };
 }
@@ -226,7 +226,7 @@ describe('evaluateGate — per-kind dispatch', () => {
 
   it('state delegates to compareState via accessor.getState', () => {
     const f = buildFixture();
-    f.setState('phase', 'idle');
+    f.setStateAt('phase', 'idle');
     expect(
       evaluateGate({ kind: 'state', key: 'phase', operator: 'eq', value: 'idle' }, f.runtime),
     ).toBe(true);
@@ -234,7 +234,7 @@ describe('evaluateGate — per-kind dispatch', () => {
       evaluateGate({ kind: 'state', key: 'phase', operator: 'neq', value: 'idle' }, f.runtime),
     ).toBe(false);
 
-    f.setState('progress', 7);
+    f.setStateAt('progress', 7);
     expect(
       evaluateGate({ kind: 'state', key: 'progress', operator: 'gte', value: 5 }, f.runtime),
     ).toBe(true);
@@ -799,7 +799,7 @@ describe('gateToCondition — partial projection', () => {
       getAmount: (id) => (id === 'gold' ? bn(75) : bn(0)),
       getRate: () => Decimal.dZero,
       getFlag: () => false,
-      getState: () => 'mid',
+      getStateAt: () => 'mid',
     };
     expect(evaluateCondition(projected, accessor)).toBe(true);
   });

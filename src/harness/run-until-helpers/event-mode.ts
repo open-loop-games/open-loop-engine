@@ -292,7 +292,7 @@ function sampleDeps(
     if (accessor.getInflowRate) inflows.set(id, accessor.getInflowRate(id));
   }
   for (const id of inc.trackedFlags) flags.set(id, accessor.getFlag(id));
-  for (const path of inc.trackedStates) states.set(path, accessor.getState(path));
+  for (const path of inc.trackedStates) states.set(path, accessor.getStateAt(path));
   return { resources, totals, rates, inflows, flags, states };
 }
 

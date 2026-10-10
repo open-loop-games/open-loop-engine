@@ -50,7 +50,7 @@ import {
 } from '@/core/modifier';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import { toFormula } from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 
@@ -390,7 +390,7 @@ export function createSkill(options: SkillOptions): Skill {
   const gainChainParent = getCurrentPersistentContext();
   const gainChainId = gainChainParent ? `${gainChainParent}/skill:${id}:gain` : `skill:${id}:gain`;
   const gainChain = createModifierChain(gainChainId);
-  const processedMaxXp = options.maxXp != null ? processGetter(options.maxXp) : undefined;
+  const processedMaxXp = options.maxXp != null ? toMaybeRef(options.maxXp) : undefined;
   const { addXp, gainInProgress } = buildAddXp(xp, gainChain, processedMaxXp);
   const handle = createEmitHandle<SkillEvents>();
   buildLevelUpEmitter(level, gainInProgress, handle);

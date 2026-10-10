@@ -73,7 +73,7 @@ export function compareState(
 /**
  * Evaluate a declarative {@link ICondition} against the given game-state
  * accessor. Recurses through `and` / `or` / `not` nodes; leaves resolve via
- * the accessor's `getAmount` / `getFlag` / `getState` lookups.
+ * the accessor's `getAmount` / `getFlag` / `getStateAt` lookups.
  *
  * @internal
  */
@@ -88,7 +88,11 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
     case 'flag':
       return accessor.getFlag(condition.target);
     case 'state':
-      return compareState(accessor.getState(condition.target), condition.operator, condition.value);
+      return compareState(
+        accessor.getStateAt(condition.target),
+        condition.operator,
+        condition.value,
+      );
     case 'all':
       return condition.conditions.every((c) => evaluateCondition(c, accessor));
     case 'any':

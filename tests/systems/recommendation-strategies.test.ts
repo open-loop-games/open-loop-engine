@@ -55,7 +55,7 @@ function createPopulatedStack(
       bestOf,
       cycle,
       currentSnapshot,
-      state: {},
+      gameState: {},
     };
   }
 

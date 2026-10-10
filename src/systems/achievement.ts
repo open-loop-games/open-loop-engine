@@ -21,7 +21,7 @@
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { computed, type Ref, unref } from 'vue';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import {
   persistent,
   withPersistentContext,
@@ -198,9 +198,9 @@ export function createAchievement<T = unknown>(
   const adoptedRequirement = predicates.adopt(requirement, true, `achievement '${id}' goal`);
   const hiddenRef = predicates.adopt(hidden, false, `achievement '${id}' hidden`).holds;
   const visibleRef = predicates.adopt(visible, true, `achievement '${id}' visible`).holds;
-  const processedImage = image !== undefined ? processGetter(image) : undefined;
-  const processedSmall = small !== undefined ? processGetter(small) : undefined;
-  const processedEffect = effect !== undefined ? processGetter(effect) : undefined;
+  const processedImage = image !== undefined ? toMaybeRef(image) : undefined;
+  const processedSmall = small !== undefined ? toMaybeRef(small) : undefined;
+  const processedEffect = effect !== undefined ? toMaybeRef(effect) : undefined;
 
   const imageRef = processedImage !== undefined ? computed(() => unref(processedImage)) : undefined;
   const smallRef = computed(() => (processedSmall !== undefined ? unref(processedSmall) : false));

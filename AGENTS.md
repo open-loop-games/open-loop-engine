@@ -152,7 +152,7 @@ The test: if you'd copy-paste the same wiring between two different incremental 
 
 **Save shape:** saves players hold must keep loading, so a change to what an engine system saves lands as a tolerant read in the system that owns the key — a new key with a default, or a fallback to the old field's name — and loading skips keys no ref owns, so a dropped key needs nothing. Bump `ENGINE_SAVE_VERSION` and add its migration in `applyEnvelope` only for a change no tolerant read can express, such as a value moving between contexts; an older engine refuses a save carrying a newer engine version.
 
-**Live reads:** a public read on an engine object — getter, method or field — is live: a `computed` or template over it recomputes when its answer changes. Back it with a ref, or have it read a version ref that every mutation bumps (`itemsVersion` in `createModifierChain`) and keep any raw-read cache behind that. A deliberate snapshot — per-tick hot-path state, an event-driven list — says "snapshot" in its TSDoc and names what to watch instead. A consumer that mirrors an engine read into its own ref to make a UI update is a receipt for this rule.
+**Reactive reads:** a public read on an engine object — getter, method or field — is reactive: a `computed` or template over it recomputes when its answer changes. Back it with a ref, or have it read a version ref that every mutation bumps (`itemsVersion` in `createModifierChain`) and keep any raw-read cache behind that. A deliberate snapshot — per-tick hot-path state, an event-driven list — says "snapshot" in its TSDoc and names what to watch instead. A consumer that mirrors an engine read into its own ref to make a UI update is a receipt for this rule.
 
 **Section banners:** `// === UPPERCASE ===` short-form, one line per section. Inner factory-body sub-sections use the same form at deeper indent. Skip banners on files small enough that scrolling isn't an issue.
 
@@ -193,7 +193,7 @@ Three tiers based on audience. IDE hover is the primary delivery mechanism — n
 
 **Enum members** — one-liner per value. Enum names are often cryptic; the doc should say what the value *means* in game terms.
 
-**Internal helpers** (`processGetter`, `topologicalSort`, etc.):
+**Internal helpers** (`toMaybeRef`, `topologicalSort`, etc.):
 - One-liner explaining *what*, not *how*
 - `@internal` tag if exported only for cross-module use
 - No `@example` needed

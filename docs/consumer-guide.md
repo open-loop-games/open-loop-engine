@@ -63,8 +63,8 @@ const engine = createEngine({
     getRate: (id) => ratesById[id] ?? Decimal.dZero,
     getInflowRate: (id) => grossById[id] ?? Decimal.dZero, // optional; exact cumulative-gte predictions
     getFlag: (id) => flags[id] ?? false,
-    getState: (path) => readPath(gameState, path),
-    ...mutator, // applyResourceOp / setFlag / setState, for the effect side
+    getStateAt: (path) => readPath(gameState, path),
+    ...mutator, // applyResourceOp / setFlag / setStateAt, for the effect side
   },
 });
 ```
@@ -133,7 +133,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 
 No per-game predicate interface, no module-side implementation table, no closures handed into registration. The Gate union grows engine-side when a validated kind shows up across consumers; consumer code stays a tree of typed data. The would-be side-table for "what's currently visible?" never materializes because `unlock` reads `unlocks.getPurchasable(id)?.active.value` through the category-signals layer.
 
-**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getState`. A "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
+**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getStateAt`. A "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
 
 A custom-predicate Gate kind carrying a closure is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed getter game-side on a `Predicate` field (or `createBooleanRequirement` on requirement-shaped fields) and keep it out of `Gate` entirely. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way.
 

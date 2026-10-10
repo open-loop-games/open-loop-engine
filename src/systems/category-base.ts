@@ -69,15 +69,15 @@ export interface CategoryEntrySignals {
  * `createCategoryBase` uses with custom shapes); per-system factories
  * (`createSkillCategory`, etc.) always populate it.
  */
-export interface CategoryEntry<Def extends { id: string }, Instance, State = void> {
+export interface CategoryEntry<Def extends { id: string }, Instance, DefState = void> {
   readonly def: Def;
   readonly instance: Instance;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals?: CategoryEntrySignals;
 }
 
 /** Options for {@link createCategoryBase}. */
-export interface CategoryBaseOptions<Def extends { id: string }, Instance, State = void> {
+export interface CategoryBaseOptions<Def extends { id: string }, Instance, DefState = void> {
   /** Persistence context prefix. Each definition gets `{id}/{def.id}`. */
   id: string;
 
@@ -95,7 +95,7 @@ export interface CategoryBaseOptions<Def extends { id: string }, Instance, State
    * Called inside the same persistent context as buildInstance.
    * Omit if no extra state is needed.
    */
-  buildState?: (def: Def, instance: Instance) => State;
+  buildState?: (def: Def, instance: Instance) => DefState;
 
   /**
    * Derive {@link CategoryEntrySignals} from the entry's instance + state.
@@ -104,7 +104,7 @@ export interface CategoryBaseOptions<Def extends { id: string }, Instance, State
    * `findCategoryEntrySignals`. Raw consumers may omit it — the entry's
    * `signals` slot will be `undefined`.
    */
-  buildSignals?: (def: Def, instance: Instance, state: State) => CategoryEntrySignals;
+  buildSignals?: (def: Def, instance: Instance, state: DefState) => CategoryEntrySignals;
 }
 
 /**
@@ -114,7 +114,7 @@ export interface CategoryBaseOptions<Def extends { id: string }, Instance, State
 export interface CategoryBase<
   Def extends { id: string },
   Instance,
-  State = void,
+  DefState = void,
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -138,10 +138,10 @@ export interface CategoryBase<
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + instance + state) */
-  getEntry(id: string): CategoryEntry<Def, Instance, State> | undefined;
+  getEntry(id: string): CategoryEntry<Def, Instance, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): CategoryEntry<Def, Instance, State>[];
+  getAll(): CategoryEntry<Def, Instance, DefState>[];
 
   /** Number of registered entries */
   readonly size: number;
@@ -170,13 +170,13 @@ export interface CategoryBase<
  * const state = actionStates.getEntry('chop')?.state;
  * ```
  */
-export function createCategoryBase<Def extends { id: string }, Instance, State = void>(
-  options: CategoryBaseOptions<Def, Instance, State>,
-): CategoryBase<Def, Instance, State> {
+export function createCategoryBase<Def extends { id: string }, Instance, DefState = void>(
+  options: CategoryBaseOptions<Def, Instance, DefState>,
+): CategoryBase<Def, Instance, DefState> {
   const { id: categoryId, buildInstance, buildState, buildSignals } = options;
 
   const { registry, assertRegistrable, remove } = createContentRegistryHandle<Def>(categoryId);
-  const entries = new Map<string, CategoryEntry<Def, Instance, State>>();
+  const entries = new Map<string, CategoryEntry<Def, Instance, DefState>>();
   // Registration-reactive read barrier for the plain Map: accessors read this
   // ref so a computed whose first evaluation misses the map (e.g. a grants
   // getter reading back through the category before its entry lands) tracks a
@@ -200,7 +200,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     const { instance, state, signals } = runInEffectScope(scope, () =>
       withPersistentContext(contextId, () => {
         const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
-        const state = buildState ? buildState(def, instance) : (undefined as State);
+        const state = buildState ? buildState(def, instance) : (undefined as DefState);
 
         // Auto-name persistent fields on the returned state object so save keys
         // are stable across field reorders. Each definition lives in its own
@@ -250,12 +250,12 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
       return registry.get(id);
     },
 
-    getEntry(id: string): CategoryEntry<Def, Instance, State> | undefined {
+    getEntry(id: string): CategoryEntry<Def, Instance, DefState> | undefined {
       void entriesVersion.value;
       return entries.get(id);
     },
 
-    getAll(): CategoryEntry<Def, Instance, State>[] {
+    getAll(): CategoryEntry<Def, Instance, DefState>[] {
       void entriesVersion.value;
       return Array.from(entries.values());
     },
@@ -394,10 +394,10 @@ export interface SetupCategoryTickOptions {
  * }, { profileLabel: 'producer.continuous.tick' });
  * ```
  */
-export function setupCategoryTick<Def extends { id: string }, Instance, State>(
-  base: CategoryBase<Def, Instance, State>,
+export function setupCategoryTick<Def extends { id: string }, Instance, DefState>(
+  base: CategoryBase<Def, Instance, DefState>,
   registerTick: RegisterTick,
-  perEntry: (entry: CategoryEntry<Def, Instance, State>, dt: number) => void,
+  perEntry: (entry: CategoryEntry<Def, Instance, DefState>, dt: number) => void,
   options: SetupCategoryTickOptions = {},
 ): () => void {
   const { profileLabel } = options;

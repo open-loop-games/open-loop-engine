@@ -454,7 +454,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
       getAmount: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
       getRate: (id) => (id === 'fragments' ? bn(1) : bn(0)),
       getFlag: () => false,
-      getState: () => undefined,
+      getStateAt: () => undefined,
     };
     if (inflow !== undefined) {
       accessor.getInflowRate = (id) => (id === 'fragments' ? bn(inflow) : bn(0));

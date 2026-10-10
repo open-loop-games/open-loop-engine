@@ -5,7 +5,7 @@ import {
   createSpatialGraph,
   type ScopeStack,
   type ScopeStackSnapshot,
-  type ScopeState,
+  type ScopeStatus,
 } from '@/core/spatial';
 
 interface Pkg {
@@ -214,13 +214,13 @@ describe('createScopeStack — recalculate propagation', () => {
         return p.length === 0 ? 'pristine' : 'stable';
       },
     });
-    const events: Array<[readonly string[], ScopeState]> = [];
+    const events: Array<[readonly string[], ScopeStatus]> = [];
     stack.on('scope:recalculated', (p, s) => events.push([[...p], s]));
     stack.enter('a');
     stack.recalculateAt(stack.path);
     // Walks ['a'] then ['] — both cached + emitted.
-    expect(stack.stateAt(['a'])).toBe('stable');
-    expect(stack.stateAt([])).toBe('pristine');
+    expect(stack.statusAt(['a'])).toBe('stable');
+    expect(stack.statusAt([])).toBe('pristine');
     expect(events).toEqual([
       [['a'], 'stable'],
       [[], 'pristine'],
@@ -279,14 +279,14 @@ describe('createScopeStack — recalculate propagation', () => {
     stack.recalculateAt(stack.path);
     // Second pass: 'a' → 'stable' (changed), bubbles; [] → 'stable' (unchanged), halts.
     expect(visited).toEqual([['a'], []]);
-    expect(stack.stateAt(['a'])).toBe('stable');
+    expect(stack.statusAt(['a'])).toBe('stable');
   });
 
   it('is a no-op when no recalculate option is provided', () => {
     const { stack } = makeNestedGraph();
     stack.enter('a');
     stack.recalculateAt(stack.path);
-    expect(stack.stateAt(['a'])).toBeUndefined();
+    expect(stack.statusAt(['a'])).toBeUndefined();
   });
 
   it('is silent when the path cannot be resolved', () => {
@@ -303,7 +303,7 @@ describe('createScopeStack — recalculate propagation', () => {
     });
     stack.recalculateAt(['ghost']);
     expect(called).toBe(0);
-    expect(stack.stateAt(['ghost'])).toBeUndefined();
+    expect(stack.statusAt(['ghost'])).toBeUndefined();
   });
 });
 
@@ -334,10 +334,10 @@ describe('createScopeStack — serialize & restore', () => {
     });
     stack.enter('a');
     stack.recalculateAt(stack.path);
-    expect(stack.stateAt(['a'])).toBe('stable');
+    expect(stack.statusAt(['a'])).toBe('stable');
 
     stack.restore({ version: 1, path: [] });
-    expect(stack.stateAt(['a'])).toBeUndefined();
+    expect(stack.statusAt(['a'])).toBeUndefined();
   });
 
   it('emits no events during restore', () => {

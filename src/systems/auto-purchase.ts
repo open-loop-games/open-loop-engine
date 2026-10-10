@@ -23,7 +23,7 @@
  */
 
 import { unref } from 'vue';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { persistent } from '@/core/persistence';
 import { profile, profileStart, profileEnd } from '@/core/profiler';
@@ -43,7 +43,7 @@ import type { Producer, ProducerCategory } from './producer-category';
 import { cachedCategoryList } from './category-base';
 
 // Default policy: cheapest by `repeatable.getCost(1)`. Module-level singleton
-// so identity is stable across `processGetter` calls when `options.policy`
+// so identity is stable across `toMaybeRef` calls when `options.policy`
 // is omitted; the helper-side filter guarantees every candidate has a
 // `repeatable` by the time the policy sees it.
 const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Producer>((p) =>
@@ -263,9 +263,9 @@ export function setupSweepAutoPurchase(
   options: SetupSweepAutoPurchaseOptions,
   registerTick: RegisterTick,
 ): () => void {
-  const processedEnabled = processGetter(options.enabled);
+  const processedEnabled = toMaybeRef(options.enabled);
   const hasReserve = options.reserve !== undefined;
-  const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
+  const processedReserve = toMaybeRef<DecimalSource>(options.reserve ?? 0);
 
   const getList: () => Purchasable[] = Array.isArray(purchasables)
     ? () => purchasables
@@ -301,7 +301,7 @@ export function setupSweepAutoPurchase(
     });
   }
 
-  const processedInterval = processGetter(options.interval);
+  const processedInterval = toMaybeRef(options.interval);
 
   // Persistent for the same reason the policy helper's accumulator is: a
   // mid-run `importSave` would otherwise leave the throttle phase out of sync
@@ -503,14 +503,14 @@ export function setupPolicyAutoPurchase(
   options: SetupPolicyAutoPurchaseOptions,
   registerTick: RegisterTick,
 ): () => void {
-  const processedEnabled = processGetter(options.enabled);
-  const processedInterval = processGetter(options.interval ?? 0);
-  const processedPolicy = processGetter<SelectionPolicy<Producer>>(
+  const processedEnabled = toMaybeRef(options.enabled);
+  const processedInterval = toMaybeRef(options.interval ?? 0);
+  const processedPolicy = toMaybeRef<SelectionPolicy<Producer>>(
     options.policy ?? defaultCheapestPolicy,
   );
-  const processedBulk = processGetter<DecimalSource>(options.bulkCount ?? 1);
-  const processedReserve = processGetter<DecimalSource>(options.reserve ?? 0);
-  const processedWaitForCost = processGetter(options.waitForCost ?? false);
+  const processedBulk = toMaybeRef<DecimalSource>(options.bulkCount ?? 1);
+  const processedReserve = toMaybeRef<DecimalSource>(options.reserve ?? 0);
+  const processedWaitForCost = toMaybeRef(options.waitForCost ?? false);
   const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
   const onIterationsOverflow = options.onIterationsOverflow;
 

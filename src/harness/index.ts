@@ -65,7 +65,7 @@ export type {
   FlagEffect,
   StateEffect,
   CompositeEffect,
-  State,
+  Serializable,
   Persistent,
   PersistentAlias,
   Resource,

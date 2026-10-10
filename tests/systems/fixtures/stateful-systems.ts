@@ -18,11 +18,11 @@ export const AUTOMATION_TIER_DEFS = [
 export const dialogAccessorStub: GameStateAccessorMutator = {
   getAmount: () => bn(0),
   getFlag: () => false,
-  getState: () => undefined,
+  getStateAt: () => undefined,
   getRate: () => Decimal.dZero,
   applyResourceOp: () => {},
   setFlag: () => {},
-  setState: () => {},
+  setStateAt: () => {},
 };
 
 /** The minimal RecommendationSystem wiring over an existing Cycle + CycleLog + BestOf. */

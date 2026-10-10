@@ -35,7 +35,7 @@ export interface GameStateMutator {
   /** Set an unlock flag (feature gate) by ID to true or false. */
   setFlag(id: string, value: boolean): void;
   /** Write an arbitrary value to a state path (dot-notation or key). */
-  setState(path: string, value: unknown): void;
+  setStateAt(path: string, value: unknown): void;
 }
 
 // === HELPERS ===
@@ -121,7 +121,7 @@ export function applyEffect(
       mutator.setFlag(effect.target, effect.value);
       return;
     case 'state':
-      mutator.setState(effect.target, effect.value);
+      mutator.setStateAt(effect.target, effect.value);
       return;
   }
 }

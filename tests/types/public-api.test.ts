@@ -70,7 +70,7 @@ import type {
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
 import type {
   ActionCategory,
-  ActionItemState,
+  ActionItemStatus,
   ActionItemMetadata,
 } from '@/systems/action-category';
 import type {
@@ -264,8 +264,8 @@ describe('createActionCategory generic inference', () => {
       .toMatchTypeOf<Partial<MyActionPayload> | ((p: MyActionPayload) => MyActionPayload)>();
   });
 
-  it('ActionItemState is a literal union, not widened string', () => {
-    expectTypeOf<ActionItemState>().toEqualTypeOf<
+  it('ActionItemStatus is a literal union, not widened string', () => {
+    expectTypeOf<ActionItemStatus>().toEqualTypeOf<
       'pending' | 'running' | 'waiting' | 'completed' | 'failed'
     >();
   });
@@ -1146,7 +1146,7 @@ describe('Systems — required options vs what defaults', () => {
 
   it('createRecommendationSystem requires cycle/cycleLog/bestOf/getCurrentSnapshot/applySnapshot', () => {
     type Options = import('@/systems/recommendation').RecommendationSystemOptions;
-    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'defs' | 'getState'>();
+    expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<'id' | 'defs' | 'getGameState'>();
   });
 
   it('createProducerCategory requires id/mapProducer/registerTick; mapState defaults', () => {

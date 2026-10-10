@@ -141,7 +141,7 @@ export interface InfluenceLayerOptions {
  * updates. {@link composeInfluenceLayers} also returns a reader, so a
  * composed multi-layer query is interchangeable with a single-layer one.
  */
-export interface InfluenceLayerReader {
+export interface InfluenceLayerView {
   /** Sample influence at a point. Returns 0 if out of bounds. */
   at(x: number, y: number): number;
   /**
@@ -194,7 +194,7 @@ export interface InfluenceLayer {
   readonly grid: SpatialGrid<number>;
 
   /** Returns a stable read-only view over the layer. */
-  read(): InfluenceLayerReader;
+  read(): InfluenceLayerView;
 
   // Source registry --------------------------------------------------------
 
@@ -261,7 +261,7 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
  * @param options Layer-wide configuration (falloff, default radius, retention factor,
  *                passability gate, profile hook).
  * @returns A lifecycle handle exposing source registry, update/reset, and
- *          a stable {@link InfluenceLayerReader}.
+ *          a stable {@link InfluenceLayerView}.
  *
  * @example
  * ```ts
@@ -367,7 +367,7 @@ export function createInfluenceLayer(
     return samples;
   }
 
-  function makeReader(): InfluenceLayerReader {
+  function makeView(): InfluenceLayerView {
     return {
       at(x, y) {
         const v = grid.tryAt(x, y);
@@ -410,7 +410,7 @@ export function createInfluenceLayer(
     };
   }
 
-  const reader = makeReader();
+  const reader = makeView();
 
   return {
     grid,
@@ -478,17 +478,17 @@ export function createInfluenceLayer(
  * ```
  */
 export function composeInfluenceLayers(
-  readers: readonly InfluenceLayerReader[],
+  views: readonly InfluenceLayerView[],
   combine: (values: readonly number[], x: number, y: number) => number,
-): InfluenceLayerReader {
-  if (readers.length === 0) {
+): InfluenceLayerView {
+  if (views.length === 0) {
     throw new Error('composeInfluenceLayers: readers array must not be empty');
   }
-  const buf = new Array<number>(readers.length);
+  const buf = new Array<number>(views.length);
 
   function combinedAt(x: number, y: number): number {
-    for (let i = 0; i < readers.length; i++) {
-      buf[i] = readers[i].at(x, y);
+    for (let i = 0; i < views.length; i++) {
+      buf[i] = views[i].at(x, y);
     }
     return combine(buf, x, y);
   }
@@ -504,13 +504,13 @@ export function composeInfluenceLayers(
     radius: number,
     fn: (cx: number, cy: number, value: number) => void,
   ): void {
-    if (!readers[0].inBounds(x, y)) return;
+    if (!views[0].inBounds(x, y)) return;
     const r = Math.max(0, Math.floor(radius));
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         const cx = x + dx;
         const cy = y + dy;
-        if (readers[0].inBounds(cx, cy)) fn(cx, cy, combinedAt(cx, cy));
+        if (views[0].inBounds(cx, cy)) fn(cx, cy, combinedAt(cx, cy));
       }
     }
   }
@@ -541,10 +541,10 @@ export function composeInfluenceLayers(
       return { x: bestX, y: bestY, value: bestValue };
     },
     inBounds(x, y) {
-      return readers[0].inBounds(x, y);
+      return views[0].inBounds(x, y);
     },
     *cells() {
-      for (const [x, y] of readers[0].cells()) {
+      for (const [x, y] of views[0].cells()) {
         yield [x, y, combinedAt(x, y)] as [number, number, number];
       }
     },

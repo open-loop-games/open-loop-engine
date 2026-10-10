@@ -13,7 +13,7 @@
 
 import { computed, unref, type MaybeRef } from 'vue';
 import { Decimal, type DecimalSource, formatSmall, renormIfLayer0 } from '@/primitives/decimal';
-import { processGetter, type Computable } from './computed';
+import { toMaybeRef, type Computable } from './computed';
 import { resetResource, type Resource } from './resource';
 import { SkipPersistence } from './persistence';
 import type { GenericFormula } from './formulas';
@@ -177,9 +177,9 @@ export interface CostRequirement extends Requirement {
 export function createCostRequirement(options: CostRequirementOptions): CostRequirement {
   const { resource, cost, requiresPay, cumulativeCost, maxBulkCount, pay, description } = options;
 
-  const processedCost = isFormula(cost) ? cost : processGetter(cost);
-  const processedCumulativeCost = cumulativeCost != null ? processGetter(cumulativeCost) : true;
-  const processedMaxBulk = maxBulkCount != null ? processGetter(maxBulkCount) : 1;
+  const processedCost = isFormula(cost) ? cost : toMaybeRef(cost);
+  const processedCumulativeCost = cumulativeCost != null ? toMaybeRef(cumulativeCost) : true;
+  const processedMaxBulk = maxBulkCount != null ? toMaybeRef(maxBulkCount) : 1;
 
   // Precomputed formula affordability — reactive via calculateMaxAffordable's own computed.
   const formulaMaxAffordable = isFormula(processedCost)
@@ -224,7 +224,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
     getCost,
 
     met,
-    requiresPay: requiresPay != null ? processGetter(requiresPay) : true,
+    requiresPay: requiresPay != null ? toMaybeRef(requiresPay) : true,
 
     canMaximize: computed(() => {
       const max = unref(processedMaxBulk);
@@ -240,7 +240,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
 
     description:
       description != null
-        ? processGetter(description)
+        ? toMaybeRef(description)
         : computed(() => {
             const costValue = getCost(1);
             return `${formatSmall(costValue)} ${resource.displayName}`;
@@ -282,9 +282,9 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
   const { met: requirement, description } = options;
 
   return {
-    met: processGetter(requirement),
+    met: toMaybeRef(requirement),
     requiresPay: false,
-    description: description != null ? processGetter(description) : undefined,
+    description: description != null ? toMaybeRef(description) : undefined,
     [SkipPersistence]: true,
   } satisfies Requirement;
 }

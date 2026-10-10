@@ -28,7 +28,7 @@ describe('Integration: simple idle game loop', () => {
     const accessor: GameStateAccessor = {
       getAmount: (id) => (id === 'gold' ? bn(gold.value) : bn(0)),
       getFlag: () => false,
-      getState: () => undefined,
+      getStateAt: () => undefined,
       getRate: () => Decimal.dZero,
     };
 

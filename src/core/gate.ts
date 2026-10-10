@@ -62,7 +62,7 @@ export interface ActiveGate {
 }
 
 /**
- * True when the comparison `accessor.getState(key) <op> value` holds. Mirrors
+ * True when the comparison `accessor.getStateAt(key) <op> value` holds. Mirrors
  * `StateCondition` — same operator vocabulary, same coercion rules.
  * Consumer-supplied state-path escape hatch for predicates the typed kinds
  * don't cover (engine doesn't define what state paths mean).

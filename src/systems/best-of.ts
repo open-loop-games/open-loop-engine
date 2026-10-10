@@ -20,7 +20,7 @@
 
 import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { persistent, withPersistentContext, type State } from '@/core/persistence';
+import { persistent, withPersistentContext, type Serializable } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
@@ -92,7 +92,7 @@ export interface BestOfEntry {
   /** When this record was set (Unix ms) */
   timestamp: number;
   /** Consumer-provided opaque configuration snapshot, or undefined */
-  strategySnapshot: State | undefined;
+  strategySnapshot: Serializable | undefined;
   /** Current validity — stale entries are beaten by any new submission */
   status: BestOfStatus;
 }
@@ -105,7 +105,7 @@ interface SerializedBestOfEntry {
   elapsed: number;
   runNumber: number;
   timestamp: number;
-  strategySnapshot: State | undefined;
+  strategySnapshot: Serializable | undefined;
   status: BestOfStatus;
 }
 
@@ -120,7 +120,7 @@ export interface BestOfCandidate {
   /** Cycle number */
   runNumber: number;
   /** Override for strategy snapshot (takes precedence over captureStrategy) */
-  strategySnapshot?: State;
+  strategySnapshot?: Serializable;
 }
 
 /** Events emitted by a {@link BestOf} instance */
@@ -141,7 +141,7 @@ export interface BestOfOptions {
   cycleLog?: CycleLog;
 
   /** Called to capture the current strategy/config when a new best is recorded */
-  captureStrategy?: () => State;
+  captureStrategy?: () => Serializable;
 }
 
 /**

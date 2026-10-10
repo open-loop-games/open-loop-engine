@@ -44,7 +44,7 @@
 
 import { computed, unref, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
@@ -179,8 +179,8 @@ export function createSlot(options: SlotOptions): Slot {
   const { id, mode } = options;
 
   // --- Resolve reactive options ---
-  const processedMax = mode === 'single' ? 1 : processGetter(options.maxSelections ?? Decimal.dInf);
-  const processedPool = options.pool != null ? processGetter(options.pool) : undefined;
+  const processedMax = mode === 'single' ? 1 : toMaybeRef(options.maxSelections ?? Decimal.dInf);
+  const processedPool = options.pool != null ? toMaybeRef(options.pool) : undefined;
 
   // --- Persistence ---
   const contextId = `slot:${id}`;

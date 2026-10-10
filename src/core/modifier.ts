@@ -16,7 +16,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
-import { processGetter, type Computable, type MaybeGetter } from './computed';
+import { toMaybeRef, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
@@ -101,8 +101,8 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
 ): OperationModifier<T> {
   const { addend, description, enabled, smallerIsBetter } = options;
 
-  const processedAddend = processGetter(addend);
-  const processedEnabled = enabled == null ? undefined : processGetter(enabled);
+  const processedAddend = toMaybeRef(addend);
+  const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
     apply: (gain: DecimalSource) => Decimal.add(gain, unref(processedAddend)),
@@ -173,8 +173,8 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
 ): OperationModifier<T> {
   const { multiplier, description, enabled, smallerIsBetter } = options;
 
-  const processedMultiplier = processGetter(multiplier);
-  const processedEnabled = enabled == null ? undefined : processGetter(enabled);
+  const processedMultiplier = toMaybeRef(multiplier);
+  const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
     apply: (gain: DecimalSource) => Decimal.times(gain, unref(processedMultiplier)),
@@ -238,8 +238,8 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
 ): OperationModifier<T> {
   const { exponent, description, enabled, supportLowNumbers, smallerIsBetter } = options;
 
-  const processedExponent = processGetter(exponent);
-  const processedEnabled = enabled == null ? undefined : processGetter(enabled);
+  const processedExponent = toMaybeRef(exponent);
+  const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
     apply: (gain: DecimalSource) => {
@@ -709,7 +709,7 @@ export function createModifierChain(id: string): ModifierChain {
     bind(opts: BindOptions): () => void {
       const rawModifier = typeof opts.modifier === 'function' ? opts.modifier() : opts.modifier;
 
-      const activeRef = opts.active == null ? undefined : processGetter(opts.active);
+      const activeRef = opts.active == null ? undefined : toMaybeRef(opts.active);
       const modifier =
         activeRef == null ? rawModifier : delegateModifier(rawModifier, { when: activeRef });
 
@@ -948,7 +948,7 @@ export function computeModifiedValue(
   base: Computable<DecimalSource>,
   modifiers: Modifier[],
 ): ComputedRef<DecimalSource> {
-  const processedBase = processGetter(base);
+  const processedBase = toMaybeRef(base);
   return computed(() => {
     const baseValue = unref(processedBase);
     return applyModifiers(modifiers, baseValue);

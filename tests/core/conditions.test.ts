@@ -7,7 +7,7 @@ function mockAccessor(overrides: Partial<GameStateAccessor> = {}): GameStateAcce
   return {
     getAmount: (id) => (id === 'gold' ? bn(100) : bn(0)),
     getFlag: (id) => id === 'smithing',
-    getState: () => undefined,
+    getStateAt: () => undefined,
     getRate: () => Decimal.dZero,
     ...overrides,
   };

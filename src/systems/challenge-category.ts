@@ -207,10 +207,10 @@ export interface Challenge {
 }
 
 /** A registered entry in a challenge category */
-export interface ChallengeCategoryEntry<Def extends ChallengeDef, State = void> {
+export interface ChallengeCategoryEntry<Def extends ChallengeDef, DefState = void> {
   readonly def: Def;
   readonly challenge: Challenge;
-  readonly state: State;
+  readonly state: DefState;
   readonly signals: CategoryEntrySignals;
 }
 
@@ -220,7 +220,7 @@ export interface ChallengeCategoryEntry<Def extends ChallengeDef, State = void> 
  * @typeParam Def - Challenge definition type
  * @typeParam State - Per-instance state type (void if none)
  */
-export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void> {
+export interface ChallengeCategoryOptions<Def extends ChallengeDef, DefState = void> {
   /** Persistence context name. Each challenge gets `{id}/{def.id}`. */
   id: string;
 
@@ -276,7 +276,7 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
    * Create per-instance state alongside each Challenge.
    * Called inside the challenge's persistent context.
    */
-  mapState?: (def: Def, challenge: Challenge) => State;
+  mapState?: (def: Def, challenge: Challenge) => DefState;
 }
 
 /**
@@ -287,7 +287,7 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
  */
 export interface ChallengeCategory<
   Def extends ChallengeDef,
-  State = void,
+  DefState = void,
 > extends ResettableObject {
   /** Persistence context id this category was constructed under. */
   readonly id: string;
@@ -305,16 +305,16 @@ export interface ChallengeCategory<
   getChallenge(id: string): Challenge | undefined;
 
   /** Get per-instance state by definition ID */
-  getState(id: string): State | undefined;
+  getState(id: string): DefState | undefined;
 
   /** Get the definition by ID */
   getDef(id: string): Def | undefined;
 
   /** Get the full entry (def + challenge + state) */
-  getEntry(id: string): ChallengeCategoryEntry<Def, State> | undefined;
+  getEntry(id: string): ChallengeCategoryEntry<Def, DefState> | undefined;
 
   /** All entries in registration order */
-  getAll(): ChallengeCategoryEntry<Def, State>[];
+  getAll(): ChallengeCategoryEntry<Def, DefState>[];
 
   /** Currently active challenge (null if none). Reactive. */
   readonly current: ComputedRef<Challenge | null>;
@@ -344,9 +344,9 @@ export interface ChallengeCategory<
  * @param options - Category configuration
  * @returns A {@link ChallengeCategory} with registration, lookup, and lifecycle
  */
-export function createChallengeCategory<Def extends ChallengeDef, State = void>(
-  options: ChallengeCategoryOptions<Def, State>,
-): ChallengeCategory<Def, State> {
+export function createChallengeCategory<Def extends ChallengeDef, DefState = void>(
+  options: ChallengeCategoryOptions<Def, DefState>,
+): ChallengeCategory<Def, DefState> {
   const {
     id: categoryId,
     overrideRegistry,
@@ -416,7 +416,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     }
   }
 
-  const base: CategoryBase<Def, Challenge, State> = createCategoryBase({
+  const base: CategoryBase<Def, Challenge, DefState> = createCategoryBase({
     id: categoryId,
     buildInstance(def: Def): Challenge {
       if (def.completionEffects?.length && !(accessor && mutator)) {
@@ -584,7 +584,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     return all.length > 0 && all.every((e) => e.instance.maxed.value);
   });
 
-  const category: ChallengeCategory<Def, State> = {
+  const category: ChallengeCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
     register: base.register,
@@ -594,11 +594,11 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       return base.getEntry(id)?.instance;
     },
 
-    getState(id: string): State | undefined {
+    getState(id: string): DefState | undefined {
       return base.getEntry(id)?.state;
     },
 
-    getEntry(id: string): ChallengeCategoryEntry<Def, State> | undefined {
+    getEntry(id: string): ChallengeCategoryEntry<Def, DefState> | undefined {
       const entry = base.getEntry(id);
       if (!entry) return undefined;
       return {
@@ -609,7 +609,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       };
     },
 
-    getAll(): ChallengeCategoryEntry<Def, State>[] {
+    getAll(): ChallengeCategoryEntry<Def, DefState>[] {
       return base.getAll().map((e) => ({
         def: e.def,
         challenge: e.instance,

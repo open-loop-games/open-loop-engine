@@ -32,19 +32,19 @@ import { getNested, setNested } from './save-migrations';
  * Note: Decimals aren't directly allowed because we need to know to parse them back.
  * DecimalSources (string/number) are allowed because they're valid Decimal inputs.
  */
-export type State =
+export type Serializable =
   | string
   | number
   | boolean
   | DecimalSource
   | null
   | undefined
-  | State[]
-  | { [key: string]: State }
-  | { [key: number]: State };
+  | Serializable[]
+  | { [key: string]: Serializable }
+  | { [key: number]: Serializable };
 
 /** Primitive subset of State for use in conditional type branches */
-export type StatePrimitive = string | number | boolean | null | undefined;
+export type SerializablePrimitive = string | number | boolean | null | undefined;
 
 /**
  * Compile-time constraint that validates T is serializable without requiring
@@ -60,18 +60,18 @@ export type StatePrimitive = string | number | boolean | null | undefined;
  * opaque state the consumer vouches for; save validation still checks it at
  * load.
  */
-export type StateConstraint<T> = unknown extends T
+export type SerializableConstraint<T> = unknown extends T
   ? T
-  : T extends StatePrimitive
+  : T extends SerializablePrimitive
     ? T
     : T extends DecimalSource
       ? T
       : T extends readonly (infer U)[]
-        ? readonly StateConstraint<U>[]
+        ? readonly SerializableConstraint<U>[]
         : T extends (...args: never[]) => unknown
           ? never
           : T extends object
-            ? { [K in keyof T]: StateConstraint<T[K]> }
+            ? { [K in keyof T]: SerializableConstraint<T[K]> }
             : never;
 
 // === SYMBOLS ===
@@ -130,7 +130,7 @@ export const Lifetime = Symbol('Lifetime');
  * A ref that is automatically saved and loaded.
  * Includes metadata for debugging and save management.
  */
-export type Persistent<T = State> = Ref<T> & {
+export type Persistent<T = Serializable> = Ref<T> & {
   readonly [PersistentState]: Ref<T>;
   readonly [DefaultValue]: T;
   readonly [StackTrace]: string;
@@ -148,7 +148,7 @@ export type Persistent<T = State> = Ref<T> & {
  * A computed ref that reads/writes to a persistent ref.
  * Used to pass values without duplicating in save data.
  */
-export type PersistentAlias<T = State> = WritableComputedRef<T> & {
+export type PersistentAlias<T = Serializable> = WritableComputedRef<T> & {
   readonly [DefaultValue]: T;
 };
 
@@ -582,10 +582,10 @@ export interface PersistentOptions<T = unknown> {
 /**
  * Resolves to `Ok` when `T` is serializable state and to `never` otherwise, so
  * a parameter typed through it rejects a non-state value at the call. Checking
- * here instead of intersecting the value parameter with {@link StateConstraint}
+ * here instead of intersecting the value parameter with {@link SerializableConstraint}
  * lets a literal default widen: `persistent(0)` is a `Persistent<number>`.
  */
-export type IfState<T, Ok> = [T] extends [StateConstraint<T>] ? Ok : never;
+export type IfSerializable<T, Ok> = [T] extends [SerializableConstraint<T>] ? Ok : never;
 
 /**
  * Create a persistent ref that will be saved/loaded automatically.
@@ -595,7 +595,7 @@ export type IfState<T, Ok> = [T] extends [StateConstraint<T>] ? Ok : never;
  */
 export function persistent<T>(
   defaultValue: T | Ref<T>,
-  ...[options = {}]: IfState<T, [options?: PersistentOptions<T>]>
+  ...[options = {}]: IfSerializable<T, [options?: PersistentOptions<T>]>
 ): Persistent<T> {
   const { checkNaN = true, schema, decimal = false, lifetime = false } = options;
   const persistentState: Ref<T> = isRef(defaultValue)
@@ -1214,7 +1214,7 @@ export function deserializePersistents(
         // Rehydrate Decimals the serializer flattened to strings — top level and
         // nested alike, guided by the ref's declared default shape.
         const revived = reviveValue(current, persistentRef[DefaultValue]);
-        persistentRef[PersistentState].value = revived as State;
+        persistentRef[PersistentState].value = revived as Serializable;
       } else {
         // Reset to default if not in save
         resetPersistent(persistentRef);

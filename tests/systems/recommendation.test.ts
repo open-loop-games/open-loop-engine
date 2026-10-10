@@ -224,7 +224,7 @@ describe('createRecommendationSystem', () => {
       bestOf,
       getCurrentSnapshot: () => ({ loadout: 'fire' }),
       applySnapshot: () => {},
-      getState: () => ({ goal: 'gold' }),
+      getGameState: () => ({ goal: 'gold' }),
       defs: [
         makeStrategy({
           id: 'spy',
@@ -239,7 +239,7 @@ describe('createRecommendationSystem', () => {
     recs.evaluate();
     expect(capturedCtx).not.toBeNull();
     expect(capturedCtx!.currentSnapshot).toEqual({ loadout: 'fire' });
-    expect(capturedCtx!.state).toEqual({ goal: 'gold' });
+    expect(capturedCtx!.gameState).toEqual({ goal: 'gold' });
     expect(capturedCtx!.cycleLog).toBe(cycleLog);
     expect(capturedCtx!.bestOf).toBe(bestOf);
     expect(capturedCtx!.cycle).toBe(cycle);
@@ -260,7 +260,7 @@ describe('createRecommendationSystem', () => {
         makeStrategy({
           id: 'spy',
           canApply: (ctx) => {
-            capturedState = ctx.state;
+            capturedState = ctx.gameState;
             return true;
           },
         }),

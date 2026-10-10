@@ -11,7 +11,7 @@ import { computed, ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { Computable } from '@/core/computed';
-import { processGetter, resolveComputable } from '@/core/computed';
+import { toMaybeRef, resolveComputable } from '@/core/computed';
 import type { AdditiveModifierOptions } from '@/core/modifier';
 
 describe('Computable type variance', () => {
@@ -42,8 +42,8 @@ describe('Computable type variance', () => {
     expect(opts.addend).toBe(addend);
   });
 
-  it('processGetter wraps getters and returns MaybeRef', () => {
-    const result = processGetter<DecimalSource>(() => new Decimal(5));
+  it('toMaybeRef wraps getters and returns MaybeRef', () => {
+    const result = toMaybeRef<DecimalSource>(() => new Decimal(5));
     // Should be a ComputedRef (which is a MaybeRef)
     expect(typeof result).toBe('object');
     expect('value' in (result as object)).toBe(true);

@@ -27,10 +27,10 @@ import {
   loadingSave,
   getCurrentPersistentContext,
   withPersistentContext,
-  type IfState,
+  type IfSerializable,
   type Persistent,
   type PersistentOptions,
-  type StateConstraint,
+  type SerializableConstraint,
   PersistentAlias,
   DefaultValue,
   resetPersistent,
@@ -168,7 +168,7 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
  */
 export function createResource<T>(
   defaultValue: T,
-  options: IfState<T, PersistentResourceOptions>,
+  options: IfSerializable<T, PersistentResourceOptions>,
 ): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T> };
 
 export function createResource<T>(
@@ -186,7 +186,7 @@ export function createResource<T>(
  * @internal Used by createInventory.
  */
 export function createPersistentContextScopedResource<T>(
-  defaultValue: T & StateConstraint<T>,
+  defaultValue: T & SerializableConstraint<T>,
   options: PersistentResourceOptions,
   saveName: string,
 ): Resource<T> & Persistent<T> {
@@ -261,7 +261,7 @@ function buildResource<T>(
     // it — so round-trips survive field reorders inside a context. The
     // non-persistent wrapper carries the same metadata.
     const metadata = { id, displayName, precision, small };
-    // The public overload checked `T` against IfState; a generic body can't
+    // The public overload checked `T` against IfSerializable; a generic body can't
     // resolve that check, so the call goes through the unchecked shape.
     const persistentResource = (persistent as (d: T, o: PersistentOptions<T>) => Persistent<T>)(
       defaultValue,

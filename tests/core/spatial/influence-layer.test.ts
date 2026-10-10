@@ -6,7 +6,7 @@ import {
   linearFalloff,
   gaussianFalloff,
   exponentialFalloff,
-  type InfluenceLayerReader,
+  type InfluenceLayerView,
 } from '@/core/spatial';
 
 const numericGrid = (width: number, height: number) =>
@@ -376,7 +376,7 @@ describe('InfluenceLayer — events', () => {
   });
 });
 
-describe('InfluenceLayerReader — sum / peak / cells / at', () => {
+describe('InfluenceLayerView — sum / peak / cells / at', () => {
   it('at() returns 0 out of bounds', () => {
     const grid = numericGrid(3, 3);
     const layer = createInfluenceLayer(grid, {
@@ -487,7 +487,7 @@ describe('composeInfluenceLayers', () => {
     layer.update();
     const composed = composeInfluenceLayers([layer.read()], (vs) => vs[0]);
     // sum over a box that extends past the grid boundary.
-    const reader: InfluenceLayerReader = composed;
+    const reader: InfluenceLayerView = composed;
     const totalInside = layer.read().sum(1, 1, 1);
     expect(reader.sum(1, 1, 1)).toBeCloseTo(totalInside);
     const peak = reader.peak(1, 1, 1);

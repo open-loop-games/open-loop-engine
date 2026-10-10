@@ -22,8 +22,8 @@ shared generic type utilities, dev-mode helpers and effect-scope ownership
 
 - `type Computable<T> = T | Readonly<Ref<T>> | (() => T)` — A reactive input that may be a direct value, a Vue ref/computed, or a getter function. `src/core/computed.ts:20`
 - `type MaybeGetter<T> = T | (() => T)` — A value that may be a direct value or a getter function (no refs). `src/core/computed.ts:25`
-- `function processGetter<T>(obj: Computable<T>): MaybeRef<T>` — Process a value that may be a getter function. `src/core/computed.ts:63`
 - `function resolveComputable<T>(value: Computable<T>): T` — Unwrap a Computable to its current value in a single step. `src/core/computed.ts:36`
+- `function toMaybeRef<T>(obj: Computable<T>): MaybeRef<T>` — Process a value that may be a getter function. `src/core/computed.ts:63`
 
 ## Effects
 
@@ -108,7 +108,7 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:108`
 - `type Predicate = Computable<boolean> | Gate` — A yes/no condition in any authoring form: a constant, a ref or getter over state in scope, or a Gate the engine can introspect and predict. `src/core/gate.ts:138`
 - `interface ResourceGteGate` — True when `accessor.getAmount(resource) >= value`. `src/core/gate.ts:21`
-- `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:70`
+- `interface StateGate` — True when the comparison `accessor.getStateAt(key) <op> value` holds. `src/core/gate.ts:70`
 - `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:382`
 - `function assertGateServices(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle evaluating `gate` will read. `src/systems/gate.ts:368`
 - `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:505`

@@ -23,7 +23,7 @@
 import { PersistentAlias } from '../persistence';
 import { Decimal, format, toNumber } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
-import { processGetter, type Computable } from '../computed';
+import { toMaybeRef, type Computable } from '../computed';
 import { unref, type MaybeRef } from 'vue';
 import * as ops from './operations';
 import {
@@ -1065,7 +1065,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     formulaModifier: (value: GenericFormula) => GenericFormula,
   ) {
     const formula = formulaModifier(Formula.variable(0));
-    const processedStart = processGetter(start);
+    const processedStart = toMaybeRef(start);
     function evalStep(lhs: DecimalSource) {
       if (Decimal.lt(lhs, unref(processedStart))) return lhs;
       return Decimal.add(
@@ -1125,7 +1125,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     // evaluation mutate state it reads, leaving every computed over it dirty.
     const formula = formulaModifier(Formula.variable(0));
     const elseFormula = elseFormulaModifier?.(Formula.variable(0));
-    const processedCondition = processGetter(condition);
+    const processedCondition = toMaybeRef(condition);
     const live = () => (unref(processedCondition) ? formula : elseFormula);
     function evalStep(lhs: DecimalSource) {
       return live()?.evaluate(lhs) ?? lhs;

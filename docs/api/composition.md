@@ -12,11 +12,11 @@ Substrate the content systems compose against. `CategoryBase` + `ContentRegistry
 
 shared skeleton for batch-registration categories
 
-- `interface CategoryBase<Def extends { id: string; }, Instance, State = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:114`
-- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, State = void>` `src/systems/category-base.ts:80`
-- `interface CategoryEntry<Def extends { id: string; }, Instance, State = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:72`
+- `interface CategoryBase<Def extends { id: string; }, Instance, DefState = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:114`
+- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, DefState = void>` `src/systems/category-base.ts:80`
+- `interface CategoryEntry<Def extends { id: string; }, Instance, DefState = void>` — A registered entry in a category: definition + instance + optional state + optional signals. `src/systems/category-base.ts:72`
 - `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:55`
-- `function createCategoryBase<Def extends { id: string; }, Instance, State = void>(options: CategoryBaseOptions<Def, Instance, State>): CategoryBase<Def, Instance, State>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:173`
+- `function createCategoryBase<Def extends { id: string; }, Instance, DefState = void>(options: CategoryBaseOptions<Def, Instance, DefState>): CategoryBase<Def, Instance, DefState>` — Create the shared category base — registry + entry map + persistent context. `src/systems/category-base.ts:173`
 
 ## Content Registry
 

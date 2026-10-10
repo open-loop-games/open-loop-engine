@@ -20,7 +20,7 @@
 
 import { ref, unref, type Ref } from 'vue';
 import { Decimal } from '@/primitives/decimal';
-import { processGetter, type Computable } from '@/core/computed';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import {
   Lifetime,
   SkipPersistence,
@@ -271,7 +271,7 @@ export function createReset(options: ResetOptions): Reset {
   const { thingsToReset, resetPersistentContexts, keep, retain, canReset, onBeforeReset, onReset } =
     options;
 
-  const processedThingsToReset = thingsToReset != null ? processGetter(thingsToReset) : undefined;
+  const processedThingsToReset = thingsToReset != null ? toMaybeRef(thingsToReset) : undefined;
   const handle = createEmitHandle<ResetEvents>();
 
   // Adopted now — reset() fires post-install, when the ambient runtime is no
