@@ -25,7 +25,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import {
   persistent,
   loadingSave,
-  getCurrentContext,
+  getCurrentPersistentContext,
   withPersistentContext,
   type IfState,
   type Persistent,
@@ -185,7 +185,7 @@ export function createResource<T>(
  *
  * @internal Used by createInventory.
  */
-export function createContextScopedResource<T>(
+export function createPersistentContextScopedResource<T>(
   defaultValue: T & StateConstraint<T>,
   options: PersistentResourceOptions,
   saveName: string,
@@ -238,7 +238,7 @@ function buildResource<T>(
   // registry registration at the end. The two sites both need to know
   // whether we're inside an engine namespace; nothing between them changes
   // the ambient context.
-  const parentContext = getCurrentContext();
+  const parentContext = getCurrentPersistentContext();
 
   let resource: Partial<Resource<T>>;
   if (isRef(defaultValue)) {
@@ -285,7 +285,7 @@ function buildResource<T>(
       withPersistentContext(`${parentContext}::${name}`, () => {
         const initial = defaultValue as DecimalSource;
         // `lifetime: true` so module-scoped resets pass over these trackers.
-        // Without the flag, a `createReset({ resetModules: [moduleId] })`
+        // Without the flag, a `createReset({ resetPersistentContexts: [moduleId] })`
         // would zero `cumulative` / `best` even when the underlying resource
         // was kept via `keep:[resource]`, contradicting the "full life"
         // semantic these refs advertise. To wipe lifetime stats on a hard
@@ -338,7 +338,7 @@ function buildResource<T>(
   // registration — the primitive still works, just isn't discoverable.
   getCurrentResourceRegistry()?.register({
     resource: resource as Resource,
-    context: parentContext,
+    persistentContextId: parentContext,
   });
 
   return resource as Resource<T>;

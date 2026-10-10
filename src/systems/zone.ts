@@ -36,10 +36,10 @@ import {
   persistent,
   type Persistent,
   withPersistentContext,
-  resolveSystemContextId,
+  resolveSystemPersistentContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { createContentRegistry, type ContentRegistry } from './content-registry';
 
 // === TYPES ===
@@ -154,7 +154,7 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     initiallyUnlocked ?? (initialZones.length > 0 ? [initialZones[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = resolveSystemContextId(id, 'zone');
+  const contextId = resolveSystemPersistentContextId(id, 'zone');
   const { unlocked, current } = withPersistentContext(contextId, () => ({
     unlocked: persistent<string[]>([...defaultUnlocked], { name: 'unlocked' }),
     current: persistent<string>(defaultUnlocked[0] ?? '', { name: 'current' }),
@@ -204,5 +204,5 @@ export function createZoneSystem(options: ZoneSystemOptions = {}): ZoneSystem {
     on: handle.on,
   };
 
-  return attachContextReset(zoneSystem, contextId);
+  return attachPersistentContextReset(zoneSystem, contextId);
 }

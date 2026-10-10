@@ -23,12 +23,12 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from './computed';
 import {
   deletePersistent,
-  getCurrentContext,
+  getCurrentPersistentContext,
   persistent,
   withPersistentContext,
   type Persistent,
 } from './persistence';
-import { attachContextReset } from './resettable';
+import { attachPersistentContextReset } from './resettable';
 import type { RegisterTick } from './sequencer';
 
 // === TYPES ===
@@ -132,7 +132,7 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
   // ambient win — N parallel trackers built inside one module's install() share
   // an ambient context, and collapsing them onto it collides their 'progress'
   // refs. Mirrors category-base's `${parent}/${local}` nesting.
-  const parent = getCurrentContext();
+  const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/${id}` : id;
   return withPersistentContext(contextId, (): TimedProgressState => ({
     progress: persistent<DecimalSource>(0, { name: 'progress' }),
@@ -303,7 +303,7 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
   };
   return state.contextId === undefined
     ? timedProgress
-    : attachContextReset(timedProgress, state.contextId);
+    : attachPersistentContextReset(timedProgress, state.contextId);
 }
 
 // === UTILITIES ===

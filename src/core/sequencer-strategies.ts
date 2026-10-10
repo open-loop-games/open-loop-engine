@@ -25,7 +25,7 @@
  */
 
 import { persistent, withPersistentContext } from './persistence';
-import { attachContextReset } from './resettable';
+import { attachPersistentContextReset } from './resettable';
 import type { FillStrategy, SequencerItem } from './sequencer';
 
 // === CONDITIONAL STRATEGY ===
@@ -135,7 +135,7 @@ export function createRoundRobinStrategy<M = void>(
       return item;
     },
   };
-  return attachContextReset(strategy, contextId);
+  return attachPersistentContextReset(strategy, contextId);
 }
 
 // === COMPOSITE STRATEGY ===

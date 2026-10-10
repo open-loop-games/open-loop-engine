@@ -257,12 +257,12 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     deserializePersistents(getAllPersistentRefs(), midChallenge);
     deserializePersistents(getAllPersistentRefs(), midChallenge);
 
-    expect(rules.scopeDepth).toBe(1);
+    expect(rules.overrideDepth).toBe(1);
     expect(log).toEqual([]);
   });
 
   it("an entry reset over the category's own module keeps the challenge entered", () => {
-    const { combat, zombie, log } = build(createReset({ resetModules: ['m'] }));
+    const { combat, zombie, log } = build(createReset({ resetPersistentContexts: ['m'] }));
 
     expect(zombie.enter()).toBe(true);
 

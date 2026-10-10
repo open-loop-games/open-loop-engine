@@ -188,7 +188,7 @@ describe('createRetentionPolicy', () => {
     endPersistentContext();
 
     createReset({
-      resetModules: ['ret-number'],
+      resetPersistentContexts: ['ret-number'],
       retain: new Map([[level, fractional(0.5)]]),
     }).reset();
 

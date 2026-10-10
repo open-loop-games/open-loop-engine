@@ -46,7 +46,7 @@ describe('engine-scoped resource registry', () => {
     engine.start();
 
     const registry = engine.tryInject(ResourceRegistryKey)!;
-    expect(registry.list()[0]!.context).toBe('gold-mod');
+    expect(registry.list()[0]!.persistentContextId).toBe('gold-mod');
 
     engine.stop();
   });
@@ -134,7 +134,10 @@ describe('engine-scoped resource registry', () => {
 
     const registry = engine.tryInject(ResourceRegistryKey)!;
     const held = registry.list();
-    registry.register({ resource: createResource(0, { id: 'gems' }), context: undefined });
+    registry.register({
+      resource: createResource(0, { id: 'gems' }),
+      persistentContextId: undefined,
+    });
     expect(held.map((e) => e.resource.id)).toEqual(['gold']);
 
     engine.stop();

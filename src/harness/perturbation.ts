@@ -23,7 +23,7 @@
  *
  * - **Tunable entries** (`kind: 'tunable'`) — registry scope push:
  *   capture the current resolved value at apply time, then
- *   `registry.pushScope('perturbation', { [key]: () => transformed })`.
+ *   `registry.pushOverrides('perturbation', { [key]: () => transformed })`.
  *   Cleanup is the scope's idempotent cleanup function. Registry lookup
  *   happens at apply time via `engine.tryInject(TuningRegistriesKey)` — the
  *   entry carries `registryName: string`, not a registry reference, so
@@ -142,7 +142,7 @@ function applyTunablePerturbation(
       ? Decimal.times(baseline, perturbation.factor)
       : Decimal.add(baseline, perturbation.delta);
 
-  return registry.pushScope('perturbation', { [entry.key]: () => transformed });
+  return registry.pushOverrides('perturbation', { [entry.key]: () => transformed });
 }
 
 function applyModifierPerturbation(

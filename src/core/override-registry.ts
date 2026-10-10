@@ -27,10 +27,10 @@
  * for non-tuning function substitution.
  *
  * Resolution order: scope stack top-down → base map. Multiple scopes can
- * stack — each pushScope returns an independent cleanup function. Cleanup
+ * stack — each pushOverrides returns an independent cleanup function. Cleanup
  * is idempotent.
  *
- * `scopeVersion` is a reactive `Ref<number>` that bumps whenever a
+ * `overrideVersion` is a reactive `Ref<number>` that bumps whenever a
  * resolution can change: every push and cleanup, every `override`, and a
  * `setDefault` that registers a new key. Read it from inside a Vue
  * `computed` to make the computed re-evaluate on those changes. Paired
@@ -47,7 +47,7 @@
  * combat.setDefault('getSelfCombat', () => 42);
  * combat.override('getSelfCombat', () => 99);        // permanent mod override
  *
- * const cleanup = combat.pushScope('challenge:zombie', {
+ * const cleanup = combat.pushOverrides('challenge:zombie', {
  *   getSelfCombat: () => 0,                          // scoped override
  * });
  * combat.get('getSelfCombat')();  // 0
@@ -68,7 +68,7 @@ import type { InjectionKey } from '../primitives/types';
 
 // === TYPES ===
 /** A scope pushed onto the override stack */
-interface Scope<T> {
+interface ScopedOverrides<T> {
   readonly label: string;
   readonly overrides: Partial<T>;
 }
@@ -121,10 +121,10 @@ export interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[])
    * @param label - Human-readable label for debugging (e.g., "challenge:zombie")
    * @param overrides - Partial map of keys to override while this scope is active
    */
-  pushScope(label: string, overrides: Partial<T>): () => void;
+  pushOverrides(label: string, overrides: Partial<T>): () => void;
 
   /** Number of active scopes on the stack */
-  readonly scopeDepth: number;
+  readonly overrideDepth: number;
 
   /**
    * Reactive version counter — bumps whenever a key's resolution can change:
@@ -133,7 +133,7 @@ export interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[])
    * a `computed` to make it re-evaluate on those changes. Paired with
    * {@link tunable} for the sim-tunable-values pattern.
    */
-  readonly scopeVersion: Ref<number>;
+  readonly overrideVersion: Ref<number>;
 }
 
 /**
@@ -161,7 +161,7 @@ export const TuningRegistriesKey = Symbol('engine:tuning-registries') as Injecti
 
 // === FACTORY ===
 /** Whether a scope supplies its own, defined entry for `key`. */
-function overridesKey<T>(scope: Scope<T>, key: keyof T & string): boolean {
+function overridesKey<T>(scope: ScopedOverrides<T>, key: keyof T & string): boolean {
   return Object.hasOwn(scope.overrides, key) && scope.overrides[key] !== undefined;
 }
 
@@ -174,28 +174,28 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
   name: string,
 ): OverrideRegistry<T> {
   const base = new Map<string, (...args: never[]) => unknown>();
-  const scopes: Scope<T>[] = [];
-  const scopeVersion = ref(0);
+  const scopedOverrides: ScopedOverrides<T>[] = [];
+  const overrideVersion = ref(0);
 
   return {
     name,
-    scopeVersion,
+    overrideVersion,
     setDefault<K extends keyof T & string>(key: K, fn: T[K]): void {
       if (!base.has(key)) {
         base.set(key, fn);
-        scopeVersion.value++;
+        overrideVersion.value++;
       }
     },
 
     override<K extends keyof T & string>(key: K, fn: T[K]): void {
       base.set(key, fn);
-      scopeVersion.value++;
+      overrideVersion.value++;
     },
 
     get<K extends keyof T & string>(key: K): T[K] {
       // Walk scopes top-down
-      for (let i = scopes.length - 1; i >= 0; i--) {
-        const scope = scopes[i];
+      for (let i = scopedOverrides.length - 1; i >= 0; i--) {
+        const scope = scopedOverrides[i];
         if (overridesKey(scope, key)) return scope.overrides[key] as T[K];
       }
 
@@ -207,8 +207,8 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
     },
 
     has(key: keyof T & string): boolean {
-      for (let i = scopes.length - 1; i >= 0; i--) {
-        if (overridesKey(scopes[i], key)) return true;
+      for (let i = scopedOverrides.length - 1; i >= 0; i--) {
+        if (overridesKey(scopedOverrides[i], key)) return true;
       }
       return base.has(key);
     },
@@ -217,22 +217,22 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
       return Array.from(base.keys());
     },
 
-    pushScope(label: string, overrides: Partial<T>): () => void {
-      const scope: Scope<T> = { label, overrides };
-      scopes.push(scope);
-      scopeVersion.value++;
+    pushOverrides(label: string, overrides: Partial<T>): () => void {
+      const scope: ScopedOverrides<T> = { label, overrides };
+      scopedOverrides.push(scope);
+      overrideVersion.value++;
 
       return () => {
-        const idx = scopes.indexOf(scope);
+        const idx = scopedOverrides.indexOf(scope);
         if (idx === -1) return;
-        scopes.splice(idx, 1);
-        scopeVersion.value++;
+        scopedOverrides.splice(idx, 1);
+        overrideVersion.value++;
       };
     },
 
-    get scopeDepth(): number {
-      void scopeVersion.value;
-      return scopes.length;
+    get overrideDepth(): number {
+      void overrideVersion.value;
+      return scopedOverrides.length;
     },
   };
 }
@@ -391,7 +391,7 @@ type Widen<R> = R extends number
  * );
  *
  * // Later, from a sim takeover UI:
- * const restore = tuning.pushScope('sim-takeover', {
+ * const restore = tuning.pushOverrides('sim-takeover', {
  *   'upgrades/double-gold/effect': () => 9999,
  * });
  * // effect.value is now 9999; Vue re-renders dependents automatically.
@@ -408,7 +408,7 @@ export function tunable<
   return computed(() => {
     // Register a reactive dep on the registry so push/cleanup/override retriggers.
     // The default fn's own reads register deps on the underlying state.
-    void registry.scopeVersion.value;
+    void registry.overrideVersion.value;
     return (registry.get(key) as () => Widen<ReturnType<F>>)();
   });
 }

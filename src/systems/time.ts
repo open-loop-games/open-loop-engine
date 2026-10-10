@@ -12,8 +12,12 @@
 
 import { ref } from 'vue';
 import type { Ref } from 'vue';
-import { persistent, resolveSystemContextId, withPersistentContext } from '@/core/persistence';
-import { attachContextReset } from '@/core/resettable';
+import {
+  persistent,
+  resolveSystemPersistentContextId,
+  withPersistentContext,
+} from '@/core/persistence';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { formatTime } from '@/primitives/decimal';
 
 // === TYPES ===
@@ -76,7 +80,7 @@ export interface TimeSystem {
  * ```
  */
 export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
-  const contextId = resolveSystemContextId(config.id, 'time');
+  const contextId = resolveSystemPersistentContextId(config.id, 'time');
   const { elapsed, totalPlayTime } = withPersistentContext(contextId, () => ({
     elapsed: persistent(0, { name: 'elapsed' }),
     totalPlayTime: persistent(0, { name: 'totalPlayTime', lifetime: true }),
@@ -98,5 +102,5 @@ export function createTimeSystem(config: TimeSystemConfig = {}): TimeSystem {
       return formatTime(totalPlayTime.value);
     },
   };
-  return attachContextReset(time, contextId);
+  return attachPersistentContextReset(time, contextId);
 }

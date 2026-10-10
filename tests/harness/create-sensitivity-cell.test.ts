@@ -78,7 +78,7 @@ describe('createEngineFromSave', () => {
     const engine = createEngineFromSave({
       saveBlob: makeLiveSave(21),
       modules: [withHook],
-      namespace: 'from-save-onload',
+      persistenceNamespace: 'from-save-onload',
     });
     expect(derived).toBe(42);
     engine.dispose();
@@ -92,7 +92,7 @@ describe('createEngineFromSave', () => {
       createEngineFromSave({
         saveBlob: corrupt,
         modules: [makeGoldModule(0).mod],
-        namespace: 'from-save-retry',
+        persistenceNamespace: 'from-save-retry',
       }),
     ).toThrow(/failed to import/);
 
@@ -100,7 +100,7 @@ describe('createEngineFromSave', () => {
     const engine = createEngineFromSave({
       saveBlob: good,
       modules: [mod],
-      namespace: 'from-save-retry',
+      persistenceNamespace: 'from-save-retry',
     });
     expect(refs.gold!.value).toBe(7);
     engine.dispose();

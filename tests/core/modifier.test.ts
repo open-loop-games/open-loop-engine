@@ -363,7 +363,7 @@ describe('chain.bind', () => {
     const recs = chain.bindings();
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toBe('category/item/Upgrade');
-    expect(recs[0].scope).toBe('category/item');
+    expect(recs[0].persistentContextId).toBe('category/item');
   });
 
   it('gates evaluation on the active predicate, synchronously', () => {
@@ -443,7 +443,7 @@ describe('chain.bind', () => {
       const recs = chain.bindings();
       expect(recs).toHaveLength(1);
       expect(recs[0].id).toBe('Rogue');
-      expect(recs[0].scope).toBeUndefined();
+      expect(recs[0].persistentContextId).toBeUndefined();
     } finally {
       warn.mockRestore();
     }

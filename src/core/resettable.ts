@@ -9,7 +9,7 @@
  * of it and never a resource or ref it only names.
  */
 
-import { bindPersistenceNamespace, getModulePersistentRefs } from './persistence';
+import { bindPersistenceNamespace, getPersistentContextRefs } from './persistence';
 
 /**
  * Symbol key for the Resettable protocol. Objects that implement this
@@ -37,11 +37,11 @@ export interface ResettableObject {
  *
  * @internal
  */
-export function attachContextReset<T extends object>(
+export function attachPersistentContextReset<T extends object>(
   target: T,
   contextId: string,
 ): T & ResettableObject {
   return Object.assign(target, {
-    [Resettable]: bindPersistenceNamespace(() => getModulePersistentRefs(contextId)),
+    [Resettable]: bindPersistenceNamespace(() => getPersistentContextRefs(contextId)),
   });
 }

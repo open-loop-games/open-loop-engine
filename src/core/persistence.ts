@@ -293,7 +293,7 @@ const refContextId: WeakMap<Persistent<any>, string> = new WeakMap();
 
 /** Parent→child context relationships. When a context is pushed while another
  * is already on the stack, the new context becomes a child of the current top.
- * Used by {@link getModulePersistentRefs} to walk all refs owned by a module. */
+ * Used by {@link getPersistentContextRefs} to walk all refs owned by a module. */
 const contextChildren: Record<string, Set<string>> = {};
 
 /**
@@ -491,12 +491,12 @@ function stripNamespace(fullId: string): string {
  * against module/category ids stays stable regardless of which engine
  * instance the context was opened under.
  */
-export function getCurrentContext(): string | undefined {
+export function getCurrentPersistentContext(): string | undefined {
   const top = addingContexts[addingContexts.length - 1];
   return top === undefined ? undefined : stripNamespace(top);
 }
 
-/** Per-kind counters behind {@link resolveSystemContextId}'s fallback. */
+/** Per-kind counters behind {@link resolveSystemPersistentContextId}'s fallback. */
 const systemFallbackCounts = new Map<string, number>();
 
 /**
@@ -508,9 +508,9 @@ const systemFallbackCounts = new Map<string, number>();
  *
  * @internal
  */
-export function resolveSystemContextId(id: string | undefined, kind: string): string {
+export function resolveSystemPersistentContextId(id: string | undefined, kind: string): string {
   if (id !== undefined) return id;
-  const ambient = getCurrentContext();
+  const ambient = getCurrentPersistentContext();
   if (ambient !== undefined) return `${ambient}/${kind}`;
   const n = systemFallbackCounts.get(kind) ?? 0;
   systemFallbackCounts.set(kind, n + 1);
@@ -522,9 +522,9 @@ export function resolveSystemContextId(id: string | undefined, kind: string): st
  * Ref creation and lookup-by-ref must use this so they land in the right
  * namespace bucket. Also used by attribution surfaces (e.g. chain bindings)
  * that want a globally-unique scope id rather than the namespace-stripped
- * {@link getCurrentContext} value.
+ * {@link getCurrentPersistentContext} value.
  */
-export function getCurrentFullContext(): string | undefined {
+export function getCurrentFullPersistentContext(): string | undefined {
   return addingContexts[addingContexts.length - 1];
 }
 
@@ -560,7 +560,7 @@ export interface PersistentOptions<T = unknown> {
   /**
    * Mark the ref as lifetime: state that outlives a run, such as cumulative
    * gain, a high-water mark or a lifetime counter. Only a reset that names
-   * the ref itself writes it. A `resetModules` scope drops it, even with no
+   * the ref itself writes it. A `resetPersistentContexts` scope drops it, even with no
    * `keep:` entry, and a `thingsToReset` walk passes over it inside any
    * object or category it walks. Save, load and `engine.dispose()` ignore
    * the flag.
@@ -658,7 +658,7 @@ export function persistent<T>(
   } as unknown as Persistent<T>;
 
   // Track in current context if there is one
-  const currentContext = getCurrentFullContext();
+  const currentContext = getCurrentFullPersistentContext();
   if (currentContext) {
     persistentRefs[currentContext].add(persistent);
     refContextId.set(persistent, currentContext);
@@ -894,13 +894,13 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
  * Unlike {@link getPersistentRefs} which returns only refs in one context,
  * this walks the parent→child context tree rooted at `moduleId` and collects
  * every non-lifetime ref reachable from that root. Used by the reset system
- * to resolve `resetModules` scope.
+ * to resolve `resetPersistentContexts` scope.
  *
- * @param moduleId - The raw context id (typically the module's `id` field)
+ * @param contextId - The raw context id (typically the module's `id` field)
  */
-export function getModulePersistentRefs(moduleId: string): Set<Persistent> {
+export function getPersistentContextRefs(contextId: string): Set<Persistent> {
   const result = new Set<Persistent>();
-  for (const r of walkContextTree(moduleId)) {
+  for (const r of walkContextTree(contextId)) {
     if (!r[Lifetime]) result.add(r);
   }
   return result;
@@ -971,8 +971,8 @@ export function resetAllPersistentContexts(): void {
  * id. Callers (typically a disposed engine being garbage-collected) must drop
  * external references for the refs themselves to be reclaimed.
  */
-export function clearPersistentNamespace(namespace?: string): void {
-  const wantNs = namespace ?? '';
+export function deletePersistenceNamespace(persistenceNamespace?: string): void {
+  const wantNs = persistenceNamespace ?? '';
   const cleared: string[] = [];
   for (const [fullId, ns] of Object.entries(contextNamespaces)) {
     if (ns === wantNs) cleared.push(fullId);
@@ -984,7 +984,7 @@ export function clearPersistentNamespace(namespace?: string): void {
     unnamedWarnedContexts.delete(fullId);
   }
   // Surviving contexts (different namespace) may still list cleared ids in
-  // their child set; drop those edges so getModulePersistentRefs doesn't
+  // their child set; drop those edges so getPersistentContextRefs doesn't
   // walk into deleted entries.
   for (const children of Object.values(contextChildren)) {
     for (const fullId of cleared) children.delete(fullId);
@@ -1092,7 +1092,7 @@ const unnamedWarnedContexts: Set<string> = new Set();
  *
  * Used by the save manager to serialize/deserialize all game state.
  *
- * @param namespace - When provided, only walks contexts that were opened
+ * @param persistenceNamespace - When provided, only walks contexts that were opened
  *   under {@link withPersistenceNamespace} with the same namespace. When
  *   omitted, walks only unnamespaced (default) contexts. This lets two
  *   engines sharing a runtime each see only their own refs.
@@ -1101,10 +1101,10 @@ const unnamedWarnedContexts: Set<string> = new Set();
  *   have the namespace prefix stripped so envelope data is portable across
  *   engines with different namespaces.
  */
-export function getAllPersistentRefs(namespace?: string): Map<string, Persistent> {
+export function getAllPersistentRefs(persistenceNamespace?: string): Map<string, Persistent> {
   const result = new Map<string, Persistent>();
   const dev = isDev();
-  const wantNs = namespace ?? '';
+  const wantNs = persistenceNamespace ?? '';
   for (const [fullId, refs] of Object.entries(persistentRefs)) {
     if ((contextNamespaces[fullId] ?? '') !== wantNs) continue;
     const contextId = stripNamespace(fullId);

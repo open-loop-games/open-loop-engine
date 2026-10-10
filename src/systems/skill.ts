@@ -37,7 +37,7 @@
 import { computed, watch, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import {
-  getCurrentContext,
+  getCurrentPersistentContext,
   persistent,
   type Persistent,
   withPersistentContext,
@@ -49,7 +49,7 @@ import {
   type ModifierChain,
 } from '@/core/modifier';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { processGetter, type Computable } from '@/core/computed';
 import { toFormula } from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
@@ -225,7 +225,7 @@ function buildSkillState(
   xp: Persistent<DecimalSource>;
   permanentBonus: Persistent<DecimalSource> | null;
 } {
-  const parent = getCurrentContext();
+  const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
   return withPersistentContext(contextId, () => ({
     contextId,
@@ -387,7 +387,7 @@ export function createSkill(options: SkillOptions): Skill {
   // Namespace the gain chain id by the enclosing context (when present)
   // so two categories sharing a skill id don't collide on the ChainRegistry.
   // Same posture as `buildSkillState` above.
-  const gainChainParent = getCurrentContext();
+  const gainChainParent = getCurrentPersistentContext();
   const gainChainId = gainChainParent ? `${gainChainParent}/skill:${id}:gain` : `skill:${id}:gain`;
   const gainChain = createModifierChain(gainChainId);
   const processedMaxXp = options.maxXp != null ? processGetter(options.maxXp) : undefined;
@@ -410,10 +410,10 @@ export function createSkill(options: SkillOptions): Skill {
   };
 
   if (isLevelDriven) {
-    return attachContextReset({ ...base, multiplierCurve: multiplierCurve! }, contextId);
+    return attachPersistentContextReset({ ...base, multiplierCurve: multiplierCurve! }, contextId);
   }
 
-  return attachContextReset(
+  return attachPersistentContextReset(
     {
       ...base,
       permanentBonus: permanentBonus!,

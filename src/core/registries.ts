@@ -41,7 +41,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import type { InjectionKey } from '@/primitives/types';
 import type { Grant, ModifierChain } from './modifier';
 import type { Resource } from './resource';
-import { createAmbientScope, createNamedRegistry, type NamedRegistry } from './named-registry';
+import { createAmbientValue, createNamedRegistry, type NamedRegistry } from './named-registry';
 
 // === CHAIN REGISTRY ===
 /**
@@ -74,7 +74,7 @@ export function createChainRegistry(): ChainRegistry {
   });
 }
 
-const chainAmbient = createAmbientScope<ChainRegistry>();
+const chainAmbient = createAmbientValue<ChainRegistry>();
 
 /**
  * Run `fn` with `registry` set as the ambient chain registry. Any
@@ -146,7 +146,7 @@ export function createEffectSystemRegistry(): EffectSystemRegistry {
   });
 }
 
-const effectSystemAmbient = createAmbientScope<EffectSystemRegistry>();
+const effectSystemAmbient = createAmbientValue<EffectSystemRegistry>();
 
 /**
  * Run `fn` with `registry` set as the ambient effect-system registry. Any
@@ -175,7 +175,7 @@ export interface ResourceRegistryEntry<T = DecimalSource> {
   /** The resource instance */
   resource: Resource<T>;
   /** Persistence context ID the resource was created in, or undefined if created at top level */
-  context: string | undefined;
+  persistentContextId: string | undefined;
 }
 
 /**
@@ -232,7 +232,7 @@ export function createResourceRegistry(): ResourceRegistry {
       const prior = inner.get(entry.resource.id);
       if (prior) {
         const where = (e: ResourceRegistryEntry) =>
-          e.context === undefined ? 'top level' : `"${e.context}"`;
+          e.persistentContextId === undefined ? 'top level' : `"${e.persistentContextId}"`;
         throw new Error(
           `ResourceRegistry: duplicate resource id "${entry.resource.id}" — ${where(prior)} and ${where(entry)} both create it. ` +
             'Resource ids are unique per engine; pass each resource a distinct `id` (a wrapped ref without one takes its displayName).',
@@ -252,7 +252,7 @@ export function createResourceRegistry(): ResourceRegistry {
   };
 }
 
-const resourceAmbient = createAmbientScope<ResourceRegistry>();
+const resourceAmbient = createAmbientValue<ResourceRegistry>();
 
 /**
  * Run `fn` with `registry` set as the ambient resource registry. Any

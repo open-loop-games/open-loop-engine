@@ -9,9 +9,9 @@ import { computed, type ComputedRef } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
-import { createContextScopedResource, type Resource } from '@/core/resource';
+import { createPersistentContextScopedResource, type Resource } from '@/core/resource';
 import { withPersistentContext } from '@/core/persistence';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { createModifierChain, type Modifier } from '@/core/modifier';
 
 // === TYPES ===
@@ -146,7 +146,7 @@ export function createInventory(options: InventoryOptions): Inventory {
         const initialAmount = initial[itemId] ?? 0;
         // Saved as the bare item id inside the inventory's context; the
         // engine-unique id is qualified so inventories can share item ids.
-        const resource = createContextScopedResource<DecimalSource>(
+        const resource = createPersistentContextScopedResource<DecimalSource>(
           initialAmount,
           { id: `${id}/${itemId}`, displayName: itemId },
           itemId,
@@ -246,5 +246,5 @@ export function createInventory(options: InventoryOptions): Inventory {
   };
 
   // Only known items persist, under the inventory's own context.
-  return items ? attachContextReset(inventory, id) : inventory;
+  return items ? attachPersistentContextReset(inventory, id) : inventory;
 }

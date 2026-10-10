@@ -6,7 +6,7 @@
  * survive (or partially survive) the reset. Scope can be defined manually
  * (a list of objects to walk) or by module ID (resolved via the persistent
  * ref registry), and Reset objects compose — one Reset's resolved scope can
- * feed another's `resetModules`.
+ * feed another's `resetPersistentContexts`.
  *
  * Factories:
  * - {@link createReset} — the reset mechanic itself (scope, retention, hooks)
@@ -28,7 +28,7 @@ import {
   isPersistent,
   resetPersistent,
   withLoadingSave,
-  getModulePersistentRefs,
+  getPersistentContextRefs,
   getPersistentRefs,
   bindPersistenceNamespace,
 } from '@/core/persistence';
@@ -70,7 +70,7 @@ export interface ResetOptions {
    * The walk skips lifetime refs, and a lifetime ref given here as its own
    * entry is reset (see `PersistentOptions.lifetime`).
    *
-   * Optional when {@link resetModules} is provided.
+   * Optional when {@link resetPersistentContexts} is provided.
    */
   thingsToReset?: Computable<unknown[]>;
 
@@ -88,11 +88,11 @@ export interface ResetOptions {
    *
    * @example
    * ```ts
-   * resetModules: ['jobs', 'skills', 'economy']
-   * resetModules: [innerReset, 'rebirth']  // composable
+   * resetPersistentContexts: ['jobs', 'skills', 'economy']
+   * resetPersistentContexts: [innerReset, 'rebirth']  // composable
    * ```
    */
-  resetModules?: ResetScope[];
+  resetPersistentContexts?: ResetScope[];
 
   /**
    * Readiness gate. When supplied, {@link Reset.reset} returns `false`
@@ -155,10 +155,10 @@ export interface Reset extends ScopedReset {
   thingsToReset: Ref<unknown[]> | unknown[] | undefined;
 
   /**
-   * The flattened set of persistent refs resolved from {@link ResetOptions.resetModules},
+   * The flattened set of persistent refs resolved from {@link ResetOptions.resetPersistentContexts},
    * re-resolved on every read. Empty when only `thingsToReset` is used.
    * Exposed so other resets/cycles can compose with this reset's scope via
-   * `resetModules: [thisReset]`.
+   * `resetPersistentContexts: [thisReset]`.
    */
   readonly resolvedScope: ReadonlySet<Persistent>;
 
@@ -214,7 +214,7 @@ function resolveScope(
   for (const entry of modules) {
     if (typeof entry === 'string') {
       if (onUnknown && getPersistentRefs(entry) === undefined) onUnknown(entry);
-      for (const ref of getModulePersistentRefs(entry)) result.add(ref);
+      for (const ref of getPersistentContextRefs(entry)) result.add(ref);
     } else {
       // A Cycle's scope is its `reset`'s, so it warns through that entry.
       const inner = (entry as { reset?: object }).reset;
@@ -231,7 +231,7 @@ function resolveScope(
  *
  * Supports two scoping modes (can be combined):
  * - **`thingsToReset`** — manual list of objects/refs, reset via recursive walking
- * - **`resetModules`** — module IDs and/or other Reset/Cycle objects, resolved
+ * - **`resetPersistentContexts`** — module IDs and/or other Reset/Cycle objects, resolved
  *   via the persistent ref registry
  *
  * Inline `keep`/`retain` options provide retention without a separate
@@ -244,7 +244,7 @@ function resolveScope(
  * ```ts
  * // Module-scoped with retention:
  * const prestigeReset = createReset({
- *   resetModules: ['gathering', 'economy'],
+ *   resetPersistentContexts: ['gathering', 'economy'],
  *   keep: [permanentBonus],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
  * })
@@ -258,7 +258,7 @@ function resolveScope(
  *
  * // Composable:
  * const outerReset = createReset({
- *   resetModules: [prestigeReset, 'prestige'],
+ *   resetPersistentContexts: [prestigeReset, 'prestige'],
  * })
  *
  * // Manual mode:
@@ -268,7 +268,8 @@ function resolveScope(
  * ```
  */
 export function createReset(options: ResetOptions): Reset {
-  const { thingsToReset, resetModules, keep, retain, canReset, onBeforeReset, onReset } = options;
+  const { thingsToReset, resetPersistentContexts, keep, retain, canReset, onBeforeReset, onReset } =
+    options;
 
   const processedThingsToReset = thingsToReset != null ? processGetter(thingsToReset) : undefined;
   const handle = createEmitHandle<ResetEvents>();
@@ -286,13 +287,13 @@ export function createReset(options: ResetOptions): Reset {
     if (warnedModules.has(moduleId)) return;
     warnedModules.add(moduleId);
     console.warn(
-      `createReset: resetModules names "${moduleId}", which has no registered module ` +
+      `createReset: resetPersistentContexts names "${moduleId}", which has no registered module ` +
         `context — nothing under that id is reset. Check the id.`,
     );
   }
   const resolveModules = bindPersistenceNamespace(
     (onUnknown?: (moduleId: string) => void): Set<Persistent> =>
-      resetModules ? resolveScope(resetModules, onUnknown) : new Set(),
+      resetPersistentContexts ? resolveScope(resetPersistentContexts, onUnknown) : new Set(),
   );
 
   // Refs to skip during module-scoped reset (kept or retained refs)

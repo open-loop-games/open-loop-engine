@@ -231,7 +231,7 @@ describe('Reset', () => {
   });
 });
 
-describe('Reset with resetModules', () => {
+describe('Reset with resetPersistentContexts', () => {
   it('resets all refs in a module including nested contexts', () => {
     beginPersistentContext('rm-mod');
     const gold = persistent(0);
@@ -251,7 +251,7 @@ describe('Reset with resetModules', () => {
     warriorLevel.value = 10;
 
     const reset = createReset({
-      resetModules: ['rm-mod'],
+      resetPersistentContexts: ['rm-mod'],
     });
 
     reset.reset();
@@ -274,7 +274,7 @@ describe('Reset with resetModules', () => {
     const bonusBefore = new Decimal(mastery.permanentBonus.value);
     expect(bonusBefore.gt(0)).toBe(true);
 
-    const reset = createReset({ resetModules: ['rm-permbonus'] });
+    const reset = createReset({ resetPersistentContexts: ['rm-permbonus'] });
     reset.reset();
 
     expect(new Decimal(mastery.xp.value).eq(0)).toBe(true);
@@ -286,7 +286,7 @@ describe('Reset with resetModules', () => {
     const inventory = persistent<string[]>([]);
     endPersistentContext();
 
-    const reset = createReset({ resetModules: ['rm-clone-default'] });
+    const reset = createReset({ resetPersistentContexts: ['rm-clone-default'] });
 
     inventory.value.push('sword');
     reset.reset();
@@ -307,7 +307,7 @@ describe('Reset with resetModules', () => {
     permanent.value = 42;
 
     const reset = createReset({
-      resetModules: ['rm-keep'],
+      resetPersistentContexts: ['rm-keep'],
       keep: [permanent],
     });
 
@@ -326,7 +326,7 @@ describe('Reset with resetModules', () => {
     temp.value = 500;
 
     const reset = createReset({
-      resetModules: ['rm-retain'],
+      resetPersistentContexts: ['rm-retain'],
       retain: new Map([[skill, fractional(0.1)]]),
     });
 
@@ -348,11 +348,11 @@ describe('Reset with resetModules', () => {
     outerRef.value = 20;
 
     const innerReset = createReset({
-      resetModules: ['rm-inner'],
+      resetPersistentContexts: ['rm-inner'],
     });
 
     const outerReset = createReset({
-      resetModules: [innerReset, 'rm-outer'],
+      resetPersistentContexts: [innerReset, 'rm-outer'],
     });
 
     outerReset.reset();
@@ -373,12 +373,12 @@ describe('Reset with resetModules', () => {
     outerRef.value = 200;
 
     const innerReset = createReset({
-      resetModules: ['rm-compose-inner'],
+      resetPersistentContexts: ['rm-compose-inner'],
       keep: [innerRef], // inner would keep this...
     });
 
     const outerReset = createReset({
-      resetModules: [innerReset, 'rm-compose-outer'],
+      resetPersistentContexts: [innerReset, 'rm-compose-outer'],
       // ...but outer doesn't keep innerRef
     });
 
@@ -387,7 +387,7 @@ describe('Reset with resetModules', () => {
     expect(outerRef.value).toBe(0);
   });
 
-  it('thingsToReset and resetModules coexist', () => {
+  it('thingsToReset and resetPersistentContexts coexist', () => {
     beginPersistentContext('rm-coexist-mod');
     const modRef = persistent(0);
     endPersistentContext();
@@ -400,7 +400,7 @@ describe('Reset with resetModules', () => {
     manualRef.value = 20;
 
     const reset = createReset({
-      resetModules: ['rm-coexist-mod'],
+      resetPersistentContexts: ['rm-coexist-mod'],
       thingsToReset: [manualRef],
     });
 
@@ -415,19 +415,22 @@ describe('Reset with resetModules', () => {
     endPersistentContext();
 
     const reset = createReset({
-      resetModules: ['rm-scope'],
+      resetPersistentContexts: ['rm-scope'],
     });
 
     expect(reset.resolvedScope.size).toBe(1);
     expect(reset.resolvedScope.has(r)).toBe(true);
   });
 
-  it('resolves resetModules at reset time, so refs created after createReset are in scope', () => {
+  it('resolves resetPersistentContexts at reset time, so refs created after createReset are in scope', () => {
     beginPersistentContext('rm-lazy');
     const early = persistent(0);
     endPersistentContext();
-    const reset = createReset({ resetModules: ['rm-lazy'] });
-    const cycle = createCycle({ resetModules: ['rm-lazy'], registerTick: () => () => {} });
+    const reset = createReset({ resetPersistentContexts: ['rm-lazy'] });
+    const cycle = createCycle({
+      resetPersistentContexts: ['rm-lazy'],
+      registerTick: () => () => {},
+    });
     beginPersistentContext('rm-lazy');
     const late = persistent(0);
     endPersistentContext();
@@ -442,10 +445,10 @@ describe('Reset with resetModules', () => {
     expect(late.value).toBe(0);
   });
 
-  it('warns once when a resetModules id names no registered module', () => {
+  it('warns once when a resetPersistentContexts id names no registered module', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const reset = createReset({ resetModules: ['rm-no-such-module'] });
+      const reset = createReset({ resetPersistentContexts: ['rm-no-such-module'] });
       reset.reset();
       reset.reset();
       const calls = warn.mock.calls.filter((c) => String(c[0]).includes('rm-no-such-module'));
@@ -460,12 +463,12 @@ describe('Reset with resetModules', () => {
     const warningsFor = (id: string) =>
       warn.mock.calls.filter((c) => String(c[0]).includes(id)).length;
     try {
-      const inner = createReset({ resetModules: ['rm-composed-missing'] });
+      const inner = createReset({ resetPersistentContexts: ['rm-composed-missing'] });
       const cycle = createCycle({
-        resetModules: ['rm-cycle-missing'],
+        resetPersistentContexts: ['rm-cycle-missing'],
         registerTick: () => () => {},
       });
-      const outer = createReset({ resetModules: [inner, cycle] });
+      const outer = createReset({ resetPersistentContexts: [inner, cycle] });
 
       void outer.resolvedScope;
       expect(warningsFor('rm-composed-missing')).toBe(0);
@@ -490,7 +493,7 @@ describe('Reset with resetModules', () => {
       const forked = persistent(0);
       endPersistentContext();
       forked.value = 9;
-      return { reset: createReset({ resetModules: ['rm-ns-shop'] }), forked };
+      return { reset: createReset({ resetPersistentContexts: ['rm-ns-shop'] }), forked };
     });
 
     forkReset.reset.reset();
@@ -695,7 +698,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
   /** Every stateful system a module can build, all inside module `m`. */
   function buildSystems() {
     return withPersistentContext('m', () => {
-      const cycle = createCycle({ resetModules: ['m'], registerTick });
+      const cycle = createCycle({ resetPersistentContexts: ['m'], registerTick });
       const time = createTimeSystem();
       const bank = createTimeBank();
       const bestOf = createBestOf({ id: 'm-best', metrics: { gold: { mode: 'absolute' } } });
@@ -769,7 +772,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     recs.autoApply.value = true;
     bestOf.submit({ key: 'gold', value: 5, elapsed: 1, cycleNumber: 0 });
 
-    createReset({ resetModules: ['m'] }).reset();
+    createReset({ resetPersistentContexts: ['m'] }).reset();
 
     expect(time.elapsed.value).toBe(0);
     expect(time.totalPlayTime.value).toBe(50);
@@ -802,8 +805,8 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     });
     expect(rewards).toBe(1);
 
-    createReset({ resetModules: ['m'] }).reset();
-    createReset({ resetModules: ['m'] }).reset();
+    createReset({ resetPersistentContexts: ['m'] }).reset();
+    createReset({ resetPersistentContexts: ['m'] }).reset();
 
     expect(rewards).toBe(1);
   });

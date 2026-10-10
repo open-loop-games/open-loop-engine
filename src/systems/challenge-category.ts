@@ -375,11 +375,11 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   let entering: string | undefined;
 
   /** Push scoped overrides and content patches for a challenge def */
-  function pushScopes(def: Def): Array<() => void> {
+  function pushOverrides(def: Def): Array<() => void> {
     const cleanups: Array<() => void> = [];
 
     if (def.overrides && overrideRegistry) {
-      cleanups.push(overrideRegistry.pushScope(`challenge:${def.id}`, def.overrides));
+      cleanups.push(overrideRegistry.pushOverrides(`challenge:${def.id}`, def.overrides));
     }
 
     if (def.contentPatches) {
@@ -395,7 +395,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   }
 
   /** Pop scoped overrides and content patches (reverse order) */
-  function popScopes(challengeId: string): void {
+  function popOverrides(challengeId: string): void {
     const cleanups = activeCleanups.get(challengeId);
     if (cleanups) {
       for (let i = cleanups.length - 1; i >= 0; i--) {
@@ -406,13 +406,13 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   }
 
   /** Push or pop each challenge's scopes to match its `active`. */
-  function reconcileScopes(): void {
+  function hydrateOverrides(): void {
     for (const entry of base.getAll()) {
       const id = entry.def.id;
       if (id === entering) continue;
       const pushed = activeCleanups.has(id);
-      if (entry.instance.active.value && !pushed) activeCleanups.set(id, pushScopes(entry.def));
-      else if (!entry.instance.active.value && pushed) popScopes(id);
+      if (entry.instance.active.value && !pushed) activeCleanups.set(id, pushOverrides(entry.def));
+      else if (!entry.instance.active.value && pushed) popOverrides(id);
     }
   }
 
@@ -457,12 +457,12 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
           }
         }
 
-        popScopes(def.id);
+        popOverrides(def.id);
         entering = def.id;
         try {
-          activeCleanups.set(def.id, pushScopes(def));
+          activeCleanups.set(def.id, pushOverrides(def));
           if (reset && !reset.reset()) {
-            popScopes(def.id);
+            popOverrides(def.id);
             return false;
           }
         } finally {
@@ -478,7 +478,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         if (!active.value) return;
 
         active.value = false;
-        popScopes(def.id);
+        popOverrides(def.id);
         def.onExit?.();
       }
 
@@ -556,7 +556,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
   const scope = effectScope();
   scope.run(() => {
-    onHydrated(reconcileScopes);
+    onHydrated(hydrateOverrides);
     if (registerTick) {
       onScopeDispose(
         registerTick(() => {
@@ -628,7 +628,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
     dispose(): void {
       scope.stop();
-      for (const id of [...activeCleanups.keys()]) popScopes(id);
+      for (const id of [...activeCleanups.keys()]) popOverrides(id);
     },
 
     [Resettable]: base[Resettable],

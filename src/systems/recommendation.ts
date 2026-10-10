@@ -34,12 +34,12 @@ import type { DecimalSource } from '@/primitives/decimal';
 import {
   persistent,
   withPersistentContext,
-  resolveSystemContextId,
+  resolveSystemPersistentContextId,
   type Persistent,
   type State,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import type { Cycle } from './cycle';
 import type { CycleLog } from './cycle-log';
 import type { BestOf } from './best-of';
@@ -382,7 +382,7 @@ export function createRecommendationSystem(
   } = options;
 
   // --- Persistence ---
-  const contextId = resolveSystemContextId(id, 'recommendation');
+  const contextId = resolveSystemPersistentContextId(id, 'recommendation');
   const { storedRecommendation, autoApply } = withPersistentContext(contextId, () => ({
     storedRecommendation: persistent<SerializedRecommendation | null>(null, {
       name: 'storedRecommendation',
@@ -517,5 +517,5 @@ export function createRecommendationSystem(
       unsubAfterRestart();
     },
   };
-  return attachContextReset(system, contextId);
+  return attachPersistentContextReset(system, contextId);
 }

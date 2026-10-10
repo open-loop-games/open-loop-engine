@@ -115,7 +115,7 @@ export {
   filterDefaultedRefs,
   createDefinitionStates,
   setPersistentName,
-  getModulePersistentRefs,
+  getPersistentContextRefs,
   getAllPersistentRefs,
   serializePersistents,
   deserializePersistents,

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createCategoryBase } from '@/systems/category-base';
 import {
   persistent,
-  getCurrentFullContext,
-  getModulePersistentRefs,
+  getCurrentFullPersistentContext,
+  getPersistentContextRefs,
   withPersistentContext,
 } from '@/core/persistence';
 import type { DecimalSource } from '@/primitives/decimal';
@@ -17,7 +17,7 @@ describe('createCategoryBase — persistent-context safety', () => {
     // A throwing buildState must still pop the context it pushed; otherwise
     // every persistent ref created afterward is silently mis-scoped under the
     // leaked `${categoryId}/${def.id}` prefix.
-    expect(getCurrentFullContext()).toBeUndefined();
+    expect(getCurrentFullPersistentContext()).toBeUndefined();
 
     const cat = createCategoryBase<
       ThingDef,
@@ -33,7 +33,7 @@ describe('createCategoryBase — persistent-context safety', () => {
 
     expect(() => cat.register({ id: 'boom' })).toThrow('builder blew up');
     // Stack must be balanced back to empty after the caught throw.
-    expect(getCurrentFullContext()).toBeUndefined();
+    expect(getCurrentFullPersistentContext()).toBeUndefined();
   });
 });
 
@@ -86,10 +86,10 @@ describe('createCategoryBase — batch registration', () => {
     });
 
     expect(() => cat.register({ id: 'a' })).toThrow('builder blew up');
-    expect(getModulePersistentRefs('retry/a').size).toBe(0);
+    expect(getPersistentContextRefs('retry/a').size).toBe(0);
 
     cat.register({ id: 'a' });
     expect(cat.getEntry('a')).toBeDefined();
-    expect(getModulePersistentRefs('retry/a').size).toBe(2);
+    expect(getPersistentContextRefs('retry/a').size).toBe(2);
   });
 });

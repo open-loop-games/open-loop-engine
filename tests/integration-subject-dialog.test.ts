@@ -184,7 +184,7 @@ describe('Scenario 2 — multi-loop persistence', () => {
       // End-of-loop: reset the `relationships` module. Knowledge is in a
       // separate persistence scope (here, the accessor's `unlocks` Map) and
       // isn't touched.
-      const reset = createReset({ resetModules: ['relationships'] });
+      const reset = createReset({ resetPersistentContexts: ['relationships'] });
       reset.reset();
 
       expect(rask.fields.trust.getIndex()).toBe(0);

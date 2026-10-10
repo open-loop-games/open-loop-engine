@@ -70,7 +70,7 @@ export interface CreateSensitivityCellOptions {
    * monotonic counter so concurrent/sequential runs never alias.
    * Defaults to `workbench-<cell name>`.
    */
-  namespace?: string;
+  persistenceNamespace?: string;
   /** Forwarded to `createEngineFromSave` — same restrictions apply. */
   config?: Omit<
     EngineConfig,
@@ -121,7 +121,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     tick,
     ticks,
     tickDelta,
-    namespace = `workbench-${name}`,
+    persistenceNamespace: namespace = `workbench-${name}`,
     config,
   } = options;
 
@@ -140,7 +140,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     const engine = createEngineFromSave({
       saveBlob,
       modules: modules(),
-      namespace: `${namespace}-${runCounter++}`,
+      persistenceNamespace: `${namespace}-${runCounter++}`,
       config,
     });
     perturb?.(engine, ctx);

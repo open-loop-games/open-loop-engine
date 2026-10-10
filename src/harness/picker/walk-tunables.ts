@@ -10,7 +10,7 @@
  * invisible — the principle lives in `override-registry.ts` under
  * `tunable()` and `createTuningRegistry()`.
  *
- * Scope-only keys (transient `pushScope` overrides) are intentionally
+ * Scope-only keys (transient `pushOverrides` overrides) are intentionally
  * excluded — `getBaseKeys()` returns the base map only. See the
  * `OverrideRegistry.getBaseKeys` TSDoc for the rationale.
  *

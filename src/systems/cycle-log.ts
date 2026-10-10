@@ -75,7 +75,7 @@ export interface CycleLogEntry {
   timestamp: number;
   deltas: CycleLogDelta[];
   /** Consumer-populated structured annotations from the cycle */
-  context: Record<string, unknown>;
+  annotations: Record<string, unknown>;
   pinned: boolean;
 }
 
@@ -101,7 +101,7 @@ export interface CycleLog {
    * Context resets each cycle (on afterRestart) and is captured into the
    * finalized entry. Calling with the same key overwrites the previous value.
    */
-  setContext(key: string, value: unknown): void;
+  annotate(key: string, value: unknown): void;
   /** Pin an entry by index so it survives ring buffer pruning */
   pin(index: number): void;
   /** Unpin an entry by index, allowing it to be pruned */
@@ -158,7 +158,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
 
   // Snapshot state — intentionally ephemeral, no persistent() calls
   let startSnapshot: Record<string, Decimal> = {};
-  let currentContext: Record<string, unknown> = {};
+  let currentAnnotations: Record<string, unknown> = {};
 
   function takeSnapshot(): void {
     const snap: Record<string, Decimal> = {};
@@ -226,7 +226,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
           elapsed: cycle.elapsed.value,
           timestamp: Date.now(),
           deltas,
-          context: { ...currentContext },
+          annotations: { ...currentAnnotations },
           pinned: false,
         };
 
@@ -239,7 +239,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
     onScopeDispose(
       cycle.on('afterRestart', () => {
         takeSnapshot();
-        currentContext = {};
+        currentAnnotations = {};
       }),
     );
   });
@@ -247,8 +247,8 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
   return {
     history,
     on: handle.on,
-    setContext(key: string, value: unknown) {
-      currentContext[key] = value;
+    annotate(key: string, value: unknown) {
+      currentAnnotations[key] = value;
     },
     pin(index: number) {
       const entry = history.value[index];

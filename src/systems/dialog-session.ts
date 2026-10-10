@@ -33,7 +33,7 @@ import {
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import {
   createNativeDialogRuntime,
@@ -288,5 +288,5 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
       deletePersistent(stateRef as unknown as Persistent);
     },
   };
-  return attachContextReset(session, contextId);
+  return attachPersistentContextReset(session, contextId);
 }

@@ -518,7 +518,7 @@ describe('loads and resets', () => {
     const { slot, applied } = buildHooked();
     slot.select('sword');
 
-    createReset({ resetModules: ['run'] }).reset();
+    createReset({ resetPersistentContexts: ['run'] }).reset();
 
     expect(slot.selected.value).toEqual([]);
     expect([...applied]).toEqual([]);

@@ -309,18 +309,18 @@ describe('createCycleLog', () => {
   // Context enrichment
   // ==========================================================================
 
-  it('setContext attaches data to the finalized entry', () => {
+  it('annotate attaches data to the finalized entry', () => {
     const { registerTick } = createManualTicks();
 
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    log.setContext('spell', { id: 'fireball', hits: 3 });
-    log.setContext('result', 'success');
+    log.annotate('spell', { id: 'fireball', hits: 3 });
+    log.annotate('result', 'success');
     cycle.end();
 
     const entry = log.history.value[0];
-    expect(entry.context).toEqual({ spell: { id: 'fireball', hits: 3 }, result: 'success' });
+    expect(entry.annotations).toEqual({ spell: { id: 'fireball', hits: 3 }, result: 'success' });
   });
 
   it('context resets after each cycle restart', () => {
@@ -329,27 +329,27 @@ describe('createCycleLog', () => {
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    log.setContext('tag', 'cycle-0');
+    log.annotate('tag', 'cycle-0');
     cycle.end();
 
-    // Second cycle — no setContext calls
+    // Second cycle — no annotate calls
     cycle.end();
 
-    expect(log.history.value[0].context).toEqual({ tag: 'cycle-0' });
-    expect(log.history.value[1].context).toEqual({});
+    expect(log.history.value[0].annotations).toEqual({ tag: 'cycle-0' });
+    expect(log.history.value[1].annotations).toEqual({});
   });
 
-  it('setContext overwrites previous value for same key', () => {
+  it('annotate overwrites previous value for same key', () => {
     const { registerTick } = createManualTicks();
 
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    log.setContext('count', 1);
-    log.setContext('count', 5);
+    log.annotate('count', 1);
+    log.annotate('count', 5);
     cycle.end();
 
-    expect(log.history.value[0].context).toEqual({ count: 5 });
+    expect(log.history.value[0].annotations).toEqual({ count: 5 });
   });
 
   it('finalized entry context is a snapshot (not a live reference)', () => {
@@ -358,22 +358,22 @@ describe('createCycleLog', () => {
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
-    log.setContext('val', 'before');
+    log.annotate('val', 'before');
     cycle.end();
 
     // Mutating after finalize should not affect the stored entry
-    log.setContext('val', 'after');
-    expect(log.history.value[0].context).toEqual({ val: 'before' });
+    log.annotate('val', 'after');
+    expect(log.history.value[0].annotations).toEqual({ val: 'before' });
   });
 
-  it('entries without setContext calls have empty context', () => {
+  it('entries without annotate calls have empty context', () => {
     const { registerTick } = createManualTicks();
 
     const cycle = createCycle({ thingsToReset: [], registerTick });
     const log = createCycleLog({ cycle, metrics: {} });
 
     cycle.end();
-    expect(log.history.value[0].context).toEqual({});
+    expect(log.history.value[0].annotations).toEqual({});
   });
 
   // ==========================================================================
@@ -519,7 +519,7 @@ describe('createCycleLog — the baseline follows loads and resets', () => {
     cycle.end();
 
     strength.value += 2;
-    createReset({ resetModules: ['m'] }).reset();
+    createReset({ resetPersistentContexts: ['m'] }).reset();
     strength.value += 3;
     gold.value += 3;
     cycle.end();

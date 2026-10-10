@@ -96,7 +96,7 @@ describe('Resource', () => {
     addResource(gold, 50);
     subtractResource(gold, 20);
 
-    createReset({ resetModules: ['tracker-reset'] }).reset();
+    createReset({ resetPersistentContexts: ['tracker-reset'] }).reset();
 
     expect(gold.value.toNumber()).toBe(0);
     expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);

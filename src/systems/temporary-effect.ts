@@ -55,7 +55,7 @@ import { resolveComputable, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import type { Grant } from '@/core/modifier';
 import { createPredicateResolver } from './gate';
@@ -514,5 +514,5 @@ export function createTemporaryEffectSystem(
   getCurrentEffectSystemRegistry()?.register(system);
   registerBindingSlots(system, (defId) => slotsByDef.get(defId));
 
-  return attachContextReset(system, contextId);
+  return attachPersistentContextReset(system, contextId);
 }

@@ -150,7 +150,7 @@ describe('createCycle', () => {
     cycle.end();
     tick(2);
 
-    createReset({ resetModules: ['cycle-run-clock'] }).reset();
+    createReset({ resetPersistentContexts: ['cycle-run-clock'] }).reset();
 
     expect(cycle.elapsed.value).toBe(0);
     expect(cycle.count.value).toBe(1);
@@ -160,7 +160,7 @@ describe('createCycle', () => {
   it('a reset covering the cycle context still records the best time', () => {
     const { registerTick, tick } = createManualTicks();
     const cycle = withPersistentContext('cycle-self-reset', () =>
-      createCycle({ resetModules: ['cycle-self-reset'], registerTick }),
+      createCycle({ resetPersistentContexts: ['cycle-self-reset'], registerTick }),
     );
     cycle.run();
     tick(3);
@@ -358,7 +358,7 @@ describe('createCycle', () => {
   });
 });
 
-describe('createCycle with resetModules', () => {
+describe('createCycle with resetPersistentContexts', () => {
   it('resets module refs on end()', () => {
     const { registerTick, tick } = createManualTicks();
 
@@ -371,7 +371,7 @@ describe('createCycle with resetModules', () => {
     level.value = 10;
 
     const cycle = createCycle({
-      resetModules: ['cycle-rm-mod'],
+      resetPersistentContexts: ['cycle-rm-mod'],
       registerTick,
     });
 
@@ -396,7 +396,7 @@ describe('createCycle with resetModules', () => {
     permanent.value = 42;
 
     const cycle = createCycle({
-      resetModules: ['cycle-rm-keep'],
+      resetPersistentContexts: ['cycle-rm-keep'],
       keep: [permanent],
       registerTick,
     });
@@ -418,7 +418,7 @@ describe('createCycle with resetModules', () => {
     xp.value = 5000;
 
     const cycle = createCycle({
-      resetModules: ['cycle-rm-retain'],
+      resetPersistentContexts: ['cycle-rm-retain'],
       retain: new Map([[skill, fractional(0.3)]]),
       registerTick,
     });
@@ -436,7 +436,7 @@ describe('createCycle with resetModules', () => {
     endPersistentContext();
 
     const cycle = createCycle({
-      resetModules: ['cycle-rm-scope'],
+      resetPersistentContexts: ['cycle-rm-scope'],
       registerTick,
     });
 
@@ -459,12 +459,12 @@ describe('createCycle with resetModules', () => {
     outerRef.value = 20;
 
     const innerLoop = createCycle({
-      resetModules: ['cycle-rm-inner'],
+      resetPersistentContexts: ['cycle-rm-inner'],
       registerTick,
     });
 
     const outerLoop = createCycle({
-      resetModules: [innerLoop, 'cycle-rm-outer'],
+      resetPersistentContexts: [innerLoop, 'cycle-rm-outer'],
       registerTick,
     });
 

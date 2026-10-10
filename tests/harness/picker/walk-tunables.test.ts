@@ -71,7 +71,7 @@ describe('walkTunables', () => {
 
     const registries = engine.tryInject(TuningRegistriesKey)!;
     const reg = [...registries].find((r) => r.name === 'scoped')!;
-    const cleanup = reg.pushScope('challenge', {
+    const cleanup = reg.pushOverrides('challenge', {
       'scope-only/key': () => 999,
     });
 

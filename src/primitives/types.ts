@@ -188,7 +188,7 @@ export interface Analyzer {
       end: Decimal;
       delta: Decimal;
     }>;
-    context: Record<string, unknown>;
+    annotations: Record<string, unknown>;
   }): void;
   /** Produces the final {@link AnalyzerResult} after the run ends. */
   summarize(): AnalyzerResult;

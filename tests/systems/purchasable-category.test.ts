@@ -722,7 +722,7 @@ describe('createPurchasableCategory grants', () => {
     const recs = productionChain.bindings();
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toBe('pc-grants1/double/from:double');
-    expect(recs[0].scope).toBe('pc-grants1/double');
+    expect(recs[0].persistentContextId).toBe('pc-grants1/double');
   });
 
   it('supports multi-chain grants via array shorthand', () => {

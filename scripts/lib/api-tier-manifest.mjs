@@ -113,7 +113,7 @@ export const TIER_MANIFEST = [
       'Anything that crosses a session boundary or a prestige reset — `withPersistentContext` namespacing, `createSaveManager` slots and migration, `createReset` with retention policies, offline catch-up.',
     entrypoints: [
       '`withPersistentContext` / `persistent` — create save-owned refs under stable namespaces.',
-      '`createReset` with `resetModules` — reset module/category scopes without manually listing every ref.',
+      '`createReset` with `resetPersistentContexts` — reset module/category scopes without manually listing every ref.',
       '`createRetentionPolicy`, `keep`, and `retain` — carry values across prestige resets.',
       '`createSaveManager` — multi-slot save/load, migration, validation, import, and export.',
       '`processOfflineTime` — replay elapsed time through the game loop in bounded chunks.',

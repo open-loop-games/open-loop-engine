@@ -202,7 +202,7 @@ There are two query modes against the same instance:
 
 These are probe-lane tools, not spine tools — both construct an engine.
 
-**Ceremony that is load-bearing.** `pushScope` + `importSave` + a `scopeDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination — the engine-level instance of restore parity (§ When an agent is the instrument), which is the same failure wherever a state is stood up rather than played into.
+**Ceremony that is load-bearing.** `pushOverrides` + `importSave` + a `overrideDepth === 0` assertion are what make "one engine instance, many iterations" sound. Push scope before each iteration, restore from a captured baseline, run, and assert depth returns to zero before the next. The iteration logic changes per game; the ceremony doesn't. A leaked scope makes iteration N+1 read as a balance finding when it is contamination — the engine-level instance of restore parity (§ When an agent is the instrument), which is the same failure wherever a state is stood up rather than played into.
 
 ## Engine surfaces
 

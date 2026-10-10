@@ -15,7 +15,7 @@
  * registries a repeated id is an authoring mistake, and answering either
  * entity for it would silently hide the other.
  *
- * The ambient half is factored separately as {@link createAmbientScope}
+ * The ambient half is factored separately as {@link createAmbientValue}
  * because the resource registry pairs its NamedRegistry with a wrapper-
  * typed ambient (the public ResourceRegistry surface differs from the
  * underlying NamedRegistry), so the two halves don't always travel
@@ -98,11 +98,11 @@ export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): 
 
 /**
  * Module-private ambient slot paired with `with` / `getCurrent` accessors.
- * Each call to {@link createAmbientScope} returns an isolated slot —
+ * Each call to {@link createAmbientValue} returns an isolated slot —
  * different scopes never share state, so chain / effect / resource ambients
  * stay independent even when minted from the same helper.
  */
-export interface AmbientScope<T> {
+export interface AmbientValue<T> {
   /**
    * Run `fn` with `value` set as the ambient target. Nested calls save
    * and restore the previous ambient so concurrent setups (e.g. multiple
@@ -127,7 +127,7 @@ export interface AmbientScope<T> {
  * each call returns an independent ambient — chain and effect-system
  * scopes can never alias even though they share this helper.
  */
-export function createAmbientScope<T>(): AmbientScope<T> {
+export function createAmbientValue<T>(): AmbientValue<T> {
   let current: T | undefined;
 
   return {

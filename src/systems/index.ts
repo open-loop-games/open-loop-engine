@@ -9,7 +9,7 @@
 // Opt-in interface for objects (categories, stateful systems) that yield
 // persistent refs for recursive reset. Used by resetObject in the reset system.
 // Lives in core so core primitives can implement it too; re-exported here by
-// name (not `export *`) so the `@internal` `attachContextReset` stays internal.
+// name (not `export *`) so the `@internal` `attachPersistentContextReset` stays internal.
 export { Resettable, type ResettableObject } from '@/core/resettable';
 
 // === CATEGORY BASE ===

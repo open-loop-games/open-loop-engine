@@ -47,7 +47,7 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '@/core/computed';
 import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 
 // === TYPES ===
 
@@ -343,5 +343,5 @@ export function createSlot(options: SlotOptions): Slot {
     restore,
     on: handle.on,
   };
-  return attachContextReset(slot, contextId);
+  return attachPersistentContextReset(slot, contextId);
 }

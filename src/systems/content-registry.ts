@@ -160,7 +160,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
   // Pushed scopes in push order. Entries are patched in place, so for every key
   // a live scope covers, `bases` holds the value beneath all scopes; a revert
   // re-resolves each key it touched as that base overlaid by the scopes left.
-  const liveScopes: Map<string, Record<string, unknown>>[] = [];
+  const liveScopedOverrides: Map<string, Record<string, unknown>>[] = [];
   const bases = new Map<string, Map<string, unknown>>();
 
   function resolveKeys(id: string, keys: string[]): void {
@@ -170,7 +170,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
     for (const key of keys) {
       let value = base.get(key);
       let covered = false;
-      for (const scope of liveScopes) {
+      for (const scope of liveScopedOverrides) {
         const partial = scope.get(id);
         if (partial && Object.hasOwn(partial, key)) {
           value = partial[key];
@@ -277,14 +277,14 @@ export function createContentRegistryHandle<T extends { id: string }>(
         scope.set(id, { ...partial });
         Object.assign(entry, partial);
       }
-      liveScopes.push(scope);
+      liveScopedOverrides.push(scope);
       version.value++;
 
       let reverted = false;
       return () => {
         if (reverted) return;
         reverted = true;
-        liveScopes.splice(liveScopes.indexOf(scope), 1);
+        liveScopedOverrides.splice(liveScopedOverrides.indexOf(scope), 1);
         for (const [id, partial] of scope) resolveKeys(id, Object.keys(partial));
         version.value++;
       };

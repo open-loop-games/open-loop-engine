@@ -66,7 +66,7 @@ describe('createCycleFinalizeTracker', () => {
       elapsed: 0,
       timestamp: 0,
       deltas: [],
-      context: {},
+      annotations: {},
       pinned: false,
     };
 

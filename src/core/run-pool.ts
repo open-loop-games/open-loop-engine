@@ -27,10 +27,10 @@
  */
 
 import { computed, effectScope, ref, shallowRef, watch, type Ref } from 'vue';
-import { runInScope } from './common';
+import { runInEffectScope } from './common';
 import { createEmitHandle, type Emittable } from './events';
 import { onHydrated, persistent, withPersistentContext } from './persistence';
-import { attachContextReset } from './resettable';
+import { attachPersistentContextReset } from './resettable';
 
 // === TYPES ===
 /**
@@ -360,7 +360,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     const initialAlive = aliveStates.value[idKey] ?? true;
     aliveStates.value[idKey] = initialAlive;
     const alive = ref(initialAlive);
-    const stopMirror = runInScope(scope, () =>
+    const stopMirror = runInEffectScope(scope, () =>
       watch(
         alive,
         (v) => {
@@ -431,5 +431,5 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     },
   };
 
-  return attachContextReset(pool, poolId);
+  return attachPersistentContextReset(pool, poolId);
 }

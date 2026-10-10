@@ -22,7 +22,7 @@ import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { persistent, withPersistentContext, type State } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
 
 // === TYPES ===
@@ -469,5 +469,5 @@ export function createBestOf(options: BestOfOptions): BestOf {
       unsubCycleLog?.();
     },
   };
-  return attachContextReset(bestOf, id);
+  return attachPersistentContextReset(bestOf, id);
 }

@@ -473,7 +473,7 @@ describe('createActionCategory — Resettable', () => {
     category.enqueue('a');
     category.enqueue('b');
 
-    createReset({ resetModules: ['act-mod'] }).reset();
+    createReset({ resetPersistentContexts: ['act-mod'] }).reset();
 
     expect(category.currentItem).toBeNull();
     expect(category.sequencer.items.value).toEqual([]);

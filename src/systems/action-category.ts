@@ -16,7 +16,7 @@
  * Resetting: the category's `[Resettable]` (`thingsToReset: [category]`)
  * yields only per-def state. The player's queue or list, the running item and
  * its progress all survive it. Restart those explicitly: `replay()` for a list,
- * `sequencer.clear()` for a queue. A module-scoped reset (`resetModules`)
+ * `sequencer.clear()` for a queue. A module-scoped reset (`resetPersistentContexts`)
  * reaching the category's context is different: it also sweeps the internal
  * sequencer's saved queue, current item, cursor and pause flag, and fires no
  * `cancelled`, so run it only where losing the queue is intended.

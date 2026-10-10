@@ -20,7 +20,7 @@ import { processGetter, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
-import { getCurrentFullContext } from './persistence';
+import { getCurrentFullPersistentContext } from './persistence';
 import { profile, profileEnd, profileStart } from './profiler';
 
 /**
@@ -409,7 +409,7 @@ export interface BindOptions {
   modifier: Modifier | (() => Modifier);
   /**
    * Override the auto-derived binding id. Normally omitted — the id is
-   * derived from the ambient persistent context (`getCurrentFullContext`)
+   * derived from the ambient persistent context (`getCurrentFullPersistentContext`)
    * and the attribution text, producing `{scope}/{text}`.
    */
   id?: string;
@@ -445,7 +445,7 @@ export interface BindingRecord {
    * in, or `undefined` if the binding was created outside any
    * `withPersistentContext` scope.
    */
-  readonly scope: string | undefined;
+  readonly persistentContextId: string | undefined;
 }
 
 /**
@@ -717,7 +717,7 @@ export function createModifierChain(id: string): ModifierChain {
       // then (fallback) the modifier's own description getter. The fallback
       // *invokes* that getter, which for factory modifiers evaluates the
       // underlying value — see BindOptions.description for the freeze hazard.
-      const scope = getCurrentFullContext();
+      const scope = getCurrentFullPersistentContext();
       let bindingId = opts.id;
       if (bindingId == null) {
         const descText = opts.description ?? resolveDescriptionText(modifier);
@@ -749,7 +749,7 @@ export function createModifierChain(id: string): ModifierChain {
         modifier,
         active: activeRef,
         tags: opts.tags ?? [],
-        scope,
+        persistentContextId: scope,
       };
       bindingsById.set(bindingId, record);
 

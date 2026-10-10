@@ -38,12 +38,12 @@ import { computed, effectScope, type ComputedRef } from 'vue';
 import {
   persistent,
   withPersistentContext,
-  resolveSystemContextId,
+  resolveSystemPersistentContextId,
   latchWhenSettled,
   type Persistent,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
@@ -190,7 +190,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   const defaultUnlocked = initiallyUnlocked ?? (tiers.length > 0 ? [tiers[0].id] : []);
 
   // --- Persistent state ---
-  const contextId = resolveSystemContextId(id, 'automation');
+  const contextId = resolveSystemPersistentContextId(id, 'automation');
   const unlocked = withPersistentContext(contextId, () =>
     persistent<string[]>([...defaultUnlocked], { name: 'unlocked', lifetime: true }),
   );
@@ -289,5 +289,5 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     }
   });
 
-  return attachContextReset(automationTiers, contextId);
+  return attachPersistentContextReset(automationTiers, contextId);
 }

@@ -104,9 +104,12 @@ const cases: Case[] = [
     name: 'cycle',
     build: () => {
       const ticks = createManualTicks();
-      return Object.assign(createCycle({ resetModules: [], registerTick: ticks.registerTick }), {
-        ticks,
-      });
+      return Object.assign(
+        createCycle({ resetPersistentContexts: [], registerTick: ticks.registerTick }),
+        {
+          ticks,
+        },
+      );
     },
     dirty: (
       cycle: ReturnType<typeof createCycle> & { ticks: ReturnType<typeof createManualTicks> },
@@ -136,7 +139,7 @@ const cases: Case[] = [
   {
     name: 'recommendation system',
     build: () => {
-      const cycle = createCycle({ resetModules: [], registerTick });
+      const cycle = createCycle({ resetPersistentContexts: [], registerTick });
       const cycleLog = createCycleLog({ cycle, metrics: {} });
       const bestOf = createBestOf({ id: 'm-rec-best', metrics: {} });
       return buildRecommendationStack(cycle, cycleLog, bestOf);
@@ -238,7 +241,7 @@ function movedRunScopedKeys(): string[] {
     .map(([key]) => key);
 }
 
-function resetVia(c: Case, via: 'thingsToReset' | 'resetModules') {
+function resetVia(c: Case, via: 'thingsToReset' | 'resetPersistentContexts') {
   resetAllPersistentContexts();
   // Earned-at and best-of timestamps read the clock; both runs see one instant.
   vi.useFakeTimers({ toFake: ['Date'], now: 0 });
@@ -254,7 +257,7 @@ function resetVia(c: Case, via: 'thingsToReset' | 'resetModules') {
       const reset =
         via === 'thingsToReset'
           ? createReset({ thingsToReset: [system] })
-          : createReset({ resetModules: ['m'] });
+          : createReset({ resetPersistentContexts: ['m'] });
       reset.reset();
       if (via === 'thingsToReset') c.check?.(system as never);
       return { before, after: snapshot(), lifetime, moved };
@@ -268,7 +271,7 @@ function resetVia(c: Case, via: 'thingsToReset' | 'resetModules') {
 describe('Reset — a standalone system in thingsToReset', () => {
   it.each(cases)('$name resets as a module reset of its own context does', (c) => {
     const walked = resetVia(c, 'thingsToReset');
-    const moduled = resetVia(c, 'resetModules');
+    const moduled = resetVia(c, 'resetPersistentContexts');
 
     expect(walked.after).toEqual(moduled.after);
     for (const key of walked.lifetime) {

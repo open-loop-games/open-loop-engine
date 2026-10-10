@@ -160,17 +160,17 @@ The context ID and each ref's `id` make up the save key. Changing either breaks 
 
 ### Resetting persistent refs in bulk
 
-Use `createReset`'s `resetModules` for module-scoped resets instead of manually enumerating refs. The reset resolves each module ID to that module's persistent refs, nested category and per-definition contexts included, each time it runs — so refs made in `connect()` or by a module installed later are in scope, and an ID naming no module logs a warning:
+Use `createReset`'s `resetPersistentContexts` for module-scoped resets instead of manually enumerating refs. The reset resolves each module ID to that module's persistent refs, nested category and per-definition contexts included, each time it runs — so refs made in `connect()` or by a module installed later are in scope, and an ID naming no module logs a warning:
 
 ```ts
 const prestigeReset = createReset({
-  resetModules: ['resources', 'upgrades', 'producers'],
+  resetPersistentContexts: ['resources', 'upgrades', 'producers'],
 });
 ```
 
 So adding a resource, upgrade, producer, or category entry inside a module scope automatically joins resets that reference that module — no cross-file coordination.
 
-**System-owned cross-run state is lifetime.** Resource `cumulative` / `best`, accumulator-skill `permanentBonus`, cycle `count` / `bestTime`, time `totalPlayTime`, BestOf records, run-pool aliveness, automation unlocks, recommendation settings, dialog state, achievement `earned` / `earnedAt` and challenge `active` / `completions` are tagged `lifetime`: neither `resetModules` nor a `thingsToReset` walk over an object or category touches them. Wipe one by naming the ref itself in `thingsToReset`, or through the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state — skill `xp`, cycle `elapsed`, TimeBank `banked` (carry it with `keep`) — so a looper's between-run reset over a skill-category module wipes xp and keeps the permanent bonus, which is the intended cycle shape. A module reset also sweeps an `ActionCategory`'s queue or list, current item, cursor and pause flag, and fires no `cancelled`; `thingsToReset: [category]` reaches only its per-def state.
+**System-owned cross-run state is lifetime.** Resource `cumulative` / `best`, accumulator-skill `permanentBonus`, cycle `count` / `bestTime`, time `totalPlayTime`, BestOf records, run-pool aliveness, automation unlocks, recommendation settings, dialog state, achievement `earned` / `earnedAt` and challenge `active` / `completions` are tagged `lifetime`: neither `resetPersistentContexts` nor a `thingsToReset` walk over an object or category touches them. Wipe one by naming the ref itself in `thingsToReset`, or through the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state — skill `xp`, cycle `elapsed`, TimeBank `banked` (carry it with `keep`) — so a looper's between-run reset over a skill-category module wipes xp and keeps the permanent bonus, which is the intended cycle shape. A module reset also sweeps an `ActionCategory`'s queue or list, current item, cursor and pause flag, and fires no `cancelled`; `thingsToReset: [category]` reaches only its per-def state.
 
 A system or category in `thingsToReset` resets what it owns — its own persistent context, or each entry's per-definition context — and nothing it merely names: a purchasable's cost resource, a producer's output, a ref passed as `limit` or `visibility`. List those explicitly when the reset should clear them.
 
@@ -180,7 +180,7 @@ Inline `keep` and `retain` on the same `createReset` act as a denylist over the 
 
 ```ts
 const prestigeReset = createReset({
-  resetModules: ['resources', 'upgrades'],
+  resetPersistentContexts: ['resources', 'upgrades'],
   keep: [premium],
   retain: new Map([[skillLevel, fractional(0.1)]]),
 });
@@ -192,7 +192,7 @@ A `Resource` returned by `createResource` is itself the `Persistent` handle (`Re
 
 Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory`, etc.) wrap each registered definition in its own persistent context, `{categoryId}/{def.id}`. That id is the **save key** as given — it isn't prefixed with the ambient module, so keep category ids unique across the game. **Reset scope** is a different axis: the per-definition context is still recorded as a child of the module the category was built in, so a reset naming that module reaches every entry's run state. Only `lifetime` refs escape it (§ Resetting persistent refs in bulk). Keep a category whose run state must outlive a prestige in a module no reset names.
 
-For challenges that means `active` and `completions` survive every prestige tier (the genre convention), and a challenge stays entered through the prestiges played inside it. Naming `'my-challenges/ic1'` in `resetModules` doesn't reset them; to wipe completions, name the refs — `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
+For challenges that means `active` and `completions` survive every prestige tier (the genre convention), and a challenge stays entered through the prestiges played inside it. Naming `'my-challenges/ic1'` in `resetPersistentContexts` doesn't reset them; to wipe completions, name the refs — `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
 
 Rebuilding runtime state from persisted refs is hydration, and the engine does it itself after every load and reset — a challenge category re-applies an active challenge's overrides and patches, so there is nothing to call from `onLoad`. A public `restore(x)` is a different operation: it writes back what the same object's `snapshot()` or `serialize()` produced, such as a slot loadout or a resource-bag record, and brings the object's hooks in line as a load would. These engine reconciles (challenge scopes, achievement and automation latching, slot hook resync, temporary-effect rebuild) run after every `ctx.onLoad`: a watcher on what they write sees state `onLoad` rebuilt, while `onLoad` itself sees them unreconciled. A reconcile that throws after a successful load leaves the load standing and fires `save:reconcile-failed`. A load restores `earned` without firing `onComplete`, so `onComplete` may grant a reward; and an achievement whose requirement holds once a load settles (one added in a content update, or one a reset wiped by name) latches then. Challenge `onEnter` / `onExit` run only on a player entry or exit, so they may write game state; runtime-only setup that must come back after a load derives from `challenge.active`. A temporary-effect system rebuilds its live instances from the save, calling each def's `onRehydrate` (else `onApply`) and never `onExpire` on the instances it replaces, so a def whose `onApply` grants game state needs an `onRehydrate`; a reset that clears the system drops its instances without `onExpire` too.
 
@@ -344,7 +344,7 @@ const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
 export const prestigeEligibleThreshold = 1_000_000;
 ```
 
-The wrap returns a `ComputedRef` that reads registry-then-default; `pushScope` and the cleanup it returns install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
+The wrap returns a `ComputedRef` that reads registry-then-default; `pushOverrides` and the cleanup it returns install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
 
 Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
 

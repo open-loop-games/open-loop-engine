@@ -13,41 +13,41 @@ import { persistent, beginPersistentContext, endPersistentContext } from '@/core
 import { createPurchasable } from '@/systems/purchasable';
 
 describe('OverrideRegistry', () => {
-  it('scopeVersion bumps on pushScope and on cleanup', () => {
+  it('overrideVersion bumps on pushOverrides and on cleanup', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('test');
     reg.setDefault('f', () => 1);
-    const v0 = reg.scopeVersion.value;
+    const v0 = reg.overrideVersion.value;
 
-    const a = reg.pushScope('a', { f: () => 2 });
-    expect(reg.scopeVersion.value).toBe(v0 + 1);
+    const a = reg.pushOverrides('a', { f: () => 2 });
+    expect(reg.overrideVersion.value).toBe(v0 + 1);
 
-    const b = reg.pushScope('b', { f: () => 3 });
-    expect(reg.scopeVersion.value).toBe(v0 + 2);
+    const b = reg.pushOverrides('b', { f: () => 3 });
+    expect(reg.overrideVersion.value).toBe(v0 + 2);
 
     b();
-    expect(reg.scopeVersion.value).toBe(v0 + 3);
+    expect(reg.overrideVersion.value).toBe(v0 + 3);
     a();
-    expect(reg.scopeVersion.value).toBe(v0 + 4);
+    expect(reg.overrideVersion.value).toBe(v0 + 4);
   });
 
-  it('scopeVersion bumps on override and on a first setDefault, not on a no-op setDefault', () => {
+  it('overrideVersion bumps on override and on a first setDefault, not on a no-op setDefault', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('test');
     reg.setDefault('f', () => 1);
-    expect(reg.scopeVersion.value).toBe(1);
+    expect(reg.overrideVersion.value).toBe(1);
     reg.setDefault('f', () => 2);
-    expect(reg.scopeVersion.value).toBe(1);
+    expect(reg.overrideVersion.value).toBe(1);
     reg.override('f', () => 3);
-    expect(reg.scopeVersion.value).toBe(2);
+    expect(reg.overrideVersion.value).toBe(2);
   });
 
-  it('cleanup is idempotent and does not double-bump scopeVersion', () => {
+  it('cleanup is idempotent and does not double-bump overrideVersion', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('test');
     reg.setDefault('f', () => 1);
-    const cleanup = reg.pushScope('s', { f: () => 2 });
-    const before = reg.scopeVersion.value;
+    const cleanup = reg.pushOverrides('s', { f: () => 2 });
+    const before = reg.overrideVersion.value;
     cleanup();
     cleanup(); // second call is a no-op
-    expect(reg.scopeVersion.value).toBe(before + 1);
+    expect(reg.overrideVersion.value).toBe(before + 1);
   });
 
   it('getBaseKeys returns base-map keys only, not scope-only keys', () => {
@@ -57,7 +57,7 @@ describe('OverrideRegistry', () => {
     expect([...reg.getBaseKeys()].sort()).toEqual(['alpha', 'beta']);
 
     // Pushing a scope that introduces a new key should NOT change getBaseKeys.
-    const cleanup = reg.pushScope('challenge', {
+    const cleanup = reg.pushOverrides('challenge', {
       gamma: () => 3,
     });
     expect([...reg.getBaseKeys()].sort()).toEqual(['alpha', 'beta']);
@@ -69,13 +69,13 @@ describe('OverrideRegistry', () => {
   it('a scope entry left undefined falls through to the base', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('test');
     reg.setDefault('f', () => 1);
-    reg.pushScope('sim', { f: undefined });
+    reg.pushOverrides('sim', { f: undefined });
     expect(reg.get('f')()).toBe(1);
   });
 
   it('inherited keys never resolve out of a scope', () => {
     const reg = createOverrideRegistry<Record<string, () => number>>('test');
-    reg.pushScope('sim', {});
+    reg.pushOverrides('sim', {});
     expect(reg.has('toString')).toBe(false);
     expect(() => reg.get('toString')).toThrow(/not registered/);
   });
@@ -139,7 +139,7 @@ describe('tunable() helper', () => {
     const t = tunable(reg, 'foo', () => 10);
     expect(t.value).toBe(10);
 
-    const restore = reg.pushScope('sim', { foo: () => 999 });
+    const restore = reg.pushOverrides('sim', { foo: () => 999 });
     expect(t.value).toBe(999);
 
     restore();
@@ -158,7 +158,7 @@ describe('tunable() helper', () => {
   it('re-evaluates when a key first registered after a read appears', () => {
     const reg = createOverrideRegistry<Record<string, () => number>>('tuning');
     const probe = computed(() => {
-      void reg.scopeVersion.value;
+      void reg.overrideVersion.value;
       return reg.has('foo') ? reg.get('foo')() : 0;
     });
     expect(probe.value).toBe(0);
@@ -211,7 +211,7 @@ describe('tunable pilot: Purchasable effect routed through registry', () => {
     expect(new Decimal(purchasable.effect.value).toNumber()).toBe(10);
 
     // Sim takeover replaces the value wholesale
-    const restore = reg.pushScope('sim-takeover', {
+    const restore = reg.pushOverrides('sim-takeover', {
       'upgrades/double-gold/effect': () => new Decimal(9999),
     });
     expect(new Decimal(purchasable.effect.value).toNumber()).toBe(9999);
@@ -261,7 +261,7 @@ describe('tunable pilot: Skill-style multiplier lookup', () => {
     expect(baseMagic).toBeCloseTo(Math.pow(1.1, 5), 5);
 
     // Override only combat
-    const restore = reg.pushScope('sim', {
+    const restore = reg.pushOverrides('sim', {
       'skills/combat/multiplier': () => new Decimal(100),
     });
     expect(new Decimal(skills.getBoost('combat')).toNumber()).toBe(100);
@@ -273,12 +273,12 @@ describe('tunable pilot: Skill-style multiplier lookup', () => {
 });
 
 describe('OverrideRegistry live reads', () => {
-  it('scopeDepth recomputes on pushScope and on cleanup', () => {
+  it('overrideDepth recomputes on pushOverrides and on cleanup', () => {
     const reg = createOverrideRegistry<{ f: () => number }>('live');
     reg.setDefault('f', () => 1);
-    const depth = computed(() => reg.scopeDepth);
+    const depth = computed(() => reg.overrideDepth);
     expect(depth.value).toBe(0);
-    const pop = reg.pushScope('a', { f: () => 2 });
+    const pop = reg.pushOverrides('a', { f: () => 2 });
     expect(depth.value).toBe(1);
     pop();
     expect(depth.value).toBe(0);

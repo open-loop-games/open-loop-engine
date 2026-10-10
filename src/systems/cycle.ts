@@ -23,10 +23,10 @@ import {
   persistent,
   type Persistent,
   withPersistentContext,
-  resolveSystemContextId,
+  resolveSystemPersistentContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import type { RegisterTick } from '@/core/sequencer';
 import { createReset, type Reset, type ResetScope, type ScopedReset } from './reset';
 import { createPredicateResolver, type Predicate } from './gate';
@@ -68,7 +68,7 @@ export interface CycleOptions {
   /**
    * A pre-built {@link Reset} to drive instead of constructing one from the
    * shorthand fields below. Takes precedence over `thingsToReset` /
-   * `resetModules` / `keep` / `retain` / `onRestart`, which are ignored when
+   * `resetPersistentContexts` / `keep` / `retain` / `onRestart`, which are ignored when
    * this is supplied.
    *
    * Those five fields are shorthand covering the common case, deliberately not
@@ -82,7 +82,7 @@ export interface CycleOptions {
 
   /**
    * Objects containing persistent refs to reset each cycle (passed through to the internal {@link Reset}).
-   * Optional when {@link resetModules} is provided.
+   * Optional when {@link resetPersistentContexts} is provided.
    */
   thingsToReset?: Computable<unknown[]>;
 
@@ -91,7 +91,7 @@ export interface CycleOptions {
    * with other Reset/Cycle objects to inherit their scope.
    * @see {@link ResetScope}
    */
-  resetModules?: ResetScope[];
+  resetPersistentContexts?: ResetScope[];
 
   /**
    * Refs that should survive the cycle reset unchanged.
@@ -162,7 +162,7 @@ export interface Cycle extends ScopedReset {
   readonly running: Ref<boolean>;
 
   /**
-   * The flattened set of persistent refs resolved from `resetModules`.
+   * The flattened set of persistent refs resolved from `resetPersistentContexts`.
    * Exposed so other cycles can compose with this cycle's scope.
    */
   readonly resolvedScope: ReadonlySet<Persistent>;
@@ -240,7 +240,7 @@ export function createCycle(options: CycleOptions): Cycle {
     endCondition,
     reset: providedReset,
     thingsToReset,
-    resetModules,
+    resetPersistentContexts,
     keep,
     retain,
     onBeforeRestart,
@@ -248,7 +248,7 @@ export function createCycle(options: CycleOptions): Cycle {
     registerTick,
   } = options;
 
-  const contextId = resolveSystemContextId(id, 'cycle');
+  const contextId = resolveSystemPersistentContextId(id, 'cycle');
   const { count, bestTime, elapsed } = withPersistentContext(contextId, () => ({
     count: persistent(0, { name: 'count', lifetime: true }),
     bestTime: persistent(Infinity, { name: 'bestTime', lifetime: true }),
@@ -266,7 +266,7 @@ export function createCycle(options: CycleOptions): Cycle {
     providedReset ??
     createReset({
       thingsToReset,
-      resetModules,
+      resetPersistentContexts,
       keep,
       retain,
       onReset: onRestart,
@@ -351,5 +351,5 @@ export function createCycle(options: CycleOptions): Cycle {
     },
   };
 
-  return attachContextReset(cycle, contextId);
+  return attachPersistentContextReset(cycle, contextId);
 }

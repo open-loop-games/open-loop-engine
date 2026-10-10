@@ -26,8 +26,8 @@ import {
 } from '@/index';
 import { createEngineFromSave } from '@/harness/create-engine';
 import {
-  clearPersistentNamespace,
-  getCurrentContext,
+  deletePersistenceNamespace,
+  getCurrentPersistentContext,
   getPersistentRefs,
   withPersistenceNamespace,
   withPersistentContext,
@@ -162,7 +162,7 @@ describe('auto-persistence context', () => {
     const mod: EngineModule = {
       id: 'my-layer',
       install() {
-        capturedContext = getCurrentContext();
+        capturedContext = getCurrentPersistentContext();
       },
     };
     const engine = createEngine({ gameId: 'test', persistence: false });
@@ -193,7 +193,7 @@ describe('auto-persistence context', () => {
     const engine = createEngine({ gameId: 'test', persistence: false });
     engine.use({ id: 'a', install() {} });
     engine.start();
-    expect(getCurrentContext()).toBeUndefined();
+    expect(getCurrentPersistentContext()).toBeUndefined();
     engine.stop();
   });
 });
@@ -1485,7 +1485,7 @@ describe('save safety', () => {
 describe('load order — engine reconcilers run after onLoad', () => {
   /**
    * The repro shape: the module rebuilds `derived` from `roster` in onLoad,
-   * and a sync watcher on the override registry's `scopeVersion` reads both.
+   * and a sync watcher on the override registry's `overrideVersion` reads both.
    * The save holds roster `['s']` mid-challenge; live state has the
    * challenge exited, so the load's reconcile pushes its scopes.
    */
@@ -1511,9 +1511,9 @@ describe('load order — engine reconcilers run after onLoad', () => {
       },
       connect() {
         watch(
-          rules.scopeVersion,
+          rules.overrideVersion,
           () => {
-            order.push('scopeVersion watcher');
+            order.push('overrideVersion watcher');
             seen.push([...derived]);
             for (const id of derived) {
               if (!roster.value.includes(id)) throw new Error(`stale derived id ${id}`);
@@ -1551,7 +1551,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
   }
 
   function expectFreshLoad(g: ReturnType<typeof game>) {
-    expect(g.order).toEqual(['onLoad', 'scopeVersion watcher']);
+    expect(g.order).toEqual(['onLoad', 'overrideVersion watcher']);
     expect(g.seen).toEqual([['s']]);
     expect(g.rules.get('mult')()).toBe(2);
   }
@@ -1636,7 +1636,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
 
     expect(rules.get('mult')()).toBe(2);
     scope.stop();
-    clearPersistentNamespace('order-bare');
+    deletePersistenceNamespace('order-bare');
   });
 
   it('a reconcile that throws leaves the load standing and reports save:reconcile-failed', () => {
@@ -1645,7 +1645,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     g.saveMidChallenge(() => engine.save());
     const boom = new Error('boom');
     const stop = watch(
-      g.rules.scopeVersion,
+      g.rules.overrideVersion,
       () => {
         throw boom;
       },

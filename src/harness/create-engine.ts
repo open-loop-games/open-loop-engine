@@ -31,7 +31,7 @@ export interface CreateEngineFromSaveOptions {
    * persistent-ref contexts and storage keys don't alias. Defaults to a
    * fresh `'workbench-scratch-<n>'` per call.
    */
-  namespace?: string;
+  persistenceNamespace?: string;
   /**
    * Overrides for the inner `createEngine` call. `gameId`, `persistence`,
    * `persistenceNamespace`, `storageAdapter`, and `autoSaveInterval` are
@@ -82,7 +82,7 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
   const {
     saveBlob,
     modules,
-    namespace = `workbench-scratch-${scratchCounter++}`,
+    persistenceNamespace: namespace = `workbench-scratch-${scratchCounter++}`,
     config = {},
   } = options;
 

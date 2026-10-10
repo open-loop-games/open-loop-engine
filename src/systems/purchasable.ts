@@ -27,7 +27,7 @@ import {
   DefaultValue,
   cloneDefault,
   withPersistentContext,
-  getCurrentContext,
+  getCurrentPersistentContext,
   SkipPersistence,
 } from '@/core/persistence';
 import {
@@ -40,7 +40,7 @@ import {
 } from '@/core/requirements';
 import type { Resource } from '@/core/resource';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import Formula, { toFormula } from '@/core/formulas/formulas';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
@@ -519,7 +519,7 @@ function buildPurchasableAmount(
   id: string,
   initialAmount: DecimalSource | undefined,
 ): { contextId: string; amount: Persistent<DecimalSource> } {
-  const parentContext = getCurrentContext();
+  const parentContext = getCurrentPersistentContext();
   const contextId = parentContext ? `${parentContext}:${id}` : id;
   const amount = withPersistentContext(contextId, () =>
     persistent<DecimalSource>(0, { name: 'amount' }),
@@ -623,7 +623,7 @@ function assemblePurchasable(
 
   // A reset walk stops at the purchasable's own context: a ref passed as
   // `limit`, `visible` or `bulkPurchase` belongs to whoever created it.
-  return attachContextReset(purchasable, contextId);
+  return attachPersistentContextReset(purchasable, contextId);
 }
 
 // === FACTORIES ===

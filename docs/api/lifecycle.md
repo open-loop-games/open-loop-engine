@@ -5,7 +5,7 @@ Anything that crosses a session boundary or a prestige reset — `withPersistent
 ## Canonical entrypoints
 
 - `withPersistentContext` / `persistent` — create save-owned refs under stable namespaces.
-- `createReset` with `resetModules` — reset module/category scopes without manually listing every ref.
+- `createReset` with `resetPersistentContexts` — reset module/category scopes without manually listing every ref.
 - `createRetentionPolicy`, `keep`, and `retain` — carry values across prestige resets.
 - `createSaveManager` — multi-slot save/load, migration, validation, import, and export.
 - `processOfflineTime` — replay elapsed time through the game loop in bounded chunks.
@@ -26,8 +26,8 @@ auto-saved refs with context-scoped registration
 - `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:768`
 - `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1201`
 - `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map with refs whose value equals their default removed. `src/core/persistence.ts:870`
-- `function getAllPersistentRefs(namespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:1104`
-- `function getModulePersistentRefs(moduleId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:901`
+- `function getAllPersistentRefs(persistenceNamespace?: string): Map<string, Persistent>` — Build a Map of all persistent refs across all contexts, keyed by a stable name when one was assigned, or by iteration order as a legacy fallback. `src/core/persistence.ts:1104`
+- `function getPersistentContextRefs(contextId: string): Set<Persistent>` — Get all persistent refs belonging to a module, including refs created in nested child contexts (categories, per-definition states, etc.). `src/core/persistence.ts:901`
 - `type IfState<T, Ok> = [T] extends [StateConstraint<T>] ? Ok : never` — Resolves to `Ok` when `T` is serializable state and to `never` otherwise, so a parameter typed through it rejects a non-state value at the call. `src/core/persistence.ts:588`
 - `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's current value equals its default. `src/core/persistence.ts:804`
 - `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:720`
@@ -53,7 +53,7 @@ auto-saved refs with context-scoped registration
 prestige and layer mechanics
 
 - `function createReset(options: ResetOptions): Reset` — Create a reset mechanic. `src/systems/reset.ts:270`
-- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:451`
+- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:452`
 - `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:153`
 - `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:181`
 - `interface ResetOptions` — Configuration for a reset mechanic. `src/systems/reset.ts:61`
@@ -112,11 +112,11 @@ persistent game state with multi-slot support
 
 banked-time reservoir with acceleration and burst spend surfaces
 
-- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:174`
-- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:136`
-- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:341`
-- `interface BurstDischargeOptions` `src/systems/time-bank.ts:301`
-- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:216`
-- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:103`
-- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:65`
-- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:44`
+- `interface BankedAcceleration` — Spend-loop handle returned by createBankedAcceleration. `src/systems/time-bank.ts:178`
+- `interface BankedAccelerationConfig` — Configuration for createBankedAcceleration. `src/systems/time-bank.ts:140`
+- `function burstDischarge(bank: TimeBank, tickDriver: TickDriver, options?: BurstDischargeOptions): number` — Spend (a fraction of) a TimeBank as one immediate fast-forward: withdraw, then replay the seconds through processOfflineTime in a single burst. `src/systems/time-bank.ts:345`
+- `interface BurstDischargeOptions` `src/systems/time-bank.ts:305`
+- `function createBankedAcceleration(config: BankedAccelerationConfig): BankedAcceleration` — The live-multiplier spend loop over a TimeBank: toggle a speed boost on the TickDriver, pay for it from the bank each tick, auto-stop at depletion. `src/systems/time-bank.ts:220`
+- `function createTimeBank(config?: TimeBankConfig): TimeBank` — Create a banked-time reservoir: a persistent pool of seconds earned by consumer policy and spent through createBankedAcceleration, burstDischarge, or a bespoke consumer drain. `src/systems/time-bank.ts:107`
+- `interface TimeBank` — Banked-time reservoir returned by createTimeBank. `src/systems/time-bank.ts:69`
+- `interface TimeBankConfig` — Configuration for createTimeBank. `src/systems/time-bank.ts:48`

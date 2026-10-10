@@ -25,11 +25,11 @@ import { processGetter, type Computable } from '@/core/computed';
 import {
   persistent,
   withPersistentContext,
-  getCurrentContext,
+  getCurrentPersistentContext,
   latchWhenSettled,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
-import { attachContextReset } from '@/core/resettable';
+import { attachPersistentContextReset } from '@/core/resettable';
 import { createPredicateResolver, type Gate, type Predicate, type PredicateResolver } from './gate';
 
 // === TYPES ===
@@ -188,7 +188,7 @@ export function createAchievement<T = unknown>(
   // (two categories reusing a def id collided); collapsing onto the bare parent
   // instead collides when several achievements share one context. Mirrors
   // category-base / timed-progress `${parent}/${local}` nesting.
-  const parent = getCurrentContext();
+  const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/achievement:${id}` : `achievement:${id}`;
   const { earned, earnedAt } = withPersistentContext(contextId, () => ({
     earned: persistent<boolean>(false, { name: 'earned', lifetime: true }),
@@ -242,7 +242,7 @@ export function createAchievement<T = unknown>(
   // added since the save, or one whose `earned` a reset wiped.
   if (requirement !== undefined) latchWhenSettled(canComplete, () => achievement.complete());
 
-  return attachContextReset(achievement, contextId);
+  return attachPersistentContextReset(achievement, contextId);
 }
 
 // === PUBLIC UTILITIES ===

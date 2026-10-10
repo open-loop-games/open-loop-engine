@@ -49,6 +49,6 @@ export function isDev(): boolean {
  *
  * @internal
  */
-export function runInScope<T>(scope: EffectScope | undefined, fn: () => T): T {
+export function runInEffectScope<T>(scope: EffectScope | undefined, fn: () => T): T {
   return scope?.active ? (scope.run(fn) as T) : fn();
 }

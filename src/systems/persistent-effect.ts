@@ -35,7 +35,7 @@
  */
 
 import { computed, effectScope, ref, watch, type ComputedRef } from 'vue';
-import { runInScope } from '@/core/common';
+import { runInEffectScope } from '@/core/common';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import type { Grant } from '@/core/modifier';
@@ -258,7 +258,7 @@ export function createPersistentEffectSystem(
       // in a tight loop with no microtask boundary, so a default (pre) flush
       // would leave the effect a step or more late. Mirrors achievement.ts /
       // automation.ts / resource-bag link watchers.
-      runInScope(scope, () =>
+      runInEffectScope(scope, () =>
         watch(activeRef, () => settle(entry), { immediate: true, flush: 'sync' }),
       );
 

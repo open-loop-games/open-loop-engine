@@ -23,10 +23,10 @@ import {
   PersistentName,
 } from '@/core/persistence';
 import type { Grant } from '@/core/modifier';
-import { runInScope } from '@/core/common';
+import { runInEffectScope } from '@/core/common';
 import { profileEnd, profileStart } from '@/core/profiler';
 import type { RegisterTick } from '@/core/sequencer';
-import { attachContextReset, Resettable, type ResettableObject } from '@/core/resettable';
+import { attachPersistentContextReset, Resettable, type ResettableObject } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
 import type { PredicateResolver } from './gate';
 import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-binding';
@@ -197,7 +197,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     // withPersistentContext guarantees the context is popped even if a builder
     // throws — a leaked context silently mis-scopes the save keys of every
     // persistent ref created afterward.
-    const { instance, state, signals } = runInScope(scope, () =>
+    const { instance, state, signals } = runInEffectScope(scope, () =>
       withPersistentContext(contextId, () => {
         const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
         const state = buildState ? buildState(def, instance) : (undefined as State);
@@ -219,7 +219,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, State =
     );
 
     entries.set(def.id, { def, instance, state, signals });
-    contextResets.push(attachContextReset({}, contextId));
+    contextResets.push(attachPersistentContextReset({}, contextId));
     entriesVersion.value++;
   }
 

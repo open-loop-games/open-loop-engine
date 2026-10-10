@@ -10,7 +10,7 @@ import {
   deserializePersistents,
   createDefinitionStates,
   getPersistentRefs,
-  getModulePersistentRefs,
+  getPersistentContextRefs,
   setPersistentName,
   PersistentName,
   isAtDefault,
@@ -670,14 +670,14 @@ describe('StateConstraint — typed interfaces without index signatures', () => 
   // persistent({ handler: class {} })   — class constructor
 });
 
-describe('getModulePersistentRefs', () => {
+describe('getPersistentContextRefs', () => {
   it('returns refs from root context', () => {
     beginPersistentContext('mod-root');
     const a = persistent(0);
     const b = persistent(1);
     endPersistentContext();
 
-    const refs = getModulePersistentRefs('mod-root');
+    const refs = getPersistentContextRefs('mod-root');
     expect(refs.size).toBe(2);
     expect(refs.has(a)).toBe(true);
     expect(refs.has(b)).toBe(true);
@@ -699,7 +699,7 @@ describe('getModulePersistentRefs', () => {
 
     endPersistentContext();
 
-    const refs = getModulePersistentRefs('mod-parent');
+    const refs = getPersistentContextRefs('mod-parent');
     expect(refs.size).toBe(3);
     expect(refs.has(parentRef)).toBe(true);
     expect(refs.has(childRef)).toBe(true);
@@ -707,7 +707,7 @@ describe('getModulePersistentRefs', () => {
   });
 
   it('returns empty set for unknown module', () => {
-    const refs = getModulePersistentRefs('nonexistent-module');
+    const refs = getPersistentContextRefs('nonexistent-module');
     expect(refs.size).toBe(0);
   });
 
@@ -720,7 +720,7 @@ describe('getModulePersistentRefs', () => {
     const refB = persistent(0);
     endPersistentContext();
 
-    const refsA = getModulePersistentRefs('mod-a');
+    const refsA = getPersistentContextRefs('mod-a');
     expect(refsA.has(refA)).toBe(true);
     expect(refsA.has(refB)).toBe(false);
   });
@@ -734,7 +734,7 @@ describe('getModulePersistentRefs', () => {
       endPersistentContext();
       endPersistentContext();
 
-      const refs = getModulePersistentRefs('mod-ns');
+      const refs = getPersistentContextRefs('mod-ns');
       expect(refs.size).toBe(2);
       expect(refs.has(r1)).toBe(true);
       expect(refs.has(r2)).toBe(true);
@@ -747,7 +747,7 @@ describe('getModulePersistentRefs', () => {
     endPersistentContext();
 
     withPersistenceNamespace('fork-1', () => {
-      expect(getModulePersistentRefs('mod-live-shop').size).toBe(0);
+      expect(getPersistentContextRefs('mod-live-shop').size).toBe(0);
       expect(getPersistentRefs('mod-live-shop')).toBeUndefined();
     });
   });
@@ -760,15 +760,15 @@ describe('getModulePersistentRefs', () => {
     endPersistentContext();
     endPersistentContext();
 
-    expect(getModulePersistentRefs('mod-cleartest').size).toBe(2);
+    expect(getPersistentContextRefs('mod-cleartest').size).toBe(2);
 
     resetAllPersistentContexts();
 
-    expect(getModulePersistentRefs('mod-cleartest').size).toBe(0);
+    expect(getPersistentContextRefs('mod-cleartest').size).toBe(0);
   });
 
   // Re-entering the same context (e.g. createTimedProgress calling
-  // withPersistentContext(getCurrentContext()) when no nesting is intended)
+  // withPersistentContext(getCurrentPersistentContext()) when no nesting is intended)
   // used to register the context as its own child, causing the
   // reset-scope walker to loop indefinitely.
   it('does not register a context as its own child on same-id re-entry', () => {
@@ -781,7 +781,7 @@ describe('getModulePersistentRefs', () => {
 
     endPersistentContext();
 
-    const refs = getModulePersistentRefs('mod-reentry');
+    const refs = getPersistentContextRefs('mod-reentry');
     expect(refs.size).toBe(2);
     expect(refs.has(outerRef)).toBe(true);
     expect(refs.has(innerRef)).toBe(true);

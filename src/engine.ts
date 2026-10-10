@@ -19,7 +19,7 @@ import { createSaveManager } from './core/save-manager';
 import {
   withPersistentContext,
   withPersistenceNamespace,
-  clearPersistentNamespace,
+  deletePersistenceNamespace,
 } from './core/persistence';
 import { isDev } from './core/common';
 import { createEmitHandle } from './core/events';
@@ -446,7 +446,7 @@ export function createEngine(config: EngineConfig): Engine {
   // Created inside the engine's namespace under a stable context id so the
   // fixed-mode accumulator joins this engine's namespaced save, restores
   // deterministically across sessions, and is evicted by `dispose()`'s
-  // `clearPersistentNamespace`. Outside the namespace it would strand in the
+  // `deletePersistenceNamespace`. Outside the namespace it would strand in the
   // default bucket — excluded from its own save (open-loop-engine#9).
   const tickDriver = withPersistenceNamespace(config.persistenceNamespace, () =>
     createTickDriver({
@@ -731,7 +731,7 @@ export function createEngine(config: EngineConfig): Engine {
       // Drop the in-memory persistent-context registry for this engine's
       // namespace so a fresh engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.
-      clearPersistentNamespace(config.persistenceNamespace);
+      deletePersistenceNamespace(config.persistenceNamespace);
       disposed = true;
     },
 

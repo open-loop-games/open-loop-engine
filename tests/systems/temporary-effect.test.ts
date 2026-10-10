@@ -638,7 +638,7 @@ describe('resets', () => {
   it('a module reset drops every live instance and its modifiers, without onExpire', () => {
     const { system, chain, onExpire } = buildHasted();
 
-    createReset({ resetModules: ['run'] }).reset();
+    createReset({ resetPersistentContexts: ['run'] }).reset();
 
     expect(system.getActive()).toEqual([]);
     expect(Decimal.eq(chain.apply(10), 10)).toBe(true);
