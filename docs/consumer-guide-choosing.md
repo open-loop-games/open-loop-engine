@@ -44,7 +44,7 @@ Three paths land in the consumer corpus, each fitting a different shape of need.
 
 | Need | Use |
 |---|---|
-| Building with continuous rate (Cookie-Clicker shape, ambient auto-producers) | `createProducerCategory` |
+| Building with continuous rate (clicker buildings, ambient auto-producers) | `createProducerCategory` |
 | Upgrades / gates / capped repeatables in batch (perks, milestones, sequential tiers, visibility unlocks) | `createPurchasableCategory` |
 | Per-instance customized leveled purchases (heterogeneous `effect` / `onPurchase` per instance, post-creation per-instance wiring) | raw `createScalingPurchasable` |
 

@@ -10,9 +10,9 @@ Three engine shapes share the "what's the player doing right now?" surface. The 
 
 | Shape | When to reach for |
 |---|---|
-| `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). A list-mode looper restarts a run with `replay()`; `sequencer.resetCursor()` moves only the cursor and leaves each slot's progress from the last run. Idle Loops / Cavernous lineage. |
-| Worker-bundle recipe | Single-active duration-driven execution from `Sequencer` + `TimedProgress` + a `getTask(id)` lookup. No per-execution state machine; the duration accumulator is the lifecycle. spell-compiler and maldacena shape; recipe below. |
-| `createSlot` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. progress-knight-ng's `currentJob` / `currentSkill` shape. |
+| `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). A list-mode looper restarts a run with `replay()`; `sequencer.resetCursor()` moves only the cursor and leaves each slot's progress from the last run. |
+| Worker-bundle recipe | Single-active duration-driven execution from `Sequencer` + `TimedProgress` + a `getTask(id)` lookup. No per-execution state machine; the duration accumulator is the lifecycle. Recipe below. |
+| `createSlot` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. The shape of a current job or current skill. |
 
 Decision flow:
 
@@ -55,9 +55,9 @@ Shared across the pool:
 - A `getTask(id)` lookup over the union of task defs all workers might execute
 - Consumer-owned policy: post-bounty, recall, wake-idle orchestration, pin-to-role strategy swaps
 
-Single-worker case: same shape with one instance (`id: 'player'`). spell-compiler and maldacena both follow this pattern in their action/spell-execution modules.
+Single-worker case: same shape with one instance (`id: 'player'`).
 
-Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive — the structural decision case (a defender-tower game evaluated during the createWorker retirement) showed that worker-shaped wiring fights spatial games' cooldown-per-tick model and has to be bypassed wholesale anyway.
+Why no engine helper: the claim axis varies widely across games — round-robin, distance, skill-filter, priority-tier, class-lockout — and recall/cancel semantics vary just as widely. The primitives above are the stable subset; a `createSharedTaskPool` that tried to subsume claim + recall + wake-idle would over-fit to one game's design. Per-worker, the bundle is thin enough (two computeds + one-line dispose) that inlining beats shipping an identity wrapper as a primitive. In a tower-defense game, worker-shaped wiring fights the cooldown-per-tick model and has to be bypassed wholesale anyway.
 
 ## Pre-completion gating in ActionCategory
 
@@ -82,7 +82,7 @@ mapAction: (def) => ({
 }),
 ```
 
-For chain-with-terminate semantics (idle-loops-ng's omsi-loops lineage runs an array of pre-completion hooks — `maxMana`, `maxEffort`, then content-specific overrides), wrap the body in an iterable:
+For chain-with-terminate semantics (e.g. an array of pre-completion hooks — `maxMana`, `maxEffort`, then content-specific overrides), wrap the body in an iterable:
 
 ```ts
 type PreCompletionHook<E, D> = (entry: E, def: D) => 'terminate' | 'continue';
@@ -107,7 +107,7 @@ mapAction: (def) => ({
 }),
 ```
 
-This is a recipe, not engine API. The chain shape is currently single-lineage (omsi-loops). A non-omsi consumer surfacing the same chain independently is the signal to graduate it onto ActionCategory.
+This is a recipe, not engine API. The chain shape comes from one lineage of consumers. A second, independent consumer surfacing the same chain is the signal to graduate it onto ActionCategory.
 
 ## Persona-roster composition
 
@@ -152,7 +152,7 @@ Why no engine helper today: the selection-policy axis (round-robin vs. priority 
 
 Composition recipe for action-queue automation that needs to interleave entries from multiple content-type categories (gathering, crafting, research, …) under one priority order. Built on `createPriorityStrategy` plus a per-content-type `passBonus` map that breaks ties between equal-priority entries from different categories.
 
-The convergent shape across consumers (incloneution `src/modules/automation.ts`, maldacena `src/modules/action-fill.ts`):
+The convergent shape across consumers:
 
 - Each content-type entry carries a player-set `automationPriority` and a static category-level `passBonus`.
 - Score is `priority * 10 + passBonus[contentType]` — the multiplier preserves player priority dominance while the pass-bonus map deterministically orders cross-category ties.
@@ -241,7 +241,7 @@ npcs.register({
 });
 npcs.get('mentor-rask')!.fields.trust.tryAdvance();
 
-// One subject, many fields — maldacena-style single Entity with mixed state
+// One subject, many fields — a single Entity with mixed state
 const entity = createSubjectCategory({
   id: 'entity',
   fields: {
@@ -433,7 +433,7 @@ def.gainChain.bind({
 });
 ```
 
-Which of `chain.bind` / declarative `grants` / `createPersistentEffectSystem` to reach for is the ladder in [consumer-guide.md §Modifier chains and effects](./consumer-guide.md#modifier-chains-and-effects); this recipe is what the binding looks like once you've picked. idle-loops-ng uses `PersistentEffectSystem.register` in places only because registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope) — not because the bonus shape requires it.
+Which of `chain.bind` / declarative `grants` / `createPersistentEffectSystem` to reach for is the ladder in [consumer-guide.md §Modifier chains and effects](./consumer-guide.md#modifier-chains-and-effects); this recipe is what the binding looks like once you've picked. Reach for `PersistentEffectSystem.register` when registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope), not because the bonus shape requires it.
 
 ## Sublinear per-source prestige payouts
 
