@@ -463,7 +463,7 @@ describe('modifiers take Grants, active takes a Predicate', () => {
     expect(value(chain)).toBe(2);
   });
 
-  it("active as a Gate whose handles the runtime doesn't carry throws at register", () => {
+  it("active as a Gate whose services the predicate resolver doesn't carry throws at register", () => {
     const system = createSystem();
     expect(() => system.register({ id: 'lit', active: { kind: 'flag', id: 'lamp' } })).toThrow(
       /conditional effect 'lit' active: /,

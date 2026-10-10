@@ -207,17 +207,17 @@ Composition recipe for games with named characters that the player returns to �
 Dialog content is a graph of nodes with text, gates, choices, and outcomes. The engine ships:
 
 - An authored data shape (`DialogGraph` — `DialogNode[]` with an `entry` pointer) — declarative, serializable, no closures.
-- An adapter contract (`DialogRuntime`) — anything that can drive a conversation: `start` / `present` / `choose` / `finish` plus `serialize` / `restore`.
-- A native runtime implementation (`createNativeDialogRuntime`) that walks `DialogGraph` nodes, evaluates `Gate` predicates on choices/nodes through the ambient Gate runtime, dispatches `IEffect` outcomes, and maintains visit counts.
+- An adapter contract (`DialogAdapter`) — anything that can drive a conversation: `start` / `present` / `choose` / `finish` plus `serialize` / `restore`.
+- A native runtime implementation (`createNativeDialogAdapter`) that walks `DialogGraph` nodes, evaluates `Gate` predicates on choices/nodes through the ambient Gate runtime, dispatches `IEffect` outcomes, and maintains visit counts.
 - A registration surface (`createDialogCategory`, `createDialogSession`) that wraps the runtime in a persistent envelope and emits `presented` / `chosen` / `finished` events.
 
-The contract is the boundary. External adapters — Ink (Inkle), Yarn Spinner, Ren'Py, Dialogic — implement `DialogRuntime` against their own content shape and runtime. They live as separate consumer packages (e.g. a hypothetical `open-loop-ink-adapter`); the engine never depends on any specific framework. To swap an adapter into a session, pass it through `createDialogSession`'s `runtimeFactory` option:
+The contract is the boundary. External adapters — Ink (Inkle), Yarn Spinner, Ren'Py, Dialogic — implement `DialogAdapter` against their own content shape and runtime. They live as separate consumer packages (e.g. a hypothetical `open-loop-ink-adapter`); the engine never depends on any specific framework. To swap an adapter into a session, pass it through `createDialogSession`'s `adapterFactory` option:
 
 ```ts
 const session = createDialogSession({
   id: 'main',
   graphs: dialogCat.getAll().flatMap((e) => e.graphs),
-  runtimeFactory: (graphs, accessor, mutator) => createInkAdapter(inkJson, accessor, mutator),
+  adapterFactory: (graphs, accessor, mutator) => createInkAdapter(inkJson, accessor, mutator),
 });
 ```
 

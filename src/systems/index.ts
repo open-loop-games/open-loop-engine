@@ -51,7 +51,7 @@ export type {
   AllGate,
   AnyGate,
   NotGate,
-  GateRuntime,
+  GateServices,
   GateService,
   GateRequirementOptions,
   Predicate,
@@ -61,7 +61,7 @@ export type {
 export {
   evaluateGate,
   timeUntilGateFlip,
-  getAmbientGateRuntime,
+  getAmbientGateServices,
   getRequiredGateServices,
   assertGateServices,
   isGate,
@@ -213,9 +213,9 @@ export * from './rule-advisor';
 // + the engine-native runtime that walks them. Choice/node conditions accept
 // Gate — predicates resolve via the ambient triple at evaluation.
 // Dialog category: batch-register DialogGraph content per NPC / scene.
-// Dialog session: wraps a DialogRuntime in a persistent envelope with
+// Dialog session: wraps a DialogAdapter in a persistent envelope with
 // lifecycle event emission. Default runtime is the engine-native walker;
-// pass `runtimeFactory` to swap in an external adapter (Ink, Yarn, Ren'Py).
+// pass `adapterFactory` to swap in an external adapter (Ink, Yarn, Ren'Py).
 export * from './dialog';
 export * from './dialog-category';
 export * from './dialog-session';

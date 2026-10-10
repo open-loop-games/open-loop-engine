@@ -6,7 +6,7 @@
  *
  * The fixture builds the same five-category engine pattern as gate.test.ts,
  * but the consumer-visible code under test never reaches for runtime —
- * adoption sites resolve it through `getAmbientGateRuntime()` internally.
+ * adoption sites resolve it through `getAmbientGateServices()` internally.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -36,7 +36,7 @@ import { createModifierChain } from '@/core/modifier';
 import { createTickDriver } from '@/core/tick-driver';
 import { createAutomationTiers } from '@/systems/automation';
 import { createCycle } from '@/systems/cycle';
-import { createNativeDialogRuntime } from '@/systems/dialog';
+import { createNativeDialogAdapter } from '@/systems/dialog';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createBankedAcceleration, createTimeBank } from '@/systems/time-bank';
 import type { ChallengeDef } from '@/systems/challenge-category';
@@ -620,7 +620,7 @@ describe('createPredicateResolver', () => {
     expect(adopted.read()).toBe(true);
   });
 
-  it("throws at adopt for a Gate whose handles the runtime doesn't carry", () => {
+  it("throws at adopt for a Gate whose services the predicate resolver doesn't carry", () => {
     const predicates = createPredicateResolver({});
     expect(() => predicates.adopt({ kind: 'flag', id: 'seen' }, false, 'cutscene')).toThrow(
       /^cutscene: .*accessor/,
@@ -949,7 +949,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
   it('dialog conditions, when the runtime is built', () => {
     const noAccessor = {} as GameStateAccessor;
     expect(() =>
-      createNativeDialogRuntime({
+      createNativeDialogAdapter({
         graphs: [
           {
             id: 'g',

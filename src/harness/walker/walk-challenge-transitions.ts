@@ -29,10 +29,10 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps, TransitionDistance } from '@/core/transitions';
 import {
   collectGateDeps,
-  getBoundGateRuntime,
+  getBoundGateServices,
   isGate,
   timeUntilGateFlip,
-  type GateRuntime,
+  type GateServices,
 } from '@/systems/gate';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
@@ -62,9 +62,9 @@ interface FieldFlip {
  * Predict when a ChallengeDef field flips, or undefined for a constant (or
  * absent) field, which never does.
  */
-function predictFieldFlip(value: unknown, runtime: GateRuntime): FieldFlip | undefined {
+function predictFieldFlip(value: unknown, services: GateServices): FieldFlip | undefined {
   if (isGate(value)) {
-    return { distance: timeUntilGateFlip(value, runtime), deps: collectGateDeps(value) };
+    return { distance: timeUntilGateFlip(value, services), deps: collectGateDeps(value) };
   }
   if (typeof value === 'function' || isRef(value)) {
     return {
@@ -101,7 +101,7 @@ function emitForEntity(
 ): void {
   const { def, challenge } = entity;
   const defId = def.id;
-  const runtime: GateRuntime = { ...getBoundGateRuntime(challenge), accessor };
+  const runtime: GateServices = { ...getBoundGateServices(challenge), accessor };
 
   if (!challenge.visible.value) {
     const flip = predictFieldFlip(def.visible, runtime);

@@ -844,7 +844,7 @@ describe('modifiers take Grants', () => {
     expect(value(chain)).toBe(2);
   });
 
-  it("a Gate when whose handles the runtime doesn't carry throws at register", () => {
+  it("a Gate when whose services the predicate resolver doesn't carry throws at register", () => {
     const { system } = createSystem();
     const chain = createModifierChain('speed');
     expect(() =>

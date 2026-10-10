@@ -110,16 +110,16 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `interface ResourceGteGate` — True when `accessor.getAmount(resource) >= value`. `src/core/gate.ts:21`
 - `interface StateGate` — True when the comparison `accessor.getStateAt(key) <op> value` holds. `src/core/gate.ts:70`
 - `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:382`
-- `function assertGateServices(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle evaluating `gate` will read. `src/systems/gate.ts:368`
+- `function assertGateServices(gate: Gate, services: GateServices, label: string): void` — Throw unless `runtime` carries every handle evaluating `gate` will read. `src/systems/gate.ts:368`
 - `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:505`
-- `function createPredicateResolver(override?: GateRuntime): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:431`
-- `function evaluateGate(gate: Gate, runtime: GateRuntime): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:175`
-- `function evaluatePredicate(predicate: Predicate, runtime: GateRuntime): boolean` — Evaluate a Predicate once against `runtime` — for consumer code that reads a predicate field back off a definition. `src/systems/gate.ts:465`
+- `function createPredicateResolver(override?: GateServices): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:431`
+- `function evaluateGate(gate: Gate, services: GateServices): boolean` — Resolve a Gate to its current truth value against the engine's live state. `src/systems/gate.ts:175`
+- `function evaluatePredicate(predicate: Predicate, services: GateServices): boolean` — Evaluate a Predicate once against `runtime` — for consumer code that reads a predicate field back off a definition. `src/systems/gate.ts:465`
 - `interface GateRequirementOptions` `src/systems/gate.ts:472`
-- `interface GateRuntime` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:124`
-- `function getAmbientGateRuntime(override?: GateRuntime): GateRuntime` — Snapshot whichever ambient handles are currently wired into a GateRuntime bundle. `src/systems/gate.ts:149`
-- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateRuntime. `src/systems/gate.ts:395`
-- `function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:237`
+- `interface GateServices` — The engine handles evaluateGate and timeUntilGateFlip read through. `src/systems/gate.ts:124`
+- `function getAmbientGateServices(override?: GateServices): GateServices` — Snapshot whichever ambient handles are currently wired into a GateServices bundle. `src/systems/gate.ts:149`
+- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateServices. `src/systems/gate.ts:395`
+- `function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance` — Distance until `gate` flips truth value at current rates. `src/systems/gate.ts:237`
 
 ## Modifier
 

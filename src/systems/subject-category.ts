@@ -426,7 +426,7 @@ function buildLadderField(
     if (gate) {
       const holds =
         accessor && gate.gate
-          ? evaluateGate(gate.gate, { ...predicates.runtime, accessor })
+          ? evaluateGate(gate.gate, { ...predicates.services, accessor })
           : gate.read();
       if (!holds) return null;
     }

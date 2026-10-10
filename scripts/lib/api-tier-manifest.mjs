@@ -101,7 +101,7 @@ export const TIER_MANIFEST = [
     entrypoints: [
       '`createDialogCategory` — batch-register authored conversation graphs.',
       '`createDialogSession` — persistent UI/runtime envelope for driving dialog.',
-      '`createNativeDialogRuntime` / `DialogRuntime` — default runtime and adapter contract for external dialog tools.',
+      '`createNativeDialogAdapter` / `DialogAdapter` — default runtime and adapter contract for external dialog tools.',
       '`createSubjectCategory` — addressable subjects (NPCs, factions, regions, single entities) with typed multi-field state (scalar / vector / tier / flag / enum).',
     ],
     clusters: ['dialog', 'subject-category'],

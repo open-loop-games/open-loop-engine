@@ -457,14 +457,14 @@ describe('Dialog surface type pins', () => {
     expectTypeOf<DialogSession['choose']>().parameter(0).toBeString();
   });
 
-  it('DialogRuntime contract is stable', async () => {
-    type DialogRuntime = import('@/systems/dialog').DialogRuntime;
+  it('DialogAdapter contract is stable', async () => {
+    type DialogAdapter = import('@/systems/dialog').DialogAdapter;
     type SerializedDialogAdapter = import('@/systems/dialog').SerializedDialogAdapter;
     type DialogPresentation = import('@/systems/dialog').DialogPresentation;
-    expectTypeOf<DialogRuntime['start']>().parameter(0).toBeString();
-    expectTypeOf<DialogRuntime['present']>().returns.toEqualTypeOf<DialogPresentation | null>();
-    expectTypeOf<DialogRuntime['serialize']>().returns.toEqualTypeOf<SerializedDialogAdapter>();
-    expectTypeOf<DialogRuntime['isActive']>().returns.toBeBoolean();
+    expectTypeOf<DialogAdapter['start']>().parameter(0).toBeString();
+    expectTypeOf<DialogAdapter['present']>().returns.toEqualTypeOf<DialogPresentation | null>();
+    expectTypeOf<DialogAdapter['serialize']>().returns.toEqualTypeOf<SerializedDialogAdapter>();
+    expectTypeOf<DialogAdapter['isActive']>().returns.toBeBoolean();
   });
 });
 

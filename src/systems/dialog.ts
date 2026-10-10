@@ -92,7 +92,7 @@ export interface DialogPresentation {
 }
 
 /**
- * Persistable runtime state — engine-canonical fields that every DialogRuntime
+ * Persistable runtime state — engine-canonical fields that every DialogAdapter
  * implementation lowers into on `serialize()`. Adapters that need to persist
  * additional internal state (Ink JSON dump, Yarn VM state) can extend this
  * type via declaration merging in their package.
@@ -110,16 +110,16 @@ export interface SerializedDialogAdapter {
 
 /**
  * Adapter contract: anything that can drive a dialog conversation against
- * host state. The engine ships {@link createNativeDialogRuntime} which walks
+ * host state. The engine ships {@link createNativeDialogAdapter} which walks
  * `DialogGraph[]`. External adapters — Ink, Yarn Spinner, Ren'Py, Dialogic —
  * implement the same interface against their own content shape and runtime.
  *
  * Adapters MUST NOT hold typed refs to host state — they read/write through
  * the supplied accessor + mutator only. This keeps adapters host-agnostic and
- * lets `createDialogSession` swap implementations through its `runtimeFactory`
+ * lets `createDialogSession` swap implementations through its `adapterFactory`
  * option without consumer changes.
  */
-export interface DialogRuntime {
+export interface DialogAdapter {
   /**
    * Activate a graph at its entry node (or an explicit node), running onEnter
    * effects and falling through `next` until a node presents. Replaces an
@@ -155,9 +155,9 @@ export interface DialogRuntime {
   restore(state: SerializedDialogAdapter): void;
 }
 
-/** Lifecycle events emitted by a {@link NativeDialogRuntime} instance. */
-export interface DialogRuntimeEvents {
-  /** Fired whenever the runtime lands on a presentable node (after start, choose or advance). */
+/** Lifecycle events emitted by a {@link NativeDialogAdapter} instance. */
+export interface DialogAdapterEvents {
+  /** Fired whenever the adapter lands on a presentable node (after start, choose or advance). */
   presented: (snapshot: DialogPresentation) => void;
   /** Fired immediately after a choice's outcomes apply, before pointer advancement. */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
@@ -170,11 +170,11 @@ export interface DialogRuntimeEvents {
 }
 
 /**
- * Options for {@link createNativeDialogRuntime} — the authored graphs plus
+ * Options for {@link createNativeDialogAdapter} — the authored graphs plus
  * the read/write side ({@link GameStateAccessor} for predicates,
  * {@link GameStateMutator} for outcome dispatch).
  */
-export interface NativeDialogRuntimeOptions {
+export interface NativeDialogAdapterOptions {
   /**
    * Authored graphs available to this runtime, looked up by graph.id on
    * start(). A graph id repeated across the list, or a node id repeated within
@@ -187,8 +187,8 @@ export interface NativeDialogRuntimeOptions {
   mutator: GameStateMutator;
 }
 
-/** Native dialog runtime instance — implements {@link DialogRuntime} plus event subscription. */
-export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRuntimeEvents> {}
+/** Native dialog adapter instance — implements {@link DialogAdapter} plus event subscription. */
+export interface NativeDialogAdapter extends DialogAdapter, Emittable<DialogAdapterEvents> {}
 
 // === FACTORIES ===
 
@@ -196,7 +196,7 @@ export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRunt
  * Construct a native dialog runtime backed by the supplied graphs + accessor + mutator.
  *
  * `condition` fields on nodes and choices accept `Gate` — predicates dispatch
- * through {@link evaluateGate} against a {@link GateRuntime} captured once here
+ * through {@link evaluateGate} against a {@link GateServices} captured once here
  * at construction, where every condition's handles are asserted. Construct
  * inside `createEngine`'s install/connect, where the ambient handles are wired:
  * dialog is driven from player input long after that scope closes, so a
@@ -209,37 +209,37 @@ export interface NativeDialogRuntime extends DialogRuntime, Emittable<DialogRunt
  * @param options Graphs + accessor/mutator. The runtime captures these for
  *   outcome dispatch and condition read-back; `accessor` also seeds the
  *   captured Gate runtime.
- * @returns A {@link NativeDialogRuntime} — the {@link DialogRuntime} adapter
+ * @returns A {@link NativeDialogAdapter} — the {@link DialogAdapter} adapter
  *   contract plus an event subscription handle.
  *
  * @example
  * ```ts
- * const runtime = createNativeDialogRuntime({ graphs, accessor, mutator });
+ * const runtime = createNativeDialogAdapter({ graphs, accessor, mutator });
  * runtime.on('presented', (snap) => uiStore.setCurrentLine(snap));
  * runtime.start('rask-greeting');
  * ```
  */
-export function createNativeDialogRuntime(
-  options: NativeDialogRuntimeOptions,
-): NativeDialogRuntime {
+export function createNativeDialogAdapter(
+  options: NativeDialogAdapterOptions,
+): NativeDialogAdapter {
   const { graphs, accessor, mutator } = options;
   // Capture the Gate runtime now, not per evaluation: start/choices/choose are
   // player-driven and run long after the engine's install/connect ambient
   // closes. Mirrors the eager capture in createReset.
   const predicates = createPredicateResolver({ accessor });
-  const gateRuntime = predicates.runtime;
+  const gateServices = predicates.services;
   const graphsById = new Map<string, DialogGraph>();
   const nodesByGraph = new Map<string, Map<string, DialogNode>>();
   for (const g of graphs) {
     if (graphsById.has(g.id)) {
-      throw new Error(`Dialog runtime: duplicate dialog graph id "${g.id}"`);
+      throw new Error(`Dialog adapter: duplicate dialog graph id "${g.id}"`);
     }
     graphsById.set(g.id, g);
     const nodes = new Map<string, DialogNode>();
     nodesByGraph.set(g.id, nodes);
     for (const node of g.nodes) {
       if (nodes.has(node.id)) {
-        throw new Error(`Dialog runtime: duplicate node id "${node.id}" in dialog graph "${g.id}"`);
+        throw new Error(`Dialog adapter: duplicate node id "${node.id}" in dialog graph "${g.id}"`);
       }
       nodes.set(node.id, node);
       const label = `dialog '${g.id}' node '${node.id}'`;
@@ -252,7 +252,7 @@ export function createNativeDialogRuntime(
     }
   }
 
-  const events = createEmitHandle<DialogRuntimeEvents>();
+  const events = createEmitHandle<DialogAdapterEvents>();
   const state: SerializedDialogAdapter = {
     activeGraphId: undefined,
     activeNodeId: undefined,
@@ -273,7 +273,7 @@ export function createNativeDialogRuntime(
   }
 
   function holds(predicate: Gate): boolean {
-    return evaluateGate(predicate, gateRuntime);
+    return evaluateGate(predicate, gateServices);
   }
 
   /** Whether a node's or choice's gate is absent or passes. */

@@ -106,7 +106,7 @@ export { isGate, gateToCondition, getRequiredGateServices } from '@/core/gate';
 /**
  * The engine handles {@link evaluateGate} and {@link timeUntilGateFlip} read
  * through. Adoption sites typically build one via
- * {@link getAmbientGateRuntime} during a factory's install/connect call and
+ * {@link getAmbientGateServices} during a factory's install/connect call and
  * close over it for evaluation. The plain-data bundle is also useful for tests
  * (construct directly to drive `evaluateGate` without standing up an engine)
  * and for partial overrides in factory options.
@@ -121,7 +121,7 @@ export { isGate, gateToCondition, getRequiredGateServices } from '@/core/gate';
  * Not auto-published under an injection key — the bundle is composition glue,
  * not a singleton.
  */
-export interface GateRuntime {
+export interface GateServices {
   accessor?: GameStateAccessor;
   categories?: EngineCategories;
   resourceRegistry?: ResourceRegistry;
@@ -129,7 +129,7 @@ export interface GateRuntime {
 
 /**
  * Snapshot whichever ambient handles are currently wired into a
- * {@link GateRuntime} bundle.
+ * {@link GateServices} bundle.
  *
  * Reads from `getCurrentGameStateAccessor()` / `getCurrentEngineCategories()` /
  * `getCurrentResourceRegistry()` — the same install-time ambient triple every
@@ -146,7 +146,7 @@ export interface GateRuntime {
  * so call this there and close over the result — resolving lazily from a
  * player-driven path gets an empty bundle.
  */
-export function getAmbientGateRuntime(override?: GateRuntime): GateRuntime {
+export function getAmbientGateServices(override?: GateServices): GateServices {
   return {
     accessor: override?.accessor ?? getCurrentGameStateAccessor(),
     categories: override?.categories ?? getCurrentEngineCategories(),
@@ -166,48 +166,48 @@ export function getAmbientGateRuntime(override?: GateRuntime): GateRuntime {
  * @example
  * ```ts
  * // Inside a factory called from engine install/connect:
- * const runtime = getAmbientGateRuntime();
+ * const runtime = getAmbientGateServices();
  * const earned = computed(() =>
  *   evaluateGate({ kind: 'count-gte', category: 'jobs', entry: 'beggar', value: 10 }, runtime)
  * );
  * ```
  */
-export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
+export function evaluateGate(gate: Gate, services: GateServices): boolean {
   switch (gate.kind) {
     case 'resource-gte':
       return Decimal.gte(
-        demand(runtime, 'accessor', gate.kind).getAmount(gate.resource),
+        demand(services, 'accessor', gate.kind).getAmount(gate.resource),
         gate.value,
       );
     case 'cumulative-gte': {
-      const ref = cumulativeRefFor(gate.resource, runtime, gate.kind);
+      const ref = cumulativeRefFor(gate.resource, services, gate.kind);
       return Decimal.gte(ref.value, gate.value);
     }
     case 'count-gte': {
-      const categories = demand(runtime, 'categories', gate.kind);
+      const categories = demand(services, 'categories', gate.kind);
       const signals = findCategoryEntrySignals(categories, gate.category, gate.entry);
       if (!signals) return false;
       return Decimal.gte(signals.count.value, gate.value);
     }
     case 'active': {
-      const categories = demand(runtime, 'categories', gate.kind);
+      const categories = demand(services, 'categories', gate.kind);
       const signals = findCategoryEntrySignals(categories, gate.category, gate.entry);
       return signals?.active.value ?? false;
     }
     case 'state':
       return compareState(
-        demand(runtime, 'accessor', gate.kind).getStateAt(gate.path),
+        demand(services, 'accessor', gate.kind).getStateAt(gate.path),
         gate.operator,
         gate.value,
       );
     case 'flag':
-      return demand(runtime, 'accessor', gate.kind).getFlag(gate.id);
+      return demand(services, 'accessor', gate.kind).getFlag(gate.id);
     case 'all':
-      return gate.of.every((g) => evaluateGate(g, runtime));
+      return gate.of.every((g) => evaluateGate(g, services));
     case 'any':
-      return gate.of.some((g) => evaluateGate(g, runtime));
+      return gate.of.some((g) => evaluateGate(g, services));
     case 'not':
-      return !evaluateGate(gate.of, runtime);
+      return !evaluateGate(gate.of, services);
   }
 }
 
@@ -234,15 +234,15 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
  *   {@link evaluateGate} + recursive {@link timeUntilGateFlip}, then delegates
  *   to {@link combineFlipDistances} for the combinator truth-table dispatch.
  */
-export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionDistance {
+export function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance {
   switch (gate.kind) {
     case 'resource-gte':
       return timeUntilConditionFlip(
         { kind: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
-        demand(runtime, 'accessor', gate.kind),
+        demand(services, 'accessor', gate.kind),
       );
     case 'cumulative-gte':
-      return timeUntilCumulativeFlip(gate, runtime);
+      return timeUntilCumulativeFlip(gate, services);
     case 'count-gte':
     case 'active':
     case 'state':
@@ -251,7 +251,7 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
     case 'all':
     case 'any':
     case 'not':
-      return combinatorFlip(gate, runtime);
+      return combinatorFlip(gate, services);
   }
 }
 
@@ -296,10 +296,10 @@ export function collectGateDeps(gate: Gate): TransitionDeps {
 
 function timeUntilCumulativeFlip(
   gate: CumulativeGteGate,
-  runtime: GateRuntime,
+  services: GateServices,
 ): TransitionDistance {
-  const total = cumulativeRefFor(gate.resource, runtime, gate.kind).value;
-  const accessor = demand(runtime, 'accessor', gate.kind);
+  const total = cumulativeRefFor(gate.resource, services, gate.kind).value;
+  const accessor = demand(services, 'accessor', gate.kind);
   if (Decimal.gte(total, gate.value)) return { seconds: null, reason: 'no-rate' };
   const inflow = accessor.getInflowRate?.(gate.resource);
   const rate = inflow ?? accessor.getRate(gate.resource);
@@ -311,21 +311,21 @@ function timeUntilCumulativeFlip(
 
 function combinatorFlip(
   gate: AllGate | AnyGate | NotGate,
-  runtime: GateRuntime,
+  services: GateServices,
 ): TransitionDistance {
   if (gate.kind === 'not') {
-    return timeUntilGateFlip(gate.of, runtime);
+    return timeUntilGateFlip(gate.of, services);
   }
   const children: ChildFlipResult[] = gate.of.map((child) => ({
-    currentlyTrue: evaluateGate(child, runtime),
-    distance: timeUntilGateFlip(child, runtime),
+    currentlyTrue: evaluateGate(child, services),
+    distance: timeUntilGateFlip(child, services),
   }));
   return combineFlipDistances(children, gate.kind === 'all' ? 'all' : 'any');
 }
 
-// === RUNTIME BINDING ===
+// === SERVICES BINDING ===
 
-const boundRuntimes = new WeakMap<object, GateRuntime>();
+const boundServices = new WeakMap<object, GateServices>();
 
 /**
  * Record the runtime a Gate-holding instance evaluates through, so a harness
@@ -334,17 +334,17 @@ const boundRuntimes = new WeakMap<object, GateRuntime>();
  *
  * @internal
  */
-export function bindGateRuntime(owner: object, runtime: GateRuntime): void {
-  boundRuntimes.set(owner, runtime);
+export function bindGateServices(owner: object, services: GateServices): void {
+  boundServices.set(owner, services);
 }
 
 /**
- * The runtime {@link bindGateRuntime} recorded for `owner`, if any.
+ * The runtime {@link bindGateServices} recorded for `owner`, if any.
  *
  * @internal
  */
-export function getBoundGateRuntime(owner: object): GateRuntime | undefined {
-  return boundRuntimes.get(owner);
+export function getBoundGateServices(owner: object): GateServices | undefined {
+  return boundServices.get(owner);
 }
 
 // === HANDLE ASSERTION ===
@@ -361,17 +361,17 @@ export function getBoundGateRuntime(owner: object): GateRuntime | undefined {
  *
  * @example
  * ```ts
- * const runtime = getAmbientGateRuntime();
+ * const runtime = getAmbientGateServices();
  * assertGateServices(def.requirement, runtime, 'createAchievement');
  * ```
  */
-export function assertGateServices(gate: Gate, runtime: GateRuntime, label: string): void {
-  const missing = [...getRequiredGateServices(gate)].filter((handle) => !runtime[handle]);
+export function assertGateServices(gate: Gate, services: GateServices, label: string): void {
+  const missing = [...getRequiredGateServices(gate)].filter((handle) => !services[handle]);
   if (missing.length === 0) return;
   const kinds = new Set<Gate['kind']>();
   forEachGateLeaf(gate, (leaf) => kinds.add(leaf.kind));
   throw new Error(
-    `${label}: this gate reads the ${missing.join(' and ')}, which the runtime doesn't carry. ` +
+    `${label}: this gate reads the ${missing.join(' and ')}, which the services don't carry. ` +
       `Gate kinds in play: ${[...kinds].join(', ')}. ${missing.map(serviceRemedy).join(' ')}`,
   );
 }
@@ -391,10 +391,10 @@ export interface AdoptedPredicate {
   read(): boolean;
 }
 
-/** Adopts a system's predicate fields against one captured {@link GateRuntime}. */
+/** Adopts a system's predicate fields against one captured {@link GateServices}. */
 export interface PredicateResolver {
   /** The handles every adopted Gate evaluates through. */
-  readonly runtime: GateRuntime;
+  readonly services: GateServices;
   /**
    * Adopt one predicate field. A Gate's handles are asserted now, so an
    * unwired handle throws here, labelled, instead of at first evaluation.
@@ -428,16 +428,16 @@ export interface PredicateResolver {
  * const canComplete = computed(() => active.value && goal.holds.value);
  * ```
  */
-export function createPredicateResolver(override?: GateRuntime): PredicateResolver {
-  const runtime = getAmbientGateRuntime(override);
+export function createPredicateResolver(override?: GateServices): PredicateResolver {
+  const services = getAmbientGateServices(override);
   return {
-    runtime,
-    assert: (gate, label) => assertGateServices(gate, runtime, label),
+    services: services,
+    assert: (gate, label) => assertGateServices(gate, services, label),
     adopt(predicate, fallback, label) {
       const gate = isGate(predicate) ? predicate : undefined;
-      if (gate) assertGateServices(gate, runtime, label);
+      if (gate) assertGateServices(gate, services, label);
       const read =
-        predicate === undefined ? () => fallback : () => evaluatePredicate(predicate, runtime);
+        predicate === undefined ? () => fallback : () => evaluatePredicate(predicate, services);
       // Built on first access: sites that poll only ever call `read()`, and a
       // computed nothing reads is held for the owner's lifetime.
       let holds: ComputedRef<boolean> | undefined;
@@ -458,19 +458,19 @@ export function createPredicateResolver(override?: GateRuntime): PredicateResolv
  *
  * @example
  * ```ts
- * const runtime = getAmbientGateRuntime(); // inside install/connect
+ * const runtime = getAmbientGateServices(); // inside install/connect
  * if (evaluatePredicate(def.goal, runtime)) celebrate();
  * ```
  */
-export function evaluatePredicate(predicate: Predicate, runtime: GateRuntime): boolean {
-  return isGate(predicate) ? evaluateGate(predicate, runtime) : resolveComputable(predicate);
+export function evaluatePredicate(predicate: Predicate, services: GateServices): boolean {
+  return isGate(predicate) ? evaluateGate(predicate, services) : resolveComputable(predicate);
 }
 
 // === REQUIREMENT ADAPTER ===
 
 /** Options for {@link createGateRequirement}. */
 export interface GateRequirementOptions {
-  /** Predicate spec; resolved through the ambient runtime captured at call time. */
+  /** Predicate spec; resolved through the ambient services captured at call time. */
   gate: Gate;
   /** Optional UI-facing description (passed through to the underlying boolean requirement). */
   description?: Computable<string>;
@@ -482,7 +482,7 @@ export interface GateRequirementOptions {
  * declarative-Gate authoring path — drops into `purchasable.requirements`
  * arrays alongside cost requirements without consumer-side closures.
  *
- * Resolves the {@link GateRuntime} eagerly via {@link getAmbientGateRuntime},
+ * Resolves the {@link GateServices} eagerly via {@link getAmbientGateServices},
  * so call inside an engine `install()` / `connect()`. The returned
  * Requirement is layer-clean (a plain core-layer `Requirement` shape) — it's
  * the *factory* that lives at systems-layer because Gate composes
@@ -504,10 +504,10 @@ export interface GateRequirementOptions {
  */
 export function createGateRequirement(options: GateRequirementOptions): Requirement {
   const { gate, description } = options;
-  const runtime = getAmbientGateRuntime();
-  assertGateServices(gate, runtime, 'createGateRequirement');
+  const services = getAmbientGateServices();
+  assertGateServices(gate, services, 'createGateRequirement');
   return createBooleanRequirement({
-    met: computed(() => evaluateGate(gate, runtime)),
+    met: computed(() => evaluateGate(gate, services)),
     description,
   });
 }
@@ -520,14 +520,14 @@ export function createGateRequirement(options: GateRequirementOptions): Requirem
  * which of their gates is at fault — and category-only gates never reach here.
  */
 function demand<K extends GateService>(
-  runtime: GateRuntime,
+  services: GateServices,
   service: K,
   kind: Gate['kind'],
-): NonNullable<GateRuntime[K]> {
-  const value = runtime[service];
+): NonNullable<GateServices[K]> {
+  const value = services[service];
   if (!value) {
     throw new Error(
-      `evaluateGate: '${kind}' gate needs the ${service}, which was not available on the GateRuntime. ` +
+      `evaluateGate: '${kind}' gate needs the ${service}, which was not available on the GateServices. ` +
         serviceRemedy(service),
     );
   }
@@ -537,12 +537,12 @@ function demand<K extends GateService>(
 /** Where an author gets a missing handle from, for the error messages. */
 function serviceRemedy(service: GateService): string {
   return service === 'accessor'
-    ? 'Wire the accessor via createEngine({ accessor }) or pass one explicitly, and resolve the runtime inside engine install/connect.'
-    : `The ${service} resolves only inside engine install/connect; build the runtime there.`;
+    ? 'Wire the accessor via createEngine({ accessor }) or pass one explicitly, and resolve the services inside engine install/connect.'
+    : `The ${service} resolves only inside engine install/connect; build the predicate resolver there.`;
 }
 
-function cumulativeRefFor(resourceId: string, runtime: GateRuntime, kind: Gate['kind']) {
-  const resource = demand(runtime, 'resourceRegistry', kind).findById(resourceId);
+function cumulativeRefFor(resourceId: string, services: GateServices, kind: Gate['kind']) {
+  const resource = demand(services, 'resourceRegistry', kind).findById(resourceId);
   if (!resource) {
     throw new Error(`Gate cumulative-gte: no resource '${resourceId}' registered`);
   }

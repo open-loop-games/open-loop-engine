@@ -60,7 +60,7 @@ import type { Purchasable } from '@/systems/purchasable';
 import type { Producer } from '@/systems/producer-category';
 import type { Challenge, ChallengeDef } from '@/systems/challenge-category';
 import { forEachGateLeaf } from '@/core/gate';
-import { evaluateGate, getBoundGateRuntime, isGate } from '@/systems/gate';
+import { evaluateGate, getBoundGateServices, isGate } from '@/systems/gate';
 import type { Transition, TransitionWalker } from './types';
 import type { TransitionSnapshot } from './index';
 import { compareTransitions } from './compare-transitions';
@@ -184,7 +184,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
       // A category leaf moves with no dep slot moving, and inside a combinator
       // that doesn't flip, its truth still picks which children carry the
       // gate's distance.
-      const runtime = getBoundGateRuntime(challenge);
+      const runtime = getBoundGateServices(challenge);
       if (!runtime) return moved;
       let slot = 5;
       for (const field of [def.visible, def.canEnter, def.goal]) {

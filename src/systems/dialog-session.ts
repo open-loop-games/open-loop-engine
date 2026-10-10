@@ -1,5 +1,5 @@
 /**
- * Dialog Session — wraps a {@link DialogRuntime} in a persistent envelope
+ * Dialog Session — wraps a {@link DialogAdapter} in a persistent envelope
  * with lifecycle event emission.
  *
  * The session is the public surface a UI subscribes to:
@@ -13,7 +13,7 @@
  *   need to know whether they're in a fresh or restored game.
  *
  * The runtime is a private implementation detail. Default factory is
- * {@link createNativeDialogRuntime}; pass `runtimeFactory` to swap in an
+ * {@link createNativeDialogAdapter}; pass `adapterFactory` to swap in an
  * external adapter (Ink, Yarn, Ren'Py).
  *
  * @see ./dialog-category for the content-authoring surface that supplies `graphs`
@@ -36,8 +36,8 @@ import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import {
-  createNativeDialogRuntime,
-  type DialogRuntime,
+  createNativeDialogAdapter,
+  type DialogAdapter,
   type DialogGraph,
   type DialogPresentation,
   type SerializedDialogAdapter,
@@ -63,12 +63,12 @@ export interface DialogSessionEvents {
   finished: (info: { graphId: string }) => void;
 }
 
-/** Factory signature for swapping in alternative DialogRuntime implementations (Ink, Yarn, etc.). */
-export type DialogRuntimeFactory = (
+/** Factory signature for swapping in alternative DialogAdapter implementations (Ink, Yarn, etc.). */
+export type DialogAdapterFactory = (
   graphs: DialogGraph[],
   accessor: GameStateAccessor,
   mutator: GameStateMutator,
-) => DialogRuntime;
+) => DialogAdapter;
 
 /**
  * Options for {@link createDialogSession} — the persistent id, the authored
@@ -82,10 +82,10 @@ export interface DialogSessionOptions {
   graphs: DialogGraph[];
   /**
    * Optional alternative runtime implementation. Defaults to
-   * {@link createNativeDialogRuntime}. Pass an Ink/Yarn adapter factory to
+   * {@link createNativeDialogAdapter}. Pass an Ink/Yarn adapter factory to
    * swap implementations without changing call sites.
    */
-  runtimeFactory?: DialogRuntimeFactory;
+  adapterFactory?: DialogAdapterFactory;
   /**
    * Override the ambient {@link GameStateAccessor} + {@link GameStateMutator}.
    * Most consumers leave this unset and rely on the engine's ambient accessor.
@@ -126,18 +126,18 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
 
 // === CONSTANTS ===
 
-const defaultNativeFactory: DialogRuntimeFactory = (graphs, accessor, mutator) =>
-  createNativeDialogRuntime({ graphs, accessor, mutator });
+const defaultNativeFactory: DialogAdapterFactory = (graphs, accessor, mutator) =>
+  createNativeDialogAdapter({ graphs, accessor, mutator });
 
 // === FACTORIES ===
 
 /**
  * Create a dialog session — the runtime envelope that drives a UI through a
- * {@link DialogGraph}. Wraps a {@link DialogRuntime} with persistent state
+ * {@link DialogGraph}. Wraps a {@link DialogAdapter} with persistent state
  * (round-trips through save) and lifecycle event emission.
  *
  * @param options - Persistence-context id, the authored `graphs` available to
- *   this session, optional `runtimeFactory` for adapter swaps (Ink / Yarn /
+ *   this session, optional `adapterFactory` for adapter swaps (Ink / Yarn /
  *   Ren'Py), and optional `accessor` override.
  * @returns A {@link DialogSession} with `start` / `present` / `choose` /
  *   `advance` / `finish` / `isActive` / `getVisitCount` / `dispose` methods and
@@ -179,13 +179,13 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   // --- Runtime instantiation + hydration ---
 
-  const factory = options.runtimeFactory ?? defaultNativeFactory;
-  const runtime = factory(options.graphs, accessorMutator, accessorMutator);
+  const factory = options.adapterFactory ?? defaultNativeFactory;
+  const adapter = factory(options.graphs, accessorMutator, accessorMutator);
 
   // Hydrate runtime from the persistent state on creation. Covers the
   // session-created-after-load path (lazy-instantiated sessions, fresh-game
   // init where the snapshot lands harmlessly).
-  runtime.restore(stateRef.value);
+  adapter.restore(stateRef.value);
 
   // Re-import on save load. The typical engine init order is
   // createEngine → mod.install (where sessions are built) → saveManager.load,
@@ -199,7 +199,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     watch(
       stateRef,
       (newState) => {
-        if (settling.value) runtime.restore(newState);
+        if (settling.value) adapter.restore(newState);
       },
       { flush: 'sync' },
     ),
@@ -210,7 +210,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // --- Internal helpers ---
 
   function snapshot(): void {
-    stateRef.value = runtime.serialize();
+    stateRef.value = adapter.serialize();
   }
 
   // A runtime throw (an authored next-only cycle) can land after effects have
@@ -225,21 +225,21 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   function emitPresentedIfActive(): void {
-    const snap = runtime.present();
+    const snap = adapter.present();
     if (snap) events.emit('presented', snap);
   }
 
   // --- Public methods ---
 
   function start(graphId: string, entryNode?: string): void {
-    if (synced(() => runtime.start(graphId, entryNode)) !== false) emitPresentedIfActive();
+    if (synced(() => adapter.start(graphId, entryNode)) !== false) emitPresentedIfActive();
   }
 
   function choose(choiceId: string): void {
     // Capture the active context *before* delegating — runtime.choose advances
     // the pointer (or finishes), so post-call state would lose the source nodeId.
-    const before = runtime.serialize();
-    synced(() => runtime.choose(choiceId));
+    const before = adapter.serialize();
+    synced(() => adapter.choose(choiceId));
     if (before.activeGraphId && before.activeNodeId) {
       events.emit('chosen', {
         graphId: before.activeGraphId,
@@ -247,7 +247,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
         choiceId,
       });
     }
-    if (runtime.isActive()) {
+    if (adapter.isActive()) {
       emitPresentedIfActive();
     } else if (before.activeGraphId) {
       events.emit('finished', { graphId: before.activeGraphId });
@@ -255,17 +255,17 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   function advance(): void {
-    const step = runtime.advance;
+    const step = adapter.advance;
     if (!step) {
-      throw new Error(`Dialog session ${options.id}: its runtime does not implement advance()`);
+      throw new Error(`Dialog session ${options.id}: its adapter does not implement advance()`);
     }
-    synced(() => step.call(runtime));
+    synced(() => step.call(adapter));
     emitPresentedIfActive();
   }
 
   function finish(): void {
-    const before = runtime.serialize();
-    synced(() => runtime.finish());
+    const before = adapter.serialize();
+    synced(() => adapter.finish());
     if (before.activeGraphId) {
       events.emit('finished', { graphId: before.activeGraphId });
     }
@@ -273,12 +273,12 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   const session: DialogSession = {
     start,
-    present: () => runtime.present(),
+    present: () => adapter.present(),
     choose,
     advance,
     finish,
-    isActive: () => runtime.isActive(),
-    getVisitCount: (graphId, nodeId) => runtime.getVisitCount(graphId, nodeId),
+    isActive: () => adapter.isActive(),
+    getVisitCount: (graphId, nodeId) => adapter.getVisitCount(graphId, nodeId),
     on: events.on,
     dispose() {
       // Stop the sync watch on stateRef; without this, a discarded session

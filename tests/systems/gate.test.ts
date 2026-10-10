@@ -20,7 +20,7 @@ import {
   type Gate,
   type GameStateAccessor,
   type GameStateAccessorMutator,
-  type GateRuntime,
+  type GateServices,
   type ResourceRegistry,
 } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
@@ -29,7 +29,7 @@ import { E } from '@/core/effects';
 import {
   assertGateServices,
   gateToCondition,
-  getAmbientGateRuntime,
+  getAmbientGateServices,
   getRequiredGateServices,
 } from '@/systems/gate';
 
@@ -64,7 +64,7 @@ interface ChalDef {
 // ---------------------------------------------------------------------------
 
 function buildFixture(): {
-  runtime: GateRuntime;
+  runtime: GateServices;
   achEntry: ReturnType<ReturnType<typeof createAchievementCategory<AchDef>>['getEntry']>;
   upgEntry: ReturnType<ReturnType<typeof createPurchasableCategory<UpgDef>>['getEntry']>;
   skillEntry: ReturnType<ReturnType<typeof createSkillCategory<SkillDef>>['getEntry']>;
@@ -436,7 +436,7 @@ describe('timeUntilGateFlip — cumulative-gte', () => {
   function withRates(
     f: ReturnType<typeof buildFixture>,
     rates: { net: DecimalSource; inflow?: DecimalSource },
-  ): GateRuntime {
+  ): GateServices {
     const base = f.runtime.accessor!;
     const accessor: GameStateAccessor = {
       ...base,
@@ -555,8 +555,8 @@ describe('timeUntilGateFlip — cumulative-gte', () => {
  * whose gates are all category-resolved would naturally write. Resolves the
  * ambient runtime inside `install()`, exactly where an adoption site would.
  */
-function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } {
-  let runtime: GateRuntime | undefined;
+function buildAccessorlessFixture(): { runtime: GateServices; stop: () => void } {
+  let runtime: GateServices | undefined;
 
   const game: EngineModule = {
     id: 'game',
@@ -580,7 +580,7 @@ function buildAccessorlessFixture(): { runtime: GateRuntime; stop: () => void } 
     id: 'observer',
     dependencies: ['game'],
     install() {
-      runtime = getAmbientGateRuntime();
+      runtime = getAmbientGateServices();
     },
   };
 

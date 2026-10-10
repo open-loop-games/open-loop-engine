@@ -170,7 +170,7 @@ export function isGate(value: unknown): value is Gate {
 /**
  * The engine handles a Gate kind reads through. Named here rather than in
  * `systems/gate.ts` so the pure walker below can stay at core layer;
- * `GateRuntime` keys off this union.
+ * `GateServices` keys off this union.
  */
 export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
 
@@ -269,7 +269,7 @@ export function gateToCondition(gate: Gate): ICondition {
     case 'active':
     case 'cumulative-gte':
       throw new Error(
-        `gateToCondition: ${gate.kind} has no ICondition projection (it resolves only through a GateRuntime).`,
+        `gateToCondition: ${gate.kind} has no ICondition projection (it resolves only through GateServices).`,
       );
   }
 }

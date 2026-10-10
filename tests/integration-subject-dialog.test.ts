@@ -18,9 +18,9 @@ import { createSubjectCategory } from '@/systems/subject-category';
 import { createReset } from '@/systems/reset';
 import { withPersistentContext } from '@/core/persistence';
 import {
-  createNativeDialogRuntime,
+  createNativeDialogAdapter,
   type DialogGraph,
-  type DialogRuntime,
+  type DialogAdapter,
   type DialogPresentation,
   type SerializedDialogAdapter,
 } from '@/systems/dialog';
@@ -28,7 +28,7 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 
 /**
- * Run `fn` inside an engine install hook so the ambient GateRuntime triple
+ * Run `fn` inside an engine install hook so the ambient GateServices triple
  * (accessor + categories + registry) is wired — required for Gate-based
  * predicates (dialog conditions, subject-category tier gates).
  */
@@ -201,15 +201,15 @@ describe('Scenario 2 — multi-loop persistence', () => {
 // Scenario 3 — Adapter contract implementability
 // ---------------------------------------------------------------------------
 
-describe('Scenario 3 — DialogRuntime adapter contract', () => {
+describe('Scenario 3 — DialogAdapter adapter contract', () => {
   it('a non-native runtime stub conforms to the contract and drives a session', () => {
     /**
      * In-memory state-machine adapter — does not use DialogGraph at all.
      * Has two nodes: 'a' → 'b' on choice 'next', then terminal.
-     * Proves that `DialogRuntime` is the only contract an adapter must
+     * Proves that `DialogAdapter` is the only contract an adapter must
      * satisfy — engine internals (graphs, conditions, effects) are optional.
      */
-    function createStubRuntime(): DialogRuntime {
+    function createStubRuntime(): DialogAdapter {
       const state: SerializedDialogAdapter = {
         activeGraphId: undefined,
         activeNodeId: undefined,
@@ -263,7 +263,7 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
       const session = createDialogSession({
         id: 'stub-session',
         graphs: [], // Stub runtime ignores graphs entirely.
-        runtimeFactory: () => createStubRuntime(),
+        adapterFactory: () => createStubRuntime(),
       });
 
       session.start('any-graph-id');
@@ -293,7 +293,7 @@ describe('Scenario 4 — save round-trip', () => {
 
     withEngine(accessor, () => {
       // First runtime: walk through a conversation to accumulate state.
-      const r1 = createNativeDialogRuntime({
+      const r1 = createNativeDialogAdapter({
         graphs: [raskGreeting],
         accessor: accessor as GameStateAccessor,
         mutator,
@@ -314,7 +314,7 @@ describe('Scenario 4 — save round-trip', () => {
       expect(r1.getVisitCount('no-such-graph', 'open')).toBe(0);
 
       // Fresh runtime + import — exactly what save/load does.
-      const r2 = createNativeDialogRuntime({
+      const r2 = createNativeDialogAdapter({
         graphs: [raskGreeting],
         accessor: accessor as GameStateAccessor,
         mutator,

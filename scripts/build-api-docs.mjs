@@ -388,7 +388,7 @@ function renderIndex(byCluster) {
     '- **flow-channel classification** — `FlowChannel`, `classifyFlowChannel`, Csikszentmihalyi-style engagement bands → harness.md#flow-channel-classification',
     '- **content registry mod patch** — `registry.patch()` for mod-side definition overrides → composition.md#content-registry, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
     '- **batch-registered category** — `createCategoryBase`, per-def persistent context + mod patch → composition.md#category-base, ../consumer-guide.md#level-2-category-systems-the-default-for-content',
-    '- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogRuntime` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second',
+    '- **dialog session vs runtime** — `DialogSession` envelope, swappable `DialogAdapter` adapter → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-runtime-second',
     '- **subject field kinds** — typed multi-field state per subject: scalar / vector / tier / flag / enum → content-narrative.md#subject-category, ../consumer-guide-recipes.md#character-interaction-surface',
     '- **best-of run recording** — per-metric best with optional projection, BestOf events → content-systems.md#bestof-tracker',
     '- **cycle restart event** — `beforeEnd` / `afterEnd` for the end→reset→replay cadence → content-systems.md#cycle',

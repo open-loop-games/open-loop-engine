@@ -51,7 +51,7 @@ import type { GameStateMutator } from '@/core/effects';
 import { applyEffect } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentEngineCategories } from './engine-categories';
-import { bindGateRuntime, createPredicateResolver, type Predicate } from './gate';
+import { bindGateServices, createPredicateResolver, type Predicate } from './gate';
 import type { Grant } from '@/core/modifier';
 
 // === TYPES ===
@@ -544,7 +544,7 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
         complete,
         toggle,
       };
-      bindGateRuntime(challenge, predicates.runtime);
+      bindGateServices(challenge, predicates.services);
       return challenge;
     },
     buildState: mapState,
