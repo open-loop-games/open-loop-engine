@@ -32,7 +32,7 @@ import { createResourcePeakTracker } from './resource-peak';
  * ```ts
  * const cell = createSensitivityCell({
  *   name: 'baseline',
- *   saveBlob,
+ *   saveText,
  *   modules: () => [createGoldModule()],
  *   buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
  *   tick: (engine) => engine.tickDriver.stepOnce(),

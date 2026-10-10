@@ -83,12 +83,12 @@ export interface SpatialGraphEvents<N, E> {
  * in a single `persistent()` ref to persist across saves; per-node
  * `persistent()` is explicitly rejected.
  */
-export interface SpatialGraphSnapshot<N, E> {
+export interface SerializedGraph<N, E> {
   version: 1;
   nodes: Array<{ id: string; data: N }>;
   edges: Array<{ id: string; fromId: string; toId: string; data: E }>;
   /** nodeId → child graph snapshot. Keys must reference ids in `nodes`. */
-  children: Record<string, SpatialGraphSnapshot<N, E>>;
+  children: Record<string, SerializedGraph<N, E>>;
 }
 
 /** Keyed node/edge container with nested child-graph composition. */
@@ -187,7 +187,7 @@ export interface SpatialGraph<N, E> {
 
   // Persistence --------------------------------------------------------------
 
-  serialize(): SpatialGraphSnapshot<N, E>;
+  serialize(): SerializedGraph<N, E>;
   /**
    * Replace this graph's state from a snapshot: clears nodes, edges, and
    * child graphs, then rebuilds from `snapshot`. Silent: no events fire, so
@@ -204,7 +204,7 @@ export interface SpatialGraph<N, E> {
    * missing node), before it changes anything: a rejected restore leaves the
    * graph and its children as they were.
    */
-  restore(snapshot: SpatialGraphSnapshot<N, E>): void;
+  restore(serialized: SerializedGraph<N, E>): void;
 }
 
 /**
@@ -241,12 +241,12 @@ interface TreeOptions {
   readonly takenIds: Map<string, number>;
 }
 
-// `initial` is a snapshot validateSnapshot has already passed, loaded as the
+// `initial` is a snapshot validateSerialized has already passed, loaded as the
 // graph is built.
 function makeGraph<N, E>(
   tree: TreeOptions,
   ownerNodeId: string | null,
-  initial?: SpatialGraphSnapshot<N, E>,
+  initial?: SerializedGraph<N, E>,
 ): SpatialGraph<N, E> {
   const { idGenerator, takenIds } = tree;
 
@@ -513,7 +513,7 @@ function makeGraph<N, E>(
     },
 
     serialize() {
-      const children: Record<string, SpatialGraphSnapshot<N, E>> = {};
+      const children: Record<string, SerializedGraph<N, E>> = {};
       for (const [ownerId, child] of childGraphs) {
         children[ownerId] = child.serialize();
       }
@@ -530,19 +530,19 @@ function makeGraph<N, E>(
       };
     },
 
-    restore(snapshot) {
-      validateSnapshot(snapshot);
+    restore(serialized) {
+      validateSerialized(serialized);
       releaseSubtree(graph);
       nodes.clear();
       edges.clear();
       adjacency.clear();
       childGraphs.clear();
-      load(snapshot);
+      load(serialized);
     },
   };
 
-  // Build from a snapshot validateSnapshot has passed, into an empty graph.
-  function load(snapshot: SpatialGraphSnapshot<N, E>): void {
+  // Build from a snapshot validateSerialized has passed, into an empty graph.
+  function load(snapshot: SerializedGraph<N, E>): void {
     for (const entry of snapshot.nodes) {
       nodes.set(entry.id, { id: entry.id, data: entry.data, parentId: ownerNodeId });
       takeId(entry.id);
@@ -567,21 +567,21 @@ function makeGraph<N, E>(
   return graph;
 }
 
-// Throw on the first integrity violation anywhere in the snapshot tree, so a
-// restore rejects a bad snapshot before it touches the graph.
-function validateSnapshot<N, E>(snapshot: SpatialGraphSnapshot<N, E>): void {
-  if (snapshot.version !== 1) {
+// Throw on the first integrity violation anywhere in the serialized tree, so a
+// restore rejects a bad serialized form before it touches the graph.
+function validateSerialized<N, E>(serialized: SerializedGraph<N, E>): void {
+  if (serialized.version !== 1) {
     throw new Error(
-      `SpatialGraph.restore: unsupported snapshot version ${String(snapshot.version)}`,
+      `SpatialGraph.restore: unsupported format version ${String(serialized.version)}`,
     );
   }
   const nodeIds = new Set<string>();
-  for (const { id } of snapshot.nodes) {
+  for (const { id } of serialized.nodes) {
     if (nodeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate node id '${id}'`);
     nodeIds.add(id);
   }
   const edgeIds = new Set<string>();
-  for (const { id, fromId, toId } of snapshot.edges) {
+  for (const { id, fromId, toId } of serialized.edges) {
     if (!nodeIds.has(fromId) || !nodeIds.has(toId)) {
       throw new Error(
         `SpatialGraph.restore: edge '${id}' references missing node '${nodeIds.has(fromId) ? toId : fromId}'`,
@@ -590,11 +590,11 @@ function validateSnapshot<N, E>(snapshot: SpatialGraphSnapshot<N, E>): void {
     if (edgeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate edge id '${id}'`);
     edgeIds.add(id);
   }
-  for (const [ownerId, childSnap] of Object.entries(snapshot.children)) {
+  for (const [ownerId, childSnap] of Object.entries(serialized.children)) {
     if (!nodeIds.has(ownerId)) {
       throw new Error(`SpatialGraph.restore: child graph keyed on missing node '${ownerId}'`);
     }
-    validateSnapshot(childSnap);
+    validateSerialized(childSnap);
   }
 }
 

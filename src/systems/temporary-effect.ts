@@ -110,7 +110,7 @@ export interface TemporaryEffectDef {
    * Called instead of onActivate for each instance a load rebuilds from the
    * save. Falls back to onActivate if not defined.
    */
-  onRehydrate?: (instance: TemporaryEffectInstance) => void;
+  onHydrate?: (instance: TemporaryEffectInstance) => void;
 }
 
 /** A live instance of a temporary effect, created by {@link TemporaryEffectSystem.activate}. */
@@ -466,7 +466,7 @@ export function createTemporaryEffectSystem(
         snap.timeRemaining,
         lowestFreeStackIndex(snap.defId),
       );
-      (def.onRehydrate ?? def.onActivate)?.(instance);
+      (def.onHydrate ?? def.onActivate)?.(instance);
     }
   }
 

@@ -4,7 +4,7 @@ import {
   createScopeStack,
   createSpatialGraph,
   type ScopeStack,
-  type ScopeStackSnapshot,
+  type SerializedScopeStack,
   type ScopeStatus,
 } from '@/core/spatial';
 
@@ -355,8 +355,8 @@ describe('createScopeStack — serialize & restore', () => {
   it('rejects unknown snapshot version', () => {
     const { graph } = makeNestedGraph();
     const stack = createScopeStack<Pkg, Wire>({ root: graph });
-    const bad = { version: 2, path: [] } as unknown as ScopeStackSnapshot;
-    expect(() => stack.restore(bad)).toThrow(/unsupported snapshot version/);
+    const bad = { version: 2, path: [] } as unknown as SerializedScopeStack;
+    expect(() => stack.restore(bad)).toThrow(/unsupported format version/);
   });
 
   it('rejects paths that reference missing nodes', () => {
@@ -383,7 +383,7 @@ describe('createScopeStack — serialize & restore', () => {
   it('integrates with the persistent() consumer pattern', () => {
     const { graph, stack } = makeNestedGraph();
     beginPersistentContext('scope-test');
-    const pathRef = persistent<ScopeStackSnapshot>({ version: 1, path: [] });
+    const pathRef = persistent<SerializedScopeStack>({ version: 1, path: [] });
     endPersistentContext();
 
     stack.enter('a');

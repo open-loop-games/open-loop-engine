@@ -177,7 +177,7 @@ export function runEventModeLoop(
       // Only an advance bisection could narrow needs the pre-advance state.
       const checkpoint =
         bisectTolSec !== undefined && result.dt > bisectTolSec
-          ? { blob: engine.saveManager!.exportSave(), rng: getRNGState() }
+          ? { saveText: engine.saveManager!.exportSave(), rng: getRNGState() }
           : null;
       const advanceStart = profileStart();
       engine.tickDriver.simulateTick(result.dt);
@@ -402,14 +402,14 @@ function fastTickDuringStasis(
 function bisectTerminationTime(
   engine: Engine,
   predicate: UntilPredicate,
-  checkpoint: { blob: string; rng: RNGState },
+  checkpoint: { saveText: string; rng: RNGState },
   advanceDt: number,
   tolSec: number,
   baseSimTime: number,
   baseSteps: number,
 ): number {
   const restore = (): void => {
-    if (!engine.saveManager!.importSave(checkpoint.blob).success) {
+    if (!engine.saveManager!.importSave(checkpoint.saveText).success) {
       throw new Error(
         'runUntil: bisectTolSec could not restore the pre-advance checkpoint (importSave failed)',
       );

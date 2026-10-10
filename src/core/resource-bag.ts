@@ -11,7 +11,7 @@
 import { reactive, shallowRef, toRaw, watch } from 'vue';
 import { Decimal, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
-import { loadingSave } from './persistence';
+import { settling } from './persistence';
 import { registerResourceClamp, type Resource } from './resource';
 
 /** A capacity value that can be static or a reactive getter */
@@ -348,7 +348,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       // was valid when saved: take it unclamped.
       function syncFromResource(value: DecimalSource): void {
         syncing = true;
-        const next = loadingSave.value
+        const next = settling.value
           ? toFinalDecimal(value)
           : clampToCapacity(typeId, toFinalDecimal(value));
         writeAmount(typeId, next);

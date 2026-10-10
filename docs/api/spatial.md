@@ -21,10 +21,10 @@ Bounded 2D grid with FOV adapter and snapshot persistence. Rectangular storage, 
 - `const HEX_AXIAL_DELTAS: readonly GridDelta[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which makes axial deltas equal grid deltas. `src/core/spatial/grid.ts:93`
 - `const ORTHOGONAL_DELTAS: readonly GridDelta[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:63`
 - `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:36`
+- `interface SerializedSpatialGrid<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:132`
 - `interface SpatialGrid<T>` — Bounded 2D grid with configurable adjacency, BFS and weighted distance fields, an FOV adapter, and snapshot persistence. `src/core/spatial/grid.ts:165`
 - `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:103`
 - `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:40`
-- `interface SpatialGridSnapshot<T>` — Plain-object snapshot of a grid's full state. `src/core/spatial/grid.ts:132`
 - `type TraversalCostFn<T> = (cell: T, x: number, y: number) => number` — Caller-supplied cost to *enter* a cell, for weighted traversal queries (`distanceField`). `src/core/spatial/types.ts:52`
 - `type Unsubscribe = () => void` — Function returned by event subscriptions; call to detach the handler. `src/core/spatial/types.ts:29`
 
@@ -35,10 +35,10 @@ Keyed node/edge container with nested child-graph composition — the substrate 
 - `function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E>` — Create a keyed graph container with nested child-graph support. `src/core/spatial/graph.ts:225`
 - `interface GraphEdge<E>` — An edge in a SpatialGraph. `src/core/spatial/graph.ts:48`
 - `interface GraphNode<N>` — A node in a SpatialGraph. `src/core/spatial/graph.ts:41`
+- `interface SerializedGraph<N, E>` — Plain-object snapshot of a graph's full state, including recursively any child graphs. `src/core/spatial/graph.ts:86`
 - `interface SpatialGraph<N, E>` — Keyed node/edge container with nested child-graph composition. `src/core/spatial/graph.ts:95`
 - `interface SpatialGraphEvents<N, E>` — Events emitted by a SpatialGraph. `src/core/spatial/graph.ts:71`
 - `interface SpatialGraphOptions` — Options accepted by createSpatialGraph. `src/core/spatial/graph.ts:56`
-- `interface SpatialGraphSnapshot<N, E>` — Plain-object snapshot of a graph's full state, including recursively any child graphs. `src/core/spatial/graph.ts:86`
 
 ## Scope stack
 
@@ -48,8 +48,8 @@ Stack navigator over a recursive `SpatialGraph` — tracks which nested child gr
 - `interface ScopeStack<N, E>` — Navigation cursor over a recursive graph-of-graphs. `src/core/spatial/scope-stack.ts:98`
 - `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:91`
 - `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:67`
-- `interface ScopeStackSnapshot` — Plain-object snapshot of the stack's navigation state. `src/core/spatial/scope-stack.ts:85`
 - `type ScopeStatus = string` — Caller-owned scope-state label. `src/core/spatial/scope-stack.ts:64`
+- `interface SerializedScopeStack` — Plain-object snapshot of the stack's navigation state. `src/core/spatial/scope-stack.ts:85`
 
 ## Influence layer
 

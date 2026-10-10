@@ -83,7 +83,7 @@ describe('in-install sensitivity integration', () => {
 
     const baseline = createSensitivityCell({
       name: 'baseline',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [createToyModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.stepOnce(),
@@ -92,7 +92,7 @@ describe('in-install sensitivity integration', () => {
 
     const variant = createSensitivityCell({
       name: 'variant',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [createToyModule()],
       perturb: (engine) => {
         const registry = engine.tryInject(ChainRegistryKey);
@@ -173,7 +173,7 @@ describe('in-install sensitivity integration', () => {
 
     const baseline = createSensitivityCell({
       name: 'baseline',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [makeEmptyChainModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.stepOnce(),
@@ -182,7 +182,7 @@ describe('in-install sensitivity integration', () => {
 
     const variant = createSensitivityCell({
       name: 'variant',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [makeEmptyChainModule()],
       perturb: (engine) => {
         applyPerturbation(engine, entry, { kind: 'scalar-multiply', factor: 5 });
@@ -264,7 +264,7 @@ describe('in-install sensitivity integration', () => {
 
     const cell = createSensitivityCell({
       name: 'cycle',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [createLoopGoldModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.stepOnce(),

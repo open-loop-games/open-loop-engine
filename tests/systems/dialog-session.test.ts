@@ -3,14 +3,14 @@ import { bn, Decimal } from '@/primitives/decimal';
 import {
   getAllPersistentRefs,
   resetAllPersistentContexts,
-  withLoadingSave,
+  withSettling,
   type Persistent,
   type Serializable,
 } from '@/core/persistence';
 import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
-import type { DialogGraph, DialogRuntimeState } from '@/systems/dialog';
+import type { DialogGraph, SerializedDialogAdapter } from '@/systems/dialog';
 
 /**
  * Construct inside an engine install hook and hand the result back for the test
@@ -73,7 +73,7 @@ function savedState(id: string): Persistent<Serializable> {
 }
 
 /** Narrows the generic introspection value down to the shape this session's stateRef actually holds. */
-function isDialogRuntimeState(v: unknown): v is DialogRuntimeState {
+function isDialogRuntimeState(v: unknown): v is SerializedDialogAdapter {
   return typeof v === 'object' && v !== null && 'visitCounts' in v;
 }
 
@@ -237,8 +237,8 @@ describe('createDialogSession', () => {
 
   it('re-imports state into the runtime when save load writes to the persistent ref', () => {
     // Engine init order is module-install → save-load, so the session's eager
-    // importState fires against the *default* stateRef value; the saved
-    // active conversation must propagate via the loadingSave-gated watcher.
+    // restore fires against the *default* stateRef value; the saved
+    // active conversation must propagate via the settling-gated watcher.
     // This test simulates the deserialize step directly: write a non-default
     // state into the ref under the load guard. Without the watcher,
     // session.isActive() would stay false.
@@ -249,7 +249,7 @@ describe('createDialogSession', () => {
       const stateRef = savedState('load-sync');
       expect(stateRef).toBeDefined();
 
-      withLoadingSave(() => {
+      withSettling(() => {
         stateRef.value = {
           activeGraphId: 'rask-greeting',
           activeNodeId: 'training',

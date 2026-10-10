@@ -28,7 +28,7 @@ import {
   beginPersistentContext,
   deletePersistent,
   endPersistentContext,
-  loadingSave,
+  settling,
   persistent,
   type Persistent,
 } from '@/core/persistence';
@@ -40,7 +40,7 @@ import {
   type DialogRuntime,
   type DialogGraph,
   type DialogPresentation,
-  type DialogRuntimeState,
+  type SerializedDialogAdapter,
 } from './dialog';
 
 // === TYPES ===
@@ -171,7 +171,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
 
   const contextId = `dialog-sessions/${options.id}`;
   beginPersistentContext(contextId);
-  const stateRef: Persistent<DialogRuntimeState> = persistent<DialogRuntimeState>(
+  const stateRef: Persistent<SerializedDialogAdapter> = persistent<SerializedDialogAdapter>(
     { activeGraphId: undefined, activeNodeId: undefined, visitCounts: {} },
     { name: 'state', lifetime: true },
   );
@@ -185,12 +185,12 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // Hydrate runtime from the persistent state on creation. Covers the
   // session-created-after-load path (lazy-instantiated sessions, fresh-game
   // init where the snapshot lands harmlessly).
-  runtime.importState(stateRef.value);
+  runtime.restore(stateRef.value);
 
   // Re-import on save load. The typical engine init order is
   // createEngine → mod.install (where sessions are built) → saveManager.load,
   // so deserializePersistents writes stateRef *after* the eager import
-  // above. The flush:sync + loadingSave gate mirrors the resource.ts pattern
+  // above. The flush:sync + settling gate mirrors the resource.ts pattern
   // (inverted gate — we want to act *during* load, not avoid acting then).
   // snapshot() writes to stateRef outside any load, so the guard returns
   // immediately on those firings.
@@ -199,7 +199,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     watch(
       stateRef,
       (newState) => {
-        if (loadingSave.value) runtime.importState(newState);
+        if (settling.value) runtime.restore(newState);
       },
       { flush: 'sync' },
     ),
@@ -210,7 +210,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   // --- Internal helpers ---
 
   function snapshot(): void {
-    stateRef.value = runtime.exportState();
+    stateRef.value = runtime.serialize();
   }
 
   // A runtime throw (an authored next-only cycle) can land after effects have
@@ -238,7 +238,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   function choose(choiceId: string): void {
     // Capture the active context *before* delegating — runtime.choose advances
     // the pointer (or finishes), so post-call state would lose the source nodeId.
-    const before = runtime.exportState();
+    const before = runtime.serialize();
     synced(() => runtime.choose(choiceId));
     if (before.activeGraphId && before.activeNodeId) {
       events.emit('chosen', {
@@ -264,7 +264,7 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   function finish(): void {
-    const before = runtime.exportState();
+    const before = runtime.serialize();
     synced(() => runtime.finish());
     if (before.activeGraphId) {
       events.emit('finished', { graphId: before.activeGraphId });

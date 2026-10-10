@@ -93,7 +93,7 @@ export interface DialogPresentation {
 
 /**
  * Persistable runtime state — engine-canonical fields that every DialogRuntime
- * implementation lowers into on `exportState()`. Adapters that need to persist
+ * implementation lowers into on `serialize()`. Adapters that need to persist
  * additional internal state (Ink JSON dump, Yarn VM state) can extend this
  * type via declaration merging in their package.
  *
@@ -101,7 +101,7 @@ export interface DialogPresentation {
  * payload across save/load, add an `adapter?` field constrained to
  * SerializableConstraint-compatible shapes (not `unknown` — must be serializable).
  */
-export interface DialogRuntimeState {
+export interface SerializedDialogAdapter {
   activeGraphId?: string;
   activeNodeId?: string;
   /** Per-graph per-node visit counts. Survives sessions. */
@@ -150,9 +150,9 @@ export interface DialogRuntime {
    */
   getVisitCount(graphId: string, nodeId: string): number;
   /** Return persistable state for save inclusion. */
-  exportState(): DialogRuntimeState;
+  serialize(): SerializedDialogAdapter;
   /** Restore from previously exported state. Replaces current state wholesale. */
-  importState(state: DialogRuntimeState): void;
+  restore(state: SerializedDialogAdapter): void;
 }
 
 /** Lifecycle events emitted by a {@link NativeDialogRuntime} instance. */
@@ -253,7 +253,7 @@ export function createNativeDialogRuntime(
   }
 
   const events = createEmitHandle<DialogRuntimeEvents>();
-  const state: DialogRuntimeState = {
+  const state: SerializedDialogAdapter = {
     activeGraphId: undefined,
     activeNodeId: undefined,
     visitCounts: {},
@@ -415,7 +415,7 @@ export function createNativeDialogRuntime(
     return state.activeGraphId !== undefined && state.activeNodeId !== undefined;
   }
 
-  function exportState(): DialogRuntimeState {
+  function serialize(): SerializedDialogAdapter {
     return {
       activeGraphId: state.activeGraphId,
       activeNodeId: state.activeNodeId,
@@ -426,10 +426,10 @@ export function createNativeDialogRuntime(
     };
   }
 
-  function importState(snapshot: DialogRuntimeState): void {
-    state.activeGraphId = snapshot.activeGraphId;
-    state.activeNodeId = snapshot.activeNodeId;
-    state.visitCounts = jsonClone(snapshot.visitCounts ?? {});
+  function restore(serialized: SerializedDialogAdapter): void {
+    state.activeGraphId = serialized.activeGraphId;
+    state.activeNodeId = serialized.activeNodeId;
+    state.visitCounts = jsonClone(serialized.visitCounts ?? {});
   }
 
   return {
@@ -440,8 +440,8 @@ export function createNativeDialogRuntime(
     finish,
     isActive,
     getVisitCount,
-    exportState,
-    importState,
+    serialize,
+    restore,
     on: events.on,
   };
 }

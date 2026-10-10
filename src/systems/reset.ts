@@ -27,7 +27,7 @@ import {
   type Persistent,
   isPersistent,
   resetPersistent,
-  withLoadingSave,
+  withSettling,
   getPersistentContextRefs,
   getPersistentRefs,
   bindPersistenceNamespace,
@@ -339,7 +339,7 @@ export function createReset(options: ResetOptions): Reset {
 
         // Load-guarded so watchers that react to player actions skip these
         // writes, hooks and listeners included.
-        withLoadingSave(() => {
+        withSettling(() => {
           // Reset via recursive object walking (legacy thingsToReset path)
           if (processedThingsToReset) {
             const things = unref(processedThingsToReset);

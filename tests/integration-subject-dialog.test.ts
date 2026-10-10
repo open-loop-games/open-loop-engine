@@ -22,7 +22,7 @@ import {
   type DialogGraph,
   type DialogRuntime,
   type DialogPresentation,
-  type DialogRuntimeState,
+  type SerializedDialogAdapter,
 } from '@/systems/dialog';
 import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
@@ -210,7 +210,7 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
      * satisfy — engine internals (graphs, conditions, effects) are optional.
      */
     function createStubRuntime(): DialogRuntime {
-      const state: DialogRuntimeState = {
+      const state: SerializedDialogAdapter = {
         activeGraphId: undefined,
         activeNodeId: undefined,
         visitCounts: {},
@@ -248,10 +248,10 @@ describe('Scenario 3 — DialogRuntime adapter contract', () => {
         getVisitCount(graphId, nodeId) {
           return state.visitCounts[graphId]?.[nodeId] ?? 0;
         },
-        exportState() {
+        serialize() {
           return { ...state };
         },
-        importState(snapshot) {
+        restore(snapshot) {
           state.activeGraphId = snapshot.activeGraphId;
           state.activeNodeId = snapshot.activeNodeId;
           state.visitCounts = snapshot.visitCounts;
@@ -301,7 +301,7 @@ describe('Scenario 4 — save round-trip', () => {
       r1.start('rask-greeting');
       r1.choose('ask-mundane');
       expect(r1.present()?.nodeId).toBe('mundane');
-      const snapshot = r1.exportState();
+      const snapshot = r1.serialize();
       expect(snapshot.activeGraphId).toBe('rask-greeting');
       expect(snapshot.activeNodeId).toBe('mundane');
       expect(snapshot.visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
@@ -320,10 +320,10 @@ describe('Scenario 4 — save round-trip', () => {
         mutator,
       });
       expect(r2.isActive()).toBe(false);
-      r2.importState(snapshot);
+      r2.restore(snapshot);
       expect(r2.isActive()).toBe(true);
       expect(r2.present()?.nodeId).toBe('mundane');
-      expect(r2.exportState().visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
+      expect(r2.serialize().visitCounts['rask-greeting']).toEqual({ open: 1, mundane: 1 });
       // Read path survives save/load on the fresh runtime.
       expect(r2.getVisitCount('rask-greeting', 'open')).toBe(1);
       expect(r2.getVisitCount('rask-greeting', 'mundane')).toBe(1);

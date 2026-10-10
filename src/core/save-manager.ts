@@ -126,7 +126,7 @@ export interface SaveManagerConfig {
    */
   persistenceNamespace?: string;
   /** Current save format version. Used to drive migration on load. Default: 1. */
-  version?: number;
+  saveVersion?: number;
   /** Pluggable storage backend. Defaults to localStorage when available. */
   storageAdapter?: StorageAdapter;
   /**
@@ -234,8 +234,8 @@ export interface SaveEvents {
   'save:future-version-refused': (err: {
     slotId: number;
     kind: 'game' | 'engine';
-    saveVersion: number;
-    currentVersion: number;
+    writtenVersion: number;
+    supportedVersion: number;
   }) => void;
   /**
    * A persistent ref's leaf value failed Zod validation. `action` reflects
@@ -256,7 +256,7 @@ export interface SaveEvents {
    * reconcilers still run. `detail` is the thrown error, also logged via
    * `console.error`.
    */
-  'save:reconcile-failed': (err: { slotId: number; detail: unknown }) => void;
+  'save:hydration-failed': (err: { slotId: number; detail: unknown }) => void;
   /** A consumer-provided migration step ran during load. */
   'save:migration-applied': (info: { from: number; to: number }) => void;
   /**
@@ -540,7 +540,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
   const {
     gameId,
     persistenceNamespace,
-    version = 1,
+    saveVersion: version = 1,
     migrations = {},
     defaultSlotName = 'Autosave',
     maxSlots = 10,
@@ -729,8 +729,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       handle.emit('save:future-version-refused', {
         slotId,
         kind: 'engine',
-        saveVersion: engineVersion,
-        currentVersion: ENGINE_SAVE_VERSION,
+        writtenVersion: engineVersion,
+        supportedVersion: ENGINE_SAVE_VERSION,
       });
       throw new LoadFailure('future-version');
     }
@@ -738,8 +738,8 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       handle.emit('save:future-version-refused', {
         slotId,
         kind: 'game',
-        saveVersion: envelope.version,
-        currentVersion: version,
+        writtenVersion: envelope.version,
+        supportedVersion: version,
       });
       throw new LoadFailure('future-version');
     }
@@ -826,15 +826,15 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
         _protectedSlots.delete(slotId);
         handle.emit('save:loaded', { slotId, timestamp: e.timestamp, version: e.version });
         return { success: true, timestamp: e.timestamp };
-      }, reportReconcileError(slotId)),
+      }, reportHydrationError(slotId)),
     );
   }
 
   /** Report a post-load reconcile's throw without failing the load it followed. */
-  function reportReconcileError(slotId: number): (err: unknown) => void {
+  function reportHydrationError(slotId: number): (err: unknown) => void {
     return (err) => {
-      console.error('A reconcile after a successful save load threw; the load stands.', err);
-      handle.emit('save:reconcile-failed', { slotId, detail: err });
+      console.error('A hydration after a successful save load threw; the load stands.', err);
+      handle.emit('save:hydration-failed', { slotId, detail: err });
     };
   }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
-import { resetAllPersistentContexts, withLoadingSave } from '@/core/persistence';
+import { resetAllPersistentContexts, withSettling } from '@/core/persistence';
 import { withGameStateAccessor, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, createPurchasableCategory, type EngineModule } from '@/index';
 import { createSubjectCategory } from '@/systems/subject-category';
@@ -451,7 +451,7 @@ describe('createSubjectCategory', () => {
 
   describe('loaded values', () => {
     function loadInto(write: () => void): void {
-      withLoadingSave(write);
+      withSettling(write);
     }
 
     it('normalizes values a save wrote outside the schema, without events', () => {

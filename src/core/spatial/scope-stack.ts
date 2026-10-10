@@ -82,7 +82,7 @@ export interface ScopeStackOptions<N, E> {
  * not serialized; consumers re-drive `recalculateAt` after restore as their
  * game state demands.
  */
-export interface ScopeStackSnapshot {
+export interface SerializedScopeStack {
   version: 1;
   path: string[];
 }
@@ -149,14 +149,14 @@ export interface ScopeStack<N, E> {
 
   // Persistence -------------------------------------------------------------
 
-  serialize(): ScopeStackSnapshot;
+  serialize(): SerializedScopeStack;
   /**
    * Replace navigation state from `snapshot`. Clears the state cache, pops
    * any active path silently, then rebuilds by walking the snapshot path
    * from root. Throws if a path node (or its child graph) is missing. No
    * events fire during restore.
    */
-  restore(snapshot: ScopeStackSnapshot): void;
+  restore(serialized: SerializedScopeStack): void;
 }
 
 /**
@@ -317,14 +317,14 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
       return handle.on(event, handler);
     },
 
-    serialize(): ScopeStackSnapshot {
+    serialize(): SerializedScopeStack {
       return { version: 1, path: path.slice() };
     },
 
-    restore(snapshot: ScopeStackSnapshot): void {
-      if (snapshot.version !== 1) {
+    restore(serialized: SerializedScopeStack): void {
+      if (serialized.version !== 1) {
         throw new Error(
-          `ScopeStack.restore: unsupported snapshot version ${String(snapshot.version)}`,
+          `ScopeStack.restore: unsupported format version ${String(serialized.version)}`,
         );
       }
 
@@ -336,7 +336,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
       statusCache.clear();
 
       let cur: SpatialGraph<N, E> = options.root;
-      for (const id of snapshot.path) {
+      for (const id of serialized.path) {
         if (!cur.getNode(id)) {
           throw new Error(`ScopeStack.restore: path node '${id}' not found`);
         }

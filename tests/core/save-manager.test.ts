@@ -97,7 +97,7 @@ describe('SaveManager', () => {
 
   it('save includes version', () => {
     const storage = createMapStorage();
-    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage, version: 2 });
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage, saveVersion: 2 });
     beginPersistentContext('sm-version');
     persistent(0);
     endPersistentContext();
@@ -129,7 +129,7 @@ describe('SaveManager', () => {
 
   it('peek returns metadata without loading', () => {
     const storage = createMapStorage();
-    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage, version: 3 });
+    const mgr = createSaveManager({ gameId: 'test', storageAdapter: storage, saveVersion: 3 });
     beginPersistentContext('sm-peek');
     const v = persistent(0);
     endPersistentContext();
@@ -900,7 +900,7 @@ describe('SaveManager — engine v3 compression', () => {
 
   it('peek works on compressed envelope without decompression', () => {
     const storage = createMapStorage();
-    const mgr = createSaveManager({ gameId: 'cz5', storageAdapter: storage, version: 4 });
+    const mgr = createSaveManager({ gameId: 'cz5', storageAdapter: storage, saveVersion: 4 });
     beginPersistentContext('cz5-ctx');
     const v = persistent(0, { name: 'v' });
     endPersistentContext();
@@ -1127,7 +1127,7 @@ describe('SaveManager — events', () => {
       );
       const mgr = createSaveManager({
         gameId: 'evt-mig',
-        version: 3,
+        saveVersion: 3,
         storageAdapter: storage,
         migrations: {
           1: (d) => d,
@@ -1153,7 +1153,7 @@ describe('SaveManager — events', () => {
       );
       const mgr = createSaveManager({
         gameId: 'evt-mig-void',
-        version: 2,
+        saveVersion: 2,
         storageAdapter: storage,
         migrations: {
           // @ts-expect-error a block body without `return` is caught at compile time
@@ -1187,7 +1187,7 @@ describe('SaveManager — events', () => {
           _engine: { version: 2 },
         }),
       );
-      const mgr = createSaveManager({ gameId: 'evt-fv', version: 2, storageAdapter: storage });
+      const mgr = createSaveManager({ gameId: 'evt-fv', saveVersion: 2, storageAdapter: storage });
 
       const fv = vi.fn();
       const failed = vi.fn();
@@ -1200,8 +1200,8 @@ describe('SaveManager — events', () => {
       expect(fv).toHaveBeenCalledWith({
         slotId: 0,
         kind: 'game',
-        saveVersion: 5,
-        currentVersion: 2,
+        writtenVersion: 5,
+        supportedVersion: 2,
       });
       expect(failed).toHaveBeenCalledWith({
         slotId: 0,
@@ -1222,7 +1222,7 @@ describe('SaveManager — events', () => {
           _engine: { version: ENGINE_SAVE_VERSION + 1, compression: 'zstd' },
         }),
       );
-      const mgr = createSaveManager({ gameId: 'evt-efv', version: 1, storageAdapter: storage });
+      const mgr = createSaveManager({ gameId: 'evt-efv', saveVersion: 1, storageAdapter: storage });
 
       const fv = vi.fn();
       const failed = vi.fn();
@@ -1233,8 +1233,8 @@ describe('SaveManager — events', () => {
       expect(fv).toHaveBeenCalledWith({
         slotId: 0,
         kind: 'engine',
-        saveVersion: ENGINE_SAVE_VERSION + 1,
-        currentVersion: ENGINE_SAVE_VERSION,
+        writtenVersion: ENGINE_SAVE_VERSION + 1,
+        supportedVersion: ENGINE_SAVE_VERSION,
       });
       expect(failed.mock.calls[0][0].reason).toBe('future-version');
     });

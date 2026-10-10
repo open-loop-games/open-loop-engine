@@ -28,7 +28,7 @@ import type { Cell, RunContext } from './types';
 export interface CreateSensitivityCellOptions {
   name: string;
   /** Exported save string — treated as an immutable snapshot across runs. */
-  saveBlob: string;
+  saveText: string;
   /**
    * Factory returning a fresh set of module instances per run. Returning
    * fresh instances prevents persistent-ref aliasing across sequential
@@ -104,7 +104,7 @@ let runCounter = 0;
  * const blob = live.saveManager!.exportSave();
  * const baseline = createSensitivityCell({
  *   name: 'baseline',
- *   saveBlob: blob,
+ *   saveText: blob,
  *   modules: () => [createGoldModule()],
  *   tick: (engine) => engine.tickDriver.stepOnce(),
  *   ticks: 1000,
@@ -114,7 +114,7 @@ let runCounter = 0;
 export function createSensitivityCell(options: CreateSensitivityCellOptions): Cell {
   const {
     name,
-    saveBlob,
+    saveText,
     modules,
     perturb,
     buildAnalyzers,
@@ -138,7 +138,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
   const setup = (ctx: RunContext): Analyzer[] => {
     teardown();
     const engine = createEngineFromSave({
-      saveBlob,
+      saveText,
       modules: modules(),
       persistenceNamespace: `${namespace}-${runCounter++}`,
       config,

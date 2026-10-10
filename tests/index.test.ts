@@ -1604,7 +1604,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     engine.dispose();
 
     const g = game();
-    const scratch = createEngineFromSave({ saveBlob: blob, modules: [g.mod] });
+    const scratch = createEngineFromSave({ saveText: blob, modules: [g.mod] });
 
     expectFreshLoad(g);
     scratch.dispose();
@@ -1655,7 +1655,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     const failed = vi.fn();
     const reconcileErrors: unknown[] = [];
     mgr.on('save:load-failed', failed);
-    mgr.on('save:reconcile-failed', (e) => reconcileErrors.push(e));
+    mgr.on('save:hydration-failed', (e) => reconcileErrors.push(e));
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(engine.load().success).toBe(true);

@@ -24,7 +24,7 @@ import { Decimal, format, formatWhole } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import {
   persistent,
-  loadingSave,
+  settling,
   getCurrentPersistentContext,
   withPersistentContext,
   type IfSerializable,
@@ -312,7 +312,7 @@ function buildResource<T>(
           resource as Ref<DecimalSource>,
           (amount) => {
             // A load is taken as saved, unclamped, and counts as no gain.
-            if (loadingSave.value) {
+            if (settling.value) {
               landed = amount;
               return;
             }

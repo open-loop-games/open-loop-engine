@@ -76,7 +76,7 @@ describe('createEngineFromSave', () => {
       },
     };
     const engine = createEngineFromSave({
-      saveBlob: makeLiveSave(21),
+      saveText: makeLiveSave(21),
       modules: [withHook],
       persistenceNamespace: 'from-save-onload',
     });
@@ -90,7 +90,7 @@ describe('createEngineFromSave', () => {
     const corrupt = JSON.stringify({ ...JSON.parse(good), data: 'not-a-save' });
     expect(() =>
       createEngineFromSave({
-        saveBlob: corrupt,
+        saveText: corrupt,
         modules: [makeGoldModule(0).mod],
         persistenceNamespace: 'from-save-retry',
       }),
@@ -98,7 +98,7 @@ describe('createEngineFromSave', () => {
 
     const { mod, refs } = makeGoldModule(0);
     const engine = createEngineFromSave({
-      saveBlob: good,
+      saveText: good,
       modules: [mod],
       persistenceNamespace: 'from-save-retry',
     });
@@ -109,8 +109,8 @@ describe('createEngineFromSave', () => {
   it('gives each call its own namespace by default', async () => {
     const { createEngineFromSave } = await import('@/harness/create-engine');
     const blob = makeLiveSave(3);
-    const first = createEngineFromSave({ saveBlob: blob, modules: [makeGoldModule(0).mod] });
-    const second = createEngineFromSave({ saveBlob: blob, modules: [makeGoldModule(0).mod] });
+    const first = createEngineFromSave({ saveText: blob, modules: [makeGoldModule(0).mod] });
+    const second = createEngineFromSave({ saveText: blob, modules: [makeGoldModule(0).mod] });
     first.dispose();
     second.dispose();
   });
@@ -122,13 +122,13 @@ describe('createSensitivityCell', () => {
 
   function makeCell(
     name: string,
-    saveBlob: string,
+    saveText: string,
     perturb?: (engine: Engine, ctx: RunContext) => void,
   ) {
     const modFactory = makeGoldModule;
     return createSensitivityCell({
       name,
-      saveBlob,
+      saveText,
       modules: () => {
         const { mod, refs } = modFactory(0);
         // Hand the current ref to the outer closure so analyzer + tick see this run's engine.
@@ -181,7 +181,7 @@ describe('createSensitivityCell', () => {
 
     const cell = createSensitivityCell({
       name: 'seeded',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => {
         const { mod, refs } = makeGoldModule(0);
         currentGold = () => refs.gold?.value ?? 0;
@@ -254,7 +254,7 @@ describe('createSensitivityCell', () => {
     const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
       name: 'disposal',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [
         {
           id: 'economy',
@@ -281,7 +281,7 @@ describe('createSensitivityCell', () => {
     const heldRefs: (() => number)[] = [];
     const cell = createSensitivityCell({
       name: 'teardown',
-      saveBlob: blob,
+      saveText: blob,
       modules: () => [
         {
           id: 'economy',

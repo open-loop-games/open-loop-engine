@@ -157,11 +157,11 @@ export type PersistentAlias<T = Serializable> = WritableComputedRef<T> & {
 /**
  * True while a save load or a reset writes persistent refs. Watchers that
  * react to player actions skip these writes: they restore state, they don't
- * change it. Written only by {@link withLoadingSave}.
+ * change it. Written only by {@link withSettling}.
  */
-export const loadingSave = ref(false);
+export const settling = ref(false);
 
-/** Open {@link withLoadingSave} calls; the flag clears as the outermost closes. */
+/** Open {@link withSettling} calls; the flag clears as the outermost closes. */
 let loadDepth = 0;
 
 const hydratedCallbacks = new Set<() => void>();
@@ -201,7 +201,7 @@ export function latchWhenSettled(holds: Readonly<Ref<boolean>>, fire: () => void
   const stopWatch = watch(
     holds,
     (held) => {
-      if (held && !loadingSave.value) fire();
+      if (held && !settling.value) fire();
     },
     { immediate: true, flush: 'sync' },
   );
@@ -229,7 +229,7 @@ function runHydrated(): unknown[] {
 
 /**
  * Run `fn` as a save load or a reset writing persistent refs, with
- * {@link loadingSave} held throughout. A nested call keeps the outer's hold,
+ * {@link settling} held throughout. A nested call keeps the outer's hold,
  * so the state settles once, as the outermost call closes: the
  * {@link onHydrated} callbacks run then, or wait for an enclosing
  * {@link deferHydration}. Outside one, the first callback throw rethrows
@@ -237,13 +237,13 @@ function runHydrated(): unknown[] {
  *
  * @internal
  */
-export function withLoadingSave<T>(fn: () => T): T {
-  if (loadDepth++ === 0) loadingSave.value = true;
+export function withSettling<T>(fn: () => T): T {
+  if (loadDepth++ === 0) settling.value = true;
   try {
     return fn();
   } finally {
     if (--loadDepth === 0) {
-      loadingSave.value = false;
+      settling.value = false;
       settleHydration();
     }
   }
@@ -1206,7 +1206,7 @@ export function deserializePersistents(
   refs: Map<string, Persistent>,
   save: Record<string, unknown>,
 ): void {
-  withLoadingSave(() => {
+  withSettling(() => {
     for (const [path, persistentRef] of refs) {
       const current = getNested(save, path);
 

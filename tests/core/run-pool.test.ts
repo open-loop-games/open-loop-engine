@@ -4,7 +4,7 @@ import {
   beginPersistentContext,
   endPersistentContext,
   getAllPersistentRefs,
-  loadingSave,
+  settling,
   deserializePersistents,
   serializePersistents,
   withPersistentContext,
@@ -142,7 +142,7 @@ describe('RunPool — construction', () => {
     );
     const handle = pool.addRun({ id: 'a', step: aliveStep });
     const loadingAtFlip: boolean[] = [];
-    watch(handle.alive, () => loadingAtFlip.push(loadingSave.value), { flush: 'sync' });
+    watch(handle.alive, () => loadingAtFlip.push(settling.value), { flush: 'sync' });
 
     deserializePersistents(getAllPersistentRefs(), {
       [ctxId]: { aliveStates: { a: false } },

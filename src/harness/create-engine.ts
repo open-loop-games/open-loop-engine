@@ -23,7 +23,7 @@ const NOOP_TIMER_PROVIDER: TimerProvider = {
 /** Options for {@link createEngineFromSave}. */
 export interface CreateEngineFromSaveOptions {
   /** Exported save string (from `saveManager.exportSave()`). */
-  saveBlob: string;
+  saveText: string;
   /** Modules to install on the new engine, in order. */
   modules: EngineModule[];
   /**
@@ -67,7 +67,7 @@ let scratchCounter = 0;
  * @example
  * ```ts
  * const scratch = createEngineFromSave({
- *   saveBlob: engine.saveManager!.exportSave(),
+ *   saveText: engine.saveManager!.exportSave(),
  *   modules: [economyModule, prestigeModule],
  * });
  * try {
@@ -80,7 +80,7 @@ let scratchCounter = 0;
  */
 export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine {
   const {
-    saveBlob,
+    saveText,
     modules,
     persistenceNamespace: namespace = `workbench-scratch-${scratchCounter++}`,
     config = {},
@@ -92,9 +92,9 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
   // carries no further meaning here.
   let envelopeGameId: string;
   try {
-    envelopeGameId = (JSON.parse(saveBlob) as { gameId: string }).gameId;
+    envelopeGameId = (JSON.parse(saveText) as { gameId: string }).gameId;
   } catch {
-    throw new Error('createEngineFromSave: save blob is not valid JSON');
+    throw new Error('createEngineFromSave: save text is not valid JSON');
   }
 
   const engine = createEngine({
@@ -110,10 +110,10 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
   for (const mod of modules) engine.use(mod);
   engine.start();
 
-  const result = engine.saveManager!.importSave(saveBlob);
+  const result = engine.saveManager!.importSave(saveText);
   if (!result.success) {
     engine.dispose();
-    throw new Error('createEngineFromSave: failed to import save blob');
+    throw new Error('createEngineFromSave: failed to import save text');
   }
 
   return engine;

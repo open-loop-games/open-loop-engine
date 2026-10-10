@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
-import { createSpatialGraph, type GraphEdge, type SpatialGraphSnapshot } from '@/core/spatial';
+import { createSpatialGraph, type GraphEdge, type SerializedGraph } from '@/core/spatial';
 
 interface Pkg {
   name: string;
@@ -342,7 +342,7 @@ describe('createSpatialGraph — serialize / restore', () => {
     const child = graph.createChildGraph(owner.id);
     child.addNode(pkg('c'));
     child.addNode(pkg('d'));
-    const saved = JSON.parse(JSON.stringify(graph.serialize())) as SpatialGraphSnapshot<Pkg, Wire>;
+    const saved = JSON.parse(JSON.stringify(graph.serialize())) as SerializedGraph<Pkg, Wire>;
 
     const restored = createSpatialGraph<Pkg, Wire>();
     restored.restore(saved);
@@ -405,13 +405,13 @@ describe('createSpatialGraph — serialize / restore', () => {
       nodes: [],
       edges: [],
       children: {},
-    } as unknown as SpatialGraphSnapshot<Pkg, Wire>;
-    expect(() => graph.restore(badSnap)).toThrow(/unsupported snapshot version/);
+    } as unknown as SerializedGraph<Pkg, Wire>;
+    expect(() => graph.restore(badSnap)).toThrow(/unsupported format version/);
   });
 
   it('restore rejects edges with missing endpoints', () => {
     const graph = createSpatialGraph<Pkg, Wire>();
-    const snap: SpatialGraphSnapshot<Pkg, Wire> = {
+    const snap: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [{ id: 'a', data: pkg('a') }],
       edges: [{ id: 'e', fromId: 'a', toId: 'missing', data: { kind: 'dependency' } }],
@@ -422,7 +422,7 @@ describe('createSpatialGraph — serialize / restore', () => {
 
   it('restore rejects child graphs keyed on missing nodes', () => {
     const graph = createSpatialGraph<Pkg, Wire>();
-    const snap: SpatialGraphSnapshot<Pkg, Wire> = {
+    const snap: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [],
       edges: [],
@@ -442,13 +442,13 @@ describe('createSpatialGraph — serialize / restore', () => {
     child.addNode(pkg('i'), { id: 'i' });
     const before = graph.serialize();
 
-    const danglingEdge: SpatialGraphSnapshot<Pkg, Wire> = {
+    const danglingEdge: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [{ id: 'x', data: pkg('x') }],
       edges: [{ id: 'e9', fromId: 'x', toId: 'ghost', data: { kind: 'dependency' } }],
       children: {},
     };
-    const nestedDuplicate: SpatialGraphSnapshot<Pkg, Wire> = {
+    const nestedDuplicate: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [{ id: 'x', data: pkg('x') }],
       edges: [],
@@ -475,7 +475,7 @@ describe('createSpatialGraph — serialize / restore', () => {
 
   it('integrates with the persistent() consumer pattern', () => {
     beginPersistentContext('graph-test');
-    const snapRef = persistent<SpatialGraphSnapshot<Pkg, Wire>>({
+    const snapRef = persistent<SerializedGraph<Pkg, Wire>>({
       version: 1,
       nodes: [],
       edges: [],

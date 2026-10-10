@@ -484,10 +484,10 @@ describe('dispel', () => {
 // ============================================================================
 
 describe('persistence', () => {
-  it('a load rebuilds instances from the save, firing onRehydrate instead of onActivate', () => {
+  it('a load rebuilds instances from the save, firing onHydrate instead of onActivate', () => {
     const onActivate = vi.fn();
-    const onRehydrate = vi.fn();
-    const defs = [{ id: 'burn', duration: 10, onActivate, onRehydrate }];
+    const onHydrate = vi.fn();
+    const defs = [{ id: 'burn', duration: 10, onActivate, onHydrate }];
     const storage = createMemoryStorage();
     const first = startSession(storage, defs);
     first.system.activate('burn');
@@ -498,12 +498,12 @@ describe('persistence', () => {
     const second = startSession(storage, defs);
     second.engine.load();
     expect(second.system.getActive().map((i) => i.defId)).toEqual(['burn']);
-    expect(onRehydrate).toHaveBeenCalledOnce();
+    expect(onHydrate).toHaveBeenCalledOnce();
     expect(onActivate).not.toHaveBeenCalled();
     second.engine.dispose();
   });
 
-  it('a load falls back to onActivate when the def has no onRehydrate', () => {
+  it('a load falls back to onActivate when the def has no onHydrate', () => {
     const onActivate = vi.fn();
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'burn', duration: 10, onActivate }]);
@@ -542,15 +542,15 @@ describe('persistence', () => {
   });
 
   it("another engine's load leaves this engine's instances alone", () => {
-    const onRehydrate = vi.fn();
-    const live = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30, onRehydrate }]);
+    const onHydrate = vi.fn();
+    const live = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30, onHydrate }]);
     const haste = live.system.activate('haste')!;
 
     const scratch = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30 }], 'scratch');
     scratch.engine.save();
     expect(scratch.engine.load().success).toBe(true);
 
-    expect(onRehydrate).not.toHaveBeenCalled();
+    expect(onHydrate).not.toHaveBeenCalled();
     expect(live.system.getActive()).toEqual([haste]);
     scratch.engine.dispose();
     live.engine.dispose();

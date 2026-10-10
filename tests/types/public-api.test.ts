@@ -37,7 +37,7 @@ import {
   type InjectionKey,
   type RuleAdvisor,
   type SpatialGrid,
-  type SpatialGridSnapshot,
+  type SerializedSpatialGrid,
   type Suggestion,
   type GridCoord,
   type Inversion,
@@ -381,9 +381,9 @@ describe('createSpatialGrid type surface', () => {
     expectTypeOf(grid.tryAt).returns.toEqualTypeOf<Tile | undefined>();
   });
 
-  it('serialize() returns a SpatialGridSnapshot<T> propagating the cell generic', () => {
+  it('serialize() returns a SerializedSpatialGrid<T> propagating the cell generic', () => {
     expectTypeOf<SpatialGrid<Tile>['serialize']>().returns.toEqualTypeOf<
-      SpatialGridSnapshot<Tile>
+      SerializedSpatialGrid<Tile>
     >();
   });
 
@@ -459,11 +459,11 @@ describe('Dialog surface type pins', () => {
 
   it('DialogRuntime contract is stable', async () => {
     type DialogRuntime = import('@/systems/dialog').DialogRuntime;
-    type DialogRuntimeState = import('@/systems/dialog').DialogRuntimeState;
+    type SerializedDialogAdapter = import('@/systems/dialog').SerializedDialogAdapter;
     type DialogPresentation = import('@/systems/dialog').DialogPresentation;
     expectTypeOf<DialogRuntime['start']>().parameter(0).toBeString();
     expectTypeOf<DialogRuntime['present']>().returns.toEqualTypeOf<DialogPresentation | null>();
-    expectTypeOf<DialogRuntime['exportState']>().returns.toEqualTypeOf<DialogRuntimeState>();
+    expectTypeOf<DialogRuntime['serialize']>().returns.toEqualTypeOf<SerializedDialogAdapter>();
     expectTypeOf<DialogRuntime['isActive']>().returns.toBeBoolean();
   });
 });

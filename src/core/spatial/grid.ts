@@ -129,7 +129,7 @@ export interface SpatialGridEvents<T> {
  * reactive proxies, so restoring from a `persistent()` ref's `.value` keeps
  * the grid's cells raw.
  */
-export interface SpatialGridSnapshot<T> {
+export interface SerializedSpatialGrid<T> {
   /** `serialize()` writes 1; `restore()` reads an absent version as 1. */
   version?: 1;
   width: number;
@@ -378,7 +378,7 @@ export interface SpatialGrid<T> {
   on<K extends keyof SpatialGridEvents<T>>(event: K, handler: SpatialGridEvents<T>[K]): Unsubscribe;
 
   /** Capture the grid's current state as a plain-object snapshot. */
-  serialize(): SpatialGridSnapshot<T>;
+  serialize(): SerializedSpatialGrid<T>;
   /**
    * Replace the grid's state from a snapshot. Width/height must match
    * construction; a version other than 1 throws. Once every cell, bitmap and
@@ -386,7 +386,7 @@ export interface SpatialGrid<T> {
    * bitmap (passable, explored, visible), so a renderer repaints a loaded
    * board the same way it repaints a `fill()` — no per-cell `cellChanged`.
    */
-  restore(snapshot: SpatialGridSnapshot<T>): void;
+  restore(serialized: SerializedSpatialGrid<T>): void;
 }
 
 /**
@@ -821,32 +821,32 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       };
     },
 
-    restore(snapshot) {
-      if (snapshot.version !== undefined && snapshot.version !== 1) {
+    restore(serialized) {
+      if (serialized.version !== undefined && serialized.version !== 1) {
         throw new Error(
-          `SpatialGrid.restore: unsupported snapshot version ${String(snapshot.version)}`,
+          `SpatialGrid.restore: unsupported format version ${String(serialized.version)}`,
         );
       }
-      if (snapshot.width !== width || snapshot.height !== height) {
+      if (serialized.width !== width || serialized.height !== height) {
         throw new Error(
-          `SpatialGrid.restore: snapshot dimensions (${snapshot.width}×${snapshot.height}) do not match grid (${width}×${height})`,
+          `SpatialGrid.restore: snapshot dimensions (${serialized.width}×${serialized.height}) do not match grid (${width}×${height})`,
         );
       }
       if (
-        snapshot.cells.length !== size ||
-        snapshot.passable.length !== size ||
-        snapshot.explored.length !== size ||
-        snapshot.visible.length !== size
+        serialized.cells.length !== size ||
+        serialized.passable.length !== size ||
+        serialized.explored.length !== size ||
+        serialized.visible.length !== size
       ) {
-        throw new Error(`SpatialGrid.restore: snapshot array lengths do not match grid size`);
+        throw new Error(`SpatialGrid.restore: serialized array lengths do not match grid size`);
       }
-      passable.set(snapshot.passable);
-      explored.set(snapshot.explored);
-      visible.set(snapshot.visible);
+      passable.set(serialized.passable);
+      explored.set(serialized.explored);
+      visible.set(serialized.visible);
       for (let i = 0; i < size; i++) {
         // A snapshot read back through a `persistent()` ref yields reactive
         // proxies; the grid holds the raw objects so tick-rate reads skip traps.
-        cells[i] = toRaw(snapshot.cells[i]);
+        cells[i] = toRaw(serialized.cells[i]);
       }
       recountMasks();
       handle.emit('bulkChanged');

@@ -466,7 +466,7 @@ export function createEngine(config: EngineConfig): Engine {
     config.persistence !== false
       ? createSaveManager({
           gameId: config.gameId,
-          version: config.saveVersion,
+          saveVersion: config.saveVersion,
           migrations: config.saveMigrations,
           storageAdapter: config.storageAdapter,
           maxSlots: config.maxSaveSlots,

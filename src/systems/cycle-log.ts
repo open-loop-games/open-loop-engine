@@ -18,7 +18,7 @@
 
 import { effectScope, onScopeDispose, ref, watch, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { isPersistent, loadingSave, onHydrated, type Persistent } from '@/core/persistence';
+import { isPersistent, settling, onHydrated, type Persistent } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { InjectionKey } from '@/primitives/types';
 import type { Cycle } from './cycle';
@@ -195,7 +195,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
   const scope = effectScope();
   scope.run(() => {
     watch(
-      loadingSave,
+      settling,
       (loading) => {
         if (!loading || preLoad) return;
         preLoad = {};

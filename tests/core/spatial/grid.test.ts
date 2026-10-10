@@ -7,7 +7,7 @@ import {
   DIAGONAL_DELTAS,
   HEX_AXIAL_DELTAS,
   type GridCoord,
-  type SpatialGridSnapshot,
+  type SerializedSpatialGrid,
 } from '@/core/spatial';
 
 interface Tile {
@@ -851,7 +851,7 @@ describe('createSpatialGrid — serialize / restore', () => {
     const { version: _, ...unversioned } = snapshot;
     expect(() => grid.restore(unversioned)).not.toThrow();
     expect(() => grid.restore({ ...snapshot, version: 2 as 1 })).toThrow(
-      'unsupported snapshot version 2',
+      'unsupported format version 2',
     );
   });
 
@@ -907,7 +907,7 @@ describe('createSpatialGrid — serialize / restore', () => {
 
   it('rejects restore from a snapshot with mismatched dimensions', () => {
     const grid = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
-    const bad: SpatialGridSnapshot<Tile> = {
+    const bad: SerializedSpatialGrid<Tile> = {
       width: 3,
       height: 3,
       cells: Array.from({ length: 9 }, floor),
@@ -935,7 +935,7 @@ describe('createSpatialGrid — serialize / restore', () => {
   it('round-trips through a JSON save/load, wrapped in a single persistent() ref', () => {
     beginPersistentContext('spatial-grid-snapshot-test');
     try {
-      const initial: SpatialGridSnapshot<Tile> = {
+      const initial: SerializedSpatialGrid<Tile> = {
         width: 2,
         height: 2,
         cells: [floor(), floor(), floor(), floor()],
@@ -943,12 +943,12 @@ describe('createSpatialGrid — serialize / restore', () => {
         explored: [0, 0, 0, 0],
         visible: [0, 0, 0, 0],
       };
-      const snapshotRef = persistent<SpatialGridSnapshot<Tile>>(initial);
+      const snapshotRef = persistent<SerializedSpatialGrid<Tile>>(initial);
       const grid = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
       grid.restore(snapshotRef.value);
       grid.set(1, 1, { kind: 'wall' });
       // Simulate the real save boundary: the persisted snapshot goes through JSON.
-      const reloaded = JSON.parse(JSON.stringify(grid.serialize())) as SpatialGridSnapshot<Tile>;
+      const reloaded = JSON.parse(JSON.stringify(grid.serialize())) as SerializedSpatialGrid<Tile>;
       const restored = createSpatialGrid<Tile>({ width: 2, height: 2, initializer: floor });
       restored.restore(reloaded);
       expect(reloaded.cells[3].kind).toBe('wall');
@@ -962,7 +962,7 @@ describe('createSpatialGrid — serialize / restore', () => {
   it('restoring from a persistent() ref stores raw cells, not reactive proxies', () => {
     beginPersistentContext('spatial-grid-raw-cells-test');
     try {
-      const snapshotRef = persistent<SpatialGridSnapshot<Tile>>({
+      const snapshotRef = persistent<SerializedSpatialGrid<Tile>>({
         width: 2,
         height: 1,
         cells: [floor(), { kind: 'wall' }],
