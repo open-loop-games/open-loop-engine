@@ -1,11 +1,11 @@
 /**
- * ScopeStack<N, E> — stack navigator over a recursive `SpatialGraph`.
+ * ScopeStack<N, E> — stack navigator over a recursive `Graph`.
  *
  * @cluster spatial-scope-stack
  *
  * Plain-data, Vue-free. Tracks which nested child graph the player is
  * currently inside, given a caller-owned tree of graphs-within-graphs built
- * via `SpatialGraph.createChildGraph`. The active path (e.g. `[pkgA, pkgB,
+ * via `Graph.createChildGraph`. The active path (e.g. `[pkgA, pkgB,
  * pkgC]`) is a list of the node ids whose child graphs have been entered in
  * order; `current` resolves to the innermost graph, `breadcrumb` resolves it
  * to the owning nodes.
@@ -45,14 +45,14 @@
  * Persistence: `serialize()` returns the active path only. The state cache
  * is ephemeral — cleared on `restore` and rebuilt as callers drive
  * `recalculateAt` after load. No events fire during restore. Restore the
- * graph first, then the stack: `SpatialGraph.restore` replaces every child
+ * graph first, then the stack: `Graph.restore` replaces every child
  * graph, so a stack left standing over the old ones reads and writes
  * detached graphs, and a removal no longer exits it. `stack.restore`
  * re-resolves the path against the live tree.
  */
 
 import { createEmitHandle } from '../events';
-import type { SpatialGraph, GraphNode } from './graph';
+import type { Graph, GraphNode } from './graph';
 import type { Unsubscribe } from './types';
 
 /**
@@ -66,7 +66,7 @@ export type ScopeStatus = string;
 /** Options accepted by {@link createScopeStack}. */
 export interface ScopeStackOptions<N, E> {
   /** Root graph the stack navigates from. The stack never mutates it. */
-  readonly root: SpatialGraph<N, E>;
+  readonly root: Graph<N, E>;
   /**
    * Invoked by `recalculateAt`. Caller computes the scope's state label from
    * the graph at the given path and returns it. The stack caches the result
@@ -74,7 +74,7 @@ export interface ScopeStackOptions<N, E> {
    * Omit to make `recalculateAt` a no-op — useful for consumers that only
    * want navigation without derived state.
    */
-  readonly recalculate?: (graph: SpatialGraph<N, E>, path: readonly string[]) => ScopeStatus;
+  readonly recalculate?: (graph: Graph<N, E>, path: readonly string[]) => ScopeStatus;
 }
 
 /**
@@ -97,13 +97,13 @@ export interface ScopeStackEvents {
 /** Navigation cursor over a recursive graph-of-graphs. */
 export interface ScopeStack<N, E> {
   /** The graph the stack was constructed with. */
-  readonly root: SpatialGraph<N, E>;
+  readonly root: Graph<N, E>;
 
   // Navigation --------------------------------------------------------------
 
   /**
    * Dive into `nodeId`'s child graph. The node must exist in the current
-   * graph and have a child graph (created via `SpatialGraph.createChildGraph`).
+   * graph and have a child graph (created via `Graph.createChildGraph`).
    * Throws otherwise — the stack does not invent the tree.
    */
   enter(nodeId: string): void;
@@ -125,7 +125,7 @@ export interface ScopeStack<N, E> {
   /** `path.length`. */
   readonly depth: number;
   /** The graph at the innermost level — `root` at depth 0. */
-  readonly current: SpatialGraph<N, E>;
+  readonly current: Graph<N, E>;
   /** The id at the innermost level, or `null` at root. */
   readonly currentNodeId: string | null;
   /** The path resolved to owning nodes, root-to-leaf. Fresh array per read. */
@@ -160,7 +160,7 @@ export interface ScopeStack<N, E> {
 }
 
 /**
- * Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree.
+ * Create a stack navigator over a `Graph`'s recursive child-graph tree.
  *
  * @param options - Required `root` graph; optional `recalculate` callback
  *   wired to derive per-scope state labels.
@@ -170,7 +170,7 @@ export interface ScopeStack<N, E> {
  * ```ts
  * interface Pkg { name: string }
  * interface Wire { kind: 'dependency' | 'symlink' }
- * const graph = createSpatialGraph<Pkg, Wire>();
+ * const graph = createGraph<Pkg, Wire>();
  * graph.addNode({ name: 'outer' }, { id: 'outer' });
  * const inner = graph.createChildGraph('outer');
  * inner.addNode({ name: 'deep' }, { id: 'deep' });
@@ -186,7 +186,7 @@ export interface ScopeStack<N, E> {
  */
 export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E> {
   const path: string[] = [];
-  const graphStack: SpatialGraph<N, E>[] = [options.root];
+  const graphStack: Graph<N, E>[] = [options.root];
   const subscriptions: Unsubscribe[] = [];
   const statusCache = new Map<string, ScopeStatus>();
   const handle = createEmitHandle<ScopeStackEvents>();
@@ -195,8 +195,8 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
     return JSON.stringify(p);
   }
 
-  function resolveGraphAtPath(p: readonly string[]): SpatialGraph<N, E> | null {
-    let g: SpatialGraph<N, E> = options.root;
+  function resolveGraphAtPath(p: readonly string[]): Graph<N, E> | null {
+    let g: Graph<N, E> = options.root;
     for (const id of p) {
       const child = g.getChildGraph(id);
       if (!child) return null;
@@ -205,11 +205,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
     return g;
   }
 
-  function subscribeForLevel(
-    parent: SpatialGraph<N, E>,
-    levelIndex: number,
-    nodeId: string,
-  ): Unsubscribe {
+  function subscribeForLevel(parent: Graph<N, E>, levelIndex: number, nodeId: string): Unsubscribe {
     return parent.on('nodeRemoved', (removedId) => {
       if (removedId !== nodeId) return;
       if (path.length <= levelIndex) return;
@@ -237,7 +233,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
     const child = parent.getChildGraph(nodeId);
     if (!child) {
       throw new Error(
-        `ScopeStack.enter: node '${nodeId}' has no child graph — create one via SpatialGraph.createChildGraph first`,
+        `ScopeStack.enter: node '${nodeId}' has no child graph — create one via Graph.createChildGraph first`,
       );
     }
     const levelIndex = path.length;
@@ -285,7 +281,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
       return path.length;
     },
 
-    get current(): SpatialGraph<N, E> {
+    get current(): Graph<N, E> {
       return graphStack[graphStack.length - 1];
     },
 
@@ -295,7 +291,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
 
     get breadcrumb(): readonly GraphNode<N>[] {
       const trail: GraphNode<N>[] = [];
-      let g: SpatialGraph<N, E> = options.root;
+      let g: Graph<N, E> = options.root;
       for (const id of path) {
         const node = g.getNode(id);
         if (!node) break;
@@ -335,7 +331,7 @@ export function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeS
       }
       statusCache.clear();
 
-      let cur: SpatialGraph<N, E> = options.root;
+      let cur: Graph<N, E> = options.root;
       for (const id of serialized.path) {
         if (!cur.getNode(id)) {
           throw new Error(`ScopeStack.restore: path node '${id}' not found`);

@@ -142,7 +142,7 @@ Short answers only — which symbol does X. When two of these overlap and pickin
 | Execute headless simulations | harness runners → harness.md |
 | Bounded coordinate board | `createSpatialGrid` → spatial.md#grid |
 | Hex board, or any non-square adjacency | still `createSpatialGrid` — pass `neighborhood` (`HEX_AXIAL_DELTAS`, `DIAGONAL_DELTAS`, or your own offsets); traversal follows it → spatial.md#grid |
-| Arbitrary node topology / nested spaces | `createSpatialGraph` → spatial.md#graph |
+| Arbitrary node topology / nested spaces | `createGraph` → spatial.md#graph |
 
 ## Predicate forms
 
@@ -271,7 +271,7 @@ Decision-support systems that observe the engine and rank actions: rule advisor,
 Coordinate primitives for adjacency-driven games — grid, graph, scope stack, influence layer. Headless: adjacency and traversal, no rendering. Rank the fields through advisors.md to steer an agent.
 
 - `spatial-grid` → spatial.md#grid
-- `spatial-graph` → spatial.md#graph
+- `graph` → spatial.md#graph
 - `spatial-scope-stack` → spatial.md#scope-stack
 - `spatial-influence-layer` → spatial.md#influence-layer
 

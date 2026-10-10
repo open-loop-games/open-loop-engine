@@ -1,10 +1,10 @@
 /**
- * SpatialGraph<N, E> — keyed nodes/edges with nested child-graph support.
+ * Graph<N, E> — keyed nodes/edges with nested child-graph support.
  *
- * @cluster spatial-graph
+ * @cluster graph
  *
  * Plain-data, Vue-free. Authoritative storage is two `Map`s (nodes, edges)
- * plus an adjacency index. Nodes may own a nested `SpatialGraph` accessed
+ * plus an adjacency index. Nodes may own a nested `Graph` accessed
  * via `createChildGraph` / `getChildGraph`, enabling recursive scope
  * structures (ScopeStack composes on top).
  *
@@ -35,7 +35,7 @@ import { createEmitHandle } from '../events';
 import type { Unsubscribe } from './types';
 
 /**
- * A node in a {@link SpatialGraph}. `parentId` is the owning-node back-
+ * A node in a {@link Graph}. `parentId` is the owning-node back-
  * pointer for nested child graphs — `null` for nodes in the root graph.
  */
 export interface GraphNode<N> {
@@ -44,7 +44,7 @@ export interface GraphNode<N> {
   readonly parentId: string | null;
 }
 
-/** An edge in a {@link SpatialGraph}. Undirected by convention; endpoints are symmetric. */
+/** An edge in a {@link Graph}. Undirected by convention; endpoints are symmetric. */
 export interface GraphEdge<E> {
   readonly id: string;
   readonly fromId: string;
@@ -52,8 +52,8 @@ export interface GraphEdge<E> {
   readonly data: E;
 }
 
-/** Options accepted by {@link createSpatialGraph}. */
-export interface SpatialGraphOptions {
+/** Options accepted by {@link createGraph}. */
+export interface GraphOptions {
   /**
    * Stable ID generator used when `addNode` / `addEdge` are called without
    * an explicit `id`. Defaults to a closure-local monotonic counter. Child
@@ -67,13 +67,13 @@ export interface SpatialGraphOptions {
   readonly idGenerator?: () => string;
 }
 
-/** Events emitted by a {@link SpatialGraph}. Subscribe via `graph.on()`. */
-export interface SpatialGraphEvents<N, E> {
+/** Events emitted by a {@link Graph}. Subscribe via `graph.on()`. */
+export interface GraphEvents<N, E> {
   nodeAdded: (node: GraphNode<N>) => void;
   nodeRemoved: (id: string) => void;
   edgeAdded: (edge: GraphEdge<E>) => void;
   edgeRemoved: (id: string, fromId: string, toId: string) => void;
-  childGraphCreated: (nodeId: string, child: SpatialGraph<N, E>) => void;
+  childGraphCreated: (nodeId: string, child: Graph<N, E>) => void;
   childGraphDestroyed: (nodeId: string) => void;
 }
 
@@ -92,7 +92,7 @@ export interface SerializedGraph<N, E> {
 }
 
 /** Keyed node/edge container with nested child-graph composition. */
-export interface SpatialGraph<N, E> {
+export interface Graph<N, E> {
   // Node CRUD ----------------------------------------------------------------
 
   /**
@@ -168,7 +168,7 @@ export interface SpatialGraph<N, E> {
   // Nested child graphs ------------------------------------------------------
 
   /** Child graph owned by `nodeId`, or `null` if none exists (or node missing). */
-  getChildGraph(nodeId: string): SpatialGraph<N, E> | null;
+  getChildGraph(nodeId: string): Graph<N, E> | null;
 
   /**
    * Creates a new empty child graph under `nodeId`. The child inherits this
@@ -176,14 +176,11 @@ export interface SpatialGraph<N, E> {
    * unique across levels. Throws if the node is missing or a child already
    * exists — use `getChildGraph` for the conditional case.
    */
-  createChildGraph(nodeId: string): SpatialGraph<N, E>;
+  createChildGraph(nodeId: string): Graph<N, E>;
 
   // Events -------------------------------------------------------------------
 
-  on<K extends keyof SpatialGraphEvents<N, E>>(
-    event: K,
-    handler: SpatialGraphEvents<N, E>[K],
-  ): Unsubscribe;
+  on<K extends keyof GraphEvents<N, E>>(event: K, handler: GraphEvents<N, E>[K]): Unsubscribe;
 
   // Persistence --------------------------------------------------------------
 
@@ -214,7 +211,7 @@ export interface SpatialGraph<N, E> {
  * ```ts
  * interface Package { name: string; }
  * interface Wire { kind: 'dependency' | 'symlink'; }
- * const graph = createSpatialGraph<Package, Wire>();
+ * const graph = createGraph<Package, Wire>();
  * const a = graph.addNode({ name: 'root' }, { id: 'pkg-a' });
  * const b = graph.addNode({ name: 'lib' }, { id: 'pkg-b' });
  * graph.addEdge(a.id, b.id, { kind: 'dependency' });
@@ -222,7 +219,7 @@ export interface SpatialGraph<N, E> {
  * internals.addNode({ name: 'a/internal' });
  * ```
  */
-export function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E> {
+export function createGraph<N, E>(options?: GraphOptions): Graph<N, E> {
   return makeGraph<N, E>(
     { idGenerator: options?.idGenerator ?? defaultIdGenerator(), takenIds: new Map() },
     null,
@@ -247,20 +244,20 @@ function makeGraph<N, E>(
   tree: TreeOptions,
   ownerNodeId: string | null,
   initial?: SerializedGraph<N, E>,
-): SpatialGraph<N, E> {
+): Graph<N, E> {
   const { idGenerator, takenIds } = tree;
 
   const nodes = new Map<string, GraphNode<N>>();
   const edges = new Map<string, GraphEdge<E>>();
   // nodeId → set of edge ids touching it (both endpoints indexed).
   const adjacency = new Map<string, Set<string>>();
-  const childGraphs = new Map<string, SpatialGraph<N, E>>();
+  const childGraphs = new Map<string, Graph<N, E>>();
 
-  const handle = createEmitHandle<SpatialGraphEvents<N, E>>();
+  const handle = createEmitHandle<GraphEvents<N, E>>();
 
   function requireNode(id: string): GraphNode<N> {
     const node = nodes.get(id);
-    if (!node) throw new Error(`SpatialGraph: node '${id}' does not exist`);
+    if (!node) throw new Error(`Graph: node '${id}' does not exist`);
     return node;
   }
 
@@ -276,7 +273,7 @@ function makeGraph<N, E>(
       const candidate = idGenerator();
       if (!takenIds.has(candidate)) return candidate;
     }
-    throw new Error('SpatialGraph: idGenerator failed to produce a free id after 1e6 attempts');
+    throw new Error('Graph: idGenerator failed to produce a free id after 1e6 attempts');
   }
 
   function takeId(id: string): void {
@@ -291,7 +288,7 @@ function makeGraph<N, E>(
 
   // Release every id this graph and its descendants hold, before a restore
   // replaces them.
-  function releaseSubtree(g: SpatialGraph<N, E>): void {
+  function releaseSubtree(g: Graph<N, E>): void {
     for (const id of g.edges.keys()) releaseId(id);
     for (const id of g.nodes.keys()) {
       releaseId(id);
@@ -326,14 +323,14 @@ function makeGraph<N, E>(
 
   function removeEdgeInternal(id: string): void {
     const edge = edges.get(id);
-    if (!edge) throw new Error(`SpatialGraph: edge '${id}' does not exist`);
+    if (!edge) throw new Error(`Graph: edge '${id}' does not exist`);
     edges.delete(id);
     releaseId(id);
     unindexEdge(edge);
     handle.emit('edgeRemoved', edge.id, edge.fromId, edge.toId);
   }
 
-  function cascadeDestroy(child: SpatialGraph<N, E>): void {
+  function cascadeDestroy(child: Graph<N, E>): void {
     // Snapshot keys so iteration is stable while the child mutates itself.
     const childNodeIds = Array.from(child.nodes.keys());
     for (const childNodeId of childNodeIds) {
@@ -341,14 +338,14 @@ function makeGraph<N, E>(
     }
   }
 
-  const graph: SpatialGraph<N, E> = {
+  const graph: Graph<N, E> = {
     nodes,
     edges,
 
     addNode(data, opts) {
       const id = resolveId(opts?.id);
       if (nodes.has(id)) {
-        throw new Error(`SpatialGraph.addNode: node id '${id}' already exists`);
+        throw new Error(`Graph.addNode: node id '${id}' already exists`);
       }
       const node: GraphNode<N> = { id, data, parentId: ownerNodeId };
       nodes.set(id, node);
@@ -386,7 +383,7 @@ function makeGraph<N, E>(
       requireNode(toId);
       const id = resolveId(opts?.id);
       if (edges.has(id)) {
-        throw new Error(`SpatialGraph.addEdge: edge id '${id}' already exists`);
+        throw new Error(`Graph.addEdge: edge id '${id}' already exists`);
       }
       const edge: GraphEdge<E> = { id, fromId, toId, data };
       edges.set(id, edge);
@@ -498,9 +495,7 @@ function makeGraph<N, E>(
     createChildGraph(nodeId) {
       requireNode(nodeId);
       if (childGraphs.has(nodeId)) {
-        throw new Error(
-          `SpatialGraph.createChildGraph: child graph already exists for '${nodeId}'`,
-        );
+        throw new Error(`Graph.createChildGraph: child graph already exists for '${nodeId}'`);
       }
       const child = makeGraph<N, E>(tree, nodeId);
       childGraphs.set(nodeId, child);
@@ -571,28 +566,26 @@ function makeGraph<N, E>(
 // restore rejects a bad serialized form before it touches the graph.
 function validateSerialized<N, E>(serialized: SerializedGraph<N, E>): void {
   if (serialized.version !== 1) {
-    throw new Error(
-      `SpatialGraph.restore: unsupported format version ${String(serialized.version)}`,
-    );
+    throw new Error(`Graph.restore: unsupported format version ${String(serialized.version)}`);
   }
   const nodeIds = new Set<string>();
   for (const { id } of serialized.nodes) {
-    if (nodeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate node id '${id}'`);
+    if (nodeIds.has(id)) throw new Error(`Graph.restore: duplicate node id '${id}'`);
     nodeIds.add(id);
   }
   const edgeIds = new Set<string>();
   for (const { id, fromId, toId } of serialized.edges) {
     if (!nodeIds.has(fromId) || !nodeIds.has(toId)) {
       throw new Error(
-        `SpatialGraph.restore: edge '${id}' references missing node '${nodeIds.has(fromId) ? toId : fromId}'`,
+        `Graph.restore: edge '${id}' references missing node '${nodeIds.has(fromId) ? toId : fromId}'`,
       );
     }
-    if (edgeIds.has(id)) throw new Error(`SpatialGraph.restore: duplicate edge id '${id}'`);
+    if (edgeIds.has(id)) throw new Error(`Graph.restore: duplicate edge id '${id}'`);
     edgeIds.add(id);
   }
   for (const [ownerId, childSnap] of Object.entries(serialized.children)) {
     if (!nodeIds.has(ownerId)) {
-      throw new Error(`SpatialGraph.restore: child graph keyed on missing node '${ownerId}'`);
+      throw new Error(`Graph.restore: child graph keyed on missing node '${ownerId}'`);
     }
     validateSerialized(childSnap);
   }

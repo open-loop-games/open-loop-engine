@@ -5,7 +5,7 @@ Coordinate primitives for adjacency-driven games — grid, graph, scope stack, i
 ## Canonical entrypoints
 
 - `createSpatialGrid` — bounded coordinate boards with adjacency, BFS, FOV adapter, and snapshots.
-- `createSpatialGraph` — arbitrary node/edge topology with nested child graphs.
+- `createGraph` — arbitrary node/edge topology with nested child graphs.
 - `createScopeStack` — active-scope navigation over recursive graphs.
 - `createInfluenceLayer` — propagation/decay over a numeric grid.
 
@@ -32,19 +32,19 @@ Bounded 2D grid with FOV adapter and a serialized form. Rectangular storage, con
 
 Keyed node/edge container with nested child-graph composition — the substrate `ScopeStack` walks.
 
-- `function createSpatialGraph<N, E>(options?: SpatialGraphOptions): SpatialGraph<N, E>` — Create a keyed graph container with nested child-graph support. `src/core/spatial/graph.ts:225`
-- `interface GraphEdge<E>` — An edge in a SpatialGraph. `src/core/spatial/graph.ts:48`
-- `interface GraphNode<N>` — A node in a SpatialGraph. `src/core/spatial/graph.ts:41`
+- `function createGraph<N, E>(options?: GraphOptions): Graph<N, E>` — Create a keyed graph container with nested child-graph support. `src/core/spatial/graph.ts:222`
+- `interface Graph<N, E>` — Keyed node/edge container with nested child-graph composition. `src/core/spatial/graph.ts:95`
+- `interface GraphEdge<E>` — An edge in a Graph. `src/core/spatial/graph.ts:48`
+- `interface GraphEvents<N, E>` — Events emitted by a Graph. `src/core/spatial/graph.ts:71`
+- `interface GraphNode<N>` — A node in a Graph. `src/core/spatial/graph.ts:41`
+- `interface GraphOptions` — Options accepted by createGraph. `src/core/spatial/graph.ts:56`
 - `interface SerializedGraph<N, E>` — Plain-object snapshot of a graph's full state, including recursively any child graphs. `src/core/spatial/graph.ts:86`
-- `interface SpatialGraph<N, E>` — Keyed node/edge container with nested child-graph composition. `src/core/spatial/graph.ts:95`
-- `interface SpatialGraphEvents<N, E>` — Events emitted by a SpatialGraph. `src/core/spatial/graph.ts:71`
-- `interface SpatialGraphOptions` — Options accepted by createSpatialGraph. `src/core/spatial/graph.ts:56`
 
 ## Scope stack
 
-Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active.
+Stack navigator over a recursive `Graph` — tracks which nested child graph is currently active.
 
-- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `SpatialGraph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:187`
+- `function createScopeStack<N, E>(options: ScopeStackOptions<N, E>): ScopeStack<N, E>` — Create a stack navigator over a `Graph`'s recursive child-graph tree. `src/core/spatial/scope-stack.ts:187`
 - `interface ScopeStack<N, E>` — Navigation cursor over a recursive graph-of-graphs. `src/core/spatial/scope-stack.ts:98`
 - `interface ScopeStackEvents` — Events emitted by a ScopeStack. `src/core/spatial/scope-stack.ts:91`
 - `interface ScopeStackOptions<N, E>` — Options accepted by createScopeStack. `src/core/spatial/scope-stack.ts:67`

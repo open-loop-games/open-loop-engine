@@ -84,7 +84,7 @@ export const DIAGONAL_DELTAS: readonly GridOffset[] = [
  * an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which
  * makes axial deltas equal grid deltas. That storage convention is what lets
  * a hex board keep the whole rectangular-grid surface (events, snapshots,
- * `createInfluenceLayer`) instead of dropping to `createSpatialGraph`.
+ * `createInfluenceLayer`) instead of dropping to `createGraph`.
  *
  * The engine knows nothing else about hexes: no axial or cube coordinate
  * type, no hex distance, no pixel layout. Those stay consumer-side, where the

@@ -43,7 +43,7 @@ export const CLUSTER_TITLES = {
     blurb:
       'Bounded 2D grid with FOV adapter and a serialized form. Rectangular storage, configurable topology: the `neighborhood` offset set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridOffset`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.',
   },
-  'spatial-graph': {
+  graph: {
     title: 'Graph',
     blurb:
       'Keyed node/edge container with nested child-graph composition — the substrate `ScopeStack` walks.',
@@ -51,7 +51,7 @@ export const CLUSTER_TITLES = {
   'spatial-scope-stack': {
     title: 'Scope stack',
     blurb:
-      'Stack navigator over a recursive `SpatialGraph` — tracks which nested child graph is currently active.',
+      'Stack navigator over a recursive `Graph` — tracks which nested child graph is currently active.',
   },
   'spatial-influence-layer': {
     title: 'Influence layer',

@@ -291,9 +291,9 @@ export type {
   FovUpdateHandle,
   GraphNode,
   GraphEdge,
-  SpatialGraph,
-  SpatialGraphOptions,
-  SpatialGraphEvents,
+  Graph,
+  GraphOptions,
+  GraphEvents,
   SerializedGraph,
   ScopeStatus,
   ScopeStack,
@@ -306,7 +306,7 @@ export type {
   InfluenceLayerView,
   InfluenceLayer,
 } from './spatial';
-export { createSpatialGrid, createSpatialGraph, createScopeStack } from './spatial';
+export { createSpatialGrid, createGraph, createScopeStack } from './spatial';
 export { ORTHOGONAL_DELTAS, DIAGONAL_DELTAS, HEX_AXIAL_DELTAS } from './spatial';
 export {
   createInfluenceLayer,

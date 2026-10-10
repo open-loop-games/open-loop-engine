@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
-import { createSpatialGraph, type GraphEdge, type SerializedGraph } from '@/core/spatial';
+import { createGraph, type GraphEdge, type SerializedGraph } from '@/core/spatial';
 
 interface Pkg {
   name: string;
@@ -12,9 +12,9 @@ interface Wire {
 
 const pkg = (name: string): Pkg => ({ name });
 
-describe('createSpatialGraph — construction & basic CRUD', () => {
+describe('createGraph — construction & basic CRUD', () => {
   it('starts empty and generates ids monotonically by default', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     expect(graph.nodes.size).toBe(0);
     expect(graph.edges.size).toBe(0);
     const a = graph.addNode(pkg('a'));
@@ -25,14 +25,14 @@ describe('createSpatialGraph — construction & basic CRUD', () => {
   });
 
   it('addNode respects explicit id and rejects collisions', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const a = graph.addNode(pkg('a'), { id: 'pkg-a' });
     expect(a.id).toBe('pkg-a');
     expect(() => graph.addNode(pkg('dup'), { id: 'pkg-a' })).toThrow(/already exists/);
   });
 
   it('addEdge requires both endpoints and respects explicit id', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const a = graph.addNode(pkg('a'), { id: 'a' });
     const b = graph.addNode(pkg('b'), { id: 'b' });
     expect(() => graph.addEdge('a', 'missing', { kind: 'dependency' })).toThrow(/does not exist/);
@@ -45,7 +45,7 @@ describe('createSpatialGraph — construction & basic CRUD', () => {
   });
 
   it('allows multigraph — parallel edges between the same pair', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     const e1 = graph.addEdge('a', 'b', { kind: 'dependency' });
@@ -56,7 +56,7 @@ describe('createSpatialGraph — construction & basic CRUD', () => {
 
   it('injects a deterministic idGenerator when caller supplies one', () => {
     let counter = 100;
-    const graph = createSpatialGraph<Pkg, Wire>({
+    const graph = createGraph<Pkg, Wire>({
       idGenerator: () => `x${counter++}`,
     });
     const a = graph.addNode(pkg('a'));
@@ -66,19 +66,19 @@ describe('createSpatialGraph — construction & basic CRUD', () => {
   });
 
   it('removeNode throws when id is missing', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     expect(() => graph.removeNode('missing')).toThrow(/does not exist/);
   });
 
   it('removeEdge throws when id is missing', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     expect(() => graph.removeEdge('missing')).toThrow(/does not exist/);
   });
 });
 
-describe('createSpatialGraph — adjacency & traversal', () => {
+describe('createGraph — adjacency & traversal', () => {
   it('neighbors and edgesOf return all incident connections', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addNode(pkg('c'), { id: 'c' });
@@ -93,7 +93,7 @@ describe('createSpatialGraph — adjacency & traversal', () => {
   });
 
   it('edgesBetween is undirected', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addEdge('a', 'b', { kind: 'dependency' });
@@ -102,7 +102,7 @@ describe('createSpatialGraph — adjacency & traversal', () => {
   });
 
   it('bfs returns parent-link map, start → self', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     for (const id of ['a', 'b', 'c', 'd']) graph.addNode(pkg(id), { id });
     graph.addEdge('a', 'b', { kind: 'dependency' });
     graph.addEdge('b', 'c', { kind: 'dependency' });
@@ -116,7 +116,7 @@ describe('createSpatialGraph — adjacency & traversal', () => {
   });
 
   it('bfs allowEdge filters traversal', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     for (const id of ['a', 'b', 'c']) graph.addNode(pkg(id), { id });
     graph.addEdge('a', 'b', { kind: 'dependency' });
     graph.addEdge('b', 'c', { kind: 'sibling' });
@@ -127,7 +127,7 @@ describe('createSpatialGraph — adjacency & traversal', () => {
   });
 
   it('isConnected reflects component membership', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     for (const id of ['a', 'b', 'c']) graph.addNode(pkg(id), { id });
     graph.addEdge('a', 'b', { kind: 'dependency' });
     expect(graph.isConnected('a', 'b')).toBe(true);
@@ -136,9 +136,9 @@ describe('createSpatialGraph — adjacency & traversal', () => {
   });
 });
 
-describe('createSpatialGraph — findDuplicateGroups', () => {
+describe('createGraph — findDuplicateGroups', () => {
   it('returns only buckets with ≥ 2 nodes', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('react'), { id: '1' });
     graph.addNode(pkg('vue'), { id: '2' });
     graph.addNode(pkg('react'), { id: '3' });
@@ -150,16 +150,16 @@ describe('createSpatialGraph — findDuplicateGroups', () => {
   });
 
   it('is empty when there are no duplicates', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('react'));
     graph.addNode(pkg('vue'));
     expect(graph.findDuplicateGroups((n) => n.data.name).size).toBe(0);
   });
 });
 
-describe('createSpatialGraph — nested child graphs', () => {
+describe('createGraph — nested child graphs', () => {
   it('createChildGraph stamps parentId on child nodes', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('root'), { id: 'r' });
     const child = graph.createChildGraph('r');
     const inner = child.addNode(pkg('inner'));
@@ -167,7 +167,7 @@ describe('createSpatialGraph — nested child graphs', () => {
   });
 
   it('createChildGraph throws on missing node or double-create', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('r'), { id: 'r' });
     expect(() => graph.createChildGraph('missing')).toThrow(/does not exist/);
     graph.createChildGraph('r');
@@ -175,7 +175,7 @@ describe('createSpatialGraph — nested child graphs', () => {
   });
 
   it('getChildGraph returns null when no child exists', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('r'), { id: 'r' });
     expect(graph.getChildGraph('r')).toBeNull();
     expect(graph.getChildGraph('missing')).toBeNull();
@@ -183,7 +183,7 @@ describe('createSpatialGraph — nested child graphs', () => {
 
   it('child graphs inherit the parent idGenerator', () => {
     let counter = 0;
-    const graph = createSpatialGraph<Pkg, Wire>({
+    const graph = createGraph<Pkg, Wire>({
       idGenerator: () => `g${++counter}`,
     });
     const r = graph.addNode(pkg('r'));
@@ -194,9 +194,9 @@ describe('createSpatialGraph — nested child graphs', () => {
   });
 });
 
-describe('createSpatialGraph — cascade deletion ordering', () => {
+describe('createGraph — cascade deletion ordering', () => {
   it('emits edgeRemoved for every attached edge before nodeRemoved', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addNode(pkg('c'), { id: 'c' });
@@ -214,7 +214,7 @@ describe('createSpatialGraph — cascade deletion ordering', () => {
   });
 
   it('destroys a child graph and emits childGraphDestroyed before nodeRemoved', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     const child = graph.createChildGraph('a');
     child.addNode(pkg('inner1'), { id: 'i1' });
@@ -235,7 +235,7 @@ describe('createSpatialGraph — cascade deletion ordering', () => {
   });
 
   it('cascades recursively through multiple nested levels', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     const l1 = graph.createChildGraph('a');
     l1.addNode(pkg('b'), { id: 'b' });
@@ -249,7 +249,7 @@ describe('createSpatialGraph — cascade deletion ordering', () => {
   });
 
   it('removeEdge emits and unindexes cleanly', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     const e = graph.addEdge('a', 'b', { kind: 'dependency' });
@@ -262,9 +262,9 @@ describe('createSpatialGraph — cascade deletion ordering', () => {
   });
 });
 
-describe('createSpatialGraph — events & subscriptions', () => {
+describe('createGraph — events & subscriptions', () => {
   it('emits nodeAdded / edgeAdded with the new entities', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const addedNodes: string[] = [];
     const addedEdges: string[] = [];
     graph.on('nodeAdded', (n) => addedNodes.push(n.id));
@@ -277,7 +277,7 @@ describe('createSpatialGraph — events & subscriptions', () => {
   });
 
   it('emits childGraphCreated with the new child', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('r'), { id: 'r' });
     let seenOwner = '';
     let seenChild: unknown = null;
@@ -291,7 +291,7 @@ describe('createSpatialGraph — events & subscriptions', () => {
   });
 
   it('unsubscribe stops further deliveries', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const seen: string[] = [];
     const off = graph.on('nodeAdded', (n) => seen.push(n.id));
     graph.addNode(pkg('a'), { id: 'a' });
@@ -301,9 +301,9 @@ describe('createSpatialGraph — events & subscriptions', () => {
   });
 });
 
-describe('createSpatialGraph — serialize / restore', () => {
+describe('createGraph — serialize / restore', () => {
   it('round-trips a flat graph preserving ids and data', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addEdge('a', 'b', { kind: 'dependency' }, { id: 'e' });
@@ -311,7 +311,7 @@ describe('createSpatialGraph — serialize / restore', () => {
     const snap = graph.serialize();
     expect(snap.version).toBe(1);
 
-    const restored = createSpatialGraph<Pkg, Wire>();
+    const restored = createGraph<Pkg, Wire>();
     restored.restore(snap);
     expect(restored.getNode('a')?.data.name).toBe('a');
     expect(Array.from(restored.edgesOf('a'))).toHaveLength(1);
@@ -320,14 +320,14 @@ describe('createSpatialGraph — serialize / restore', () => {
 
   it('auto-id after restore does not collide with restored auto ids', () => {
     // First session hands out auto ids "1", "2".
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'));
     graph.addNode(pkg('b'));
     const snap = graph.serialize();
 
     // Second session restores into a fresh graph whose id counter starts at 0.
     // Adding a node must skip the already-restored "1"/"2" instead of clashing.
-    const restored = createSpatialGraph<Pkg, Wire>();
+    const restored = createGraph<Pkg, Wire>();
     restored.restore(snap);
     expect(() => restored.addNode(pkg('c'))).not.toThrow();
     expect(restored.nodes.size).toBe(3);
@@ -336,7 +336,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   it('auto-id after a reload stays unique across the whole tree, not just its own level', () => {
     // Before the save, one shared counter makes ids unique across levels:
     // root holds "1", "2" and the child of "1" holds "3", "4".
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const owner = graph.addNode(pkg('a'));
     graph.addNode(pkg('b'));
     const child = graph.createChildGraph(owner.id);
@@ -344,7 +344,7 @@ describe('createSpatialGraph — serialize / restore', () => {
     child.addNode(pkg('d'));
     const saved = JSON.parse(JSON.stringify(graph.serialize())) as SerializedGraph<Pkg, Wire>;
 
-    const restored = createSpatialGraph<Pkg, Wire>();
+    const restored = createGraph<Pkg, Wire>();
     restored.restore(saved);
     const fresh = restored.addNode(pkg('e'));
     const freshChild = restored.getChildGraph(owner.id)!.addNode(pkg('f'));
@@ -355,7 +355,7 @@ describe('createSpatialGraph — serialize / restore', () => {
 
   it('an explicit id repeated across levels stays taken until every holder is gone', () => {
     const draws = ['x', 'y'];
-    const graph = createSpatialGraph<Pkg, Wire>({ idGenerator: () => draws.shift() ?? 'z' });
+    const graph = createGraph<Pkg, Wire>({ idGenerator: () => draws.shift() ?? 'z' });
     graph.addNode(pkg('owner'), { id: 'owner' });
     graph.addNode(pkg('root x'), { id: 'x' });
     graph.createChildGraph('owner').addNode(pkg('child x'), { id: 'x' });
@@ -365,7 +365,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('round-trips nested child graphs', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     const child = graph.createChildGraph('a');
     child.addNode(pkg('inner'), { id: 'i' });
@@ -373,7 +373,7 @@ describe('createSpatialGraph — serialize / restore', () => {
     deeper.addNode(pkg('deepest'), { id: 'd' });
 
     const snap = graph.serialize();
-    const restored = createSpatialGraph<Pkg, Wire>();
+    const restored = createGraph<Pkg, Wire>();
     restored.restore(snap);
 
     const restoredChild = restored.getChildGraph('a');
@@ -387,10 +387,10 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('restore clears prior state before loading', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('old'), { id: 'old' });
 
-    const fresh = createSpatialGraph<Pkg, Wire>();
+    const fresh = createGraph<Pkg, Wire>();
     fresh.addNode(pkg('a'), { id: 'a' });
     graph.restore(fresh.serialize());
 
@@ -399,7 +399,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('restore rejects unknown version', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const badSnap = {
       version: 2,
       nodes: [],
@@ -410,7 +410,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('restore rejects edges with missing endpoints', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const snap: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [{ id: 'a', data: pkg('a') }],
@@ -421,7 +421,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('restore rejects child graphs keyed on missing nodes', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     const snap: SerializedGraph<Pkg, Wire> = {
       version: 1,
       nodes: [],
@@ -434,7 +434,7 @@ describe('createSpatialGraph — serialize / restore', () => {
   });
 
   it('a rejected restore leaves the graph as it was, wherever in the tree it fails', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addEdge('a', 'b', { kind: 'dependency' }, { id: 'e1' });
@@ -483,14 +483,14 @@ describe('createSpatialGraph — serialize / restore', () => {
     });
     endPersistentContext();
 
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.addNode(pkg('b'), { id: 'b' });
     graph.addEdge('a', 'b', { kind: 'dependency' });
     snapRef.value = graph.serialize();
 
     // Simulate a fresh session load.
-    const loaded = createSpatialGraph<Pkg, Wire>();
+    const loaded = createGraph<Pkg, Wire>();
     loaded.restore(snapRef.value);
     expect(loaded.isConnected('a', 'b')).toBe(true);
   });

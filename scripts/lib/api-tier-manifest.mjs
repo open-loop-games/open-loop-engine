@@ -179,11 +179,11 @@ export const TIER_MANIFEST = [
       'Coordinate primitives for adjacency-driven games — grid, graph, scope stack, influence layer. Headless: adjacency and traversal, no rendering. Rank the fields through advisors.md to steer an agent.',
     entrypoints: [
       '`createSpatialGrid` — bounded coordinate boards with adjacency, BFS, FOV adapter, and snapshots.',
-      '`createSpatialGraph` — arbitrary node/edge topology with nested child graphs.',
+      '`createGraph` — arbitrary node/edge topology with nested child graphs.',
       '`createScopeStack` — active-scope navigation over recursive graphs.',
       '`createInfluenceLayer` — propagation/decay over a numeric grid.',
     ],
-    clusters: ['spatial-grid', 'spatial-graph', 'spatial-scope-stack', 'spatial-influence-layer'],
+    clusters: ['spatial-grid', 'graph', 'spatial-scope-stack', 'spatial-influence-layer'],
   },
   {
     tier: 'harness',

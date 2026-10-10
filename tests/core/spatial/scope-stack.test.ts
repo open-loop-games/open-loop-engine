@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
 import {
   createScopeStack,
-  createSpatialGraph,
+  createGraph,
   type ScopeStack,
   type SerializedScopeStack,
   type ScopeStatus,
@@ -18,14 +18,14 @@ interface Wire {
 const pkg = (name: string): Pkg => ({ name });
 
 function makeNestedGraph(): {
-  graph: ReturnType<typeof createSpatialGraph<Pkg, Wire>>;
+  graph: ReturnType<typeof createGraph<Pkg, Wire>>;
   stack: ScopeStack<Pkg, Wire>;
 } {
   // root:        a, b        (b has no child graph)
   // a.child:     a1, a2      (a2 has no child graph)
   // a1.child:    a1x         (a1x has a child graph)
   // a1x.child:   deep
-  const graph = createSpatialGraph<Pkg, Wire>();
+  const graph = createGraph<Pkg, Wire>();
   graph.addNode(pkg('a'), { id: 'a' });
   graph.addNode(pkg('b'), { id: 'b' });
   const aChild = graph.createChildGraph('a');
@@ -203,7 +203,7 @@ describe('createScopeStack — recalculate propagation', () => {
     const { stack: basicStack } = makeNestedGraph();
     void basicStack; // unused — this test uses its own configured stack
 
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.createChildGraph('a');
     const calls: Array<readonly string[]> = [];
@@ -229,7 +229,7 @@ describe('createScopeStack — recalculate propagation', () => {
   });
 
   it('stops bubbling when the cached state is unchanged', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.createChildGraph('a');
     const visited: Array<readonly string[]> = [];
@@ -253,7 +253,7 @@ describe('createScopeStack — recalculate propagation', () => {
   });
 
   it('resumes bubbling when a cached state changes', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.createChildGraph('a');
     let aCallCount = 0;
@@ -290,7 +290,7 @@ describe('createScopeStack — recalculate propagation', () => {
   });
 
   it('is silent when the path cannot be resolved', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.createChildGraph('a');
     let called = 0;
@@ -325,7 +325,7 @@ describe('createScopeStack — serialize & restore', () => {
   });
 
   it('clears the state cache during restore', () => {
-    const graph = createSpatialGraph<Pkg, Wire>();
+    const graph = createGraph<Pkg, Wire>();
     graph.addNode(pkg('a'), { id: 'a' });
     graph.createChildGraph('a');
     const stack = createScopeStack<Pkg, Wire>({
