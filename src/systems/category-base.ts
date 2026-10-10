@@ -37,7 +37,7 @@ import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-bin
  * Uniform per-entry introspection axes — the engine's cohesive cross-cut over
  * heterogeneous category types. Every per-system category factory derives a
  * `CategoryEntrySignals` view from its instance refs, so a single helper
- * (`findCategoryEntrySignals`) can address any entry by `(categoryId, entityId)`
+ * (`findCategoryEntrySignals`) can address any entry by `(categoryId, defId)`
  * without consumer-side path conventions.
  *
  * Mapping per category type:

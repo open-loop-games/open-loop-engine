@@ -348,7 +348,7 @@ function renderIndex(byCluster) {
     '| time-until-X transition timing | runtime.md#transition-distance-primitives |',
     '| expose a tunable knob to a slider / mod config | introspection.md#override-registry |',
     '| in-game devtools / balance UI / walk all content | introspection.md#engine-categories |',
-    '| upcoming unlock / "what changes next?" | harness.md#content-walker, runtime.md#transition-distance-primitives |',
+    '| upcoming unlock / "what changes next?" | harness.md#transition-walker, runtime.md#transition-distance-primitives |',
     '| schedule jobs / persona rotation / ordered dispatch | composition.md#sequencer |',
     '| recommendation between cycles | advisors.md#recommendation |',
     '| spatial adjacency / grid bonuses | spatial.md#grid, spatial.md#graph |',

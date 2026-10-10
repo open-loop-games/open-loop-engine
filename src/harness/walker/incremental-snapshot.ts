@@ -18,7 +18,7 @@
  * Rebuild paths:
  *
  * - `dirty.all` (or no walkable entity at all) → **full rebuild**: walk every
- *   category entity via `forEachCategoryEntity`, re-populate the entity
+ *   category entity via `forEachCategoryEntry`, re-populate the entity
  *   registry, entries and reverse indices. This is the escape hatch for
  *   entity-set changes and the fallback when targeted invalidation isn't
  *   possible.
@@ -69,10 +69,10 @@ import { emitChallengeTransitionsForEntity } from './walk-challenge-transitions'
 import { emitPurchasableTransitionsForEntity } from './walk-purchasable-transitions';
 import { emitProducerTransitionsForEntity } from './walk-producer-transitions';
 import { profile } from '@/core/profiler';
-import { forEachCategoryEntity } from '../walk';
+import { forEachCategoryEntry } from '../walk';
 
 /**
- * Caching overlay on the content-walker snapshot. Built once, rebuilt on
+ * Caching overlay on the transition-walker snapshot. Built once, rebuilt on
  * demand via {@link rebuild}.
  */
 export interface IncrementalSnapshot {
@@ -339,7 +339,7 @@ export function createIncrementalSnapshot(
     byUnlock.clear();
     byState.clear();
 
-    forEachCategoryEntity(categories, ({ categoryKey, categoryId, entity }) => {
+    forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
       const walk = CATEGORY_WALKS[categoryKey];
       if (!walk) return;
       const record: EntityRecord = {

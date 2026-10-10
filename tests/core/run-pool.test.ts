@@ -53,7 +53,7 @@ describe('RunPool — construction', () => {
 
   it('starts with no instances and liveCount=0', () => {
     const pool = makePool({ deathPolicy: 'park' });
-    expect(pool.instances.value).toEqual([]);
+    expect(pool.runs.value).toEqual([]);
     expect(pool.liveCount.value).toBe(0);
   });
 
@@ -64,9 +64,9 @@ describe('RunPool — construction', () => {
     endPersistentContext();
 
     // Three instances — two alive, one parked.
-    pool.addInstance({ id: 'a', step: aliveStep });
-    pool.addInstance({ id: 'b', step: aliveStep });
-    const c = pool.addInstance({ id: 'c', step: deadStep });
+    pool.addRun({ id: 'a', step: aliveStep });
+    pool.addRun({ id: 'b', step: aliveStep });
+    const c = pool.addRun({ id: 'c', step: deadStep });
     c.step(); // parks (deathPolicy=park, no onDeath)
 
     expect(pool.liveCount.value).toBe(2);
@@ -75,7 +75,7 @@ describe('RunPool — construction', () => {
     // Simulate fresh-session load: seed a new pool, then deserialize a save
     // under `${ctxId2}` that still carries the `instanceIds` key older builds
     // wrote. Instances are added *after* deserialize to exercise the post-load
-    // addInstance path that motivated the refactor.
+    // addRun path that motivated the refactor.
     const ctxId2 = `round-trip-2-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId2);
     const pool2 = createRunPool({ id: ctxId2, deathPolicy: 'park' });
@@ -88,13 +88,13 @@ describe('RunPool — construction', () => {
       },
     });
 
-    pool2.addInstance({ id: 'a', step: aliveStep });
-    pool2.addInstance({ id: 'b', step: aliveStep });
-    pool2.addInstance({ id: 'c', step: deadStep });
+    pool2.addRun({ id: 'a', step: aliveStep });
+    pool2.addRun({ id: 'b', step: aliveStep });
+    pool2.addRun({ id: 'c', step: deadStep });
 
-    expect(pool2.getInstance('a')!.alive.value).toBe(true);
-    expect(pool2.getInstance('b')!.alive.value).toBe(true);
-    expect(pool2.getInstance('c')!.alive.value).toBe(false);
+    expect(pool2.getRun('a')!.alive.value).toBe(true);
+    expect(pool2.getRun('b')!.alive.value).toBe(true);
+    expect(pool2.getRun('c')!.alive.value).toBe(false);
     expect(pool2.liveCount.value).toBe(2);
   });
 
@@ -103,7 +103,7 @@ describe('RunPool — construction', () => {
     const pool = withPersistentContext(ctxId, () =>
       createRunPool({ id: ctxId, deathPolicy: 'park' }),
     );
-    pool.addInstance({ id: 'a', step: aliveStep });
+    pool.addRun({ id: 'a', step: aliveStep });
     expect(serializePersistents(getAllPersistentRefs())[ctxId]).toEqual({
       aliveStates: { a: true },
     });
@@ -119,10 +119,10 @@ describe('RunPool — construction', () => {
     const pool = createRunPool({ id: ctxId, deathPolicy: 'park' });
     endPersistentContext();
 
-    pool.addInstance({ id: 'a', step: aliveStep });
-    pool.addInstance({ id: 'b', step: aliveStep });
-    expect(pool.getInstance('a')!.alive.value).toBe(true);
-    expect(pool.getInstance('b')!.alive.value).toBe(true);
+    pool.addRun({ id: 'a', step: aliveStep });
+    pool.addRun({ id: 'b', step: aliveStep });
+    expect(pool.getRun('a')!.alive.value).toBe(true);
+    expect(pool.getRun('b')!.alive.value).toBe(true);
 
     deserializePersistents(getAllPersistentRefs(), {
       [ctxId]: {
@@ -131,8 +131,8 @@ describe('RunPool — construction', () => {
       },
     });
 
-    expect(pool.getInstance('a')!.alive.value).toBe(true);
-    expect(pool.getInstance('b')!.alive.value).toBe(false);
+    expect(pool.getRun('a')!.alive.value).toBe(true);
+    expect(pool.getRun('b')!.alive.value).toBe(false);
   });
 
   it('a mid-session load flips a handle once the load has settled', () => {
@@ -140,7 +140,7 @@ describe('RunPool — construction', () => {
     const pool = withPersistentContext(ctxId, () =>
       createRunPool({ id: ctxId, deathPolicy: 'park' }),
     );
-    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    const handle = pool.addRun({ id: 'a', step: aliveStep });
     const loadingAtFlip: boolean[] = [];
     watch(handle.alive, () => loadingAtFlip.push(loadingSave.value), { flush: 'sync' });
 
@@ -158,9 +158,9 @@ describe('RunPool — construction', () => {
     const pool = createRunPool({ id: ctxId, deathPolicy: 'destroy' });
     endPersistentContext();
 
-    const clone = pool.addInstance({ id: 'clone-1', step: deadStep });
+    const clone = pool.addRun({ id: 'clone-1', step: deadStep });
     clone.step();
-    expect(pool.getInstance('clone-1')).toBeUndefined();
+    expect(pool.getRun('clone-1')).toBeUndefined();
 
     deserializePersistents(getAllPersistentRefs(), {
       [ctxId]: { instanceIds: ['clone-1'], aliveStates: { 'clone-1': true } },
@@ -176,7 +176,7 @@ describe('RunPool — teardown', () => {
     const pool = withPersistentContext(ctxId, () =>
       createRunPool({ id: ctxId, deathPolicy: 'park' }),
     );
-    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    const handle = pool.addRun({ id: 'a', step: aliveStep });
     pool.dispose();
 
     deserializePersistents(getAllPersistentRefs(), {
@@ -193,7 +193,7 @@ describe('RunPool — teardown', () => {
     const pool = scope.run(() =>
       withPersistentContext(ctxId, () => createRunPool({ id: ctxId, deathPolicy: 'park' })),
     )!;
-    const handle = pool.addInstance({ id: 'a', step: aliveStep });
+    const handle = pool.addRun({ id: 'a', step: aliveStep });
     scope.stop();
 
     const saved = {
@@ -205,77 +205,75 @@ describe('RunPool — teardown', () => {
 });
 
 // ---------------------------------------------------------------------------
-// addInstance / removeInstance
+// addRun / removeRun
 // ---------------------------------------------------------------------------
 
-describe('RunPool — addInstance / removeInstance', () => {
+describe('RunPool — addRun / removeRun', () => {
   it('fires instance:added with the returned handle', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
     let added: RunHandle | null = null;
-    pool.on('instance:added', (h) => {
+    pool.on('run:added', (h) => {
       added = h;
     });
-    const handle = pool.addInstance({ id: 'x', step: aliveStep });
+    const handle = pool.addRun({ id: 'x', step: aliveStep });
     expect(added).toBe(handle);
     expect(handle.alive.value).toBe(true);
-    expect(pool.instances.value).toEqual([handle]);
+    expect(pool.runs.value).toEqual([handle]);
     expect(pool.liveCount.value).toBe(1);
   });
 
   it('throws on duplicate id', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    pool.addInstance({ id: 'x', step: aliveStep });
-    expect(() => pool.addInstance({ id: 'x', step: aliveStep })).toThrow(/duplicate/i);
+    pool.addRun({ id: 'x', step: aliveStep });
+    expect(() => pool.addRun({ id: 'x', step: aliveStep })).toThrow(/duplicate/i);
   });
 
-  it('enforces maxInstances cap', () => {
-    const pool = makePool({ deathPolicy: 'destroy', maxInstances: 2 });
-    pool.addInstance({ id: 'a', step: aliveStep });
-    pool.addInstance({ id: 'b', step: aliveStep });
-    expect(() => pool.addInstance({ id: 'c', step: aliveStep })).toThrow(/maxInstances/i);
+  it('enforces maxRuns cap', () => {
+    const pool = makePool({ deathPolicy: 'destroy', maxRuns: 2 });
+    pool.addRun({ id: 'a', step: aliveStep });
+    pool.addRun({ id: 'b', step: aliveStep });
+    expect(() => pool.addRun({ id: 'c', step: aliveStep })).toThrow(/maxRuns/i);
   });
 
-  it('treats maxInstances:0 as valid-but-empty (always throws)', () => {
-    const pool = makePool({ deathPolicy: 'destroy', maxInstances: 0 });
-    expect(() => pool.addInstance({ id: 'a', step: aliveStep })).toThrow(/maxInstances/i);
+  it('treats maxRuns:0 as valid-but-empty (always throws)', () => {
+    const pool = makePool({ deathPolicy: 'destroy', maxRuns: 0 });
+    expect(() => pool.addRun({ id: 'a', step: aliveStep })).toThrow(/maxRuns/i);
   });
 
-  it('removeInstance fires instance:died then instance:removed', () => {
+  it('removeRun fires instance:died then instance:removed', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: aliveStep });
+    const handle = pool.addRun({ id: 'x', step: aliveStep });
     const events: string[] = [];
-    pool.on('instance:died', (_h, o) =>
-      events.push(`died:${typeof o === 'string' ? o : 'restart'}`),
-    );
-    pool.on('instance:removed', () => events.push('removed'));
-    pool.removeInstance('x');
+    pool.on('run:died', (_h, o) => events.push(`died:${typeof o === 'string' ? o : 'restart'}`));
+    pool.on('run:removed', () => events.push('removed'));
+    pool.removeRun('x');
     expect(events).toEqual(['died:destroyed', 'removed']);
-    expect(pool.instances.value).toEqual([]);
+    expect(pool.runs.value).toEqual([]);
     expect(handle.alive.value).toBe(false);
   });
 
-  it('removeInstance on unknown id is a no-op', () => {
+  it('removeRun on unknown id is a no-op', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
     let fired = 0;
-    pool.on('instance:removed', () => fired++);
-    pool.removeInstance('nope');
+    pool.on('run:removed', () => fired++);
+    pool.removeRun('nope');
     expect(fired).toBe(0);
   });
 
   it('instances.value reference is stable between no-op reads', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    pool.addInstance({ id: 'x', step: aliveStep });
-    const view1 = pool.instances.value;
-    const view2 = pool.instances.value;
+    pool.addRun({ id: 'x', step: aliveStep });
+    const view1 = pool.runs.value;
+    const view2 = pool.runs.value;
     expect(view1).toBe(view2);
   });
 
   it('instances.value reference changes on mutation', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    pool.addInstance({ id: 'x', step: aliveStep });
-    const view1 = pool.instances.value;
-    pool.addInstance({ id: 'y', step: aliveStep });
-    const view2 = pool.instances.value;
+    pool.addRun({ id: 'x', step: aliveStep });
+    const view1 = pool.runs.value;
+    pool.addRun({ id: 'y', step: aliveStep });
+    const view2 = pool.runs.value;
     expect(view1).not.toBe(view2);
     expect(view2.map((h) => h.id)).toEqual(['x', 'y']);
   });
@@ -288,32 +286,32 @@ describe('RunPool — addInstance / removeInstance', () => {
 describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
   it('step returning true fires no events', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: aliveStep });
+    const handle = pool.addRun({ id: 'x', step: aliveStep });
     let fired = 0;
-    pool.on('instance:died', () => fired++);
-    pool.on('instance:removed', () => fired++);
+    pool.on('run:died', () => fired++);
+    pool.on('run:removed', () => fired++);
     expect(handle.step()).toBe(true);
     expect(fired).toBe(0);
   });
 
   it('step returning false fires died then removed, handle gone', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     const events: string[] = [];
-    pool.on('instance:died', (_h, o) => events.push(`died:${o as string}`));
-    pool.on('instance:removed', () => events.push('removed'));
+    pool.on('run:died', (_h, o) => events.push(`died:${o as string}`));
+    pool.on('run:removed', () => events.push('removed'));
     expect(handle.step()).toBe(false);
     expect(events).toEqual(['died:destroyed', 'removed']);
-    expect(pool.instances.value).toEqual([]);
+    expect(pool.runs.value).toEqual([]);
     expect(pool.liveCount.value).toBe(0);
   });
 
   it('step on already-dead handle is a silent no-op', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     handle.step();
     let fired = 0;
-    pool.on('instance:died', () => fired++);
+    pool.on('run:died', () => fired++);
     expect(handle.step()).toBe(false);
     expect(fired).toBe(0);
   });
@@ -326,22 +324,22 @@ describe("RunPool — step routing (deathPolicy: 'destroy')", () => {
 describe("RunPool — step routing (deathPolicy: 'park')", () => {
   it('step returning false parks the handle (alive=false, stays in pool)', () => {
     const pool = makePool({ deathPolicy: 'park' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     const events: string[] = [];
-    pool.on('instance:died', (_h, o) => events.push(`died:${o as string}`));
-    pool.on('instance:removed', () => events.push('removed'));
+    pool.on('run:died', (_h, o) => events.push(`died:${o as string}`));
+    pool.on('run:removed', () => events.push('removed'));
     handle.step();
     expect(events).toEqual(['died:parked']);
-    expect(pool.instances.value).toEqual([handle]);
+    expect(pool.runs.value).toEqual([handle]);
     expect(handle.alive.value).toBe(false);
   });
 
   it('subsequent step on parked handle returns false without events', () => {
     const pool = makePool({ deathPolicy: 'park' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     handle.step();
     let fired = 0;
-    pool.on('instance:died', () => fired++);
+    pool.on('run:died', () => fired++);
     expect(handle.step()).toBe(false);
     expect(fired).toBe(0);
   });
@@ -354,24 +352,24 @@ describe("RunPool — step routing (deathPolicy: 'park')", () => {
 describe('RunPool — onDeath outcomes', () => {
   it("'destroyed' outcome from onDeath override (against 'park' pool)", () => {
     const pool = makePool({ deathPolicy: 'park' });
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: deadStep,
       onDeath: () => 'destroyed',
     });
     handle.step();
-    expect(pool.instances.value).toEqual([]);
+    expect(pool.runs.value).toEqual([]);
   });
 
   it("'parked' outcome from onDeath override (against 'destroy' pool)", () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: deadStep,
       onDeath: () => 'parked',
     });
     handle.step();
-    expect(pool.instances.value).toEqual([handle]);
+    expect(pool.runs.value).toEqual([handle]);
     expect(handle.alive.value).toBe(false);
   });
 
@@ -386,14 +384,14 @@ describe('RunPool — onDeath outcomes', () => {
       calls++;
       return true;
     };
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: firstStep,
       onDeath: () => ({ restartedWith: replacement }),
     });
     const events: string[] = [];
-    pool.on('instance:died', () => events.push('died'));
-    pool.on('instance:restarted', () => events.push('restarted'));
+    pool.on('run:died', () => events.push('died'));
+    pool.on('run:restarted', () => events.push('restarted'));
 
     expect(handle.step()).toBe(false); // first step dies → restartedWith installs replacement
     expect(events).toEqual(['died', 'restarted']);
@@ -420,15 +418,15 @@ describe('RunPool — reset', () => {
 
   it('handler can re-arm parked handles via handle.restart()', () => {
     const pool = makePool({ deathPolicy: 'park' });
-    const a = pool.addInstance({ id: 'a', step: deadStep });
-    const b = pool.addInstance({ id: 'b', step: deadStep });
+    const a = pool.addRun({ id: 'a', step: deadStep });
+    const b = pool.addRun({ id: 'b', step: deadStep });
     a.step();
     b.step();
     expect(a.alive.value).toBe(false);
     expect(b.alive.value).toBe(false);
 
     pool.on('pool:reset', () => {
-      for (const h of pool.instances.value) h.restart(aliveStep);
+      for (const h of pool.runs.value) h.restart(aliveStep);
     });
     pool.reset();
 
@@ -439,9 +437,9 @@ describe('RunPool — reset', () => {
 
   it('handle.restart on a live handle is a no-op', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: aliveStep });
+    const handle = pool.addRun({ id: 'x', step: aliveStep });
     let fired = 0;
-    pool.on('instance:restarted', () => fired++);
+    pool.on('run:restarted', () => fired++);
     handle.restart(aliveStep);
     expect(fired).toBe(0);
   });
@@ -454,12 +452,12 @@ describe('RunPool — reset', () => {
 describe('RunPool — firing-order invariants', () => {
   it("on instance:died('destroyed'): alive=false, handle still in instances.value", () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedAlive: boolean | null = null;
     let observedPresent: boolean | null = null;
-    pool.on('instance:died', (h) => {
+    pool.on('run:died', (h) => {
       observedAlive = h.alive.value;
-      observedPresent = pool.instances.value.includes(h);
+      observedPresent = pool.runs.value.includes(h);
     });
     handle.step();
     expect(observedAlive).toBe(false);
@@ -468,12 +466,12 @@ describe('RunPool — firing-order invariants', () => {
 
   it("on instance:died('parked'): alive=false, handle still present", () => {
     const pool = makePool({ deathPolicy: 'park' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedAlive: boolean | null = null;
     let observedPresent: boolean | null = null;
-    pool.on('instance:died', (h) => {
+    pool.on('run:died', (h) => {
       observedAlive = h.alive.value;
-      observedPresent = pool.instances.value.includes(h);
+      observedPresent = pool.runs.value.includes(h);
     });
     handle.step();
     expect(observedAlive).toBe(false);
@@ -482,14 +480,14 @@ describe('RunPool — firing-order invariants', () => {
 
   it('on instance:died(restartedWith): alive=true, handle still present', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: deadStep,
       onDeath: () => ({ restartedWith: aliveStep }),
     });
     let observedAlive: boolean | null = null;
     let observedOutcome: RunDeathOutcome | null = null;
-    pool.on('instance:died', (h, o) => {
+    pool.on('run:died', (h, o) => {
       observedAlive = h.alive.value;
       observedOutcome = o;
     });
@@ -500,10 +498,10 @@ describe('RunPool — firing-order invariants', () => {
 
   it('on instance:removed: handle no longer in instances.value', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: deadStep });
+    const handle = pool.addRun({ id: 'x', step: deadStep });
     let observedPresent: boolean | null = null;
-    pool.on('instance:removed', (h) => {
-      observedPresent = pool.instances.value.includes(h);
+    pool.on('run:removed', (h) => {
+      observedPresent = pool.runs.value.includes(h);
     });
     handle.step();
     expect(observedPresent).toBe(false);
@@ -515,19 +513,19 @@ describe('RunPool — firing-order invariants', () => {
 // ---------------------------------------------------------------------------
 
 describe('RunPool — re-entrancy', () => {
-  it('addInstance from inside instance:died handler lands before instance:removed', () => {
+  it('addRun from inside instance:died handler lands before instance:removed', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
     const events: string[] = [];
-    pool.on('instance:died', (h) => {
+    pool.on('run:died', (h) => {
       events.push(`died:${h.id}`);
       if (h.id === 'a') {
-        pool.addInstance({ id: 'b', step: aliveStep });
+        pool.addRun({ id: 'b', step: aliveStep });
       }
     });
-    pool.on('instance:added', (h) => events.push(`added:${h.id}`));
-    pool.on('instance:removed', (h) => events.push(`removed:${h.id}`));
+    pool.on('run:added', (h) => events.push(`added:${h.id}`));
+    pool.on('run:removed', (h) => events.push(`removed:${h.id}`));
 
-    const a = pool.addInstance({ id: 'a', step: deadStep });
+    const a = pool.addRun({ id: 'a', step: deadStep });
     events.length = 0; // clear the initial added:a
     a.step();
 
@@ -543,7 +541,7 @@ describe('RunPool — re-entrancy', () => {
 describe('RunPool — edge cases', () => {
   it('step() throwing propagates, aliveness unchanged', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: () => {
         throw new Error('boom');
@@ -551,14 +549,14 @@ describe('RunPool — edge cases', () => {
     });
     expect(() => handle.step()).toThrow('boom');
     expect(handle.alive.value).toBe(true);
-    expect(pool.instances.value).toEqual([handle]);
+    expect(pool.runs.value).toEqual([handle]);
   });
 
   it('pool.reset during a step is synchronous and safe', () => {
     const pool = makePool({ deathPolicy: 'park' });
     let resetFired = 0;
     pool.on('pool:reset', () => resetFired++);
-    const handle = pool.addInstance({
+    const handle = pool.addRun({
       id: 'x',
       step: () => {
         pool.reset();
@@ -571,23 +569,23 @@ describe('RunPool — edge cases', () => {
 
   it('destroy() is idempotent', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const handle = pool.addInstance({ id: 'x', step: aliveStep });
+    const handle = pool.addRun({ id: 'x', step: aliveStep });
     handle.destroy();
     let fired = 0;
-    pool.on('instance:removed', () => fired++);
+    pool.on('run:removed', () => fired++);
     handle.destroy(); // second call
     expect(fired).toBe(0);
   });
 
   it('a destroyed handle leaves alone the new handle that reuses its id', () => {
     const pool = makePool({ deathPolicy: 'destroy' });
-    const old = pool.addInstance({ id: 'x', step: aliveStep });
+    const old = pool.addRun({ id: 'x', step: aliveStep });
     old.destroy();
-    const next = pool.addInstance({ id: 'x', step: aliveStep });
+    const next = pool.addRun({ id: 'x', step: aliveStep });
     old.destroy();
     old.restart(aliveStep);
     expect(old.alive.value).toBe(false);
-    expect(pool.getInstance('x')).toBe(next);
+    expect(pool.getRun('x')).toBe(next);
     expect(next.alive.value).toBe(true);
   });
 });
@@ -610,7 +608,7 @@ describe('RunPool — reactivity', () => {
       );
     });
 
-    const h = pool.addInstance({ id: 'x', step: deadStep });
+    const h = pool.addRun({ id: 'x', step: deadStep });
     h.step(); // park
     h.restart(aliveStep);
 
@@ -626,7 +624,7 @@ describe('RunPool — reactivity', () => {
     scope.run(() => {
       watchEffect(
         () => {
-          void pool.instances.value;
+          void pool.runs.value;
           runs++;
         },
         { flush: 'sync' },
@@ -634,9 +632,9 @@ describe('RunPool — reactivity', () => {
     });
     const initial = runs;
 
-    pool.addInstance({ id: 'a', step: aliveStep });
-    pool.addInstance({ id: 'b', step: aliveStep });
-    pool.removeInstance('a');
+    pool.addRun({ id: 'a', step: aliveStep });
+    pool.addRun({ id: 'b', step: aliveStep });
+    pool.removeRun('a');
 
     expect(runs - initial).toBeGreaterThanOrEqual(3);
     scope.stop();

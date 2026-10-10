@@ -119,7 +119,7 @@ export interface MetricHistogram {
  * `${analyzerName}.${metricKey}` namespace that `CellAggregate.metrics`
  * uses. `edges` must have at least two entries in ascending order.
  */
-export interface HistogramSpec {
+export interface HistogramOptions {
   edges: number[];
 }
 
@@ -137,13 +137,13 @@ export interface AggregateOptions {
    * produced no numeric samples are omitted from {@link
    * CellAggregate.histograms}.
    */
-  histograms?: Record<string, HistogramSpec>;
+  histograms?: Record<string, HistogramOptions>;
   /**
    * Opt into a histogram of predicate-termination times for
    * {@link runMatrixUntil}. Ignored by {@link runMatrix}. Edges are in
    * sim-seconds to match {@link CellAggregate.terminationTime}.
    */
-  terminationTimeHistogram?: HistogramSpec;
+  terminationTimeHistogram?: HistogramOptions;
 }
 
 /**

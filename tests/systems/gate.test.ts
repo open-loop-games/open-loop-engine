@@ -27,10 +27,10 @@ import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
 import { E } from '@/core/effects';
 import {
-  assertGateHandles,
+  assertGateServices,
   gateToCondition,
   getAmbientGateRuntime,
-  getRequiredGateHandles,
+  getRequiredGateServices,
 } from '@/systems/gate';
 
 beforeEach(() => {
@@ -156,7 +156,7 @@ function buildFixture(): {
   engine.start();
 
   return {
-    runtime: { accessor, categories: categories!, registry: registry! },
+    runtime: { accessor, categories: categories!, resourceRegistry: registry! },
     achEntry: achCat!.getEntry('first'),
     upgEntry: upgCat!.getEntry('fast'),
     skillEntry: skillCat!.getEntry('combat'),
@@ -204,16 +204,10 @@ describe('evaluateGate — per-kind dispatch', () => {
     const f = buildFixture();
     f.upgEntry!.purchasable.amount.value = 3;
     expect(
-      evaluateGate(
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 3 },
-        f.runtime,
-      ),
+      evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 3 }, f.runtime),
     ).toBe(true);
     expect(
-      evaluateGate(
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 4 },
-        f.runtime,
-      ),
+      evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 4 }, f.runtime),
     ).toBe(false);
     f.stop();
   });
@@ -221,11 +215,11 @@ describe('evaluateGate — per-kind dispatch', () => {
   it('unlock reads CategoryEntrySignals.unlock', () => {
     const f = buildFixture();
     expect(
-      evaluateGate({ kind: 'unlock', category: 'achievements', entity: 'first' }, f.runtime),
+      evaluateGate({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime),
     ).toBe(false);
     f.achEntry!.achievement.complete();
     expect(
-      evaluateGate({ kind: 'unlock', category: 'achievements', entity: 'first' }, f.runtime),
+      evaluateGate({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime),
     ).toBe(true);
     f.stop();
   });
@@ -262,12 +256,12 @@ describe('evaluateGate — per-kind dispatch', () => {
     const f = buildFixture();
     expect(
       evaluateGate(
-        { kind: 'count-gte', category: 'fictional', entity: 'whatever', value: 1 },
+        { kind: 'count-gte', category: 'fictional', entry: 'whatever', value: 1 },
         f.runtime,
       ),
     ).toBe(false);
     expect(
-      evaluateGate({ kind: 'unlock', category: 'fictional', entity: 'whatever' }, f.runtime),
+      evaluateGate({ kind: 'unlock', category: 'fictional', entry: 'whatever' }, f.runtime),
     ).toBe(false);
     f.stop();
   });
@@ -276,7 +270,7 @@ describe('evaluateGate — per-kind dispatch', () => {
     const f = buildFixture();
     expect(
       evaluateGate(
-        { kind: 'count-gte', category: 'upgrades', entity: 'ghost', value: 1 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'ghost', value: 1 },
         f.runtime,
       ),
     ).toBe(false);
@@ -306,7 +300,7 @@ describe('evaluateGate — combinators', () => {
       kind: 'all',
       of: [
         { kind: 'resource-gte', resource: 'points', value: 49 },
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 2 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 2 },
       ],
     };
     expect(evaluateGate(both, f.runtime)).toBe(true);
@@ -322,7 +316,7 @@ describe('evaluateGate — combinators', () => {
       kind: 'any',
       of: [
         { kind: 'resource-gte', resource: 'points', value: 100 },
-        { kind: 'unlock', category: 'achievements', entity: 'first' },
+        { kind: 'unlock', category: 'achievements', entry: 'first' },
       ],
     };
     expect(evaluateGate(either, f.runtime)).toBe(false);
@@ -335,7 +329,7 @@ describe('evaluateGate — combinators', () => {
     const f = buildFixture();
     const negated: Gate = {
       kind: 'not',
-      of: { kind: 'unlock', category: 'achievements', entity: 'first' },
+      of: { kind: 'unlock', category: 'achievements', entry: 'first' },
     };
     expect(evaluateGate(negated, f.runtime)).toBe(true);
     f.achEntry!.achievement.complete();
@@ -380,12 +374,12 @@ describe('timeUntilGateFlip — dispatch table', () => {
     const f = buildFixture();
     expect(
       timeUntilGateFlip(
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
         f.runtime,
       ).reason,
     ).toBe('opaque-predicate');
     expect(
-      timeUntilGateFlip({ kind: 'unlock', category: 'achievements', entity: 'first' }, f.runtime)
+      timeUntilGateFlip({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime)
         .reason,
     ).toBe('opaque-predicate');
     expect(
@@ -410,7 +404,7 @@ describe('timeUntilGateFlip — dispatch table', () => {
       kind: 'all',
       of: [
         { kind: 'resource-gte', resource: 'points', value: 100 },
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
       ],
     };
     const dist = timeUntilGateFlip(mixed, f.runtime);
@@ -602,25 +596,19 @@ describe('evaluateGate — no ambient accessor', () => {
     const f = buildAccessorlessFixture();
     expect(f.runtime.accessor).toBeUndefined();
     expect(f.runtime.categories).toBeDefined();
-    expect(f.runtime.registry).toBeDefined();
+    expect(f.runtime.resourceRegistry).toBeDefined();
     f.stop();
   });
 
   it('evaluates count-gte and unlock against categories alone', () => {
     const f = buildAccessorlessFixture();
     expect(
-      evaluateGate(
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 3 },
-        f.runtime,
-      ),
+      evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 3 }, f.runtime),
     ).toBe(true);
     expect(
-      evaluateGate(
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 9 },
-        f.runtime,
-      ),
+      evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 9 }, f.runtime),
     ).toBe(false);
-    expect(evaluateGate({ kind: 'unlock', category: 'upgrades', entity: 'fast' }, f.runtime)).toBe(
+    expect(evaluateGate({ kind: 'unlock', category: 'upgrades', entry: 'fast' }, f.runtime)).toBe(
       true,
     );
     f.stop();
@@ -631,8 +619,8 @@ describe('evaluateGate — no ambient accessor', () => {
     const gate: Gate = {
       kind: 'all',
       of: [
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
-        { kind: 'not', of: { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 99 } },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
+        { kind: 'not', of: { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 99 } },
       ],
     };
     expect(evaluateGate(gate, f.runtime)).toBe(true);
@@ -657,7 +645,7 @@ describe('evaluateGate — no ambient accessor', () => {
     const f = buildAccessorlessFixture();
     const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 1 };
     expect(evaluateGate(gate, f.runtime)).toBe(false);
-    expect(() => assertGateHandles(gate, f.runtime, 'site')).not.toThrow();
+    expect(() => assertGateServices(gate, f.runtime, 'site')).not.toThrow();
     expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(/cumulative-gte.*accessor/);
     f.stop();
   });
@@ -670,7 +658,7 @@ describe('evaluateGate — no ambient accessor', () => {
         {
           kind: 'any',
           of: [
-            { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+            { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
             { kind: 'flag', id: 'some-flag' },
           ],
         },
@@ -683,7 +671,7 @@ describe('evaluateGate — no ambient accessor', () => {
         {
           kind: 'all',
           of: [
-            { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+            { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
             { kind: 'flag', id: 'some-flag' },
           ],
         },
@@ -695,17 +683,17 @@ describe('evaluateGate — no ambient accessor', () => {
 });
 
 // ============================================================================
-// getRequiredGateHandles — per-kind handle demand
+// getRequiredGateServices — per-kind handle demand
 // ============================================================================
 
-describe('getRequiredGateHandles', () => {
-  const handles = (gate: Gate) => [...getRequiredGateHandles(gate)].sort();
+describe('getRequiredGateServices', () => {
+  const handles = (gate: Gate) => [...getRequiredGateServices(gate)].sort();
 
   it('category-aware leaves demand categories only', () => {
-    expect(handles({ kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 })).toEqual([
+    expect(handles({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 })).toEqual([
       'categories',
     ]);
-    expect(handles({ kind: 'unlock', category: 'achievements', entity: 'first' })).toEqual([
+    expect(handles({ kind: 'unlock', category: 'achievements', entry: 'first' })).toEqual([
       'categories',
     ]);
   });
@@ -719,20 +707,22 @@ describe('getRequiredGateHandles', () => {
   });
 
   it('cumulative-gte evaluates through the registry', () => {
-    expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual(['registry']);
+    expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual([
+      'resourceRegistry',
+    ]);
   });
 
   it('combinators union their children, recursing through nesting', () => {
     const gate: Gate = {
       kind: 'all',
       of: [
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
         {
           kind: 'not',
           of: {
             kind: 'any',
             of: [
-              { kind: 'unlock', category: 'achievements', entity: 'first' },
+              { kind: 'unlock', category: 'achievements', entry: 'first' },
               { kind: 'flag', id: 'knowledge-rask' },
             ],
           },
@@ -746,8 +736,8 @@ describe('getRequiredGateHandles', () => {
     const gate: Gate = {
       kind: 'any',
       of: [
-        { kind: 'count-gte', category: 'producers', entity: 'farm', value: 5 },
-        { kind: 'unlock', category: 'upgrades', entity: 'fast' },
+        { kind: 'count-gte', category: 'producers', entry: 'farm', value: 5 },
+        { kind: 'unlock', category: 'upgrades', entry: 'fast' },
       ],
     };
     expect(handles(gate)).toEqual(['categories']);
@@ -816,13 +806,13 @@ describe('gateToCondition — partial projection', () => {
 
   it('throws on count-gte', () => {
     expect(() =>
-      gateToCondition({ kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 }),
+      gateToCondition({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 }),
     ).toThrow(/no ICondition projection/);
   });
 
   it('throws on unlock (category-aware)', () => {
     expect(() =>
-      gateToCondition({ kind: 'unlock', category: 'achievements', entity: 'first' }),
+      gateToCondition({ kind: 'unlock', category: 'achievements', entry: 'first' }),
     ).toThrow(/no ICondition projection/);
   });
 
@@ -831,7 +821,7 @@ describe('gateToCondition — partial projection', () => {
       kind: 'all',
       of: [
         { kind: 'resource-gte', resource: 'gold', value: 1 },
-        { kind: 'count-gte', category: 'upgrades', entity: 'fast', value: 1 },
+        { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
       ],
     };
     expect(() => gateToCondition(gate)).toThrow(/no ICondition projection/);

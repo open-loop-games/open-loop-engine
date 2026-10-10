@@ -7,7 +7,7 @@
 import type { Engine } from '@/engine';
 import type { ModifierPickerEntry, PickerEntry, PickerSnapshot, TunablePickerEntry } from './types';
 import { walkChainRegistry } from './walk-chain-registry';
-import { walkContent } from './walk-content';
+import { walkEffectSystemBindings } from './walk-effect-system-bindings';
 import { walkTunables } from './walk-tunables';
 
 /**
@@ -18,8 +18,8 @@ import { walkTunables } from './walk-tunables';
  * path. Tunable entries don't compete with modifier identity and skip
  * this dedup.
  */
-const MODIFIER_SOURCE_PRIORITY: Record<'content' | 'chain-registry', number> = {
-  content: 2,
+const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', number> = {
+  'effect-system': 2,
   'chain-registry': 1,
 };
 
@@ -61,7 +61,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'content' | 'chain-registry', number> = {
  * ```
  */
 export function createPickerSnapshot(engine: Engine): PickerSnapshot {
-  const contentEntries = walkContent(engine);
+  const contentEntries = walkEffectSystemBindings(engine);
   const chainEntries = walkChainRegistry(engine);
   const tunableEntries: TunablePickerEntry[] = walkTunables(engine);
 
@@ -91,7 +91,7 @@ export function createPickerSnapshot(engine: Engine): PickerSnapshot {
 
   for (const entry of canonical.values()) {
     all.push(entry);
-    if (entry.address.source === 'content') content.push(entry);
+    if (entry.address.source === 'effect-system') content.push(entry);
     else chains.push(entry);
   }
 

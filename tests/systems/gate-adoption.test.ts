@@ -426,7 +426,7 @@ describe('createGateRequirement — no ambient accessor', () => {
   it('constructs and satisfies a category-only gate', () => {
     const { result, stop } = bootstrapAccessorless(() =>
       createGateRequirement({
-        gate: { kind: 'count-gte', category: 'producers', entity: 'farm', value: 5 },
+        gate: { kind: 'count-gte', category: 'producers', entry: 'farm', value: 5 },
         description: '5 farms owned',
       }),
     );
@@ -465,7 +465,7 @@ describe('createGateRequirement — no ambient accessor', () => {
           gate: {
             kind: 'all',
             of: [
-              { kind: 'count-gte', category: 'producers', entity: 'farm', value: 1 },
+              { kind: 'count-gte', category: 'producers', entry: 'farm', value: 1 },
               { kind: 'state', key: 'phase', operator: 'eq', value: 'idle' },
             ],
           },
@@ -558,7 +558,7 @@ describe('createPredicateResolver', () => {
   const categoryOnly = {
     kind: 'count-gte',
     category: 'producers',
-    entity: 'farm',
+    entry: 'farm',
     value: 1,
   } as const;
 
@@ -958,7 +958,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
               {
                 id: 'a',
                 text: 'hi',
-                when: { kind: 'count-gte', category: 'x', entity: 'y', value: 1 },
+                when: { kind: 'count-gte', category: 'x', entry: 'y', value: 1 },
               },
             ],
           },

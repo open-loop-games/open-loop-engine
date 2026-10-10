@@ -72,7 +72,7 @@ export const CLUSTER_TITLES = {
     blurb: 'Walk engine state to enumerate addressable choices for solvers / UIs.',
   },
   walker: {
-    title: 'Content walker',
+    title: 'Transition walker',
     blurb: 'Enumerate purchasables, producers, and challenges with their next-transition timing.',
   },
   analyzers: {

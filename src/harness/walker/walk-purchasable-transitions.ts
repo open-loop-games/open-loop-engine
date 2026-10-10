@@ -32,14 +32,14 @@ import { timeUntilResource, type TransitionDeps } from '@/core/transitions';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
 import { unref } from 'vue';
-import { forEachCategoryEntity } from '../walk';
+import { forEachCategoryEntry } from '../walk';
 import type { Transition } from './types';
 
 // ============================================================================
 // TYPES (private)
 // ============================================================================
 
-/** Shape yielded by `forEachCategoryEntity` for the `purchasables` slice. */
+/** Shape yielded by `forEachCategoryEntry` for the `purchasables` slice. */
 interface PurchasableEntity {
   readonly def: { readonly id: string };
   readonly purchasable: Purchasable;
@@ -93,7 +93,7 @@ export function predictAffordable(
 
 function buildTransition(
   categoryId: string,
-  entityId: string,
+  defId: string,
   kind: string,
   currentValue: Transition['currentValue'],
   distance: Transition['distance'],
@@ -102,10 +102,10 @@ function buildTransition(
     source: 'purchasable',
     kind,
     categoryId,
-    entityId,
+    defId,
     currentValue,
     distance,
-    label: `${categoryId}.${entityId}.${kind}`,
+    label: `${categoryId}.${defId}.${kind}`,
   };
 }
 
@@ -116,7 +116,7 @@ function emitForEntity(
   out: { transition: Transition; deps: TransitionDeps }[],
 ): void {
   const { def, purchasable } = entity;
-  const entityId = def.id;
+  const defId = def.id;
 
   // Maxed, or boolean-only gates and unlock/state predicates with no cost
   // resource to run distance math against.
@@ -127,7 +127,7 @@ function emitForEntity(
   out.push({
     transition: buildTransition(
       categoryId,
-      entityId,
+      defId,
       'becomes-affordable',
       affordable.currentValue,
       distance,
@@ -143,7 +143,7 @@ function emitForEntity(
     out.push({
       transition: buildTransition(
         categoryId,
-        entityId,
+        defId,
         'purchasable-maxed',
         purchasable.amount.value,
         distance,
@@ -193,7 +193,7 @@ export function emitPurchasableTransitionsWithDeps(
   if (!categories) return [];
 
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  forEachCategoryEntity(categories, ({ categoryKey, categoryId, entity }) => {
+  forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'purchasables') return;
     emitForEntity(categoryId, entity as unknown as PurchasableEntity, accessor, out);
   });

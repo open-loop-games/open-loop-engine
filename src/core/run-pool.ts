@@ -17,7 +17,7 @@
  *
  * Pool persists its per-id aliveness map under context `${poolId}`, not
  * which ids exist: step closures can't be saved, so the game keeps its own
- * record of its runs and recreates them post-load via `addInstance` — the
+ * record of its runs and recreates them post-load via `addRun` — the
  * saved aliveness map is consulted so previously-dead
  * instances stay dead across save/load regardless of when they're
  * recreated, fixing the lazy-context gap an earlier per-instance layout
@@ -81,7 +81,7 @@ export interface RunHandle<Id = string> {
 }
 
 /**
- * Registration payload for {@link RunPool.addInstance}: a stable id, the
+ * Registration payload for {@link RunPool.addRun}: a stable id, the
  * per-tick `step` function, and an optional `onDeath` override that
  * supersedes the pool's `deathPolicy` for this specific instance.
  */
@@ -97,20 +97,20 @@ export interface RunRegistration<Id = string> {
 
 /** Events emitted during pool lifecycle. Subscribe via `pool.on()`. */
 export interface RunPoolEvents<Id = string> {
-  'instance:added': (handle: RunHandle<Id>) => void;
-  'instance:removed': (handle: RunHandle<Id>) => void;
+  'run:added': (handle: RunHandle<Id>) => void;
+  'run:removed': (handle: RunHandle<Id>) => void;
   /**
    * Fired whenever a run's step returns false. The handle's `alive` has
    * already been flipped to the post-death state (or left `true` for
    * `restartedWith`). For `'destroyed'`, the handle is still present in
    * `instances.value` during this event; `instance:removed` fires next.
    */
-  'instance:died': (handle: RunHandle<Id>, outcome: RunDeathOutcome) => void;
+  'run:died': (handle: RunHandle<Id>, outcome: RunDeathOutcome) => void;
   /**
    * Fired when a parked handle was re-armed via `handle.restart()` or a
    * just-died handle was replaced via `{ restartedWith }`.
    */
-  'instance:restarted': (handle: RunHandle<Id>) => void;
+  'run:restarted': (handle: RunHandle<Id>) => void;
   /**
    * Fired on `pool.reset()`. Consumers observe and run game-side reset
    * (re-arm parked handles, reset zones, etc.). The pool itself does not
@@ -122,7 +122,7 @@ export interface RunPoolEvents<Id = string> {
 /**
  * Configuration for {@link createRunPool}. `deathPolicy` picks the
  * post-death disposition (`'destroy'` vs `'park'`); the
- * optional `maxInstances` caps concurrent runs.
+ * optional `maxRuns` caps concurrent runs.
  */
 export interface RunPoolOptions {
   /** Unique identifier; used as the persistence context name. */
@@ -135,11 +135,11 @@ export interface RunPoolOptions {
    */
   readonly deathPolicy: 'destroy' | 'park';
   /**
-   * Optional hard cap on concurrent runs. `addInstance` throws when
+   * Optional hard cap on concurrent runs. `addRun` throws when
    * exceeding. Default: unlimited. `0` is treated as valid-but-empty
    * (always throws), not as "unlimited".
    */
-  readonly maxInstances?: number;
+  readonly maxRuns?: number;
 }
 
 /**
@@ -155,18 +155,18 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
    * Read-only view of all registered handles in insertion order. Array
    * identity changes on add/remove; stable between no-op reads.
    */
-  readonly instances: { readonly value: readonly RunHandle<Id>[] };
+  readonly runs: { readonly value: readonly RunHandle<Id>[] };
   /** Reactive count of handles with `alive.value === true`. */
   readonly liveCount: Readonly<Ref<number>>;
   /**
    * Register a new run. Throws on ID collision or when exceeding
-   * `maxInstances`. Fires `instance:added`.
+   * `maxRuns`. Fires `instance:added`.
    */
-  addInstance(registration: RunRegistration<Id>): RunHandle<Id>;
+  addRun(registration: RunRegistration<Id>): RunHandle<Id>;
   /** Look up by ID. Returns `undefined` for unknown IDs. */
-  getInstance(id: Id): RunHandle<Id> | undefined;
+  getRun(id: Id): RunHandle<Id> | undefined;
   /** Force-destroy by ID. No-op if unknown. Equivalent to `handle.destroy()`. */
-  removeInstance(id: Id): void;
+  removeRun(id: Id): void;
   /**
    * Atomic pool-wide reset. Fires `pool:reset`; consumers re-arm handles
    * in the handler. Seam, not a verb — the pool does not itself touch
@@ -187,8 +187,8 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * Creates a persistent pool of opaque runs with lifecycle events.
  *
  * @param options - Pool configuration including `id`, `deathPolicy`, and
- *   optional `maxInstances` cap
- * @returns A pool with `addInstance`/`getInstance`/`removeInstance`/`reset`
+ *   optional `maxRuns` cap
+ * @returns A pool with `addRun`/`getRun`/`removeRun`/`reset`
  *   operations, reactive `instances` and `liveCount`, and typed event
  *   subscription
  *
@@ -196,7 +196,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * ```ts
  * const pool = createRunPool({ id: 'runs', deathPolicy: 'destroy' });
  *
- * const handle = pool.addInstance({
+ * const handle = pool.addRun({
  *   id: 'run-1',
  *   step: () => runner.tick(),
  *   onDeath: () => {
@@ -209,10 +209,10 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * ```
  */
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
-  const { id: poolId, deathPolicy, maxInstances = Infinity } = options;
+  const { id: poolId, deathPolicy, maxRuns: maxRuns = Infinity } = options;
 
   // Pool-level persistence: the per-id aliveness map, in the pool's own
-  // context so it's in the registry at save-load time — `addInstance` is
+  // context so it's in the registry at save-load time — `addRun` is
   // consulted against the saved `aliveStates` regardless of when it runs, so
   // dynamic instances created post-load pick up their saved alive state (no
   // resurrection of dead clones).
@@ -320,31 +320,31 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
 
     if (outcome === 'parked') {
       h.alive.value = false;
-      bus.emit('instance:died', h, 'parked');
+      bus.emit('run:died', h, 'parked');
       return;
     }
 
     // { restartedWith } — swap step in-place, alive stays true.
     entry.step = outcome.restartedWith;
-    bus.emit('instance:died', h, outcome);
-    bus.emit('instance:restarted', h);
+    bus.emit('run:died', h, outcome);
+    bus.emit('run:restarted', h);
   }
 
   function forceDestroy(h: RunHandle<Id>): void {
     const entry = entryOf(h);
     if (!entry) return; // idempotent
     h.alive.value = false;
-    bus.emit('instance:died', h, 'destroyed');
+    bus.emit('run:died', h, 'destroyed');
     removeFromCollection(entry);
-    bus.emit('instance:removed', h);
+    bus.emit('run:removed', h);
   }
 
-  function addInstance(reg: RunRegistration<Id>): RunHandle<Id> {
+  function addRun(reg: RunRegistration<Id>): RunHandle<Id> {
     if (entries.has(reg.id)) {
-      throw new Error(`RunPool(${poolId}): duplicate instance id ${String(reg.id)}`);
+      throw new Error(`RunPool(${poolId}): duplicate run id ${String(reg.id)}`);
     }
-    if (handleArray.length >= maxInstances) {
-      throw new Error(`RunPool(${poolId}): maxInstances (${maxInstances}) exceeded`);
+    if (handleArray.length >= maxRuns) {
+      throw new Error(`RunPool(${poolId}): maxRuns (${maxRuns}) exceeded`);
     }
 
     // Resolve initial aliveness from the pool's persisted map. A fresh id
@@ -389,7 +389,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
         if (!entry || alive.value) return;
         entry.step = nextStep;
         alive.value = true;
-        bus.emit('instance:restarted', handle);
+        bus.emit('run:restarted', handle);
       },
       destroy(): void {
         forceDestroy(handle);
@@ -405,20 +405,20 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     handleArray.push(handle);
     bumpLive();
 
-    bus.emit('instance:added', handle);
+    bus.emit('run:added', handle);
     return handle;
   }
 
   const pool: RunPool<Id> = {
     id: poolId,
     deathPolicy,
-    instances,
+    runs: instances,
     liveCount,
-    addInstance,
-    getInstance(id: Id): RunHandle<Id> | undefined {
+    addRun: addRun,
+    getRun(id: Id): RunHandle<Id> | undefined {
       return entries.get(id)?.handle;
     },
-    removeInstance(id: Id): void {
+    removeRun(id: Id): void {
       const entry = entries.get(id);
       if (entry) forceDestroy(entry.handle);
     },

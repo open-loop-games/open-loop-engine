@@ -124,7 +124,7 @@ export interface BaseTieredAchievementDef<T = unknown> {
 }
 
 /**
- * One tier in a {@link TieredAchievementSpec}. Each tier becomes one
+ * One tier in a {@link AchievementLadderOptions}. Each tier becomes one
  * Achievement registered into the category.
  */
 export interface TieredAchievementTier<T = number> {
@@ -150,7 +150,7 @@ export interface TieredAchievementTier<T = number> {
  * value-getter into N threshold-gated achievements, each registered into the
  * category via the standard `register()` path.
  */
-export interface TieredAchievementBaseSpec<T = number> {
+export interface AchievementLadderBaseOptions<T = number> {
   /** Prefix for generated achievement IDs (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`). */
   baseId: string;
   /** Display name prefix shared by all tiers. */
@@ -162,7 +162,7 @@ export interface TieredAchievementBaseSpec<T = number> {
 }
 
 /**
- * Parameters passed to a {@link TieredAchievementSpec.buildDef} callback.
+ * Parameters passed to a {@link AchievementLadderOptions.buildDef} callback.
  * The base authoring fields (`id`/`title`/`description`/`requirement`) are
  * synthesized from the tier spec; tier metadata (`tierIndex`, `tier`) is
  * available for consumer Def fields that need it.
@@ -204,7 +204,7 @@ export type TieredAchievementBuildDef<Def, T = number> = (
  * the optional form, because `Base` is assignable to the union. Defeating
  * distributivity does not close it — assignability holds either way.
  */
-export type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> &
+export type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOptions<T> &
   (Def extends BaseTieredAchievementDef
     ? BaseTieredAchievementDef<T> extends Def
       ? { buildDef?: TieredAchievementBuildDef<Def, T> }
@@ -251,7 +251,7 @@ export interface AchievementCategory<
    * @returns The tier achievements in tier order, suitable for binding
    *   directly (e.g. `getEarnedCount(tiers)`) without re-querying.
    */
-  registerTiered<T = number>(spec: TieredAchievementSpec<Def, T>): Achievement<T>[];
+  registerTiered<T = number>(options: AchievementLadderOptions<Def, T>): Achievement<T>[];
 
   /** Get the Achievement instance for a definition ID */
   getAchievement(id: string): Achievement | undefined;
@@ -340,7 +340,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     register: base.register,
     getDef: base.getDef,
 
-    registerTiered<T = number>(spec: TieredAchievementSpec<Def, T>): Achievement<T>[] {
+    registerTiered<T = number>(spec: AchievementLadderOptions<Def, T>): Achievement<T>[] {
       const { baseId, baseName, getValue, tiers } = spec;
       const buildDef = (spec as { buildDef?: TieredAchievementBuildDef<Def, T> }).buildDef;
 

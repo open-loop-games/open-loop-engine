@@ -170,7 +170,7 @@ const cases: Case[] = [
     name: 'run pool',
     build: () => createRunPool({ id: 'm-pool', deathPolicy: 'park' }),
     dirty: (pool: ReturnType<typeof createRunPool>) =>
-      void pool.addInstance({ id: 'a', step: () => false }).step(),
+      void pool.addRun({ id: 'a', step: () => false }).step(),
   },
   {
     name: 'timed progress',

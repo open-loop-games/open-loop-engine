@@ -73,7 +73,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | time-until-X transition timing | runtime.md#transition-distance-primitives |
 | expose a tunable knob to a slider / mod config | introspection.md#override-registry |
 | in-game devtools / balance UI / walk all content | introspection.md#engine-categories |
-| upcoming unlock / "what changes next?" | harness.md#content-walker, runtime.md#transition-distance-primitives |
+| upcoming unlock / "what changes next?" | harness.md#transition-walker, runtime.md#transition-distance-primitives |
 | schedule jobs / persona rotation / ordered dispatch | composition.md#sequencer |
 | recommendation between cycles | advisors.md#recommendation |
 | spatial adjacency / grid bonuses | spatial.md#grid, spatial.md#graph |
@@ -289,7 +289,7 @@ Headless-sim substrate: runners, probes, content walkers, the picker, solvers, p
 - `runners` → harness.md#cell-aggregation-kernel
 - `solve` → harness.md#solvers
 - `types` → harness.md#measurement-harness-types
-- `walker` → harness.md#content-walker
+- `walker` → harness.md#transition-walker
 
 ## Source layers
 

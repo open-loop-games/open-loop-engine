@@ -210,13 +210,13 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
     config.resources.gold = 5;
     inc.invalidateResource('gold');
     check('after-purchase');
-    expect(inc.snapshot.purchasables.some((t) => t.entityId === 'fast')).toBe(false);
+    expect(inc.snapshot.purchasables.some((t) => t.defId === 'fast')).toBe(false);
 
     fast.amount.value = 0;
     config.resources.gold = 10;
     inc.invalidateResource('gold');
     check('after-reset');
-    expect(inc.snapshot.purchasables.some((t) => t.entityId === 'fast')).toBe(true);
+    expect(inc.snapshot.purchasables.some((t) => t.defId === 'fast')).toBe(true);
   });
 
   it('a raised limit un-maxes a purchasable without an invalidation', () => {
@@ -242,7 +242,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
     mill.amount.value = 0;
     check('after-reset-without-invalidation');
-    expect(inc.snapshot.producers.some((t) => t.entityId === 'mill')).toBe(true);
+    expect(inc.snapshot.producers.some((t) => t.defId === 'mill')).toBe(true);
   });
 
   it('entering a challenge surfaces its goal without an invalidation', () => {
@@ -262,7 +262,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
     // reset drops gold under its visibility gate.
     const { config, inc, check } = setup('inc-gate-silent', { gold: 20, gems: 10 });
     check('initial');
-    expect(inc.snapshot.challenges.some((t) => t.entityId === 'bronze')).toBe(false);
+    expect(inc.snapshot.challenges.some((t) => t.defId === 'bronze')).toBe(false);
 
     config.resources.gold = 0;
     inc.invalidateResource('gold');

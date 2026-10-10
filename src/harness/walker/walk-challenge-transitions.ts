@@ -36,14 +36,14 @@ import {
 } from '@/systems/gate';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
-import { forEachCategoryEntity } from '../walk';
+import { forEachCategoryEntry } from '../walk';
 import type { Transition } from './types';
 
 // ============================================================================
 // TYPES (private)
 // ============================================================================
 
-/** Shape yielded by `forEachCategoryEntity` for the `challenges` slice. */
+/** Shape yielded by `forEachCategoryEntry` for the `challenges` slice. */
 interface ChallengeEntity {
   readonly def: ChallengeDef;
   readonly challenge: Challenge;
@@ -77,7 +77,7 @@ function predictFieldFlip(value: unknown, runtime: GateRuntime): FieldFlip | und
 
 function buildTransition(
   categoryId: string,
-  entityId: string,
+  defId: string,
   kind: string,
   currentValue: Transition['currentValue'],
   distance: Transition['distance'],
@@ -86,10 +86,10 @@ function buildTransition(
     source: 'challenge',
     kind,
     categoryId,
-    entityId,
+    defId,
     currentValue,
     distance,
-    label: `${categoryId}.${entityId}.${kind}`,
+    label: `${categoryId}.${defId}.${kind}`,
   };
 }
 
@@ -100,20 +100,14 @@ function emitForEntity(
   out: { transition: Transition; deps: TransitionDeps }[],
 ): void {
   const { def, challenge } = entity;
-  const entityId = def.id;
+  const defId = def.id;
   const runtime: GateRuntime = { ...getBoundGateRuntime(challenge), accessor };
 
   if (!challenge.visible.value) {
     const flip = predictFieldFlip(def.visible, runtime);
     if (flip) {
       out.push({
-        transition: buildTransition(
-          categoryId,
-          entityId,
-          'visibility-reveal',
-          false,
-          flip.distance,
-        ),
+        transition: buildTransition(categoryId, defId, 'visibility-reveal', false, flip.distance),
         deps: flip.deps,
       });
     }
@@ -125,7 +119,7 @@ function emitForEntity(
     const flip = predictFieldFlip(def.canStart, runtime);
     if (flip) {
       out.push({
-        transition: buildTransition(categoryId, entityId, 'start-unlock', false, flip.distance),
+        transition: buildTransition(categoryId, defId, 'start-unlock', false, flip.distance),
         deps: flip.deps,
       });
     }
@@ -137,7 +131,7 @@ function emitForEntity(
     const flip = predictFieldFlip(def.goal, runtime);
     if (flip) {
       out.push({
-        transition: buildTransition(categoryId, entityId, 'goal-complete', false, flip.distance),
+        transition: buildTransition(categoryId, defId, 'goal-complete', false, flip.distance),
         deps: flip.deps,
       });
 
@@ -146,7 +140,7 @@ function emitForEntity(
         out.push({
           transition: buildTransition(
             categoryId,
-            entityId,
+            defId,
             'challenge-maxed',
             challenge.completions.value,
             flip.distance,
@@ -198,7 +192,7 @@ export function emitChallengeTransitionsWithDeps(
   if (!categories) return [];
 
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  forEachCategoryEntity(categories, ({ categoryKey, categoryId, entity }) => {
+  forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'challenges') return;
     emitForEntity(categoryId, entity as unknown as ChallengeEntity, accessor, out);
   });
@@ -210,7 +204,7 @@ export function emitChallengeTransitionsWithDeps(
  * {@link createIncrementalSnapshot}'s selective-rebuild path: given
  * an entity reference cached at the last full rebuild, produce the same
  * `{ transition, deps }` emissions {@link emitChallengeTransitionsWithDeps}
- * would yield for that one entity — no `forEachCategoryEntity` walk, no
+ * would yield for that one entity — no `forEachCategoryEntry` walk, no
  * engine lookup.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.

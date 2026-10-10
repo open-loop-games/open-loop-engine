@@ -21,16 +21,16 @@ milestone tracking with auto-unlock and tiered rewards
 - `interface AchievementCategoryOptions<Def extends { id: string; }, State = void>` `src/systems/achievement-category.ts:62`
 - `interface AchievementDisplay` — Display text shown on an achievement tile. `src/systems/achievement.ts:38`
 - `interface AchievementEvents` — Events emitted by an Achievement instance. `src/systems/achievement.ts:147`
+- `interface AchievementLadderBaseOptions<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:153`
+- `type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOptions<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef<T> extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:207`
 - `interface AchievementOptions<T = unknown>` — Configuration for createAchievement. `src/systems/achievement.ts:57`
 - `interface BaseTieredAchievementDef<T = unknown>` — Minimum Def shape that AchievementCategory.registerTiered's default `buildDef` can synthesize without a consumer callback. `src/systems/achievement-category.ts:117`
 - `function createAchievementCategory<Def extends { id: string; }, State = void>(options: AchievementCategoryOptions<Def, State>): AchievementCategory<Def, State>` — Create an achievement category — batch registration of Achievements from definitions. `src/systems/achievement-category.ts:307`
 - `function getCombinedAchievementEffect(achievements: Achievement<number>[], base?: DecimalSource): Decimal` — Multiply effect values across earned achievements onto a base. `src/systems/achievement.ts:257`
 - `function getEarnedCount(achievements: Achievement[]): number` — Reactive count of how many achievements in the list are currently earned. `src/systems/achievement.ts:273`
-- `interface TieredAchievementBaseSpec<T = number>` — Spec for AchievementCategory.registerTiered. `src/systems/achievement-category.ts:153`
 - `type TieredAchievementBuildDef<Def, T = number> = (params: TieredAchievementBuildDefParams<T>) => Def` — `buildDef` callback type for the `registerTiered` spec. `src/systems/achievement-category.ts:185`
-- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a TieredAchievementSpec.buildDef callback. `src/systems/achievement-category.ts:170`
-- `type TieredAchievementSpec<Def, T = number> = TieredAchievementBaseSpec<T> & (Def extends BaseTieredAchievementDef ? BaseTieredAchievementDef<T> extends Def ? { buildDef?: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; } : { buildDef: TieredAchievementBuildDef<Def, T>; })` — `registerTiered` parameter type. `src/systems/achievement-category.ts:207`
-- `interface TieredAchievementTier<T = number>` — One tier in a TieredAchievementSpec. `src/systems/achievement-category.ts:130`
+- `interface TieredAchievementBuildDefParams<T = number>` — Parameters passed to a AchievementLadderOptions.buildDef callback. `src/systems/achievement-category.ts:170`
+- `interface TieredAchievementTier<T = number>` — One tier in a AchievementLadderOptions. `src/systems/achievement-category.ts:130`
 
 ## Action Category
 
@@ -158,7 +158,7 @@ core primitive for managing a collection of opaque, addressable "runs" with inde
 - `interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>>` — A pool of concurrent run instances — spawned clones, loops, idle factory loops — sharing one death policy but each carrying its own step closure. `src/core/run-pool.ts:151`
 - `interface RunPoolEvents<Id = string>` — Events emitted during pool lifecycle. `src/core/run-pool.ts:99`
 - `interface RunPoolOptions` — Configuration for createRunPool. `src/core/run-pool.ts:127`
-- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addInstance: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:88`
+- `interface RunRegistration<Id = string>` — Registration payload for RunPool.addRun: a stable id, the per-tick `step` function, and an optional `onDeath` override that supersedes the pool's `deathPolicy` for this specific instance. `src/core/run-pool.ts:88`
 - `type RunStep = () => boolean` — One step of a run. `src/core/run-pool.ts:41`
 
 ## Skill

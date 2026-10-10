@@ -47,7 +47,7 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { TransitionDeps } from '@/core/transitions';
 import { CategoriesKey } from '@/systems/engine-categories';
 import type { Engine } from '@/engine';
-import { forEachCategoryEntity } from '../walk';
+import { forEachCategoryEntry } from '../walk';
 import type { Transition } from './types';
 import { predictAffordable } from './walk-purchasable-transitions';
 
@@ -55,7 +55,7 @@ import { predictAffordable } from './walk-purchasable-transitions';
 // TYPES (private)
 // ============================================================================
 
-/** Shape yielded by `forEachCategoryEntity` for the `producers` slice. */
+/** Shape yielded by `forEachCategoryEntry` for the `producers` slice. */
 interface ProducerEntity {
   readonly def: { readonly id: string };
   readonly producer: Producer;
@@ -67,7 +67,7 @@ interface ProducerEntity {
 
 function buildTransition(
   categoryId: string,
-  entityId: string,
+  defId: string,
   kind: string,
   currentValue: Transition['currentValue'],
   distance: Transition['distance'],
@@ -76,10 +76,10 @@ function buildTransition(
     source: 'producer',
     kind,
     categoryId,
-    entityId,
+    defId,
     currentValue,
     distance,
-    label: `${categoryId}.${entityId}.${kind}`,
+    label: `${categoryId}.${defId}.${kind}`,
   };
 }
 
@@ -90,7 +90,7 @@ function emitForEntity(
   out: { transition: Transition; deps: TransitionDeps }[],
 ): void {
   const { def, producer } = entity;
-  const entityId = def.id;
+  const defId = def.id;
 
   // Manual producers with no `repeatable` have no "next purchase" transition
   // to describe — skip entirely rather than emit a null/no-rate placeholder.
@@ -101,7 +101,7 @@ function emitForEntity(
   out.push({
     transition: buildTransition(
       categoryId,
-      entityId,
+      defId,
       'producer-becomes-affordable',
       affordable.currentValue,
       affordable.distance,
@@ -147,7 +147,7 @@ export function emitProducerTransitionsWithDeps(
   if (!categories) return [];
 
   const out: { transition: Transition; deps: TransitionDeps }[] = [];
-  forEachCategoryEntity(categories, ({ categoryKey, categoryId, entity }) => {
+  forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
     if (categoryKey !== 'producers') return;
     emitForEntity(categoryId, entity as unknown as ProducerEntity, accessor, out);
   });

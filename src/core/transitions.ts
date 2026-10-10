@@ -12,7 +12,7 @@
  * - {@link timeUntilAffordable} — distance until a purchasable's next level is buyable.
  * - {@link timeUntilConditionFlip} — distance until an {@link ICondition} changes truth value.
  *
- * Consumed by the content-walker family — each walker leaf wraps one of these
+ * Consumed by the transition-walker family — each walker leaf wraps one of these
  * per entity and emits `{ source, kind, currentValue, distance }` snapshots for
  * stasis analyzers, devtools panels, unlock hints, and tutorial-reachability tools.
  *
@@ -46,7 +46,7 @@ export type TransitionDistance =
  * Accessor slots a transition's distance arithmetic reads.
  *
  * Produced by `collectGateDeps` (in `systems/gate.ts`, for Gate trees) and by the
- * content walker's per-leaf dep emitters (for cost-resource transitions).
+ * transition walker's per-leaf dep emitters (for cost-resource transitions).
  * Used by incremental-snapshot caches: when any id in a dep set changes, the
  * consumer re-runs the distance calc for transitions that named it.
  *

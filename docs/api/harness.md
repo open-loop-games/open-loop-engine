@@ -54,7 +54,7 @@ Walk engine state to enumerate addressable choices for solvers / UIs.
 - `type PickerAddress = ModifierPickerAddress | TunablePickerAddress` — Address of any PickerEntry. `src/harness/picker/types.ts:102`
 - `type PickerEntry = ModifierPickerEntry | TunablePickerEntry` — Normalized picker output. `src/harness/picker/types.ts:155`
 - `interface PickerSnapshot` `src/harness/picker/types.ts:166`
-- `type PickerSource = 'content' | 'chain-registry' | 'tunable'` — Which discovery walker produced a given PickerEntry. `src/harness/picker/types.ts:35`
+- `type PickerSource = 'effect-system' | 'chain-registry' | 'tunable'` — Which discovery walker produced a given PickerEntry. `src/harness/picker/types.ts:35`
 - `interface TunablePickerAddress` — Address of a `TunablePickerEntry`. `src/harness/picker/types.ts:88`
 - `interface TunablePickerEntry` — A designer-flagged tunable value discovered by the picker. `src/harness/picker/types.ts:138`
 
@@ -110,7 +110,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface Cell` — One named configuration in a matrix. `src/harness/types.ts:47`
 - `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerName}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:162`
 - `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:193`
-- `interface HistogramSpec` — Consumer-supplied histogram spec for one metric. `src/harness/types.ts:122`
+- `interface HistogramOptions` — Consumer-supplied histogram spec for one metric. `src/harness/types.ts:122`
 - `interface MatrixConfig` — Top-level matrix runner config — N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:206`
 - `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:218`
 - `interface MatrixUntilConfig` — Configuration for runMatrixUntil — `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:558`
@@ -143,13 +143,13 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface UnlockEffect` — Sets an unlock flag to true or false, controlling feature/content visibility. `src/primitives/types.ts:14`
 - `interface WeightedItem<T>` — A candidate value paired with a relative probability weight for weighted random selection. `src/primitives/types.ts:198`
 
-## Content walker
+## Transition walker
 
 Enumerate purchasables, producers, and challenges with their next-transition timing.
 
 - `function createIncrementalSnapshot(engine: Engine, accessor: GameStateAccessor): IncrementalSnapshot` — Build an incremental-snapshot cache over the given engine. `src/harness/walker/incremental-snapshot.ts:232`
 - `function createTransitionSnapshot(engine: Engine, accessor: GameStateAccessor): TransitionSnapshot` — Build a single merged snapshot of pending state transitions across the engine's auto-registered content. `src/harness/walker/index.ts:85`
-- `interface IncrementalSnapshot` — Caching overlay on the content-walker snapshot. `src/harness/walker/incremental-snapshot.ts:78`
-- `interface Transition` — A pending state change surfaced by the content walkers. `src/harness/walker/types.ts:35`
+- `interface IncrementalSnapshot` — Caching overlay on the transition-walker snapshot. `src/harness/walker/incremental-snapshot.ts:78`
+- `interface Transition` — A pending state change surfaced by the transition walkers. `src/harness/walker/types.ts:35`
 - `interface TransitionSnapshot` — Merged output of createTransitionSnapshot. `src/harness/walker/index.ts:47`
-- `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which content-walker leaf produced a given Transition. `src/harness/walker/types.ts:24`
+- `type TransitionSource = 'challenge' | 'purchasable' | 'producer'` — Which transition walker produced a given Transition. `src/harness/walker/types.ts:24`

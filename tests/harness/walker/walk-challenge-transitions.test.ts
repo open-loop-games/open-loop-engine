@@ -112,7 +112,7 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
     expect(vis).toHaveLength(1);
     expect(vis[0].source).toBe('challenge');
     expect(vis[0].categoryId).toBe('vis');
-    expect(vis[0].entityId).toBe('secret');
+    expect(vis[0].defId).toBe('secret');
     expect(vis[0].label).toBe('vis.secret.visibility-reveal');
     expect(vis[0].currentValue).toBe(false);
     expect(vis[0].distance.reason).toBe('computed');
@@ -252,7 +252,7 @@ describe('walkChallengeTransitions — start-unlock', () => {
         c.register({
           id: 'c',
           name: 'C',
-          canStart: { kind: 'count-gte', category: 'upgrades', entity: 'farm', value: 3 },
+          canStart: { kind: 'count-gte', category: 'upgrades', entry: 'farm', value: 3 },
         }),
       accessor,
     );

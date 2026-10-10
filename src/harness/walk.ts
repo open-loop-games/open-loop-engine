@@ -28,13 +28,13 @@ import { flattenGrants } from '@/systems/modifier-binding';
 // Category traversal
 // ============================================================================
 
-export interface CategoryEntityVisit {
+export interface CategoryEntryVisit {
   /** Which {@link EngineCategories} key the entity came from. */
   categoryKey: keyof EngineCategories;
   /** The owning category's `registry.name`. */
   categoryId: string;
   /** The entity's `def.id`. */
-  entityId: string;
+  defId: string;
   /**
    * The `.getAll()[N]` object for this entity. Exact shape depends on
    * `categoryKey`:
@@ -47,7 +47,7 @@ export interface CategoryEntityVisit {
    *
    * Narrow via `categoryKey` at the call site.
    */
-  entity: { readonly def: { readonly id: string } };
+  entry: { readonly def: { readonly id: string } };
 }
 
 interface WalkableCategory {
@@ -69,7 +69,7 @@ function isWalkableCategory(value: unknown): value is WalkableCategory {
 
 /**
  * Walk every entity across every category slice published under
- * {@link EngineCategories}. Yields `{ categoryKey, categoryId, entityId,
+ * {@link EngineCategories}. Yields `{ categoryKey, categoryId, defId,
  * entity }` per entity.
  *
  * Duck-types each slice entry for `{ registry.name, getAll() }` — the
@@ -77,9 +77,9 @@ function isWalkableCategory(value: unknown): value is WalkableCategory {
  * (`Resource[]`) are silently skipped. Handled/unhandled filtering and
  * any per-key warnings are the emitter's responsibility.
  */
-export function forEachCategoryEntity(
+export function forEachCategoryEntry(
   categories: EngineCategories | undefined,
-  visitor: (visit: CategoryEntityVisit) => void,
+  visitor: (visit: CategoryEntryVisit) => void,
 ): void {
   if (!categories) return;
   for (const key of Object.keys(categories) as Array<keyof EngineCategories>) {
@@ -89,7 +89,7 @@ export function forEachCategoryEntity(
       if (!isWalkableCategory(maybeCategory)) continue;
       const categoryId = maybeCategory.registry.name;
       for (const entity of maybeCategory.getAll()) {
-        visitor({ categoryKey: key, categoryId, entityId: entity.def.id, entity });
+        visitor({ categoryKey: key, categoryId, defId: entity.def.id, entry: entity });
       }
     }
   }

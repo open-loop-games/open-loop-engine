@@ -313,7 +313,7 @@ export function createTemporaryEffectSystem(
   function expireInstance(instance: TemporaryEffectInstance): void {
     defs.get(instance.defId)?.onExpire?.(instance);
     handle.emit('expired', instance);
-    removeInstance(instance);
+    removeRun(instance);
   }
 
   function unbindInstance(instance: TemporaryEffectInstance): void {
@@ -321,7 +321,7 @@ export function createTemporaryEffectSystem(
     unbindByInstance.delete(instance.id);
   }
 
-  function removeInstance(instance: TemporaryEffectInstance): void {
+  function removeRun(instance: TemporaryEffectInstance): void {
     unbindInstance(instance);
     instances.value = instances.value.filter((i) => i.id !== instance.id);
   }

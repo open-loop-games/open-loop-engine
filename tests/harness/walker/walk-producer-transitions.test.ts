@@ -164,7 +164,7 @@ describe('walkProducerTransitions — producer-becomes-affordable (computed)', (
     expect(t.source).toBe('producer');
     expect(t.kind).toBe('producer-becomes-affordable');
     expect(t.categoryId).toBe('buildings');
-    expect(t.entityId).toBe('cursor');
+    expect(t.defId).toBe('cursor');
     expect(t.label).toBe('buildings.cursor.producer-becomes-affordable');
     expect(t.distance.reason).toBe('computed');
     expect(t.distance.seconds).toBe(5);
@@ -197,8 +197,8 @@ describe('walkProducerTransitions — producer-becomes-affordable (computed)', (
     const accessor = mockAccessor({ resources: { cookies: 0 }, rates: { cookies: 10 } });
 
     const out = walkProducerTransitions(engine, accessor);
-    const bySlow = out.find((t) => t.entityId === 'slow')!;
-    const byFast = out.find((t) => t.entityId === 'fast')!;
+    const bySlow = out.find((t) => t.defId === 'slow')!;
+    const byFast = out.find((t) => t.defId === 'fast')!;
     expect(bySlow.distance.seconds).toBe(10);
     expect(byFast.distance.seconds).toBe(10);
   });

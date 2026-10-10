@@ -766,7 +766,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     hard.enter();
     hard.complete(true);
     time.tick(50);
-    const run = pool.addInstance({ id: 'a', step: () => false });
+    const run = pool.addRun({ id: 'a', step: () => false });
     run.step();
     tiers.unlock('basic');
     recs.autoApply.value = true;

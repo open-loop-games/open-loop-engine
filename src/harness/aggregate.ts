@@ -12,7 +12,7 @@ import type { HeadlessResult } from '@/core/headless';
 import type {
   AggregateOptions,
   CellAggregate,
-  HistogramSpec,
+  HistogramOptions,
   MetricDelta,
   MetricHistogram,
   MetricStats,
@@ -89,7 +89,7 @@ export function computeMetricStats(values: number[]): MetricStats {
  * count into `underflow`, above `edges[N]` into `overflow` — lossless by
  * construction.
  */
-function bucketize(values: number[], spec: HistogramSpec): MetricHistogram {
+function bucketize(values: number[], spec: HistogramOptions): MetricHistogram {
   const edges = spec.edges;
   const nBuckets = Math.max(0, edges.length - 1);
   const counts = new Array<number>(nBuckets).fill(0);

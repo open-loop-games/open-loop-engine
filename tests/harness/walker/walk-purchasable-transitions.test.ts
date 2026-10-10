@@ -130,7 +130,7 @@ describe('walkPurchasableTransitions — becomes-affordable', () => {
     expect(affordable).toHaveLength(1);
     expect(affordable[0].source).toBe('purchasable');
     expect(affordable[0].categoryId).toBe('upgrades');
-    expect(affordable[0].entityId).toBe('double');
+    expect(affordable[0].defId).toBe('double');
     expect(affordable[0].label).toBe('upgrades.double.becomes-affordable');
     expect(affordable[0].currentValue).toEqual(bn(40));
     expect(affordable[0].distance.reason).toBe('computed');

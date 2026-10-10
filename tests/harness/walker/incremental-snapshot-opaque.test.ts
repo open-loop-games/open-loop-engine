@@ -73,7 +73,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
           canStart: {
             kind: 'all',
             of: [
-              { kind: 'count-gte', category: 'shop', entity: 'pick', value: 1 },
+              { kind: 'count-gte', category: 'shop', entry: 'pick', value: 1 },
               { kind: 'resource-gte', resource: 'gold', value: 100 },
             ],
           },

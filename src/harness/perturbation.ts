@@ -165,24 +165,22 @@ function applyModifierPerturbation(
       return overlayChainModifier(chain, target, (m) => wrapModifier(m, perturbation));
     }
 
-    case 'content': {
+    case 'effect-system': {
       const registry = engine.tryInject(EffectSystemRegistryKey);
       if (!registry) throw new Error('EffectSystemRegistryKey not provided on engine');
-      const system = registry.get(address.contentType);
-      if (!system) throw new Error(`effect system "${address.contentType}" not found`);
+      const system = registry.get(address.effectSystemId);
+      if (!system) throw new Error(`effect system "${address.effectSystemId}" not found`);
 
-      const def = system.allDefs().find((d) => d.id === address.contentId);
+      const def = system.allDefs().find((d) => d.id === address.defId);
       if (!def) {
         throw new Error(
-          `effect def "${address.contentId}" not found in system "${address.contentType}"`,
+          `effect def "${address.defId}" not found in system "${address.effectSystemId}"`,
         );
       }
       if (address.bindingIndex >= effectDefBindings(def).length) {
-        throw new Error(
-          `def "${address.contentId}" has no binding at index ${address.bindingIndex}`,
-        );
+        throw new Error(`def "${address.defId}" has no binding at index ${address.bindingIndex}`);
       }
-      return overlayBinding(system, address.contentId, address.bindingIndex, (m) =>
+      return overlayBinding(system, address.defId, address.bindingIndex, (m) =>
         wrapModifier(m, perturbation),
       );
     }

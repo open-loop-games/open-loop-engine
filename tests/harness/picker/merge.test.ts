@@ -115,7 +115,7 @@ describe('createPickerSnapshot', () => {
     expect(snap.all).toHaveLength(2);
     expect(snap.content).toHaveLength(1);
     expect(snap.content[0].modifier).toBe(sharedModifier);
-    expect(snap.content[0].address.source).toBe('content');
+    expect(snap.content[0].address.source).toBe('effect-system');
     expect(snap.chains).toHaveLength(1);
     expect(snap.chains[0].label).toBe('damage[*]');
 

@@ -687,7 +687,7 @@ export function persistent<T>(
  * the old name.
  *
  * Called directly with an explicit `name` on {@link persistent}'s options, or
- * by collector factories ({@link createDefinitionStates}, category `mapState`)
+ * by collector factories ({@link createDefStates}, category `mapState`)
  * that know the enclosing field name after the factory returns.
  */
 export function setPersistentName(ref: Persistent, name: string): void {
@@ -1013,14 +1013,14 @@ export function deletePersistenceNamespace(persistenceNamespace?: string): void 
  *
  * @example
  * ```ts
- * const jobStates = createDefinitionStates('jobs', JOBS, (def) => ({
+ * const jobStates = createDefStates('jobs', JOBS, (def) => ({
  *   progress: persistent<DecimalSource>(0),
  *   timesCompleted: persistent<DecimalSource>(0),
  *   automationPriority: persistent<AutomationPriority>(AutomationPriority.Disabled),
  * }));
  * ```
  */
-export function createDefinitionStates<D, K, S>(
+export function createDefStates<D, K, S>(
   contextId: string,
   definitions: readonly D[],
   stateFactory: (def: D) => S,

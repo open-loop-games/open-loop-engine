@@ -1,5 +1,5 @@
 /**
- * Content walker — emit one {@link ModifierPickerEntry} per grant binding
+ * Effect-system binding walker — emit one {@link ModifierPickerEntry} per grant binding
  * on every effect-system def registered in {@link EffectSystemRegistryKey}.
  *
  * @internal
@@ -30,7 +30,7 @@ import type { ModifierPickerEntry } from './types';
  *
  * @internal
  */
-export function walkContent(engine: Engine): ModifierPickerEntry[] {
+export function walkEffectSystemBindings(engine: Engine): ModifierPickerEntry[] {
   const registry = engine.tryInject(EffectSystemRegistryKey);
   if (!registry) return [];
 
@@ -45,9 +45,9 @@ export function walkContent(engine: Engine): ModifierPickerEntry[] {
         chain,
         indexInChain: chain.modifiers.indexOf(modifier),
         address: {
-          source: 'content',
-          contentType: systemId,
-          contentId: def.id,
+          source: 'effect-system',
+          effectSystemId: systemId,
+          defId: def.id,
           bindingIndex,
         },
         label: `${systemId}.${def.id}[${bindingIndex}]`,

@@ -6,7 +6,7 @@ import {
   retypeField,
   dropField,
   addField,
-  forEachDefinition,
+  forEachDef,
 } from '@/core/save-migrations';
 
 describe('getNested', () => {
@@ -212,13 +212,13 @@ describe('addField', () => {
   });
 });
 
-describe('forEachDefinition', () => {
+describe('forEachDef', () => {
   it('iterates each entry in the context', () => {
     const data: Record<string, unknown> = {
       jobs: { warrior: { lv: 1 }, mage: { lv: 2 } },
     };
     const seen: string[] = [];
-    forEachDefinition(data, 'jobs', (entry, id) => {
+    forEachDef(data, 'jobs', (entry, id) => {
       seen.push(id);
       entry.touched = true;
     });
@@ -230,7 +230,7 @@ describe('forEachDefinition', () => {
 
   it('no-ops when the context is missing', () => {
     const data: Record<string, unknown> = { other: 1 };
-    forEachDefinition(data, 'jobs', () => {
+    forEachDef(data, 'jobs', () => {
       throw new Error('should not be called');
     });
     expect(data).toEqual({ other: 1 });
@@ -238,7 +238,7 @@ describe('forEachDefinition', () => {
 
   it('no-ops when the context is not an object', () => {
     const data: Record<string, unknown> = { jobs: 'oops' };
-    forEachDefinition(data, 'jobs', () => {
+    forEachDef(data, 'jobs', () => {
       throw new Error('should not be called');
     });
     expect(data).toEqual({ jobs: 'oops' });
@@ -249,7 +249,7 @@ describe('forEachDefinition', () => {
       jobs: { warrior: { lv: 1 }, broken: null, scalar: 7 },
     };
     const seen: string[] = [];
-    forEachDefinition(data, 'jobs', (_entry, id) => {
+    forEachDef(data, 'jobs', (_entry, id) => {
       seen.push(id);
     });
     expect(seen).toEqual(['warrior']);
@@ -291,7 +291,7 @@ describe('incloneution corpus regression', () => {
 
     // Helper-composed shape.
     for (const group of ['jobs', 'constructions', 'exploration']) {
-      forEachDefinition(helper as Record<string, unknown>, group, (entry) => {
+      forEachDef(helper as Record<string, unknown>, group, (entry) => {
         entry.genStartCompletions ??= entry.timesCompleted ?? 0;
         entry.hadEncounteredBeforeGeneration ??= entry.hasEncountered ?? false;
       });
@@ -327,7 +327,7 @@ describe('incloneution corpus regression', () => {
   it('forward-compat: helpers tolerate the absent-section case the hand-rolled code also tolerates', () => {
     const data: Record<string, unknown> = { jobs: {} };
     expect(() =>
-      forEachDefinition(data, 'constructions', () => {
+      forEachDef(data, 'constructions', () => {
         throw new Error('unreachable');
       }),
     ).not.toThrow();

@@ -8,10 +8,10 @@ import {
   createPersistentEffectSystem,
   type EngineModule,
 } from '@/index';
-import { walkContent } from '@/harness/picker';
+import { walkEffectSystemBindings } from '@/harness/picker';
 import { startEngine } from '../helpers';
 
-describe('walkContent', () => {
+describe('walkEffectSystemBindings', () => {
   it('emits one entry per binding across temporary + persistent systems', () => {
     const mod: EngineModule = {
       id: 'fx',
@@ -52,7 +52,7 @@ describe('walkContent', () => {
     engine.use(mod);
     engine.start();
 
-    const entries = walkContent(engine);
+    const entries = walkEffectSystemBindings(engine);
     expect(entries).toHaveLength(3);
     expect(entries.map((e) => e.label).sort()).toEqual([
       'auras.library-bonus[0]',
@@ -60,7 +60,7 @@ describe('walkContent', () => {
       'buffs.haste[1]',
     ]);
     for (const e of entries) {
-      expect(e.address.source).toBe('content');
+      expect(e.address.source).toBe('effect-system');
     }
     engine.stop();
   });
@@ -84,7 +84,7 @@ describe('walkContent', () => {
     engine.use(mod);
     engine.start();
 
-    expect(walkContent(engine)).toEqual([]);
+    expect(walkEffectSystemBindings(engine)).toEqual([]);
     engine.stop();
   });
 
@@ -114,10 +114,10 @@ describe('walkContent', () => {
     engine.use(mod);
     engine.start();
 
-    const entries = walkContent(engine);
+    const entries = walkEffectSystemBindings(engine);
     expect(entries).toHaveLength(1);
     expect(entries[0].label).toBe('buffs.shield[0]');
-    expect(entries[0].address.source).toBe('content');
+    expect(entries[0].address.source).toBe('effect-system');
     engine.stop();
   });
 
@@ -140,9 +140,9 @@ describe('walkContent', () => {
     };
     const engine = startEngine('wco-5', mod);
 
-    expect(walkContent(engine)[0].indexInChain).toBe(-1);
+    expect(walkEffectSystemBindings(engine)[0].indexInChain).toBe(-1);
     built.value = true;
-    expect(walkContent(engine)[0].indexInChain).toBe(1);
+    expect(walkEffectSystemBindings(engine)[0].indexInChain).toBe(1);
     engine.stop();
   });
 
@@ -154,12 +154,12 @@ describe('walkContent', () => {
     });
     engine.use({ id: 'noop', install() {} });
     engine.start();
-    expect(walkContent(engine)).toEqual([]);
+    expect(walkEffectSystemBindings(engine)).toEqual([]);
     engine.stop();
   });
 });
 
-describe('walkContent — grant chain arrays', () => {
+describe('walkEffectSystemBindings — grant chain arrays', () => {
   it('addresses each chain of a chain-array grant as its own binding', async () => {
     const { applyPerturbation } = await import('@/harness/perturbation');
     const speed = createModifierChain('speed');
@@ -177,7 +177,7 @@ describe('walkContent — grant chain arrays', () => {
     };
     const engine = startEngine('wco-grants', mod);
 
-    const entries = walkContent(engine);
+    const entries = walkEffectSystemBindings(engine);
     expect(entries.map((e) => [e.label, e.chain.id])).toEqual([
       ['auras.rage[0]', 'speed'],
       ['auras.rage[1]', 'power'],

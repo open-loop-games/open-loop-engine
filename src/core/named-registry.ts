@@ -54,7 +54,7 @@ export interface CreateNamedRegistryOptions<T> {
   /** Class-style label used as the duplicate-id error prefix (e.g. `'ChainRegistry'`). */
   label: string;
   /** Lowercase noun used in the duplicate-id error message (e.g. `'chain'`, `'effect-system'`). */
-  entityNoun: string;
+  noun: string;
   /** Extract the registry id from an entity. The resource registry projects through its entry wrapper; chain and effect-system entities expose `id` directly. */
   idOf: (entity: T) => string;
 }
@@ -64,8 +64,8 @@ export interface CreateNamedRegistryOptions<T> {
  * its own — scratch-engine forks never cross-contaminate.
  */
 export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): NamedRegistry<T> {
-  const { label, entityNoun, idOf } = options;
-  const Noun = entityNoun.charAt(0).toUpperCase() + entityNoun.slice(1);
+  const { label, noun: noun, idOf } = options;
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
 
   const byId = new Map<string, T>();
   const order: T[] = [];
@@ -75,7 +75,7 @@ export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): 
       const id = idOf(entity);
       if (byId.has(id)) {
         throw new Error(
-          `${label}: duplicate ${entityNoun} id "${id}". ${Noun} ids must be unique within an engine instance.`,
+          `${label}: duplicate ${noun} id "${id}". ${Noun} ids must be unique within an engine instance.`,
         );
       }
       byId.set(id, entity);

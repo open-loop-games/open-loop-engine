@@ -22,7 +22,7 @@ import type { ModifierPickerEntry } from './types';
  *   perturbation appends a scalar wrapper, so empty-at-walk-time chains
  *   remain perturbable once they populate via purchases/binds).
  * - one `modifier-index` entry per existing modifier in each chain, except
- *   those an effect binding put there — the content walker offers those,
+ *   those an effect binding put there — the effect-system binding walker offers those,
  *   and a chain-side swap would outlive the effect.
  *
  * Missing registry (e.g. an engine constructed outside the standard

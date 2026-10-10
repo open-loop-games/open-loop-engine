@@ -8,7 +8,7 @@ import {
   getAllPersistentRefs,
   serializePersistents,
   deserializePersistents,
-  createDefinitionStates,
+  createDefStates,
   getPersistentRefs,
   getPersistentContextRefs,
   setPersistentName,
@@ -385,9 +385,9 @@ describe('Persistence', () => {
       warn.mockRestore();
     });
 
-    it('createDefinitionStates auto-names fields as `${defId}.${fieldName}`', () => {
+    it('createDefStates auto-names fields as `${defId}.${fieldName}`', () => {
       const defs = [{ id: 'warrior' }, { id: 'mage' }] as const;
-      createDefinitionStates('test-autoname', defs, () => ({
+      createDefStates('test-autoname', defs, () => ({
         progress: persistent(0),
         level: persistent(1),
       }));
@@ -399,9 +399,9 @@ describe('Persistence', () => {
       expect(refs.has('test-autoname.mage.level')).toBe(true);
     });
 
-    it('createDefinitionStates auto-naming produces a nested serialized shape', () => {
+    it('createDefStates auto-naming produces a nested serialized shape', () => {
       const defs = [{ id: 'warrior' }];
-      const map = createDefinitionStates('test-autoname-shape', defs, () => ({
+      const map = createDefStates('test-autoname-shape', defs, () => ({
         xp: persistent(0),
       }));
       map.get('warrior')!.xp.value = 123;
@@ -522,7 +522,7 @@ describe('default-value pruning', () => {
   });
 });
 
-describe('createDefinitionStates', () => {
+describe('createDefStates', () => {
   it('creates a Map keyed by def.id with state from factory', () => {
     const defs = [
       { id: 1, name: 'a' },
@@ -530,7 +530,7 @@ describe('createDefinitionStates', () => {
       { id: 3, name: 'c' },
     ];
 
-    const map = createDefinitionStates('test-def-states', defs, (def) => ({
+    const map = createDefStates('test-def-states', defs, (def) => ({
       progress: persistent(0),
       label: def.name,
     }));
@@ -544,7 +544,7 @@ describe('createDefinitionStates', () => {
   it('tracks persistent refs under the given contextId', () => {
     const defs = [{ id: 10 }, { id: 20 }];
 
-    createDefinitionStates('test-def-ctx', defs, () => ({
+    createDefStates('test-def-ctx', defs, () => ({
       value: persistent(0),
       flag: persistent(false),
     }));
@@ -561,7 +561,7 @@ describe('createDefinitionStates', () => {
       { code: 'beta', id: 2 },
     ];
 
-    const map = createDefinitionStates(
+    const map = createDefStates(
       'test-def-custom-key',
       defs,
       () => ({ val: persistent(0) }),
@@ -574,7 +574,7 @@ describe('createDefinitionStates', () => {
   });
 
   it('works with empty definitions array', () => {
-    const map = createDefinitionStates('test-def-empty', [], () => ({
+    const map = createDefStates('test-def-empty', [], () => ({
       val: persistent(0),
     }));
 
@@ -587,7 +587,7 @@ describe('createDefinitionStates', () => {
       { id: 2, base: 200 },
     ];
 
-    const map = createDefinitionStates('test-def-factory-args', defs, (def) => ({
+    const map = createDefStates('test-def-factory-args', defs, (def) => ({
       progress: persistent(def.base),
     }));
 

@@ -46,7 +46,7 @@ export interface CumulativeGteGate {
 export interface CountGteGate {
   kind: 'count-gte';
   category: string;
-  entity: string;
+  entry: string;
   value: DecimalSource;
 }
 
@@ -58,7 +58,7 @@ export interface CountGteGate {
 export interface UnlockGate {
   kind: 'unlock';
   category: string;
-  entity: string;
+  entry: string;
 }
 
 /**
@@ -171,7 +171,7 @@ export function isGate(value: unknown): value is Gate {
  * `systems/gate.ts` so the pure walker below can stay at core layer;
  * `GateRuntime` keys off this union.
  */
-export type GateHandle = 'accessor' | 'categories' | 'registry';
+export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
 
 /**
  * Which engine handles `gate` will actually reach for. Pure data → data;
@@ -189,8 +189,8 @@ export type GateHandle = 'accessor' | 'categories' | 'registry';
  * for `cumulative-gte`, the resource's rate through the accessor, and demands
  * it when it runs.
  */
-export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
-  const out = new Set<GateHandle>();
+export function getRequiredGateServices(gate: Gate): ReadonlySet<GateService> {
+  const out = new Set<GateService>();
   forEachGateLeaf(gate, (leaf) => {
     switch (leaf.kind) {
       case 'resource-gte':
@@ -199,7 +199,7 @@ export function getRequiredGateHandles(gate: Gate): ReadonlySet<GateHandle> {
         out.add('accessor');
         return;
       case 'cumulative-gte':
-        out.add('registry');
+        out.add('resourceRegistry');
         return;
       case 'count-gte':
       case 'unlock':

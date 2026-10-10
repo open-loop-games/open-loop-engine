@@ -155,7 +155,7 @@ Composition recipe for action-queue automation that needs to interleave entries 
 The convergent shape across consumers:
 
 - Each content-type entry carries a player-set `automationPriority` and a static category-level `passBonus`.
-- Score is `priority * 10 + passBonus[contentType]` — the multiplier preserves player priority dominance while the pass-bonus map deterministically orders cross-category ties.
+- Score is `priority * 10 + passBonus[effectSystemId]` — the multiplier preserves player priority dominance while the pass-bonus map deterministically orders cross-category ties.
 - A single fill strategy walks every relevant `category.getAll()`, filters by unlock + visibility, builds a candidate list, sorts descending by score, and returns the first item whose task's `canRun()` returns `'now'`.
 
 ```ts

@@ -32,7 +32,7 @@ import type { Modifier, ModifierChain } from '@/core/modifier';
  * Tunable entries don't compete with modifier entries for identity and
  * skip dedup entirely.
  */
-export type PickerSource = 'content' | 'chain-registry' | 'tunable';
+export type PickerSource = 'effect-system' | 'chain-registry' | 'tunable';
 
 /**
  * Address of a `ModifierPickerEntry`. Discriminated union by `source` —
@@ -41,11 +41,11 @@ export type PickerSource = 'content' | 'chain-registry' | 'tunable';
  */
 export type ModifierPickerAddress =
   | {
-      source: 'content';
+      source: 'effect-system';
       /** Effect-system id (e.g. `'buffs'`, `'constructions-effects'`) */
-      contentType: string;
+      effectSystemId: string;
       /** Def id within the effect system */
-      contentId: string;
+      defId: string;
       /** Position of this binding in the def's `modifiers`, each grant's chain array flattened */
       bindingIndex: number;
     }

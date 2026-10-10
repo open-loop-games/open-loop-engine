@@ -167,7 +167,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     const kinds = snap.all.map((t) => ({
       source: t.source,
       kind: t.kind,
-      entityId: t.entityId,
+      defId: t.defId,
       seconds: t.distance.seconds,
       reason: t.distance.reason,
     }));
@@ -267,7 +267,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     const accessor = mockAccessor({ resources: { gold: 0 }, rates: { gold: 1 } });
     const snap = createTransitionSnapshot(engine, accessor);
     const affordable = snap.purchasables.filter((t) => t.kind === 'becomes-affordable');
-    expect(affordable.map((t) => t.entityId)).toEqual(['alpha', 'beta']);
+    expect(affordable.map((t) => t.defId)).toEqual(['alpha', 'beta']);
   });
 });
 

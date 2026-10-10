@@ -113,7 +113,7 @@ export {
   resetPersistent,
   isAtDefault,
   filterDefaultedRefs,
-  createDefinitionStates,
+  createDefStates,
   setPersistentName,
   getPersistentContextRefs,
   getAllPersistentRefs,
@@ -179,7 +179,7 @@ export {
   retypeField,
   dropField,
   addField,
-  forEachDefinition,
+  forEachDef,
 } from './save-migrations';
 
 // === SAVE VALIDATION ===

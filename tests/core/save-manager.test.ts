@@ -5,7 +5,7 @@ import {
   beginPersistentContext,
   endPersistentContext,
   resetPersistent,
-  createDefinitionStates,
+  createDefStates,
 } from '@/core/persistence';
 import { bn, Decimal } from '@/primitives/decimal';
 
@@ -690,13 +690,13 @@ describe('SaveManager — engine v1→v2 legacy key migration', () => {
     warn.mockRestore();
   });
 
-  it('nested named keys from createDefinitionStates round-trip through save/load', () => {
+  it('nested named keys from createDefStates round-trip through save/load', () => {
     const storage = createMapStorage();
     // compressSave: false so we can assert on the on-disk envelope shape directly.
     const mgr = createSaveManager({ gameId: 'nd', storageAdapter: storage, compressSave: false });
 
     const defs = [{ id: 'warrior' }, { id: 'mage' }] as const;
-    const states = createDefinitionStates('nd-jobs', defs, () => ({
+    const states = createDefStates('nd-jobs', defs, () => ({
       xp: persistent(0),
       level: persistent(1),
     }));
@@ -795,11 +795,11 @@ describe('SaveManager — default-value pruning round-trip', () => {
     expect(envelope.data['pr4-ctx'].xp).toBe('100');
   });
 
-  it('createDefinitionStates with all-defaulted entries yields empty bucket', () => {
+  it('createDefStates with all-defaulted entries yields empty bucket', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr5', storageAdapter: storage, compressSave: false });
     const defs = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-    createDefinitionStates('pr5-jobs', defs, () => ({
+    createDefStates('pr5-jobs', defs, () => ({
       progress: persistent(0),
       level: persistent(1),
     }));
@@ -809,11 +809,11 @@ describe('SaveManager — default-value pruning round-trip', () => {
     expect(envelope.data['pr5-jobs']).toBeUndefined();
   });
 
-  it('createDefinitionStates with one mutated field yields one nested key', () => {
+  it('createDefStates with one mutated field yields one nested key', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pr6', storageAdapter: storage, compressSave: false });
     const defs = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-    const states = createDefinitionStates('pr6-jobs', defs, () => ({
+    const states = createDefStates('pr6-jobs', defs, () => ({
       progress: persistent(0),
       level: persistent(1),
     }));
@@ -991,7 +991,7 @@ describe('SaveManager — engine v3 compression', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'pcz', storageAdapter: storage });
     const defs = Array.from({ length: 50 }, (_, i) => ({ id: `d${i}` }));
-    const states = createDefinitionStates('pcz-jobs', defs, () => ({
+    const states = createDefStates('pcz-jobs', defs, () => ({
       progress: persistent(0),
       level: persistent(0),
     }));

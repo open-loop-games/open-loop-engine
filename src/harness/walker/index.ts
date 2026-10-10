@@ -1,7 +1,7 @@
 /**
- * Content-walker merger — engine-public introspection contract.
+ * Transition-walker merger — engine-public introspection contract.
  *
- * Runs the three content-walker leaves (challenges, purchasables, producers)
+ * Runs the three transition walkers (challenges, purchasables, producers)
  * and returns a single {@link TransitionSnapshot} with the merged list sorted
  * by {@link TransitionDistance} plus per-source group arrays. The leaves
  * themselves stay internal to harness; consumers go through this merger so
@@ -59,7 +59,7 @@ export interface TransitionSnapshot {
  * Build a single merged snapshot of pending state transitions across the
  * engine's auto-registered content.
  *
- * Runs each content-walker leaf (challenges, purchasables, producers) against
+ * Runs each transition walker (challenges, purchasables, producers) against
  * `engine` and concatenates the output into a sorted, grouped snapshot.
  *
  * Missing `CategoriesKey` or empty category slices degrade silently — each

@@ -17,7 +17,7 @@ import {
 import {
   createPickerSnapshot,
   walkChainRegistry,
-  walkContent,
+  walkEffectSystemBindings,
   walkTunables,
 } from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
@@ -50,7 +50,7 @@ function persistentDamage(gameId: string) {
       ]);
     },
   });
-  const entry = (label: string) => walkContent(engine).find((e) => e.label === label)!;
+  const entry = (label: string) => walkEffectSystemBindings(engine).find((e) => e.label === label)!;
   return { engine, on, flat, dmg: () => dmg, entry };
 }
 
@@ -357,7 +357,7 @@ describe('applyPerturbation — content source', () => {
     engine.use(mod);
     engine.start();
 
-    const entry = walkContent(engine).find((e) => e.label === 'buffs.haste[0]')!;
+    const entry = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.haste[0]')!;
     expect(entry).toBeDefined();
     expect(entry.indexInChain).toBeGreaterThanOrEqual(0);
     expect(num(speedChain!.apply(10))).toBe(20);
@@ -478,7 +478,7 @@ describe('applyPerturbation — content source', () => {
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
-    const rage = walkContent(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
     buffs.apply('rage');
     expect(num(dmg.apply(1))).toBe(12);
 
@@ -522,7 +522,7 @@ describe('applyPerturbation — content source', () => {
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
-    const rage = walkContent(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
     buffs.apply('rage');
     tick(1);
     buffs.apply('rage');
@@ -598,21 +598,21 @@ describe('applyPerturbation — content source', () => {
   it('names the missing piece when an entry no longer resolves', () => {
     const { engine, entry } = persistentDamage('pert-content-missing');
     const flatEntry = entry('gear.flat[0]');
-    // walkContent always produces 'content'-source addresses; narrow away the
+    // walkEffectSystemBindings always produces 'effect-system'-source addresses; narrow away the
     // wider ModifierPickerAddress union so the override merges cleanly.
     const contentAddress = flatEntry.address as Extract<
       typeof flatEntry.address,
-      { source: 'content' }
+      { source: 'effect-system' }
     >;
     const at = (address: Partial<typeof contentAddress>) => ({
       ...flatEntry,
       address: { ...contentAddress, ...address },
     });
     const times2 = { kind: 'scalar-multiply', factor: 2 } as const;
-    expect(() => applyPerturbation(engine, at({ contentType: 'nope' }), times2)).toThrow(
+    expect(() => applyPerturbation(engine, at({ effectSystemId: 'nope' }), times2)).toThrow(
       /effect system "nope" not found/,
     );
-    expect(() => applyPerturbation(engine, at({ contentId: 'nope' }), times2)).toThrow(
+    expect(() => applyPerturbation(engine, at({ defId: 'nope' }), times2)).toThrow(
       /effect def "nope" not found/,
     );
     expect(() => applyPerturbation(engine, at({ bindingIndex: 3 }), times2)).toThrow(

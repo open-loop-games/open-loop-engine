@@ -122,10 +122,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first-handful', description: 'Ten saved.',
     requirement: { kind: 'cumulative-gte', resource: 'eggs', value: 10 } },
   { id: 'coop-built', description: 'Hens settle in.',
-    requirement: { kind: 'count-gte', category: 'producers', entity: 'coop', value: 1 } },
+    requirement: { kind: 'count-gte', category: 'producers', entry: 'coop', value: 1 } },
   { id: 'flock-master', description: 'A big coop and a full larder.',
     requirement: { kind: 'all', of: [
-      { kind: 'count-gte', category: 'producers', entity: 'coop', value: 5 },
+      { kind: 'count-gte', category: 'producers', entry: 'coop', value: 5 },
       { kind: 'cumulative-gte', resource: 'eggs', value: 1000 },
     ] } },
 ];
@@ -218,13 +218,13 @@ Reach for the getter only when the predicate is derived from more than one sourc
 When you bump `EngineConfig.saveVersion`, supply a `saveMigrations` entry for each version that transforms data from `v → v+1`. Migrations run sequentially over the raw decoded save object before validation and deserialize. A step must return the object: one that returns nothing doesn't compile, and fails the load at runtime. Changing a default is a migration too — a leaf at the old default was pruned from the save, so it loads as the new default, and a migration sees `undefined` for it, meaning "the writing build's default". The engine ships a small kit of pure transforms — compose them in the migration body rather than hand-rolling traversal each time.
 
 ```ts
-import { renameField, retypeField, forEachDefinition, type SaveMigration } from '@open-loop/engine';
+import { renameField, retypeField, forEachDef, type SaveMigration } from '@open-loop/engine';
 
 const saveMigrations: Record<number, SaveMigration> = {
   // v1 → v2: definitions gained derived fields — iterate each entry, seed with `??=`.
   1: (data) => {
     for (const group of ['jobs', 'constructions', 'exploration']) {
-      forEachDefinition(data, group, (entry) => {
+      forEachDef(data, group, (entry) => {
         entry.genStartCompletions ??= entry.timesCompleted ?? 0;
       });
     }
@@ -359,7 +359,7 @@ The "game code never imports harness" rule applies to runtime gameplay modules (
 Two query shapes recur:
 
 - **"What can modify this value, and where does it come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. Content entries are declared effect bindings, active or not; chain entries are what the chains hold now. See `api/harness.md#picker`.
-- **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#content-walker`.
+- **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#transition-walker`.
 
 Null `distance.seconds` is intentional and consumer-interpreted: a stasis analyzer treats it as "cannot rule out this transition"; a countdown UI hides null rows entirely. The walker never makes that policy call.
 

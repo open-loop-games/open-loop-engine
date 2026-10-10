@@ -69,7 +69,7 @@ export const ChainRegistryKey: InjectionKey<ChainRegistry> = Symbol('engine:chai
 export function createChainRegistry(): ChainRegistry {
   return createNamedRegistry<ModifierChain>({
     label: 'ChainRegistry',
-    entityNoun: 'chain',
+    noun: 'chain',
     idOf: (chain) => chain.id,
   });
 }
@@ -98,7 +98,7 @@ export const getCurrentChainRegistry = chainAmbient.getCurrent;
  * {@link ../systems/temporary-effect.TemporaryEffectSystem} and
  * {@link ../systems/persistent-effect.PersistentEffectSystem} satisfy this.
  *
- * The picker's content walker reads `id` for addressing and `allDefs()` for
+ * The picker's effect-system binding walker reads `id` for addressing and `allDefs()` for
  * enumeration; everything else is system-specific and stays behind the
  * system's full interface.
  */
@@ -141,7 +141,7 @@ export const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry> = Symbo
 export function createEffectSystemRegistry(): EffectSystemRegistry {
   return createNamedRegistry<EnumerableEffectSystem>({
     label: 'EffectSystemRegistry',
-    entityNoun: 'effect-system',
+    noun: 'effect-system',
     idOf: (system) => system.id,
   });
 }
@@ -224,7 +224,7 @@ export const ResourceRegistryKey: InjectionKey<ResourceRegistry> = Symbol(
 export function createResourceRegistry(): ResourceRegistry {
   const inner = createNamedRegistry<ResourceRegistryEntry>({
     label: 'ResourceRegistry',
-    entityNoun: 'resource',
+    noun: 'resource',
     idOf: (entry) => entry.resource.id,
   });
   return {

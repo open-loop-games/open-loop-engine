@@ -139,7 +139,7 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve `(categoryId, entityId)` to the entry's introspection signals across
+ * Resolve `(categoryId, defId)` to the entry's introspection signals across
  * every typed slot in {@link EngineCategories}. The cohesive cross-cut over
  * heterogeneous category types — every category factory derives a uniform
  * {@link CategoryEntrySignals} view from its instance refs, so a Gate
@@ -152,7 +152,7 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
  * by declaration merging aren't walked, so their categories aren't
  * gate-visible. Returns
  * `undefined` if no matching category is registered, or if the matching
- * category has no entry under `entityId`.
+ * category has no entry under `defId`.
  *
  * @example
  * ```ts
@@ -165,7 +165,7 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
 export function findCategoryEntrySignals(
   categories: EngineCategories,
   categoryId: string,
-  entityId: string,
+  defId: string,
 ): CategoryEntrySignals | undefined {
   const buckets = [
     categories.purchasables,
@@ -180,7 +180,7 @@ export function findCategoryEntrySignals(
     if (!bucket) continue;
     for (const cat of bucket) {
       if (cat.id !== categoryId) continue;
-      return cat.getEntry(entityId)?.signals;
+      return cat.getEntry(defId)?.signals;
     }
   }
   return undefined;

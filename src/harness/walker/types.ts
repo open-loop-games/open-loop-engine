@@ -1,5 +1,5 @@
 /**
- * Shared types for the content-walker family. Three leaf walkers —
+ * Shared types for the transition-walker family. Three leaf walkers —
  * {@link walkChallengeTransitions}, walkPurchasableTransitions,
  * walkProducerTransitions — emit the same {@link Transition} shape so
  * `createTransitionSnapshot` can concatenate, sort, and group uniformly.
@@ -17,14 +17,14 @@ import type { TransitionDistance } from '@/core/transitions';
 export type { TransitionDeps } from '@/core/transitions';
 
 /**
- * Which content-walker leaf produced a given {@link Transition}. Also used
+ * Which transition walker produced a given {@link Transition}. Also used
  * by the merger as the group key for `TransitionSnapshot.{challenges,
  * purchasables, producers}`.
  */
 export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
 
 /**
- * A pending state change surfaced by the content walkers.
+ * A pending state change surfaced by the transition walkers.
  *
  * `kind` is narrowed per `source`: challenge emits `visibility-reveal`,
  * `start-unlock`, `goal-complete` and `challenge-maxed`; purchasable emits
@@ -33,14 +33,14 @@ export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
  * pattern-match on `source` first, then on `kind`.
  */
 export interface Transition {
-  /** Which content-walker leaf produced this transition. */
+  /** Which transition walker produced this transition. */
   source: TransitionSource;
   /** Per-source kind tag; string-typed to keep leaves independent. */
   kind: string;
   /** Owning category's `registry.name` (e.g. `'challenges'`, `'buildings'`). */
   categoryId: string;
   /** Entity's `def.id` within the category. */
-  entityId: string;
+  defId: string;
   /**
    * Snapshot of the value whose transition is being predicted. Shape depends
    * on `kind`: boolean for visibility / unlock / goal flips, the owned level
@@ -51,6 +51,6 @@ export interface Transition {
   currentValue: DecimalSource | boolean | number;
   /** Distance to the predicted transition. See {@link TransitionDistance}. */
   distance: TransitionDistance;
-  /** Display-ready label, conventionally `{categoryId}.{entityId}.{kind}`. */
+  /** Display-ready label, conventionally `{categoryId}.{defId}.{kind}`. */
   label: string;
 }

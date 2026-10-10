@@ -65,7 +65,7 @@ import type { SkillCategory, SkillCategoryOptions } from '@/systems/skill-catego
 import type {
   AchievementCategory,
   BaseTieredAchievementDef,
-  TieredAchievementSpec,
+  AchievementLadderOptions,
 } from '@/systems/achievement-category';
 import type { ProducerCategory, Producer } from '@/systems/producer-category';
 import type {
@@ -501,7 +501,7 @@ describe('Subject category surface type pins', () => {
       },
     });
     const e = cat.get('the-entity');
-    // Each field narrows to its kind-specific instance — no getInstance<K> ceremony.
+    // Each field narrows to its kind-specific instance — no getRun<K> ceremony.
     expectTypeOf(e?.fields.trust).toEqualTypeOf<ScalarFieldInstance | undefined>();
     expectTypeOf(e?.fields.rank).toEqualTypeOf<TierFieldInstance | undefined>();
     expectTypeOf(e?.fields.met).toEqualTypeOf<FlagFieldInstance | undefined>();
@@ -928,16 +928,20 @@ describe('registerTiered spec — buildDef optionality', () => {
       goal: () => boolean;
     }
     expectTypeOf<
-      OptionalKeys<TieredAchievementSpec<BaseTieredAchievementDef>>
+      OptionalKeys<AchievementLadderOptions<BaseTieredAchievementDef>>
     >().toEqualTypeOf<'buildDef'>();
-    expectTypeOf<OptionalKeys<TieredAchievementSpec<StructuralTwin>>>().toEqualTypeOf<'buildDef'>();
+    expectTypeOf<
+      OptionalKeys<AchievementLadderOptions<StructuralTwin>>
+    >().toEqualTypeOf<'buildDef'>();
 
     // Extra fields that are themselves optional lose nothing when the callback
     // is omitted, so they stay on the optional branch.
     interface LooselyWidened extends BaseTieredAchievementDef {
       effect?: number;
     }
-    expectTypeOf<OptionalKeys<TieredAchievementSpec<LooselyWidened>>>().toEqualTypeOf<'buildDef'>();
+    expectTypeOf<
+      OptionalKeys<AchievementLadderOptions<LooselyWidened>>
+    >().toEqualTypeOf<'buildDef'>();
   });
 
   it('is required once Def carries a field the default synthesizer cannot populate', () => {
@@ -948,10 +952,10 @@ describe('registerTiered spec — buildDef optionality', () => {
     interface WidenedDef extends BaseTieredAchievementDef {
       effect: number;
     }
-    expectTypeOf<OptionalKeys<TieredAchievementSpec<WidenedDef>>>().toBeNever();
+    expectTypeOf<OptionalKeys<AchievementLadderOptions<WidenedDef>>>().toBeNever();
 
     // A Def narrower than the base shape has never been on the optional branch.
-    expectTypeOf<OptionalKeys<TieredAchievementSpec<{ id: string }>>>().toBeNever();
+    expectTypeOf<OptionalKeys<AchievementLadderOptions<{ id: string }>>>().toBeNever();
   });
 });
 

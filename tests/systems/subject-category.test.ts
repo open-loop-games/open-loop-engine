@@ -209,7 +209,7 @@ describe('createSubjectCategory', () => {
           id: 'mentor-rask',
           fields: {
             trust: {
-              advanceWhen: [{ kind: 'count-gte', category: 'upgrades', entity: 'charm', value: 2 }],
+              advanceWhen: [{ kind: 'count-gte', category: 'upgrades', entry: 'charm', value: 2 }],
             },
           },
         });

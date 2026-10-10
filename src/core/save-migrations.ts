@@ -18,7 +18,7 @@
  *   serialize/deserialize paths
  * - `renameField`, `retypeField`, `dropField`, `addField` — single-path
  *   transforms
- * - `forEachDefinition` — iterate over a context's per-definition state
+ * - `forEachDef` — iterate over a context's per-definition state
  *
  * @cluster save
  */
@@ -187,12 +187,12 @@ export function addField(
  * @example
  * ```ts
  * 6: (data) =>
- *   forEachDefinition(data as Record<string, unknown>, 'jobs', (entry) => {
+ *   forEachDef(data as Record<string, unknown>, 'jobs', (entry) => {
  *     entry.genStartCompletions ??= entry.timesCompleted ?? 0;
  *   }),
  * ```
  */
-export function forEachDefinition(
+export function forEachDef(
   data: SaveData,
   contextId: string,
   fn: (entry: SaveData, id: string) => void,

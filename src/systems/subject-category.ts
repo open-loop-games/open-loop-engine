@@ -279,7 +279,7 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
   register(defs: SubjectDef<S> | SubjectDef<S>[]): void;
   /** Get the authored def for a subject id (delegates to the registry). */
   getDef(id: string): SubjectDef<S> | undefined;
-  /** Get the typed live instance for a subject id. Replaces variant-narrowing `getInstance<K>`. */
+  /** Get the typed live instance for a subject id. Replaces variant-narrowing `getRun<K>`. */
   get(id: string): SubjectInstance<S> | undefined;
   /** Get the full entry (def + instance) for a subject id. */
   getEntry(id: string): SubjectCategoryEntry<S> | undefined;
