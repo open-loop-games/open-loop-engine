@@ -53,7 +53,16 @@ export interface SequencerItem<M = void> {
  */
 export type StartResult = 'now' | 'notNow' | 'never';
 
-/** Tick registration function — matches `EngineContext.onTick` signature. */
+/**
+ * Tick registration — subscribes a per-tick callback and returns its
+ * unsubscribe. Matches `EngineContext.onTick`; pass `ctx.onTick` directly.
+ *
+ * It must accept any number of callbacks and run every one each tick, because
+ * a factory may register several: `createActionCategory` registers its
+ * sequencer's advance-cap reset and its own dispatcher. An adapter that keeps
+ * only the latest callback type-checks, then silently drops the rest; for a
+ * sequencer the cap latches and `advanceCapTrips` climbs while nothing runs.
+ */
 export type RegisterTick = (callback: (dt: number) => void) => () => void;
 
 /**
@@ -147,12 +156,13 @@ export interface SequencerOptions<M = void> {
    */
   canRun?: (item: SequencerItem<M>) => StartResult;
   /**
-   * Tick registration for the `'notNow'` retry path. When a canRun call
-   * returns `'notNow'`, the sequencer installs a retry callback via this
+   * Tick registration, used twice: the per-tick advance-cap reset (see
+   * {@link maxAdvancesPerTick}), and the `'notNow'` retry path. When a canRun
+   * call returns `'notNow'`, the sequencer installs a retry callback via this
    * function and re-evaluates canRun each tick until the item transitions
    * to `'now'` or `'never'`. Without this, `'notNow'` falls back to `'never'`.
    *
-   * Matches `EngineContext.onTick` — pass `ctx.onTick` directly.
+   * Must run every callback it is given — see {@link RegisterTick}.
    */
   registerTick?: RegisterTick;
   /**
