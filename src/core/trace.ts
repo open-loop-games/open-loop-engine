@@ -5,7 +5,7 @@
  * The graph view and other observers read the trace to visualize flows.
  *
  * - Zero module code changes for basic tracing (setter intercept)
- * - Opt-in withChain() for modifier chain attribution
+ * - Opt-in withTraceChain() for modifier chain attribution
  * - Per-tick grouping via beginTick()/endTick() called by game loop
  */
 
@@ -21,7 +21,7 @@ export interface TraceEntry {
   delta: DecimalSource;
   /** The tick number when this mutation occurred */
   tick: number;
-  /** The modifier chain that computed the amount (opt-in via withChain) */
+  /** The modifier chain that computed the amount (opt-in via withTraceChain) */
   chain?: Modifier;
 }
 
@@ -76,12 +76,12 @@ let activeChain: Modifier | undefined;
  *
  * @example
  * ```ts
- * withChain(decayChain, () => {
+ * withTraceChain(decayChain, () => {
  *   health.value = Decimal.sub(health.value, decay)
  * })
  * ```
  */
-export function withChain<T>(chain: Modifier, fn: () => T): T {
+export function withTraceChain<T>(chain: Modifier, fn: () => T): T {
   const prev = activeChain;
   activeChain = chain;
   try {

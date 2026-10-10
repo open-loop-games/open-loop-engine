@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import type { Engine } from '@/index';
 import { random } from '@/primitives/rng';
 import { runMatrixUntil, runMatrix } from '@/harness';
@@ -48,7 +48,7 @@ function makeCell(name: string, stateSink: Map<number, TestState>, tickDelta = 0
 function createTickRecorder(state: TestState): Analyzer {
   return {
     id: 'tick-recorder',
-    summarize: (): AnalyzerResult => ({
+    summarize: (): AnalyzerSummary => ({
       id: 'tick-recorder',
       metrics: { finalTick: state.tick },
     }),
@@ -380,7 +380,7 @@ describe('runMatrixUntil', () => {
     expect(seenSeeds).toEqual([7, 8, 9]);
     expect(result.cells[0]!.runs).toHaveLength(3);
     for (const run of result.cells[0]!.runs) {
-      expect(run.analyzerResults).toHaveLength(1);
+      expect(run.analyzerSummaries).toHaveLength(1);
     }
   });
 

@@ -14,7 +14,7 @@ import {
   getCurrentTraceEntries,
   getPreviousTraceEntries,
   getTraceTick,
-  withChain,
+  withTraceChain,
   resetTrace,
 } from '@/core/trace';
 import { createMultiplicativeModifier } from '@/core/modifier';
@@ -145,7 +145,7 @@ describe('Trace System', () => {
     });
   });
 
-  describe('withChain attribution', () => {
+  describe('withTraceChain attribution', () => {
     it('attaches modifier chain to trace entries', () => {
       const health = makeResource('Health', 100);
       const decayMod = createMultiplicativeModifier({
@@ -154,7 +154,7 @@ describe('Trace System', () => {
       }) as Modifier;
 
       beginTraceTick();
-      withChain(decayMod, () => {
+      withTraceChain(decayMod, () => {
         health.value = Decimal.sub(health.value, 10);
       });
       endTraceTick();
@@ -164,7 +164,7 @@ describe('Trace System', () => {
       expect(entries[0].chain).toBe(decayMod);
     });
 
-    it('does not attach chain outside withChain', () => {
+    it('does not attach chain outside withTraceChain', () => {
       const health = makeResource('Health', 100);
 
       beginTraceTick();
@@ -174,16 +174,16 @@ describe('Trace System', () => {
       expect(getPreviousTraceEntries()[0].chain).toBeUndefined();
     });
 
-    it('restores previous chain on nested withChain', () => {
+    it('restores previous chain on nested withTraceChain', () => {
       const health = makeResource('Health', 100);
       const gold = makeResource('Gold', 50);
       const chainA = createMultiplicativeModifier({ multiplier: 1, description: 'A' }) as Modifier;
       const chainB = createMultiplicativeModifier({ multiplier: 1, description: 'B' }) as Modifier;
 
       beginTraceTick();
-      withChain(chainA, () => {
+      withTraceChain(chainA, () => {
         health.value = Decimal.sub(health.value, 1);
-        withChain(chainB, () => {
+        withTraceChain(chainB, () => {
           gold.value = Decimal.add(gold.value, 1);
         });
         health.value = Decimal.sub(health.value, 1);

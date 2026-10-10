@@ -721,7 +721,7 @@ describe("runUntil({mode: 'next-event'}) guards", () => {
       setup: () => [],
     });
     engine.stop();
-    expect(result.analyzerResults).toEqual([]);
+    expect(result.analyzerSummaries).toEqual([]);
   });
 
   it('throws from runMatrixUntil when an event-mode cell carries analyzers', () => {

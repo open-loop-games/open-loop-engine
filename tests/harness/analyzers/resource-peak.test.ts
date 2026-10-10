@@ -24,7 +24,7 @@ describe('createResourcePeakAnalyzer', () => {
       ticks: 10,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.peak).toBe(5);
     expect(metrics.final).toBe(0);
     expect(metrics.avg).toBeCloseTo(2.5, 10);
@@ -47,7 +47,7 @@ describe('createResourcePeakAnalyzer', () => {
       ticks: 0,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.peak).toBe(42);
     expect(metrics.final).toBe(42);
     expect(metrics.avg).toBe(42);
@@ -74,6 +74,6 @@ describe('createResourcePeakAnalyzer', () => {
       ticks: 1,
     });
 
-    expect(result.analyzerResults[0]!.metrics.peak).toBe(5);
+    expect(result.analyzerSummaries[0]!.metrics.peak).toBe(5);
   });
 });

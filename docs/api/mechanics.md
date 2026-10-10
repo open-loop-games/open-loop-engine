@@ -191,4 +191,4 @@ Resource mutation tracing system
 - `function getPreviousTraceEntries(): readonly TraceEntry[]` — Get trace entries for the previous (completed) tick. `src/core/trace.ts:161`
 - `function getTraceTick(): number` — Get the current tick number. `src/core/trace.ts:151`
 - `interface TraceEntry` — A single resource mutation recorded by the trace system. `src/core/trace.ts:17`
-- `function withChain<T>(chain: Modifier, fn: () => T): T` — Execute a callback with modifier chain attribution. `src/core/trace.ts:84`
+- `function withTraceChain<T>(chain: Modifier, fn: () => T): T` — Execute a callback with modifier chain attribution. `src/core/trace.ts:84`

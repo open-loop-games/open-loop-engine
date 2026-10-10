@@ -13,7 +13,7 @@ export type {
   CompositeEffect,
   GameStateAccessor,
   Analyzer,
-  AnalyzerResult,
+  AnalyzerSummary,
   InjectionKey,
 } from '../primitives/types';
 
@@ -221,8 +221,8 @@ export {
   enableDevMode,
   disableDevMode,
   isDevMode,
-  getDiagnostics,
-  resetDiagnostics,
+  getSafeguardDiagnostics,
+  resetSafeguardDiagnostics,
 } from './safeguards';
 
 // === SEQUENCER ===
@@ -332,7 +332,7 @@ export { withPersistentContext } from './persistence';
 // === TRACE ===
 export type { TraceEntry } from './trace';
 export {
-  withChain,
+  withTraceChain,
   enableTracing,
   getTraceTick,
   getCurrentTraceEntries,

@@ -455,8 +455,8 @@ describe('createCycleLog', () => {
     expect(entries[0].runNumber).toBe(0);
     expect(entries[0].deltas[0].delta.eq(20)).toBe(true);
     expect(tickCount).toBe(6);
-    expect(result.analyzerResults[0].metrics.cycles).toBe(3);
-    expect(result.analyzerResults[1].metrics.ticks).toBe(6);
+    expect(result.analyzerSummaries[0].metrics.cycles).toBe(3);
+    expect(result.analyzerSummaries[1].metrics.ticks).toBe(6);
   });
 
   it('unsubscribe returned by log.on removes the finalized subscription', () => {

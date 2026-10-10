@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import { createEngine, type Engine } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { runUntil } from '@/harness';
@@ -81,7 +81,7 @@ function createLifecycleAnalyzer(): Analyzer {
     onEnd: () => {
       ends += 1;
     },
-    summarize: (): AnalyzerResult => ({
+    summarize: (): AnalyzerSummary => ({
       id: 'lifecycle',
       metrics: {
         starts,
@@ -164,7 +164,7 @@ describe('runUntil', () => {
       tickDelta: 0.1,
       setup: () => [createLifecycleAnalyzer()],
     });
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.starts).toBe(1);
     expect(metrics.ticks).toBe(3);
     expect(metrics.ends).toBe(1);
@@ -181,7 +181,7 @@ describe('runUntil', () => {
       maxSimTime: 1,
       setup: () => [createLifecycleAnalyzer()],
     });
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.starts).toBe(1);
     expect(metrics.ticks).toBe(0);
     expect(metrics.ends).toBe(1);
@@ -226,7 +226,7 @@ describe('runUntil', () => {
       until: ({ iteration: tick }) => tick >= 1,
       maxSimTime: 1,
     });
-    expect(result.analyzerResults).toEqual([]);
+    expect(result.analyzerSummaries).toEqual([]);
   });
 
   it('simulates every second it reports when tickDelta exceeds maxDeltaTime', () => {

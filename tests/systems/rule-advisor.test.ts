@@ -26,7 +26,7 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
     const history: { value: number }[] = [{ value: 1 }, { value: 2 }, { value: 3 }];
     const advisor = createRuleAdvisor({
       historySource: () => history,
-      aggregate: (h) => h.reduce((acc, e) => acc + e.value, 0),
+      digest: (h) => h.reduce((acc, e) => acc + e.value, 0),
       analyzers: [
         (sum) => [
           { id: 'sum', severity: 'info' as const, summary: `sum=${sum}`, payload: { tag: 'sum' } },
@@ -54,7 +54,7 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
   it('emits an empty list when no analyzer produces a suggestion', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [() => []],
     });
     expect(advisor.reevaluate()).toEqual([]);
@@ -64,7 +64,7 @@ describe('createRuleAdvisor — aggregate + analyzers', () => {
   it('default rank is severity-then-registration-order', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           { id: 'i1', severity: 'info' as const, summary: '', payload: undefined },
@@ -90,7 +90,7 @@ describe('createRuleAdvisor — historySource branches', () => {
     let seen: readonly CycleLogEntry[] = [];
     const advisor = createRuleAdvisor({
       historySource: log,
-      aggregate: (h: readonly CycleLogEntry[]) => {
+      digest: (h: readonly CycleLogEntry[]) => {
         seen = h;
         return h.length;
       },
@@ -109,7 +109,7 @@ describe('createRuleAdvisor — historySource branches', () => {
         calls++;
         return [];
       },
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [() => []],
     });
     advisor.reevaluate();
@@ -128,7 +128,7 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
     type P = { weight: number };
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () =>
           [
@@ -145,7 +145,7 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
   it('caps the emitted list at maxSuggestions (number form)', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () =>
           Array.from({ length: 5 }, (_, i) => ({
@@ -164,7 +164,7 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
     const cap = ref(1);
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
@@ -190,7 +190,7 @@ describe('createRuleAdvisor — analyzer context', () => {
     }
     const advisor = createRuleAdvisor({
       historySource: () => [10],
-      aggregate: (h) => h[0] ?? 0,
+      digest: (h) => h[0] ?? 0,
       context: { threshold: 5 } as Ctx,
       analyzers: [
         (sum, ctx) =>
@@ -206,7 +206,7 @@ describe('createRuleAdvisor — analyzer context', () => {
     let threshold = 100;
     const advisor = createRuleAdvisor({
       historySource: () => [10],
-      aggregate: (h) => h[0] ?? 0,
+      digest: (h) => h[0] ?? 0,
       context: () => ({ threshold }),
       analyzers: [
         (sum, ctx) =>
@@ -224,7 +224,7 @@ describe('createRuleAdvisor — analyzer context', () => {
     let received: unknown = 'sentinel';
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         (_profile, ctx) => {
           received = ctx;
@@ -250,7 +250,7 @@ describe('createRuleAdvisor — aggregator context', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [1, 2, 3],
       context: { multiplier: 10 } as Ctx,
-      aggregate: (h, ctx) => {
+      digest: (h, ctx) => {
         seenCtx = ctx;
         return h.reduce((a, b) => a + b, 0) * ctx.multiplier;
       },
@@ -270,7 +270,7 @@ describe('createRuleAdvisor — aggregator context', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [5],
       context: () => ({ multiplier }),
-      aggregate: (h, ctx) => (h[0] ?? 0) * ctx.multiplier,
+      digest: (h, ctx) => (h[0] ?? 0) * ctx.multiplier,
       analyzers: [
         (n) => [{ id: 'n', severity: 'info' as const, summary: `n=${n}`, payload: undefined }],
       ],
@@ -284,7 +284,7 @@ describe('createRuleAdvisor — aggregator context', () => {
     let received: unknown = 'sentinel';
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: (_h, ctx) => {
+      digest: (_h, ctx) => {
         received = ctx;
         return undefined;
       },
@@ -303,7 +303,7 @@ describe('createRuleAdvisor — dismiss + reset', () => {
   it('hides a suggestion until reset and emits dismissed + suggestions', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
@@ -337,7 +337,7 @@ describe('createRuleAdvisor — dismiss + reset', () => {
   it('dismiss is idempotent and silent for repeat keys', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [() => [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
     });
     advisor.reevaluate();
@@ -352,7 +352,7 @@ describe('createRuleAdvisor — dismiss + reset', () => {
   it("fills a dismissed suggestion's cap slot with the next-ranked one", () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           { id: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
@@ -369,7 +369,7 @@ describe('createRuleAdvisor — dismiss + reset', () => {
   it('backfills the dismissed slot at once, without waiting for reevaluate', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           { id: 'k1', severity: 'warning' as const, summary: '', payload: undefined },
@@ -398,7 +398,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     let produceA = true;
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           ...(produceA
@@ -423,7 +423,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     let producing = true;
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () =>
           producing
@@ -442,7 +442,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
   it('does NOT fire accepted for keys removed via dismiss()', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [() => [{ id: 'a', severity: 'info' as const, summary: '', payload: undefined }]],
     });
     advisor.reevaluate();
@@ -461,7 +461,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     ];
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [() => analyzerOutput],
     });
     advisor.reevaluate();
@@ -480,7 +480,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     let producing = true;
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () =>
           producing
@@ -506,7 +506,7 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
     let urgent = false;
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => undefined,
+      digest: () => undefined,
       analyzers: [
         () => [
           ...(urgent
@@ -528,15 +528,15 @@ describe('createRuleAdvisor — accepted (inferred-acceptance)', () => {
 });
 
 // ============================================================================
-// onAggregate profiling hook
+// onDigest profiling hook
 // ============================================================================
 
-describe('createRuleAdvisor — onAggregate', () => {
+describe('createRuleAdvisor — onDigest', () => {
   it('fires once per reevaluate with the post-rank/cap pre-dismissal list', () => {
     const seen: { profile: number; n: number }[] = [];
     const advisor = createRuleAdvisor({
       historySource: () => [],
-      aggregate: () => 42,
+      digest: () => 42,
       analyzers: [
         () => [
           { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
@@ -544,7 +544,7 @@ describe('createRuleAdvisor — onAggregate', () => {
         ],
       ],
       maxSuggestions: 1,
-      onAggregate: (profile, suggestions) => {
+      onDigest: (profile, suggestions) => {
         seen.push({ profile, n: suggestions.length });
       },
     });
@@ -631,7 +631,7 @@ describe('createRuleAdvisor — spell-compiler shape (windowed profile aggregati
     const advisor = createRuleAdvisor({
       historySource: () => history,
       context: ruleSet,
-      aggregate,
+      digest: aggregate,
       analyzers: [
         (profile, _ctx): readonly Suggestion<RuleSuggestionPayload>[] =>
           profile.avgOtherwiseShare > 0.5
@@ -697,7 +697,7 @@ describe('createRuleAdvisor — Cookie Monster shape (window=1 degenerate case)'
 
     const advisor = createRuleAdvisor({
       historySource: () => [snapshot],
-      aggregate,
+      digest: aggregate,
       analyzers: [
         (snap): readonly Suggestion<PpPayload>[] => {
           if (!snap) return [];
@@ -726,7 +726,7 @@ describe('createRuleAdvisor — live suggestions', () => {
     const history = ref<number[]>([]);
     const advisor = createRuleAdvisor({
       historySource: () => history.value,
-      aggregate: (h) => h.length,
+      digest: (h) => h.length,
       analyzers: [
         (n) =>
           Array.from({ length: n }, (_, i) => ({

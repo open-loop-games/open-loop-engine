@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import type { HeadlessResult } from '@/core/headless';
 import type { Engine } from '@/index';
 import {
@@ -24,7 +24,7 @@ function createCounterAnalyzer(): Analyzer {
     onTick: () => {
       ticks += 1;
     },
-    summarize: (): AnalyzerResult => ({
+    summarize: (): AnalyzerSummary => ({
       id: 'counter',
       metrics: { ticks, summarize: ++summarized },
     }),
@@ -81,7 +81,7 @@ function runWithMetric(
   return {
     totalTicks: 0,
     elapsedSimulated: 0,
-    analyzerResults: [{ id: name, metrics }],
+    analyzerSummaries: [{ id: name, metrics }],
   };
 }
 
@@ -155,7 +155,7 @@ describe('aggregateCell', () => {
       {
         totalTicks: 0,
         elapsedSimulated: 0,
-        analyzerResults: [
+        analyzerSummaries: [
           { id: 'a', metrics: { x: 10 } },
           { id: 'b', metrics: { x: 100 } },
         ],
@@ -234,7 +234,7 @@ describe('runMatrix', () => {
       seeds: [1, 2, 3],
     });
     const summarizeValues = result.cells[0]!.runs.map(
-      (r) => r.analyzerResults[0]!.metrics.summarize,
+      (r) => r.analyzerSummaries[0]!.metrics.summarize,
     );
     expect(summarizeValues).toEqual([1, 1, 1]);
   });

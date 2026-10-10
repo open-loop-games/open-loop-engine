@@ -8,7 +8,7 @@ The cross-cutting "walk every X" surface external tools read — devtools, mods,
 - `createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.
 - `ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — per-engine enumerable surfaces for tools, read through `engine.tryInject` or `ctx.inject`.
 - `enableProfiling` / `getProfileReport` — runtime timing instrumentation.
-- `enableDevMode` / `getDiagnostics` — development safeguards and diagnostics.
+- `enableDevMode` / `getSafeguardDiagnostics` — development safeguards and diagnostics.
 
 ## Engine categories
 
@@ -62,7 +62,7 @@ iteration caps, depth limits, and dev diagnostics
 
 - `function disableDevMode(): void` — Disable dev-mode diagnostics. `src/core/safeguards.ts:23`
 - `function enableDevMode(): void` — Enable dev-mode diagnostics: a console warning on every safeguard trip. `src/core/safeguards.ts:18`
-- `function getDiagnostics(): Readonly<SafeguardDiagnostics>` — Read-only snapshot of safeguard diagnostics counters. `src/core/safeguards.ts:57`
+- `function getSafeguardDiagnostics(): Readonly<SafeguardDiagnostics>` — Read-only snapshot of safeguard diagnostics counters. `src/core/safeguards.ts:57`
 - `function isDevMode(): boolean` — Check whether dev mode is active. `src/core/safeguards.ts:28`
-- `function resetDiagnostics(): void` — Reset all diagnostics counters to zero. `src/core/safeguards.ts:62`
+- `function resetSafeguardDiagnostics(): void` — Reset all diagnostics counters to zero. `src/core/safeguards.ts:62`
 - `interface SafeguardDiagnostics` — Diagnostic counters captured by the runtime safeguards — how often the emit-depth cap and sequencer advance cap have tripped, plus the last offender of each. `src/core/safeguards.ts:38`

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEngine, persistent, type Engine, type EngineModule } from '@/index';
 import { bindPersistenceNamespace, getPersistentRefs } from '@/core/persistence';
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import { createSensitivityCell, runMatrix, runSensitivity, type RunContext } from '@/harness';
 
 // A minimal module that holds a single `gold` persistent ref and ticks it.
@@ -54,7 +54,7 @@ function createGoldPeakAnalyzer(getGold: () => number): Analyzer {
       const v = getGold();
       if (v > peak) peak = v;
     },
-    summarize: (): AnalyzerResult => ({
+    summarize: (): AnalyzerSummary => ({
       id: 'gold-peak',
       metrics: { peak },
     }),

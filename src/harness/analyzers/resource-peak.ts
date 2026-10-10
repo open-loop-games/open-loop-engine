@@ -14,7 +14,7 @@
  * which walks the engine's resource registry (via `ResourceRegistryKey`)
  * and constructs one tracker per entry.
  *
- * Precision note: resource values are `Decimal`, but `AnalyzerResult.metrics`
+ * Precision note: resource values are `Decimal`, but `AnalyzerSummary.metrics`
  * is `number | string | boolean`. Each sample is converted via `.toNumber()`
  * at observation time; values beyond `Number.MAX_VALUE` saturate to `Infinity`.
  * v1 accepts this — astronomical resources are a consumer problem until the
@@ -25,7 +25,7 @@
  * `summarize` so the tracker still reports a meaningful `peak/final/avg` trio.
  */
 
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import type { Resource } from '@/core/resource';
 import { Decimal } from '@/primitives/decimal';
 
@@ -85,7 +85,7 @@ export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
     onTick() {
       sample();
     },
-    summarize(): AnalyzerResult {
+    summarize(): AnalyzerSummary {
       if (samples.length === 0) sample();
       const final = samples[samples.length - 1];
       const avg = samples.reduce((a, b) => a + b, 0) / samples.length;

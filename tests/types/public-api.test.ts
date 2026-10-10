@@ -543,7 +543,7 @@ describe('createRuleAdvisor type surface', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [] as readonly CycleEntry[],
       context: { threshold: 0 } as Ctx,
-      aggregate: (h) => {
+      digest: (h) => {
         expectTypeOf(h).toEqualTypeOf<readonly CycleEntry[]>();
         return { avg: 0 } as Profile;
       },
@@ -554,7 +554,7 @@ describe('createRuleAdvisor type surface', () => {
           return [] as readonly Suggestion<MyPayload>[];
         },
       ],
-      onAggregate: (profile, suggestions) => {
+      onDigest: (profile, suggestions) => {
         expectTypeOf(profile).toEqualTypeOf<Profile>();
         expectTypeOf(suggestions).toEqualTypeOf<readonly Suggestion<MyPayload>[]>();
       },
@@ -571,7 +571,7 @@ describe('createRuleAdvisor type surface', () => {
     const advisor = createRuleAdvisor<CycleEntry, Profile, MyPayload, Ctx>({
       historySource: () => [],
       context: { threshold: 0 },
-      aggregate: () => ({ avg: 0 }),
+      digest: () => ({ avg: 0 }),
       analyzers: [
         (profile, ctx) => {
           expectTypeOf(profile).toEqualTypeOf<Profile>();
@@ -586,7 +586,7 @@ describe('createRuleAdvisor type surface', () => {
   it('TContext defaults to undefined when context is omitted', () => {
     const advisor = createRuleAdvisor({
       historySource: () => [] as readonly CycleEntry[],
-      aggregate: () => ({ avg: 0 }) as Profile,
+      digest: () => ({ avg: 0 }) as Profile,
       analyzers: [
         (profile, ctx) => {
           expectTypeOf(profile).toEqualTypeOf<Profile>();

@@ -24,7 +24,7 @@ describe('createTimeSeriesAnalyzer', () => {
       ticks: 5,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.t0).toBe(1);
     expect(metrics.t1).toBe(2);
     expect(metrics.t4).toBe(5);
@@ -48,7 +48,7 @@ describe('createTimeSeriesAnalyzer', () => {
       ticks: 0,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.t0).toBe(42);
     expect(Object.keys(metrics)).toHaveLength(1);
   });
@@ -74,7 +74,7 @@ describe('createTimeSeriesAnalyzer', () => {
       ticks: 1,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.t0).toBe(5);
     expect(Object.keys(metrics)).toHaveLength(1);
   });

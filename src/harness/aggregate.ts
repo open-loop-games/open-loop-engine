@@ -139,7 +139,7 @@ function bucketize(values: number[], spec: HistogramOptions): MetricHistogram {
 export function aggregateCell(runs: HeadlessResult[], options?: AggregateOptions): CellAggregate {
   const samples: Record<string, number[]> = {};
   for (const run of runs) {
-    for (const ar of run.analyzerResults) {
+    for (const ar of run.analyzerSummaries) {
       for (const [key, value] of Object.entries(ar.metrics)) {
         if (typeof value !== 'number') continue;
         const fullKey = `${ar.id}.${key}`;

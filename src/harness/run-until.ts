@@ -105,7 +105,7 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
       totalTicks: out.totalTicks,
       elapsedSimulated: out.elapsedSimulated,
       terminated: out.terminated,
-      analyzerResults: [],
+      analyzerSummaries: [],
     };
   }
 
@@ -138,6 +138,6 @@ export function runUntil(config: RunUntilConfig): RunUntilResult {
     totalTicks: tick,
     elapsedSimulated: tick * tickDelta,
     terminated,
-    analyzerResults: analyzers.map((a) => a.summarize()),
+    analyzerSummaries: analyzers.map((a) => a.summarize()),
   };
 }

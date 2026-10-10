@@ -155,7 +155,7 @@ export type ICondition =
   | NotCondition;
 
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */
-export interface AnalyzerResult {
+export interface AnalyzerSummary {
   id: string;
   /** Scalar measurements collected during the run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
   metrics: Record<string, number | string | boolean>;
@@ -190,8 +190,8 @@ export interface Analyzer {
     }>;
     annotations: Record<string, unknown>;
   }): void;
-  /** Produces the final {@link AnalyzerResult} after the run ends. */
-  summarize(): AnalyzerResult;
+  /** Produces the final {@link AnalyzerSummary} after the run ends. */
+  summarize(): AnalyzerSummary;
 }
 
 /** A candidate value paired with a relative probability weight for weighted random selection. */

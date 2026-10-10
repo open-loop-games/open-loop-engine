@@ -20,7 +20,7 @@ export type {
   StateEffect,
   CompositeEffect,
   Analyzer,
-  AnalyzerResult,
+  AnalyzerSummary,
   WeightedItem,
   GameStateAccessor,
   InjectionKey,

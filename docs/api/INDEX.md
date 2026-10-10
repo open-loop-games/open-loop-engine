@@ -88,7 +88,7 @@ Cross-cutting shapes rather than symbol names — "where do I read about X?" whe
 - **perturbation seam** — address→override mechanism for the balance workbench → harness.md#perturbation-applier
 - **persistent context scoping** — `withPersistentContext`, save-key namespacing → lifecycle.md#persistence, ../consumer-guide.md#persistent-context
 - **category auto-registration** — categories self-publish into `EngineCategories` for introspection → introspection.md#engine-categories, ../consumer-guide.md#level-2-category-systems-the-default-for-content
-- **modifier attribution** — `BindingRecord`, trace entries, `withChain` scope → mechanics.md#modifier, mechanics.md#trace
+- **modifier attribution** — `BindingRecord`, trace entries, `withTraceChain` scope → mechanics.md#modifier, mechanics.md#trace
 - **modifier chain composition** — named chains, `bind`, declarative `grants`/`restricts`/`rewards` → mechanics.md#modifier, ../consumer-guide.md#modifier-chains-and-effects
 - **cross-action bonus** — A's yield scaled by B's state via binary-gate or level-scaled modifier → ../consumer-guide-recipes.md#cross-action-bonuses, mechanics.md#modifier
 - **predicate-bounded sim** — `runUntil` / `runMatrixUntil`, terminate on shared predicate → harness.md#cell-aggregation-kernel

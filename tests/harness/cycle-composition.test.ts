@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import { createCycle, createCycleLog } from '@/systems';
 import { runMatrix } from '@/harness';
 
@@ -12,7 +12,7 @@ function createLoopCounterAnalyzer(): Analyzer {
     onRunFinalize: () => {
       finalized += 1;
     },
-    summarize: (): AnalyzerResult => ({
+    summarize: (): AnalyzerSummary => ({
       id: 'cycle-counter',
       metrics: { finalized },
     }),
@@ -59,7 +59,7 @@ describe('runMatrix composition with direct CycleLog finalize subscription', () 
     });
 
     const perRunFinalized = result.cells[0]!.runs.map(
-      (r) => r.analyzerResults[0]!.metrics.finalized,
+      (r) => r.analyzerSummaries[0]!.metrics.finalized,
     );
     expect(perRunFinalized).toEqual([5, 5]);
   });

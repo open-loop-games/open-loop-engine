@@ -1476,8 +1476,9 @@ describe('Sequencer — repeat()', () => {
   });
 
   it('queue mode: repeat counts toward maxAdvancesPerTick', async () => {
-    const { resetDiagnostics, getDiagnostics } = await import('@/core/safeguards');
-    resetDiagnostics();
+    const { resetSafeguardDiagnostics, getSafeguardDiagnostics } =
+      await import('@/core/safeguards');
+    resetSafeguardDiagnostics();
 
     const ctxId = `repeat-cap-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
@@ -1491,8 +1492,8 @@ describe('Sequencer — repeat()', () => {
     // Initial dispatch consumed 1 advance. Three repeats trip the cap.
     for (let i = 0; i < 5; i++) q.repeat();
 
-    expect(getDiagnostics().advanceCapTrips).toBe(1);
-    expect(getDiagnostics().lastAdvanceCapSequencer).toBe(ctxId);
+    expect(getSafeguardDiagnostics().advanceCapTrips).toBe(1);
+    expect(getSafeguardDiagnostics().lastAdvanceCapSequencer).toBe(ctxId);
   });
 
   it('list mode: cursor does not advance on repeat', () => {

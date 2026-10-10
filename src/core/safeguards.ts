@@ -13,7 +13,7 @@ let _devMode = false;
 
 /**
  * Enable dev-mode diagnostics: a console warning on every safeguard trip.
- * The counters {@link getDiagnostics} reads run whether or not dev mode is on.
+ * The counters {@link getSafeguardDiagnostics} reads run whether or not dev mode is on.
  */
 export function enableDevMode(): void {
   _devMode = true;
@@ -33,7 +33,7 @@ export function isDevMode(): boolean {
 /**
  * Diagnostic counters captured by the runtime safeguards — how often the
  * emit-depth cap and sequencer advance cap have tripped, plus the last
- * offender of each. Read via {@link getDiagnostics}.
+ * offender of each. Read via {@link getSafeguardDiagnostics}.
  */
 export interface SafeguardDiagnostics {
   /** Number of times an emit depth limit was hit */
@@ -54,12 +54,12 @@ const _diagnostics: SafeguardDiagnostics = {
 };
 
 /** Read-only snapshot of safeguard diagnostics counters. */
-export function getDiagnostics(): Readonly<SafeguardDiagnostics> {
+export function getSafeguardDiagnostics(): Readonly<SafeguardDiagnostics> {
   return { ..._diagnostics };
 }
 
 /** Reset all diagnostics counters to zero. */
-export function resetDiagnostics(): void {
+export function resetSafeguardDiagnostics(): void {
   _diagnostics.emitDepthTrips = 0;
   _diagnostics.advanceCapTrips = 0;
   _diagnostics.lastEmitDepthEvent = null;

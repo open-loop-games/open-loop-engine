@@ -155,7 +155,7 @@ export const TIER_MANIFEST = [
       '`createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.',
       '`ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — per-engine enumerable surfaces for tools, read through `engine.tryInject` or `ctx.inject`.',
       '`enableProfiling` / `getProfileReport` — runtime timing instrumentation.',
-      '`enableDevMode` / `getDiagnostics` — development safeguards and diagnostics.',
+      '`enableDevMode` / `getSafeguardDiagnostics` — development safeguards and diagnostics.',
     ],
     clusters: ['engine-categories', 'override-registry', 'profiler', 'registries', 'safeguards'],
   },

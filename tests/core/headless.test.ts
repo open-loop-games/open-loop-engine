@@ -71,7 +71,7 @@ describe('Headless Runner', () => {
     };
     const result = runHeadless({ setup: () => [analyzer], tick: () => {}, ticks: 3 });
     expect(events).toEqual(['start', 'tick-0', 'tick-1', 'tick-2', 'end']);
-    expect(result.analyzerResults).toHaveLength(1);
+    expect(result.analyzerSummaries).toHaveLength(1);
   });
   it('calls setup before first tick', () => {
     const order: string[] = [];

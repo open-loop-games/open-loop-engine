@@ -39,7 +39,7 @@ describe('createRunFinalizeAnalyzer', () => {
       ticks: 3,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.runs).toBe(3);
     expect(metrics['last.gold.end']).toBe(30);
     expect(metrics['last.gold.delta']).toBe(30);
@@ -54,7 +54,7 @@ describe('createRunFinalizeAnalyzer', () => {
       ticks: 5,
     });
 
-    const metrics = result.analyzerResults[0]!.metrics;
+    const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.runs).toBe(0);
     expect(Object.keys(metrics)).toEqual(['runs']);
   });

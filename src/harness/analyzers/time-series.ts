@@ -5,7 +5,7 @@
  * two resources sharing a display name never merge.
  *
  * The design leans on the harness aggregator rather than adding a new
- * Decimal-array metric type. {@link AnalyzerResult.metrics} is scalar-only,
+ * Decimal-array metric type. {@link AnalyzerSummary.metrics} is scalar-only,
  * so a trajectory can't ride through as one value — but by fanning each tick
  * out to its own key, the `${analyzerName}.${metricKey}` aggregation scheme
  * computes min/mean/max/percentiles *per tick across seeds* automatically.
@@ -23,7 +23,7 @@
  * saturate to `Infinity`.
  */
 
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import type { Engine } from '@/engine';
 import type { Resource } from '@/core/resource';
 import { ResourceRegistryKey } from '@/core/registries';
@@ -61,7 +61,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
     onTick() {
       sample();
     },
-    summarize(): AnalyzerResult {
+    summarize(): AnalyzerSummary {
       // Zero-tick runs still report a single-point series so the trajectory
       // is never empty — mirrors the resource-peak tracker's fallback.
       if (samples.length === 0) sample();

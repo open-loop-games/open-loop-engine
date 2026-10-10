@@ -581,7 +581,7 @@ describe('Integration: Prestige Tree layer chain', () => {
       expect(superPrestigeCount + new Decimal(game!.prestige.value).toNumber()).toBeGreaterThan(0);
 
       // Analyzer tracks correctly
-      const summary = result.analyzerResults[0];
+      const summary = result.analyzerSummaries[0];
       expect(summary.metrics.prestiges).toBe(prestigeCount);
     });
 

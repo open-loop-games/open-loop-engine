@@ -87,10 +87,10 @@ export type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[]);
  *
  * MUST be pure; called once per `reevaluate()`.
  */
-export type AdvisorAggregatorFn<TEntry, TProfile, TContext = undefined> = (
+export type AdvisorDigestFn<TEntry, TDigest, TContext = undefined> = (
   history: readonly TEntry[],
   context: TContext,
-) => TProfile;
+) => TDigest;
 
 /**
  * Analyzer function — domain-specific heuristic that consumes the aggregate
@@ -100,8 +100,8 @@ export type AdvisorAggregatorFn<TEntry, TProfile, TContext = undefined> = (
  * `TContext` defaults to `undefined`, so analyzers that don't need context can
  * ignore the second argument — the engine still calls with `undefined`.
  */
-export type AdvisorAnalyzerFn<TProfile, TPayload, TContext = undefined> = (
-  profile: TProfile,
+export type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (
+  digest: TDigest,
   context: TContext,
 ) => readonly Suggestion<TPayload>[];
 
@@ -124,7 +124,7 @@ export type SuggestionRankFn<TPayload> = (
  * of `historySource`, the value/getter form of `context`, and the analyzer
  * return types carry enough information for full inference.
  */
-export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undefined> {
+export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefined> {
   /**
    * History source. Pass a {@link CycleLog} for the canonical engine case
    * (entries are cycle-log shaped) or a function returning the entry list for
@@ -141,7 +141,7 @@ export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undef
    * walks the history newest-to-oldest with a fingerprint filter keyed off
    * the context's rule-set and a window cap.
    */
-  aggregate: AdvisorAggregatorFn<TEntry, TProfile, TContext>;
+  digest: AdvisorDigestFn<TEntry, TDigest, TContext>;
 
   /**
    * Analyzer list. Each is called with the aggregate and the resolved
@@ -149,7 +149,7 @@ export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undef
    * default rank function. Domain-specific heuristics stay caller-side — the
    * engine ships zero analyzers.
    */
-  analyzers: ReadonlyArray<AdvisorAnalyzerFn<TProfile, TPayload, TContext>>;
+  analyzers: ReadonlyArray<AdvisorAnalyzerFn<TDigest, TPayload, TContext>>;
 
   /**
    * Parallel context passed to every analyzer alongside the aggregated
@@ -184,7 +184,7 @@ export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undef
    *
    * MUST NOT mutate state visible to the next `reevaluate()` call.
    */
-  onAggregate?: (profile: TProfile, suggestions: readonly Suggestion<TPayload>[]) => void;
+  onDigest?: (digest: TDigest, suggestions: readonly Suggestion<TPayload>[]) => void;
 }
 
 /** Events emitted by a {@link RuleAdvisor} instance. */
@@ -346,10 +346,10 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
     historySource: () => readonly TEntry[];
   },
 ): RuleAdvisor<TPayload>;
-export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefined>(
-  options: RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext>,
+export function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefined>(
+  options: RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext>,
 ): RuleAdvisor<TPayload> {
-  const { historySource, aggregate, analyzers, context, rank, onAggregate } = options;
+  const { historySource, digest: reduce, analyzers, context, rank, onDigest } = options;
 
   const getMaxSuggestions = normalizeMaxSuggestions(options.maxSuggestions);
   const rankFn: SuggestionRankFn<TPayload> = rank ?? defaultRank;
@@ -373,18 +373,18 @@ export function createRuleAdvisor<TEntry, TProfile, TPayload, TContext = undefin
   function reevaluate(trigger?: string): readonly Suggestion<TPayload>[] {
     const history = resolveHistory<TEntry>(historySource);
     const ctx = resolveContext<TContext>(context);
-    const profile = aggregate(history, ctx);
+    const digest = reduce(history, ctx);
 
     const merged: Suggestion<TPayload>[] = [];
     for (const analyzer of analyzers) {
-      const out = analyzer(profile, ctx);
+      const out = analyzer(digest, ctx);
       for (const s of out) merged.push(s);
     }
 
     merged.sort(rankFn);
 
     const cap = getMaxSuggestions();
-    onAggregate?.(profile, capList(merged, cap));
+    onDigest?.(digest, capList(merged, cap));
 
     // Acceptance means the analyzers stopped producing the key; one a
     // higher-ranked suggestion pushed below the cap is still being produced.

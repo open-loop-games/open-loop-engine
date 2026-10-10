@@ -5,8 +5,8 @@ import {
   enableDevMode,
   disableDevMode,
   isDevMode,
-  getDiagnostics,
-  resetDiagnostics,
+  getSafeguardDiagnostics,
+  resetSafeguardDiagnostics,
 } from '@/core/safeguards';
 import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
 
@@ -28,7 +28,7 @@ function makeQueue(
 }
 
 beforeEach(() => {
-  resetDiagnostics();
+  resetSafeguardDiagnostics();
   disableDevMode();
 });
 
@@ -96,7 +96,7 @@ describe('emit depth limit', () => {
 
     handle.emit('ping');
 
-    const diag = getDiagnostics();
+    const diag = getSafeguardDiagnostics();
     expect(diag.emitDepthTrips).toBe(1);
     expect(diag.lastEmitDepthEvent).toBe('ping');
   });
@@ -141,7 +141,7 @@ describe('sequencer advance cap', () => {
       q.complete();
     }
 
-    const diag = getDiagnostics();
+    const diag = getSafeguardDiagnostics();
     expect(diag.advanceCapTrips).toBeGreaterThan(0);
   });
 
@@ -157,7 +157,7 @@ describe('sequencer advance cap', () => {
       q.complete();
     }
 
-    const before = getDiagnostics();
+    const before = getSafeguardDiagnostics();
     expect(before.advanceCapTrips).toBeGreaterThan(0);
 
     // Reset and try again — should advance
@@ -166,7 +166,7 @@ describe('sequencer advance cap', () => {
     q.complete();
     // After reset, complete should have advanced to next item
     // (or null if we ran out of items, but the cap shouldn't block it)
-    const diagAfter = getDiagnostics();
+    const diagAfter = getSafeguardDiagnostics();
     // The trip count should not have increased further after reset + single advance
     expect(diagAfter.advanceCapTrips).toBe(before.advanceCapTrips);
   });
@@ -204,7 +204,7 @@ describe('sequencer advance cap', () => {
     }
 
     // The queue kept advancing every tick — never latched to null.
-    expect(getDiagnostics().advanceCapTrips).toBe(0);
+    expect(getSafeguardDiagnostics().advanceCapTrips).toBe(0);
     expect(q.currentItem).not.toBeNull();
     // 1 auto-start on first enqueue + 15 per-tick advances.
     expect(started.length).toBe(16);
@@ -224,7 +224,7 @@ describe('sequencer advance cap', () => {
     q.complete(); // complete c
 
     expect(completed).toEqual(['a', 'b', 'c']);
-    expect(getDiagnostics().advanceCapTrips).toBe(0);
+    expect(getSafeguardDiagnostics().advanceCapTrips).toBe(0);
   });
 });
 
@@ -262,7 +262,7 @@ describe('instant-complete cascades', () => {
     expect(q.items.value).toHaveLength(0);
     expect(q.currentItem).toBeNull();
     // Depth stays constant however long the cascade runs.
-    expect(getDiagnostics().emitDepthTrips).toBe(0);
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(0);
   });
 
   it('drains a list-mode cascade past the emit-depth cap', () => {
@@ -276,7 +276,7 @@ describe('instant-complete cascades', () => {
     expect(starts).toHaveLength(20);
     expect(q.cursor).toBe(20);
     expect(q.currentItem).toBeNull();
-    expect(getDiagnostics().emitDepthTrips).toBe(0);
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(0);
   });
 
   it('drains a cascade routed through a second sequencer', () => {
@@ -305,7 +305,7 @@ describe('instant-complete cascades', () => {
     expect(log).toHaveLength(31);
     expect(a.currentItem).toBeNull();
     expect(b.currentItem).toBeNull();
-    expect(getDiagnostics().emitDepthTrips).toBe(0);
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(0);
   });
 
   it('bounds a cascade by the advance cap, and resumes on the next tick', () => {
@@ -331,8 +331,8 @@ describe('instant-complete cascades', () => {
     q.start();
 
     expect(starts).toHaveLength(1000);
-    expect(getDiagnostics().advanceCapTrips).toBe(1);
-    expect(getDiagnostics().emitDepthTrips).toBe(0);
+    expect(getSafeguardDiagnostics().advanceCapTrips).toBe(1);
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(0);
     // Degraded, not wedged: nothing is left dispatched-but-unstarted.
     expect(q.currentItem).toBeNull();
     expect(q.items.value).toHaveLength(1500);
@@ -359,7 +359,7 @@ describe('instant-complete cascades', () => {
     q.start();
 
     expect(starts).toBe(1000);
-    expect(getDiagnostics().advanceCapTrips).toBe(1);
+    expect(getSafeguardDiagnostics().advanceCapTrips).toBe(1);
   });
 
   it("defers a listener's dispatch until the emit unwinds", () => {
@@ -425,18 +425,18 @@ describe('dev mode diagnostics', () => {
 
     expect(warnSpy).not.toHaveBeenCalled();
     // But diagnostics still recorded
-    expect(getDiagnostics().emitDepthTrips).toBe(1);
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(1);
     warnSpy.mockRestore();
   });
 
-  it('resetDiagnostics clears all counters', () => {
+  it('resetSafeguardDiagnostics clears all counters', () => {
     const handle = createEmitHandle<{ ping: () => void }>({ maxEmitDepth: 1 });
     handle.on('ping', () => handle.emit('ping'));
     handle.emit('ping');
 
-    expect(getDiagnostics().emitDepthTrips).toBe(1);
-    resetDiagnostics();
-    expect(getDiagnostics().emitDepthTrips).toBe(0);
-    expect(getDiagnostics().lastEmitDepthEvent).toBeNull();
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(1);
+    resetSafeguardDiagnostics();
+    expect(getSafeguardDiagnostics().emitDepthTrips).toBe(0);
+    expect(getSafeguardDiagnostics().lastEmitDepthEvent).toBeNull();
   });
 });

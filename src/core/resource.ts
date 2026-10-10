@@ -35,7 +35,7 @@ import {
   DefaultValue,
   resetPersistent,
 } from './persistence';
-import { withChain } from './trace';
+import { withTraceChain } from './trace';
 import { getCurrentResourceRegistry } from './registries';
 import type { Modifier } from './modifier';
 
@@ -393,7 +393,7 @@ export function addResource(
   chain?: Modifier,
 ): void {
   if (chain) {
-    withChain(chain, () => {
+    withTraceChain(chain, () => {
       resource.value = Decimal.add(resource.value, amount);
     });
   } else {
@@ -434,7 +434,7 @@ export function subtractResource(
     return false;
   }
   if (chain) {
-    withChain(chain, () => {
+    withTraceChain(chain, () => {
       resource.value = newValue;
     });
   } else {

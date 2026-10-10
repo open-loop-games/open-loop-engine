@@ -488,7 +488,7 @@ export interface RunUntilResult {
    */
   terminated: 'predicate' | 'maxSimTime' | 'unreachable';
   /** One result object per analyzer, in setup order. */
-  analyzerResults: HeadlessResult['analyzerResults'];
+  analyzerSummaries: HeadlessResult['analyzerSummaries'];
 }
 
 /**

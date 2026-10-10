@@ -2,7 +2,7 @@
  * Headless runner — synchronous tick loop for deterministic simulation and tests
  */
 
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import { seedRNG } from '@/primitives/rng';
 import { beginTraceTick, endTraceTick } from './trace';
 import { beginProfileTick, endProfileTick } from './profiler';
@@ -39,7 +39,7 @@ export interface HeadlessResult {
   /** Total simulated wall-clock time in seconds (ticks × tickDelta). */
   elapsedSimulated: number;
   /** One result object per analyzer, in the same order `setup` returned them. */
-  analyzerResults: AnalyzerResult[];
+  analyzerSummaries: AnalyzerSummary[];
 }
 
 /**
@@ -68,11 +68,11 @@ export function runHeadless(config: HeadlessConfig): HeadlessResult {
       for (const a of analyzers) a.onTick?.(i);
     }
     for (const a of analyzers) a.onEnd?.();
-    const analyzerResults = analyzers.map((a) => a.summarize());
+    const analyzerSummaries = analyzers.map((a) => a.summarize());
     return {
       totalTicks: ticks,
       elapsedSimulated: ticks * tickDelta,
-      analyzerResults,
+      analyzerSummaries,
     };
   } finally {
     config.teardown?.();

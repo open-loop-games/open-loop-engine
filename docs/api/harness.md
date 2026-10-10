@@ -131,7 +131,7 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface Variant<C extends Cell | UntilCell = Cell>` — A named config patch — the generic equivalent of a domain-specific axis such as excluding upgrades. `src/harness/types.ts:233`
 - `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:69`
 - `interface Analyzer` — Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. `src/primitives/types.ts:165`
-- `interface AnalyzerResult` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:158`
+- `interface AnalyzerSummary` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:158`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:30`
 - `interface FlagEffect` — Sets an unlock flag to true or false, controlling feature/content visibility. `src/primitives/types.ts:14`
 - `interface GameStateAccessor` — Read-only view of game state used when evaluating conditions and resolving effects. `src/primitives/types.ts:205`

@@ -16,7 +16,7 @@
  * directly: `log.on('finalized', entry => tracker.onRunFinalize?.(entry))`.
  */
 
-import type { Analyzer, AnalyzerResult } from '@/primitives/types';
+import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
 import { Decimal } from '@/primitives/decimal';
 
 type FinalizeEntry = Parameters<NonNullable<Analyzer['onRunFinalize']>>[0];
@@ -39,7 +39,7 @@ export function createRunFinalizeAnalyzer(): Analyzer {
       runs += 1;
       lastEntry = entry;
     },
-    summarize(): AnalyzerResult {
+    summarize(): AnalyzerSummary {
       const metrics: Record<string, number> = { runs };
       if (lastEntry) {
         for (const delta of lastEntry.deltas) {

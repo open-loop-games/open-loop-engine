@@ -58,7 +58,7 @@ export type {
 export type {
   DecimalSource,
   Analyzer,
-  AnalyzerResult,
+  AnalyzerSummary,
   InjectionKey,
   IEffect,
   FlagEffect,

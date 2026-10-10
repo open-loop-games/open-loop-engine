@@ -273,7 +273,7 @@ export type {
   CompositeEffect,
   GameStateAccessor,
   Analyzer,
-  AnalyzerResult,
+  AnalyzerSummary,
   InjectionKey,
   Resource,
   Modifier,
