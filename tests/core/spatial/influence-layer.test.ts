@@ -194,7 +194,7 @@ describe('InfluenceLayer — update & accumulation', () => {
     const layer = createInfluenceLayer(grid, {
       defaultRadius: 2,
       falloff: linearFalloff,
-      decay: 1,
+      retentionFactor: 1,
     });
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 3 });
     layer.update();
@@ -207,7 +207,7 @@ describe('InfluenceLayer — update & accumulation', () => {
     const layer = createInfluenceLayer(grid, {
       defaultRadius: 1,
       falloff: linearFalloff,
-      decay: 0.5,
+      retentionFactor: 0.5,
     });
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 4 });
     layer.update(); // value = 4
@@ -321,7 +321,7 @@ describe('InfluenceLayer — reset', () => {
     const layer = createInfluenceLayer(grid, {
       defaultRadius: 2,
       falloff: linearFalloff,
-      decay: 1,
+      retentionFactor: 1,
     });
     layer.addSource({ id: 'a', x: 1, y: 1, strength: 5 });
     layer.update();

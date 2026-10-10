@@ -245,7 +245,7 @@ function resolveScope(
  * // Module-scoped with retention:
  * const prestigeReset = createReset({
  *   resetPersistentContexts: ['gathering', 'economy'],
- *   keep: [permanentBonus],
+ *   keep: [lifetimeBonus],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
  * })
  *

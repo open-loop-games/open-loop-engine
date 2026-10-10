@@ -102,13 +102,13 @@ export type {
   StateConstraint,
   IfState,
   Persistent,
-  NonPersistent,
+  PersistentAlias,
   PersistentOptions,
 } from './persistence';
 export {
   persistent,
   isPersistent,
-  noPersist,
+  aliasPersistent,
   deletePersistent,
   resetPersistent,
   isAtDefault,

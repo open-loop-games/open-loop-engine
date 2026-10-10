@@ -67,7 +67,7 @@ export type {
   CompositeEffect,
   State,
   Persistent,
-  NonPersistent,
+  PersistentAlias,
   Resource,
   ResourceEffect,
   Requirement,

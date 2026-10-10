@@ -31,7 +31,7 @@ import {
   type Persistent,
   type PersistentOptions,
   type StateConstraint,
-  NonPersistent,
+  PersistentAlias,
   DefaultValue,
   resetPersistent,
 } from './persistence';
@@ -169,7 +169,7 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
 export function createResource<T>(
   defaultValue: T,
   options: IfState<T, PersistentResourceOptions>,
-): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T> };
+): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T> };
 
 export function createResource<T>(
   defaultValue: T | Ref<T>,
@@ -267,7 +267,7 @@ function buildResource<T>(
       defaultValue,
       { name },
     );
-    Object.assign(persistentResource[NonPersistent], metadata);
+    Object.assign(persistentResource[PersistentAlias], metadata);
     resource = Object.assign(persistentResource, metadata);
 
     // Cumulative + best trackers are intrinsic to a persistent resource —
@@ -460,7 +460,7 @@ export function hasResource(resource: Resource<DecimalSource>, amount: DecimalSo
  * @param resource - The resource to reset
  */
 export function resetResource<T extends DecimalSource>(resource: Resource<T>): void {
-  // The noPersist wrapper carries the default too, so this also covers it.
+  // The aliasPersistent wrapper carries the default too, so this also covers it.
   if (DefaultValue in resource) resetPersistent(resource as Resource<T> & Persistent<T>);
   else resource.value = 0 as T;
 }

@@ -4,7 +4,7 @@
  * Key features:
  * - NaN detection to prevent corrupted saves
  * - Stack traces for debugging orphaned persistent refs
- * - NonPersistent wrappers to avoid save duplication
+ * - PersistentAlias wrappers to avoid save duplication
  * - Deleted flag for conditional persistence
  */
 
@@ -89,7 +89,7 @@ export const StackTrace = Symbol('StackTrace');
 export const Deleted = Symbol('Deleted');
 
 /** Symbol for the non-persistent computed wrapper */
-export const NonPersistent = Symbol('NonPersistent');
+export const PersistentAlias = Symbol('PersistentAlias');
 
 /** Symbol for the save data path */
 export const SaveDataPath = Symbol('SaveDataPath');
@@ -135,7 +135,7 @@ export type Persistent<T = State> = Ref<T> & {
   readonly [DefaultValue]: T;
   readonly [StackTrace]: string;
   [Deleted]: boolean;
-  readonly [NonPersistent]: NonPersistent<T>;
+  readonly [PersistentAlias]: PersistentAlias<T>;
   [SaveDataPath]: string[] | undefined;
   readonly [CheckNaN]: boolean;
   [PersistentName]: string | undefined;
@@ -148,7 +148,7 @@ export type Persistent<T = State> = Ref<T> & {
  * A computed ref that reads/writes to a persistent ref.
  * Used to pass values without duplicating in save data.
  */
-export type NonPersistent<T = State> = WritableComputedRef<T> & {
+export type PersistentAlias<T = State> = WritableComputedRef<T> & {
   readonly [DefaultValue]: T;
 };
 
@@ -607,7 +607,7 @@ export function persistent<T>(
   const actualDefault: T = cloneDefault(isRef(defaultValue) ? defaultValue.value : defaultValue);
 
   // Create non-persistent computed wrapper
-  const nonPersistent = computed({
+  const alias = computed({
     get: () => persistentState.value,
     set: (value: T) => {
       if (checkNaN) {
@@ -616,10 +616,10 @@ export function persistent<T>(
         persistent[PersistentState].value = value;
       }
     },
-  }) as NonPersistent<T>;
+  }) as PersistentAlias<T>;
 
   // Attach default value to non-persistent wrapper
-  (nonPersistent as { [DefaultValue]: T })[DefaultValue] = actualDefault;
+  (alias as { [DefaultValue]: T })[DefaultValue] = actualDefault;
 
   // Create the persistent ref object that mocks a Vue ref
   const persistent = {
@@ -648,7 +648,7 @@ export function persistent<T>(
     [DefaultValue]: actualDefault,
     [StackTrace]: getStackTrace(),
     [Deleted]: false,
-    [NonPersistent]: nonPersistent,
+    [PersistentAlias]: alias,
     [SaveDataPath]: undefined,
     [CheckNaN]: checkNaN,
     [PersistentName]: undefined,
@@ -727,15 +727,19 @@ export function isPersistent(value: unknown): value is Persistent {
  *
  * For objects, returns a proxy that hides persistence symbols.
  */
-export function noPersist<T extends Persistent<S>, S>(persistentRef: T): T[typeof NonPersistent];
-export function noPersist<T extends object>(obj: T): T;
-export function noPersist<T extends Persistent<S> | object, S>(value: T): T | NonPersistent<S> {
-  if (NonPersistent in value) {
-    // TS 6 narrows `value` only to `T & Record<typeof NonPersistent, unknown>`; TS 7,
+export function aliasPersistent<T extends Persistent<S>, S>(
+  persistentRef: T,
+): T[typeof PersistentAlias];
+export function aliasPersistent<T extends object>(obj: T): T;
+export function aliasPersistent<T extends Persistent<S> | object, S>(
+  value: T,
+): T | PersistentAlias<S> {
+  if (PersistentAlias in value) {
+    // TS 6 narrows `value` only to `T & Record<typeof PersistentAlias, unknown>`; TS 7,
     // which the type-aware linter runs on, narrows further. Drop the cast and this
     // disable when the engine compiles with TS 7.
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion
-    return (value as Persistent<S>)[NonPersistent];
+    return (value as Persistent<S>)[PersistentAlias];
   }
 
   // For non-persistent objects, return a proxy that hides persistence symbols

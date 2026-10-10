@@ -303,7 +303,7 @@ export type {
   MaybeGetter,
   State,
   Persistent,
-  NonPersistent,
+  PersistentAlias,
   GameStateMutator,
   OverrideRegistry,
   RegisterTick,

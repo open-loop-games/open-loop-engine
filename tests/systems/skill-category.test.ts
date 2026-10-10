@@ -15,7 +15,7 @@ import { createSkillCategory } from '@/systems/skill-category';
 import type { AccumulatorSkill, Skill } from '@/systems/skill';
 import Formula from '@/core/formulas/formulas';
 
-const isAccumulator = (s: Skill): s is AccumulatorSkill => s.permanentBonus != null;
+const isAccumulator = (s: Skill): s is AccumulatorSkill => s.lifetimeBonus != null;
 
 // ============================================================================
 // Types for tests
@@ -266,7 +266,7 @@ describe('createSkillCategory', () => {
 
       // Accumulate: 10 * 0.01 = 0.1
       skill.accumulateBonus();
-      expect(new Decimal(skill.permanentBonus.value).eq(0.1)).toBe(true);
+      expect(new Decimal(skill.lifetimeBonus.value).eq(0.1)).toBe(true);
     }
   });
 

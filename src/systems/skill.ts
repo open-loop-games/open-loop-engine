@@ -8,7 +8,7 @@
  * - **Level-driven:** modifier = levelToMultiplier(level). For tiers where the
  *   current level directly drives the multiplier (e.g. stat tiers,
  *   level bonuses).
- * - **Accumulator:** modifier = 1 + permanentBonus. For tiers where a bonus
+ * - **Accumulator:** modifier = 1 + lifetimeBonus. For tiers where a bonus
  *   accumulates across loops via retentionFormula (e.g. soulstones,
  *   snapshots).
  *
@@ -22,7 +22,7 @@
  * standard Formula API.
  *
  * Key features:
- * - Persistence: xp + permanentBonus auto-collected via persistent context
+ * - Persistence: xp + lifetimeBonus auto-collected via persistent context
  * - Modifier: reactive, updates as xp/level/bonus change
  * - Per-gain ModifierChain: always-created chain (`skill:<id>:gain`) for
  *   cross-cutting XP scaling (global boosts, zone multipliers)
@@ -101,14 +101,14 @@ export interface SkillOptionsBase {
 /**
  * Accumulator mode — permanent bonus accumulates across loops.
  *
- * Modifier = `1 + permanentBonus`. Call `accumulateBonus()` at loop end to
+ * Modifier = `1 + lifetimeBonus`. Call `accumulateBonus()` at loop end to
  * apply the retention formula. Good for soulstone-style or snapshot-style bonuses.
  */
 export interface AccumulatorSkillOptions extends SkillOptionsBase {
   /**
    * Formula factory for the retention curve — receives the computed level ref,
    * returns a FormulaSource. The curve's value at the current level is added
-   * to `permanentBonus` each time `accumulateBonus()` is called.
+   * to `lifetimeBonus` each time `accumulateBonus()` is called.
    */
   retentionFormula: SkillCurve;
   levelToMultiplier?: never;
@@ -117,7 +117,7 @@ export interface AccumulatorSkillOptions extends SkillOptionsBase {
 /**
  * Level-driven mode — modifier tracks level reactively.
  *
- * Modifier = `levelToMultiplier(level)`. No permanentBonus or accumulation.
+ * Modifier = `levelToMultiplier(level)`. No lifetimeBonus or accumulation.
  * Good for stat tiers and level multipliers.
  */
 export interface LevelDrivenSkillOptions extends SkillOptionsBase {
@@ -164,7 +164,7 @@ export interface SkillBase {
 
 /** Level-driven skill — modifier = levelToMultiplier(level), no accumulator */
 export interface LevelDrivenSkill extends SkillBase {
-  readonly permanentBonus?: undefined;
+  readonly lifetimeBonus?: undefined;
   accumulateBonus?: undefined;
   /**
    * The built level→multiplier formula, bound to `level`. Use `.invert(target)`
@@ -174,20 +174,20 @@ export interface LevelDrivenSkill extends SkillBase {
   readonly retentionCurve?: undefined;
 }
 
-/** Accumulator skill — modifier = 1 + permanentBonus */
+/** Accumulator skill — modifier = 1 + lifetimeBonus */
 export interface AccumulatorSkill extends SkillBase {
   /**
    * Permanent bonus — tagged `lifetime`, so any reset that doesn't name it
    * skips it. To wipe it in a hard reset, pass it to `thingsToReset` itself.
    */
-  readonly permanentBonus: Persistent<DecimalSource>;
+  readonly lifetimeBonus: Persistent<DecimalSource>;
   /**
    * The built retention formula, bound to `level`. `accumulateBonus()` adds
-   * `retentionCurve.evaluate()` to `permanentBonus`.
+   * `retentionCurve.evaluate()` to `lifetimeBonus`.
    */
   readonly retentionCurve: GenericFormula;
   readonly multiplierCurve?: undefined;
-  /** Add retentionFormula(level) to permanentBonus. Call at loop end. */
+  /** Add retentionFormula(level) to lifetimeBonus. Call at loop end. */
   accumulateBonus(): void;
   /**
    * Project how much permanent bonus a given amount of additional XP would produce,
@@ -200,13 +200,13 @@ export interface AccumulatorSkill extends SkillBase {
   projectGain(additionalXP: DecimalSource): DecimalSource;
 }
 
-/** A Skill in either mode — discriminated by the presence of `permanentBonus`. */
+/** A Skill in either mode — discriminated by the presence of `lifetimeBonus`. */
 export type Skill = LevelDrivenSkill | AccumulatorSkill;
 
 // === PRIVATE BUILDERS ===
 
 /**
- * Allocate xp (and permanentBonus, accumulator-only) under the skill's
+ * Allocate xp (and lifetimeBonus, accumulator-only) under the skill's
  * persistence context. When invoked inside an enclosing context (the
  * common case — `createSkillCategory`'s `registerOne` opens
  * `${categoryId}/${defId}` around `buildInstance`), the skill context
@@ -223,16 +223,16 @@ function buildSkillState(
 ): {
   contextId: string;
   xp: Persistent<DecimalSource>;
-  permanentBonus: Persistent<DecimalSource> | null;
+  lifetimeBonus: Persistent<DecimalSource> | null;
 } {
   const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/skill:${id}` : `skill:${id}`;
   return withPersistentContext(contextId, () => ({
     contextId,
     xp: persistent<DecimalSource>(0, { name: 'xp' }),
-    permanentBonus: isLevelDriven
+    lifetimeBonus: isLevelDriven
       ? null
-      : persistent<DecimalSource>(0, { name: 'permanentBonus', lifetime: true }),
+      : persistent<DecimalSource>(0, { name: 'lifetimeBonus', lifetime: true }),
   }));
 }
 
@@ -240,7 +240,7 @@ function buildSkillState(
 function buildSkillCurves(
   options: SkillOptions,
   xp: Persistent<DecimalSource>,
-  permanentBonus: Persistent<DecimalSource> | null,
+  lifetimeBonus: Persistent<DecimalSource> | null,
   isLevelDriven: boolean,
 ): {
   xpCurve: GenericFormula;
@@ -267,7 +267,7 @@ function buildSkillCurves(
     : (() => {
         retentionCurve = toFormula((options as AccumulatorSkillOptions).retentionFormula(level));
         return createMultiplicativeModifier({
-          multiplier: computed(() => Decimal.add(1, permanentBonus!.value)),
+          multiplier: computed(() => Decimal.add(1, lifetimeBonus!.value)),
           description: description ?? `${options.id} mastery`,
         });
       })();
@@ -334,7 +334,7 @@ function buildLevelUpEmitter(
  * @param options - Provide `levelToMultiplier` for level-driven mode or
  *   `retentionFormula` for accumulator mode (mutually exclusive).
  * @returns Skill with xp, level, modifier, gainChain, addXp, exposed curves,
- *   and (accumulator mode only) permanentBonus + accumulateBonus + projectGain
+ *   and (accumulator mode only) lifetimeBonus + accumulateBonus + projectGain
  *
  * @example
  * // Level-driven (stat tier) — power curve via Formula sugar
@@ -375,12 +375,12 @@ export function createSkill(options: SkillOptions): Skill {
   const { id } = options;
   const isLevelDriven = 'levelToMultiplier' in options && options.levelToMultiplier != null;
 
-  const { contextId, xp, permanentBonus } = buildSkillState(id, isLevelDriven);
+  const { contextId, xp, lifetimeBonus } = buildSkillState(id, isLevelDriven);
 
   const { xpCurve, level, multiplierCurve, retentionCurve, modifier } = buildSkillCurves(
     options,
     xp,
-    permanentBonus,
+    lifetimeBonus,
     isLevelDriven,
   );
 
@@ -416,11 +416,11 @@ export function createSkill(options: SkillOptions): Skill {
   return attachPersistentContextReset(
     {
       ...base,
-      permanentBonus: permanentBonus!,
+      lifetimeBonus: lifetimeBonus!,
       retentionCurve: retentionCurve!,
       accumulateBonus() {
         const gain = retentionCurve!.evaluate();
-        permanentBonus!.value = Decimal.add(permanentBonus!.value, gain);
+        lifetimeBonus!.value = Decimal.add(lifetimeBonus!.value, gain);
       },
       projectGain(additionalXP: DecimalSource): DecimalSource {
         const projectedXP = Decimal.add(xp.value, additionalXP);

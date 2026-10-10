@@ -24,8 +24,8 @@
  * (`(|dx| + |dy| + |dx + dy|) / 2`). Built-ins clamp or asymptote past
  * `radius`; custom falloffs are responsible for their own cutoff.
  *
- * Update order: evaporate → accumulate. `decay` is the *retention* factor
- * (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = full reset).
+ * Update order: evaporate → accumulate. `retentionFactor` is the fraction kept
+ * per tick (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = full reset).
  * Full reset is the default — cheapest and fully reactive to source
  * movement, matching the most common field shape.
  *
@@ -116,7 +116,7 @@ export interface InfluenceLayerOptions {
    * - `0` or omitted — zero-fill each tick (full reset; cheapest, fully
    *   reactive to source movement). This is the most common field shape.
    */
-  decay?: number;
+  retentionFactor?: number;
   /**
    * When true, accumulation skips cells where `grid.passable[idx] === 0`.
    * Default false — RTS threat maps typically allow walls to receive
@@ -213,8 +213,8 @@ export interface InfluenceLayer {
   // Lifecycle --------------------------------------------------------------
 
   /**
-   * One propagation pass: evaporate (multiply by `decay`, or zero-fill if
-   * `decay` is 0/undefined) → accumulate from each registered source.
+   * One propagation pass: evaporate (multiply by `retentionFactor`, or zero-fill if
+   * `retentionFactor` is 0/undefined) → accumulate from each registered source.
    * Caller drives the tick; the layer has no internal timer.
    */
   update(): void;
@@ -258,7 +258,7 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
  *
  * @param grid Caller-owned numeric grid. The layer reads and writes via the
  *             grid's public API; persistence is the grid's concern.
- * @param options Layer-wide configuration (falloff, default radius, decay,
+ * @param options Layer-wide configuration (falloff, default radius, retention factor,
  *                passability gate, profile hook).
  * @returns A lifecycle handle exposing source registry, update/reset, and
  *          a stable {@link InfluenceLayerReader}.
@@ -273,7 +273,7 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
  * const threat = createInfluenceLayer(grid, {
  *   defaultRadius: 6,
  *   falloff: linearFalloff,
- *   // decay omitted → full reset each tick (default)
+ *   // retentionFactor omitted → full reset each tick (default)
  * });
  *
  * threat.addSource({ id: unit.id, x: unit.tileX, y: unit.tileY, strength: 10 });
@@ -289,7 +289,13 @@ export function createInfluenceLayer(
   grid: SpatialGrid<number>,
   options: InfluenceLayerOptions,
 ): InfluenceLayer {
-  const { defaultRadius, falloff, decay, respectPassability = false, profileHook } = options;
+  const {
+    defaultRadius,
+    falloff,
+    retentionFactor,
+    respectPassability = false,
+    profileHook,
+  } = options;
 
   if (!Number.isFinite(defaultRadius) || defaultRadius <= 0) {
     throw new Error(
@@ -324,7 +330,7 @@ export function createInfluenceLayer(
     }
   }
 
-  const retention = decay ?? 0;
+  const retention = retentionFactor ?? 0;
   const zeroFill = (): number => 0;
   const decayFill = (_x: number, _y: number, v: number): number => v * retention;
 

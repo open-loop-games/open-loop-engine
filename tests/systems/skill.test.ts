@@ -26,7 +26,7 @@ describe('createSkill — accumulator mode', () => {
     });
     expect(Decimal.eq(skill.xp.value, 0)).toBe(true);
     expect(Decimal.eq(skill.level.value, 0)).toBe(true);
-    expect(Decimal.eq(skill.permanentBonus.value, 0)).toBe(true);
+    expect(Decimal.eq(skill.lifetimeBonus.value, 0)).toBe(true);
     expect(skill.id).toBe('combat');
   });
 
@@ -57,7 +57,7 @@ describe('createSkill — accumulator mode', () => {
     expect(Decimal.eq(skill.level.value, 10)).toBe(true);
 
     skill.accumulateBonus(); // 10 * 0.01 = 0.10
-    expect(new Decimal(skill.permanentBonus.value).toNumber()).toBeCloseTo(0.1, 10);
+    expect(new Decimal(skill.lifetimeBonus.value).toNumber()).toBeCloseTo(0.1, 10);
   });
 
   it('permanent bonus accumulates across multiple calls', () => {
@@ -70,7 +70,7 @@ describe('createSkill — accumulator mode', () => {
     // First loop: reach level 10
     skill.addXp(5000);
     skill.accumulateBonus(); // +0.10
-    expect(new Decimal(skill.permanentBonus.value).toNumber()).toBeCloseTo(0.1, 10);
+    expect(new Decimal(skill.lifetimeBonus.value).toNumber()).toBeCloseTo(0.1, 10);
 
     // Simulate reset (consumer zeros xp via loop reset)
     skill.xp.value = 0;
@@ -78,10 +78,10 @@ describe('createSkill — accumulator mode', () => {
     // Second loop: reach level 5
     skill.addXp(1250); // sqrt(1250/50) = sqrt(25) = 5
     skill.accumulateBonus(); // +0.05
-    expect(new Decimal(skill.permanentBonus.value).toNumber()).toBeCloseTo(0.15);
+    expect(new Decimal(skill.lifetimeBonus.value).toNumber()).toBeCloseTo(0.15);
   });
 
-  it('modifier applies permanentBonus as 1 + bonus multiplier', () => {
+  it('modifier applies lifetimeBonus as 1 + bonus multiplier', () => {
     const skill = createSkill({
       id: 'strength',
       xpToLevel: quadraticXpToLevel,
@@ -92,8 +92,8 @@ describe('createSkill — accumulator mode', () => {
     const base = skill.modifier.apply(100);
     expect(Decimal.eq(base, 100)).toBe(true);
 
-    // permanentBonus = 0.5 → modifier is ×1.5
-    skill.permanentBonus.value = 0.5;
+    // lifetimeBonus = 0.5 → modifier is ×1.5
+    skill.lifetimeBonus.value = 0.5;
     const boosted = skill.modifier.apply(100);
     expect(Decimal.eq(boosted, 150)).toBe(true);
   });
@@ -108,7 +108,7 @@ describe('createSkill — accumulator mode', () => {
 
     skill.addXp(5000); // level 50
     skill.accumulateBonus(); // 50/10 = 5.0
-    expect(Decimal.eq(skill.permanentBonus.value, 5)).toBe(true);
+    expect(Decimal.eq(skill.lifetimeBonus.value, 5)).toBe(true);
 
     // Modifier: 1 + 5 = 6x
     const result = skill.modifier.apply(10);
@@ -138,13 +138,13 @@ describe('createSkill — level-driven mode', () => {
     expect(skill.id).toBe('gen-combat');
   });
 
-  it('has no permanentBonus or accumulateBonus', () => {
+  it('has no lifetimeBonus or accumulateBonus', () => {
     const skill = createSkill({
       id: 'gen-mining',
       xpToLevel: quadraticXpToLevel,
       levelToMultiplier: expMultiplier(1.05),
     });
-    expect(skill.permanentBonus).toBeUndefined();
+    expect(skill.lifetimeBonus).toBeUndefined();
     expect(skill.accumulateBonus).toBeUndefined();
   });
 
@@ -251,7 +251,7 @@ describe('projectGain', () => {
 
     // State unchanged
     expect(Decimal.eq(skill.xp.value, 200)).toBe(true);
-    expect(Decimal.eq(skill.permanentBonus.value, 0)).toBe(true);
+    expect(Decimal.eq(skill.lifetimeBonus.value, 0)).toBe(true);
   });
 
   it('returns 0 when additional XP does not change level', () => {

@@ -20,7 +20,7 @@
  * `THIRD-PARTY-NOTICES.md`.
  */
 
-import { NonPersistent } from '../persistence';
+import { PersistentAlias } from '../persistence';
 import { Decimal, format, toNumber } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { processGetter, type Computable } from '../computed';
@@ -381,12 +381,12 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     let readonlyProperties: FormulaProperties<T>;
     if ('inputs' in options) {
       options.inputs = options.inputs.map((input) =>
-        typeof input === 'object' && NonPersistent in input ? input[NonPersistent] : input,
+        typeof input === 'object' && PersistentAlias in input ? input[PersistentAlias] : input,
       ) as T | [FormulaSource];
     }
     if ('variable' in options) {
-      if (typeof options.variable === 'object' && NonPersistent in options.variable) {
-        options.variable = options.variable[NonPersistent] as MaybeRef<DecimalSource>;
+      if (typeof options.variable === 'object' && PersistentAlias in options.variable) {
+        options.variable = options.variable[PersistentAlias] as MaybeRef<DecimalSource>;
       }
       readonlyProperties = this.setupVariable(options);
     } else if (!('evaluate' in options)) {

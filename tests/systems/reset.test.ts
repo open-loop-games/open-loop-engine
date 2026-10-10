@@ -260,7 +260,7 @@ describe('Reset with resetPersistentContexts', () => {
     expect(warriorLevel.value).toBe(1);
   });
 
-  it('skips accumulator permanentBonus (lifetime) while wiping xp', () => {
+  it('skips accumulator lifetimeBonus (lifetime) while wiping xp', () => {
     beginPersistentContext('rm-permbonus');
     const mastery = createSkill({
       id: 'mastery',
@@ -271,14 +271,14 @@ describe('Reset with resetPersistentContexts', () => {
 
     mastery.xp.value = new Decimal(5000);
     mastery.accumulateBonus();
-    const bonusBefore = new Decimal(mastery.permanentBonus.value);
+    const bonusBefore = new Decimal(mastery.lifetimeBonus.value);
     expect(bonusBefore.gt(0)).toBe(true);
 
     const reset = createReset({ resetPersistentContexts: ['rm-permbonus'] });
     reset.reset();
 
     expect(new Decimal(mastery.xp.value).eq(0)).toBe(true);
-    expect(new Decimal(mastery.permanentBonus.value).eq(bonusBefore)).toBe(true);
+    expect(new Decimal(mastery.lifetimeBonus.value).eq(bonusBefore)).toBe(true);
   });
 
   it('clones non-primitive defaults so in-place mutation does not corrupt them', () => {
@@ -558,13 +558,13 @@ describe('Reset — Resettable protocol on category wrappers', () => {
     const mastery = skills.getSkill('reset-cat-lifetime-mastery')!;
     mastery.xp.value = new Decimal(5000);
     mastery.accumulateBonus!();
-    const bonus = new Decimal(mastery.permanentBonus!.value);
+    const bonus = new Decimal(mastery.lifetimeBonus!.value);
     expect(bonus.gt(0)).toBe(true);
 
     createReset({ thingsToReset: [skills] }).reset();
 
     expect(Decimal.eq(mastery.xp.value, 0)).toBe(true);
-    expect(Decimal.eq(mastery.permanentBonus!.value, bonus)).toBe(true);
+    expect(Decimal.eq(mastery.lifetimeBonus!.value, bonus)).toBe(true);
   });
 
   it('a lifetime ref named directly in thingsToReset is still reset', () => {

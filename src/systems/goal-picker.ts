@@ -103,9 +103,9 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
   slot?: Slot;
 
   /**
-   * Selection lifecycle. Default `'persistent'`.
+   * Selection lifecycle. Default `'until-completed'`.
    *
-   * - `'persistent'` — selections survive across `pick()` calls; sweep via
+   * - `'until-completed'` — selections survive across `pick()` calls; sweep via
    *   `isCompleted`. Right for AI-bot-watching-its-own-goals shapes where the
    *   selection is a long-running commitment.
    * - `'fresh-each-cycle'` — every previously-active candidate is deselected at
@@ -118,7 +118,7 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
    * Under `'fresh-each-cycle'` with a Slot, `slot.deselect` fires its
    * `onDeselect` hook for every previously-active candidate each cycle.
    */
-  mode?: 'persistent' | 'fresh-each-pick';
+  mode?: 'until-completed' | 'fresh-each-pick';
 
   /**
    * Profiling hook. Fires once per `pick()` call AFTER the slot has been
@@ -210,7 +210,7 @@ function normalizeCapacity(c: number | (() => number) | undefined): () => number
 export function createGoalPicker<TCandidate, TContext, TWeights>(
   options: GoalPickerOptions<TCandidate, TContext, TWeights>,
 ): GoalPicker<TCandidate, TContext, TWeights> {
-  const { pool, scorer, isCompleted, slot, onPick, mode = 'persistent' } = options;
+  const { pool, scorer, isCompleted, slot, onPick, mode = 'until-completed' } = options;
 
   let getWeights = normalizeWeights(options.weights);
   const getCapacity = normalizeCapacity(options.capacity);
