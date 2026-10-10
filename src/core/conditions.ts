@@ -8,7 +8,7 @@ import type {
   ICondition,
   GameStateAccessor,
   ResourceCondition,
-  UnlockCondition,
+  FlagCondition,
   StateCondition,
   AllCondition,
   AnyCondition,
@@ -73,7 +73,7 @@ export function compareState(
 /**
  * Evaluate a declarative {@link ICondition} against the given game-state
  * accessor. Recurses through `and` / `or` / `not` nodes; leaves resolve via
- * the accessor's `getResource` / `isUnlocked` / `getState` lookups.
+ * the accessor's `getResource` / `getFlag` / `getState` lookups.
  *
  * @internal
  */
@@ -85,8 +85,8 @@ export function evaluateCondition(condition: ICondition, accessor: GameStateAcce
         condition.operator,
         new Decimal(condition.value),
       );
-    case 'unlock':
-      return accessor.isUnlocked(condition.target);
+    case 'flag':
+      return accessor.getFlag(condition.target);
     case 'state':
       return compareState(accessor.getState(condition.target), condition.operator, condition.value);
     case 'all':
@@ -103,8 +103,8 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
     case 'resource':
       deps.push(`resources.${condition.target}.amount`);
       break;
-    case 'unlock':
-      deps.push(`unlocks.${condition.target}`);
+    case 'flag':
+      deps.push(`flags.${condition.target}`);
       break;
     case 'state':
       deps.push(condition.target);
@@ -151,8 +151,8 @@ export const C = {
   ): ResourceCondition {
     return { type: 'resource', target, operator, value };
   },
-  unlock(target: string): UnlockCondition {
-    return { type: 'unlock', target };
+  flag(target: string): FlagCondition {
+    return { type: 'flag', target };
   },
   state(target: string, operator: StateCondition['operator'], value: unknown): StateCondition {
     return { type: 'state', target, operator, value };

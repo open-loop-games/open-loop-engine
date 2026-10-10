@@ -59,10 +59,10 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
   const accessor: GameStateAccessorMutator = {
     getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
-    isUnlocked: () => false,
+    getFlag: () => false,
     getState: (path) => stateMap.get(path),
     applyResourceOp: () => {},
-    setUnlocked: () => {},
+    setFlag: () => {},
     setState: (path, value) => stateMap.set(path, value),
   };
 
@@ -517,7 +517,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
     const override: GameStateAccessor = {
       getResource: () => new Decimal(1000),
       getRate: () => Decimal.dZero,
-      isUnlocked: () => true,
+      getFlag: () => true,
       getState: () => undefined,
     };
     const { result, stop } = bootstrap(() => {
@@ -650,7 +650,7 @@ describe('evaluatePredicate', () => {
     const accessor: GameStateAccessor = {
       getResource: () => new Decimal(10),
       getRate: () => Decimal.dZero,
-      isUnlocked: (id) => id === 'seen',
+      getFlag: (id) => id === 'seen',
       getState: () => undefined,
     };
     expect(evaluatePredicate(true, {})).toBe(true);
@@ -757,9 +757,9 @@ describe('Predicate fields — every arm reaches the system', () => {
       }),
     }));
 
-    expect(result.tiers.isTierUnlocked('basic')).toBe(false);
+    expect(result.tiers.isUnlocked('basic')).toBe(false);
     result.api.points.value = 7;
-    expect(result.tiers.isTierUnlocked('basic')).toBe(true);
+    expect(result.tiers.isUnlocked('basic')).toBe(true);
     stop();
   });
 
@@ -964,7 +964,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
           },
         ],
         accessor: noAccessor,
-        mutator: { applyResourceOp: () => {}, setUnlocked: () => {}, setState: () => {} },
+        mutator: { applyResourceOp: () => {}, setFlag: () => {}, setState: () => {} },
       }),
     ).toThrow(/dialog 'g' node 'a' condition: /);
   });

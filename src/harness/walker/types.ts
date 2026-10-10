@@ -27,7 +27,7 @@ export type TransitionSource = 'challenge' | 'purchasable' | 'producer';
  * A pending state change surfaced by the transition walkers.
  *
  * `kind` is narrowed per `source`: challenge emits `visibility-reveal`,
- * `start-unlock`, `goal-complete` and `challenge-maxed`; purchasable emits
+ * `becomes-enterable`, `goal-complete` and `challenge-maxed`; purchasable emits
  * `becomes-affordable` and `purchasable-maxed`; producer emits
  * `producer-becomes-affordable`. Consumers that need exhaustive narrowing
  * pattern-match on `source` first, then on `kind`.

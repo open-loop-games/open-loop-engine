@@ -29,7 +29,7 @@ function mockAccessor(
   const state = config.state ?? {};
   return {
     getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
+    getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
@@ -77,7 +77,7 @@ function buildPurchasableEngine(gameId: string): Engine {
   return engine;
 }
 
-/** UnlockCondition gate → every walker emission is `reason: 'opaque-predicate'`. */
+/** FlagCondition gate → every walker emission is `reason: 'opaque-predicate'`. */
 function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor): Engine {
   resetAllPersistentContexts();
   const module: EngineModule = {
@@ -516,7 +516,7 @@ function buildGoldEngine(
   const gold = () => bn(goldRef!.value).toNumber();
   const accessor: GameStateAccessor = {
     getResource: () => bn(goldRef!.value),
-    isUnlocked: () => false,
+    getFlag: () => false,
     getState: () => undefined,
     getRate: () => bn(options.rate ?? 1),
   };
@@ -615,7 +615,7 @@ function buildDrainedEngine(inflowFrom: number) {
       id === 'clock' ? bn(clock.value) : id === 'fragments' ? bn(fragments.value) : bn(0),
     getRate: (id) => (id === 'clock' ? bn(1) : bn(0)),
     getInflowRate: (id) => (id === 'fragments' ? bn(inflow()) : bn(0)),
-    isUnlocked: () => false,
+    getFlag: () => false,
     getState: () => undefined,
   };
   const module: EngineModule = {

@@ -172,11 +172,11 @@ describe('walkChallengeTransitions — visibility-reveal', () => {
 });
 
 // ---------------------------------------------------------------------------
-// start-unlock
+// becomes-enterable
 // ---------------------------------------------------------------------------
 
-describe('walkChallengeTransitions — start-unlock', () => {
-  it('emits start-unlock with computed distance for declarative canStart', () => {
+describe('walkChallengeTransitions — becomes-enterable', () => {
+  it('emits becomes-enterable with computed distance for declarative canStart', () => {
     const accessor = mockAccessor({ resources: { mana: 10 }, rates: { mana: 1 } });
     const engine = buildEngineWithChallenges(
       'start',
@@ -190,14 +190,14 @@ describe('walkChallengeTransitions — start-unlock', () => {
     );
 
     const out = walkChallengeTransitions(engine, accessor);
-    const unlock = out.filter((t) => t.kind === 'start-unlock');
+    const unlock = out.filter((t) => t.kind === 'becomes-enterable');
     expect(unlock).toHaveLength(1);
     expect(unlock[0].distance.reason).toBe('computed');
     expect(unlock[0].distance.seconds).toBe(10);
     expect(unlock[0].currentValue).toBe(false);
   });
 
-  it('skips start-unlock while the challenge is active, even with the gate true', () => {
+  it('skips becomes-enterable while the challenge is active, even with the gate true', () => {
     const accessor = mockAccessor({ resources: { gold: 200 }, rates: { gold: -10 } });
     const engine = buildEngineWithChallenges(
       'start-active',
@@ -211,16 +211,16 @@ describe('walkChallengeTransitions — start-unlock', () => {
       accessor,
     );
     expect(
-      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'becomes-enterable'),
     ).toHaveLength(0);
 
     engine.tryInject(CategoriesKey)!.challenges![0].getChallenge('c')!.enter();
     expect(
-      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'becomes-enterable'),
     ).toHaveLength(0);
   });
 
-  it('skips start-unlock once the challenge is maxed', () => {
+  it('skips becomes-enterable once the challenge is maxed', () => {
     const accessor = mockAccessor({ resources: { gold: 200 }, rates: { gold: 1 } });
     const engine = buildEngineWithChallenges(
       'start-maxed',
@@ -240,11 +240,11 @@ describe('walkChallengeTransitions — start-unlock', () => {
     // The gate is false again, and rising, but a maxed challenge never starts.
     (accessor as { getResource: GameStateAccessor['getResource'] }).getResource = () => bn(0);
     expect(
-      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'start-unlock'),
+      walkChallengeTransitions(engine, accessor).filter((t) => t.kind === 'becomes-enterable'),
     ).toHaveLength(0);
   });
 
-  it('emits an opaque start-unlock for a category-aware canStart gate', () => {
+  it('emits an opaque becomes-enterable for a category-aware canStart gate', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
       'start-count',
@@ -257,13 +257,13 @@ describe('walkChallengeTransitions — start-unlock', () => {
       accessor,
     );
     const unlock = walkChallengeTransitions(engine, accessor).filter(
-      (t) => t.kind === 'start-unlock',
+      (t) => t.kind === 'becomes-enterable',
     );
     expect(unlock).toHaveLength(1);
     expect(unlock[0].distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });
 
-  it('skips start-unlock when boolean canStart', () => {
+  it('skips becomes-enterable when boolean canStart', () => {
     const accessor = mockAccessor();
     const engine = buildEngineWithChallenges(
       'start-bool',
@@ -277,7 +277,7 @@ describe('walkChallengeTransitions — start-unlock', () => {
       accessor,
     );
     const out = walkChallengeTransitions(engine, accessor);
-    expect(out.filter((t) => t.kind === 'start-unlock')).toHaveLength(0);
+    expect(out.filter((t) => t.kind === 'becomes-enterable')).toHaveLength(0);
   });
 });
 
@@ -453,7 +453,7 @@ describe('walkChallengeTransitions — cumulative-gte', () => {
     const accessor: GameStateAccessor = {
       getResource: (id) => (id === 'fragments' ? bn(fragments.value) : bn(0)),
       getRate: (id) => (id === 'fragments' ? bn(1) : bn(0)),
-      isUnlocked: () => false,
+      getFlag: () => false,
       getState: () => undefined,
     };
     if (inflow !== undefined) {

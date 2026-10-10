@@ -77,7 +77,7 @@ function makeCategory(opts?: { mode?: 'queue' | 'list'; driver?: FakeTickDriver 
       const entry = () => category.getEntry(def.id)!;
       return {
         signals: {
-          unlock: computed(() => Decimal.gt(entry()?.state.timesCompleted.value ?? 0, 0)),
+          active: computed(() => Decimal.gt(entry()?.state.timesCompleted.value ?? 0, 0)),
           count: computed(() => entry()?.state.timesCompleted.value ?? 0),
         },
         tick: ({ category: cat, dt }) => {
@@ -147,7 +147,7 @@ describe('createActionCategory — a rejected register leaves no mapping behind'
       mapAction: (def) => {
         if (def.id === 'bad-map') throw new Error('mapAction blew up');
         return {
-          signals: { unlock: computed(() => false), count: computed(() => 0) },
+          signals: { active: computed(() => false), count: computed(() => 0) },
           rateChain: true,
           tick: () => {
             tickCalls.push(def.id);
@@ -216,7 +216,7 @@ describe('createActionCategory — polymorphic dispatch', () => {
       registerTick: driver.registerTick,
       mapAction: (def) => ({
         signals: {
-          unlock: computed(() => true),
+          active: computed(() => true),
           count: computed(() => 0),
         },
         tick: ({ category: cat }) => {
@@ -349,7 +349,7 @@ describe('createActionCategory — multi-bar progress', () => {
       mode: 'queue',
       registerTick: driver.registerTick,
       mapAction: (def) => ({
-        signals: { unlock: computed(() => true), count: computed(() => 0) },
+        signals: { active: computed(() => true), count: computed(() => 0) },
         tick: ({ category: cat, dt }) => {
           cat.tickItemProgress(def.id, { mana: dt * 2, ticks: dt });
         },
@@ -461,7 +461,7 @@ describe('createActionCategory — Resettable', () => {
     const category = createActionCategory<ActionDef, void, void>({
       id: 'acts',
       registerTick: driver.registerTick,
-      mapAction: () => ({ signals: { unlock: computed(() => true), count: computed(() => 0) } }),
+      mapAction: () => ({ signals: { active: computed(() => true), count: computed(() => 0) } }),
     });
     category.register([
       { id: 'a', baseTicks: 1 },
@@ -495,7 +495,7 @@ describe('createActionCategory — per-def canRun', () => {
       mode: 'queue',
       registerTick: driver.registerTick,
       mapAction: () => ({
-        signals: { unlock: computed(() => true), count: computed(() => 0) },
+        signals: { active: computed(() => true), count: computed(() => 0) },
         canRun: () => (allow.value ? 'now' : 'never'),
         tick: ({ category: cat }) => {
           cat.sequencer.complete();
@@ -543,7 +543,7 @@ describe('createActionCategory — list mode', () => {
       mode: 'list',
       registerTick: driver.registerTick,
       mapAction: (def) => ({
-        signals: { unlock: computed(() => true), count: computed(() => 0) },
+        signals: { active: computed(() => true), count: computed(() => 0) },
         canRun: () => (def.id === 'blocked' ? 'never' : 'now'),
         tick: () => {},
       }),
@@ -628,7 +628,7 @@ describe('createActionCategory — TSDoc example', () => {
           mapState: () => ({ timesCast: persistent(0) }),
           mapAction: (def) => ({
             signals: {
-              unlock: computed(() => true),
+              active: computed(() => true),
               // Read state lazily: mapAction runs before the entry exists.
               count: computed(() => spells.getState(def.id)?.timesCast.value ?? 0),
             },

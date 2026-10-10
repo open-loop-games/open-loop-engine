@@ -22,7 +22,7 @@ function shape(deps: TransitionDeps) {
   return {
     resources: [...deps.resources].sort(),
     rates: [...deps.rates].sort(),
-    unlocks: [...deps.unlocks].sort(),
+    unlocks: [...deps.flags].sort(),
     states: [...deps.states].sort(),
   };
 }
@@ -233,7 +233,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     });
   });
 
-  it('start-unlock condition: OR with a state path registers the state dep', () => {
+  it('becomes-enterable condition: OR with a state path registers the state dep', () => {
     const accessor = mockAccessor({
       resources: { mana: 10 },
       rates: { mana: 1 },
@@ -254,7 +254,7 @@ describe('emitChallengeTransitionsWithDeps', () => {
     }, accessor);
 
     const out = emitChallengeTransitionsWithDeps(engine, accessor);
-    const unlock = out.find((e) => e.transition.kind === 'start-unlock');
+    const unlock = out.find((e) => e.transition.kind === 'becomes-enterable');
     expect(unlock).toBeDefined();
     expect(shape(unlock!.deps)).toEqual({
       resources: ['mana'],

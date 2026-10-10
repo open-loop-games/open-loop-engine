@@ -744,7 +744,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       'dialog-sessions/m-dialog.state': true,
       'm-achievements/first/achievement:first.earned': true,
       'm-achievements/first/achievement:first.earnedAt': true,
-      'm-challenges/hard.active': true,
+      'm-challenges/hard.entered': true,
       'm-challenges/hard.completions': true,
     });
   });
@@ -786,7 +786,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
     expect(first.earned.value).toBe(true);
     expect(first.earnedAt.value).toBe(earnedAt);
     expect(hard.completions.value).toBe(1);
-    expect(hard.active.value).toBe(true);
+    expect(hard.entered.value).toBe(true);
   });
 
   it('a module reset re-fires no achievement whose requirement still holds', () => {

@@ -25,7 +25,7 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
   const memo: GameStateAccessor = {
     getResource: cached((id) => accessor.getResource(id)),
     getRate: cached((id) => accessor.getRate(id)),
-    isUnlocked: cached((id) => accessor.isUnlocked(id)),
+    getFlag: cached((id) => accessor.getFlag(id)),
     getState: cached((path) => accessor.getState(path)),
   };
   // Only where the source serves it: an absent hook is what tells a

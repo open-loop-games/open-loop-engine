@@ -95,12 +95,13 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
+- `interface ActiveGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:58`
 - `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:96`
 - `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:102`
 - `interface CountGteGate` — True when the entity's `count` signal is `>= value`. `src/core/gate.ts:46`
 - `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:34`
-- `interface FlagGate` — True when `accessor.isUnlocked(id)` returns true. `src/core/gate.ts:90`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | UnlockGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:121`
+- `interface FlagGate` — True when `accessor.getFlag(id)` returns true. `src/core/gate.ts:90`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | ActiveGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — Typed declarative predicate spec. `src/core/gate.ts:121`
 - `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — The engine handles a Gate kind reads through. `src/core/gate.ts:174`
 - `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — Which engine handles `gate` will actually reach for. `src/core/gate.ts:192`
 - `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:150`
@@ -108,7 +109,6 @@ typed predicate-spec data shape. Type union and pure-data projection live at cor
 - `type Predicate = Computable<boolean> | Gate` — A yes/no condition in any authoring form: a constant, a ref or getter over state in scope, or a Gate the engine can introspect and predict. `src/core/gate.ts:138`
 - `interface ResourceGteGate` — True when `accessor.getResource(resource) >= value`. `src/core/gate.ts:21`
 - `interface StateGate` — True when the comparison `accessor.getState(key) <op> value` holds. `src/core/gate.ts:70`
-- `interface UnlockGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:58`
 - `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:382`
 - `function assertGateServices(gate: Gate, runtime: GateRuntime, label: string): void` — Throw unless `runtime` carries every handle evaluating `gate` will read. `src/systems/gate.ts:368`
 - `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate evaluates truthy. `src/systems/gate.ts:505`

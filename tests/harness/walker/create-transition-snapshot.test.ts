@@ -159,7 +159,7 @@ describe('createTransitionSnapshot — merge + sort', () => {
     const snap = createTransitionSnapshot(engine, accessor);
 
     // Expected finite emissions, ordered ascending by seconds:
-    //  - trials.bronze.start-unlock                  gems (5-0)/1   =   5s
+    //  - trials.bronze.becomes-enterable                  gems (5-0)/1   =   5s
     //  - upgrades.fast.becomes-affordable            gold (20-0)/2  =  10s
     //  - farms.wheat.producer-becomes-affordable     gold (50-0)/2  =  25s
     //  - farms.fallow.producer-becomes-affordable    gold (150-0)/2 =  75s

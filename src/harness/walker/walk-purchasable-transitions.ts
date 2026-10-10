@@ -84,7 +84,7 @@ export function predictAffordable(
     deps: {
       resources: new Set([costId]),
       rates: new Set([costId]),
-      unlocks: new Set(),
+      flags: new Set(),
       states: new Set(),
     },
     currentValue: accessor.getResource(costId),

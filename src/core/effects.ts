@@ -8,7 +8,7 @@ import type {
   IEffectInternal,
   GameStateAccessor,
   ResourceEffect,
-  UnlockEffect,
+  FlagEffect,
   StateEffect,
   CompositeEffect,
 } from '@/primitives/types';
@@ -18,7 +18,7 @@ import { gateToCondition, type Gate } from './gate';
 // === TYPES ===
 /** A fully resolved effect with all formulas evaluated — ready for mutation. */
 export interface ResolvedEffect {
-  /** Discriminant matching the source IEffect type ('resource', 'unlock', 'state'). */
+  /** Discriminant matching the source IEffect type ('resource', 'flag', 'state'). */
   type: string;
   /** ID of the resource, flag, or state path being mutated. */
   target: string;
@@ -33,7 +33,7 @@ export interface GameStateMutator {
   /** Apply an arithmetic or set operation to a resource by ID. */
   applyResourceOp(id: string, op: ResourceEffect['operation'], value: DecimalSource): void;
   /** Set an unlock flag (feature gate) by ID to true or false. */
-  setUnlocked(id: string, value: boolean): void;
+  setFlag(id: string, value: boolean): void;
   /** Write an arbitrary value to a state path (dot-notation or key). */
   setState(path: string, value: unknown): void;
 }
@@ -78,8 +78,8 @@ export function resolveEffect(
           value: resolveValue(effect.value),
         },
       ];
-    case 'unlock':
-      return [{ type: 'unlock', target: effect.target, operation: 'set', value: effect.value }];
+    case 'flag':
+      return [{ type: 'flag', target: effect.target, operation: 'set', value: effect.value }];
     case 'state':
       return [{ type: 'state', target: effect.target, operation: 'set', value: effect.value }];
     case 'composite':
@@ -117,8 +117,8 @@ export function applyEffect(
     case 'resource':
       mutator.applyResourceOp(effect.target, effect.operation, resolveValue(effect.value));
       return;
-    case 'unlock':
-      mutator.setUnlocked(effect.target, effect.value);
+    case 'flag':
+      mutator.setFlag(effect.target, effect.value);
       return;
     case 'state':
       mutator.setState(effect.target, effect.value);
@@ -151,8 +151,8 @@ export const E = {
   ): ResourceEffect {
     return { type: 'resource', target, operation, value };
   },
-  unlock(target: string, value = true): UnlockEffect {
-    return { type: 'unlock', target, value };
+  flag(target: string, value = true): FlagEffect {
+    return { type: 'flag', target, value };
   },
   state(target: string, value: unknown): StateEffect {
     return { type: 'state', target, value };

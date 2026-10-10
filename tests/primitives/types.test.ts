@@ -11,7 +11,7 @@ describe('Primitive types', () => {
       type: 'composite',
       effects: [
         { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-        { type: 'unlock', target: 'smithing', value: true },
+        { type: 'flag', target: 'smithing', value: true },
       ],
     };
     expect(effect.effects).toHaveLength(2);
@@ -30,7 +30,7 @@ describe('Primitive types', () => {
       type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'unlock', target: 'smithing' },
+        { type: 'flag', target: 'smithing' },
       ],
     };
     expect(cond.conditions).toHaveLength(2);

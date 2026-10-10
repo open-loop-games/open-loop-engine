@@ -28,7 +28,7 @@ function mockAccessor(
   const state = config.state ?? {};
   return {
     getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
+    getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
@@ -75,7 +75,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        // UnlockCondition → walker emits `reason: 'opaque-predicate'`.
+        // FlagCondition → walker emits `reason: 'opaque-predicate'`.
         canStart: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });

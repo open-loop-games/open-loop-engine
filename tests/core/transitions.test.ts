@@ -29,7 +29,7 @@ function mockAccessor(
   const state = config.state ?? {};
   return {
     getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
+    getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
@@ -254,7 +254,7 @@ describe('timeUntilConditionFlip — resource six-way truth table', () => {
 
 describe('timeUntilConditionFlip — opaque predicates', () => {
   it('unlock → opaque-predicate', () => {
-    const c: ICondition = { type: 'unlock', target: 'smithing' };
+    const c: ICondition = { type: 'flag', target: 'smithing' };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });
@@ -321,7 +321,7 @@ describe('timeUntilConditionFlip — and combinator', () => {
       type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 100 },
-        { type: 'unlock', target: 'smithing' },
+        { type: 'flag', target: 'smithing' },
       ],
     };
     // gold computable (15s); unlock opaque. AND currently false (unlock is false).
@@ -406,7 +406,7 @@ describe('timeUntilConditionFlip — not combinator', () => {
   });
 
   it('NOT of opaque → opaque-predicate', () => {
-    const c: ICondition = { type: 'not', condition: { type: 'unlock', target: 'smithing' } };
+    const c: ICondition = { type: 'not', condition: { type: 'flag', target: 'smithing' } };
     const d = timeUntilConditionFlip(c, mockAccessor());
     expect(d).toEqual({ seconds: null, reason: 'opaque-predicate' });
   });

@@ -86,7 +86,7 @@ describe('createIncrementalSnapshot — empty-deps emissions', () => {
     engine.start();
 
     const inc = createIncrementalSnapshot(engine, accessor);
-    const startUnlock = () => inc.snapshot.challenges.find((t) => t.kind === 'start-unlock');
+    const startUnlock = () => inc.snapshot.challenges.find((t) => t.kind === 'becomes-enterable');
     expect(startUnlock()?.distance).toEqual({ seconds: null, reason: 'opaque-predicate' });
 
     // Gold has no rate, so no dep moves either way, and the gate stays false.

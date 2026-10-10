@@ -4,7 +4,7 @@
  * Stores the last-built `TransitionSnapshot` plus per-label `TransitionDeps`
  * and reverse indices keyed by resource / rate / unlock / state id. Consumers
  * signal state changes via `invalidateResource` / `invalidateRate` /
- * `invalidateUnlock` / `invalidateState` / `invalidateAll`; the next
+ * `invalidateFlag` / `invalidateState` / `invalidateAll`; the next
  * `rebuild()` honors those signals and re-emits only the affected entries.
  *
  * Two things decide a leaf's output for one entity. The entity's own gating
@@ -91,7 +91,7 @@ export interface IncrementalSnapshot {
    */
   readonly trackedRates: Iterable<string>;
   /** Unlock-axis analogue of {@link trackedResources}. */
-  readonly trackedUnlocks: Iterable<string>;
+  readonly trackedFlags: Iterable<string>;
   /** State-path analogue of {@link trackedResources}. */
   readonly trackedStates: Iterable<string>;
   /** Signal that the named resource id has changed. */
@@ -99,7 +99,7 @@ export interface IncrementalSnapshot {
   /** Signal that the named rate-producing resource's rate has changed. */
   invalidateRate(id: string): void;
   /** Signal that the named unlock flag has flipped. */
-  invalidateUnlock(id: string): void;
+  invalidateFlag(id: string): void;
   /** Signal that the named state path has been written. */
   invalidateState(path: string): void;
   /**
@@ -176,7 +176,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
     emit: emitChallengeTransitionsForEntity,
     readSignature(entity, gate) {
       const { def, challenge } = entity as { def: ChallengeDef; challenge: Challenge };
-      let moved = updateSlot(gate, 0, challenge.active.value);
+      let moved = updateSlot(gate, 0, challenge.entered.value);
       moved = updateSlot(gate, 1, challenge.completions.value) || moved;
       moved = updateSlot(gate, 2, challenge.visible.value) || moved;
       moved = updateSlot(gate, 3, challenge.canStart.value) || moved;
@@ -190,7 +190,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
       for (const field of [def.visible, def.canStart, def.goal]) {
         if (!isGate(field)) continue;
         forEachGateLeaf(field, (leaf) => {
-          if (leaf.kind !== 'count-gte' && leaf.kind !== 'unlock') return;
+          if (leaf.kind !== 'count-gte' && leaf.kind !== 'active') return;
           moved = updateSlot(gate, slot++, evaluateGate(leaf, runtime)) || moved;
         });
       }
@@ -237,12 +237,12 @@ export function createIncrementalSnapshot(
   const entities: EntityRecord[] = [];
   const byResource = new Map<string, Set<string>>();
   const byRate = new Map<string, Set<string>>();
-  const byUnlock = new Map<string, Set<string>>();
+  const byFlag = new Map<string, Set<string>>();
   const byState = new Map<string, Set<string>>();
   const dirty = {
     resources: new Set<string>(),
     rates: new Set<string>(),
-    unlocks: new Set<string>(),
+    flags: new Set<string>(),
     states: new Set<string>(),
     all: false,
   };
@@ -280,7 +280,7 @@ export function createIncrementalSnapshot(
     entries.set(label, entry);
     addToReverseIndex(byResource, entry.deps.resources, label);
     addToReverseIndex(byRate, entry.deps.rates, label);
-    addToReverseIndex(byUnlock, entry.deps.unlocks, label);
+    addToReverseIndex(byFlag, entry.deps.flags, label);
     addToReverseIndex(byState, entry.deps.states, label);
   }
 
@@ -290,7 +290,7 @@ export function createIncrementalSnapshot(
     entries.delete(label);
     removeFromReverseIndex(byResource, entry.deps.resources, label);
     removeFromReverseIndex(byRate, entry.deps.rates, label);
-    removeFromReverseIndex(byUnlock, entry.deps.unlocks, label);
+    removeFromReverseIndex(byFlag, entry.deps.flags, label);
     removeFromReverseIndex(byState, entry.deps.states, label);
   }
 
@@ -315,7 +315,7 @@ export function createIncrementalSnapshot(
   function clearDirty(): void {
     dirty.resources.clear();
     dirty.rates.clear();
-    dirty.unlocks.clear();
+    dirty.flags.clear();
     dirty.states.clear();
     dirty.all = false;
   }
@@ -336,7 +336,7 @@ export function createIncrementalSnapshot(
     entities.length = 0;
     byResource.clear();
     byRate.clear();
-    byUnlock.clear();
+    byFlag.clear();
     byState.clear();
 
     forEachCategoryEntry(categories, ({ categoryKey, categoryId, entry: entity }) => {
@@ -377,7 +377,7 @@ export function createIncrementalSnapshot(
     const dirtyEntities = new Set<EntityRecord>();
     collectDirtyEntities(byResource, dirty.resources, dirtyEntities);
     collectDirtyEntities(byRate, dirty.rates, dirtyEntities);
-    collectDirtyEntities(byUnlock, dirty.unlocks, dirtyEntities);
+    collectDirtyEntities(byFlag, dirty.flags, dirtyEntities);
     collectDirtyEntities(byState, dirty.states, dirtyEntities);
     // Every record's signature is refreshed, dirty or not, so the stored gate
     // always describes the state its entries were emitted from.
@@ -422,8 +422,8 @@ export function createIncrementalSnapshot(
     get trackedRates() {
       return trackedView(byRate);
     },
-    get trackedUnlocks() {
-      return trackedView(byUnlock);
+    get trackedFlags() {
+      return trackedView(byFlag);
     },
     get trackedStates() {
       return trackedView(byState);
@@ -434,8 +434,8 @@ export function createIncrementalSnapshot(
     invalidateRate(id) {
       dirty.rates.add(id);
     },
-    invalidateUnlock(id) {
-      dirty.unlocks.add(id);
+    invalidateFlag(id) {
+      dirty.flags.add(id);
     },
     invalidateState(path) {
       dirty.states.add(path);

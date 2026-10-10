@@ -38,7 +38,7 @@ export function mockAccessor(
   const state = config.state ?? {};
   return {
     getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
+    getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
@@ -57,7 +57,7 @@ export function mutableAccessor(initial: MutableAccessorConfig): {
   return {
     accessor: {
       getResource: (id) => bn(config.resources[id] ?? 0),
-      isUnlocked: (id) => config.unlocks[id] ?? false,
+      getFlag: (id) => config.unlocks[id] ?? false,
       getState: (path) => config.state[path],
       getRate: (id) => bn(config.rates[id] ?? 0),
     },

@@ -267,7 +267,7 @@ interface DepSnapshot {
   totals: Map<string, Decimal>;
   rates: Map<string, Decimal>;
   inflows: Map<string, Decimal>;
-  unlocks: Map<string, boolean>;
+  flags: Map<string, boolean>;
   states: Map<string, unknown>;
 }
 
@@ -280,7 +280,7 @@ function sampleDeps(
   const totals = new Map<string, Decimal>();
   const rates = new Map<string, Decimal>();
   const inflows = new Map<string, Decimal>();
-  const unlocks = new Map<string, boolean>();
+  const flags = new Map<string, boolean>();
   const states = new Map<string, unknown>();
   for (const id of inc.trackedResources) {
     resources.set(id, accessor.getResource(id));
@@ -291,15 +291,15 @@ function sampleDeps(
     rates.set(id, accessor.getRate(id));
     if (accessor.getInflowRate) inflows.set(id, accessor.getInflowRate(id));
   }
-  for (const id of inc.trackedUnlocks) unlocks.set(id, accessor.isUnlocked(id));
+  for (const id of inc.trackedFlags) flags.set(id, accessor.getFlag(id));
   for (const path of inc.trackedStates) states.set(path, accessor.getState(path));
-  return { resources, totals, rates, inflows, unlocks, states };
+  return { resources, totals, rates, inflows, flags, states };
 }
 
 function forEachChangedDep(
   before: DepSnapshot,
   after: DepSnapshot,
-  visit: (kind: 'resources' | 'rates' | 'unlocks' | 'states', key: string) => void,
+  visit: (kind: 'resources' | 'rates' | 'flags' | 'states', key: string) => void,
 ): void {
   const visitMoved = (
     kind: 'resources' | 'rates',
@@ -315,8 +315,8 @@ function forEachChangedDep(
   visitMoved('resources', before.totals, after.totals);
   visitMoved('rates', before.rates, after.rates);
   visitMoved('rates', before.inflows, after.inflows);
-  for (const [id, afterVal] of after.unlocks) {
-    if (before.unlocks.get(id) !== afterVal) visit('unlocks', id);
+  for (const [id, afterVal] of after.flags) {
+    if (before.flags.get(id) !== afterVal) visit('flags', id);
   }
   for (const [path, afterVal] of after.states) {
     if (!Object.is(before.states.get(path), afterVal)) visit('states', path);
@@ -327,7 +327,7 @@ function diffInto(inc: IncrementalSnapshot, before: DepSnapshot, after: DepSnaps
   forEachChangedDep(before, after, (kind, key) => {
     if (kind === 'resources') inc.invalidateResource(key);
     else if (kind === 'rates') inc.invalidateRate(key);
-    else if (kind === 'unlocks') inc.invalidateUnlock(key);
+    else if (kind === 'flags') inc.invalidateFlag(key);
     else inc.invalidateState(key);
   });
 }

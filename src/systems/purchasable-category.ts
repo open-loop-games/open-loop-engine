@@ -214,7 +214,7 @@ export function createPurchasableCategory<Def extends { id: string }, State = vo
     },
     buildState: mapState,
     buildSignals: (_def, purchasable) => ({
-      unlock: purchasable.active,
+      active: purchasable.active,
       count: computed(() => purchasable.amount.value),
     }),
   });

@@ -124,7 +124,7 @@ describe('ChallengeDef declarative bindings', () => {
     ch.enter();
     ch.complete();
     // Exited after completion; but reward predicate is completions > 0.
-    expect(ch.active.value).toBe(false);
+    expect(ch.entered.value).toBe(false);
     expect(ch.completions.value).toBe(1);
     expect(Decimal.eq(chain.apply(100), 200)).toBe(true);
   });
@@ -212,7 +212,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     const { combat, cost, log, zombie } = build();
     deserializePersistents(getAllPersistentRefs(), midChallenge);
 
-    expect(zombie.active.value).toBe(true);
+    expect(zombie.entered.value).toBe(true);
     expect(combat()).toBe(0);
     expect(cost()).toBe(1);
     expect(log).toEqual([]);
@@ -225,7 +225,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     log.length = 0;
 
     deserializePersistents(getAllPersistentRefs(), idle);
-    expect(zombie.active.value).toBe(false);
+    expect(zombie.entered.value).toBe(false);
     expect(combat()).toBe(10);
     expect(cost()).toBe(5);
     expect(log).toEqual([]);
@@ -240,8 +240,8 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     const { combat, zombie } = build();
     zombie.enter();
 
-    createReset({ thingsToReset: [zombie.active] }).reset();
-    expect(zombie.active.value).toBe(false);
+    createReset({ thingsToReset: [zombie.entered] }).reset();
+    expect(zombie.entered.value).toBe(false);
     expect(combat()).toBe(10);
 
     zombie.enter();
@@ -266,7 +266,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
     expect(zombie.enter()).toBe(true);
 
-    expect(zombie.active.value).toBe(true);
+    expect(zombie.entered.value).toBe(true);
     expect(combat()).toBe(0);
     expect(log).toEqual(['enter zombie']);
   });
@@ -276,7 +276,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
     expect(zombie.enter()).toBe(false);
 
-    expect(zombie.active.value).toBe(false);
+    expect(zombie.entered.value).toBe(false);
     expect(combat()).toBe(10);
     expect(log).toEqual([]);
   });
@@ -287,7 +287,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
     challenges.getChallenge('other')!.enter();
 
-    expect(zombie.active.value).toBe(false);
+    expect(zombie.entered.value).toBe(false);
     expect(combat()).toBe(5);
     expect(log).toEqual(['enter zombie', 'exit zombie', 'enter other']);
   });
@@ -298,7 +298,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
 
     challenges.dispose();
 
-    expect(zombie.active.value).toBe(true);
+    expect(zombie.entered.value).toBe(true);
     expect(combat()).toBe(10);
     expect(cost()).toBe(5);
     expect(log).toEqual(['enter zombie']);

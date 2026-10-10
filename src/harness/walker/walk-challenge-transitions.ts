@@ -16,7 +16,7 @@
  * Emissions per challenge entity:
  *
  * - `visibility-reveal` — `visible` is currently false.
- * - `start-unlock` — the challenge is neither active nor maxed and its
+ * - `becomes-enterable` — the challenge is neither active nor maxed and its
  *   `canStart` gate is currently false.
  * - `goal-complete` — the challenge is active and its goal doesn't hold yet.
  * - `challenge-maxed` — as `goal-complete`, on the last completion
@@ -69,7 +69,7 @@ function predictFieldFlip(value: unknown, runtime: GateRuntime): FieldFlip | und
   if (typeof value === 'function' || isRef(value)) {
     return {
       distance: { seconds: null, reason: 'opaque-predicate' },
-      deps: { resources: new Set(), rates: new Set(), unlocks: new Set(), states: new Set() },
+      deps: { resources: new Set(), rates: new Set(), flags: new Set(), states: new Set() },
     };
   }
   return undefined;
@@ -115,11 +115,11 @@ function emitForEntity(
 
   // `Challenge.canStart` is the gate with the active and maxed guards folded
   // in, so outside those two states it reads the gate's own truth.
-  if (!challenge.active.value && !challenge.maxed.value && !challenge.canStart.value) {
+  if (!challenge.entered.value && !challenge.maxed.value && !challenge.canStart.value) {
     const flip = predictFieldFlip(def.canStart, runtime);
     if (flip) {
       out.push({
-        transition: buildTransition(categoryId, defId, 'start-unlock', false, flip.distance),
+        transition: buildTransition(categoryId, defId, 'becomes-enterable', false, flip.distance),
         deps: flip.deps,
       });
     }
@@ -127,7 +127,7 @@ function emitForEntity(
 
   // A goal only completes while the challenge is entered; one already met is
   // waiting on a completer, not on a flip.
-  if (challenge.active.value && !challenge.canComplete.value) {
+  if (challenge.entered.value && !challenge.canComplete.value) {
     const flip = predictFieldFlip(def.goal, runtime);
     if (flip) {
       out.push({

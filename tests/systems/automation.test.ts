@@ -77,9 +77,9 @@ describe('AutomationTiers', () => {
 
   it('unlocks a tier', () => {
     const at = createAutomationTiers({ tiers: TIERS });
-    expect(at.isTierUnlocked('basic')).toBe(false);
+    expect(at.isUnlocked('basic')).toBe(false);
     at.unlock('basic');
-    expect(at.isTierUnlocked('basic')).toBe(true);
+    expect(at.isUnlocked('basic')).toBe(true);
     expect(at.unlocked.value).toContain('basic');
   });
 
@@ -167,7 +167,7 @@ describe('AutomationTiers', () => {
         { id: 'basic', name: 'Basic', order: 1, unlockWhen: () => true },
       ],
     });
-    expect(at.isTierUnlocked('basic')).toBe(true);
+    expect(at.isUnlocked('basic')).toBe(true);
     expect(at.currentTierId.value).toBe('basic');
   });
 
@@ -179,11 +179,11 @@ describe('AutomationTiers', () => {
         { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
-    expect(at.isTierUnlocked('basic')).toBe(false);
+    expect(at.isUnlocked('basic')).toBe(false);
 
     flag.value = true;
     await nextTick();
-    expect(at.isTierUnlocked('basic')).toBe(true);
+    expect(at.isUnlocked('basic')).toBe(true);
     expect(at.currentTierId.value).toBe('basic');
   });
 
@@ -213,13 +213,13 @@ describe('AutomationTiers', () => {
         { id: 'basic', name: 'Basic', order: 1, unlockWhen: flag },
       ],
     });
-    expect(at.isTierUnlocked('basic')).toBe(false);
+    expect(at.isUnlocked('basic')).toBe(false);
 
     at.dispose();
 
     flag.value = true;
     await nextTick();
-    expect(at.isTierUnlocked('basic')).toBe(false);
+    expect(at.isUnlocked('basic')).toBe(false);
   });
 
   // --- Type guard ---

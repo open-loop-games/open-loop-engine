@@ -320,7 +320,7 @@ export function createAchievementCategory<Def extends { id: string }, State = vo
     },
     buildState: mapState,
     buildSignals: (_def, achievement) => ({
-      unlock: computed(() => achievement.earned.value),
+      active: computed(() => achievement.earned.value),
       count: computed(() => (achievement.earned.value ? 1 : 0)),
     }),
   });

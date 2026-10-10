@@ -62,7 +62,7 @@ export type {
   AnalyzerResult,
   InjectionKey,
   IEffect,
-  UnlockEffect,
+  FlagEffect,
   StateEffect,
   CompositeEffect,
   State,

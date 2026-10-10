@@ -6,7 +6,7 @@ import { evaluateCondition, extractDependencies } from '@/core/conditions';
 function mockAccessor(overrides: Partial<GameStateAccessor> = {}): GameStateAccessor {
   return {
     getResource: (id) => (id === 'gold' ? bn(100) : bn(0)),
-    isUnlocked: (id) => id === 'smithing',
+    getFlag: (id) => id === 'smithing',
     getState: () => undefined,
     getRate: () => Decimal.dZero,
     ...overrides,
@@ -31,17 +31,17 @@ describe('evaluateCondition', () => {
     ).toBe(false);
   });
   it('unlock passes', () => {
-    expect(evaluateCondition({ type: 'unlock', target: 'smithing' }, mockAccessor())).toBe(true);
+    expect(evaluateCondition({ type: 'flag', target: 'smithing' }, mockAccessor())).toBe(true);
   });
   it('unlock fails', () => {
-    expect(evaluateCondition({ type: 'unlock', target: 'alchemy' }, mockAccessor())).toBe(false);
+    expect(evaluateCondition({ type: 'flag', target: 'alchemy' }, mockAccessor())).toBe(false);
   });
   it('and requires all', () => {
     const c: ICondition = {
       type: 'all',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
-        { type: 'unlock', target: 'smithing' },
+        { type: 'flag', target: 'smithing' },
       ],
     };
     expect(evaluateCondition(c, mockAccessor())).toBe(true);
@@ -51,7 +51,7 @@ describe('evaluateCondition', () => {
       type: 'any',
       conditions: [
         { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
-        { type: 'unlock', target: 'smithing' },
+        { type: 'flag', target: 'smithing' },
       ],
     };
     expect(evaluateCondition(c, mockAccessor())).toBe(true);
@@ -59,7 +59,7 @@ describe('evaluateCondition', () => {
   it('not negates', () => {
     expect(
       evaluateCondition(
-        { type: 'not', condition: { type: 'unlock', target: 'alchemy' } },
+        { type: 'not', condition: { type: 'flag', target: 'alchemy' } },
         mockAccessor(),
       ),
     ).toBe(true);
@@ -73,9 +73,7 @@ describe('extractDependencies', () => {
     ).toContain('resources.gold.amount');
   });
   it('extracts unlock dep', () => {
-    expect(extractDependencies({ type: 'unlock', target: 'smithing' })).toContain(
-      'unlocks.smithing',
-    );
+    expect(extractDependencies({ type: 'flag', target: 'smithing' })).toContain('flags.smithing');
   });
   it('deduplicates', () => {
     const c: ICondition = {

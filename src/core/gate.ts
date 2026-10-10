@@ -55,8 +55,8 @@ export interface CountGteGate {
  * cross-cut as `count-gte` — "is this entity active / owned / earned" without
  * consumer-side path conventions.
  */
-export interface UnlockGate {
-  kind: 'unlock';
+export interface ActiveGate {
+  kind: 'active';
   category: string;
   entry: string;
 }
@@ -75,14 +75,14 @@ export interface StateGate {
 }
 
 /**
- * True when `accessor.isUnlocked(id)` returns true. Escape hatch for
+ * True when `accessor.getFlag(id)` returns true. Escape hatch for
  * progression flags the engine doesn't model as category entries
  * (knowledge-discovery IDs, UI-panel reveals, info-reveals). Peer to
  * {@link StateGate} for the unlock namespace — projects 1:1 to
- * `UnlockCondition` via {@link gateToCondition}. Predictor-opaque,
+ * `FlagCondition` via {@link gateToCondition}. Predictor-opaque,
  * matching how flat unlocks already behave at the ICondition layer.
  *
- * Use the category-aware {@link UnlockGate} when the unlock you're gating
+ * Use the category-aware {@link ActiveGate} when the unlock you're gating
  * on *is* a registered category entry — that path gets
  * `CategoryEntrySignals`-backed introspection. Use this when the
  * unlock is a consumer-side progression flag with no category structure.
@@ -122,7 +122,7 @@ export type Gate =
   | ResourceGteGate
   | CumulativeGteGate
   | CountGteGate
-  | UnlockGate
+  | ActiveGate
   | StateGate
   | FlagGate
   | AllGate
@@ -154,7 +154,7 @@ export function isGate(value: unknown): value is Gate {
     case 'resource-gte':
     case 'cumulative-gte':
     case 'count-gte':
-    case 'unlock':
+    case 'active':
     case 'state':
     case 'flag':
     case 'all':
@@ -202,7 +202,7 @@ export function getRequiredGateServices(gate: Gate): ReadonlySet<GateService> {
         out.add('resourceRegistry');
         return;
       case 'count-gte':
-      case 'unlock':
+      case 'active':
         out.add('categories');
         return;
     }
@@ -257,7 +257,7 @@ export function gateToCondition(gate: Gate): ICondition {
     case 'state':
       return { type: 'state', target: gate.key, operator: gate.operator, value: gate.value };
     case 'flag':
-      return { type: 'unlock', target: gate.id };
+      return { type: 'flag', target: gate.id };
     case 'all':
       return { type: 'all', conditions: gate.of.map(gateToCondition) };
     case 'any':
@@ -265,7 +265,7 @@ export function gateToCondition(gate: Gate): ICondition {
     case 'not':
       return { type: 'not', condition: gateToCondition(gate.of) };
     case 'count-gte':
-    case 'unlock':
+    case 'active':
     case 'cumulative-gte':
       throw new Error(
         `gateToCondition: ${gate.kind} has no ICondition projection (it resolves only through a GateRuntime).`,

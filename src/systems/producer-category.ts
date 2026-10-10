@@ -446,7 +446,7 @@ export function createProducerCategory<Def extends { id: string }, State = void>
     buildInstance: (def) => buildProducer(def, categoryId, mapProducer, ctx, predicates),
     buildState: mapState,
     buildSignals: (_def, producer) => ({
-      unlock: computed(() => Decimal.fromValue(producer.count.value).gt(0)),
+      active: computed(() => Decimal.fromValue(producer.count.value).gt(0)),
       count: producer.count,
     }),
   });

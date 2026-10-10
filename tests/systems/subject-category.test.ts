@@ -14,11 +14,11 @@ function buildAccessor(): GameStateAccessorMutator {
   const unlocks = new Map<string, boolean>();
   return {
     getResource: () => bn(0),
-    isUnlocked: (id) => unlocks.get(id) ?? false,
+    getFlag: (id) => unlocks.get(id) ?? false,
     getState: () => undefined,
     getRate: () => Decimal.dZero,
     applyResourceOp: () => {},
-    setUnlocked: (id, v) => {
+    setFlag: (id, v) => {
       unlocks.set(id, v);
     },
     setState: () => {},
@@ -168,15 +168,15 @@ describe('createSubjectCategory', () => {
       expect(rask.fields.trust.getTier()).toBe('stranger');
 
       // Satisfy first gate, advance to acquaintance.
-      accessor.setUnlocked('knowledge-rask-approach', true);
+      accessor.setFlag('knowledge-rask-approach', true);
       expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
 
       // Second gate not yet satisfied.
       expect(rask.fields.trust.tryAdvance()).toBeNull();
 
       // Satisfy second + third gates, advance twice more.
-      accessor.setUnlocked('knowledge-rask-competence', true);
-      accessor.setUnlocked('knowledge-rask-task', true);
+      accessor.setFlag('knowledge-rask-competence', true);
+      accessor.setFlag('knowledge-rask-task', true);
       expect(rask.fields.trust.tryAdvance()).toBe('student');
       expect(rask.fields.trust.tryAdvance()).toBe('trusted');
 
@@ -347,11 +347,11 @@ describe('createSubjectCategory', () => {
       });
       cat.register({ id: 'the-entity' });
       const entry = cat.getEntry('the-entity')!;
-      expect(entry.signals?.unlock.value).toBe(false);
+      expect(entry.signals?.active.value).toBe(false);
       expect(Decimal.fromValue(entry.signals!.count.value).toNumber()).toBe(0);
 
       cat.get('the-entity')!.fields.met.set(true);
-      expect(entry.signals?.unlock.value).toBe(true);
+      expect(entry.signals?.active.value).toBe(true);
       expect(Decimal.fromValue(entry.signals!.count.value).toNumber()).toBe(1);
 
       cat.get('the-entity')!.fields.trust.set(5);
@@ -420,11 +420,11 @@ describe('createSubjectCategory', () => {
       // Neither field has been touched: both sit at their seeded initial, so
       // both are "default". Comparing against the schema default alone wrongly
       // flagged the overridden subject as non-default from creation.
-      expect(cat.getEntry('plain')!.signals!.unlock.value).toBe(false);
-      expect(cat.getEntry('special')!.signals!.unlock.value).toBe(false);
+      expect(cat.getEntry('plain')!.signals!.active.value).toBe(false);
+      expect(cat.getEntry('special')!.signals!.active.value).toBe(false);
       // A real change still registers.
       cat.get('special')!.fields.bond.set(60);
-      expect(cat.getEntry('special')!.signals!.unlock.value).toBe(true);
+      expect(cat.getEntry('special')!.signals!.active.value).toBe(true);
     });
 
     it('reports a subject at its clamped seed as default', () => {
@@ -442,7 +442,7 @@ describe('createSubjectCategory', () => {
       });
       cat.register({ id: 'fresh' });
       const signals = cat.getEntry('fresh')!.signals!;
-      expect(signals.unlock.value).toBe(false);
+      expect(signals.active.value).toBe(false);
       expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(0);
       cat.get('fresh')!.fields.mood.set('calm', 3);
       expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(1);

@@ -135,12 +135,12 @@ cartesian `cells × seeds` plan over `runHeadless`, preserving raw per-run resul
 - `interface Analyzer` — Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. `src/primitives/types.ts:165`
 - `interface AnalyzerResult` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:158`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:30`
+- `interface FlagEffect` — Sets an unlock flag to true or false, controlling feature/content visibility. `src/primitives/types.ts:14`
 - `interface GameStateAccessor` — Read-only view of game state used when evaluating conditions and resolving effects. `src/primitives/types.ts:205`
-- `type IEffect = ResourceEffect | UnlockEffect | StateEffect | CompositeEffect` — Tagged-union root for declarative effects — the data shape content authors hand to category factories. `src/primitives/types.ts:63`
+- `type IEffect = ResourceEffect | FlagEffect | StateEffect | CompositeEffect` — Tagged-union root for declarative effects — the data shape content authors hand to category factories. `src/primitives/types.ts:63`
 - `type InjectionKey<T>` — Typed symbol key for module provide/inject — mirrors Vue's InjectionKey pattern. `src/primitives/types.ts:243`
 - `interface ResourceEffect` — Modifies a numeric resource by adding, subtracting, multiplying, or setting its value. `src/primitives/types.ts:4`
 - `interface StateEffect` — Writes an arbitrary value to a dot-path in game state (e.g. `src/primitives/types.ts:22`
-- `interface UnlockEffect` — Sets an unlock flag to true or false, controlling feature/content visibility. `src/primitives/types.ts:14`
 - `interface WeightedItem<T>` — A candidate value paired with a relative probability weight for weighted random selection. `src/primitives/types.ts:198`
 
 ## Transition walker

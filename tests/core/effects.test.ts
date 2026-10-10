@@ -6,7 +6,7 @@ import { resolveEffect, applyEffect, E, type GameStateMutator } from '@/core/eff
 function mockAccessor(): GameStateAccessor {
   return {
     getResource: (id) => (id === 'gold' ? bn(100) : bn(0)),
-    isUnlocked: () => false,
+    getFlag: () => false,
     getState: () => undefined,
     getRate: () => Decimal.dZero,
   };
@@ -27,7 +27,7 @@ describe('resolveEffect', () => {
       type: 'composite',
       effects: [
         { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-        { type: 'unlock', target: 'x', value: true },
+        { type: 'flag', target: 'x', value: true },
       ],
     };
     expect(resolveEffect(e, mockAccessor())).toHaveLength(2);
@@ -89,8 +89,8 @@ function mockMutator(): GameStateMutator & { calls: Array<{ method: string; args
     applyResourceOp(id, op, value) {
       calls.push({ method: 'applyResourceOp', args: [id, op, value] });
     },
-    setUnlocked(id, value) {
-      calls.push({ method: 'setUnlocked', args: [id, value] });
+    setFlag(id, value) {
+      calls.push({ method: 'setFlag', args: [id, value] });
     },
     setState(path, value) {
       calls.push({ method: 'setState', args: [path, value] });
@@ -113,11 +113,11 @@ describe('applyEffect', () => {
     expect(new Decimal(mutator.calls[0].args[2] as number).eq(100)).toBe(true);
   });
 
-  it('calls setUnlocked for unlock effects', () => {
+  it('calls setFlag for unlock effects', () => {
     const mutator = mockMutator();
-    applyEffect({ type: 'unlock', target: 'forest', value: true }, mockAccessor(), mutator);
+    applyEffect({ type: 'flag', target: 'forest', value: true }, mockAccessor(), mutator);
     expect(mutator.calls).toHaveLength(1);
-    expect(mutator.calls[0].method).toBe('setUnlocked');
+    expect(mutator.calls[0].method).toBe('setFlag');
     expect(mutator.calls[0].args).toEqual(['forest', true]);
   });
 
@@ -140,7 +140,7 @@ describe('applyEffect', () => {
         type: 'composite',
         effects: [
           { type: 'resource', target: 'gold', operation: 'add', value: 10 },
-          { type: 'unlock', target: 'x', value: true },
+          { type: 'flag', target: 'x', value: true },
           { type: 'state', target: 'flag', value: 1 },
         ],
       },
@@ -149,7 +149,7 @@ describe('applyEffect', () => {
     );
     expect(mutator.calls).toHaveLength(3);
     expect(mutator.calls[0].method).toBe('applyResourceOp');
-    expect(mutator.calls[1].method).toBe('setUnlocked');
+    expect(mutator.calls[1].method).toBe('setFlag');
     expect(mutator.calls[2].method).toBe('setState');
   });
 
@@ -174,7 +174,7 @@ describe('applyEffect', () => {
     const unlocked = new Set<string>();
     const accessor: GameStateAccessor = {
       getResource: (id) => (id === 'gold' ? gold.amount : bn(0)),
-      isUnlocked: (id) => unlocked.has(id),
+      getFlag: (id) => unlocked.has(id),
       getState: () => undefined,
       getRate: () => Decimal.dZero,
     };
@@ -182,13 +182,13 @@ describe('applyEffect', () => {
       applyResourceOp: (_id, _op, value) => {
         gold.amount = gold.amount.add(value);
       },
-      setUnlocked: (id) => unlocked.add(id),
+      setFlag: (id) => unlocked.add(id),
       setState: () => {},
     };
     applyEffect(
       E.composite(
         E.resource('gold', 'add', 100),
-        E.conditional({ kind: 'resource-gte', resource: 'gold', value: 100 }, E.unlock('rich')),
+        E.conditional({ kind: 'resource-gte', resource: 'gold', value: 100 }, E.flag('rich')),
       ),
       accessor,
       mutator,

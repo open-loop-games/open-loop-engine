@@ -49,7 +49,7 @@ What a category gives you: per-definition persistent context, typed accessors (`
 
 Two predicate-requirement forms, in preference order:
 
-- `createGateRequirement({ gate })` — the Gate-authored path. Express the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `unlock`, `flag`, `state`, `all`/`any`/`not`) and the adapter lifts it into the Requirement contract. The Gate is the only form that's serializable for save/mod/sim and supports `timeUntilGateFlip` for predictor UIs. Use this whenever the predicate can be expressed as a Gate.
+- `createGateRequirement({ gate })` — the Gate-authored path. Express the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`) and the adapter lifts it into the Requirement contract. The Gate is the only form that's serializable for save/mod/sim and supports `timeUntilGateFlip` for predictor UIs. Use this whenever the predicate can be expressed as a Gate.
 - `createBooleanRequirement({ requirement })` — the closure escape hatch. Use when the predicate doesn't fit a Gate kind (arbitrary cross-system computation, opaque consumer state). Same runtime shape as the Gate adapter, but the predicate isn't introspectable.
 
 **What a Gate needs wired.** A Gate reads only the handles its kinds use, and the engine resolves them from the ambient scope — so construct gates inside `install()` / `connect()`, and hold the result rather than re-resolving from a player-driven path. `count-gte` and `unlock` resolve entirely through the category registry and need **no accessor at all**; `cumulative-gte` evaluates through the resource registry and needs one only when you predict it with `timeUntilGateFlip`; the accessor-backed kinds (`resource-gte`, `flag`, `state`) need one, and it's yours to supply:
@@ -62,9 +62,9 @@ const engine = createEngine({
     getResource: (id) => resourcesById[id]?.value ?? Decimal.dZero,
     getRate: (id) => ratesById[id] ?? Decimal.dZero,
     getInflowRate: (id) => grossById[id] ?? Decimal.dZero, // optional; exact cumulative-gte predictions
-    isUnlocked: (id) => flags[id] ?? false,
+    getFlag: (id) => flags[id] ?? false,
     getState: (path) => readPath(gameState, path),
-    ...mutator, // applyResourceOp / setUnlocked / setState, for the effect side
+    ...mutator, // applyResourceOp / setFlag / setState, for the effect side
   },
 });
 ```

@@ -16,7 +16,7 @@ export { Notation, Presets, HTMLPresets } from './notations';
 export type {
   IEffect,
   ResourceEffect,
-  UnlockEffect,
+  FlagEffect,
   StateEffect,
   CompositeEffect,
   Analyzer,

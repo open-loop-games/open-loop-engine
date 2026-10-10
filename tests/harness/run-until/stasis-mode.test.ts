@@ -28,7 +28,7 @@ function mockAccessor(
   const state = config.state ?? {};
   return {
     getResource: (id) => bn(resources[id] ?? 0),
-    isUnlocked: (id) => unlocks[id] ?? false,
+    getFlag: (id) => unlocks[id] ?? false,
     getState: (path) => state[path],
     getRate: (id) => bn(rates[id] ?? 0),
   };
@@ -77,7 +77,7 @@ function buildPurchasableEngine(gameId: string) {
 }
 
 /**
- * Challenge whose `canStart` is a pure `UnlockCondition` — the walker emits
+ * Challenge whose `canStart` is a pure `FlagCondition` — the walker emits
  * `{ seconds: null, reason: 'opaque-predicate' }`. Conservative stasis
  * refuses to short-circuit in this case even though no finite distance
  * exists.
@@ -91,7 +91,7 @@ function buildOpaqueChallengeEngine(gameId: string, accessor: GameStateAccessor)
       challenges.register({
         id: 'bronze',
         name: 'Bronze',
-        // UnlockCondition → opaque-predicate distance, no computable horizon.
+        // FlagCondition → opaque-predicate distance, no computable horizon.
         canStart: { kind: 'flag', id: 'unreachable-flag' },
         goal: () => false,
       });
@@ -162,7 +162,7 @@ describe("runProbe({mode: 'stasis-aware-tick'})", () => {
   });
 
   it('does NOT short-circuit when an opaque-predicate transition is present', () => {
-    // Challenge gated by UnlockCondition → every walker emission is
+    // Challenge gated by FlagCondition → every walker emission is
     // `reason: 'opaque-predicate'`. No finite distance, but conservative
     // stasis refuses to classify as unreachable (could be flipped by code
     // the walker can't introspect).

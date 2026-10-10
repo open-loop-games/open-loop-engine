@@ -190,7 +190,7 @@ export function createSkillCategory<Def extends { id: string }, State = void>(
     },
     buildState: mapState,
     buildSignals: (_def, skill) => ({
-      unlock: computed(() => Decimal.fromValue(skill.level.value).gt(0)),
+      active: computed(() => Decimal.fromValue(skill.level.value).gt(0)),
       count: skill.level,
     }),
   });

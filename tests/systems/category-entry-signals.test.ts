@@ -58,11 +58,11 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     cat.register({ id: 'first', name: 'First' });
 
     const entry = cat.getEntry('first')!;
-    expect(entry.signals.unlock.value).toBe(false);
+    expect(entry.signals.active.value).toBe(false);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(0);
 
     entry.achievement.complete();
-    expect(entry.signals.unlock.value).toBe(true);
+    expect(entry.signals.active.value).toBe(true);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(1);
   });
 
@@ -79,11 +79,11 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     cat.register({ id: 'fast', name: 'Fast' });
 
     const entry = cat.getEntry('fast')!;
-    expect(entry.signals.unlock.value).toBe(false);
+    expect(entry.signals.active.value).toBe(false);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(0);
 
     entry.purchasable.amount.value = 3;
-    expect(entry.signals.unlock.value).toBe(true);
+    expect(entry.signals.active.value).toBe(true);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(3);
   });
 
@@ -98,11 +98,11 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     cat.register({ id: 'combat', name: 'Combat' });
 
     const entry = cat.getEntry('combat')!;
-    expect(entry.signals.unlock.value).toBe(false);
+    expect(entry.signals.active.value).toBe(false);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(0);
 
     entry.skill.addXp(5);
-    expect(entry.signals.unlock.value).toBe(true);
+    expect(entry.signals.active.value).toBe(true);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(5);
   });
 
@@ -122,7 +122,7 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     const entry = cat.getEntry('click')!;
     // Manual producer with no purchase config: count is constant 1.
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(1);
-    expect(entry.signals.unlock.value).toBe(true);
+    expect(entry.signals.active.value).toBe(true);
   });
 
   it('Challenge: unlock=completed, count=completions', () => {
@@ -133,12 +133,12 @@ describe('CategoryEntrySignals — per-category derivation', () => {
     cat.register({ id: 'no-x', name: 'No X', goal: () => true });
 
     const entry = cat.getEntry('no-x')!;
-    expect(entry.signals.unlock.value).toBe(false);
+    expect(entry.signals.active.value).toBe(false);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(0);
 
     entry.challenge.enter();
     entry.challenge.complete();
-    expect(entry.signals.unlock.value).toBe(true);
+    expect(entry.signals.active.value).toBe(true);
     expect(Decimal.fromValue(entry.signals.count.value).toNumber()).toBe(1);
   });
 });
@@ -185,11 +185,11 @@ describe('findCategoryEntrySignals', () => {
 
     const skillSignals = findCategoryEntrySignals(categories!, 'pk/skills', 'mining');
     expect(skillSignals).toBeDefined();
-    expect(skillSignals!.unlock.value).toBe(false);
+    expect(skillSignals!.active.value).toBe(false);
 
     const achSignals = findCategoryEntrySignals(categories!, 'pk/achievements', 'first-ore');
     expect(achSignals).toBeDefined();
-    expect(achSignals!.unlock.value).toBe(false);
+    expect(achSignals!.active.value).toBe(false);
 
     engine.stop();
   });
@@ -236,9 +236,9 @@ describe('findCategoryEntrySignals', () => {
     const categories: EngineCategories = { achievements: [cat] };
     const signals = findCategoryEntrySignals(categories, 'achievements', 'a')!;
 
-    expect(signals.unlock.value).toBe(false);
+    expect(signals.active.value).toBe(false);
     cat.getAchievement('a')!.complete();
-    expect(signals.unlock.value).toBe(true);
+    expect(signals.active.value).toBe(true);
   });
 });
 

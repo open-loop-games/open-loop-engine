@@ -17,11 +17,11 @@ export const AUTOMATION_TIER_DEFS = [
 /** A stateless GameStateAccessorMutator stub for a DialogSession under test. */
 export const dialogAccessorStub: GameStateAccessorMutator = {
   getResource: () => bn(0),
-  isUnlocked: () => false,
+  getFlag: () => false,
   getState: () => undefined,
   getRate: () => Decimal.dZero,
   applyResourceOp: () => {},
-  setUnlocked: () => {},
+  setFlag: () => {},
   setState: () => {},
 };
 

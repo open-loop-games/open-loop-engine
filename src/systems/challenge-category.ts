@@ -164,7 +164,7 @@ export interface Challenge {
    * or category walk touches either. A hard wipe names the refs in
    * `thingsToReset`.
    */
-  readonly active: Persistent<boolean>;
+  readonly entered: Persistent<boolean>;
 
   /** Number of times this challenge has been completed (persistent) */
   readonly completions: Persistent<number>;
@@ -198,9 +198,9 @@ export interface Challenge {
 
   /**
    * Complete the challenge (increment completions, apply rewards).
-   * @param remainActive - If true, stay in the challenge after completion
+   * @param stayEntered - If true, stay in the challenge after completion
    */
-  complete(remainActive?: boolean): void;
+  complete(stayEntered?: boolean): void;
 
   /** Toggle: enter if inactive, exit if active */
   toggle(): void;
@@ -317,7 +317,7 @@ export interface ChallengeCategory<
   getAll(): ChallengeCategoryEntry<Def, State>[];
 
   /** Currently active challenge (null if none). Reactive. */
-  readonly active: ComputedRef<Challenge | null>;
+  readonly current: ComputedRef<Challenge | null>;
 
   /** Number of challenges with at least one completion. Reactive. */
   readonly completedCount: ComputedRef<number>;
@@ -411,8 +411,8 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       const id = entry.def.id;
       if (id === entering) continue;
       const pushed = activeCleanups.has(id);
-      if (entry.instance.active.value && !pushed) activeCleanups.set(id, pushOverrides(entry.def));
-      else if (!entry.instance.active.value && pushed) popOverrides(id);
+      if (entry.instance.entered.value && !pushed) activeCleanups.set(id, pushOverrides(entry.def));
+      else if (!entry.instance.entered.value && pushed) popOverrides(id);
     }
   }
 
@@ -426,7 +426,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
         );
       }
 
-      const active = persistent<boolean>(false, { name: 'active', lifetime: true });
+      const active = persistent<boolean>(false, { name: 'entered', lifetime: true });
       const completions = persistent<number>(0, { name: 'completions', lifetime: true });
       const limit = def.completionLimit ?? 1;
 
@@ -451,7 +451,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
         if (mutuallyExclusive) {
           for (const entry of base.getAll()) {
-            if (entry.instance.active.value && entry.instance.id !== def.id) {
+            if (entry.instance.entered.value && entry.instance.id !== def.id) {
               entry.instance.exit();
             }
           }
@@ -532,7 +532,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
 
       const challenge: Challenge = {
         id: def.id,
-        active,
+        entered: active,
         completions,
         completed,
         maxed,
@@ -549,7 +549,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
     },
     buildState: mapState,
     buildSignals: (_def, challenge) => ({
-      unlock: challenge.completed,
+      active: challenge.completed,
       count: computed(() => challenge.completions.value),
     }),
   });
@@ -571,7 +571,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
   });
 
   const activeChallenge = computed(() => {
-    const entry = base.getAll().find((e) => e.instance.active.value);
+    const entry = base.getAll().find((e) => e.instance.entered.value);
     return entry?.instance ?? null;
   });
 
@@ -618,7 +618,7 @@ export function createChallengeCategory<Def extends ChallengeDef, State = void>(
       }));
     },
 
-    active: activeChallenge,
+    current: activeChallenge,
     completedCount,
     allMaxed,
 

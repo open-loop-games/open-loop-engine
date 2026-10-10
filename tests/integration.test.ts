@@ -27,7 +27,7 @@ describe('Integration: simple idle game loop', () => {
 
     const accessor: GameStateAccessor = {
       getResource: (id) => (id === 'gold' ? bn(gold.value) : bn(0)),
-      isUnlocked: () => false,
+      getFlag: () => false,
       getState: () => undefined,
       getRate: () => Decimal.dZero,
     };

@@ -23,8 +23,8 @@
  * | resource-gte   | accessor.getResource(id) >= value                   | timeUntilConditionFlip over projection   |
  * | cumulative-gte | registry.findById(id).cumulative.value >= value     | gap in the cumulative total ÷ inflow     |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
- * | unlock         | findCategoryEntrySignals(...).unlock                | 'opaque-predicate'                       |
- * | flag           | accessor.isUnlocked(id)                             | 'opaque-predicate'                       |
+ * | active         | findCategoryEntrySignals(...).active                | 'opaque-predicate'                       |
+ * | flag           | accessor.getFlag(id)                                | 'opaque-predicate'                       |
  * | state          | compareState(accessor.getState(...), op, val)       | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
@@ -91,7 +91,7 @@ export type {
   ResourceGteGate,
   CumulativeGteGate,
   CountGteGate,
-  UnlockGate,
+  ActiveGate,
   StateGate,
   FlagGate,
   AllGate,
@@ -189,10 +189,10 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
       if (!signals) return false;
       return Decimal.gte(signals.count.value, gate.value);
     }
-    case 'unlock': {
+    case 'active': {
       const categories = demand(runtime, 'categories', gate.kind);
       const signals = findCategoryEntrySignals(categories, gate.category, gate.entry);
-      return signals?.unlock.value ?? false;
+      return signals?.active.value ?? false;
     }
     case 'state':
       return compareState(
@@ -201,7 +201,7 @@ export function evaluateGate(gate: Gate, runtime: GateRuntime): boolean {
         gate.value,
       );
     case 'flag':
-      return demand(runtime, 'accessor', gate.kind).isUnlocked(gate.id);
+      return demand(runtime, 'accessor', gate.kind).getFlag(gate.id);
     case 'all':
       return gate.of.every((g) => evaluateGate(g, runtime));
     case 'any':
@@ -244,7 +244,7 @@ export function timeUntilGateFlip(gate: Gate, runtime: GateRuntime): TransitionD
     case 'cumulative-gte':
       return timeUntilCumulativeFlip(gate, runtime);
     case 'count-gte':
-    case 'unlock':
+    case 'active':
     case 'state':
     case 'flag':
       return { seconds: null, reason: 'opaque-predicate' };
@@ -270,7 +270,7 @@ export function collectGateDeps(gate: Gate): TransitionDeps {
   const deps = {
     resources: new Set<string>(),
     rates: new Set<string>(),
-    unlocks: new Set<string>(),
+    flags: new Set<string>(),
     states: new Set<string>(),
   };
   forEachGateLeaf(gate, (leaf) => {
@@ -281,13 +281,13 @@ export function collectGateDeps(gate: Gate): TransitionDeps {
         deps.rates.add(leaf.resource);
         return;
       case 'flag':
-        deps.unlocks.add(leaf.id);
+        deps.flags.add(leaf.id);
         return;
       case 'state':
         deps.states.add(leaf.key);
         return;
       case 'count-gte':
-      case 'unlock':
+      case 'active':
         return;
     }
   });

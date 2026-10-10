@@ -54,7 +54,7 @@ import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-bin
  */
 export interface CategoryEntrySignals {
   /** "Is this entity active / owned / earned / unlocked?" */
-  readonly unlock: ComputedRef<boolean>;
+  readonly active: ComputedRef<boolean>;
   /** "How many / what level / how complete?" */
   readonly count: ComputedRef<DecimalSource>;
 }

@@ -116,7 +116,7 @@ export interface AutomationTiers {
   readonly unlocked: Persistent<string[]>;
 
   /** Check whether a specific tier is unlocked. */
-  isTierUnlocked(tierId: string): boolean;
+  isUnlocked(tierId: string): boolean;
 
   /**
    * Check whether automation has progressed to at least the given tier.
@@ -242,7 +242,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     currentTierOrder,
     unlocked,
 
-    isTierUnlocked(tierId: string): boolean {
+    isUnlocked(tierId: string): boolean {
       return unlocked.value.includes(tierId);
     },
 

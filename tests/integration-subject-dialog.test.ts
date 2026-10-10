@@ -59,11 +59,11 @@ function buildAccessor(): GameStateAccessorMutator {
   const unlocks = new Map<string, boolean>();
   return {
     getResource: () => bn(0),
-    isUnlocked: (id) => unlocks.get(id) ?? false,
+    getFlag: (id) => unlocks.get(id) ?? false,
     getState: () => undefined,
     getRate: () => Decimal.dZero,
     applyResourceOp: () => {},
-    setUnlocked: (id, v) => {
+    setFlag: (id, v) => {
       unlocks.set(id, v);
     },
     setState: () => {},
@@ -117,7 +117,7 @@ describe('Scenario 1 — knowledge-gated conversation', () => {
       expect(snap?.choices.map((c) => c.id)).toEqual(['ask-mundane']);
 
       // Discover the knowledge entry — the gate now passes.
-      accessor.setUnlocked('knowledge-restricted-library-tip', true);
+      accessor.setFlag('knowledge-restricted-library-tip', true);
 
       session.start('rask-greeting');
       snap = session.present();
@@ -176,7 +176,7 @@ describe('Scenario 2 — multi-loop persistence', () => {
       });
 
       // Player unlocks the first protocol step's knowledge and advances trust.
-      accessor.setUnlocked('knowledge-rask-approach', true);
+      accessor.setFlag('knowledge-rask-approach', true);
       const rask = cat.get('mentor-rask')!;
       expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
       expect(rask.fields.trust.getIndex()).toBe(1);
@@ -189,7 +189,7 @@ describe('Scenario 2 — multi-loop persistence', () => {
 
       expect(rask.fields.trust.getIndex()).toBe(0);
       // Knowledge unlock survived the relationship reset.
-      expect(accessor.isUnlocked('knowledge-rask-approach')).toBe(true);
+      expect(accessor.getFlag('knowledge-rask-approach')).toBe(true);
       // Player can re-advance trust without re-discovering the knowledge — the
       // gate still passes.
       expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');

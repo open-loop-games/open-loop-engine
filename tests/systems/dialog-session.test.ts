@@ -45,11 +45,11 @@ function buildAccessor(state: Record<string, unknown> = {}): GameStateAccessorMu
   const unlocks = new Map<string, boolean>();
   return {
     getResource: () => bn(0),
-    isUnlocked: (id) => unlocks.get(id) ?? false,
+    getFlag: (id) => unlocks.get(id) ?? false,
     getState: (path) => state[path],
     getRate: () => Decimal.dZero,
     applyResourceOp: () => {},
-    setUnlocked: (id, v) => {
+    setFlag: (id, v) => {
       unlocks.set(id, v);
     },
     setState: (path, v) => {
@@ -176,7 +176,7 @@ describe('createDialogSession', () => {
 
   it('reveals gated choices once the gate flips true', () => {
     const accessor = buildAccessor();
-    accessor.setUnlocked('knowledge-restricted-tip', true);
+    accessor.setFlag('knowledge-restricted-tip', true);
     const session = buildSession([greetingGraph], { accessor });
     session.start('rask-greeting');
     const snap = session.present();
@@ -297,7 +297,7 @@ describe('createDialogSession', () => {
 
   it('advances a node whose choices were gated off after it presented them', () => {
     const accessor = buildAccessor();
-    accessor.setUnlocked('offer-open', true);
+    accessor.setFlag('offer-open', true);
     const setStateSpy = vi.spyOn(accessor, 'setState');
     const graph: DialogGraph = {
       id: 'lapsed-offer',
@@ -316,7 +316,7 @@ describe('createDialogSession', () => {
     session.start('lapsed-offer');
     expect(session.present()?.choices.map((c) => c.id)).toEqual(['offer']);
 
-    accessor.setUnlocked('offer-open', false);
+    accessor.setFlag('offer-open', false);
     expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], finished: false });
 
     const presented = vi.fn();

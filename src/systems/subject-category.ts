@@ -727,7 +727,7 @@ function buildSubjectSignals<S extends FieldSchema>(
   }
 
   return {
-    unlock: computed(() => fields.some(isNonDefault)),
+    active: computed(() => fields.some(isNonDefault)),
     count: computed(() => Decimal.fromValue(fields.filter(isNonDefault).length)),
   };
 }

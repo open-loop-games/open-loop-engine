@@ -32,7 +32,7 @@ beforeEach(() => {
 
 type Fixture = ReturnType<typeof buildMixedEngine>;
 
-type MutationAxis = 'resource' | 'rate' | 'unlock' | 'state' | 'entity';
+type MutationAxis = 'resource' | 'rate' | 'flag' | 'state' | 'entity';
 
 interface Mutation {
   axis: MutationAxis;
@@ -69,7 +69,7 @@ function makeMutationPool(rng: () => number): Mutation[] {
   }
   for (const key of unlockKeys) {
     pool.push({
-      axis: 'unlock',
+      axis: 'flag',
       key,
       apply: (c) => {
         c.unlocks[key] = rng() < 0.5;
@@ -116,7 +116,7 @@ function makeMutationPool(rng: () => number): Mutation[] {
       key: `trials.${id}.active`,
       apply: (_c, f) => {
         const challenge = f.trials.getChallenge(id)!;
-        challenge.active.value = !challenge.active.value;
+        challenge.entered.value = !challenge.entered.value;
       },
     });
     pool.push({
@@ -144,8 +144,8 @@ function applyMutation(
     case 'rate':
       inc.invalidateRate(mutation.key);
       break;
-    case 'unlock':
-      inc.invalidateUnlock(mutation.key);
+    case 'flag':
+      inc.invalidateFlag(mutation.key);
       break;
     case 'state':
       inc.invalidateState(mutation.key);
@@ -204,7 +204,7 @@ describe('createIncrementalSnapshot — random-mutation equivalence', () => {
     // cached entries.
     config.rates.gold = 7;
     config.rates.gems = 3;
-    inc.invalidateUnlock('silver-unlock');
+    inc.invalidateFlag('silver-unlock');
     const stale = inc.rebuild();
     expect(stale.all).toEqual(before.all);
     expect(stale.all).not.toEqual(createTransitionSnapshot(engine, accessor).all);

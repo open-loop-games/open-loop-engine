@@ -426,7 +426,7 @@ function renderIndex(byCluster) {
     '',
     '| Form | Shape | Use when | Predictor-friendly | Serializable | Tier anchor |',
     '| --- | --- | --- | --- | --- | --- |',
-    '| `Gate` | typed AST (`ResourceGteGate`, `UnlockGate`, `FlagGate`, …) | declarative predicate; want `timeUntilGateFlip` + save/mod/sim serializability | yes (typed) | yes | mechanics.md#gate |',
+    '| `Gate` | typed AST (`ResourceGteGate`, `ActiveGate`, `FlagGate`, …) | declarative predicate; want `timeUntilGateFlip` + save/mod/sim serializability | yes (typed) | yes | mechanics.md#gate |',
     '| `Requirement` | cost-bearing predicate with pay strategy | the predicate also charges a resource (cost, bulk-buy via inversion, pay-by-reset / pay-by-division) | partial | no (closures) | mechanics.md#requirements |',
     "| `Computable<boolean>` | ref / computed / getter | typed refs already in scope; no introspection needed; predicate doesn't fit dot-paths | no | no | mechanics.md#computed |",
     '',

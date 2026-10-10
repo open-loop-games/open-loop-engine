@@ -11,8 +11,8 @@ export interface ResourceEffect {
 }
 
 /** Sets an unlock flag to true or false, controlling feature/content visibility. */
-export interface UnlockEffect {
-  type: 'unlock';
+export interface FlagEffect {
+  type: 'flag';
   target: string;
   /** Whether the target should become unlocked (`true`) or locked (`false`). */
   value: boolean;
@@ -60,7 +60,7 @@ export interface ConditionalEffect {
  * receive them opaquely typed as `IEffect`, so the embedded ICondition can't
  * be reached through union narrowing.
  */
-export type IEffect = ResourceEffect | UnlockEffect | StateEffect | CompositeEffect;
+export type IEffect = ResourceEffect | FlagEffect | StateEffect | CompositeEffect;
 
 /**
  * Engine-internal effect IR — the full union including {@link ConditionalEffect}.
@@ -88,8 +88,8 @@ export interface ResourceCondition {
  * True when the named unlock flag is set. Used to gate content behind prior progression.
  * @internal
  */
-export interface UnlockCondition {
-  type: 'unlock';
+export interface FlagCondition {
+  type: 'flag';
   target: string;
 }
 
@@ -148,7 +148,7 @@ export interface NotCondition {
  */
 export type ICondition =
   | ResourceCondition
-  | UnlockCondition
+  | FlagCondition
   | StateCondition
   | AllCondition
   | AnyCondition
@@ -206,7 +206,7 @@ export interface GameStateAccessor {
   /** Returns the current amount of the named resource. */
   getResource(id: string): Decimal;
   /** Returns whether the named unlock flag is currently set. */
-  isUnlocked(id: string): boolean;
+  getFlag(id: string): boolean;
   /** Returns the value at a dot-separated state path (e.g. `"player.phase"`). */
   getState(path: string): unknown;
   /**

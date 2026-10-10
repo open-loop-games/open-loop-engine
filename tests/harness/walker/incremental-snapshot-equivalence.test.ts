@@ -35,7 +35,7 @@ describe('createIncrementalSnapshot — construction', () => {
     engine.start();
     const accessor: GameStateAccessor = {
       getResource: () => bn(0),
-      isUnlocked: () => false,
+      getFlag: () => false,
       getState: () => undefined,
       getRate: () => bn(0),
     };
@@ -72,7 +72,7 @@ describe('createIncrementalSnapshot — construction', () => {
     engine.start();
     const accessor: GameStateAccessor = {
       getResource: () => bn(0),
-      isUnlocked: () => false,
+      getFlag: () => false,
       getState: () => undefined,
       getRate: () => bn(0),
     };
@@ -134,7 +134,7 @@ describe('createIncrementalSnapshot — equivalence across mutations', () => {
     );
 
     config.unlocks['bronze-unlock'] = true;
-    inc.invalidateUnlock('bronze-unlock');
+    inc.invalidateFlag('bronze-unlock');
     expectSnapshotsEquivalent(inc, engine, accessor, 'post-unlock-flip');
   });
 
@@ -287,7 +287,7 @@ describe('createIncrementalSnapshot — dirty-set plumbing', () => {
 
     expect(() => inc.invalidateResource('not-a-resource')).not.toThrow();
     expect(() => inc.invalidateRate('not-a-rate')).not.toThrow();
-    expect(() => inc.invalidateUnlock('not-an-unlock')).not.toThrow();
+    expect(() => inc.invalidateFlag('not-an-unlock')).not.toThrow();
     expect(() => inc.invalidateState('not.a.state.path')).not.toThrow();
 
     // And the next rebuild is still correct.
@@ -304,7 +304,7 @@ describe('createIncrementalSnapshot — dirty-set plumbing', () => {
 
     inc.invalidateResource('gold');
     inc.invalidateRate('gold');
-    inc.invalidateUnlock('bronze-unlock');
+    inc.invalidateFlag('bronze-unlock');
     inc.invalidateState('trial.seen');
     const viaTargeted = inc.rebuild();
 

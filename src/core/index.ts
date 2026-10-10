@@ -8,7 +8,7 @@ export type { RequiredKeys } from './common';
 export type {
   IEffect,
   ResourceEffect,
-  UnlockEffect,
+  FlagEffect,
   StateEffect,
   CompositeEffect,
   GameStateAccessor,

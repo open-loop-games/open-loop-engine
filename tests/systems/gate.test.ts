@@ -72,7 +72,7 @@ function buildFixture(): {
   chalEntry: ReturnType<ReturnType<typeof createChallengeCategory<ChalDef>>['getEntry']>;
   points: ReturnType<typeof createResource<number>>;
   setRate: (id: string, rate: Decimal) => void;
-  setUnlocked: (id: string, value: boolean) => void;
+  setFlag: (id: string, value: boolean) => void;
   setState: (path: string, value: unknown) => void;
   stop: () => void;
 } {
@@ -92,10 +92,10 @@ function buildFixture(): {
   const accessor: GameStateAccessorMutator = {
     getResource: (id) => (id === 'points' ? new Decimal(points.value) : Decimal.dZero),
     getRate: (id) => rates.get(id) ?? Decimal.dZero,
-    isUnlocked: (id) => unlocks.get(id) ?? false,
+    getFlag: (id) => unlocks.get(id) ?? false,
     getState: (path) => stateMap.get(path),
     applyResourceOp: () => {},
-    setUnlocked: (id, value) => unlocks.set(id, value),
+    setFlag: (id, value) => unlocks.set(id, value),
     setState: (path, value) => stateMap.set(path, value),
   };
 
@@ -164,7 +164,7 @@ function buildFixture(): {
     chalEntry: chalCat!.getEntry('no-x'),
     points: points!,
     setRate: (id, rate) => rates.set(id, rate),
-    setUnlocked: (id, value) => unlocks.set(id, value),
+    setFlag: (id, value) => unlocks.set(id, value),
     setState: (path, value) => stateMap.set(path, value),
     stop: () => engine.stop(),
   };
@@ -215,11 +215,11 @@ describe('evaluateGate — per-kind dispatch', () => {
   it('unlock reads CategoryEntrySignals.unlock', () => {
     const f = buildFixture();
     expect(
-      evaluateGate({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime),
+      evaluateGate({ kind: 'active', category: 'achievements', entry: 'first' }, f.runtime),
     ).toBe(false);
     f.achEntry!.achievement.complete();
     expect(
-      evaluateGate({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime),
+      evaluateGate({ kind: 'active', category: 'achievements', entry: 'first' }, f.runtime),
     ).toBe(true);
     f.stop();
   });
@@ -247,7 +247,7 @@ describe('evaluateGate — per-kind dispatch', () => {
   it('flag reads accessor.isUnlocked by flat id', () => {
     const f = buildFixture();
     expect(evaluateGate({ kind: 'flag', id: 'knowledge-rask' }, f.runtime)).toBe(false);
-    f.setUnlocked('knowledge-rask', true);
+    f.setFlag('knowledge-rask', true);
     expect(evaluateGate({ kind: 'flag', id: 'knowledge-rask' }, f.runtime)).toBe(true);
     f.stop();
   });
@@ -261,7 +261,7 @@ describe('evaluateGate — per-kind dispatch', () => {
       ),
     ).toBe(false);
     expect(
-      evaluateGate({ kind: 'unlock', category: 'fictional', entry: 'whatever' }, f.runtime),
+      evaluateGate({ kind: 'active', category: 'fictional', entry: 'whatever' }, f.runtime),
     ).toBe(false);
     f.stop();
   });
@@ -316,7 +316,7 @@ describe('evaluateGate — combinators', () => {
       kind: 'any',
       of: [
         { kind: 'resource-gte', resource: 'points', value: 100 },
-        { kind: 'unlock', category: 'achievements', entry: 'first' },
+        { kind: 'active', category: 'achievements', entry: 'first' },
       ],
     };
     expect(evaluateGate(either, f.runtime)).toBe(false);
@@ -329,7 +329,7 @@ describe('evaluateGate — combinators', () => {
     const f = buildFixture();
     const negated: Gate = {
       kind: 'not',
-      of: { kind: 'unlock', category: 'achievements', entry: 'first' },
+      of: { kind: 'active', category: 'achievements', entry: 'first' },
     };
     expect(evaluateGate(negated, f.runtime)).toBe(true);
     f.achEntry!.achievement.complete();
@@ -379,7 +379,7 @@ describe('timeUntilGateFlip — dispatch table', () => {
       ).reason,
     ).toBe('opaque-predicate');
     expect(
-      timeUntilGateFlip({ kind: 'unlock', category: 'achievements', entry: 'first' }, f.runtime)
+      timeUntilGateFlip({ kind: 'active', category: 'achievements', entry: 'first' }, f.runtime)
         .reason,
     ).toBe('opaque-predicate');
     expect(
@@ -608,7 +608,7 @@ describe('evaluateGate — no ambient accessor', () => {
     expect(
       evaluateGate({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 9 }, f.runtime),
     ).toBe(false);
-    expect(evaluateGate({ kind: 'unlock', category: 'upgrades', entry: 'fast' }, f.runtime)).toBe(
+    expect(evaluateGate({ kind: 'active', category: 'upgrades', entry: 'fast' }, f.runtime)).toBe(
       true,
     );
     f.stop();
@@ -693,7 +693,7 @@ describe('getRequiredGateServices', () => {
     expect(handles({ kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 })).toEqual([
       'categories',
     ]);
-    expect(handles({ kind: 'unlock', category: 'achievements', entry: 'first' })).toEqual([
+    expect(handles({ kind: 'active', category: 'achievements', entry: 'first' })).toEqual([
       'categories',
     ]);
   });
@@ -722,7 +722,7 @@ describe('getRequiredGateServices', () => {
           of: {
             kind: 'any',
             of: [
-              { kind: 'unlock', category: 'achievements', entry: 'first' },
+              { kind: 'active', category: 'achievements', entry: 'first' },
               { kind: 'flag', id: 'knowledge-rask' },
             ],
           },
@@ -737,7 +737,7 @@ describe('getRequiredGateServices', () => {
       kind: 'any',
       of: [
         { kind: 'count-gte', category: 'producers', entry: 'farm', value: 5 },
-        { kind: 'unlock', category: 'upgrades', entry: 'fast' },
+        { kind: 'active', category: 'upgrades', entry: 'fast' },
       ],
     };
     expect(handles(gate)).toEqual(['categories']);
@@ -766,7 +766,7 @@ describe('gateToCondition — partial projection', () => {
 
   it('E.conditional over a cumulative-gte gate fails when the effect is built', () => {
     expect(() =>
-      E.conditional({ kind: 'cumulative-gte', resource: 'gold', value: 50 }, E.unlock('x')),
+      E.conditional({ kind: 'cumulative-gte', resource: 'gold', value: 50 }, E.flag('x')),
     ).toThrow(/no ICondition projection/);
   });
 
@@ -776,9 +776,9 @@ describe('gateToCondition — partial projection', () => {
     );
   });
 
-  it('flag → UnlockCondition (1:1, name-preserving projection)', () => {
+  it('flag → FlagCondition (1:1, name-preserving projection)', () => {
     expect(gateToCondition({ kind: 'flag', id: 'knowledge-rask' })).toEqual({
-      type: 'unlock',
+      type: 'flag',
       target: 'knowledge-rask',
     });
   });
@@ -798,7 +798,7 @@ describe('gateToCondition — partial projection', () => {
     const accessor: GameStateAccessor = {
       getResource: (id) => (id === 'gold' ? bn(75) : bn(0)),
       getRate: () => Decimal.dZero,
-      isUnlocked: () => false,
+      getFlag: () => false,
       getState: () => 'mid',
     };
     expect(evaluateCondition(projected, accessor)).toBe(true);
@@ -812,7 +812,7 @@ describe('gateToCondition — partial projection', () => {
 
   it('throws on unlock (category-aware)', () => {
     expect(() =>
-      gateToCondition({ kind: 'unlock', category: 'achievements', entry: 'first' }),
+      gateToCondition({ kind: 'active', category: 'achievements', entry: 'first' }),
     ).toThrow(/no ICondition projection/);
   });
 

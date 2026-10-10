@@ -67,8 +67,8 @@ export interface TransitionDeps {
    * `accessor.getInflowRate(id)` where the accessor serves it.
    */
   rates: ReadonlySet<string>;
-  /** Unlock ids read via `accessor.isUnlocked(id)`. */
-  unlocks: ReadonlySet<string>;
+  /** Flag ids read via `accessor.getFlag(id)`. */
+  flags: ReadonlySet<string>;
   /** Dot-paths read via `accessor.getState(path)`. */
   states: ReadonlySet<string>;
 }
@@ -162,7 +162,7 @@ export function timeUntilConditionFlip(
       return timeUntilCombinatorFlip(condition.conditions, accessor, 'any');
     case 'not':
       return timeUntilConditionFlip(condition.condition, accessor);
-    case 'unlock':
+    case 'flag':
     case 'state':
       return { seconds: null, reason: 'opaque-predicate' };
   }
