@@ -6,11 +6,11 @@
  *
  * Two modes for the two universal patterns:
  * - **Level-driven:** modifier = levelToMultiplier(level). For tiers where the
- *   current level directly drives the multiplier (Increlution gen/instinct,
- *   Progress Knight level bonuses).
+ *   current level directly drives the multiplier (e.g. stat tiers,
+ *   level bonuses).
  * - **Accumulator:** modifier = 1 + permanentBonus. For tiers where a bonus
- *   accumulates across loops via retentionFormula (Idle Loops soulstones,
- *   Groundhog Life snapshots).
+ *   accumulates across loops via retentionFormula (e.g. soulstones,
+ *   snapshots).
  *
  * Dual-tier skills compose as two createSkill() calls — one per tier — each
  * returning a .modifier that plugs into a sequential chain.
@@ -102,8 +102,7 @@ export interface SkillOptionsBase {
  * Accumulator mode — permanent bonus accumulates across loops.
  *
  * Modifier = `1 + permanentBonus`. Call `accumulateBonus()` at loop end to
- * apply the retention formula. Good for Idle Loops soulstones, Groundhog
- * Life snapshots.
+ * apply the retention formula. Good for soulstone-style or snapshot-style bonuses.
  */
 export interface AccumulatorSkillOptions extends SkillOptionsBase {
   /**
@@ -119,7 +118,7 @@ export interface AccumulatorSkillOptions extends SkillOptionsBase {
  * Level-driven mode — modifier tracks level reactively.
  *
  * Modifier = `levelToMultiplier(level)`. No permanentBonus or accumulation.
- * Good for Increlution gen/instinct tiers, Progress Knight level multipliers.
+ * Good for stat tiers and level multipliers.
  */
 export interface LevelDrivenSkillOptions extends SkillOptionsBase {
   /** Formula factory — receives the computed level ref, returns a FormulaSource. */
@@ -338,7 +337,7 @@ function buildLevelUpEmitter(
  *   and (accumulator mode only) permanentBonus + accumulateBonus + projectGain
  *
  * @example
- * // Level-driven (Increlution gen tier) — power curve via Formula sugar
+ * // Level-driven (stat tier) — power curve via Formula sugar
  * const gen = createSkill({
  *   id: 'combat-gen',
  *   xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
@@ -352,7 +351,7 @@ function buildLevelUpEmitter(
  * gen.gainChain.add(createMultiplicativeModifier({ multiplier: 2 }))
  *
  * @example
- * // Accumulator (Idle Loops soulstones)
+ * // Accumulator (soulstones)
  * const mastery = createSkill({
  *   id: 'combat-mastery',
  *   xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),

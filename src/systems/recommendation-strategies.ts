@@ -5,8 +5,7 @@
  * incremental games with cycle mechanics:
  *
  * - {@link createBestReplayDef} — "replay the best-known config for this metric"
- *   (Cavernous II loadBestRoute, Melvor Idle combat loadouts), optionally
- *   gated on a goal threshold (Spell Compiler farming goals)
+ *   (a best route, a combat loadout), optionally gated on a goal threshold
  *
  * A thin wrapper over {@link BestOf} data. Games with more complex needs
  * (adaptive responses, trend detection, route generation) implement custom

@@ -9,10 +9,10 @@
  * - {@link createCycle} — the sole factory, wires up reset + elapsed timer + stats
  *
  * Supports any termination model via `endCondition`:
- * - Mana-budget (Idle Loops) — cycle ends when mana depletes
- * - Health-to-zero (Increlution) — cycle ends when HP hits 0
- * - Fixed time budget (Groundhog Life) — cycle ends after N seconds
- * - Manual trigger (Progress Knight) — omit `endCondition`, call `cycle.end()` directly
+ * - Mana-budget — cycle ends when mana depletes
+ * - Health-to-zero — cycle ends when HP hits 0
+ * - Fixed time budget — cycle ends after N seconds
+ * - Manual trigger — omit `endCondition`, call `cycle.end()` directly
  *
  * @see ./cycle-log for per-cycle analytics that snapshot/diff metrics on lifecycle events
  */

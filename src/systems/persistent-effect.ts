@@ -44,7 +44,7 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 
 // === TYPES ===
 
-// TODO(ergonomics): string-keyed effect dict shorthand — Kittens Game-style
+// TODO(ergonomics): string-keyed effect dict shorthand — string-keyed
 // `effects: { "goldPerTick": 0.01 }` mapped to Grant[].
 // Consumer-side helper first; promote to engine if two consumers converge.
 

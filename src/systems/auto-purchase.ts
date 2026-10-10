@@ -397,9 +397,8 @@ export interface SetupPolicyAutoPurchaseOptions {
    * fraction of the bank stays at its start-of-tick value for the whole drain,
    * which over-reserves slightly rather than under-reserving.
    *
-   * Mirrors the "leave N in the bank" pattern shared by Frozen Cookies
-   * (Spontaneous Edifice / harvest bank), Cookie Monster (`PP` formula's
-   * bank term), and AutoTrimps (`spendingPerc`).
+   * Mirrors the "leave N in the bank" pattern shared by auto-buy
+   * userscripts.
    *
    * Independent of any reserve a {@link SelectionPolicy} scores with —
    * {@link selectionHybridPayback}'s wait term reads whatever `getResource`
@@ -479,7 +478,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  *
  * @example
  * ```ts
- * // Cookie Clicker-style hybrid auto-buy behind an upgrade
+ * // Hybrid auto-buy behind an upgrade
  * setupPolicyAutoPurchase(
  *   buildings,
  *   {

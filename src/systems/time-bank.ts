@@ -9,13 +9,12 @@
  *
  * - {@link createTimeBank} — the spend-agnostic reservoir: deposit (with an
  *   earn-efficiency factor and optional cap) and withdraw. Consumers with
- *   bespoke spend shapes (per-subsystem fast-tick à la Bitburner's stored
+ *   bespoke spend shapes (per-subsystem fast-tick such as stored
  *   cycles) wire `withdraw()` at their own cadence.
- * - {@link createBankedAcceleration} — the dominant corpus shape (Kill the
- *   Lich, Idle Loops lineage, Cavernous, Shark Game): toggle a live
+ * - {@link createBankedAcceleration} — the dominant corpus shape: toggle a live
  *   `TickDriver.speedMultiplier` boost, drain the bank per tick, auto-stop
  *   at depletion. Sessions always start unaccelerated.
- * - {@link burstDischarge} — the Antimatter Dimensions "stored time" shape:
+ * - {@link burstDischarge} — the "stored time" shape:
  *   dump (a fraction of) the reservoir through `processOfflineTime` as one
  *   immediate fast-forward, optionally at an efficiency penalty.
  *
@@ -50,7 +49,7 @@ export interface TimeBankConfig {
   id?: string;
   /**
    * Fraction of each deposit that lands in the bank (default 1). Corpus
-   * range: 1 (Kill the Lich), 0.7 (AD stored real time), 2/3 (Evolve).
+   * range: 1, 0.7, 2/3.
    * Can be a ref or getter for dynamic values (upgradeable efficiency).
    */
   earnEfficiency?: Computable<number>;
@@ -150,10 +149,10 @@ export interface BankedAccelerationConfig {
    * - `'excess'` (default) — only the boost beyond baseline, charged in real
    *   seconds: a spend at n× costs n − 1 banked seconds per real second,
    *   whatever the driver's baseline multiplier. The corpus-dominant
-   *   conservation shape (Kill the Lich, Idle Loops, Cavernous, Shark Game);
-   *   Idle Loops charges real time even while a challenge doubles game speed.
+   *   conservation shape; real time is charged even while a challenge
+   *   doubles game speed.
    * - `'full'` — the whole accelerated dt: banked seconds are raw sim-seconds
-   *   delivered at speed. Deliberately lossier (Kittens Game Redshift).
+   *   delivered at speed. Deliberately lossier.
    */
   drainMode?: 'excess' | 'full';
   /**
@@ -302,7 +301,7 @@ let burstInFlight = false;
 export interface BurstDischargeOptions {
   /**
    * Fraction of the current reservoir to discharge (default 1 — the whole
-   * bank). AD's Enslaved auto-release is `0.01`.
+   * bank). A slow auto-release is `0.01`.
    */
   fraction?: number;
   /**
@@ -322,7 +321,7 @@ export interface BurstDischargeOptions {
 /**
  * Spend (a fraction of) a {@link TimeBank} as one immediate fast-forward:
  * withdraw, then replay the seconds through {@link processOfflineTime} in a
- * single burst. The AD "stored time" discharge shape, as opposed to
+ * single burst. The "stored time" discharge shape, as opposed to
  * {@link createBankedAcceleration}'s live boost.
  *
  * Wall-clock faithful and speed-independent — the replay path never applies

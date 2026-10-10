@@ -76,7 +76,7 @@ export interface ReplacementBindingOptions {
  *
  * Uses a value-based target — callers pass the current cancelled value as a
  * getter, not an id pointer to an existing modifier. This fits intrinsic
- * targets (like AD's `1.1^n` baked into the production formula, which has no
+ * targets (like a `1.1^n` baked into the production formula, which has no
  * corresponding chain entry to point at) as well as targets that are themselves
  * chain entries.
  *

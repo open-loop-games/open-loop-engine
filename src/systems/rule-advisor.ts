@@ -136,8 +136,8 @@ export interface RuleAdvisorOptions<TEntry, TProfile, TPayload, TContext = undef
   /**
    * History-window aggregator. Called fresh each `reevaluate()` with the
    * resolved `context` value as the second argument (mirroring the analyzer
-   * shape). The Cookie Monster degenerate case (window = 1,
-   * current-state-only advisory) returns the last entry alone; spell-compiler
+   * shape). The degenerate case (window = 1,
+   * current-state-only advisory) returns the last entry alone; a richer aggregator
    * walks the history newest-to-oldest with a fingerprint filter keyed off
    * the context's rule-set and a window cap.
    */
@@ -302,7 +302,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  *
  * @example
  * ```ts
- * // Profile-history advisor with parallel rule-set context (spell-compiler shape):
+ * // Profile-history advisor with parallel rule-set context:
  * const advisor = createRuleAdvisor({
  *   historySource: cycleLog,
  *   context: () => ({ ruleSet: currentRuleSet.value, encounterId: currentEncounterId.value }),

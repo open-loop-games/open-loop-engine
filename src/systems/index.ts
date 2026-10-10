@@ -133,7 +133,7 @@ export * from './action-category';
 export * from './auto-purchase';
 
 // === LOOP INCREMENTALS ===
-// Cycle: constrained-replay pattern (Idle Loops, Increlution, etc.)
+// Cycle: constrained-replay pattern
 // Skill: dual-tier XP/level with permanent bonus accumulation across cycles.
 // SkillCategory: batch-register Skills from content definitions.
 // Retention: policies for what persists between cycles.

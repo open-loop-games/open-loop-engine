@@ -6,9 +6,9 @@
  * modified conditions, and earn persistent rewards on completion.
  *
  * Supports:
- * - Lloyd-style: 3 simple mutually exclusive challenges
- * - AD-style: multi-tier challenges with multiple completions and scaling rewards
- * - TMT/Profectus-style: reset-bound enter/exit with goal conditions
+ * - Simple: 3 mutually exclusive challenges
+ * - Multi-tier: challenges with multiple completions and scaling rewards
+ * - Reset-bound: enter/exit with goal conditions
  *
  * Uses {@link createCategoryBase} for registration + persistent context.
  * Composes with {@link OverrideRegistry} for scoped push/pop of game
@@ -108,7 +108,7 @@ export interface ChallengeDef<
    */
   goal?: Predicate;
 
-  /** Maximum number of completions. Default: 1. AD Eternity Challenges use 5. */
+  /** Maximum number of completions. Default: 1. Multi-tier challenges often use 5. */
   completionLimit?: number;
 
   /**
@@ -240,7 +240,7 @@ export interface ChallengeCategoryOptions<Def extends ChallengeDef, State = void
   contentRegistries?: Record<string, ContentRegistryView<any>>;
 
   /**
-   * Optional reset to trigger on challenge enter (TMT/Profectus-style).
+   * Optional reset to trigger on challenge enter.
    * Called after overrides are pushed but before onEnter.
    */
   reset?: Reset;

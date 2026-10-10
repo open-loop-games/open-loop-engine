@@ -69,7 +69,7 @@ export interface PurchasableDisplay {
 }
 
 // TODO(expansion): staged definitions — a purchasable that transforms between
-// N phases (Kittens Game stages[], AD charged overlays). Add optional `stages`
+// N phases (a stages[] list, charged overlays). Add optional `stages`
 // array to options, expose `stage` ref on instance. Deferred: no consumer need yet.
 
 /**

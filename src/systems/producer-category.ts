@@ -182,7 +182,7 @@ export interface Producer {
   /**
    * Owned count: the purchasable's `amount`, or 0 when no purchase config is
    * set. Bind this — not `count` — for effects and costs that apply only to
-   * what the player has purchased (e.g. AD-shape "+10% per owned T1",
+   * what the player has purchased (e.g. "+10% per owned T1",
    * next-tier-cost-scales-with-owned).
    */
   readonly ownedCount: ComputedRef<DecimalSource>;
@@ -406,7 +406,7 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
  *
  * @example
  * ```ts
- * // Cookie Clicker: buildings that produce cookies per second
+ * // Buildings that produce currency per second
  * const buildings = createProducerCategory<BuildingDef>({
  *   id: 'buildings',
  *   mapProducer: (def) => ({

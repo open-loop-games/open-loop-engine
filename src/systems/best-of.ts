@@ -49,7 +49,7 @@ export interface BestOfMetricDef {
    *
    * @example
    * ```ts
-   * // Cavernous II-style: project transient stat gain into permanent base increase
+   * // Project transient stat gain into permanent base increase
    * project: (observed) => retentionFormula(observed, currentBase)
    * ```
    */

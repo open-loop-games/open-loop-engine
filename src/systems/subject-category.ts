@@ -610,7 +610,7 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  *
  * @example
  * ```ts
- * // One subject, many fields (maldacena shape)
+ * // One subject, many fields
  * const entity = createSubjectCategory({
  *   id: 'entity',
  *   fields: {
