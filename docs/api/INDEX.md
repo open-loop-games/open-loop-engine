@@ -52,7 +52,7 @@ Deliberately absent: real-time entity combat (positioning, collision, frame-leve
 | skill XP / level curve | content-systems.md#skill |
 | inventory with item capacities | content-systems.md#inventory |
 | zone unlocks / named content regions | content-systems.md#zone |
-| constrained loadout / persistent selection slot | content-systems.md#slot |
+| constrained loadout / persistent selection | content-systems.md#loadout |
 | automation unlock ladder | content-systems.md#automation-tiers |
 | modifier bonus stacking on a chain | mechanics.md#modifier |
 | "buy max" count / bulk cost preview | mechanics.md#formulas |
@@ -198,7 +198,7 @@ Substrate the content systems compose against. `CategoryBase` + `ContentRegistry
 
 ### Content Systems — `content-systems.md`
 
-The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
+The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Loadout / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
 
 - `achievement` → content-systems.md#achievement
 - `action-category` → content-systems.md#action-category
@@ -212,7 +212,7 @@ The validated incremental primitives, each a typed registration surface over the
 - `purchasable` → content-systems.md#purchasable
 - `run-pool` → content-systems.md#runpool
 - `skill` → content-systems.md#skill
-- `slot` → content-systems.md#slot
+- `loadout` → content-systems.md#loadout
 - `zone` → content-systems.md#zone
 
 ### Narrative — `content-narrative.md`

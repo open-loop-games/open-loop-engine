@@ -414,19 +414,19 @@ describe('createActionCategory — onItemChange', () => {
 // ============================================================================
 
 describe('createActionCategory — payload', () => {
-  it('patchItemPayload with partial merges', () => {
+  it('updateItemPayload with partial merges', () => {
     const { category } = makeCategory();
     category.register({ id: 'with-payload', baseTicks: 100 });
     category.enqueue('with-payload', { payload: { count: 3 } });
-    category.patchItemPayload('with-payload', { count: 5 });
+    category.updateItemPayload('with-payload', { count: 5 });
     expect(category.currentItem?.payload).toEqual({ count: 5 });
   });
 
-  it('patchItemPayload with function transforms', () => {
+  it('updateItemPayload with function transforms', () => {
     const { category } = makeCategory();
     category.register({ id: 'fn-payload', baseTicks: 100 });
     category.enqueue('fn-payload', { payload: { count: 1 } });
-    category.patchItemPayload('fn-payload', (p) => ({ count: p.count + 10 }));
+    category.updateItemPayload('fn-payload', (p) => ({ count: p.count + 10 }));
     expect(category.currentItem?.payload).toEqual({ count: 11 });
   });
 });

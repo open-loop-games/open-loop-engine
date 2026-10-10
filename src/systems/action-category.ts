@@ -22,7 +22,7 @@
  * `cancelled`, so run it only where losing the queue is intended.
  *
  * ID-addressed verbs (`setItemStatus` / `tickItemProgress` / `setItemError` /
- * `patchItemPayload`) target the current item if its defId matches, else
+ * `updateItemPayload`) target the current item if its defId matches, else
  * linear-scan `sequencer.items.value` for the first match. Queues <~20 per
  * consumer annotation — indexed lookup is a `TODO(expansion)`.
  *
@@ -244,7 +244,7 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
   setItemProgress(defId: string, value: number | Record<string, number>): void;
   tickItemProgress(defId: string, delta: number | Record<string, number>): void;
   setItemError(defId: string, error: { message: string } | null): void;
-  patchItemPayload(defId: string, update: Partial<Payload> | ((p: Payload) => Payload)): void;
+  updateItemPayload(defId: string, update: Partial<Payload> | ((p: Payload) => Payload)): void;
 
   // --- Scoped subscriptions ---
 
@@ -434,19 +434,19 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     return cur.metadata;
   }
 
-  function patchByDefId(
+  function updateByDefId(
     defId: string,
     patch: (m: ActionItemMetadata<Payload>) => ActionItemMetadata<Payload>,
   ): boolean {
     const cur = sequencer.currentItem;
     if (cur && cur.metadata.defId === defId) {
-      sequencer.patchCurrentItem(patch);
+      sequencer.updateCurrentItem(patch);
       fireItemChange(defId);
       return true;
     }
     const idx = findItemIndexByDefId(defId);
     if (idx >= 0) {
-      sequencer.patchItem(idx, patch);
+      sequencer.updateItem(idx, patch);
       fireItemChange(defId);
       return true;
     }
@@ -493,7 +493,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     // must see the new lifecycle, and one that calls a verb must not have its
     // write overwritten by this patch's spread of the stale metadata.
     const transition: { from?: ActionItemStatus; patched?: ActionItemMetadata<Payload> } = {};
-    patchByDefId(defId, (m) => {
+    updateByDefId(defId, (m) => {
       const from = m.status;
       if (from === next && !extra) return m;
       const patched: ActionItemMetadata<Payload> = {
@@ -545,7 +545,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     // terminal state there too, or the slot reads 'running' until replayed.
     if (mode === 'list') {
       const slot = sequencer.cursor - 1;
-      if (sequencer.items.value[slot]?.id === item.id) sequencer.patchItem(slot, () => terminal);
+      if (sequencer.items.value[slot]?.id === item.id) sequencer.updateItem(slot, () => terminal);
     }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
@@ -569,7 +569,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     // before `skipped` fires: record the terminal state there or it reads 'pending'.
     if (mode === 'list') {
       const slot = sequencer.cursor - 1;
-      if (sequencer.items.value[slot]?.id === item.id) sequencer.patchItem(slot, () => terminal);
+      if (sequencer.items.value[slot]?.id === item.id) sequencer.updateItem(slot, () => terminal);
     }
     const entry = makeEntry(meta.defId, terminal);
     if (!entry) return;
@@ -671,11 +671,11 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     },
 
     setItemProgress(defId, value) {
-      patchByDefId(defId, (m) => ({ ...m, progress: value }));
+      updateByDefId(defId, (m) => ({ ...m, progress: value }));
     },
 
     tickItemProgress(defId, delta) {
-      patchByDefId(defId, (m) => {
+      updateByDefId(defId, (m) => {
         if (typeof delta === 'number') {
           const current = typeof m.progress === 'number' ? m.progress : 0;
           return { ...m, progress: current + delta };
@@ -693,10 +693,10 @@ export function createActionCategory<Def extends { id: string }, DefState = void
 
     setItemError(defId, error) {
       if (error === null) {
-        patchByDefId(defId, (m) => (m.error === undefined ? m : { ...m, error: undefined }));
+        updateByDefId(defId, (m) => (m.error === undefined ? m : { ...m, error: undefined }));
         return;
       }
-      patchByDefId(defId, (m) => ({
+      updateByDefId(defId, (m) => ({
         ...m,
         error: { message: error.message, at: Date.now() },
         attempt: m.attempt + 1,
@@ -704,8 +704,8 @@ export function createActionCategory<Def extends { id: string }, DefState = void
       transitionLifecycle(defId, 'failed');
     },
 
-    patchItemPayload(defId, update) {
-      patchByDefId(defId, (m) => {
+    updateItemPayload(defId, update) {
+      updateByDefId(defId, (m) => {
         const nextPayload =
           typeof update === 'function'
             ? update(m.payload)

@@ -66,7 +66,7 @@ export interface Inventory {
   /** Current evaluated per-item cap (reactive) */
   capacity: ComputedRef<Decimal>;
   /** Add a modifier to the per-item capacity chain; returns a remover. */
-  addCapacityModifier(mod: Modifier): () => void;
+  addCapacityModifier(modifier: Modifier): () => void;
   /** How much more of this item can fit */
   remainingSpace(itemId: string): Decimal;
   /** Is the inventory full for a specific item, or overall if no itemId */

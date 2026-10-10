@@ -1,6 +1,6 @@
 # Content Systems
 
-The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
+The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Loadout / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.
 
 ## Canonical entrypoints
 
@@ -8,7 +8,7 @@ The validated incremental primitives, each a typed registration surface over the
 - `createPurchasableCategory` — upgrades, gates, capped repeatables, perks, and bought effects in batch.
 - `createAchievementCategory` — observed milestones and tier ladders that auto-earn.
 - `createSkillCategory` — XP/level progression surfaces.
-- `createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.
+- `createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createLoadout`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.
 - `createActionCategory` — ordered-execution queues with per-execution state machine.
 
 ## Achievement
@@ -185,14 +185,14 @@ Skill helper for dual-tier loop incremental skills
 - `type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions` — Discriminated union of createSkill option shapes — accumulator (XP banks for retention) vs level-driven (level multiplies a curve). `src/systems/skill.ts:134`
 - `interface SkillOptionsBase` — Shared option fields present in both skill modes. `src/systems/skill.ts:82`
 
-## Slot
+## Loadout
 
 constrained persistent selection from a pool
 
-- `function createSlot(options: SlotOptions): Slot` — Creates a slot — a constrained persistent selection from a pool. `src/systems/slot.ts:178`
-- `interface Slot` — A constrained persistent selection from a pool, created by createSlot. `src/systems/slot.ts:107`
-- `interface SlotEvents` — Events emitted by a Slot. `src/systems/slot.ts:92`
-- `interface SlotOptions` — Configuration for createSlot. `src/systems/slot.ts:55`
+- `function createLoadout(options: LoadoutOptions): Loadout` — Creates a loadout — a constrained persistent selection from a pool. `src/systems/loadout.ts:178`
+- `interface Loadout` — A constrained persistent selection from a pool, created by createLoadout. `src/systems/loadout.ts:107`
+- `interface LoadoutEvents` — Events emitted by a Loadout. `src/systems/loadout.ts:92`
+- `interface LoadoutOptions` — Configuration for createLoadout. `src/systems/loadout.ts:55`
 
 ## Zone
 

@@ -1013,7 +1013,7 @@ describe('Sequencer — burst pop ordering', () => {
 
     const ctxId = `q-burst-${Math.random().toString(36).slice(2, 8)}`;
     beginPersistentContext(ctxId);
-    const q = createSequencer<void>({ id: ctxId, canStart: canStart });
+    const q = createSequencer<void>({ id: ctxId, canStart });
     endPersistentContext();
 
     q.enqueue(qi('a'));
@@ -1591,7 +1591,7 @@ describe('Sequencer — repeat()', () => {
   });
 });
 
-describe('Sequencer — patchCurrentItem / patchItem', () => {
+describe('Sequencer — updateCurrentItem / updateItem', () => {
   type Meta = { ticks: number; err?: string };
   const mi = (id: string, ticks = 0): SequencerItem<Meta> => ({ id, metadata: { ticks } });
 
@@ -1603,51 +1603,51 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
     return q;
   }
 
-  it('patchCurrentItem updates queue-mode current via persistent ref', () => {
+  it('updateCurrentItem updates queue-mode current via persistent ref', () => {
     const q = makeTypedQueue();
     q.enqueue(mi('a', 5));
-    q.patchCurrentItem((m) => ({ ...m, ticks: m.ticks + 1 }));
+    q.updateCurrentItem((m) => ({ ...m, ticks: m.ticks + 1 }));
     expect(q.currentMetadata).toEqual({ ticks: 6 });
     expect(q.currentItem?.id).toBe('a');
   });
 
-  it('patchCurrentItem is a no-op in queue mode when nothing is running', () => {
+  it('updateCurrentItem is a no-op in queue mode when nothing is running', () => {
     const q = makeTypedQueue();
     // No enqueue → no current. Should not throw, should not affect state.
-    expect(() => q.patchCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(() => q.updateCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
     expect(q.currentItem).toBeNull();
   });
 
-  it('patchCurrentItem updates list-mode current and mirrors into items.value at cursor', () => {
+  it('updateCurrentItem updates list-mode current and mirrors into items.value at cursor', () => {
     const q = makeTypedQueue({ mode: 'list' });
     q.enqueue(mi('a', 0));
     q.enqueue(mi('b', 0));
     // 'a' is running at cursor 0.
-    q.patchCurrentItem((m) => ({ ...m, ticks: 42 }));
+    q.updateCurrentItem((m) => ({ ...m, ticks: 42 }));
     expect(q.currentMetadata).toEqual({ ticks: 42 });
     expect(q.items.value[0].metadata).toEqual({ ticks: 42 });
     // Sibling untouched.
     expect(q.items.value[1].metadata).toEqual({ ticks: 0 });
   });
 
-  it('patchCurrentItem is a no-op in list mode when no running item', () => {
+  it('updateCurrentItem is a no-op in list mode when no running item', () => {
     const q = makeTypedQueue({ mode: 'list' });
     q.enqueue(mi('a', 0));
     q.pause();
     q.cancel();
     // List mode with paused + cancel → no running item, cursor still at 0.
     expect(q.currentItem).toBeNull();
-    expect(() => q.patchCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(() => q.updateCurrentItem((m) => ({ ...m, ticks: 99 }))).not.toThrow();
     expect(q.items.value[0].metadata).toEqual({ ticks: 0 });
   });
 
-  it('patchItem updates items.value at index and preserves other identities', () => {
+  it('updateItem updates items.value at index and preserves other identities', () => {
     const q = makeTypedQueue({ mode: 'list' });
     q.enqueue(mi('a', 1));
     q.enqueue(mi('b', 2));
     q.enqueue(mi('c', 3));
     const before = q.items.value;
-    q.patchItem(1, (m) => ({ ...m, ticks: 99 }));
+    q.updateItem(1, (m) => ({ ...m, ticks: 99 }));
     const after = q.items.value;
 
     expect(after[1].metadata).toEqual({ ticks: 99 });
@@ -1657,18 +1657,18 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
     expect(after[2]).toBe(before[2]);
   });
 
-  it('patchItem with out-of-range index is a no-op', () => {
+  it('updateItem with out-of-range index is a no-op', () => {
     const q = makeTypedQueue({ mode: 'list' });
     q.enqueue(mi('a', 1));
     const before = q.items.value;
-    expect(() => q.patchItem(-1, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
-    expect(() => q.patchItem(5, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(() => q.updateItem(-1, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
+    expect(() => q.updateItem(5, (m) => ({ ...m, ticks: 99 }))).not.toThrow();
     // No mutation → version stable → same view reference.
     expect(q.items.value).toBe(before);
     expect(q.items.value[0].metadata).toEqual({ ticks: 1 });
   });
 
-  it('patchItem fires reactive watchers on items.value', () => {
+  it('updateItem fires reactive watchers on items.value', () => {
     const q = makeTypedQueue({ mode: 'list' });
     q.enqueue(mi('a', 0));
     q.enqueue(mi('b', 0));
@@ -1685,12 +1685,12 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
     });
     // initial effect run captures [0, 0].
     expect(seen[seen.length - 1]).toEqual([0, 0]);
-    q.patchItem(1, (m) => ({ ...m, ticks: 7 }));
+    q.updateItem(1, (m) => ({ ...m, ticks: 7 }));
     expect(seen[seen.length - 1]).toEqual([0, 7]);
     scope.stop();
   });
 
-  it('queue-mode patchCurrentItem persists into the current persistent ref', () => {
+  it('queue-mode updateCurrentItem persists into the current persistent ref', () => {
     // Queue-mode current item is stored serialized in current.value. Verify
     // patch reaches that surface (the save manager picks up the change as
     // part of standard persistent-ref serialization).
@@ -1699,7 +1699,7 @@ describe('Sequencer — patchCurrentItem / patchItem', () => {
     const q = createSequencer<Meta>({ id: ctxId });
     endPersistentContext();
     q.enqueue(mi('a', 0));
-    q.patchCurrentItem((m) => ({ ...m, ticks: 9 }));
+    q.updateCurrentItem((m) => ({ ...m, ticks: 9 }));
 
     const refs = getAllPersistentRefs();
     const currentRef = refs.get(`${ctxId}.current`);
@@ -1947,7 +1947,7 @@ describe('Sequencer — skip ordering', () => {
     q.on('skipped', () => {
       const priorIdx = q.cursor - 1;
       if (priorIdx < 0) return;
-      q.patchItem(priorIdx, (m) => ({ ...m, error: 'Cannot run here' }));
+      q.updateItem(priorIdx, (m) => ({ ...m, error: 'Cannot run here' }));
     });
 
     q.enqueue(smi('a'));

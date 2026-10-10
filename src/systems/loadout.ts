@@ -1,27 +1,27 @@
 /**
- * Slot system — constrained persistent selection from a pool
+ * Loadout system — constrained persistent selection from a pool
  *
- * Manages "pick N from M" selection mechanics: equipment slots, spell slots,
- * dragon auras, housing choices, policy picks. Each slot tracks which items
+ * Manages "pick N from M" selection mechanics: equipment loadouts, spell loadouts,
+ * dragon auras, housing choices, policy picks. Each loadout tracks which items
  * are selected, enforces capacity and pool constraints, and persists state
  * across saves.
  *
  * Key features:
  * - Single-select (radio-button) and multi-select modes
  * - Optional pool constraint with reactive updates
- * - Custom `canSelect` predicate for complex gating (cross-slot exclusions, unlock conditions)
+ * - Custom `canSelect` predicate for complex gating (cross-loadout exclusions, unlock conditions)
  * - `onSelect`/`onDeselect` hooks for wiring modifiers, VFX, or side effects
  * - Insertion-order preservation (matters for queue-ordered systems)
  * - Snapshot/restore for loadout saving
  * - Restores, loads and resets revalidate the selection and bring the hooks in line
  *
- * The slot manages **selection state only**. It does not know what the selected
+ * The loadout manages **selection state only**. It does not know what the selected
  * items *are* — consumers map item IDs to definitions, modifiers, and effects.
  *
  * @example
  * ```ts
  * // Single-select: one active housing property
- * const housing = createSlot({
+ * const housing = createLoadout({
  *   id: 'housing',
  *   mode: 'single',
  *   pool: ['tent', 'cabin', 'apartment', 'penthouse'],
@@ -30,8 +30,8 @@
  * });
  * housing.select('cabin'); // auto-deselects previous
  *
- * // Multi-select: support spell slots with growing capacity
- * const supportSlots = createSlot({
+ * // Multi-select: support spell loadouts with growing capacity
+ * const supportSlots = createLoadout({
  *   id: 'support',
  *   mode: 'multi',
  *   maxSelections: () => 2 + purchasedSlots.value,
@@ -51,8 +51,8 @@ import { attachPersistentContextReset } from '@/core/resettable';
 
 // === TYPES ===
 
-/** Configuration for {@link createSlot}. */
-export interface SlotOptions {
+/** Configuration for {@link createLoadout}. */
+export interface LoadoutOptions {
   /** Unique identifier, used as persistence context key */
   id: string;
   /**
@@ -68,7 +68,7 @@ export interface SlotOptions {
    */
   maxSelections?: Computable<DecimalSource>;
   /**
-   * Valid item IDs for this slot. Can be a ref or getter for dynamic pools
+   * Valid item IDs for this loadout. Can be a ref or getter for dynamic pools
    * (e.g., unlockable items). If omitted, any string ID is accepted.
    */
   pool?: Computable<string[]>;
@@ -77,7 +77,7 @@ export interface SlotOptions {
   /**
    * Called after an item is successfully selected. Use for runtime-only side
    * effects — modifier wiring, VFX: once a load or reset settles, and after
-   * {@link Slot.restore}, the slot calls it for each selected item whose
+   * {@link Loadout.restore}, the loadout calls it for each selected item whose
    * effect isn't applied yet, so it must not grant game state.
    */
   onSelect?: (itemId: string) => void;
@@ -88,23 +88,23 @@ export interface SlotOptions {
   onDeselect?: (itemId: string) => void;
 }
 
-/** Events emitted by a {@link Slot}. */
-export interface SlotEvents {
+/** Events emitted by a {@link Loadout}. */
+export interface LoadoutEvents {
   /** Fired after an item is selected */
   selected: (itemId: string) => void;
   /** Fired after an item is deselected (including auto-deselect in single mode) */
   deselected: (itemId: string) => void;
-  /** Fired after all items are deselected via {@link Slot.deselectAll} */
+  /** Fired after all items are deselected via {@link Loadout.deselectAll} */
   cleared: () => void;
 }
 
 /**
- * A constrained persistent selection from a pool, created by {@link createSlot}.
+ * A constrained persistent selection from a pool, created by {@link createLoadout}.
  *
  * Tracks which items are selected, enforces capacity and pool constraints,
  * emits events on state changes, and persists across saves.
  */
-export interface Slot {
+export interface Loadout {
   readonly id: string;
   readonly mode: 'single' | 'multi';
 
@@ -112,7 +112,7 @@ export interface Slot {
   readonly selected: ComputedRef<readonly string[]>;
   /** Number of currently selected items */
   readonly count: ComputedRef<number>;
-  /** Whether the slot is at capacity */
+  /** Whether the loadout is at capacity */
   readonly isFull: ComputedRef<boolean>;
   /** First selected item, or null. Primary accessor for single-select mode. */
   readonly current: ComputedRef<string | null>;
@@ -151,31 +151,31 @@ export interface Slot {
    */
   restore(ids: string[]): void;
 
-  on: Emittable<SlotEvents>['on'];
+  on: Emittable<LoadoutEvents>['on'];
 }
 
 // === FACTORIES ===
 
 /**
- * Creates a slot — a constrained persistent selection from a pool.
+ * Creates a loadout — a constrained persistent selection from a pool.
  *
- * @param options - Slot configuration: mode, capacity, pool, constraints, and hooks
- * @returns A {@link Slot} with reactive state, validation, mutation methods,
+ * @param options - Loadout configuration: mode, capacity, pool, constraints, and hooks
+ * @returns A {@link Loadout} with reactive state, validation, mutation methods,
  *   snapshot/restore for loadout saving, and events for side-effect wiring
  *
  * @example
  * ```ts
- * const focus = createSlot({ id: 'focus', mode: 'single', pool: allSpells });
+ * const focus = createLoadout({ id: 'focus', mode: 'single', pool: allSpells });
  * focus.select('fireball');
  * focus.current.value; // 'fireball'
  *
- * const support = createSlot({ id: 'support', mode: 'multi', maxSelections: 3 });
+ * const support = createLoadout({ id: 'support', mode: 'multi', maxSelections: 3 });
  * support.select('heal');
  * support.select('shield');
  * support.count.value; // 2
  * ```
  */
-export function createSlot(options: SlotOptions): Slot {
+export function createLoadout(options: LoadoutOptions): Loadout {
   const { id, mode } = options;
 
   // --- Resolve reactive options ---
@@ -183,13 +183,13 @@ export function createSlot(options: SlotOptions): Slot {
   const processedPool = options.pool != null ? toMaybeRef(options.pool) : undefined;
 
   // --- Persistence ---
-  const contextId = `slot:${id}`;
+  const contextId = `loadout:${id}`;
   const _selected = withPersistentContext(contextId, () =>
     persistent<string[]>([], { id: 'selected' }),
   );
 
   // --- Events ---
-  const handle = createEmitHandle<SlotEvents>();
+  const handle = createEmitHandle<LoadoutEvents>();
 
   // --- Internal helpers ---
 
@@ -326,7 +326,7 @@ export function createSlot(options: SlotOptions): Slot {
     resync();
   });
 
-  const slot: Slot = {
+  const loadout: Loadout = {
     id,
     mode,
     selected,
@@ -343,5 +343,5 @@ export function createSlot(options: SlotOptions): Slot {
     restore,
     on: handle.on,
   };
-  return attachPersistentContextReset(slot, contextId);
+  return attachPersistentContextReset(loadout, contextId);
 }

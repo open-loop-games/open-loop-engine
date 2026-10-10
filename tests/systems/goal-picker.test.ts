@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { createGoalPicker, type GoalPickResult } from '@/systems/goal-picker';
-import { createSlot } from '@/systems/slot';
+import { createLoadout } from '@/systems/loadout';
 import {
   beginPersistentContext,
   endPersistentContext,
@@ -12,9 +12,9 @@ beforeEach(() => {
   resetAllPersistentContexts();
 });
 
-function createTestSlot(...args: Parameters<typeof createSlot>) {
+function createTestSlot(...args: Parameters<typeof createLoadout>) {
   beginPersistentContext('test');
-  const slot = createSlot(...args);
+  const slot = createLoadout(...args);
   endPersistentContext();
   return slot;
 }
@@ -188,7 +188,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
       weights: { a: 2, b: 1 },
       scorer: (id, w) => w[id] ?? 0,
       capacity: 2,
-      slot,
+      loadout: slot,
       mode: 'fresh-each-pick',
     });
 
@@ -260,7 +260,7 @@ describe('createGoalPicker — slot composition', () => {
       weights: { a: 5, b: 3, c: 1 },
       scorer: (id, w) => w[id] ?? 0,
       capacity: 2,
-      slot,
+      loadout: slot,
     });
     picker.pick();
     expect(slot.selected.value).toEqual(['a', 'b']);
@@ -280,7 +280,7 @@ describe('createGoalPicker — slot composition', () => {
       weights: { a: 10, b: 5, c: 1 },
       scorer: (id, w) => w[id] ?? 0,
       capacity: 2,
-      slot,
+      loadout: slot,
     });
     const result = picker.pick();
     expect(result.selected).toEqual(['b', 'c']);
@@ -297,7 +297,7 @@ describe('createGoalPicker — slot composition', () => {
       scorer: (id, w) => w[id] ?? 0,
       isCompleted: (id) => doneIds.has(id),
       capacity: 2,
-      slot,
+      loadout: slot,
     });
     picker.pick();
     doneIds = new Set(['a']);
@@ -411,7 +411,7 @@ describe('createGoalPicker — multi-slot linear-weighted scoring', () => {
       weights,
       scorer: (id, w) => scoreGoal(id, w),
       capacity: 2,
-      slot,
+      loadout: slot,
     });
     const result = picker.pick();
     expect(result.selected).toEqual(['claim:h1', 'defend:s1']);

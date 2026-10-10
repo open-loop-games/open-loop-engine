@@ -6,10 +6,10 @@
  * chain's value depend on activation history; routing each binding through a
  * slot reserved on its chain keeps it where the definition first claimed it.
  *
- * A binding can also carry overlays — wraps applied to whatever it resolves
+ * A binding can also carry wraps — functions applied to whatever it resolves
  * to, on the live activations and on every later one until removed. The
  * balance harness perturbs effect content through them, reaching a
- * definition's slots by its system and id via {@link overlayBinding}, and
+ * definition's slots by its system and id via {@link wrapBinding}, and
  * tells an effect's modifiers from a chain's own via {@link isSlotBound}.
  *
  * @cluster effects
@@ -27,7 +27,7 @@ export type ModifierWrap = (modifier: Modifier) => Modifier;
 /**
  * Wraps stacked over one base modifier, each wrapping the ones before it.
  *
- * @internal Binding overlays, and the balance harness's chain-modifier overlays.
+ * @internal Binding wraps, and the balance harness's chain-modifier wraps.
  */
 export interface WrapStack {
   /**
@@ -53,7 +53,7 @@ export interface BindingSlots {
    * Wrap binding `index` in every activation, live and later, until the
    * returned cleanup runs. Overlays stack: each wraps the ones before it.
    */
-  overlay(index: number, wrap: ModifierWrap): () => void;
+  wrap(index: number, wrap: ModifierWrap): () => void;
   /** Release every slot this definition reserved. */
   release(): void;
 }
@@ -62,7 +62,7 @@ export interface BindingSlots {
 interface LiveBinding {
   index: number;
   slot: ModifierChainSlot;
-  /** What the binding resolved to, before overlays. */
+  /** What the binding resolved to, before wraps. */
   resolved: Modifier;
   /** Removes the object actually standing in the slot. */
   remove: () => void;
@@ -125,7 +125,7 @@ export function createBindingSlots(
   // A factory-form binding list can aim one index at different chains across
   // activations, so each (index, chain) pair keeps its own slot.
   const byIndex = new Map<number, Map<ModifierChain, ModifierChainSlot>>();
-  const overlays = new Map<number, WrapStack>();
+  const wrapStacks = new Map<number, WrapStack>();
   // In bind order, which is also each slot's member order.
   const live: LiveBinding[] = [];
 
@@ -148,7 +148,7 @@ export function createBindingSlots(
   for (const [index, binding] of fixed.entries()) slotFor(index, binding.chain);
 
   function seat(binding: LiveBinding): void {
-    const standing = overlays.get(binding.index)?.compose(binding.resolved) ?? binding.resolved;
+    const standing = wrapStacks.get(binding.index)?.compose(binding.resolved) ?? binding.resolved;
     seated.set(standing, (seated.get(standing) ?? 0) + 1);
     const remove = binding.slot.add(standing);
     binding.remove = () => {
@@ -159,7 +159,7 @@ export function createBindingSlots(
     };
   }
 
-  /** Re-seat binding `index`'s live modifiers under the current overlays, keeping slot order. */
+  /** Re-seat binding `index`'s live modifiers under the current wraps, keeping slot order. */
   function reseat(index: number): void {
     const affected = live.filter((binding) => binding.index === index);
     for (const binding of affected) binding.remove();
@@ -191,11 +191,11 @@ export function createBindingSlots(
         }
       };
     },
-    overlay(index, wrap) {
-      let stack = overlays.get(index);
+    wrap(index, wrap) {
+      let stack = wrapStacks.get(index);
       if (stack == null) {
         stack = createWrapStack(() => reseat(index));
-        overlays.set(index, stack);
+        wrapStacks.set(index, stack);
       }
       return stack.push(wrap);
     },
@@ -214,7 +214,7 @@ export function createBindingSlots(
 const slotsBySystem = new WeakMap<object, (defId: string) => BindingSlots | undefined>();
 
 /**
- * Make `system`'s definitions reachable by {@link overlayBinding}.
+ * Make `system`'s definitions reachable by {@link wrapBinding}.
  *
  * @internal Called once by each effect-system factory.
  */
@@ -227,12 +227,12 @@ export function registerBindingSlots(
 
 /**
  * Overlay binding `index` of definition `defId` in `system`; see
- * {@link BindingSlots.overlay}.
+ * {@link BindingSlots.wrap}.
  *
  * @internal The balance harness's content perturbation.
  * @throws {Error} when `system` doesn't bind through slots or has no such definition.
  */
-export function overlayBinding(
+export function wrapBinding(
   system: object,
   defId: string,
   index: number,
@@ -242,7 +242,7 @@ export function overlayBinding(
   if (!lookup) throw new Error('effect system does not bind its modifiers through binding slots');
   const slots = lookup(defId);
   if (!slots) throw new Error(`effect def "${defId}" has no binding slots`);
-  return slots.overlay(index, wrap);
+  return slots.wrap(index, wrap);
 }
 
 /**

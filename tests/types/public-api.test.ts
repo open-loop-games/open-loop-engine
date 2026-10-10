@@ -259,7 +259,7 @@ describe('createActionCategory generic inference', () => {
     expectTypeOf<Cat['getState']>().returns.toEqualTypeOf<MyActionState | undefined>();
     expectTypeOf<Cat['register']>().parameter(0).toMatchTypeOf<MyActionDef | MyActionDef[]>();
     expectTypeOf<Cat['currentItem']>().toEqualTypeOf<ActionItemMetadata<MyActionPayload> | null>();
-    expectTypeOf<Cat['patchItemPayload']>()
+    expectTypeOf<Cat['updateItemPayload']>()
       .parameter(1)
       .toMatchTypeOf<Partial<MyActionPayload> | ((p: MyActionPayload) => MyActionPayload)>();
   });

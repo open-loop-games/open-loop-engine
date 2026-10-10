@@ -26,7 +26,7 @@ import { createPurchasable } from '@/systems/purchasable';
 import { createRecommendationSystem } from '@/systems/recommendation';
 import { createReset } from '@/systems/reset';
 import { createSkill } from '@/systems/skill';
-import { createSlot } from '@/systems/slot';
+import { createLoadout } from '@/systems/loadout';
 import { createTemporaryEffectSystem } from '@/systems/temporary-effect';
 import { createTimeBank } from '@/systems/time-bank';
 import { createTimeSystem } from '@/systems/time';
@@ -55,11 +55,11 @@ interface Case {
 const cases: Case[] = [
   {
     name: 'slot',
-    build: () => createSlot({ id: 'gear', mode: 'multi' }),
-    dirty: (slot: ReturnType<typeof createSlot>) => {
+    build: () => createLoadout({ id: 'gear', mode: 'multi' }),
+    dirty: (slot: ReturnType<typeof createLoadout>) => {
       slot.select('sword');
     },
-    check: (slot: ReturnType<typeof createSlot>) => {
+    check: (slot: ReturnType<typeof createLoadout>) => {
       expect(slot.selected.value).toEqual([]);
     },
   },

@@ -14,7 +14,7 @@
  * @example
  * ```ts
  * const mgr = createSaveManager({ gameId: 'my-game' });
- * mgr.createSlot('Manual Save');  // slot 1
+ * mgr.createLoadout('Manual Save');  // slot 1
  * mgr.selectSlot(1);
  * mgr.save();       // save, and the engine's autosave, now write slot 1
  * mgr.peekSlot(0);  // peek slot 0 without switching
@@ -309,7 +309,7 @@ export interface SaveManager extends Emittable<SaveEvents> {
   /** All save slots (id + name) */
   readonly slots: readonly SaveSlot[];
   /** Create a new slot. Returns the new slot's ID. */
-  createSlot(displayName?: string): number;
+  createLoadout(displayName?: string): number;
   /** Delete a slot by ID. Throws if it's the active slot. */
   deleteSlot(slotId: number): void;
   /** Rename a slot */
@@ -343,7 +343,7 @@ export interface SaveManager extends Emittable<SaveEvents> {
   /**
    * Allocate a new slot and copy `srcId`'s on-disk envelope into it byte-for-byte.
    * Source slot must exist; if it has no saved data, the new slot is created
-   * empty (mirroring `createSlot()` alone). Does not touch the active slot.
+   * empty (mirroring `createLoadout()` alone). Does not touch the active slot.
    * Returns the new slot's id.
    */
   duplicateSlot(srcId: number, name?: string): number;
@@ -920,7 +920,7 @@ export function createSaveManager(config: SaveManagerConfig): SaveManager {
       return (_slotsView ??= _slots.map((s) => ({ ...s })));
     },
 
-    createSlot(name?: string): number {
+    createLoadout(name?: string): number {
       return allocSlot(name);
     },
 

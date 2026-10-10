@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
-import { createSlot } from '@/systems/slot';
+import { createLoadout } from '@/systems/loadout';
 import {
   beginPersistentContext,
   endPersistentContext,
@@ -16,9 +16,9 @@ beforeEach(() => {
 });
 
 /** Wrap slot creation in a persistence context for tests */
-function createTestSlot(...args: Parameters<typeof createSlot>) {
+function createTestSlot(...args: Parameters<typeof createLoadout>) {
   beginPersistentContext('test');
-  const slot = createSlot(...args);
+  const slot = createLoadout(...args);
   endPersistentContext();
   return slot;
 }
@@ -342,17 +342,17 @@ describe('hook resync', () => {
   it('invokes onSelect once for the rehydrated selection after a save loads', () => {
     const onSelect = vi.fn();
     resetAllPersistentContexts();
-    const slot = createSlot({ id: 'hz', mode: 'single', onSelect });
+    const slot = createLoadout({ id: 'hz', mode: 'single', onSelect });
 
     // The save-restore path writes the selection straight into the ref,
     // bypassing select(); the slot re-establishes the side effect once the
     // load settles, and a second load of the same selection finds nothing
     // left to apply.
-    deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
+    deserializePersistents(getAllPersistentRefs(), { 'loadout:hz': { selected: ['cabin'] } });
     expect(slot.selected.value).toEqual(['cabin']);
     expect(onSelect).toHaveBeenCalledWith('cabin');
 
-    deserializePersistents(getAllPersistentRefs(), { 'slot:hz': { selected: ['cabin'] } });
+    deserializePersistents(getAllPersistentRefs(), { 'loadout:hz': { selected: ['cabin'] } });
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
@@ -377,17 +377,17 @@ describe('hook resync', () => {
   it('fires no selected events on a load', () => {
     const onSelected = vi.fn();
     resetAllPersistentContexts();
-    const slot = createSlot({ id: 'ev', mode: 'multi', maxSelections: 5, onSelect: vi.fn() });
+    const slot = createLoadout({ id: 'ev', mode: 'multi', maxSelections: 5, onSelect: vi.fn() });
     slot.on('selected', onSelected);
 
-    deserializePersistents(getAllPersistentRefs(), { 'slot:ev': { selected: ['a', 'b'] } });
+    deserializePersistents(getAllPersistentRefs(), { 'loadout:ev': { selected: ['a', 'b'] } });
     expect(onSelected).not.toHaveBeenCalled();
   });
 
   it('a load with no onSelect configured keeps the selection', () => {
     resetAllPersistentContexts();
-    const slot = createSlot({ id: 'noop', mode: 'single' });
-    deserializePersistents(getAllPersistentRefs(), { 'slot:noop': { selected: ['x'] } });
+    const slot = createLoadout({ id: 'noop', mode: 'single' });
+    deserializePersistents(getAllPersistentRefs(), { 'loadout:noop': { selected: ['x'] } });
     expect(slot.selected.value).toEqual(['x']);
   });
 });
@@ -480,10 +480,10 @@ describe('events', () => {
 
 describe('loads and resets', () => {
   /** A slot whose hooks record which items have their side effect applied. */
-  function buildHooked(options: Partial<Parameters<typeof createSlot>[0]> = {}) {
+  function buildHooked(options: Partial<Parameters<typeof createLoadout>[0]> = {}) {
     const applied = new Set<string>();
     const slot = withPersistentContext('run', () =>
-      createSlot({
+      createLoadout({
         id: 'gear',
         mode: 'single',
         onSelect: (id) => applied.add(id),
@@ -498,7 +498,7 @@ describe('loads and resets', () => {
     const { slot } = buildHooked({ pool: ['a', 'b'] });
 
     deserializePersistents(getAllPersistentRefs(), {
-      'slot:gear': { selected: ['a', 'b', 'removed-in-patch'] },
+      'loadout:gear': { selected: ['a', 'b', 'removed-in-patch'] },
     });
 
     expect(slot.selected.value).toEqual(['a']);
@@ -509,7 +509,7 @@ describe('loads and resets', () => {
     const { slot, applied } = buildHooked();
     slot.select('x');
 
-    deserializePersistents(getAllPersistentRefs(), { 'slot:gear': { selected: ['y'] } });
+    deserializePersistents(getAllPersistentRefs(), { 'loadout:gear': { selected: ['y'] } });
 
     expect([...applied]).toEqual(['y']);
   });

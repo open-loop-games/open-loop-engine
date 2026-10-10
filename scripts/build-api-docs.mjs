@@ -327,7 +327,7 @@ function renderIndex(byCluster) {
     '| skill XP / level curve | content-systems.md#skill |',
     '| inventory with item capacities | content-systems.md#inventory |',
     '| zone unlocks / named content regions | content-systems.md#zone |',
-    '| constrained loadout / persistent selection slot | content-systems.md#slot |',
+    '| constrained loadout / persistent selection | content-systems.md#loadout |',
     '| automation unlock ladder | content-systems.md#automation-tiers |',
     '| modifier bonus stacking on a chain | mechanics.md#modifier |',
     '| "buy max" count / bulk cost preview | mechanics.md#formulas |',

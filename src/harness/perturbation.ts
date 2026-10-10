@@ -48,7 +48,7 @@ import type { Modifier, ModifierChain } from '@/core/modifier';
 import {
   createWrapStack,
   isSlotBound,
-  overlayBinding,
+  wrapBinding,
   type ModifierWrap,
   type WrapStack,
 } from '@/systems/binding-slots';
@@ -70,7 +70,7 @@ export type Perturbation =
  * and on commit (against the live engine).
  *
  * Dispatches on the entry's address:
- * - `'content'` — overlays the effect def's binding, live and future
+ * - `'effect-system'` — wraps the effect def's grant, live and future
  *   activations alike, each in its own chain position.
  * - `'chain-registry'` — swaps the addressed modifier for its wrapper in
  *   place (`modifier-index`), or appends a scalar modifier (`chain-apply`).
@@ -162,7 +162,7 @@ function applyModifierPerturbation(
         return appendChainWrapper(chain, perturbation);
       }
       const target = resolveChainTarget(chain, entry.modifier, address.modifierIndex);
-      return overlayChainModifier(chain, target, (m) => wrapModifier(m, perturbation));
+      return wrapChainModifier(chain, target, (m) => wrapModifier(m, perturbation));
     }
 
     case 'effect-system': {
@@ -180,7 +180,7 @@ function applyModifierPerturbation(
       if (address.grantIndex >= effectDefBindings(def).length) {
         throw new Error(`def "${address.defId}" has no grant at index ${address.grantIndex}`);
       }
-      return overlayBinding(system, address.defId, address.grantIndex, (m) =>
+      return wrapBinding(system, address.defId, address.grantIndex, (m) =>
         wrapModifier(m, perturbation),
       );
     }
@@ -206,41 +206,37 @@ function resolveChainTarget(chain: ModifierChain, discovered: Modifier, index: n
 }
 
 /** One chain modifier's active perturbations. */
-interface ChainOverlay {
+interface ChainWrap {
   original: Modifier;
   wraps: WrapStack;
   /** The object currently standing in the chain for `original`. */
   live: Modifier;
 }
 
-/** Live wrapper → its overlay, so perturbing a perturbed modifier composes on the same stack. */
-const chainOverlays = new WeakMap<Modifier, ChainOverlay>();
+/** Live wrapper → its chain wrap, so perturbing a perturbed modifier composes on the same stack. */
+const chainWraps = new WeakMap<Modifier, ChainWrap>();
 
 /** Swap `target` for its wrapped form in place; the cleanup swaps back while the wrapper is still there. */
-function overlayChainModifier(
-  chain: ModifierChain,
-  target: Modifier,
-  wrap: ModifierWrap,
-): () => void {
-  let overlay = chainOverlays.get(target);
-  if (overlay == null) {
-    const created: ChainOverlay = {
+function wrapChainModifier(chain: ModifierChain, target: Modifier, wrap: ModifierWrap): () => void {
+  let chainWrap = chainWraps.get(target);
+  if (chainWrap == null) {
+    const created: ChainWrap = {
       original: target,
-      wraps: createWrapStack(() => reseatChainOverlay(chain, created)),
+      wraps: createWrapStack(() => reseatChainWrap(chain, created)),
       live: target,
     };
-    overlay = created;
+    chainWrap = created;
   }
-  return overlay.wraps.push(wrap);
+  return chainWrap.wraps.push(wrap);
 }
 
-/** Swap the overlay's live object for its current composition, in place; a no-op once it has left the chain. */
-function reseatChainOverlay(chain: ModifierChain, overlay: ChainOverlay): void {
-  const next = overlay.wraps.compose(overlay.original);
-  if (!chain.replace(overlay.live, next)) return;
-  chainOverlays.delete(overlay.live);
-  overlay.live = next;
-  if (overlay.wraps.size > 0) chainOverlays.set(next, overlay);
+/** Swap the chain wrap's live object for its current composition, in place; a no-op once it has left the chain. */
+function reseatChainWrap(chain: ModifierChain, chainWrap: ChainWrap): void {
+  const next = chainWrap.wraps.compose(chainWrap.original);
+  if (!chain.replace(chainWrap.live, next)) return;
+  chainWraps.delete(chainWrap.live);
+  chainWrap.live = next;
+  if (chainWrap.wraps.size > 0) chainWraps.set(next, chainWrap);
 }
 
 /**

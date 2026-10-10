@@ -67,13 +67,13 @@ export const TIER_MANIFEST = [
     tier: 'content-systems',
     title: 'Content Systems',
     scope:
-      'The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Slot / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.',
+      'The validated incremental primitives, each a typed registration surface over the mechanics kernel. Purchasable / Producer / Achievement / Inventory / BestOf carry currency flow; Skill / Cycle / Challenge / Zone / Loadout / AutomationTiers / CycleLog carry long-arc structure; RunPool holds many concurrent runs at once.',
     entrypoints: [
       '`createProducerCategory` — buildings/generators whose ownership creates continuous resource flow.',
       '`createPurchasableCategory` — upgrades, gates, capped repeatables, perks, and bought effects in batch.',
       '`createAchievementCategory` — observed milestones and tier ladders that auto-earn.',
       '`createSkillCategory` — XP/level progression surfaces.',
-      '`createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createSlot`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.',
+      '`createCycle`, `createChallengeCategory`, `createInventory`, `createZoneSystem`, `createLoadout`, `createAutomationTiers` — progression, inventory, grouping, selection, and automation surfaces.',
       '`createActionCategory` — ordered-execution queues with per-execution state machine.',
     ],
     clusters: [
@@ -89,7 +89,7 @@ export const TIER_MANIFEST = [
       'purchasable',
       'run-pool',
       'skill',
-      'slot',
+      'loadout',
       'zone',
     ],
   },

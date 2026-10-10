@@ -4,7 +4,7 @@ Recurring shapes consumers assemble from engine primitives. Each is a worked pat
 
 This is the companion cookbook to [consumer-guide.md](./consumer-guide.md) — a condensed starter-components reference. Read the guide for *how to think* about composing the engine; reach here for the full worked patterns when you're building one. The guide's narrative spine stays a continuous read; these bulkier examples live here so they don't bloat it.
 
-## Action execution: ActionCategory, worker bundle, or Slot
+## Action execution: ActionCategory, worker bundle, or Loadout
 
 Three engine shapes share the "what's the player doing right now?" surface. The split is queue × per-execution state machine × selection-only.
 
@@ -12,15 +12,15 @@ Three engine shapes share the "what's the player doing right now?" surface. The 
 |---|---|
 | `createActionCategory` | Ordered-execution queue with per-execution state machine. Lifecycle (`pending` / `running` / `waiting` / `completed` / `failed`), progress, attempt, error, timing observable per running item; multi-bar progress shapes (mana + ticks + loops). A list-mode looper restarts a run with `replay()`; `sequencer.resetCursor()` moves only the cursor and leaves each slot's progress from the last run. |
 | Worker-bundle recipe | Single-active duration-driven execution from `Sequencer` + `TimedProgress` + a `getTask(id)` lookup. No per-execution state machine; the duration accumulator is the lifecycle. Recipe below. |
-| `createSlot` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. The shape of a current job or current skill. |
+| `createLoadout` | Single-active *selection*, not execution. Pick one of N at a time, switch instantly, persisted across saves. No queue, no per-tick progress. The shape of a current job or current skill. |
 
 Decision flow:
 
-- No queue, just "what's equipped or active right now"? → `createSlot`.
+- No queue, just "what's equipped or active right now"? → `createLoadout`.
 - Queue, but execution is dispatch + duration accumulator with no per-item state machine? → worker-bundle recipe.
 - Queue with lifecycle / progress / error observable per running item? → `createActionCategory`.
 
-For a slot whose selected entry then needs queued execution, compose them: `createSlot` for the selection, `createActionCategory` (or the worker-bundle recipe) reading the slot's current value.
+For a slot whose selected entry then needs queued execution, compose them: `createLoadout` for the selection, `createActionCategory` (or the worker-bundle recipe) reading the slot's current value.
 
 ## Indirect-control worker pools
 

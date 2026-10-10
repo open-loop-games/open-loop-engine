@@ -191,13 +191,13 @@ export * from './conditional-effect';
 // the `grants` field on a def.
 export { replacementGrants, type ReplacementGrantsOptions } from './replacement-grants';
 
-// === SLOTS ===
-// Constrained persistent selection from a pool (equipment slots, spell slots, policy picks).
-export * from './slot';
+// === LOADOUTS ===
+// Constrained persistent selection from a pool (equipment, spells, policy picks).
+export * from './loadout';
 
 // === GOAL PICKER ===
 // Weighted-goal selection over a candidate pool: sweep-completed + score + top-N fill.
-// Composes Slot for persistence. Distinct from createConditionalStrategy (FillStrategy,
+// Composes Loadout for persistence. Distinct from createConditionalStrategy (FillStrategy,
 // sequencer-driven) and createRecommendationSystem (between-cycle arbitration).
 export * from './goal-picker';
 

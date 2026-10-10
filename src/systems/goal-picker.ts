@@ -3,7 +3,7 @@
  *
  * Runs `score(candidate, weights, context)` across a pool each tick, sweeps
  * completed selections via an optional predicate, then fills open capacity
- * from the top-scoring candidates. Optionally composes {@link Slot} for
+ * from the top-scoring candidates. Optionally composes {@link Loadout} for
  * persistence and multi-select constraints; falls back to an internal array
  * when no slot is provided.
  *
@@ -20,13 +20,13 @@
  *   historical runs)
  *
  * The picker is **stateless**: it owns no persistent refs. When `options.slot`
- * is provided, the Slot handles selection persistence. When omitted, selections
+ * is provided, the Loadout handles selection persistence. When omitted, selections
  * live in an internal array and are ephemeral.
  *
- * @see {@link createSlot} — the composition target for persistence
+ * @see {@link createLoadout} — the composition target for persistence
  */
 
-import type { Slot } from './slot';
+import type { Loadout } from './loadout';
 
 // === TYPES ===
 
@@ -95,12 +95,12 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
   capacity?: number | (() => number);
 
   /**
-   * Externally-managed Slot to write selections into. When provided, selection
+   * Externally-managed Loadout to write selections into. When provided, selection
    * state persists with the slot and integrates with its `canSelect` /
    * `onSelect` / `onDeselect` hooks. When omitted, the picker holds an internal
-   * array (no persistence). Using a Slot requires `TCandidate extends string`.
+   * array (no persistence). Using a Loadout requires `TCandidate extends string`.
    */
-  slot?: Slot;
+  loadout?: Loadout;
 
   /**
    * Selection lifecycle. Default `'until-completed'`.
@@ -108,14 +108,14 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
    * - `'until-completed'` — selections survive across `pick()` calls; sweep via
    *   `isCompleted`. Right for AI-bot-watching-its-own-goals shapes where the
    *   selection is a long-running commitment.
-   * - `'fresh-each-cycle'` — every previously-active candidate is deselected at
+   * - `'fresh-each-pick'` — every previously-active candidate is deselected at
    *   the top of each `pick()` and reported in `swept`; capacity is always
    *   fully open per pick. Right for "rank a candidate pool for this turn /
    *   this loop only" shapes where selections are ephemeral. `isCompleted`
    *   becomes redundant under this mode (the active set is empty before the
    *   predicate would run).
    *
-   * Under `'fresh-each-cycle'` with a Slot, `slot.deselect` fires its
+   * Under `'fresh-each-pick'` with a Loadout, `loadout.deselect` fires its
    * `onDeselect` hook for every previously-active candidate each cycle.
    */
   mode?: 'until-completed' | 'fresh-each-pick';
@@ -135,7 +135,7 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
 export interface GoalPicker<TCandidate, TContext, TWeights> {
   /**
    * Run one pick cycle:
-   *   1. If `mode` is `'fresh-each-cycle'`, deselect every active candidate
+   *   1. If `mode` is `'fresh-each-pick'`, deselect every active candidate
    *      and add them to `swept`.
    *   2. Sweep completed selections (calls `isCompleted` on each remaining
    *      active).
@@ -210,7 +210,7 @@ function normalizeCapacity(c: number | (() => number) | undefined): () => number
 export function createGoalPicker<TCandidate, TContext, TWeights>(
   options: GoalPickerOptions<TCandidate, TContext, TWeights>,
 ): GoalPicker<TCandidate, TContext, TWeights> {
-  const { pool, scorer, isCompleted, slot, onPick, mode = 'until-completed' } = options;
+  const { pool, scorer, isCompleted, loadout: slot, onPick, mode = 'until-completed' } = options;
 
   let getWeights = normalizeWeights(options.weights);
   const getCapacity = normalizeCapacity(options.capacity);
