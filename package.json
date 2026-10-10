@@ -103,7 +103,7 @@
     "git-cliff": "^2.14.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
-    "oxfmt": "^0.70.0",
+    "oxfmt": "^0.72.0",
     "oxlint": "^1.85.0",
     "oxlint-tsgolint": "^7.0.2002",
     "ts-morph": "^28.0.0",
