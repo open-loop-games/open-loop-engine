@@ -13,7 +13,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
-import { findCrossing } from './root-find';
+import { solveMonotone } from './root-find';
 import { NOT_SUMMABLE, exactSeries, geometricSeries, powerSeries, type Series } from './series';
 import type { FormulaSource, GenericFormula, InvertFunction, SubstitutionStack } from './types';
 
@@ -51,7 +51,7 @@ function makeUnaryIntegrate(formulaOp: (x: GenericFormula) => GenericFormula) {
         console.error('Could not integrate due to variable not being integrable');
         return Formula.constant(0);
       }
-      return formulaOp(lhs.getIntegralFormula(stack));
+      return formulaOp(lhs.getAntiderivative(stack));
     }
     console.error('Could not integrate due to no input being a variable');
     return Formula.constant(0);
@@ -82,13 +82,13 @@ function makeBinaryIntegrate(
         console.error('Could not integrate due to variable not being integrable');
         return Formula.constant(0);
       }
-      return lhsOp(lhs.getIntegralFormula(stack), rhs, lhs);
+      return lhsOp(lhs.getAntiderivative(stack), rhs, lhs);
     } else if (hasVariable(rhs) && rhsOp) {
       if (!rhs.isIntegrable()) {
         console.error('Could not integrate due to variable not being integrable');
         return Formula.constant(0);
       }
-      return rhsOp(rhs.getIntegralFormula(stack), lhs, rhs);
+      return rhsOp(rhs.getAntiderivative(stack), lhs, rhs);
     }
     console.error('Could not integrate due to no input being a variable');
     return Formula.constant(0);
@@ -426,9 +426,9 @@ function buildLinearIntegral(
           // Generic shape (cubic and higher, or a flat slope): solve by
           // bisection. F⁻¹(s_f·target) is the answer when c = 0, so it makes a
           // tight starting bracket for the general case. `c·x - F(x)` rises then
-          // falls, so it is only monotone up to its turning point; `findCrossing`
+          // falls, so it is only monotone up to its turning point; `solveMonotone`
           // cannot detect the violation and takes the first crossing it finds.
-          const x = findCrossing((v) => at(v, c), target, {
+          const x = solveMonotone((v) => at(v, c), target, {
             upper: F.invert(signed(fSign, target)),
           });
           if (x == null) {
@@ -498,7 +498,7 @@ export function integrateDiv(stack: SubstitutionStack, lhs: FormulaSource, rhs: 
       console.error('Could not integrate due to variable not being integrable');
       return Formula.constant(0);
     }
-    return Formula.div(lhs.getIntegralFormula(stack), rhs);
+    return Formula.div(lhs.getAntiderivative(stack), rhs);
   }
   if (hasVariable(rhs)) return Formula.mul(lhs, Formula.ln(rhs));
   console.error('Could not integrate due to no input being a variable');
@@ -522,7 +522,7 @@ function internalIntegrateLog10(lhs: DecimalSource) {
   return Decimal.ln(lhs).sub(1).mul(lhs).div(ln10);
 }
 
-function internalInvertIntegralLog10(value: DecimalSource, lhs: FormulaSource) {
+function internalInvertAntiderivativeLog10(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
     const numerator = ln10.mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
@@ -538,9 +538,9 @@ export function integrateLog10(stack: SubstitutionStack, lhs: FormulaSource) {
       return Formula.constant(0);
     }
     return new Formula({
-      inputs: [lhs.getIntegralFormula(stack)],
+      inputs: [lhs.getAntiderivative(stack)],
       evaluate: internalIntegrateLog10,
-      invert: internalInvertIntegralLog10,
+      invert: internalInvertAntiderivativeLog10,
     });
   }
   console.error('Could not integrate due to no input being a variable');
@@ -556,7 +556,11 @@ function internalIntegrateLog(lhs: DecimalSource, rhs: DecimalSource) {
   return Decimal.ln(lhs).sub(1).mul(lhs).div(Decimal.ln(rhs));
 }
 
-function internalInvertIntegralLog(value: DecimalSource, lhs: FormulaSource, rhs: FormulaSource) {
+function internalInvertAntiderivativeLog(
+  value: DecimalSource,
+  lhs: FormulaSource,
+  rhs: FormulaSource,
+) {
   if (hasVariable(lhs)) {
     const numerator = Decimal.ln(unrefFormulaSource(rhs)).mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
@@ -572,9 +576,9 @@ export function integrateLog(stack: SubstitutionStack, lhs: FormulaSource, rhs: 
       return Formula.constant(0);
     }
     return new Formula({
-      inputs: [lhs.getIntegralFormula(stack), rhs],
+      inputs: [lhs.getAntiderivative(stack), rhs],
       evaluate: internalIntegrateLog,
-      invert: internalInvertIntegralLog,
+      invert: internalInvertAntiderivativeLog,
     });
   }
   console.error('Could not integrate due to no input being a variable');
@@ -587,7 +591,7 @@ function internalIntegrateLog2(lhs: DecimalSource) {
   return Decimal.ln(lhs).sub(1).mul(lhs).div(Decimal.ln(2));
 }
 
-function internalInvertIntegralLog2(value: DecimalSource, lhs: FormulaSource) {
+function internalInvertAntiderivativeLog2(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
     const numerator = Decimal.ln(2).mul(value);
     return lhs.invert(numerator.div(numerator.div(Math.E).lambertw()));
@@ -603,9 +607,9 @@ export function integrateLog2(stack: SubstitutionStack, lhs: FormulaSource) {
       return Formula.constant(0);
     }
     return new Formula({
-      inputs: [lhs.getIntegralFormula(stack)],
+      inputs: [lhs.getAntiderivative(stack)],
       evaluate: internalIntegrateLog2,
-      invert: internalInvertIntegralLog2,
+      invert: internalInvertAntiderivativeLog2,
     });
   }
   console.error('Could not integrate due to no input being a variable');
@@ -618,7 +622,7 @@ function internalIntegrateLn(lhs: DecimalSource) {
   return Decimal.ln(lhs).sub(1).mul(lhs);
 }
 
-function internalInvertIntegralLn(value: DecimalSource, lhs: FormulaSource) {
+function internalInvertAntiderivativeLn(value: DecimalSource, lhs: FormulaSource) {
   if (hasVariable(lhs)) {
     return lhs.invert(Decimal.div(value, new Decimal(Decimal.div(value, Math.E)).lambertw()));
   }
@@ -633,9 +637,9 @@ export function integrateLn(stack: SubstitutionStack, lhs: FormulaSource) {
       return Formula.constant(0);
     }
     return new Formula({
-      inputs: [lhs.getIntegralFormula(stack)],
+      inputs: [lhs.getAntiderivative(stack)],
       evaluate: internalIntegrateLn,
-      invert: internalInvertIntegralLn,
+      invert: internalInvertAntiderivativeLn,
     });
   }
   console.error('Could not integrate due to no input being a variable');
@@ -712,7 +716,7 @@ export function integrateRoot(stack: SubstitutionStack, lhs: FormulaSource, rhs:
       console.error('Could not integrate due to variable not being integrable');
       return Formula.constant(0);
     }
-    const x = lhs.getIntegralFormula(stack);
+    const x = lhs.getAntiderivative(stack);
     return Formula.pow(x, Formula.recip(rhs).add(1)).mul(rhs).div(Formula.add(rhs, 1));
   }
   console.error('Could not integrate due to no input being a variable');
@@ -754,7 +758,7 @@ export function invertTetrate(
     // monotone increasing in `b` only above 1 — below it the tower converges
     // instead of growing — so the search starts there and reports when the
     // target can't be bracketed above it.
-    const solved = findCrossing((b) => tetrate(b, heightValue, payloadValue), value, { lower: 1 });
+    const solved = solveMonotone((b) => tetrate(b, heightValue, payloadValue), value, { lower: 1 });
     if (solved == null) {
       reportInversionFailure(
         'no-solution',
@@ -798,7 +802,7 @@ export function invertIteratedExp(
     if (Decimal.eq(heightValue, 1)) {
       return lhs.invert(Decimal.root(value, payloadValue));
     }
-    const solved = findCrossing((b) => iteratedexp(b, heightValue, payloadValue), value, {
+    const solved = solveMonotone((b) => iteratedexp(b, heightValue, payloadValue), value, {
       lower: 1,
     });
     if (solved == null) {

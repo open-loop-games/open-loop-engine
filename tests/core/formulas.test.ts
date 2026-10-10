@@ -206,13 +206,14 @@ describe('Creating Formulas', () => {
         test('Is not invertible', () => expect(formula.isInvertible()).toBe(false));
         test('Is not integrable', () => expect(formula.isIntegrable()).toBe(false));
         test('Integral is not invertible', () =>
-          expect(formula.isIntegralInvertible()).toBe(false));
+          expect(formula.isAntiderivativeInvertible()).toBe(false));
         test('Is not marked as having a variable', () => expect(formula.hasVariable()).toBe(false));
         test('Evaluates correctly', () =>
           expect(formula.evaluate()).compare_tolerance(expectedValue));
         test('Invert errors', () => expect(() => formula.invert(25)).toLogError());
-        test('Integrate errors', () => expect(() => formula.evaluateIntegral()).toLogError());
-        test('Invert integral errors', () => expect(() => formula.invertIntegral(25)).toLogError());
+        test('Integrate errors', () => expect(() => formula.evaluateAntiderivative()).toLogError());
+        test('Invert integral errors', () =>
+          expect(() => formula.invertAntiderivative(25)).toLogError());
       });
     }
     testConstant('number', () => Formula.constant(10));
@@ -235,7 +236,8 @@ describe('Creating Formulas', () => {
     test('Is not invertible', () => expect(formula.isInvertible()).toBe(false));
     test(`Formula errors if trying to invert`, () => expect(() => formula.invert(10)).toLogError());
     test('Is not integrable', () => expect(formula.isIntegrable()).toBe(false));
-    test('Has a non-invertible integral', () => expect(formula.isIntegralInvertible()).toBe(false));
+    test('Has a non-invertible integral', () =>
+      expect(formula.isAntiderivativeInvertible()).toBe(false));
   }
 
   // Utility function that will test all the different
@@ -383,7 +385,7 @@ describe('Inverting', () => {
     function checkFormula(formula: GenericFormula) {
       expect(formula.isInvertible()).toBe(false);
       expect(formula.isIntegrable()).toBe(false);
-      expect(formula.isIntegralInvertible()).toBe(false);
+      expect(formula.isAntiderivativeInvertible()).toBe(false);
     }
     nonInvertibleZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
@@ -462,7 +464,7 @@ describe('Inverting', () => {
       const result = cost.tryInvert(target);
       expect(result.reason, `target ${target}`).toBe('no-solution');
       expect(result.value, `target ${target}`).toBeNull();
-      const integral = cost.tryInvertIntegral(target);
+      const integral = cost.tryInvertAntiderivative(target);
       expect(integral.reason, `integral target ${target}`).toBe('no-solution');
     }
   });
@@ -501,15 +503,15 @@ describe('Integrating', () => {
     constant = Formula.constant(10);
   });
 
-  test('variable.evaluateIntegral() calculates correctly', () =>
-    expect(variable.evaluateIntegral()).compare_tolerance(Decimal.pow(10, 2).div(2)));
-  test('variable.evaluateIntegral(variable) overrides variable value', () =>
-    expect(variable.evaluateIntegral(20)).compare_tolerance(Decimal.pow(20, 2).div(2)));
+  test('variable.evaluateAntiderivative() calculates correctly', () =>
+    expect(variable.evaluateAntiderivative()).compare_tolerance(Decimal.pow(10, 2).div(2)));
+  test('variable.evaluateAntiderivative(variable) overrides variable value', () =>
+    expect(variable.evaluateAntiderivative(20)).compare_tolerance(Decimal.pow(20, 2).div(2)));
 
   describe('Integrable functions marked as such', () => {
     function checkFormula(formula: GenericFormula) {
       expect(formula.isIntegrable()).toBe(true);
-      expect(() => formula.evaluateIntegral()).to.not.throw();
+      expect(() => formula.evaluateAntiderivative()).to.not.throw();
     }
     integrableZeroParamFunctionNames.forEach((name) => {
       describe(name, () => {
@@ -621,19 +623,19 @@ describe('Integrating', () => {
 
   test('Integrating nested complex formulas', () => {
     const formula = F.pow(1.05, variable).mul(100).pow(0.5);
-    expect(() => formula.evaluateIntegral()).toLogError();
+    expect(() => formula.evaluateAntiderivative()).toLogError();
   });
 
   describe('Integrating with non-integrable sections', () => {
     test('Non-integrable constant', () => {
       const formula = F.add(variable, constant.ceil());
       expect(formula.isIntegrable()).toBe(true);
-      expect(() => formula.evaluateIntegral()).not.toLogError();
+      expect(() => formula.evaluateAntiderivative()).not.toLogError();
     });
     test('Non-integrable variable', () => {
       const formula = F.add(variable.ceil(), constant);
       expect(formula.isIntegrable()).toBe(false);
-      expect(() => formula.evaluateIntegral()).toLogError();
+      expect(() => formula.evaluateAntiderivative()).toLogError();
     });
   });
 
@@ -644,19 +646,19 @@ describe('Integrating', () => {
     test('Formula.linear(level=0, base=10, coef=5) integrates as 2.5x² + 10x', () => {
       const level = ref<DecimalSource>(0);
       const formula = Formula.linear(level, 10, 5);
-      expect(formula.evaluateIntegral(0)).compare_tolerance(0);
-      expect(formula.evaluateIntegral(1)).compare_tolerance(12.5);
-      expect(formula.evaluateIntegral(2)).compare_tolerance(30);
-      expect(formula.evaluateIntegral(5)).compare_tolerance(112.5);
-      expect(formula.evaluateIntegral(10)).compare_tolerance(350);
+      expect(formula.evaluateAntiderivative(0)).compare_tolerance(0);
+      expect(formula.evaluateAntiderivative(1)).compare_tolerance(12.5);
+      expect(formula.evaluateAntiderivative(2)).compare_tolerance(30);
+      expect(formula.evaluateAntiderivative(5)).compare_tolerance(112.5);
+      expect(formula.evaluateAntiderivative(10)).compare_tolerance(350);
     });
 
     test('Formula.add(variable, constant=10) integrates as 0.5x² + 10x', () => {
       const v = Formula.variable(ref<DecimalSource>(0));
       const formula = v.add(10);
-      expect(formula.evaluateIntegral(0)).compare_tolerance(0);
-      expect(formula.evaluateIntegral(1)).compare_tolerance(10.5);
-      expect(formula.evaluateIntegral(10)).compare_tolerance(150);
+      expect(formula.evaluateAntiderivative(0)).compare_tolerance(0);
+      expect(formula.evaluateAntiderivative(1)).compare_tolerance(10.5);
+      expect(formula.evaluateAntiderivative(10)).compare_tolerance(150);
     });
 
     test('integrateAdd matches direct discrete sum within boundary error', () => {
@@ -665,36 +667,44 @@ describe('Integrating', () => {
       // Diff = 25 = N·c/2 = 50·c/(2·5) — exact discrete-vs-integral relationship.
       const level = ref<DecimalSource>(0);
       const formula = Formula.linear(level, 10, 5);
-      const integral10 = Decimal.fromValue(formula.evaluateIntegral(10));
+      const integral10 = Decimal.fromValue(formula.evaluateAntiderivative(10));
       let discrete = new Decimal(0);
       for (let i = 0; i < 10; i++) discrete = discrete.add(formula.evaluate(i));
       // integral - discrete = N·c/2 + (boundary term) = 25 for this case.
       expect(integral10.toNumber() - discrete.toNumber()).toBeCloseTo(25, 6);
     });
 
-    test('Formula.linear invertIntegral roundtrips via closed-form', () => {
+    test('Formula.linear invertAntiderivative roundtrips via closed-form', () => {
       // ∫₀^N (5x+10) dx = 2.5N² + 10N. At N=10 → 350.
       const level = ref<DecimalSource>(0);
       const formula = Formula.linear(level, 10, 5);
-      expect(formula.invertIntegral(350)).compare_tolerance(10);
-      expect(formula.invertIntegral(formula.evaluateIntegral(7))).compare_tolerance(7);
-      expect(formula.invertIntegral(formula.evaluateIntegral(0.5))).compare_tolerance(0.5);
+      expect(formula.invertAntiderivative(350)).compare_tolerance(10);
+      expect(formula.invertAntiderivative(formula.evaluateAntiderivative(7))).compare_tolerance(7);
+      expect(formula.invertAntiderivative(formula.evaluateAntiderivative(0.5))).compare_tolerance(
+        0.5,
+      );
     });
 
-    test('var.add(c) invertIntegral roundtrips via closed-form', () => {
+    test('var.add(c) invertAntiderivative roundtrips via closed-form', () => {
       // ∫₀^N (x+10) dx = 0.5N² + 10N. At N=5 → 12.5 + 50 = 62.5.
       const level = ref<DecimalSource>(0);
       const formula = Formula.variable(level).add(10);
-      expect(formula.invertIntegral(62.5)).compare_tolerance(5);
-      expect(formula.invertIntegral(formula.evaluateIntegral(3))).compare_tolerance(3);
+      expect(formula.invertAntiderivative(62.5)).compare_tolerance(5);
+      expect(formula.invertAntiderivative(formula.evaluateAntiderivative(3))).compare_tolerance(3);
     });
 
-    test('non-linear outer-add invertIntegral roundtrips via bisection', () => {
+    test('non-linear outer-add invertAntiderivative roundtrips via bisection', () => {
       // x²·10 + 5  → ∫ = 10x³/3 + 5x. Cubic-in-x, no closed form.
       const level = ref<DecimalSource>(0);
       const formula = Formula.polynomial(level, 10, 2).add(5);
-      expect(formula.invertIntegral(formula.evaluateIntegral(4))).compare_tolerance(4, 1e-6);
-      expect(formula.invertIntegral(formula.evaluateIntegral(10))).compare_tolerance(10, 1e-6);
+      expect(formula.invertAntiderivative(formula.evaluateAntiderivative(4))).compare_tolerance(
+        4,
+        1e-6,
+      );
+      expect(formula.invertAntiderivative(formula.evaluateAntiderivative(10))).compare_tolerance(
+        10,
+        1e-6,
+      );
     });
   });
 });
@@ -707,13 +717,15 @@ describe('Inverting integrals', () => {
     constant = Formula.constant(10);
   });
 
-  test('variable.invertIntegral() calculates correctly', () =>
-    expect(variable.invertIntegral(20)).compare_tolerance(Decimal.sqrt(20).mul(Decimal.sqrt(2))));
+  test('variable.invertAntiderivative() calculates correctly', () =>
+    expect(variable.invertAntiderivative(20)).compare_tolerance(
+      Decimal.sqrt(20).mul(Decimal.sqrt(2)),
+    ));
 
   describe('Invertible Integral functions marked as such', () => {
     function checkFormula(formula: GenericFormula) {
-      expect(formula.isIntegralInvertible()).toBe(true);
-      expect(() => formula.invertIntegral(10)).not.toLogError();
+      expect(formula.isAntiderivativeInvertible()).toBe(true);
+      expect(() => formula.invertAntiderivative(10)).not.toLogError();
     }
     invertibleIntegralZeroPramFunctionNames.forEach((name) => {
       describe(name, () => {
@@ -731,8 +743,8 @@ describe('Inverting integrals', () => {
         }
         test(`${name}(var, var) is marked as not having an invertible integral`, () => {
           const formula = F[name](variable, variable);
-          expect(formula.isIntegralInvertible()).toBe(false);
-          expect(() => formula.invertIntegral(10)).toLogError();
+          expect(formula.isAntiderivativeInvertible()).toBe(false);
+          expect(() => formula.invertAntiderivative(10)).toLogError();
         });
       });
     });
@@ -740,7 +752,7 @@ describe('Inverting integrals', () => {
 
   describe('Non-Invertible integral functions marked as such', () => {
     function checkFormula(formula: GenericFormula) {
-      expect(formula.isIntegralInvertible()).toBe(false);
+      expect(formula.isAntiderivativeInvertible()).toBe(false);
     }
     nonInvertibleIntegralZeroPramFunctionNames.forEach((name) => {
       describe(name, () => {
@@ -783,12 +795,12 @@ describe('Inverting integrals', () => {
 
   test('Inverting integral of nested formulas', () => {
     const formula = F.add(variable, constant).mul(constant).pow(2).mul(30);
-    expect(formula.invertIntegral(formula.evaluateIntegral())).compare_tolerance(10);
+    expect(formula.invertAntiderivative(formula.evaluateAntiderivative())).compare_tolerance(10);
   });
 
   test('Inverting integral of nested complex formulas', () => {
     const formula = F.pow(1.05, variable).mul(100).pow(0.5);
-    expect(() => formula.invertIntegral(100)).toLogError();
+    expect(() => formula.invertAntiderivative(100)).toLogError();
   });
 });
 
@@ -818,16 +830,16 @@ describe('Step-wise', () => {
   test('Formula never marked integrable', () => {
     expect(Formula.step(constant, 10, (value) => F.add(value, 10)).isIntegrable()).toBe(false);
     expect(() =>
-      Formula.step(constant, 10, (value) => F.add(value, 10)).evaluateIntegral(),
+      Formula.step(constant, 10, (value) => F.add(value, 10)).evaluateAntiderivative(),
     ).toLogError();
   });
 
   test('Formula never marked as having an invertible integral', () => {
-    expect(Formula.step(constant, 10, (value) => F.add(value, 10)).isIntegralInvertible()).toBe(
-      false,
-    );
+    expect(
+      Formula.step(constant, 10, (value) => F.add(value, 10)).isAntiderivativeInvertible(),
+    ).toBe(false);
     expect(() =>
-      Formula.step(constant, 10, (value) => F.add(value, 10)).invertIntegral(10),
+      Formula.step(constant, 10, (value) => F.add(value, 10)).invertAntiderivative(10),
     ).toLogError();
   });
 
@@ -915,16 +927,16 @@ describe('Conditionals', () => {
   test('Formula never marked integrable', () => {
     expect(Formula.if(constant, true, (value) => F.add(value, 10)).isIntegrable()).toBe(false);
     expect(() =>
-      Formula.if(constant, true, (value) => F.add(value, 10)).evaluateIntegral(),
+      Formula.if(constant, true, (value) => F.add(value, 10)).evaluateAntiderivative(),
     ).toLogError();
   });
 
   test('Formula never marked as having an invertible integral', () => {
-    expect(Formula.if(constant, true, (value) => F.add(value, 10)).isIntegralInvertible()).toBe(
-      false,
-    );
+    expect(
+      Formula.if(constant, true, (value) => F.add(value, 10)).isAntiderivativeInvertible(),
+    ).toBe(false);
     expect(() =>
-      Formula.if(constant, true, (value) => F.add(value, 10)).invertIntegral(10),
+      Formula.if(constant, true, (value) => F.add(value, 10)).invertAntiderivative(10),
     ).toLogError();
   });
 
@@ -1109,7 +1121,7 @@ describe('Custom Formulas', () => {
           inputs: [],
           evaluate: () => 0,
           integrate: (_stack) => variable,
-        }).evaluateIntegral(),
+        }).evaluateAntiderivative(),
       ).toLogError());
     test('One input integrates correctly', () =>
       expect(
@@ -1117,7 +1129,7 @@ describe('Custom Formulas', () => {
           inputs: [variable],
           evaluate: (v1) => Decimal.add(v1, 10),
           integrate: (_stack, v1) => F.add(v1, 10),
-        }).evaluateIntegral(),
+        }).evaluateAntiderivative(),
       ).compare_tolerance(11));
     test('Two inputs integrates correctly', () =>
       expect(
@@ -1125,18 +1137,18 @@ describe('Custom Formulas', () => {
           inputs: [variable, 10],
           evaluate: (v1, v2) => Decimal.add(v1, v2),
           integrate: (_stack, v1, v2) => F.add(v1, v2),
-        }).evaluateIntegral(),
+        }).evaluateAntiderivative(),
       ).compare_tolerance(11));
   });
 
-  describe('Formula with invertIntegral', () => {
+  describe('Formula with invertAntiderivative', () => {
     test('Zero input does not invert integral', () =>
       expect(() =>
         new Formula({
           inputs: [],
           evaluate: () => 0,
           integrate: (_stack) => variable,
-        }).invertIntegral(20),
+        }).invertAntiderivative(20),
       ).toLogError());
     test('One input inverts integral correctly', () =>
       expect(
@@ -1144,7 +1156,7 @@ describe('Custom Formulas', () => {
           inputs: [variable],
           evaluate: (v1) => Decimal.add(v1, 10),
           integrate: (_stack, v1) => F.add(v1, 10),
-        }).invertIntegral(20),
+        }).invertAntiderivative(20),
       ).compare_tolerance(10));
     test('Two inputs inverts integral correctly', () =>
       expect(
@@ -1152,7 +1164,7 @@ describe('Custom Formulas', () => {
           inputs: [variable, 10],
           evaluate: (v1, v2) => Decimal.add(v1, v2),
           integrate: (_stack, v1, v2) => F.add(v1, v2),
-        }).invertIntegral(20),
+        }).invertAntiderivative(20),
       ).compare_tolerance(10));
   });
 
@@ -1163,7 +1175,7 @@ describe('Custom Formulas', () => {
         inputs: [variable],
         evaluate: (v1) => v1,
         invert: (value) => value,
-        integrate: (stack, v1) => v1.getIntegralFormula(stack),
+        integrate: (stack, v1) => v1.getAntiderivative(stack),
       });
     });
     test('Evaluate correctly', () =>
@@ -1171,9 +1183,9 @@ describe('Custom Formulas', () => {
     test('Invert correctly', () => expect(customFormula.add(10).invert(20)).compare_tolerance(10));
     test('Integrate correctly', () =>
       // ∫(customFormula(x) + 10) dx at x=10 = customFormula_integral(10) + 10·10
-      // customFormula's integral delegates to variable.getIntegralFormula via
+      // customFormula's integral delegates to variable.getAntiderivative via
       // the substitution stack, which evaluates as 10 at x=10. So 10 + 100 = 110.
-      expect(customFormula.add(10).evaluateIntegral(10)).compare_tolerance(110));
+      expect(customFormula.add(10).evaluateAntiderivative(10)).compare_tolerance(110));
   });
 });
 
@@ -1592,7 +1604,7 @@ describe('Buy Max', () => {
       expect(maxAffordable.value).compare_tolerance(20);
     });
 
-    test('flipping cumulativeCost invalidates the band', () => {
+    test('flipping sumLevels invalidates the band', () => {
       // The two operations price different things — the series vs the single
       // level reached — and on a linear curve they diverge widely. The band was
       // computed in one of them and read back under the other.
@@ -1615,7 +1627,7 @@ describe('Buy Max', () => {
       // `Formula.if` carries only the value in `inputs`; the condition and both
       // branch formulas live in a closure. No signature over the input tree can
       // reach them at any depth, which is why the guard keys on a token that
-      // *evaluates* the curve instead. Reachable under cumulativeCost: false —
+      // *evaluates* the curve instead. Reachable under sumLevels: false —
       // `if` binds no integrate, so the cumulative path bails before the guard
       // is ever written.
       const level = ref<DecimalSource>(0);
@@ -1654,7 +1666,7 @@ describe('Buy Max', () => {
 });
 
 describe('reactive coefficients survive integral memoization', () => {
-  // `getIntegralFormula` memoizes its result for the life of the formula, so
+  // `getAntiderivative` memoizes its result for the life of the formula, so
   // anything the builders read while *constructing* it is frozen there. A
   // coefficient is a `FormulaSource` — a ref or a variable-free sub-formula —
   // and reading one eagerly turns it into a snapshot that a later modifier,
@@ -1668,12 +1680,12 @@ describe('reactive coefficients survive integral memoization', () => {
     const coef = ref<DecimalSource>(1);
     const formula = Formula.variable(level).mul(coef).add(5);
 
-    formula.evaluateIntegral(); // build and memoize the integral against coef = 1
+    formula.evaluateAntiderivative(); // build and memoize the integral against coef = 1
 
     coef.value = 100;
     level.value = 10;
     // ∫₀¹⁰ (100x + 5) dx = 100·10²/2 + 5·10 = 5050
-    expect(formula.evaluateIntegral()).compare_tolerance(5050);
+    expect(formula.evaluateAntiderivative()).compare_tolerance(5050);
   });
 
   test('a ref coefficient that moves is honoured by buy-max', () => {
@@ -1721,18 +1733,18 @@ describe('reactive coefficients survive integral memoization', () => {
   test('integrateSub reads its coefficient at invert time too', () => {
     // The fix touches both builders; the ticket only ever exercised `add`.
     // Inverting is where the slope still lives after the forward arm stopped
-    // consulting it, so this has to go through `invertIntegral` to bite.
+    // consulting it, so this has to go through `invertAntiderivative` to bite.
     const level = ref<DecimalSource>(0);
     const coef = ref<DecimalSource>(1);
     const formula = Formula.variable(level).mul(coef).sub(5);
 
-    formula.invertIntegral(1e5); // build and memoize against coef = 1
+    formula.invertAntiderivative(1e5); // build and memoize against coef = 1
 
     coef.value = 100;
     // K·x²/2 - c·x = T with K = 100, c = 5, T = 1e5
     //   → x = (5 + √(25 + 2·100·1e5)) / 100 ≈ 44.77
     // A slope frozen at 1 answers 452.24 instead.
-    expect(formula.invertIntegral(1e5)).compare_tolerance(
+    expect(formula.invertAntiderivative(1e5)).compare_tolerance(
       Decimal.add(5, Decimal.sqrt(20000025)).div(100),
     );
   });
@@ -1748,10 +1760,10 @@ describe('reactive coefficients survive integral memoization', () => {
     const coef = ref<DecimalSource>(1);
     const formula = Formula.variable(level).mul(coef).add(5);
 
-    formula.evaluateIntegral();
+    formula.evaluateAntiderivative();
 
     coef.value = -100;
-    expect(() => formula.invertIntegral(1e5)).toLogError();
+    expect(() => formula.invertAntiderivative(1e5)).toLogError();
   });
 });
 
@@ -1769,16 +1781,18 @@ describe('the quadratic integral inverse is gated on its discriminant', () => {
     // integral 5x - 50x^2, peaking at 0.125 (x = 0.05). Target 0.1 has real
     // roots (5 -+ sqrt5)/100 = 0.02763932 and 0.07236068; first passage is the
     // smaller.
-    expect(() => formula.invertIntegral(0.1)).not.toLogError();
-    expect(formula.invertIntegral(0.1)).compare_tolerance(0.02763932);
-    expect(formula.evaluateIntegral(formula.invertIntegral(0.1))).compare_tolerance(0.1);
+    expect(() => formula.invertAntiderivative(0.1)).not.toLogError();
+    expect(formula.invertAntiderivative(0.1)).compare_tolerance(0.02763932);
+    expect(formula.evaluateAntiderivative(formula.invertAntiderivative(0.1))).compare_tolerance(
+      0.1,
+    );
   });
 
   test('a target past the peak has no pre-image and says so', () => {
     const level = ref<DecimalSource>(0);
     const formula = Formula.variable(level).mul(-100).add(5);
     // Above 0.125 the discriminant goes negative. Declining is correct here.
-    expect(formula.tryInvertIntegral(1)).toMatchObject({ value: null });
+    expect(formula.tryInvertAntiderivative(1)).toMatchObject({ value: null });
   });
 
   test('a zero slope declines the closed form rather than dividing by it', () => {
@@ -1786,10 +1800,10 @@ describe('the quadratic integral inverse is gated on its discriminant', () => {
     const coef = ref<DecimalSource>(4);
     const formula = Formula.variable(level).mul(coef).add(5);
 
-    formula.invertIntegral(1e3);
+    formula.invertAntiderivative(1e3);
 
     coef.value = 0; // integral collapses to 5x, linear — no quadratic to solve
-    const x = formula.invertIntegral(1e3);
+    const x = formula.invertAntiderivative(1e3);
     expect(new Decimal(x).isNan()).toBe(false);
   });
 
@@ -1800,21 +1814,21 @@ describe('the quadratic integral inverse is gated on its discriminant', () => {
     const level = ref<DecimalSource>(0);
     const formula = Formula.constant(5).sub(Formula.variable(level).mul(100));
     // 5x - 50x² peaks at 0.125; 1e5 is far past it.
-    expect(new Decimal(formula.invertIntegral(1e5)).isNan()).toBe(false);
-    expect(formula.tryInvertIntegral(1e5)).toMatchObject({ value: null });
+    expect(new Decimal(formula.invertAntiderivative(1e5)).isNan()).toBe(false);
+    expect(formula.tryInvertAntiderivative(1e5)).toMatchObject({ value: null });
   });
 
   test('integrateSub inverts a negative slope in both orientations', () => {
     const level = ref<DecimalSource>(0);
     // c*x - K*x^2/2 with K = -100: 5x + 50x^2, increasing and convex.
     const right = Formula.constant(5).sub(Formula.variable(level).mul(-100));
-    expect(() => right.invertIntegral(1e5)).not.toLogError();
-    expect(right.evaluateIntegral(right.invertIntegral(1e5))).compare_tolerance(1e5);
+    expect(() => right.invertAntiderivative(1e5)).not.toLogError();
+    expect(right.evaluateAntiderivative(right.invertAntiderivative(1e5))).compare_tolerance(1e5);
 
     // K*x^2/2 - c*x with K = 100: 50x^2 - 5x.
     const left = Formula.variable(level).mul(100).sub(5);
-    expect(() => left.invertIntegral(1e5)).not.toLogError();
-    expect(left.evaluateIntegral(left.invertIntegral(1e5))).compare_tolerance(1e5);
+    expect(() => left.invertAntiderivative(1e5)).not.toLogError();
+    expect(left.evaluateAntiderivative(left.invertAntiderivative(1e5))).compare_tolerance(1e5);
   });
 });
 
@@ -1844,8 +1858,8 @@ describe('buy-max returns no count it could not price', () => {
 
   test('a seed the walk cannot reach is recovered by searching the price', () => {
     // Non-cumulative, so the seed is `formula.invert` — the lie — and pricing
-    // is `evaluate`, which stays honest. Under cumulativeCost the seed comes
-    // from `invertIntegral` instead and a lying `invert` is never consulted.
+    // is `evaluate`, which stays honest. Under sumLevels the seed comes
+    // from `invertAntiderivative` instead and a lying `invert` is never consulted.
     const level = ref<DecimalSource>(0);
     const formula = overshootingCurve(level);
     const maxAffordable = calculateMaxAffordable(

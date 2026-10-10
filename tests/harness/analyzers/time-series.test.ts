@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createResource } from '@/core/resource';
 import { runHeadless } from '@/core/headless';
-import { createTimeSeriesAnalyzer } from '@/harness/analyzers/series';
+import { createTimeSeriesAnalyzer } from '@/harness/analyzers/time-series';
 
 describe('createTimeSeriesAnalyzer', () => {
   it('emits one metric per tick keyed t{i} over the trajectory', () => {
@@ -31,11 +31,11 @@ describe('createTimeSeriesAnalyzer', () => {
     expect(Object.keys(metrics)).toHaveLength(5);
   });
 
-  it('analyzer name is keyed by resource id, so a shared displayName never merges', () => {
+  it('analyzer id is keyed by resource id, so a shared displayName never merges', () => {
     const prestige = createResource(0, { id: 'prestige-points', displayName: 'Points' });
     const transcend = createResource(0, { id: 'transcend-points', displayName: 'Points' });
-    expect(createTimeSeriesAnalyzer(prestige).id).toBe('series:prestige-points');
-    expect(createTimeSeriesAnalyzer(transcend).id).toBe('series:transcend-points');
+    expect(createTimeSeriesAnalyzer(prestige).id).toBe('time-series:prestige-points');
+    expect(createTimeSeriesAnalyzer(transcend).id).toBe('time-series:transcend-points');
   });
 
   it('zero-tick run reports a single-point series', () => {

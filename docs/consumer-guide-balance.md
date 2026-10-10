@@ -223,7 +223,7 @@ The harness is the toolkit. Curated entries; the full surface is `docs/api/harne
 | `createEngineFromSave` | Load a save into an isolated scratch engine — a predictor or worker simulating ahead of the live game. |
 | `diffAggregates` | Per-metric delta between a variant cell and baseline. |
 | `createTransitionSnapshot` / `createIncrementalSnapshot` | Pending content transitions; caching overlay for time-series introspection. |
-| `defaultAnalyzerPack` / `seriesAnalyzerPack` | Cycle-finalize and resource-peak analyzers; per-resource trajectory capture. |
+| `defaultAnalyzerPack` / `timeSeriesAnalyzerPack` | Cycle-finalize and resource-peak analyzers; per-resource trajectory capture. |
 | `classifyFlowChannel` / `getFlowChannelBoundaries` | Classify a beat duration into its flow channel; read the threshold table. |
 
 Most balance work uses the first two and the analyzer packs. The sweep surfaces are there when a design question genuinely is "what does this curve look like across a range" — reach for them then, not as routine process.

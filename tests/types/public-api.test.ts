@@ -812,16 +812,16 @@ describe('Formula inversion contract', () => {
     // recursively, so widening it here would ripple through every op invert.
     expectTypeOf(formula.invert('3')).toEqualTypeOf<DecimalSource>();
     expectTypeOf(formula.tryInvert('3')).toEqualTypeOf<Inversion>();
-    expectTypeOf(formula.tryInvertIntegral('3')).toEqualTypeOf<Inversion>();
+    expectTypeOf(formula.tryInvertAntiderivative('3')).toEqualTypeOf<Inversion>();
     expectTypeOf(formula.tryInvert).parameter(1).toEqualTypeOf<number | undefined>();
   });
 
   it('discriminates on reason, so a failure arm cannot be read as a value', () => {
-    type Exact = Extract<Inversion, { reason: 'exact' }>;
+    type OnTarget = Extract<Inversion, { reason: 'on-target' }>;
     type OutsideImage = Extract<Inversion, { reason: 'outside-image' }>;
     type Failed = Extract<Inversion, { value: null }>;
 
-    expectTypeOf<Exact['value']>().toEqualTypeOf<DecimalSource>();
+    expectTypeOf<OnTarget['value']>().toEqualTypeOf<DecimalSource>();
     expectTypeOf<OutsideImage['value']>().toEqualTypeOf<DecimalSource>();
     // The value the target *does* reach lives only on this arm, so measuring the
     // gap can't be done without first admitting there is one.
@@ -841,7 +841,7 @@ describe('Formula series contract', () => {
     // The antiderivative stays a bare value — it is the raw thing, arbitrary
     // constant included, and callers who want a well-posed answer take one of
     // the other two.
-    expectTypeOf(formula.evaluateIntegral('3')).toEqualTypeOf<DecimalSource>();
+    expectTypeOf(formula.evaluateAntiderivative('3')).toEqualTypeOf<DecimalSource>();
     // The continuous span is always answerable once a formula is integrable, so
     // it needs no grading.
     expectTypeOf(formula.cumulative(0, 10)).toEqualTypeOf<DecimalSource>();
@@ -897,9 +897,9 @@ describe('Formula first-passage contract', () => {
 
     // A found crossing and a target already met at the floor are both answers,
     // and both carry the input they answer with.
-    expectTypeOf<Answered['reason']>().toEqualTypeOf<'crossed' | 'already-reached'>();
+    expectTypeOf<Answered['reason']>().toEqualTypeOf<'reached' | 'already-reached'>();
     expectTypeOf<Unanswered['value']>().toBeNull();
-    expectTypeOf<Unanswered['reason']>().toEqualTypeOf<'no-crossing' | 'not-monotone'>();
+    expectTypeOf<Unanswered['reason']>().toEqualTypeOf<'not-reached' | 'not-monotone'>();
   });
 
   it('exposes the domain, not the search', () => {
@@ -1183,7 +1183,7 @@ describe('createCostRequirement / createInventory type surface', () => {
   it('createCostRequirement requires resource and cost; the rest defaults', async () => {
     type Options = import('@/core/requirements').CostRequirementOptions;
     expectTypeOf<OptionalKeys<Options>>().toEqualTypeOf<
-      'requiresPay' | 'cumulativeCost' | 'maxBulkCount' | 'pay' | 'description'
+      'requiresPay' | 'sumLevels' | 'maxBulkCount' | 'pay' | 'description'
     >();
     const { createCostRequirement } = await import('@/index');
     const resource = createResource(0, { id: 'cost-gold', displayName: 'gold' });
@@ -1430,14 +1430,16 @@ describe('Formula capability is a runtime question', () => {
 
   it('calculateCost takes any formula, in one signature', () => {
     expectTypeOf<Parameters<Index['calculateCost']>>().toEqualTypeOf<
-      [formula: GenericFormula, amountToBuy: DecimalSource, cumulativeCost?: boolean]
+      [formula: GenericFormula, amountToBuy: DecimalSource, sumLevels?: boolean]
     >();
   });
 
   it('the capability predicates answer a boolean rather than narrowing', () => {
     expectTypeOf<ReturnType<GenericFormula['isInvertible']>>().toEqualTypeOf<boolean>();
     expectTypeOf<ReturnType<GenericFormula['isIntegrable']>>().toEqualTypeOf<boolean>();
-    expectTypeOf<ReturnType<GenericFormula['isIntegralInvertible']>>().toEqualTypeOf<boolean>();
+    expectTypeOf<
+      ReturnType<GenericFormula['isAntiderivativeInvertible']>
+    >().toEqualTypeOf<boolean>();
   });
 
   it('cost-curve factories take a reactive or formula-valued parameter anywhere after the level', async () => {
@@ -1456,7 +1458,7 @@ describe('Removed surface stays removed', () => {
     type _InvertibleFormula = import('@/index').InvertibleFormula;
     // @ts-expect-error — same; check isIntegrable().
     type _IntegrableFormula = import('@/index').IntegrableFormula;
-    // @ts-expect-error — same; check isIntegralInvertible().
+    // @ts-expect-error — same; check isAntiderivativeInvertible().
     type _InvertibleIntegralFormula = import('@/index').InvertibleIntegralFormula;
   });
 

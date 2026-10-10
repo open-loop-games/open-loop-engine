@@ -25,8 +25,8 @@
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 
-/** Tuning for {@link findCrossing}. Every field has a defensible default; pass one only when the shape of the problem gives a better starting point. */
-export interface FindCrossingOptions {
+/** Tuning for {@link solveMonotone}. Every field has a defensible default; pass one only when the shape of the problem gives a better starting point. */
+export interface SolveMonotoneOptions {
   /** Bottom of the search domain, and the answer when `target` is already reached there. Defaults to 0. */
   lower?: DecimalSource;
   /**
@@ -81,7 +81,7 @@ export function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
  *
  * @param f - The function to cross. Monotone non-decreasing on `[lower, ∞)`.
  * @param target - The value to reach.
- * @param options - Bracket and iteration tuning. See {@link FindCrossingOptions}.
+ * @param options - Bracket and iteration tuning. See {@link SolveMonotoneOptions}.
  * @returns The crossing point — always an `x` with `f(x) ≥ target`, so a stepped
  *   curve answers on the far side of the step rather than the last input before
  *   it. `lower` when `target` is already reached there, or `null` when the target
@@ -91,13 +91,13 @@ export function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
  * @example
  * ```ts
  * // Solve x³/3 + 2x = 100 for x.
- * const x = findCrossing((v) => Decimal.add(Decimal.pow(v, 3).div(3), Decimal.mul(2, v)), 100);
+ * const x = solveMonotone((v) => Decimal.add(Decimal.pow(v, 3).div(3), Decimal.mul(2, v)), 100);
  * ```
  */
-export function findCrossing(
+export function solveMonotone(
   f: (x: Decimal) => DecimalSource,
   target: DecimalSource,
-  options: FindCrossingOptions = {},
+  options: SolveMonotoneOptions = {},
 ): Decimal | null {
   const {
     lower = 0,

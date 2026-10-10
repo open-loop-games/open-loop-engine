@@ -16,7 +16,7 @@ export {
   createRunFinalizeAnalyzer,
   defaultAnalyzerPack,
   createTimeSeriesAnalyzer,
-  seriesAnalyzerPack,
+  timeSeriesAnalyzerPack,
 } from './analyzers';
 export {
   createPickerSnapshot,

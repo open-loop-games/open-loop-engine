@@ -89,7 +89,7 @@ function clearMissBound(price: DecimalSource): DecimalSource {
  *
  * @param formula - Cost formula — the price of the level at its variable
  * @param resource - The resource paying for the levels
- * @param cumulativeCost - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
+ * @param sumLevels - If true, affordability is measured against `Σ f(a+i)` over the levels bought. If false, against `f(a + n)` alone. Default: `true`
  * @param maxBulkCount - Ceiling on the returned count, for "buy max" caps; a fractional cap counts the whole levels below it. Default: unbounded
  * @returns Reactive count of affordable levels, recomputed as the resource, the
  * cost curve, and both options change — including reactive values the curve
@@ -98,10 +98,10 @@ function clearMissBound(price: DecimalSource): DecimalSource {
 export function calculateMaxAffordable(
   formula: GenericFormula,
   resource: Resource,
-  cumulativeCost: Computable<boolean> = true,
+  sumLevels: Computable<boolean> = true,
   maxBulkCount: Computable<DecimalSource> = Decimal.dInf,
 ) {
-  const computedCumulativeCost = toMaybeRef(cumulativeCost);
+  const computedCumulativeCost = toMaybeRef(sumLevels);
   const computedmaxBulkAmount = toMaybeRef(maxBulkCount);
 
   // Change token for the cost curve. Recomputes — and so returns a *fresh*
@@ -124,8 +124,8 @@ export function calculateMaxAffordable(
 
   // Threshold guard: cache the affordability band [floorCost, ceilCost) so ticks
   // where the resource changes by a small amount (production) can short-circuit
-  // with a handful of comparisons instead of a full invertIntegral +
-  // evaluateIntegral. See `scenarioF` in scripts/formula-hotpath-bench.ts.
+  // with a handful of comparisons instead of a full invertAntiderivative +
+  // evaluateAntiderivative. See `scenarioF` in scripts/formula-hotpath-bench.ts.
   //
   // Every field here is part of the key, and the fast path must test all of
   // them: the band was computed at one level, in one pricing operation, under
@@ -154,20 +154,20 @@ export function calculateMaxAffordable(
       // input the curve reads, not just the key it is compared by.
       const token = curveToken.value;
       const maxBulkCount = unref(computedmaxBulkAmount);
-      const cumulativeCost = unref(computedCumulativeCost);
+      const sumLevels = unref(computedCumulativeCost);
       const currentVariable = unref(formula.innermostVariable) ?? 0;
 
       if (Decimal.eq(maxBulkCount, 1)) {
         guard = null;
         // Price the level being bought, in the operation `pay` will charge it
         // in — the same question `priceOf(1)` answers on the general path, and
-        // the reason `cumulativeCost` is read above rather than below. A
+        // the reason `sumLevels` is read above rather than below. A
         // cumulative buy of one sums to `evaluate(A)`, which is `token.at`; a
         // non-cumulative one pays `evaluate(A + 1)` for the level it reaches.
         // Comparing against `token.at` in both granted a level the balance
         // could not cover, and `pay` does not re-check — it subtracts and
         // clamps at zero.
-        const price = cumulativeCost ? token.at : formula.evaluate(Decimal.add(currentVariable, 1));
+        const price = sumLevels ? token.at : formula.evaluate(Decimal.add(currentVariable, 1));
         return payable(price, resource.value) ? Decimal.dOne : Decimal.dZero;
       }
 
@@ -182,7 +182,7 @@ export function calculateMaxAffordable(
       if (
         guard !== null &&
         guard.token === token &&
-        guard.cumulative === cumulativeCost &&
+        guard.cumulative === sumLevels &&
         // `maxBulkCount` defaults to `dInf`, and `toMaybeRef` hands back the
         // same object each run, so identity settles the common case before the
         // comparison that has to reason about infinities.
@@ -208,7 +208,7 @@ export function calculateMaxAffordable(
       const priceOf = (n: DecimalSource): DecimalSource => {
         if (lastAccepted && Decimal.eq(lastAccepted.n, n)) return lastAccepted.price;
         if (lastRefused && Decimal.eq(lastRefused.n, n)) return lastRefused.price;
-        return priceLevels(formula, currentVariable, n, cumulativeCost) ?? Decimal.dInf;
+        return priceLevels(formula, currentVariable, n, sumLevels) ?? Decimal.dInf;
       };
 
       /** Whether buying `n` levels is payable out of the current balance. */
@@ -220,8 +220,8 @@ export function calculateMaxAffordable(
         return ok;
       };
 
-      const seed = profile('formula.affordable.integral', () =>
-        seedAffordable(formula, resource.value, currentVariable, cumulativeCost, cap),
+      const seed = profile('formula.affordable.seed', () =>
+        seedAffordable(formula, resource.value, currentVariable, sumLevels, cap),
       );
       const correctionStart = profileStart();
       const affordable = countAffordable(canAfford, cap, seed);
@@ -247,7 +247,7 @@ export function calculateMaxAffordable(
         ceilCost,
         ceilClear: clearMissBound(ceilCost),
         token,
-        cumulative: cumulativeCost,
+        cumulative: sumLevels,
         maxBulk: maxBulkCount,
       };
 
@@ -265,10 +265,10 @@ function priceLevels(
   formula: GenericFormula,
   from: DecimalSource,
   n: DecimalSource,
-  cumulativeCost: boolean,
+  sumLevels: boolean,
 ): DecimalSource | null {
   if (Decimal.lte(n, 0)) return Decimal.dZero;
-  if (!cumulativeCost) return formula.evaluate(Decimal.add(from, n));
+  if (!sumLevels) return formula.evaluate(Decimal.add(from, n));
   return formula.sum(from, n).value;
 }
 
@@ -280,15 +280,15 @@ function seedAffordable(
   formula: GenericFormula,
   balance: DecimalSource,
   currentVariable: DecimalSource,
-  cumulativeCost: boolean,
+  sumLevels: boolean,
   cap: DecimalSource,
 ): DecimalSource | null {
   // A seed is an accelerator, so an inverse that fails is a missing seed rather
   // than a report: the search answers without one.
   const { value: level, failure } = captureInversionFailures(() => {
-    if (cumulativeCost) {
-      if (!formula.isIntegralInvertible()) return null;
-      return formula.invertIntegral(Decimal.add(balance, formula.evaluateIntegral()));
+    if (sumLevels) {
+      if (!formula.isAntiderivativeInvertible()) return null;
+      return formula.invertAntiderivative(Decimal.add(balance, formula.evaluateAntiderivative()));
     }
     // `invert(R)` is the level whose single payment is R, so the count is the
     // distance to it from here.
@@ -391,7 +391,7 @@ export function countAffordable(
 /**
  * Calculate the total cost of purchasing a specific number of levels.
  *
- * Under `cumulativeCost` this is the **series** {@link Formula.sum} — what
+ * Under `sumLevels` this is the **series** {@link Formula.sum} — what
  * buying the levels one at a time charges — not the continuous area
  * {@link Formula.cumulative} under the same curve. Companion to
  * {@link calculateMaxAffordable}, which counts levels through the same
@@ -399,17 +399,17 @@ export function countAffordable(
  *
  * @param formula - Cost formula — the price of the level at its variable
  * @param count - Number of levels to price; a fractional amount takes every whole level below it
- * @param cumulativeCost - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
+ * @param sumLevels - If true, the cost is `Σ f(a+i)` over the levels bought. If false, it is `f(a + amountToBuy)` alone. Default: `true`
  * @returns The total cost, or 0 with a report when the span has no price
  */
 export function calculateCost(
   formula: GenericFormula,
   count: DecimalSource,
-  cumulativeCost = true,
+  sumLevels = true,
 ): DecimalSource {
   const origValue = unref(formula.innermostVariable) ?? 0;
-  const price = priceLevels(formula, origValue, count, cumulativeCost);
+  const price = priceLevels(formula, origValue, count, sumLevels);
   if (price != null) return price;
-  console.error('Cannot calculate cumulative cost of a formula with no series and no integral');
+  console.error('Cannot sum the levels of a formula with no series and no antiderivative');
   return 0;
 }

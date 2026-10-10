@@ -4,7 +4,7 @@
  * Most consumers only need {@link FormulaSource} (a formula or a raw value) and
  * {@link GenericFormula}. What a formula can do — invert, integrate, invert its
  * integral — depends on the ops in its chain and is answered at runtime by
- * `isInvertible()` / `isIntegrable()` / `isIntegralInvertible()`. Every formula
+ * `isInvertible()` / `isIntegrable()` / `isAntiderivativeInvertible()`. Every formula
  * carries every method, so a type naming a capability could not tell one
  * formula from another.
  */

@@ -278,7 +278,7 @@ describe('setupSweepAutoPurchase', () => {
         createCostRequirement({
           resource: cookies,
           cost: F.sub(10, F.div(5, F.variable(level).add(1))),
-          cumulativeCost: false,
+          sumLevels: false,
           maxBulkCount: Decimal.dInf,
         }),
     });

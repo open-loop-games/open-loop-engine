@@ -53,7 +53,7 @@ export type InversionFailureReason =
   | 'no-solution';
 
 /**
- * Diagnosed result of {@link Formula.tryInvert} / {@link Formula.tryInvertIntegral}.
+ * Diagnosed result of {@link Formula.tryInvert} / {@link Formula.tryInvertAntiderivative}.
  *
  * - `exact` — the pre-image evaluates back onto the target. Use `value`.
  * - `outside-image` — `value` is the correct algebraic pre-image but the target
@@ -64,7 +64,7 @@ export type InversionFailureReason =
  * - `not-invertible` / `no-solution` — no answer at all.
  */
 export type Inversion =
-  | { value: DecimalSource; reason: 'exact' }
+  | { value: DecimalSource; reason: 'on-target' }
   | { value: DecimalSource; reason: 'outside-image'; evaluatesTo: DecimalSource }
   | { value: null; reason: InversionFailureReason };
 

@@ -30,7 +30,7 @@
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { bracketMidpoint, findCrossing } from './root-find';
+import { bracketMidpoint, solveMonotone } from './root-find';
 
 // === CONTRACT ===
 
@@ -65,8 +65,8 @@ export interface FirstPassageOptions {
  *   failure otherwise reads as a confident answer.
  */
 export type Passage =
-  | { value: Decimal; reason: 'crossed' | 'already-reached' }
-  | { value: null; reason: 'no-crossing' | 'not-monotone' };
+  | { value: Decimal; reason: 'reached' | 'already-reached' }
+  | { value: null; reason: 'not-reached' | 'not-monotone' };
 
 // === MONOTONICITY PROBE ===
 
@@ -95,7 +95,7 @@ function descends(f: (x: Decimal) => DecimalSource, lower: Decimal, atFloor: Dec
 /**
  * Smallest `x ≥ lower` where `f(x)` reaches `target`, graded.
  *
- * Wraps {@link findCrossing} with the two checks that separate a real answer
+ * Wraps {@link solveMonotone} with the two checks that separate a real answer
  * from a plausible one, each aimed at a specific way a non-monotone curve
  * produces a number instead of a report:
  *
@@ -125,12 +125,12 @@ export function findFirstPassage(
     return { value: lower, reason: 'already-reached' };
   }
 
-  const crossing = findCrossing(f, target, { lower, upper: options.upper });
-  if (crossing === null) return { value: null, reason: 'no-crossing' };
+  const crossing = solveMonotone(f, target, { lower, upper: options.upper });
+  if (crossing === null) return { value: null, reason: 'not-reached' };
 
   const probe = bracketMidpoint(lower, crossing);
   if (Decimal.gt(probe, lower) && Decimal.lt(probe, crossing) && Decimal.gte(f(probe), target)) {
     return { value: null, reason: 'not-monotone' };
   }
-  return { value: crossing, reason: 'crossed' };
+  return { value: crossing, reason: 'reached' };
 }

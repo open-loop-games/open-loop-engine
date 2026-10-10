@@ -256,7 +256,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
     const req = createCostRequirement({
       resource: wallet,
       cost,
-      cumulativeCost: true,
+      sumLevels: true,
       maxBulkCount: 100,
     });
 
@@ -355,7 +355,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
     // `maxBulkCount: 1` — createCostRequirement's default — takes a fast path
     // that skips the seed and the correction walk entirely. It still has to
     // answer the same question the general path does, and under
-    // `cumulativeCost: false` it did not: it compared the balance against
+    // `sumLevels: false` it did not: it compared the balance against
     // `evaluate(A)`, the cost at the current level, while `pay` charges
     // `evaluate(A + 1)` for the level being reached. Funds sit exactly at the
     // current level's price, which is the value the fast path was reading and
@@ -367,7 +367,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
         const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const shape = {
           resource: wallet,
-          cumulativeCost: false as const,
+          sumLevels: false as const,
         };
         const capped = createCostRequirement({
           ...shape,
@@ -399,7 +399,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
     }
   });
 
-  // The sibling of the law above, one flag over. `cumulativeCost: false` prices
+  // The sibling of the law above, one flag over. `sumLevels: false` prices
   // a bulk buy as one payment at the target level rather than a sum, so "bulk
   // charges what singles charge" does NOT hold here and is the wrong law. What
   // must hold is the invariant studio/open-loop-engine#22 was actually about:
@@ -416,7 +416,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
         const req = createCostRequirement({
           resource: wallet,
           cost: Formula.exponential(level, 10, costScaling),
-          cumulativeCost: false,
+          sumLevels: false,
           maxBulkCount: Decimal.dInf,
         });
 

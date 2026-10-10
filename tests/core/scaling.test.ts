@@ -19,8 +19,8 @@ describe('Formula cost-scaling sugar constructors', () => {
       const f = Formula.exponential(0, 10, 1.15);
       let manual = new Decimal(0);
       for (let i = 0; i < 10; i++) manual = manual.add(new Decimal(f.evaluate(i)));
-      const integralEnd = new Decimal(f.evaluateIntegral(10));
-      const integralStart = new Decimal(f.evaluateIntegral(0));
+      const integralEnd = new Decimal(f.evaluateAntiderivative(10));
+      const integralStart = new Decimal(f.evaluateAntiderivative(0));
       const closedForm = integralEnd.sub(integralStart);
       // Closed-form integral approximates discrete sum — loose tolerance
       expect(closedForm.div(manual).toNumber()).toBeCloseTo(1, 0);

@@ -1,6 +1,6 @@
 /**
  * Per-tick series tracker — samples a single resource every tick and emits
- * one scalar metric per tick (`series:{id}.t{i}`) instead of a reduced
+ * one scalar metric per tick (`time-series:{id}.t{i}`) instead of a reduced
  * peak/final/avg trio. Keys use {@link Resource.id}, unique per engine, so
  * two resources sharing a display name never merge.
  *
@@ -31,22 +31,22 @@ import { Decimal } from '@/primitives/decimal';
 
 /**
  * Create an {@link Analyzer} that records a single resource's value at every
- * tick and emits it as `series:{id}.t{i}` (zero-based tick index).
+ * tick and emits it as `time-series:{id}.t{i}` (zero-based tick index).
  *
- * The analyzer's `name` is `series:{id}` so multiple series trackers
+ * The analyzer's `id` is `time-series:{id}` so multiple time-series analyzers
  * coexist in one run without metric-key collisions under the harness's
  * `${analyzerName}.${metricKey}` aggregation scheme.
  *
  * @example
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
- * const tracker = createTimeSeriesAnalyzer(gold);
- * runHeadless({ analyzers: [tracker], ticks: 200, ... });
- * // tracker.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }
+ * const analyzer = createTimeSeriesAnalyzer(gold);
+ * runHeadless({ analyzers: [analyzer], ticks: 200, ... });
+ * // analyzer.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }
  * ```
  */
 export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
-  const name = `series:${resource.id}`;
+  const name = `time-series:${resource.id}`;
   const samples: number[] = [];
 
   function sample(): void {
@@ -83,7 +83,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
  * so callers opt in explicitly. Intended to be called from inside a harness
  * `Cell.setup()` so it sees the live per-run resource set.
  */
-export function seriesAnalyzerPack(engine: Engine): Analyzer[] {
+export function timeSeriesAnalyzerPack(engine: Engine): Analyzer[] {
   const registry = engine.tryInject(ResourceRegistryKey);
   return (registry?.list() ?? []).map((entry) => createTimeSeriesAnalyzer(entry.resource));
 }

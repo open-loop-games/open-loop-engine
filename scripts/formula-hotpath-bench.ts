@@ -257,8 +257,8 @@ function scenarioMaxAffordableGuard(): void {
 
   const baseCost = Formula.exponential(ref<DecimalSource>(7), 10, 1.15);
   time(
-    'baseline: invertIntegral + evaluateIntegral',
-    () => baseCost.invertIntegral(Decimal.add(1e6, baseCost.evaluateIntegral())),
+    'baseline: invertAntiderivative + evaluateAntiderivative',
+    () => baseCost.invertAntiderivative(Decimal.add(1e6, baseCost.evaluateAntiderivative())),
     iters,
   );
   time('baseline: formula.evaluate() (the guard key)', () => baseCost.evaluate(), iters);

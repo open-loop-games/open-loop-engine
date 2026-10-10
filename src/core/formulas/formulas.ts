@@ -375,7 +375,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   public readonly innermostVariable: MaybeRef<DecimalSource> | undefined;
 
-  private integralFormula: GenericFormula | undefined;
+  private antiderivativeFormula: GenericFormula | undefined;
 
   constructor(options: FormulaOptions<T>) {
     let readonlyProperties: FormulaProperties<T>;
@@ -492,9 +492,9 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     return this.hasVariable() && this.internalIntegrate != null;
   }
 
-  isIntegralInvertible(): boolean {
+  isAntiderivativeInvertible(): boolean {
     if (!this.isIntegrable()) return false;
-    return this.getIntegralFormula().isInvertible();
+    return this.getAntiderivative().isInvertible();
   }
 
   hasVariable(): boolean {
@@ -564,7 +564,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       // `internalEvaluate == null` or it also catches the unary ops that bind no
       // invert (`sign`, `abs`, `factorial`, …) and answers `value` for them —
       // formulas whose own `isInvertible()` correctly reports false. Matches the
-      // condition `getIntegralFormula` already uses for the same case.
+      // condition `getAntiderivative` already uses for the same case.
       return value;
     }
     reportInversionFailure('not-invertible', 'Cannot invert non-invertible formula');
@@ -639,31 +639,38 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   /**
    * Invert this formula's integral and say whether the answer is usable — the
-   * checked counterpart to {@link invertIntegral}, graded the same way
+   * checked counterpart to {@link invertAntiderivative}, graded the same way
    * {@link tryInvert} grades a forward inversion.
    */
-  tryInvertIntegral(value: DecimalSource, tolerance?: number): Inversion {
-    return this.gradeInversion(value, (target) => this.invertIntegral(target), tolerance, true);
+  tryInvertAntiderivative(value: DecimalSource, tolerance?: number): Inversion {
+    return this.gradeInversion(
+      value,
+      (target) => this.invertAntiderivative(target),
+      tolerance,
+      true,
+    );
   }
 
   /**
-   * Shared body of {@link tryInvert} / {@link tryInvertIntegral}: capture any
+   * Shared body of {@link tryInvert} / {@link tryInvertAntiderivative}: capture any
    * reported failure, then grade the candidate by mapping it forward.
    */
   private gradeInversion(
     value: DecimalSource,
     run: (target: DecimalSource) => DecimalSource,
     tolerance?: number,
-    viaIntegral = false,
+    viaAntiderivative = false,
   ): Inversion {
     const { value: candidate, failure } = captureInversionFailures(() => run(value));
     if (failure !== null) return { value: null, reason: failure };
     // Below a curve's infimum the algebra answers NaN (`ln` of a non-positive
     // target), and `outside-image` promises a value the caller can use as-is.
     if (!Decimal.isFinite(candidate)) return { value: null, reason: 'no-solution' };
-    const forward = viaIntegral ? this.evaluateIntegral(candidate) : this.evaluate(candidate);
+    const forward = viaAntiderivative
+      ? this.evaluateAntiderivative(candidate)
+      : this.evaluate(candidate);
     const tol = tolerance ?? inversionTolerance(value);
-    if (landsOnTarget(forward, value, tol)) return { value: candidate, reason: 'exact' };
+    if (landsOnTarget(forward, value, tol)) return { value: candidate, reason: 'on-target' };
     return { value: candidate, reason: 'outside-image', evaluatesTo: forward };
   }
 
@@ -672,16 +679,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * **This is not `∫₀ˣ`.** It carries an arbitrary constant, so the value at a
    * single point is only meaningful relative to another one:
-   * `Formula.exponential(0, 10, 1.15).evaluateIntegral(0)` is `71.55`, not 0.
+   * `Formula.exponential(0, 10, 1.15).evaluateAntiderivative(0)` is `71.55`, not 0.
    * For the area over a span use {@link cumulative}, which differences it; for
    * a level-indexed cost use {@link sum}, which is a different operation again.
    */
-  evaluateIntegral(variable?: DecimalSource): DecimalSource {
+  evaluateAntiderivative(variable?: DecimalSource): DecimalSource {
     if (!this.isIntegrable()) {
-      console.error('Cannot evaluate integral of formula without integral');
+      console.error('Cannot evaluate the antiderivative of a formula without one');
       return 0;
     }
-    return this.getIntegralFormula().evaluate(variable);
+    return this.getAntiderivative().evaluate(variable);
   }
 
   /**
@@ -689,7 +696,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * The rate-function lineage's *cumulative*: integrate a rate over time and
    * this is the total accrued, which is what {@link firstPassage} inverts. The
-   * arbitrary constant {@link evaluateIntegral} carries cancels in the
+   * arbitrary constant {@link evaluateAntiderivative} carries cancels in the
    * difference, so unlike that method this answers a well-posed question.
    *
    * **Not the cost of buying levels.** A level-indexed cost curve is a series,
@@ -704,10 +711,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    */
   cumulative(from: DecimalSource, to: DecimalSource): DecimalSource {
     if (!this.isIntegrable()) {
-      console.error('Cannot take a cumulative of a formula without an integral');
+      console.error('Cannot take a cumulative of a formula without an antiderivative');
       return 0;
     }
-    const antiderivative = this.getIntegralFormula();
+    const antiderivative = this.getAntiderivative();
     return Decimal.sub(antiderivative.evaluate(to), antiderivative.evaluate(from));
   }
 
@@ -811,20 +818,20 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     return { value, reason: 'approximate', error };
   }
 
-  invertIntegral(value: DecimalSource): DecimalSource {
-    if (!this.isIntegrable() || !this.getIntegralFormula().isInvertible()) {
+  invertAntiderivative(value: DecimalSource): DecimalSource {
+    if (!this.isIntegrable() || !this.getAntiderivative().isInvertible()) {
       reportInversionFailure(
         'not-invertible',
-        'Cannot invert integral of formula without invertible integral',
+        'Cannot invert the antiderivative of a formula without an invertible one',
       );
       return 0;
     }
-    return this.getIntegralFormula().invert(value);
+    return this.getAntiderivative().invert(value);
   }
 
-  getIntegralFormula(stack?: SubstitutionStack): GenericFormula {
-    if (this.integralFormula != null && stack == null) {
-      return this.integralFormula;
+  getAntiderivative(stack?: SubstitutionStack): GenericFormula {
+    if (this.antiderivativeFormula != null && stack == null) {
+      return this.antiderivativeFormula;
     }
     if (stack == null) {
       if (this.applySubstitution == null) {
@@ -835,22 +842,22 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
         }
         let value = this.internalIntegrate.call(this, stack, ...this.inputs);
         stack.forEach((func) => (value = func(value)));
-        this.integralFormula = value;
+        this.antiderivativeFormula = value;
       } else {
         if (this.internalIntegrate) {
-          this.integralFormula = this.internalIntegrate.call(this, undefined, ...this.inputs);
+          this.antiderivativeFormula = this.internalIntegrate.call(this, undefined, ...this.inputs);
         } else if (
           this.inputs.length === 1 &&
           this.internalEvaluate == null &&
           this.hasVariable()
         ) {
-          this.integralFormula = this;
+          this.antiderivativeFormula = this;
         } else {
           console.error('Cannot integrate formula without variable');
           return Formula.constant(0);
         }
       }
-      return this.integralFormula;
+      return this.antiderivativeFormula;
     } else {
       if (this.applySubstitution == null) {
         throw new Error(

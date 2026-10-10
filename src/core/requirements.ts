@@ -110,7 +110,7 @@ export interface CostRequirementOptions {
    * priced one level ahead of the cumulative mode.
    * Default: true
    */
-  cumulativeCost?: Computable<boolean>;
+  sumLevels?: Computable<boolean>;
 
   /**
    * Ceiling on how many purchases one bulk buy may satisfy. Default: `1`,
@@ -142,7 +142,7 @@ export interface CostRequirement extends Requirement {
   cost: MaybeRef<DecimalSource> | GenericFormula;
 
   /** Whether costs are cumulative for bulk purchases */
-  cumulativeCost: MaybeRef<boolean>;
+  sumLevels: MaybeRef<boolean>;
 
   /** Maximum bulk purchase amount */
   maxBulkCount: MaybeRef<DecimalSource>;
@@ -175,10 +175,10 @@ export interface CostRequirement extends Requirement {
  * ```
  */
 export function createCostRequirement(options: CostRequirementOptions): CostRequirement {
-  const { resource, cost, requiresPay, cumulativeCost, maxBulkCount, pay, description } = options;
+  const { resource, cost, requiresPay, sumLevels, maxBulkCount, pay, description } = options;
 
   const processedCost = isFormula(cost) ? cost : toMaybeRef(cost);
-  const processedCumulativeCost = cumulativeCost != null ? toMaybeRef(cumulativeCost) : true;
+  const processedCumulativeCost = sumLevels != null ? toMaybeRef(sumLevels) : true;
   const processedMaxBulk = maxBulkCount != null ? toMaybeRef(maxBulkCount) : 1;
 
   // Precomputed formula affordability — reactive via calculateMaxAffordable's own computed.
@@ -219,7 +219,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
   const requirement: CostRequirement = {
     resource,
     cost: processedCost,
-    cumulativeCost: processedCumulativeCost,
+    sumLevels: processedCumulativeCost,
     maxBulkCount: processedMaxBulk,
     getCost,
 

@@ -29,7 +29,7 @@ import Formula, { F } from '@/core/formulas/formulas';
 import { calculateCost, calculateMaxAffordable } from '@/core/formulas/affordability';
 import { inversionTolerance, representationFloor } from '@/core/formulas/inversion';
 import { createResource } from '@/core/resource';
-import { findCrossing } from '@/core/formulas/root-find';
+import { solveMonotone } from '@/core/formulas/root-find';
 import { arithmeticSeries, geometricSeries, powerSeries } from '@/core/formulas/series';
 import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
 import { Decimal } from '@/primitives/decimal';
@@ -431,7 +431,7 @@ describe('round-trip through a clamp: min / max over a composed chain', () => {
   });
 });
 
-describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
+describe('round-trip: invertAntiderivative(evaluateAntiderivative(x)) === x', () => {
   // The direction `calculateMaxAffordable` actually calls, and the one link the
   // chain skipped: the op round-trip above covers `invert`, and the oracle below
   // covers `F(b) − F(a)` forward, but nothing swept the integral's inverse.
@@ -493,14 +493,14 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
   /** The integral round-trip. Error graded in input space, per the header's rule 2. */
   function expectIntegralRoundTrip(formula: GenericFormula, x: DecimalSource, tol: number) {
     const { value, errors } = withoutEngineErrors(() => {
-      const target = formula.evaluateIntegral();
-      return { target, back: formula.invertIntegral(target) };
+      const target = formula.evaluateAntiderivative();
+      return { target, back: formula.invertAntiderivative(target) };
     });
     expect(errors, `engine logged while round-tripping the integral at x=${String(x)}`).toEqual([]);
     const err = relativeError(value.back, x);
     expect(
       Decimal.lte(err, tol),
-      `x=${String(x)} → ∫=${String(value.target)} → invertIntegral=${String(value.back)}` +
+      `x=${String(x)} → ∫=${String(value.target)} → invertAntiderivative=${String(value.back)}` +
         ` (relative error ${err.toString()} in input space, tolerance ${tol})`,
     ).toBe(true);
   }
@@ -535,7 +535,7 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
     for (const [name, curve] of Object.entries(CURVES)) {
       for (const x of ['0.5', '2', '10', '137.5', '1e3']) {
         const formula = curve(x);
-        expect(formula.isIntegralInvertible(), `${name} has no integral inverse`).toBe(true);
+        expect(formula.isAntiderivativeInvertible(), `${name} has no integral inverse`).toBe(true);
         expectIntegralRoundTrip(formula, x, DEFAULT_TOL);
       }
     }
@@ -614,8 +614,8 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
         [`sub(c, var·${k})`, F.sub(C, F.variable(0).mul(k))],
       ] as const) {
         const { value, errors } = withoutEngineErrors(() => ({
-          graded: formula.tryInvertIntegral(beyond),
-          raw: formula.invertIntegral(beyond),
+          graded: formula.tryInvertAntiderivative(beyond),
+          raw: formula.invertAntiderivative(beyond),
         }));
         expect(
           value.graded.value,
@@ -638,7 +638,7 @@ describe('round-trip: invertIntegral(evaluateIntegral(x)) === x', () => {
     // and no target has a pre-image on a rising branch.
     for (const k of ['-0.5', '-3', '-10']) {
       const formula = F.variable(0).mul(k).sub(C);
-      const at = (x: DecimalSource) => formula.evaluateIntegral(x);
+      const at = (x: DecimalSource) => formula.evaluateAntiderivative(x);
       expect(Decimal.lt(at('2'), at('1')), `k=${k}: ∫ rose between x=1 and x=2`).toBe(true);
       expect(Decimal.lt(at('10'), at('2')), `k=${k}: ∫ rose between x=2 and x=10`).toBe(true);
     }
@@ -788,7 +788,7 @@ describe('piecewise: step and if', () => {
   });
 });
 
-describe('root finding: findCrossing', () => {
+describe('root finding: solveMonotone', () => {
   // The numeric fallback three inverses now share. Swept directly as well as
   // through them, because its two interesting properties — the search coordinate
   // and the refusal to early-out on value tolerance — are invisible from the
@@ -800,7 +800,7 @@ describe('root finding: findCrossing', () => {
     // states the property instead of a number.
     const f = (x: Decimal) => Decimal.add(Decimal.div(Decimal.pow(x, 3), 3), Decimal.mul(2, x));
     for (const target of ['1', '100', '1e6', '1e30']) {
-      const x = findCrossing(f, target);
+      const x = solveMonotone(f, target);
       expect(x, `target ${target}`).not.toBeNull();
       expect(
         Decimal.lte(relativeError(f(x!), target), DEFAULT_TOL),
@@ -814,7 +814,7 @@ describe('root finding: findCrossing', () => {
     // has its answer at 250 while the bracket opens to ~1e250: bisecting that
     // arithmetically needs thousands of halvings to walk down, and the default
     // 60 would stop nowhere near. Geometric halving gets there in tens.
-    const x = findCrossing((v) => Decimal.pow10(v), '1e250', { upper: '1e250' });
+    const x = solveMonotone((v) => Decimal.pow10(v), '1e250', { upper: '1e250' });
     expect(x).not.toBeNull();
     expect(Decimal.lte(relativeError(x!, 250), DEFAULT_TOL), `got ${String(x)}`).toBe(true);
   });
@@ -823,7 +823,7 @@ describe('root finding: findCrossing', () => {
     // Not a failure: the first x in the declared domain that reaches the target
     // *is* `lower`. Reporting here would make every "already affordable" query
     // an error.
-    const x = findCrossing((v) => Decimal.mul(v, 2), '-5', { lower: 0 });
+    const x = solveMonotone((v) => Decimal.mul(v, 2), '-5', { lower: 0 });
     expect(x).not.toBeNull();
     expect(String(x)).toBe('0');
   });
@@ -834,7 +834,7 @@ describe('root finding: findCrossing', () => {
     // compares below `lo`, so it has to be recognised as no guess at all.
     const f = (v: Decimal) => Decimal.mul(v, 10);
     for (const upper of [Decimal.dInf, Decimal.dNaN]) {
-      const x = findCrossing(f, '1000', { upper });
+      const x = solveMonotone(f, '1000', { upper });
       expect(x, `upper ${String(upper)}`).not.toBeNull();
       expect(Decimal.lte(relativeError(x!, 100), DEFAULT_TOL), `got ${String(x)}`).toBe(true);
     }
@@ -843,7 +843,7 @@ describe('root finding: findCrossing', () => {
   test('an unbracketable target returns null rather than the bound it never crossed', () => {
     // A bounded function: `tanh`-like saturation at 10. Nothing reaches 20, and
     // the old per-caller loops would have returned their final `hi` regardless.
-    const x = findCrossing((v) => Decimal.min(v, 10), '20');
+    const x = solveMonotone((v) => Decimal.min(v, 10), '20');
     expect(x).toBeNull();
   });
 
@@ -853,7 +853,7 @@ describe('root finding: findCrossing', () => {
     // because dv/dx is enormous. `2 ↑↑ x`-shaped steepness — a tiny x error is a
     // vast value error, so the only safe statement is about x.
     const f = (v: Decimal) => Decimal.pow10(Decimal.pow10(v));
-    const x = findCrossing(f, f(new Decimal('2.5')));
+    const x = solveMonotone(f, f(new Decimal('2.5')));
     expect(x).not.toBeNull();
     expect(Decimal.lte(relativeError(x!, '2.5'), 1e-14), `got ${String(x)}`).toBe(true);
   });
@@ -886,7 +886,7 @@ describe('invert contract: tryInvert grades the answer', () => {
           formula.tryInvert(formula.evaluate(), IMAGE_TOL[name] ?? tol),
         );
         expect(errors, `${name} logged at x=${x}`).toEqual([]);
-        expect(value.reason, `${name} at x=${x} (value ${String(value.value)})`).toBe('exact');
+        expect(value.reason, `${name} at x=${x} (value ${String(value.value)})`).toBe('on-target');
       }
     }
   });
@@ -905,7 +905,7 @@ describe('invert contract: tryInvert grades the answer', () => {
               formula.tryInvert(formula.evaluate(), tol),
             );
             expect(errors, `${name}(${label}) logged at x=${x}, k=${k}`).toEqual([]);
-            expect(value.reason, `${name}(${label}) at x=${x}, k=${k}`).toBe('exact');
+            expect(value.reason, `${name}(${label}) at x=${x}, k=${k}`).toBe('on-target');
           }
         }
       }
@@ -928,7 +928,7 @@ describe('invert contract: tryInvert grades the answer', () => {
         ['10', '5000'],
       ]) {
         const result = xpToLevel.tryInvert(level);
-        expect(result.reason, `level ${level}`).toBe('exact');
+        expect(result.reason, `level ${level}`).toBe('on-target');
         expect(String(result.value), `level ${level}`).toBe(String(new Decimal(xp)));
       }
 
@@ -986,7 +986,7 @@ describe('invert contract: tryInvert grades the answer', () => {
     // The fallback the fix above narrowed. Tightening it to `internalEvaluate ==
     // null` must not cost the legitimate case.
     const result = F.variable('7').tryInvert('12');
-    expect(result.reason).toBe('exact');
+    expect(result.reason).toBe('on-target');
     expect(String(result.value)).toBe('12');
   });
 
@@ -1018,7 +1018,7 @@ describe('invert contract: tryInvert grades the answer', () => {
     const formula = F.variable(0).pow10();
     for (const x of ['1e6', '1e9']) {
       const target = formula.evaluate(x);
-      expect(formula.tryInvert(target).reason, `pow10 at x=${x}`).toBe('exact');
+      expect(formula.tryInvert(target).reason, `pow10 at x=${x}`).toBe('on-target');
       expect(inversionTolerance(target), `tolerance at x=${x}`).toBeGreaterThan(1e-10);
     }
     // Layer 0 keeps the strict floor, and so does the low end of layer 1 — the
@@ -1027,17 +1027,17 @@ describe('invert contract: tryInvert grades the answer', () => {
     expect(inversionTolerance(formula.evaluate('1e3'))).toBe(1e-10);
   });
 
-  test('tryInvertIntegral grades the integral the same way', () => {
+  test('tryInvertAntiderivative grades the integral the same way', () => {
     const formula = F.variable(0).pow_base(1.15).mul(100);
-    const cumulative = formula.evaluateIntegral(50);
-    const result = formula.tryInvertIntegral(cumulative);
-    expect(result.reason).toBe('exact');
+    const cumulative = formula.evaluateAntiderivative(50);
+    const result = formula.tryInvertAntiderivative(cumulative);
+    expect(result.reason).toBe('on-target');
     expect(Decimal.lte(relativeError(result.value!, 50), DEFAULT_TOL)).toBe(true);
 
     // Non-integrable chain: no answer, and the reason is structural. `factorial`
     // binds no integral — `sin` does, so it is not the example it looks like.
     const { value, errors } = withoutEngineErrors(() =>
-      F.variable(0).factorial().tryInvertIntegral('1'),
+      F.variable(0).factorial().tryInvertAntiderivative('1'),
     );
     expect(errors).toEqual([]);
     expect(value.reason).toBe('not-invertible');
@@ -1060,7 +1060,7 @@ describe('first passage: the smallest input that reaches the target', () => {
     for (const target of ['110', '350', '1e6', '1e30']) {
       const { value, errors } = withoutEngineErrors(() => formula.firstPassage(target));
       expect(errors, `target ${target}`).toEqual([]);
-      expect(value.reason, `target ${target}`).toBe('crossed');
+      expect(value.reason, `target ${target}`).toBe('reached');
       expect(
         Decimal.lte(relativeError(value.value!, formula.invert(target)), DEFAULT_TOL),
         `target ${target}: passage ${String(value.value)}, invert ${String(formula.invert(target))}`,
@@ -1082,7 +1082,7 @@ describe('first passage: the smallest input that reaches the target', () => {
       const shipped = tg * Math.ceil(Math.log(h) / Math.log(g) - 0.5);
       const { value, errors } = withoutEngineErrors(() => burn.firstPassage(b0 * h));
       expect(errors, `H=${h}`).toEqual([]);
-      expect(value.reason, `H=${h}`).toBe('crossed');
+      expect(value.reason, `H=${h}`).toBe('reached');
       expect(String(value.value), `H=${h}`).toBe(String(shipped));
       // …and the algebra really does miss it, so the law fails if the
       // divergence this method exists for ever quietly closes.
@@ -1099,10 +1099,10 @@ describe('first passage: the smallest input that reaches the target', () => {
     const xpToLevel = F.variable(0).div(50).sqrt().floor();
 
     expect(String(xpToLevel.firstPassage(3).value)).toBe('450');
-    expect(xpToLevel.tryInvert(3).reason).toBe('exact');
+    expect(xpToLevel.tryInvert(3).reason).toBe('on-target');
 
     const fractional = xpToLevel.firstPassage(3.5);
-    expect(fractional.reason).toBe('crossed');
+    expect(fractional.reason).toBe('reached');
     expect(xpToLevel.tryInvert(3.5).reason).toBe('outside-image');
     // Stated as the property, not the number: the answer is the smallest
     // *representable* input whose evaluation reaches 3.5. That sits one ulp
@@ -1124,7 +1124,7 @@ describe('first passage: the smallest input that reaches the target', () => {
     expect(String(spliced.evaluate(10))).toBe('15');
 
     const passage = spliced.firstPassage(12);
-    expect(passage.reason).toBe('crossed');
+    expect(passage.reason).toBe('reached');
     expect(String(passage.value)).toBe('10');
   });
 
@@ -1133,7 +1133,7 @@ describe('first passage: the smallest input that reaches the target', () => {
     // the curve can never produce. The search cannot bracket it and says so;
     // below the cap it answers normally.
     const capped = F.variable(0).mul(2).max(0).min(50);
-    expect(capped.firstPassage('80')).toEqual({ value: null, reason: 'no-crossing' });
+    expect(capped.firstPassage('80')).toEqual({ value: null, reason: 'not-reached' });
     expect(String(capped.firstPassage(50).value)).toBe('25');
   });
 
@@ -1147,7 +1147,7 @@ describe('first passage: the smallest input that reaches the target', () => {
 
     const { value, errors } = withoutEngineErrors(() => absolute.firstPassage(30));
     expect(errors).toEqual([]);
-    expect(value.reason).toBe('crossed');
+    expect(value.reason).toBe('reached');
     expect(String(value.value)).toBe('10');
   });
 
@@ -1157,7 +1157,7 @@ describe('first passage: the smallest input that reaches the target', () => {
     // rather than render a zero it can't tell from a computed crossing.
     const formula = F.variable(0).add(100);
     expect(formula.firstPassage(50)).toEqual({ value: new Decimal(0), reason: 'already-reached' });
-    expect(formula.firstPassage(150).reason).toBe('crossed');
+    expect(formula.firstPassage(150).reason).toBe('reached');
   });
 
   test('refuses a descending curve instead of reporting its floor', () => {
@@ -1185,7 +1185,7 @@ describe('first passage: the smallest input that reaches the target', () => {
     // logarithm in a float64, worth ~16 − log₁₀(log₁₀ x) significant digits.
     const tower = F.variable(0).pow_base(10);
     const passage = tower.firstPassage('1e250');
-    expect(passage.reason).toBe('crossed');
+    expect(passage.reason).toBe('reached');
     expect(Decimal.lte(relativeError(passage.value!, 250), DEFAULT_TOL)).toBe(true);
   });
 });
@@ -1582,7 +1582,7 @@ describe('tetration family', () => {
   test('tetrate above height 2 — solved numerically in the base', () => {
     // `ssqrt` inverts `b^b` alone. Applying it at height 3 returned a
     // plausible-looking wrong number (2.745 for `tetrate(2, 3) = 16`); the
-    // interim contract reported instead. Now `findCrossing` solves for the base,
+    // interim contract reported instead. Now `solveMonotone` solves for the base,
     // which is a well-conditioned search even where the value is at layer 2 —
     // the answer lives in a bracket a few units wide no matter how tall the
     // tower. `b ↑↑ 5` at base 3 is `ee3638334640023.79`, and the base still
@@ -1742,14 +1742,14 @@ describe('magnitude regimes: laws hold where no oracle can reach', () => {
 });
 
 describe('oracle: F(b) − F(a) equals the definite integral', () => {
-  // `evaluateIntegral` is an antiderivative, not `∫₀ˣ` — `evaluateIntegral(0)`
+  // `evaluateAntiderivative` is an antiderivative, not `∫₀ˣ` — `evaluateAntiderivative(0)`
   // is not 0. So the law that actually holds is the difference, where the
   // arbitrary constant cancels. Reference values come from adaptive quadrature.
   for (const { op, from, to, value } of oracle.integrals) {
     test(`${op} over [${from}, ${to}]`, () => {
       const formula = UNARY[op].op(F.variable(0));
       const { value: got, errors } = withoutEngineErrors(() =>
-        Decimal.sub(formula.evaluateIntegral(to), formula.evaluateIntegral(from)),
+        Decimal.sub(formula.evaluateAntiderivative(to), formula.evaluateAntiderivative(from)),
       );
       expect(errors, `engine logged integrating ${op}`).toEqual([]);
       const { tol = 1e-12, tolReason } = INTEGRAL_TOL[op] ?? {};
@@ -1770,7 +1770,7 @@ describe('oracle: F(b) − F(a) equals the definite integral', () => {
       const build = BINARY[op].op;
       const formula = side === 'lhs' ? build(F.variable(0), k) : build(k, F.variable(0));
       const { value: got, errors } = withoutEngineErrors(() =>
-        Decimal.sub(formula.evaluateIntegral(to), formula.evaluateIntegral(from)),
+        Decimal.sub(formula.evaluateAntiderivative(to), formula.evaluateAntiderivative(from)),
       );
       expect(errors, `engine logged integrating ${op}(${side})`).toEqual([]);
       const { tol = 1e-12, tolReason } = INTEGRAL_TOL[`${op}.${side}`] ?? {};
