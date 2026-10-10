@@ -1,6 +1,6 @@
 /**
  * Gate — typed predicate-spec data shape. Type union and pure-data projection
- * live at core layer so `E.conditional` and other core-layer builders can
+ * live at core layer so `E.branch` and other core-layer builders can
  * accept Gate without a layer violation. The runtime side (evaluator,
  * predictor, ambient-runtime resolution, requirement adapter) lives in
  * `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry,
@@ -245,7 +245,7 @@ export function forEachGateLeaf(
  * synthetic-path encoding would hand the consumer's accessor an id it
  * doesn't serve.
  *
- * `E.conditional` embeds the projection, so an unprojectable gate fails when
+ * `E.branch` embeds the projection, so an unprojectable gate fails when
  * the effect is built. Predictors read every kind through `timeUntilGateFlip`.
  *
  * @internal

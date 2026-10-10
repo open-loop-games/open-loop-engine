@@ -22,7 +22,7 @@ import type {
 } from '@/core/registries';
 import type { Grant, Modifier, ModifierChain } from '@/core/modifier';
 import type { EngineCategories } from '@/systems/engine-categories';
-import { flattenGrants } from '@/systems/modifier-binding';
+import { flattenGrants } from '@/systems/replacement-grants';
 
 // ============================================================================
 // Category traversal
@@ -102,7 +102,7 @@ export function forEachCategoryEntry(
 export interface EffectDefVisit {
   /** The owning system's id, e.g. `'buffs'`, `'auras'`. */
   systemId: string;
-  /** `'temporary'` vs `'persistent'` — read from the system's `kind` tag. */
+  /** `'temporary'` vs `'conditional'` — read from the system's `kind` tag. */
   systemKind: EnumerableEffectSystem['kind'];
   def: EffectDefLike;
 }
@@ -124,11 +124,11 @@ export function forEachEffectDef(
 }
 
 /**
- * A def's bindings in `bindingIndex` order — each grant paired with each
+ * A def's bindings in `grantIndex` order — each grant paired with each
  * chain it targets, calling a factory-form `modifiers` once.
  */
 export function effectDefBindings(def: EffectDefLike): { grant: Grant; chain: ModifierChain }[] {
-  const raw = def.modifiers;
+  const raw = def.grants;
   if (raw == null) return [];
   return flattenGrants(typeof raw === 'function' ? raw() : raw);
 }

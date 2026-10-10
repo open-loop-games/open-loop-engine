@@ -128,7 +128,7 @@ export {
 export * from './formulas';
 
 // === EFFECTS ===
-// ICondition + C and ConditionalEffect + IEffectInternal are engine-internal
+// ICondition + C and BranchEffect + IEffectInternal are engine-internal
 // IR — imported via `@/core/conditions` / `@/primitives/types` from tests and
 // from systems-layer callers that need the projection target. Not part of
 // the public surface.

@@ -166,7 +166,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | VC8 | **grant**, **lowered grant** | an authored entry `{ chain, mult / add / exp, when }`, sign-neutral; one grant an effect system places in a reserved chain slot | binding entry, declarative binding |
 | VC9 | **multiplier**, **cost ratio** | a multiplicative factor; the factor each purchase multiplies the next cost by | multiplier, for a cost ratio |
 | VC10 | **apply** | with its object: apply a modifier, an effect, a recommendation | apply, for starting an effect |
-| VC11 | **activate**, **deactivate**, **expire**, **dispel** | an effect starts or ends; a temporary effect runs out, or is removed early | applied, onApply |
+| VC11 | **activate**, **deactivate**, **expire**, **dispel** | an effect starts or ends; a temporary effect runs out, or is removed early | applied, onActivate |
 | VC12 | **composite** | a node that combines children in order | — |
 
 ### RX — replacing and extending

@@ -1303,8 +1303,8 @@ describe('Effect-system factories — persistent and temporary', () => {
     [K in keyof T]-?: object extends Pick<T, K> ? K : never;
   }[keyof T];
 
-  it('createPersistentEffectSystem requires only id', () => {
-    type Options = import('@/systems/persistent-effect').PersistentEffectSystemOptions;
+  it('createConditionalEffectSystem requires only id', () => {
+    type Options = import('@/systems/conditional-effect').ConditionalEffectSystemOptions;
     expectTypeOf<OptionalKeys<Options>>().toBeNever();
   });
 
@@ -1315,7 +1315,7 @@ describe('Effect-system factories — persistent and temporary', () => {
     const sys = createTemporaryEffectSystem({ id: 'effects', registerTick: () => () => {} });
     sys.register({ id: 'haste', duration: 10 });
     // apply() answers null at max stacks rather than throwing — pin the union.
-    expectTypeOf(sys.apply('haste')).toEqualTypeOf<
+    expectTypeOf(sys.activate('haste')).toEqualTypeOf<
       import('@/systems/temporary-effect').TemporaryEffectInstance | null
     >();
   });
@@ -1579,19 +1579,17 @@ describe('Systems predicate fields take Predicate', () => {
 
 describe('Effect systems take Grants', () => {
   it('effect defs bind Grant[] or a factory returning one', () => {
-    type Modifiers = Grant[] | (() => Grant[]);
+    type Grants = Grant[] | (() => Grant[]);
     expectTypeOf<
-      Exclude<import('@/index').PersistentEffectDef['modifiers'], undefined>
-    >().toEqualTypeOf<Modifiers>();
+      Exclude<import('@/index').ConditionalEffectDef['grants'], undefined>
+    >().toEqualTypeOf<Grants>();
     expectTypeOf<
-      Exclude<import('@/index').TemporaryEffectDef['modifiers'], undefined>
-    >().toEqualTypeOf<Modifiers>();
-    expectTypeOf<import('@/index').PersistentEffectDef['active']>().toEqualTypeOf<
+      Exclude<import('@/index').TemporaryEffectDef['grants'], undefined>
+    >().toEqualTypeOf<Grants>();
+    expectTypeOf<import('@/index').ConditionalEffectDef['active']>().toEqualTypeOf<
       import('@/index').Predicate
     >();
-    expectTypeOf<ReturnType<typeof import('@/index').replacementBinding>>().toEqualTypeOf<
-      Grant[]
-    >();
+    expectTypeOf<ReturnType<typeof import('@/index').replacementGrants>>().toEqualTypeOf<Grant[]>();
   });
 
   it('ModifierBinding no longer resolves from the root barrel', () => {

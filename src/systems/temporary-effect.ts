@@ -10,12 +10,12 @@
  * - Modifier integration: binds to `ModifierChain`s while active, auto-removes on expiry
  * - Query surface: reactive `isActive` / `activeCount`, tag-based filtering
  * - Persistence: summary-based save; every load and reset rebuilds the live instances
- * - Events: applied, expired, dispelled
+ * - Events: activated, expired, dispelled
  *
  * Interactions between effects (e.g., "if Burn and Frost both active, trigger Steam")
  * are intentionally consumer-side. The system provides queries; consumers wire logic.
  *
- * @see ./persistent-effect for predicate-driven effects (active while a condition holds, no timer)
+ * @see ./conditional-effect for predicate-driven effects (active while a condition holds, no timer)
  *
  * @example
  * ```ts
@@ -28,12 +28,12 @@
  *   id: 'burn',
  *   duration: 4,
  *   tags: ['echo', 'flame'],
- *   modifiers: [{ chain: damageChain, mult: 1.5, description: 'Burn' }],
+ *   grants: [{ chain: damageChain, mult: 1.5, description: 'Burn' }],
  *   onTick: (inst, dt) => dealDamage(10 * dt),
  *   onExpire: () => clearBurnVisuals(),
  * });
  *
- * const inst = effects.apply('burn'); // starts 4s countdown
+ * const inst = effects.activate('burn'); // starts 4s countdown
  * effects.isActive('burn').value;     // true
  * ```
  *
@@ -70,7 +70,7 @@ export interface TemporaryEffectDef {
   /**
    * Base duration in seconds. Can be reactive for dynamic durations. Must be
    * finite: `register` and `apply` throw otherwise, since the saved
-   * countdown cannot hold `Infinity`. Use a persistent-effect system for an
+   * countdown cannot hold `Infinity`. Use a conditional effect system for an
    * effect that lasts until removed.
    */
   duration: Computable<DecimalSource>;
@@ -99,21 +99,21 @@ export interface TemporaryEffectDef {
    * a factory on its first apply. Stacks of one def sit together there, in
    * apply order.
    */
-  modifiers?: Grant[] | (() => Grant[]);
+  grants?: Grant[] | (() => Grant[]);
   /** Called when the effect is applied */
-  onApply?: (instance: TemporaryEffectInstance) => void;
+  onActivate?: (instance: TemporaryEffectInstance) => void;
   /** Called every tick while the effect is active */
   onTick?: (instance: TemporaryEffectInstance, dt: number) => void;
   /** Called when the effect expires naturally or is dispelled */
   onExpire?: (instance: TemporaryEffectInstance) => void;
   /**
-   * Called instead of onApply for each instance a load rebuilds from the
-   * save. Falls back to onApply if not defined.
+   * Called instead of onActivate for each instance a load rebuilds from the
+   * save. Falls back to onActivate if not defined.
    */
   onRehydrate?: (instance: TemporaryEffectInstance) => void;
 }
 
-/** A live instance of a temporary effect, created by {@link TemporaryEffectSystem.apply}. */
+/** A live instance of a temporary effect, created by {@link TemporaryEffectSystem.activate}. */
 export interface TemporaryEffectInstance {
   /** Unique instance identifier (`${defId}:${counter}`) */
   readonly id: string;
@@ -136,7 +136,7 @@ export interface TemporaryEffectInstance {
 /** Events emitted by the temporary effect system */
 export interface TemporaryEffectEvents {
   /** Fired when an effect instance is applied */
-  applied: (instance: TemporaryEffectInstance) => void;
+  activated: (instance: TemporaryEffectInstance) => void;
   /** Fired when an effect instance expires or is ended early */
   expired: (instance: TemporaryEffectInstance) => void;
   /** Fired when all instances of a def are dispelled */
@@ -164,7 +164,7 @@ export interface TemporaryEffectSystem {
   /** Snapshot of every registered definition in insertion order. */
   allDefs(): readonly TemporaryEffectDef[];
   /** Activate an effect. Returns the instance, or null if at max stacks. */
-  apply(defId: string): TemporaryEffectInstance | null;
+  activate(defId: string): TemporaryEffectInstance | null;
   /** Remove all active instances of a definition */
   dispel(defId: string): void;
   /** Remove all active instances of all definitions */
@@ -204,7 +204,7 @@ function toFiniteDuration(defId: string, duration: DecimalSource): number {
   if (!Number.isFinite(seconds)) {
     throw new Error(
       `TemporaryEffect '${defId}': duration must be finite, got ${String(duration)}. ` +
-        `An effect that lasts until removed belongs in a persistent-effect system.`,
+        `An effect that lasts until removed belongs in a conditional effect system.`,
     );
   }
   return seconds;
@@ -228,10 +228,10 @@ function toFiniteDuration(defId: string, duration: DecimalSource): number {
  * effects.register({
  *   id: 'haste',
  *   duration: 10,
- *   modifiers: [{ chain: speedChain, mult: 1.5, description: 'Haste' }],
+ *   grants: [{ chain: speedChain, mult: 1.5, description: 'Haste' }],
  * });
  *
- * effects.apply('haste'); // +50% speed for 10 seconds
+ * effects.activate('haste'); // +50% speed for 10 seconds
  * ```
  */
 export function createTemporaryEffectSystem(
@@ -366,8 +366,8 @@ export function createTemporaryEffectSystem(
         toFiniteDuration(d.id, d.duration);
       }
       const maxStacks = d.maxStacks ?? 1;
-      if (maxStacks > 1 && d.modifiers && typeof d.modifiers !== 'function') {
-        for (const grant of d.modifiers) {
+      if (maxStacks > 1 && d.grants && typeof d.grants !== 'function') {
+        for (const grant of d.grants) {
           if ('modifier' in grant && typeof grant.modifier !== 'function') {
             throw new Error(
               `TemporaryEffect '${d.id}': modifier bindings must be factories (functions) when maxStacks > 1`,
@@ -375,7 +375,7 @@ export function createTemporaryEffectSystem(
           }
         }
       }
-      const slots = createBindingSlots(d.modifiers, predicates, `temporary effect '${d.id}'`);
+      const slots = createBindingSlots(d.grants, predicates, `temporary effect '${d.id}'`);
       defs.set(d.id, d);
       slotsByDef.set(d.id, slots);
     }
@@ -402,8 +402,8 @@ export function createTemporaryEffectSystem(
       const existing = instances.value.find((i) => i.defId === defId)!;
       (existing as { duration: number }).duration = dur;
       existing.timeRemaining.value = dur;
-      def.onApply?.(existing);
-      handle.emit('applied', existing);
+      def.onActivate?.(existing);
+      handle.emit('activated', existing);
       syncSavedState();
       return existing;
     }
@@ -411,8 +411,8 @@ export function createTemporaryEffectSystem(
     if (currentCount >= maxStacks) return null;
 
     const instance = createInstance(def, dur, dur, lowestFreeStackIndex(defId));
-    def.onApply?.(instance);
-    handle.emit('applied', instance);
+    def.onActivate?.(instance);
+    handle.emit('activated', instance);
     syncSavedState();
     return instance;
   }
@@ -466,7 +466,7 @@ export function createTemporaryEffectSystem(
         snap.timeRemaining,
         lowestFreeStackIndex(snap.defId),
       );
-      (def.onRehydrate ?? def.onApply)?.(instance);
+      (def.onRehydrate ?? def.onActivate)?.(instance);
     }
   }
 
@@ -496,7 +496,7 @@ export function createTemporaryEffectSystem(
     register,
     getDef,
     allDefs,
-    apply,
+    activate: apply,
     dispel,
     dispelAll,
     isActive,

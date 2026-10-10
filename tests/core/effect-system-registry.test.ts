@@ -6,7 +6,7 @@ import {
   getCurrentEffectSystemRegistry,
 } from '@/core/registries';
 import { createTemporaryEffectSystem } from '@/systems/temporary-effect';
-import { createPersistentEffectSystem } from '@/systems/persistent-effect';
+import { createConditionalEffectSystem } from '@/systems/conditional-effect';
 import { resetAllPersistentContexts } from '@/core/persistence';
 
 beforeEach(() => {
@@ -24,21 +24,21 @@ describe('EffectSystemRegistry', () => {
     const registry = createEffectSystemRegistry();
     withEffectSystemRegistry(registry, () => {
       createTemporaryEffectSystem({ id: 'buffs', registerTick: () => () => {} });
-      createPersistentEffectSystem({ id: 'conditions' });
+      createConditionalEffectSystem({ id: 'conditions' });
     });
 
     expect(registry.size).toBe(2);
     expect(registry.has('buffs')).toBe(true);
     expect(registry.has('conditions')).toBe(true);
     expect(registry.get('buffs')?.kind).toBe('temporary');
-    expect(registry.get('conditions')?.kind).toBe('persistent');
+    expect(registry.get('conditions')?.kind).toBe('conditional');
   });
 
   it('preserves insertion order in all()', () => {
     const registry = createEffectSystemRegistry();
     withEffectSystemRegistry(registry, () => {
       createTemporaryEffectSystem({ id: 'first', registerTick: () => () => {} });
-      createPersistentEffectSystem({ id: 'second' });
+      createConditionalEffectSystem({ id: 'second' });
       createTemporaryEffectSystem({ id: 'third', registerTick: () => () => {} });
     });
     expect(registry.all().map((s) => s.id)).toEqual(['first', 'second', 'third']);
@@ -49,7 +49,7 @@ describe('EffectSystemRegistry', () => {
     expect(() =>
       withEffectSystemRegistry(registry, () => {
         createTemporaryEffectSystem({ id: 'dup', registerTick: () => () => {} });
-        createPersistentEffectSystem({ id: 'dup' });
+        createConditionalEffectSystem({ id: 'dup' });
       }),
     ).toThrow(/duplicate effect-system id "dup"/);
   });
@@ -76,7 +76,7 @@ describe('EffectSystemRegistry', () => {
 
   it('allDefs() on persistent system snapshots registered defs', () => {
     const flag = ref(false);
-    const system = createPersistentEffectSystem({ id: 'conditions' });
+    const system = createConditionalEffectSystem({ id: 'conditions' });
     system.register({ id: 'library', active: computed(() => flag.value) });
     system.register({ id: 'temple', active: computed(() => !flag.value) });
 

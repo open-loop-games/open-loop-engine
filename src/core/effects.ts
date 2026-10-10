@@ -61,7 +61,7 @@ function resolveValue(value: ResourceEffect['value']): DecimalSource {
  * before it would write. {@link applyEffect} is the one that applies steps
  * in order.
  *
- * Accepts the full internal IR including {@link ConditionalEffect}; the
+ * Accepts the full internal IR including {@link BranchEffect}; the
  * narrower public {@link IEffect} is a structural subtype and assigns freely.
  */
 export function resolveEffect(
@@ -84,7 +84,7 @@ export function resolveEffect(
       return [{ type: 'state', target: effect.target, operation: 'set', value: effect.value }];
     case 'composite':
       return effect.effects.flatMap((e) => resolveEffect(e, accessor));
-    case 'conditional': {
+    case 'branch': {
       if (evaluateCondition(effect.condition, accessor))
         return resolveEffect(effect.then, accessor);
       if (effect.else) return resolveEffect(effect.else, accessor);
@@ -109,7 +109,7 @@ export function applyEffect(
     case 'composite':
       for (const child of effect.effects) applyEffect(child, accessor, mutator);
       return;
-    case 'conditional': {
+    case 'branch': {
       const branch = evaluateCondition(effect.condition, accessor) ? effect.then : effect.else;
       if (branch) applyEffect(branch, accessor, mutator);
       return;
@@ -167,7 +167,7 @@ export const E = {
    * time, so the returned effect is fully serializable and the resolution
    * path stays predictor-friendly.
    *
-   * Returns `IEffect` opaquely — the internal `ConditionalEffect` shape isn't
+   * Returns `IEffect` opaquely — the internal `BranchEffect` shape isn't
    * part of the public union, so consumers can't narrow to it and the
    * embedded ICondition stays unreachable through the public type system.
    *
@@ -176,11 +176,11 @@ export const E = {
    * `unlock`), `cumulative-gte` and combinators containing them have no
    * `ICondition` projection, so building the effect throws. For those, gate
    * the application at the consumer (only build the effect inside the branch
-   * you want), not via `E.conditional`.
+   * you want), not via `E.branch`.
    */
-  conditional(gate: Gate, then: IEffect, otherwise?: IEffect): IEffect {
+  branch(gate: Gate, then: IEffect, otherwise?: IEffect): IEffect {
     return {
-      type: 'conditional',
+      type: 'branch',
       condition: gateToCondition(gate),
       then,
       else: otherwise,

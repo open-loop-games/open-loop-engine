@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { createModifierChain, createMultiplicativeModifier } from '@/core/modifier';
-import { createPersistentEffectSystem } from '@/systems/persistent-effect';
-import { replacementBinding } from '@/systems/modifier-binding';
+import { createConditionalEffectSystem } from '@/systems/conditional-effect';
+import { replacementGrants } from '@/systems/replacement-grants';
 
-describe('replacementBinding', () => {
+describe('replacementGrants', () => {
   it('cancels the target multiplier and applies the replacement', async () => {
     // Base chain contains a ×(1.1^n) multiplier we want to swap out.
     const tickspeed = ref(4);
@@ -22,13 +22,13 @@ describe('replacementBinding', () => {
     // Without any replacement, chain.apply(1) = 1 × 1.1^4 ≈ 1.4641
     expect(new Decimal(chain.apply(1)).toNumber()).toBeCloseTo(Math.pow(1.1, 4), 5);
 
-    // Bind a replacement via persistent-effect, which is the idiomatic path.
-    const effects = createPersistentEffectSystem({ id: 'test-effects' });
+    // Bind a replacement via a conditional effect, which is the idiomatic path.
+    const effects = createConditionalEffectSystem({ id: 'test-effects' });
     const active = ref(false);
     effects.register({
       id: 'rewire',
       active,
-      modifiers: replacementBinding({
+      grants: replacementGrants({
         chain,
         cancel: () => Decimal.pow(1.1, tickspeed.value),
         replacement: () =>
@@ -56,12 +56,12 @@ describe('replacementBinding', () => {
 
   it('surfaces both entries on the chain for full attribution', async () => {
     const chain = createModifierChain('test-attribution');
-    const effects = createPersistentEffectSystem({ id: 'test-attr-effects' });
+    const effects = createConditionalEffectSystem({ id: 'test-attr-effects' });
 
     effects.register({
       id: 'rewire',
       active: ref(true),
-      modifiers: replacementBinding({
+      grants: replacementGrants({
         chain,
         cancel: () => 2,
         replacement: () => 3,

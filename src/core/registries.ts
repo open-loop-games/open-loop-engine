@@ -5,9 +5,9 @@
  *
  * - **Chain registry** — every {@link ModifierChain} created via
  *   `createModifierChain`.
- * - **Effect-system registry** — every temporary or persistent effect
+ * - **Effect-system registry** — every temporary or conditional effect
  *   system created via `createTemporaryEffectSystem` /
- *   `createPersistentEffectSystem`.
+ *   `createConditionalEffectSystem`.
  * - **Resource registry** — every {@link Resource} created via
  *   `createResource`.
  *
@@ -96,7 +96,7 @@ export const getCurrentChainRegistry = chainAmbient.getCurrent;
 /**
  * Minimal shape an effect system must expose to be enumerable. Both
  * {@link ../systems/temporary-effect.TemporaryEffectSystem} and
- * {@link ../systems/persistent-effect.PersistentEffectSystem} satisfy this.
+ * {@link ../systems/conditional-effect.ConditionalEffectSystem} satisfy this.
  *
  * The picker's effect-system binding walker reads `id` for addressing and `allDefs()` for
  * enumeration; everything else is system-specific and stays behind the
@@ -106,19 +106,19 @@ export interface EnumerableEffectSystem {
   /** System identifier, e.g. `'buffs'`, `'constructions-effects'`. */
   readonly id: string;
   /** Kind tag so walkers can distinguish temporary from persistent defs. */
-  readonly kind: 'temporary' | 'persistent';
+  readonly kind: 'temporary' | 'conditional';
   /** Snapshot of every registered def — shape differs between kinds. */
   allDefs(): readonly EffectDefLike[];
 }
 
 /**
- * Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef`
+ * Structural shape shared by `TemporaryEffectDef` and `ConditionalEffectDef`
  * that the picker needs. The full def types live in systems, which core
  * doesn't import.
  */
 export interface EffectDefLike {
   readonly id: string;
-  readonly modifiers?: readonly Grant[] | (() => readonly Grant[]);
+  readonly grants?: readonly Grant[] | (() => readonly Grant[]);
 }
 
 /**
@@ -150,7 +150,7 @@ const effectSystemAmbient = createAmbientValue<EffectSystemRegistry>();
 
 /**
  * Run `fn` with `registry` set as the ambient effect-system registry. Any
- * `createTemporaryEffectSystem` / `createPersistentEffectSystem` called
+ * `createTemporaryEffectSystem` / `createConditionalEffectSystem` called
  * inside `fn` auto-registers into `registry`.
  *
  * @internal Used by {@link createEngine} during `install()` / `connect()`.

@@ -764,9 +764,9 @@ describe('gateToCondition — partial projection', () => {
     );
   });
 
-  it('E.conditional over a cumulative-gte gate fails when the effect is built', () => {
+  it('E.branch over a cumulative-gte gate fails when the effect is built', () => {
     expect(() =>
-      E.conditional({ kind: 'cumulative-gte', resource: 'gold', value: 50 }, E.flag('x')),
+      E.branch({ kind: 'cumulative-gte', resource: 'gold', value: 50 }, E.flag('x')),
     ).toThrow(/no ICondition projection/);
   });
 

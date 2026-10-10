@@ -1,12 +1,12 @@
 /**
  * Modifier binding — how effect systems bind {@link Grant}s, and grant helpers.
  *
- * Effect systems (`createTemporaryEffectSystem`, `createPersistentEffectSystem`)
+ * Effect systems (`createTemporaryEffectSystem`, `createConditionalEffectSystem`)
  * take `Grant[]` on their `modifiers` field — the vocabulary category
  * `grants` / `restricts` / `rewards` use. Categories bind a grant once, gated
  * on the owning item; effect systems bind it per activation into a reserved
  * chain slot, so they lower each grant to one factory per chain.
- * {@link replacementBinding} builds a common grant pair.
+ * {@link replacementGrants} builds a common grant pair.
  *
  * @cluster effects
  */
@@ -30,7 +30,7 @@ import type { PredicateResolver } from './gate';
 
 /**
  * One chain position an effect definition's grants lower to. Its index in the
- * lowered list is the binding's slot and its perturbation `bindingIndex`.
+ * lowered list is the binding's slot and its perturbation `grantIndex`.
  *
  * @internal
  */
@@ -40,8 +40,8 @@ export interface LoweredGrant {
   modifier: () => Modifier;
 }
 
-/** Options for {@link replacementBinding} */
-export interface ReplacementBindingOptions {
+/** Options for {@link replacementGrants} */
+export interface ReplacementGrantsOptions {
   /** Chain the cancel + replacement modifiers land on */
   chain: ModifierChain;
   /**
@@ -68,7 +68,7 @@ export interface ReplacementBindingOptions {
  * chain entries: a cancel multiplier `× 1/cancel()` that nullifies the existing
  * value, and a replacement multiplier `× replacement()` that supplies the new
  * one. Both must be gated on the same predicate — typically via a
- * {@link createPersistentEffectSystem} binding.
+ * {@link createConditionalEffectSystem} binding.
  *
  * Chain-level introspection is preserved: both entries remain distinct modifiers
  * in the chain (descriptions suffixed `"(cancel)"` / `"(replacement)"`) so
@@ -82,14 +82,14 @@ export interface ReplacementBindingOptions {
  *
  * @param options - Cancel/replacement value sources + target chain + description
  * @returns Two grants (cancel + replacement) suitable for
- *   `PersistentEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
+ *   `ConditionalEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
  *
  * @example
  * ```ts
  * effects.register({
  *   id: 'challenge:ic3:tickspeed-rewire',
  *   active: () => ic3.active.value && Decimal.gt(tickspeed.amount.value, 0),
- *   modifiers: replacementBinding({
+ *   grants: replacementGrants({
  *     chain: productionChain,
  *     cancel: () => Decimal.pow(1.1, tickspeed.amount.value),
  *     replacement: () =>
@@ -102,7 +102,7 @@ export interface ReplacementBindingOptions {
  * });
  * ```
  */
-export function replacementBinding(options: ReplacementBindingOptions): Grant[] {
+export function replacementGrants(options: ReplacementGrantsOptions): Grant[] {
   const { chain, cancel, replacement, description } = options;
   const cancelSrc = processGetter(cancel);
   const replacementSrc = processGetter(replacement);

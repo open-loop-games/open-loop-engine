@@ -48,7 +48,7 @@ three per-engine enumerable collections that external introspection tools (balan
 
 - `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:53`
 - `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:61`
-- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `PersistentEffectDef` that the picker needs. `src/core/registries.ts:119`
+- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `ConditionalEffectDef` that the picker needs. `src/core/registries.ts:119`
 - `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:128`
 - `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:131`
 - `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:105`

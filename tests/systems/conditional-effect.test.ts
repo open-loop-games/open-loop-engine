@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ref, computed, effectScope, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
-import { createPersistentEffectSystem } from '@/systems/persistent-effect';
+import { createConditionalEffectSystem } from '@/systems/conditional-effect';
 import {
   createModifierChain,
   createMultiplicativeModifier,
@@ -9,7 +9,7 @@ import {
 } from '@/core/modifier';
 
 function createSystem() {
-  return createPersistentEffectSystem({ id: 'test' });
+  return createConditionalEffectSystem({ id: 'test' });
 }
 
 // ============================================================================
@@ -55,7 +55,7 @@ describe('activation', () => {
     system.register({
       id: 'belt',
       active,
-      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
+      grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
     });
 
     expect(chain.modifiers.length).toBe(0);
@@ -81,7 +81,7 @@ describe('activation', () => {
     system.register({
       id: 'belt',
       active,
-      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
+      grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
     });
 
     active.value = true;
@@ -98,7 +98,7 @@ describe('activation', () => {
     system.register({
       id: 'belt',
       active,
-      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
+      grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
     });
 
     // immediate watch applies on registration
@@ -123,7 +123,7 @@ describe('activation', () => {
     system.register({
       id: 'phase-scope',
       active,
-      modifiers: chains.map((chain) => ({
+      grants: chains.map((chain) => ({
         chain,
         modifier: () => createMultiplicativeModifier({ multiplier: 0 }),
       })),
@@ -170,7 +170,7 @@ describe('activation', () => {
     system.register({
       id: 'library',
       active: computed(() => built.value && level.value >= 3),
-      modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+      grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
     });
 
     built.value = true;
@@ -202,12 +202,12 @@ describe('binding isolation', () => {
       {
         id: 'a',
         active: aActive,
-        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+        grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 5 }) }],
       },
       {
         id: 'b',
         active: bActive,
-        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+        grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
       },
     ]);
 
@@ -240,12 +240,12 @@ describe('chain order', () => {
       {
         id: 'flat',
         active: flat,
-        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+        grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
       },
       {
         id: 'double',
         active: ref(true),
-        modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+        grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
       },
     ]);
     return { chain, flat };
@@ -278,7 +278,7 @@ describe('predicates its own edge flips', () => {
     system.register({
       id: 'spend-charge',
       active: () => charges.value > 0,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
       onActivate: () => charges.value--,
     });
 
@@ -295,7 +295,7 @@ describe('predicates its own edge flips', () => {
       system.register({
         id: 'catch-up',
         active: () => Decimal.lt(chain.apply(1), 10),
-        modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 100 }) }],
+        grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 100 }) }],
       }),
     ).toThrow(/its own bindings/);
   });
@@ -312,7 +312,7 @@ describe('load-time reconstruction', () => {
     system.register({
       id: 'belt',
       active: savedBuilt,
-      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
+      grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 4 }) }],
     });
 
     expect(chain.modifiers.length).toBe(1);
@@ -327,7 +327,7 @@ describe('load-time reconstruction', () => {
     system.register({
       id: 'milestone',
       active: computed(() => progress.value >= 3),
-      modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 100 }) }],
+      grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 100 }) }],
     });
 
     expect(chain.modifiers.length).toBe(1);
@@ -407,7 +407,7 @@ describe('dispose', () => {
     system.register({
       id: 'belt',
       active,
-      modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
     });
     expect(chain.modifiers.length).toBe(1);
 
@@ -438,7 +438,7 @@ describe('modifiers take Grants, active takes a Predicate', () => {
     system.register({
       id: 'library',
       active: built,
-      modifiers: [{ chain, mult: 2, description: 'Library' }],
+      grants: [{ chain, mult: 2, description: 'Library' }],
     });
 
     expect(value(chain)).toBe(1);
@@ -455,7 +455,7 @@ describe('modifiers take Grants, active takes a Predicate', () => {
     system.register({
       id: 'library',
       active: true,
-      modifiers: [{ chain, add: 1, description: 'Lamp', when: () => lit.value }],
+      grants: [{ chain, add: 1, description: 'Lamp', when: () => lit.value }],
     });
 
     expect(value(chain)).toBe(1);
@@ -466,15 +466,15 @@ describe('modifiers take Grants, active takes a Predicate', () => {
   it("active as a Gate whose handles the runtime doesn't carry throws at register", () => {
     const system = createSystem();
     expect(() => system.register({ id: 'lit', active: { kind: 'flag', id: 'lamp' } })).toThrow(
-      /persistent effect 'lit' active: /,
+      /conditional effect 'lit' active: /,
     );
   });
 });
 
-describe('createPersistentEffectSystem — teardown', () => {
+describe('createConditionalEffectSystem — teardown', () => {
   it('a definition registered outside any scope stops with the scope that built the system', () => {
     const scope = effectScope();
-    const system = scope.run(() => createPersistentEffectSystem({ id: 'late-fx' }))!;
+    const system = scope.run(() => createConditionalEffectSystem({ id: 'late-fx' }))!;
     const active = ref(false);
     const onActivate = vi.fn();
     system.register({ id: 'late', active, onActivate });

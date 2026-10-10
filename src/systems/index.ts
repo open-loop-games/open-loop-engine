@@ -39,7 +39,7 @@ export { CategoriesKey, findCategoryEntrySignals } from './engine-categories';
 // Consumer-facing predicate-spec data shape over CategoryEntrySignals + ResourceRegistry +
 // GameStateAccessor. Authored as plain data in content definitions; evaluated through
 // evaluateGate, predicted through timeUntilGateFlip. `gateToCondition` is engine-internal
-// (projects accessor-backed Gate leaves to the ICondition IR that E.conditional embeds).
+// (projects accessor-backed Gate leaves to the ICondition IR that E.branch embeds).
 export type {
   Gate,
   ResourceGteGate,
@@ -180,16 +180,16 @@ export {
 // Time-limited effects (buffs, debuffs, DoTs, power-ups) with modifier integration.
 export * from './temporary-effect';
 
-// === PERSISTENT EFFECTS ===
+// === CONDITIONAL EFFECTS ===
 // Condition-driven effects with modifier integration. Bindings track a reactive
 // predicate; state is implicit in the game so load reconstruction is automatic.
-export * from './persistent-effect';
+export * from './conditional-effect';
 
-// === MODIFIER BINDING HELPERS ===
+// === REPLACEMENT GRANTS ===
 // Factories that return `Grant[]` for common patterns. Sibling to
-// temporary-effect / persistent-effect; consumers pass the factory output as
-// the `modifiers` field on a def.
-export { replacementBinding, type ReplacementBindingOptions } from './modifier-binding';
+// temporary-effect / conditional-effect; consumers pass the factory output as
+// the `grants` field on a def.
+export { replacementGrants, type ReplacementGrantsOptions } from './replacement-grants';
 
 // === SLOTS ===
 // Constrained persistent selection from a pool (equipment slots, spell slots, policy picks).

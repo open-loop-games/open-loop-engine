@@ -29,7 +29,7 @@ import type { RegisterTick } from '@/core/sequencer';
 import { attachPersistentContextReset, Resettable, type ResettableObject } from '@/core/resettable';
 import { createContentRegistryHandle, type ContentRegistryView } from './content-registry';
 import type { PredicateResolver } from './gate';
-import { adoptGrantWhens, buildGrantModifier, grantChains } from './modifier-binding';
+import { adoptGrantWhens, buildGrantModifier, grantChains } from './replacement-grants';
 
 // === TYPES ===
 

@@ -27,7 +27,7 @@ describe('createPickerSnapshot', () => {
         temp.register({
           id: 'crit',
           duration: 5,
-          modifiers: [{ chain: damage, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+          grants: [{ chain: damage, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
         });
 
         // Source 2: chain registry — a standalone chain with 2 modifiers that
@@ -88,7 +88,7 @@ describe('createPickerSnapshot', () => {
         temp.register({
           id: 'rage',
           duration: 5,
-          modifiers: [{ chain: damage, modifier: sharedModifier }],
+          grants: [{ chain: damage, modifier: sharedModifier }],
         });
 
         // Pre-seed the chain with the modifier so both paths reach it.
@@ -135,17 +135,17 @@ describe('createPickerSnapshot', () => {
           duration: 5,
           // A factory builds a fresh modifier per activation, so the content
           // walker's object never matches the one standing in the chain.
-          modifiers: [
+          grants: [
             { chain: damage, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) },
           ],
         });
         temp.register({
           id: 'focus',
           duration: 5,
-          modifiers: [{ chain: damage, modifier: createMultiplicativeModifier({ multiplier: 3 }) }],
+          grants: [{ chain: damage, modifier: createMultiplicativeModifier({ multiplier: 3 }) }],
         });
-        temp.apply('rage');
-        temp.apply('focus');
+        temp.activate('rage');
+        temp.activate('focus');
       },
     };
     const engine = startEngine('pk-owned', mod);

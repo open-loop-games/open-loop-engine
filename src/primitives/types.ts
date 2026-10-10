@@ -35,14 +35,14 @@ export interface CompositeEffect {
 /**
  * Applies one of two effects depending on whether a condition holds at evaluation time.
  *
- * Engine-internal IR: consumers construct via `E.conditional(gate, then, otherwise?)`
+ * Engine-internal IR: consumers construct via `E.branch(gate, then, otherwise?)`
  * which returns the public {@link IEffect} opaquely, so the embedded
  * {@link ICondition} is unreachable through the public type system.
  *
  * @internal
  */
-export interface ConditionalEffect {
-  type: 'conditional';
+export interface BranchEffect {
+  type: 'branch';
   condition: ICondition;
   /** Effect applied when the condition is true. */
   then: IEffect;
@@ -55,7 +55,7 @@ export interface ConditionalEffect {
  * authors hand to category factories. Resolved via {@link resolveEffect} and
  * applied through a {@link GameStateMutator}.
  *
- * Conditional effects (built via `E.conditional`) are part of the internal IR
+ * Branch effects (built via `E.branch`) are part of the internal IR
  * ({@link IEffectInternal}) and aren't members of this public union — consumers
  * receive them opaquely typed as `IEffect`, so the embedded ICondition can't
  * be reached through union narrowing.
@@ -63,13 +63,13 @@ export interface ConditionalEffect {
 export type IEffect = ResourceEffect | FlagEffect | StateEffect | CompositeEffect;
 
 /**
- * Engine-internal effect IR — the full union including {@link ConditionalEffect}.
+ * Engine-internal effect IR — the full union including {@link BranchEffect}.
  * Used by `resolveEffect` / `applyEffect` / walker machinery that needs to
- * narrow on `type: 'conditional'`. Not part of the public surface.
+ * narrow on `type: 'branch'`. Not part of the public surface.
  *
  * @internal
  */
-export type IEffectInternal = IEffect | ConditionalEffect;
+export type IEffectInternal = IEffect | BranchEffect;
 
 /**
  * Tests a resource amount against a threshold using a comparison operator.
@@ -137,7 +137,7 @@ export interface NotCondition {
  * Engine-internal IR for declarative predicates. Consumers author {@link Gate}
  * literals on content-def fields; the engine projects accessor-backed Gate
  * leaves to ICondition via `gateToCondition`. Embedded by the internal
- * {@link ConditionalEffect} as the conditional-effect IR (unreachable from
+ * {@link BranchEffect} as the conditional-effect IR (unreachable from
  * the public {@link IEffect} union).
  *
  * Not part of the public surface — kept as a typed interchange shape between

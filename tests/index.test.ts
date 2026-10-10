@@ -11,7 +11,7 @@ import {
   TuningRegistriesKey,
   createModifierChain,
   createTemporaryEffectSystem,
-  createPersistentEffectSystem,
+  createConditionalEffectSystem,
   createPurchasableCategory,
   createSkillCategory,
   createCycle,
@@ -1056,7 +1056,7 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
     const modB: EngineModule = {
       id: 'b',
       install() {
-        createPersistentEffectSystem({ id: 'b/conditions' });
+        createConditionalEffectSystem({ id: 'b/conditions' });
       },
     };
     const probe: EngineModule = {
@@ -1076,7 +1076,7 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
     engine.start();
 
     expect(capturedIds.sort()).toEqual(['a/buffs', 'b/conditions']);
-    expect(kinds.sort()).toEqual(['persistent', 'temporary']);
+    expect(kinds.sort()).toEqual(['conditional', 'temporary']);
     engine.stop();
   });
 
@@ -1127,7 +1127,7 @@ describe('EffectSystemRegistryKey — auto-registered effect-system discovery', 
           id: 'dup',
           registerTick: (cb) => ctx.onTick(cb),
         });
-        createPersistentEffectSystem({ id: 'dup' });
+        createConditionalEffectSystem({ id: 'dup' });
       },
     };
     const engine = createEngine({ gameId: 'test', persistence: false });

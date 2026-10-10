@@ -165,7 +165,7 @@ export interface MultiplicativeModifierOptions {
  * });
  * ```
  * For lifecycle management + balance-sim attribution, bind conditional
- * modifiers through {@link createPersistentEffectSystem} rather than
+ * modifiers through {@link createConditionalEffectSystem} rather than
  * toggling `enabled` manually.
  */
 export function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(
@@ -609,12 +609,12 @@ export interface ModifierChainSlot {
  * }
  * ```
  *
- * @example Surface-wide chain shared across modules via persistent-effect:
+ * @example Surface-wide chain shared across modules via a conditional effect:
  * ```ts
  * // Module A creates the chain — auto-registered for discovery
  * const progressChain = createModifierChain('progress');
  *
- * // Module B binds a conditional modifier through persistent-effect
+ * // Module B binds a conditional modifier through a conditional effect
  * effects.register({
  *   id: 'affected-by:wander:glasses',
  *   active: computed(() => equipment.has('glasses')),
@@ -626,7 +626,7 @@ export interface ModifierChainSlot {
  * const registry = engine.tryInject(ChainRegistryKey)!;
  * for (const chain of registry.all()) console.log(chain.id);
  * ```
- * Prefer binding through {@link createPersistentEffectSystem} over raw
+ * Prefer binding through {@link createConditionalEffectSystem} over raw
  * `chain.add()` so the {@link EffectSystemRegistryKey | EffectSystemRegistry}
  * can trace every modifier to its source for balance-sim attribution.
  */

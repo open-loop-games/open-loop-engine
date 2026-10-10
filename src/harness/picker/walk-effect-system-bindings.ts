@@ -6,7 +6,7 @@
  */
 
 import type { Engine } from '@/engine';
-import { buildGrantModifier } from '@/systems/modifier-binding';
+import { buildGrantModifier } from '@/systems/replacement-grants';
 import { EffectSystemRegistryKey } from '@/core/registries';
 import { effectDefBindings, forEachEffectDef } from '../walk';
 import type { ModifierPickerEntry } from './types';
@@ -37,7 +37,7 @@ export function walkEffectSystemBindings(engine: Engine): ModifierPickerEntry[] 
   const entries: ModifierPickerEntry[] = [];
 
   forEachEffectDef(registry, ({ systemId, def }) => {
-    effectDefBindings(def).forEach(({ grant, chain }, bindingIndex) => {
+    effectDefBindings(def).forEach(({ grant, chain }, grantIndex) => {
       const modifier = buildGrantModifier(grant);
       entries.push({
         kind: 'modifier',
@@ -48,9 +48,9 @@ export function walkEffectSystemBindings(engine: Engine): ModifierPickerEntry[] 
           source: 'effect-system',
           effectSystemId: systemId,
           defId: def.id,
-          bindingIndex,
+          grantIndex,
         },
-        label: `${systemId}.${def.id}[${bindingIndex}]`,
+        label: `${systemId}.${def.id}[${grantIndex}]`,
       });
     });
   });

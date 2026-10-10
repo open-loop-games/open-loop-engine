@@ -2,13 +2,13 @@
  * Balance-sim enumeration validation — proves that the EffectSystemRegistry +
  * ChainRegistry pair provides full modifier attribution for external tools.
  *
- * Validates the convention: bind modifiers through persistent-effect systems,
+ * Validates the convention: bind modifiers through conditional effect systems,
  * not raw chain.add(), so every modifier is traceable to its source effect.
  */
 
 import { describe, it, expect } from 'vitest';
 import { ref, nextTick } from 'vue';
-import { createPersistentEffectSystem } from '@/systems/persistent-effect';
+import { createConditionalEffectSystem } from '@/systems/conditional-effect';
 import {
   createModifierChain,
   createMultiplicativeModifier,
@@ -48,14 +48,14 @@ describe('balance-sim enumeration', () => {
       const progressChain = createModifierChain('progress');
       const rewardChain = createModifierChain('reward');
 
-      // Three "actions" binding modifiers via persistent-effect systems
-      const system = createPersistentEffectSystem({ id: 'action-effects' });
+      // Three "actions" binding modifiers via conditional effect systems
+      const system = createConditionalEffectSystem({ id: 'action-effects' });
 
       system.register([
         {
           id: 'affected-by:wander:glasses',
           active: ref(true),
-          modifiers: [
+          grants: [
             {
               chain: progressChain,
               modifier: () =>
@@ -66,7 +66,7 @@ describe('balance-sim enumeration', () => {
         {
           id: 'affected-by:mine:pickaxe',
           active: ref(true),
-          modifiers: [
+          grants: [
             {
               chain: rewardChain,
               modifier: () =>
@@ -82,7 +82,7 @@ describe('balance-sim enumeration', () => {
         {
           id: 'affected-by:fish:bait',
           active: ref(false), // inactive — should not appear in modifier counts
-          modifiers: [
+          grants: [
             {
               chain: rewardChain,
               modifier: () =>
@@ -105,7 +105,7 @@ describe('balance-sim enumeration', () => {
       const attribution = new Map<string, string[]>();
 
       for (const def of defs) {
-        const bindings = def.modifiers as SingleChainGrant[] | undefined;
+        const bindings = def.grants as SingleChainGrant[] | undefined;
         if (!bindings) continue;
         attribution.set(
           def.id,
@@ -141,7 +141,7 @@ describe('balance-sim enumeration', () => {
       // Count modifiers reachable via effect-system path (active defs only)
       let effectPathCount = 0;
       for (const def of defs) {
-        const bindings = def.modifiers as SingleChainGrant[] | undefined;
+        const bindings = def.grants as SingleChainGrant[] | undefined;
         if (!bindings) continue;
         // Only count if the def is active (has applied modifiers on chains)
         const isActive = system.isActive(def.id).value;
@@ -168,19 +168,19 @@ describe('balance-sim enumeration', () => {
     withRegistries(chainReg, effectReg, () => {
       const chain = createModifierChain('output');
 
-      const equipmentEffects = createPersistentEffectSystem({ id: 'equipment' });
-      const skillEffects = createPersistentEffectSystem({ id: 'skills' });
+      const equipmentEffects = createConditionalEffectSystem({ id: 'equipment' });
+      const skillEffects = createConditionalEffectSystem({ id: 'skills' });
 
       equipmentEffects.register({
         id: 'sword-dmg',
         active: ref(true),
-        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+        grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
       });
 
       skillEffects.register({
         id: 'power-strike',
         active: ref(true),
-        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+        grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
       });
 
       // Registry sees both systems
@@ -203,7 +203,7 @@ describe('balance-sim enumeration', () => {
       const allBindings: { systemId: string; defId: string; chainId: string }[] = [];
       for (const sys of effectReg.all()) {
         for (const def of sys.allDefs()) {
-          const bindings = def.modifiers as SingleChainGrant[] | undefined;
+          const bindings = def.grants as SingleChainGrant[] | undefined;
           if (!bindings) continue;
           for (const b of bindings) {
             allBindings.push({ systemId: sys.id, defId: def.id, chainId: b.chain.id });
@@ -226,12 +226,12 @@ describe('balance-sim enumeration', () => {
     // Setup must be synchronous so ambient registries are active
     const { chain } = withRegistries(chainReg, effectReg, () => {
       const chain = createModifierChain('speed');
-      const system = createPersistentEffectSystem({ id: 'buffs' });
+      const system = createConditionalEffectSystem({ id: 'buffs' });
 
       system.register({
         id: 'haste',
         active,
-        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 1.5 }) }],
+        grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 1.5 }) }],
       });
 
       return { chain };
@@ -246,12 +246,12 @@ describe('balance-sim enumeration', () => {
 
     expect(chain.modifiers).toHaveLength(0);
     expect(effectReg.get('buffs')!.allDefs()).toHaveLength(1);
-    expect((effectReg.get('buffs')!.allDefs()[0].modifiers as SingleChainGrant[]).length).toBe(1);
+    expect((effectReg.get('buffs')!.allDefs()[0].grants as SingleChainGrant[]).length).toBe(1);
 
     // Effect-system path still shows the binding definition
     // (attribution is "what could modify this" not just "what is active now")
     const def = effectReg.get('buffs')!.allDefs()[0];
-    const bindings = def.modifiers as SingleChainGrant[];
+    const bindings = def.grants as SingleChainGrant[];
     expect(bindings[0].chain.id).toBe('speed');
 
     // Re-activate — chain picks it back up

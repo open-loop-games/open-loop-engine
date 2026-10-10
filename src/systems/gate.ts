@@ -29,7 +29,7 @@
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
  * `gateToCondition` partial-projects accessor-backed Gates (and their
- * combinators) to `ICondition`, the serializable IR `E.conditional` embeds.
+ * combinators) to `ICondition`, the serializable IR `E.branch` embeds.
  * Throws on category descendants and on `cumulative-gte`, whose values live
  * behind the categories and the registry rather than the accessor.
  * Predictors read every kind through {@link timeUntilGateFlip} instead.

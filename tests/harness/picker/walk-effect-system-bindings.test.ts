@@ -5,7 +5,7 @@ import {
   createModifierChain,
   createMultiplicativeModifier,
   createTemporaryEffectSystem,
-  createPersistentEffectSystem,
+  createConditionalEffectSystem,
   type EngineModule,
 } from '@/index';
 import { walkEffectSystemBindings } from '@/harness/picker';
@@ -27,20 +27,18 @@ describe('walkEffectSystemBindings', () => {
         temp.register({
           id: 'haste',
           duration: 5,
-          modifiers: [
+          grants: [
             { chain: speed, modifier: createMultiplicativeModifier({ multiplier: 2 }) },
             { chain: damage, modifier: createMultiplicativeModifier({ multiplier: 1.25 }) },
           ],
         });
 
-        const pers = createPersistentEffectSystem({ id: 'auras' });
+        const pers = createConditionalEffectSystem({ id: 'auras' });
         const libraryBuilt = ref(true);
         pers.register({
           id: 'library-bonus',
           active: computed(() => libraryBuilt.value),
-          modifiers: [
-            { chain: regen, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) },
-          ],
+          grants: [{ chain: regen, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) }],
         });
       },
     };
@@ -100,7 +98,7 @@ describe('walkEffectSystemBindings', () => {
         temp.register({
           id: 'shield',
           duration: 5,
-          modifiers: () => [
+          grants: () => [
             { chain, modifier: () => createMultiplicativeModifier({ multiplier: 3 }) },
           ],
         });
@@ -128,13 +126,11 @@ describe('walkEffectSystemBindings', () => {
       install() {
         const regen = createModifierChain('regen');
         regen.add(createMultiplicativeModifier({ multiplier: 2 }));
-        const pers = createPersistentEffectSystem({ id: 'auras' });
+        const pers = createConditionalEffectSystem({ id: 'auras' });
         pers.register({
           id: 'library-bonus',
           active: computed(() => built.value),
-          modifiers: [
-            { chain: regen, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) },
-          ],
+          grants: [{ chain: regen, modifier: createMultiplicativeModifier({ multiplier: 1.5 }) }],
         });
       },
     };
@@ -167,11 +163,11 @@ describe('walkEffectSystemBindings — grant chain arrays', () => {
     const mod: EngineModule = {
       id: 'fx',
       install() {
-        const pers = createPersistentEffectSystem({ id: 'auras' });
+        const pers = createConditionalEffectSystem({ id: 'auras' });
         pers.register({
           id: 'rage',
           active: true,
-          modifiers: [{ chain: [speed, power], mult: 2, description: 'Rage' }],
+          grants: [{ chain: [speed, power], mult: 2, description: 'Rage' }],
         });
       },
     };

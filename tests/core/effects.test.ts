@@ -34,7 +34,7 @@ describe('resolveEffect', () => {
   });
   it('conditional true branch', () => {
     const e: IEffectInternal = {
-      type: 'conditional',
+      type: 'branch',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
       else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
@@ -43,7 +43,7 @@ describe('resolveEffect', () => {
   });
   it('conditional false branch', () => {
     const e: IEffectInternal = {
-      type: 'conditional',
+      type: 'branch',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
       else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
@@ -52,7 +52,7 @@ describe('resolveEffect', () => {
   });
   it('conditional no else returns empty', () => {
     const e: IEffectInternal = {
-      type: 'conditional',
+      type: 'branch',
       condition: { type: 'resource', target: 'gold', operator: 'gte', value: 999 },
       then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
     };
@@ -157,7 +157,7 @@ describe('applyEffect', () => {
     const mutator = mockMutator();
     applyEffect(
       {
-        type: 'conditional',
+        type: 'branch',
         condition: { type: 'resource', target: 'gold', operator: 'gte', value: 50 },
         then: { type: 'resource', target: 'gems', operation: 'add', value: 1 },
         else: { type: 'resource', target: 'dust', operation: 'add', value: 1 },
@@ -188,7 +188,7 @@ describe('applyEffect', () => {
     applyEffect(
       E.composite(
         E.resource('gold', 'add', 100),
-        E.conditional({ kind: 'resource-gte', resource: 'gold', value: 100 }, E.flag('rich')),
+        E.branch({ kind: 'resource-gte', resource: 'gold', value: 100 }, E.flag('rich')),
       ),
       accessor,
       mutator,

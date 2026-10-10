@@ -47,7 +47,7 @@ export type ModifierPickerAddress =
       /** Def id within the effect system */
       defId: string;
       /** Position of this binding in the def's `modifiers`, each grant's chain array flattened */
-      bindingIndex: number;
+      grantIndex: number;
     }
   | {
       source: 'chain-registry';

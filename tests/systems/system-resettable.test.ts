@@ -190,7 +190,8 @@ const cases: Case[] = [
       effects.register({ id: 'haste', duration: 30 });
       return effects;
     },
-    dirty: (effects: ReturnType<typeof createTemporaryEffectSystem>) => void effects.apply('haste'),
+    dirty: (effects: ReturnType<typeof createTemporaryEffectSystem>) =>
+      void effects.activate('haste'),
     check: (effects: ReturnType<typeof createTemporaryEffectSystem>) => {
       expect(effects.getActive()).toEqual([]);
     },

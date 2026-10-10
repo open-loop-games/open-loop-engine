@@ -5,7 +5,7 @@ import {
   createEngine,
   createModifierChain,
   createMultiplicativeModifier,
-  createPersistentEffectSystem,
+  createConditionalEffectSystem,
   createProducerCategory,
   createTemporaryEffectSystem,
   createTuningRegistry,
@@ -28,7 +28,7 @@ function num(v: unknown): number {
   return Decimal.fromValue(v as Decimal).toNumber();
 }
 
-/** `dmg` = [flat +5, mult ×2], each bound by a persistent effect gated on its own flag. */
+/** `dmg` = [flat +5, mult ×2], each bound by a conditional effect gated on its own flag. */
 function persistentDamage(gameId: string) {
   const on = { flat: ref(true), mult: ref(true) };
   const flat = createAdditiveModifier({ addend: 5 });
@@ -37,15 +37,13 @@ function persistentDamage(gameId: string) {
     id: 'fx',
     install() {
       dmg = createModifierChain('dmg');
-      const effects = createPersistentEffectSystem({ id: 'gear' });
+      const effects = createConditionalEffectSystem({ id: 'gear' });
       effects.register([
-        { id: 'flat', active: () => on.flat.value, modifiers: [{ chain: dmg, modifier: flat }] },
+        { id: 'flat', active: () => on.flat.value, grants: [{ chain: dmg, modifier: flat }] },
         {
           id: 'mult',
           active: () => on.mult.value,
-          modifiers: [
-            { chain: dmg, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) },
-          ],
+          grants: [{ chain: dmg, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
         },
       ]);
     },
@@ -339,14 +337,14 @@ describe('applyPerturbation — content source', () => {
         temp.register({
           id: 'haste',
           duration: 5,
-          modifiers: [
+          grants: [
             // Non-factory binding so the walker + applier resolve the same
             // instance.
             { chain: speedChain, modifier: createMultiplicativeModifier({ multiplier: 2 }) },
           ],
         });
         // Apply the effect so the binding's modifier lands in the chain.
-        temp.apply('haste');
+        temp.activate('haste');
       },
     };
     const engine = createEngine({
@@ -473,13 +471,13 @@ describe('applyPerturbation — content source', () => {
         buffs.register({
           id: 'rage',
           duration: 2,
-          modifiers: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+          grants: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
         });
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
     const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
-    buffs.apply('rage');
+    buffs.activate('rage');
     expect(num(dmg.apply(1))).toBe(12);
 
     const cleanup = applyPerturbation(engine, rage, { kind: 'scalar-multiply', factor: 3 });
@@ -487,7 +485,7 @@ describe('applyPerturbation — content source', () => {
     tick(2);
     expect(num(dmg.apply(1))).toBe(2);
     expect(dmg.modifiers).toHaveLength(1);
-    buffs.apply('rage');
+    buffs.activate('rage');
     expect(num(dmg.apply(1))).toBe(36);
 
     cleanup();
@@ -517,15 +515,15 @@ describe('applyPerturbation — content source', () => {
           id: 'rage',
           duration: 2,
           maxStacks: 2,
-          modifiers: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+          grants: [{ chain: dmg, modifier: () => createAdditiveModifier({ addend: 5 }) }],
         });
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
     const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
-    buffs.apply('rage');
+    buffs.activate('rage');
     tick(1);
-    buffs.apply('rage');
+    buffs.activate('rage');
     const stacks = [...dmg.modifiers];
     expect(num(dmg.apply(1))).toBe(22);
 
@@ -572,11 +570,11 @@ describe('applyPerturbation — content source', () => {
       install() {
         dmg = createModifierChain('dmg');
         dmg.add(plain);
-        createPersistentEffectSystem({ id: 'gear' }).register([
+        createConditionalEffectSystem({ id: 'gear' }).register([
           {
             id: 'flat',
             active: () => on.value,
-            modifiers: [{ chain: dmg, modifier: createAdditiveModifier({ addend: 5 }) }],
+            grants: [{ chain: dmg, modifier: createAdditiveModifier({ addend: 5 }) }],
           },
         ]);
       },
@@ -615,8 +613,8 @@ describe('applyPerturbation — content source', () => {
     expect(() => applyPerturbation(engine, at({ defId: 'nope' }), times2)).toThrow(
       /effect def "nope" not found/,
     );
-    expect(() => applyPerturbation(engine, at({ bindingIndex: 3 }), times2)).toThrow(
-      /no binding at index 3/,
+    expect(() => applyPerturbation(engine, at({ grantIndex: 3 }), times2)).toThrow(
+      /no grant at index 3/,
     );
     engine.stop();
   });

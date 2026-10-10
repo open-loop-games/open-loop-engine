@@ -4,7 +4,7 @@
  *
  * Each of those three registries is auto-populated by its corresponding
  * factory (`createModifierChain`, `createTemporaryEffectSystem` /
- * `createPersistentEffectSystem`, `createResource`) via an ambient
+ * `createConditionalEffectSystem`, `createResource`) via an ambient
  * registry-target that {@link createEngine} sets up around `install()` /
  * `connect()`. The mechanism — module-private ambient slot, `with*` scope,
  * `getCurrent*` reader, id-keyed Map plus insertion-order array — is
@@ -64,7 +64,7 @@ export interface CreateNamedRegistryOptions<T> {
  * its own — scratch-engine forks never cross-contaminate.
  */
 export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): NamedRegistry<T> {
-  const { label, noun: noun, idOf } = options;
+  const { label, noun, idOf } = options;
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
 
   const byId = new Map<string, T>();

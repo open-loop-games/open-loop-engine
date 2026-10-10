@@ -34,17 +34,17 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface GameStateMutator` — Mutation interface for applying resolved effects to game state. `src/core/effects.ts:32`
 - `interface ResolvedEffect` — A fully resolved effect with all formulas evaluated — ready for mutation. `src/core/effects.ts:20`
 - `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:67`
-- `function createPersistentEffectSystem(options: PersistentEffectSystemOptions): PersistentEffectSystem` — Create a persistent effect system for managing condition-driven effects. `src/systems/persistent-effect.ts:181`
+- `interface ConditionalEffectDef` — Definition for a conditional effect, registered at startup. `src/systems/conditional-effect.ts:52`
+- `interface ConditionalEffectEvents` — Events emitted by the conditional effect system. `src/systems/conditional-effect.ts:85`
+- `interface ConditionalEffectSystem` — Manages conditional effects: registration, condition watching, and edge-triggered binding. `src/systems/conditional-effect.ts:99`
+- `interface ConditionalEffectSystemOptions` `src/systems/conditional-effect.ts:93`
+- `function createConditionalEffectSystem(options: ConditionalEffectSystemOptions): ConditionalEffectSystem` — Create a conditional effect system for managing condition-driven effects. `src/systems/conditional-effect.ts:181`
 - `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:237`
-- `interface PersistentEffectDef` — Definition for a persistent effect, registered at startup. `src/systems/persistent-effect.ts:52`
-- `interface PersistentEffectEvents` — Events emitted by the persistent effect system. `src/systems/persistent-effect.ts:85`
-- `interface PersistentEffectSystem` — Manages persistent effects: registration, condition watching, and edge-triggered binding. `src/systems/persistent-effect.ts:99`
-- `interface PersistentEffectSystemOptions` `src/systems/persistent-effect.ts:93`
-- `function replacementBinding(options: ReplacementBindingOptions): Grant[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/modifier-binding.ts:105`
-- `interface ReplacementBindingOptions` `src/systems/modifier-binding.ts:44`
+- `function replacementGrants(options: ReplacementGrantsOptions): Grant[]` — Build a cancel-then-replace binding pair for a modifier chain. `src/systems/replacement-grants.ts:105`
+- `interface ReplacementGrantsOptions` `src/systems/replacement-grants.ts:44`
 - `interface TemporaryEffectDef` — Definition for a temporary effect, registered at startup. `src/systems/temporary-effect.ts:67`
 - `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:137`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.apply. `src/systems/temporary-effect.ts:117`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.activate. `src/systems/temporary-effect.ts:117`
 - `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:155`
 - `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:147`
 
@@ -93,7 +93,7 @@ Algebraic expression trees with evaluate / invert / integrate.
 
 ## Gate
 
-typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.conditional` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
+typed predicate-spec data shape. Type union and pure-data projection live at core layer so `E.branch` and other core-layer builders can accept Gate without a layer violation. The runtime side (evaluator, predictor, ambient-runtime resolution, requirement adapter) lives in `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry, which are systems-layer concerns
 
 - `interface ActiveGate` — True when the entity's `unlock` signal is true. `src/core/gate.ts:58`
 - `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:96`

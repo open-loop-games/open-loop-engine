@@ -22,7 +22,7 @@
  *
  * @example
  * ```ts
- * const persistent = createPersistentEffectSystem({ id: 'constructions-effects' });
+ * const persistent = createConditionalEffectSystem({ id: 'constructions-effects' });
  *
  * persistent.register({
  *   id: 'belt-maxhealth',
@@ -48,8 +48,8 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 // `effects: { "goldPerTick": 0.01 }` mapped to Grant[].
 // Consumer-side helper first; promote to engine if two consumers converge.
 
-/** Definition for a persistent effect, registered at startup. */
-export interface PersistentEffectDef {
+/** Definition for a conditional effect, registered at startup. */
+export interface ConditionalEffectDef {
   id: string;
   name?: string;
   /**
@@ -59,7 +59,7 @@ export interface PersistentEffectDef {
    * it reads), the opposite edge follows at once. A predicate that reads a
    * value the effect's own bindings change has no stable state and throws.
    * A Gate resolves through the runtime captured at
-   * `createPersistentEffectSystem` time.
+   * `createConditionalEffectSystem` time.
    */
   active: Predicate;
   /** Tags for query filtering */
@@ -74,47 +74,47 @@ export interface PersistentEffectDef {
    * effect toggles: a static array claims its places at `register`, a
    * factory on its first activation.
    */
-  modifiers?: Grant[] | (() => Grant[]);
+  grants?: Grant[] | (() => Grant[]);
   /** Called on the rising edge (`false → true`), including on registration if already active */
-  onActivate?: (def: PersistentEffectDef) => void;
+  onActivate?: (def: ConditionalEffectDef) => void;
   /** Called on the falling edge (`true → false`) */
-  onDeactivate?: (def: PersistentEffectDef) => void;
+  onDeactivate?: (def: ConditionalEffectDef) => void;
 }
 
-/** Events emitted by the persistent effect system */
-export interface PersistentEffectEvents {
+/** Events emitted by the conditional effect system */
+export interface ConditionalEffectEvents {
   /** Fired on the rising edge of a def's `active` predicate */
-  activated: (def: PersistentEffectDef) => void;
+  activated: (def: ConditionalEffectDef) => void;
   /** Fired on the falling edge of a def's `active` predicate */
-  deactivated: (def: PersistentEffectDef) => void;
+  deactivated: (def: ConditionalEffectDef) => void;
 }
 
-/** Options for {@link createPersistentEffectSystem} */
-export interface PersistentEffectSystemOptions {
+/** Options for {@link createConditionalEffectSystem} */
+export interface ConditionalEffectSystemOptions {
   /** Unique identifier (for debugging / symmetry with temporary-effect) */
   id: string;
 }
 
-/** Manages persistent effects: registration, condition watching, and edge-triggered binding. */
-export interface PersistentEffectSystem {
-  /** System identifier (from {@link PersistentEffectSystemOptions.id}) */
+/** Manages conditional effects: registration, condition watching, and edge-triggered binding. */
+export interface ConditionalEffectSystem {
+  /** System identifier (from {@link ConditionalEffectSystemOptions.id}) */
   readonly id: string;
   /** Kind tag used by the effect-system registry / picker discovery */
-  readonly kind: 'persistent';
+  readonly kind: 'conditional';
   /** Register one or more effect definitions */
-  register(def: PersistentEffectDef | PersistentEffectDef[]): void;
+  register(def: ConditionalEffectDef | ConditionalEffectDef[]): void;
   /** Get a registered definition by ID */
-  getDef(id: string): PersistentEffectDef | undefined;
+  getDef(id: string): ConditionalEffectDef | undefined;
   /** Snapshot of every registered definition in insertion order. */
-  allDefs(): readonly PersistentEffectDef[];
+  allDefs(): readonly ConditionalEffectDef[];
   /** Whether the given def is currently active (reactive) */
   isActive(defId: string): ComputedRef<boolean>;
   /** All currently active definitions, as a fresh array each call (reactive) */
-  getActive(): PersistentEffectDef[];
+  getActive(): ConditionalEffectDef[];
   /** Active definitions with the given tag (reactive) */
-  getByTag(tag: string): PersistentEffectDef[];
+  getByTag(tag: string): ConditionalEffectDef[];
   /** Subscribe to system events */
-  on: Emittable<PersistentEffectEvents>['on'];
+  on: Emittable<ConditionalEffectEvents>['on'];
   /** Stop all watchers and remove all bindings */
   dispose(): void;
 }
@@ -122,7 +122,7 @@ export interface PersistentEffectSystem {
 // === INTERNAL TRACKING ===
 
 interface DefEntry {
-  def: PersistentEffectDef;
+  def: ConditionalEffectDef;
   activeRef: ComputedRef<boolean>;
   slots: BindingSlots;
   unbind: () => void;
@@ -139,14 +139,14 @@ const MAX_SETTLE_EDGES = 8;
 // === FACTORIES ===
 
 /**
- * Create a persistent effect system for managing condition-driven effects.
+ * Create a conditional effect system for managing condition-driven effects.
  *
  * @param options - System ID
- * @returns A {@link PersistentEffectSystem} for registering and querying state-driven effects
+ * @returns A {@link ConditionalEffectSystem} for registering and querying state-driven effects
  *
  * @example Basic conditional effect:
  * ```ts
- * const persistent = createPersistentEffectSystem({ id: 'buffs' });
+ * const persistent = createConditionalEffectSystem({ id: 'buffs' });
  *
  * persistent.register({
  *   id: 'library-bonus',
@@ -158,7 +158,7 @@ const MAX_SETTLE_EDGES = 8;
  * @example Per-action conditional modifiers on a surface-wide chain (the
  * idiomatic pattern for "item X boosts action Y"):
  * ```ts
- * const effects = createPersistentEffectSystem({ id: 'equipment-effects' });
+ * const effects = createConditionalEffectSystem({ id: 'equipment-effects' });
  *
  * // Each registration is an affectedBy binding: "glasses boost wander progress"
  * effects.register({
@@ -178,11 +178,11 @@ const MAX_SETTLE_EDGES = 8;
  * }
  * ```
  */
-export function createPersistentEffectSystem(
-  options: PersistentEffectSystemOptions,
-): PersistentEffectSystem {
+export function createConditionalEffectSystem(
+  options: ConditionalEffectSystemOptions,
+): ConditionalEffectSystem {
   const entries = new Map<string, DefEntry>();
-  const handle = createEmitHandle<PersistentEffectEvents>();
+  const handle = createEmitHandle<ConditionalEffectEvents>();
   const predicates = createPredicateResolver();
   // Owns each definition's watch, including those registered after install.
   const scope = effectScope();
@@ -214,7 +214,7 @@ export function createPersistentEffectSystem(
       for (let edges = 0; entry.activeRef.value !== entry.isApplied; edges++) {
         if (edges === MAX_SETTLE_EDGES) {
           throw new Error(
-            `PersistentEffect '${entry.def.id}': 'active' keeps flipping as its own bindings ` +
+            `ConditionalEffect '${entry.def.id}': 'active' keeps flipping as its own bindings ` +
               `apply and remove — the predicate reads a value its bindings change.`,
           );
         }
@@ -234,20 +234,20 @@ export function createPersistentEffectSystem(
     }
   }
 
-  function register(def: PersistentEffectDef | PersistentEffectDef[]): void {
+  function register(def: ConditionalEffectDef | ConditionalEffectDef[]): void {
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
       if (entries.has(d.id)) {
-        throw new Error(`PersistentEffect: duplicate definition '${d.id}'`);
+        throw new Error(`ConditionalEffect: duplicate definition '${d.id}'`);
       }
 
-      const owner = `persistent effect '${d.id}'`;
+      const owner = `conditional effect '${d.id}'`;
       const activeRef = predicates.adopt(d.active, false, `${owner} active`).holds;
 
       const entry: DefEntry = {
         def: d,
         activeRef,
-        slots: createBindingSlots(d.modifiers, predicates, owner),
+        slots: createBindingSlots(d.grants, predicates, owner),
         unbind: () => {},
         isApplied: false,
         settling: false,
@@ -266,12 +266,12 @@ export function createPersistentEffectSystem(
     }
   }
 
-  function getDef(id: string): PersistentEffectDef | undefined {
+  function getDef(id: string): ConditionalEffectDef | undefined {
     return entries.get(id)?.def;
   }
 
-  function allDefs(): readonly PersistentEffectDef[] {
-    const out: PersistentEffectDef[] = [];
+  function allDefs(): readonly ConditionalEffectDef[] {
+    const out: ConditionalEffectDef[] = [];
     for (const entry of entries.values()) out.push(entry.def);
     return out;
   }
@@ -280,16 +280,16 @@ export function createPersistentEffectSystem(
     return computed(() => entries.get(defId)?.activeRef.value ?? false);
   }
 
-  function getActive(): PersistentEffectDef[] {
+  function getActive(): ConditionalEffectDef[] {
     void appliedVersion.value;
-    const out: PersistentEffectDef[] = [];
+    const out: ConditionalEffectDef[] = [];
     for (const entry of entries.values()) {
       if (entry.isApplied) out.push(entry.def);
     }
     return out;
   }
 
-  function getByTag(tag: string): PersistentEffectDef[] {
+  function getByTag(tag: string): ConditionalEffectDef[] {
     return getActive().filter((d) => d.tags?.includes(tag) ?? false);
   }
 
@@ -300,9 +300,9 @@ export function createPersistentEffectSystem(
     appliedVersion.value++;
   }
 
-  const system: PersistentEffectSystem = {
+  const system: ConditionalEffectSystem = {
     id: options.id,
-    kind: 'persistent',
+    kind: 'conditional',
     register,
     getDef,
     allDefs,

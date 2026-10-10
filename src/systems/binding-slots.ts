@@ -17,7 +17,7 @@
 
 import type { Grant, Modifier, ModifierChain, ModifierChainSlot } from '@/core/modifier';
 import type { PredicateResolver } from './gate';
-import { lowerGrants } from './modifier-binding';
+import { lowerGrants } from './replacement-grants';
 
 // === TYPES ===
 

@@ -81,7 +81,7 @@ describe('registration', () => {
     expect(system.getDef('chill')).toBeDefined();
   });
 
-  it('throws on a duplicate definition id, as persistent-effect does', () => {
+  it('throws on a duplicate definition id, as conditional-effect does', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 4 });
     expect(() => system.register({ id: 'burn', duration: 8 })).toThrow(/duplicate/);
@@ -98,7 +98,7 @@ describe('registration', () => {
         id: 'burn',
         duration: 4,
         maxStacks: 3,
-        modifiers: [{ chain, modifier }],
+        grants: [{ chain, modifier }],
       }),
     ).toThrow(/factories/i);
   });
@@ -112,7 +112,7 @@ describe('apply', () => {
   it('creates instance with correct fields', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 4 });
-    const inst = system.apply('burn');
+    const inst = system.activate('burn');
 
     expect(inst).not.toBeNull();
     expect(inst!.defId).toBe('burn');
@@ -125,8 +125,8 @@ describe('apply', () => {
   it('returns null at maxStacks', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 4, maxStacks: 1 });
-    const first = system.apply('burn');
-    const second = system.apply('burn');
+    const first = system.activate('burn');
+    const second = system.activate('burn');
 
     expect(first).not.toBeNull();
     expect(second).toBeNull();
@@ -135,11 +135,11 @@ describe('apply', () => {
   it('refresh behavior resets timeRemaining', () => {
     const { system, tick } = createSystem();
     system.register({ id: 'burn', duration: 4, stackBehavior: 'refresh' });
-    const first = system.apply('burn')!;
+    const first = system.activate('burn')!;
     tick(2); // 2s elapsed, 2s remaining
     expect(first.timeRemaining.value).toBeCloseTo(2);
 
-    const refreshed = system.apply('burn')!;
+    const refreshed = system.activate('burn')!;
     expect(refreshed).toBe(first); // same instance
     expect(refreshed.timeRemaining.value).toBe(4); // reset to full
   });
@@ -148,9 +148,9 @@ describe('apply', () => {
     const { system } = createSystem();
     const duration = ref(4);
     system.register({ id: 'burn', duration, stackBehavior: 'refresh' });
-    const first = system.apply('burn')!;
+    const first = system.activate('burn')!;
     duration.value = 9;
-    system.apply('burn');
+    system.activate('burn');
     expect(first.timeRemaining.value).toBe(9);
     expect(first.duration).toBe(9);
   });
@@ -161,11 +161,11 @@ describe('apply', () => {
     system.register({
       id: 'buff',
       duration: 5,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
     });
 
     expect(Decimal.eq(chain.apply(10), 10)).toBe(true); // no effect yet
-    system.apply('buff');
+    system.activate('buff');
     expect(Decimal.eq(chain.apply(10), 20)).toBe(true); // x2
   });
 
@@ -176,14 +176,14 @@ describe('apply', () => {
       id: 'burn',
       duration: 4,
       maxStacks: 3,
-      modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 5 }) }],
+      grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 5 }) }],
     });
 
-    system.apply('burn');
+    system.activate('burn');
     expect(Decimal.eq(chain.apply(0), 5)).toBe(true);
-    system.apply('burn');
+    system.activate('burn');
     expect(Decimal.eq(chain.apply(0), 10)).toBe(true);
-    system.apply('burn');
+    system.activate('burn');
     expect(Decimal.eq(chain.apply(0), 15)).toBe(true);
   });
 
@@ -197,36 +197,36 @@ describe('apply', () => {
       id: 'charge',
       duration: 4,
       stackBehavior: 'refresh',
-      modifiers: () => [
+      grants: () => [
         { chain: targetChain, modifier: () => createMultiplicativeModifier({ multiplier: 1.5 }) },
       ],
     });
 
     // First apply targets chainA
-    system.apply('charge');
+    system.activate('charge');
     expect(Decimal.eq(chainA.apply(10), 15)).toBe(true);
     expect(Decimal.eq(chainB.apply(10), 10)).toBe(true);
 
     // Dispel, switch target, re-apply → targets chainB
     system.dispel('charge');
     targetChain = chainB;
-    system.apply('charge');
+    system.activate('charge');
     expect(Decimal.eq(chainA.apply(10), 10)).toBe(true);
     expect(Decimal.eq(chainB.apply(10), 15)).toBe(true);
   });
 
-  it('onApply fires', () => {
+  it('onActivate fires', () => {
     const { system } = createSystem();
-    const onApply = vi.fn();
-    system.register({ id: 'burn', duration: 4, onApply });
-    system.apply('burn');
-    expect(onApply).toHaveBeenCalledOnce();
-    expect(onApply.mock.calls[0]![0].defId).toBe('burn');
+    const onActivate = vi.fn();
+    system.register({ id: 'burn', duration: 4, onActivate });
+    system.activate('burn');
+    expect(onActivate).toHaveBeenCalledOnce();
+    expect(onActivate.mock.calls[0]![0].defId).toBe('burn');
   });
 
   it('throws on unknown defId', () => {
     const { system } = createSystem();
-    expect(() => system.apply('nonexistent')).toThrow(/unknown/i);
+    expect(() => system.activate('nonexistent')).toThrow(/unknown/i);
   });
 });
 
@@ -238,7 +238,7 @@ describe('tick and expiry', () => {
   it('timeRemaining decreases by dt', () => {
     const { system, tick } = createSystem();
     system.register({ id: 'burn', duration: 4 });
-    const inst = system.apply('burn')!;
+    const inst = system.activate('burn')!;
 
     tick(1);
     expect(inst.timeRemaining.value).toBeCloseTo(3);
@@ -249,7 +249,7 @@ describe('tick and expiry', () => {
   it('instance expires at 0', () => {
     const { system, tick } = createSystem();
     system.register({ id: 'burn', duration: 2 });
-    system.apply('burn');
+    system.activate('burn');
 
     tick(1);
     expect(system.getActive()).toHaveLength(1);
@@ -261,7 +261,7 @@ describe('tick and expiry', () => {
     const { system, tick } = createSystem();
     const onTick = vi.fn();
     system.register({ id: 'burn', duration: 10, onTick });
-    system.apply('burn');
+    system.activate('burn');
 
     tick(0.25);
     expect(onTick).toHaveBeenCalledOnce();
@@ -272,7 +272,7 @@ describe('tick and expiry', () => {
     const { system, tick } = createSystem();
     const onExpire = vi.fn();
     system.register({ id: 'burn', duration: 1, onExpire });
-    system.apply('burn');
+    system.activate('burn');
 
     tick(1);
     expect(onExpire).toHaveBeenCalledOnce();
@@ -284,10 +284,10 @@ describe('tick and expiry', () => {
     system.register({
       id: 'buff',
       duration: 2,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 3 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 3 }) }],
     });
 
-    system.apply('buff');
+    system.activate('buff');
     expect(Decimal.eq(chain.apply(10), 30)).toBe(true);
 
     tick(2);
@@ -306,7 +306,7 @@ describe('query', () => {
     const active = system.isActive('burn');
 
     expect(active.value).toBe(false);
-    system.apply('burn');
+    system.activate('burn');
     expect(active.value).toBe(true);
     tick(1);
     expect(active.value).toBe(false);
@@ -318,16 +318,16 @@ describe('query', () => {
     const count = system.activeCount('burn');
 
     expect(count.value).toBe(0);
-    system.apply('burn');
+    system.activate('burn');
     expect(count.value).toBe(1);
-    system.apply('burn');
+    system.activate('burn');
     expect(count.value).toBe(2);
   });
 
   it('getActive returns snapshot copy', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 10 });
-    system.apply('burn');
+    system.activate('burn');
 
     const active = system.getActive();
     expect(active).toHaveLength(1);
@@ -341,9 +341,9 @@ describe('query', () => {
       { id: 'chill', duration: 6, tags: ['echo', 'frost'] },
       { id: 'surge', duration: 8, tags: ['surge'] },
     ]);
-    system.apply('burn');
-    system.apply('chill');
-    system.apply('surge');
+    system.activate('burn');
+    system.activate('chill');
+    system.activate('surge');
 
     expect(system.getByTag('echo')).toHaveLength(2);
     expect(system.getByTag('flame')).toHaveLength(1);
@@ -366,9 +366,9 @@ describe('stacking', () => {
       stackBehavior: 'independent',
     });
 
-    const a = system.apply('burn')!;
+    const a = system.activate('burn')!;
     tick(1); // a at 3s
-    const b = system.apply('burn')!;
+    const b = system.activate('burn')!;
 
     expect(a.id).not.toBe(b.id);
     expect(a.timeRemaining.value).toBeCloseTo(3);
@@ -384,9 +384,9 @@ describe('stacking', () => {
       stackBehavior: 'refresh',
     });
 
-    system.apply('burn');
+    system.activate('burn');
     tick(2);
-    system.apply('burn');
+    system.activate('burn');
 
     expect(system.getActive()).toHaveLength(1);
     expect(system.getActive()[0]!.timeRemaining.value).toBe(4);
@@ -395,11 +395,11 @@ describe('stacking', () => {
   it('stackIndex is the lowest index no live stack of the def holds', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 10, maxStacks: 3 });
-    const a = system.apply('burn')!;
-    const b = system.apply('burn')!;
+    const a = system.activate('burn')!;
+    const b = system.activate('burn')!;
     a.expire();
-    const c = system.apply('burn')!;
-    const d = system.apply('burn')!;
+    const c = system.activate('burn')!;
+    const d = system.activate('burn')!;
     expect([b.stackIndex, c.stackIndex, d.stackIndex]).toEqual([1, 0, 2]);
   });
 
@@ -407,9 +407,9 @@ describe('stacking', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 10, maxStacks: 2 });
 
-    expect(system.apply('burn')).not.toBeNull();
-    expect(system.apply('burn')).not.toBeNull();
-    expect(system.apply('burn')).toBeNull();
+    expect(system.activate('burn')).not.toBeNull();
+    expect(system.activate('burn')).not.toBeNull();
+    expect(system.activate('burn')).toBeNull();
     expect(system.getActive()).toHaveLength(2);
   });
 });
@@ -425,9 +425,9 @@ describe('dispel', () => {
       { id: 'burn', duration: 10, maxStacks: 2 },
       { id: 'chill', duration: 10 },
     ]);
-    system.apply('burn');
-    system.apply('burn');
-    system.apply('chill');
+    system.activate('burn');
+    system.activate('burn');
+    system.activate('chill');
 
     system.dispel('burn');
     expect(system.getActive()).toHaveLength(1);
@@ -440,8 +440,8 @@ describe('dispel', () => {
       { id: 'burn', duration: 10 },
       { id: 'chill', duration: 10 },
     ]);
-    system.apply('burn');
-    system.apply('chill');
+    system.activate('burn');
+    system.activate('chill');
 
     system.dispelAll();
     expect(system.getActive()).toHaveLength(0);
@@ -453,8 +453,8 @@ describe('dispel', () => {
     const { system } = createSystem();
     system.register({ id: 'burn', duration: 10, maxStacks: 2, onExpire });
     system.on('expired', expired);
-    const a = system.apply('burn')!;
-    system.apply('burn');
+    const a = system.activate('burn')!;
+    system.activate('burn');
 
     a.expire();
     expect(system.getActive()).toHaveLength(1);
@@ -468,10 +468,10 @@ describe('dispel', () => {
     system.register({
       id: 'buff',
       duration: 10,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
     });
 
-    system.apply('buff');
+    system.activate('buff');
     expect(Decimal.eq(chain.apply(10), 20)).toBe(true);
 
     system.dispel('buff');
@@ -484,37 +484,37 @@ describe('dispel', () => {
 // ============================================================================
 
 describe('persistence', () => {
-  it('a load rebuilds instances from the save, firing onRehydrate instead of onApply', () => {
-    const onApply = vi.fn();
+  it('a load rebuilds instances from the save, firing onRehydrate instead of onActivate', () => {
+    const onActivate = vi.fn();
     const onRehydrate = vi.fn();
-    const defs = [{ id: 'burn', duration: 10, onApply, onRehydrate }];
+    const defs = [{ id: 'burn', duration: 10, onActivate, onRehydrate }];
     const storage = createMemoryStorage();
     const first = startSession(storage, defs);
-    first.system.apply('burn');
+    first.system.activate('burn');
     first.engine.save();
     first.engine.dispose();
-    onApply.mockClear();
+    onActivate.mockClear();
 
     const second = startSession(storage, defs);
     second.engine.load();
     expect(second.system.getActive().map((i) => i.defId)).toEqual(['burn']);
     expect(onRehydrate).toHaveBeenCalledOnce();
-    expect(onApply).not.toHaveBeenCalled();
+    expect(onActivate).not.toHaveBeenCalled();
     second.engine.dispose();
   });
 
-  it('a load falls back to onApply when the def has no onRehydrate', () => {
-    const onApply = vi.fn();
+  it('a load falls back to onActivate when the def has no onRehydrate', () => {
+    const onActivate = vi.fn();
     const storage = createMemoryStorage();
-    const first = startSession(storage, [{ id: 'burn', duration: 10, onApply }]);
-    first.system.apply('burn');
+    const first = startSession(storage, [{ id: 'burn', duration: 10, onActivate }]);
+    first.system.activate('burn');
     first.engine.save();
     first.engine.dispose();
-    onApply.mockClear();
+    onActivate.mockClear();
 
-    const second = startSession(storage, [{ id: 'burn', duration: 10, onApply }]);
+    const second = startSession(storage, [{ id: 'burn', duration: 10, onActivate }]);
     second.engine.load();
-    expect(onApply).toHaveBeenCalledOnce();
+    expect(onActivate).toHaveBeenCalledOnce();
     second.engine.dispose();
   });
 
@@ -524,15 +524,15 @@ describe('persistence', () => {
       {
         id: 'haste',
         duration: 30,
-        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+        grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
       },
       { id: 'burn', duration: 10 },
     ];
     const storage = createMemoryStorage();
     const { engine, system } = startSession(storage, defs);
-    system.apply('burn');
+    system.activate('burn');
     engine.save();
-    system.apply('haste');
+    system.activate('haste');
     expect(Decimal.eq(chain.apply(10), 20)).toBe(true);
 
     engine.load();
@@ -544,7 +544,7 @@ describe('persistence', () => {
   it("another engine's load leaves this engine's instances alone", () => {
     const onRehydrate = vi.fn();
     const live = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30, onRehydrate }]);
-    const haste = live.system.apply('haste')!;
+    const haste = live.system.activate('haste')!;
 
     const scratch = startSession(createMemoryStorage(), [{ id: 'haste', duration: 30 }], 'scratch');
     scratch.engine.save();
@@ -559,7 +559,7 @@ describe('persistence', () => {
   it('a live instance survives a save round trip with its remaining time', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
-    first.system.apply('haste');
+    first.system.activate('haste');
     for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
     first.engine.save();
     first.engine.dispose();
@@ -573,7 +573,7 @@ describe('persistence', () => {
   it('a rehydrated instance keeps the duration it was applied with', () => {
     const storage = createMemoryStorage();
     const first = startSession(storage, [{ id: 'haste', duration: 30 }]);
-    first.system.apply('haste');
+    first.system.activate('haste');
     for (let s = 0; s < 12; s++) first.engine.tickDriver.simulateTick(1);
     first.engine.save();
     first.engine.dispose();
@@ -606,8 +606,8 @@ describe('persistence', () => {
       { id: 'burn', duration: 10 },
       { id: 'haste', duration: 30 },
     ]);
-    first.system.apply('burn');
-    first.system.apply('haste');
+    first.system.activate('burn');
+    first.system.activate('haste');
     first.engine.save();
     first.engine.dispose();
 
@@ -629,9 +629,9 @@ describe('resets', () => {
       id: 'haste',
       duration: 30,
       onExpire,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
     });
-    system.apply('haste');
+    system.activate('haste');
     return { system, chain, onExpire };
   }
 
@@ -664,7 +664,7 @@ describe('offline', () => {
     const { system, tick } = createSystem();
     const onExpire = vi.fn();
     system.register({ id: 'burn', duration: 5, onExpire });
-    system.apply('burn');
+    system.activate('burn');
 
     // Simulate 10 seconds offline
     tick(10);
@@ -685,21 +685,21 @@ describe('chain order', () => {
       {
         id: 'flat',
         duration: 10,
-        modifiers: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
+        grants: [{ chain, modifier: () => createAdditiveModifier({ addend: 10 }) }],
       },
       {
         id: 'double',
         duration: 10,
-        modifiers: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
+        grants: [{ chain, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) }],
       },
     ]);
 
-    system.apply('double');
-    system.apply('flat');
+    system.activate('double');
+    system.activate('flat');
     expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
 
     system.dispel('flat');
-    system.apply('flat');
+    system.activate('flat');
     expect(Decimal.eq(chain.apply(1), 22)).toBe(true);
   });
 });
@@ -714,8 +714,8 @@ describe('events', () => {
     system.register({ id: 'burn', duration: 4 });
 
     const handler = vi.fn();
-    system.on('applied', handler);
-    system.apply('burn');
+    system.on('activated', handler);
+    system.activate('burn');
 
     expect(handler).toHaveBeenCalledOnce();
     expect(handler.mock.calls[0]![0].defId).toBe('burn');
@@ -727,7 +727,7 @@ describe('events', () => {
 
     const handler = vi.fn();
     system.on('expired', handler);
-    system.apply('burn');
+    system.activate('burn');
     tick(1);
 
     expect(handler).toHaveBeenCalledOnce();
@@ -746,10 +746,10 @@ describe('dispose', () => {
     system.register({
       id: 'buff',
       duration: 10,
-      modifiers: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
+      grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 2 }) }],
     });
 
-    system.apply('buff');
+    system.activate('buff');
     expect(Decimal.eq(chain.apply(10), 20)).toBe(true);
 
     system.dispose();
@@ -769,14 +769,14 @@ describe('reactive duration', () => {
   it('rejects a non-finite duration, which a save cannot hold', () => {
     const { system } = createSystem();
     expect(() => system.register({ id: 'forever', duration: Infinity })).toThrow(
-      /persistent-effect/,
+      /conditional effect system/,
     );
     expect(() => system.register({ id: 'nan', duration: Decimal.dNaN })).toThrow(/finite/);
 
     const dur = ref<number>(5);
     system.register({ id: 'burn', duration: dur });
     dur.value = Infinity;
-    expect(() => system.apply('burn')).toThrow(/finite/);
+    expect(() => system.activate('burn')).toThrow(/finite/);
     expect(system.getActive()).toHaveLength(0);
   });
 
@@ -785,7 +785,7 @@ describe('reactive duration', () => {
     const dur = ref(5);
     system.register({ id: 'burn', duration: dur });
 
-    const inst = system.apply('burn')!;
+    const inst = system.activate('burn')!;
     expect(inst.duration).toBe(5);
     expect(inst.timeRemaining.value).toBe(5);
   });
@@ -806,11 +806,11 @@ describe('modifiers take Grants', () => {
       id: 'haste',
       duration: 10,
       maxStacks: 2,
-      modifiers: [{ chain, mult: 1.5, description: 'Haste' }],
+      grants: [{ chain, mult: 1.5, description: 'Haste' }],
     });
 
-    system.apply('haste');
-    system.apply('haste');
+    system.activate('haste');
+    system.activate('haste');
     expect(value(chain)).toBeCloseTo(2.25);
   });
 
@@ -821,10 +821,10 @@ describe('modifiers take Grants', () => {
     system.register({
       id: 'rage',
       duration: 10,
-      modifiers: [{ chain: [speed, power], add: 2, description: 'Rage' }],
+      grants: [{ chain: [speed, power], add: 2, description: 'Rage' }],
     });
 
-    system.apply('rage');
+    system.activate('rage');
     expect([value(speed), value(power)]).toEqual([3, 3]);
   });
 
@@ -835,10 +835,10 @@ describe('modifiers take Grants', () => {
     system.register({
       id: 'owl',
       duration: 10,
-      modifiers: [{ chain, mult: 2, description: 'Owl', when: night }],
+      grants: [{ chain, mult: 2, description: 'Owl', when: night }],
     });
 
-    system.apply('owl');
+    system.activate('owl');
     expect(value(chain)).toBe(1);
     night.value = true;
     expect(value(chain)).toBe(2);
@@ -851,7 +851,7 @@ describe('modifiers take Grants', () => {
       system.register({
         id: 'owl',
         duration: 10,
-        modifiers: [{ chain, mult: 2, description: 'Owl', when: { kind: 'flag', id: 'night' } }],
+        grants: [{ chain, mult: 2, description: 'Owl', when: { kind: 'flag', id: 'night' } }],
       }),
     ).toThrow(/temporary effect 'owl' grant 'Owl' when: /);
   });

@@ -433,7 +433,7 @@ def.gainChain.bind({
 });
 ```
 
-Which of `chain.bind` / declarative `grants` / `createPersistentEffectSystem` to reach for is the ladder in [consumer-guide.md §Modifier chains and effects](./consumer-guide.md#modifier-chains-and-effects); this recipe is what the binding looks like once you've picked. Reach for `PersistentEffectSystem.register` when registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope), not because the bonus shape requires it.
+Which of `chain.bind` / declarative `grants` / `createConditionalEffectSystem` to reach for is the ladder in [consumer-guide.md §Modifier chains and effects](./consumer-guide.md#modifier-chains-and-effects); this recipe is what the binding looks like once you've picked. Reach for `ConditionalEffectSystem.register` when registration happens outside a category-driven persistent context (attribution auto-derivation needs a scope), not because the bonus shape requires it.
 
 ## Sublinear per-source prestige payouts
 

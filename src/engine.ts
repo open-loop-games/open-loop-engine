@@ -608,7 +608,7 @@ export function createEngine(config: EngineConfig): Engine {
         // calls that run inside install()/connect() via the ambient set below.
         const chainRegistry = createChainRegistry();
         // Per-engine effect-system registry — auto-populated by
-        // createTemporaryEffectSystem / createPersistentEffectSystem calls
+        // createTemporaryEffectSystem / createConditionalEffectSystem calls
         // via the ambient set below. Parallel to chainRegistry.
         const effectSystemRegistry = createEffectSystemRegistry();
         // Per-engine resource registry — auto-populated by createResource

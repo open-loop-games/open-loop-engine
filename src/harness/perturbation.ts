@@ -177,10 +177,10 @@ function applyModifierPerturbation(
           `effect def "${address.defId}" not found in system "${address.effectSystemId}"`,
         );
       }
-      if (address.bindingIndex >= effectDefBindings(def).length) {
-        throw new Error(`def "${address.defId}" has no binding at index ${address.bindingIndex}`);
+      if (address.grantIndex >= effectDefBindings(def).length) {
+        throw new Error(`def "${address.defId}" has no grant at index ${address.grantIndex}`);
       }
-      return overlayBinding(system, address.defId, address.bindingIndex, (m) =>
+      return overlayBinding(system, address.defId, address.grantIndex, (m) =>
         wrapModifier(m, perturbation),
       );
     }
