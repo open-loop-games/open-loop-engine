@@ -19,7 +19,7 @@ export const ROOT = join(__dirname, '..', '..');
 /**
  * Cross-file cluster overrides for files that don't (or can't) declare
  * `@cluster <name>` in their header TSDoc. Prefer adding the tag in source so
- * the cluster lives next to the code; this map exists as an escape hatch.
+ * the cluster is declared next to the code; this map exists as an escape hatch.
  */
 export const CLUSTER_OVERRIDES = {
   // (currently empty — every cross-file cluster declares @cluster in source)
@@ -35,13 +35,13 @@ export const CLUSTER_OVERRIDES = {
 export const CLUSTER_TITLES = {
   reactivity: {
     blurb:
-      "Vue's reactivity API surfaced through the engine — import these from `@open-loop/engine`, not from `vue`: a separately-resolved `vue` won't subscribe to engine refs and updates silently miss. Signatures and semantics are Vue's own; read them in Vue's docs.",
+      "Vue's reactivity API, re-exported by the engine. Import these from `@open-loop/engine`, not from `vue`. A separately resolved `vue` does not subscribe to engine refs, so updates are missed silently. Signatures and semantics are Vue's own; read them in Vue's docs.",
     compact: true,
   },
   'spatial-grid': {
     title: 'Grid',
     blurb:
-      'Bounded 2D grid with FOV adapter and a serialized form. Rectangular storage, configurable topology: the `neighborhood` offset set makes 4-connected, 8-connected, and hex-at-axial-offset the same container, and every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. Shared coordinate types (`GridCoord`, `GridOffset`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) sit here.',
+      'Bounded 2D grid with FOV updates and a serialized form. Rectangular storage, configurable neighborhood: the `neighborhood` offset set makes 4-connected, 8-connected and hex-at-axial-offset the same container. Every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. The shared coordinate types (`GridCoord`, `GridOffset`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) are here.',
   },
   graph: {
     title: 'Graph',
@@ -50,42 +50,42 @@ export const CLUSTER_TITLES = {
   },
   'spatial-scope-stack': {
     title: 'Scope stack',
-    blurb:
-      'Stack navigator over a recursive `Graph` — tracks which nested child graph is currently active.',
+    blurb: 'Stack navigator over a recursive `Graph` — tracks the graph scope it has entered.',
   },
   'spatial-influence-layer': {
     title: 'Influence layer',
     blurb:
-      'Utility-function layer over `SpatialGrid<number>` — the per-frame propagation/decay lifecycle that turns a numeric grid into an influence map.',
+      'An influence layer over `SpatialGrid<number>` — the propagation and decay steps that turn a numeric grid into per-cell influence.',
   },
   formulas: {
     title: 'Formulas',
-    blurb: 'Algebraic expression trees with evaluate / invert / integrate.',
+    blurb: 'Algebraic expression trees with evaluate / invert / antiderivative / cumulative.',
   },
   probe: {
     title: 'Probes',
     blurb:
-      'Seed-sweep runners. `runBeatProbe` collects per-beat termination-time distributions (with optional `tuningWindow` → `inTuningWindow` classification for design-time balance tuning); `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. Both dispatch on `RunMode` (`uniform` / `next-event` / `stasis-aware`) inherited from `runMatrixUntil`.',
+      'Seed-sweep runners. `runBeatProbe` collects termination-time distributions per beat, with an optional `tuningWindow` → `inTuningWindow` classification for balance at design time. `runWaypointProbe` returns consumer-shaped snapshots at scheduled waypoints. `runBeatProbe` dispatches on the run mode (`RunMode`: `uniform` / `next-event` / `stasis-aware`), as `runMatrixUntil` does. `runWaypointProbe` always runs `uniform`.',
   },
   picker: {
     title: 'Picker',
-    blurb: 'Walk engine state to enumerate addressable choices for solvers / UIs.',
+    blurb: 'Walk the engine to enumerate perturbable addresses for solvers and UIs.',
   },
   walker: {
     title: 'Transition walker',
-    blurb: 'Enumerate purchasables, producers, and challenges with their next-transition timing.',
+    blurb:
+      'Enumerate purchasables, producers and challenges, with the transition distance to each next transition.',
   },
   analyzers: {
     title: 'Analyzers',
-    blurb: 'Reusable in-run trackers (resource peaks, loop finalize, default pack).',
+    blurb: 'Reusable analyzers (resource peaks, run finalize, time series, the default pack).',
   },
   solve: {
     title: 'Solvers',
-    blurb: 'Tune a parameter to satisfy a predicate (bisection, etc.).',
+    blurb: 'Tune a value until a predicate holds (bisection, and others).',
   },
   purchasable: {
     prologue:
-      "Two consumer entry points: `createPurchasableCategory` batch-registers from content definitions and is the default; `createScalingPurchasable` is the per-instance escape hatch for leveled costs. `createPurchasable` is the raw factory both lower into. A cost that scales on the item's own level goes through the factory form of `requirements`, which receives the live level ref — a getter reading the level back out misprices bulk purchases. See consumer-guide.md §Choosing among purchasable primitives.",
+      "Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. `createPurchasable` is the raw factory both build on. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.",
   },
 };
 

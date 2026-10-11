@@ -1,33 +1,33 @@
 # Introspection
 
-The cross-cutting "walk every X" surface external tools read — devtools, mods, balance workbenches. `EngineCategories`, per-engine registries, `tunable()` plus the override/tuning registries, profiler and safeguards. All reachable through injection keys.
+The cross-cutting "walk every X" API surface that external tools read: devtools, mods, balance workbenches. `EngineCategories`, the per-engine registries, `tunable()` with the override and tuning registries, the profiler and safeguard diagnostics. All are reachable through injection keys.
 
 ## Canonical entrypoints
 
 - `EngineCategories` / `CategoriesKey` — discover auto-registered content categories.
-- `createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved balance knobs.
-- `ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — per-engine enumerable surfaces for tools, read through `engine.tryInject` or `ctx.inject`.
-- `enableProfiling` / `getProfileReport` — runtime timing instrumentation.
-- `enableDevMode` / `getSafeguardDiagnostics` — development safeguards and diagnostics.
+- `createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved tunables.
+- `ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — the chain, resource and effect-system registries for tools, read through `engine.tryInject` or `ctx.inject`.
+- `enableProfiling` / `getProfileReport` — profile engine calls.
+- `enableDevMode` / `getSafeguardDiagnostics` — dev-mode safeguards and safeguard diagnostics.
 
 ## Engine categories
 
-the typed cross-category accumulator the engine self-publishes for external introspection tools (sim pickers, devtools, balance workbenches, harness walkers)
+the typed cross-category collection the engine self-publishes for external introspection tools (the picker, devtools, balance workbenches, balance-harness walkers)
 
-- `const CategoriesKey: InjectionKey<EngineCategories>` — Discovery key for external introspection tools (sim, devtools). `src/systems/engine-categories.ts:96`
-- `interface EngineCategories` — Discovery map for external introspection tools (sim, devtools, balance workbenches). `src/systems/engine-categories.ts:62`
-- `function findCategoryEntrySignals(categories: EngineCategories, categoryId: string, defId: string): CategoryEntrySignals | undefined` — Resolve `(categoryId, defId)` to the entry's introspection signals across every typed slot in EngineCategories. `src/systems/engine-categories.ts:165`
+- `const CategoriesKey: InjectionKey<EngineCategories>` — Injection key for external introspection tools (the balance harness, devtools). `src/systems/engine-categories.ts:94`
+- `interface EngineCategories` — Discovery map for external introspection tools (the balance harness, devtools, balance workbenches). `src/systems/engine-categories.ts:60`
+- `function findCategoryEntrySignals(categories: EngineCategories, categoryId: string, defId: string): CategoryEntrySignals | undefined` — Resolve `(categoryId, defId)` to the category entry's signals across every typed field in EngineCategories. `src/systems/engine-categories.ts:162`
 
 ## Override Registry
 
-generic typed registry with scoped push/pop, plus the typed `TuningRegistry` narrow that opts a registry into the picker's tuning-surface enumeration
+generic typed registry with scoped overrides, plus the typed `TuningRegistry` narrow that opts a registry into the picker's tunable enumeration
 
-- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(id: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:173`
-- `function createTuningRegistry(id: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tuning-surface enumeration. `src/core/override-registry.ts:274`
-- `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:81`
-- `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Bind a default implementation to `key` on `registry` and return a reactive `ComputedRef` that re-evaluates when the scope stack changes or the key is overridden. `src/core/override-registry.ts:402`
-- `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:158`
-- `type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>` — Typed narrow over OverrideRegistry for "values intentionally declared as tuning surface." Every key resolves to a zero-arg reader returning a `DecimalSource`. `src/core/override-registry.ts:145`
+- `function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>(id: string): OverrideRegistry<T>` — Create a new override registry. `src/core/override-registry.ts:170`
+- `function createTuningRegistry(id: string): TuningRegistry` — Create a tuning registry — typed narrow over OverrideRegistry for `Record<string, () => DecimalSource>`-shaped registries that opt into the picker's tunable enumeration. `src/core/override-registry.ts:270`
+- `interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown; }>` — A typed, scoped override registry for named functions. `src/core/override-registry.ts:79`
+- `function tunable<T extends { [P in keyof T]: (...args: never[]) => unknown; }, K extends NullaryKeys<T>, F extends T[K] & (() => unknown)>(registry: OverrideRegistry<T>, key: K, defaultFn: F): ComputedRef<Widen<ReturnType<F>>>` — Register a registry default for `key` on `registry` and return a reactive `ComputedRef`. `src/core/override-registry.ts:398`
+- `const TuningRegistriesKey: InjectionKey<Set<TuningRegistry>>` — Per-engine collection of tuning registries — the picker's `walkTunables` reads this. `src/core/override-registry.ts:155`
+- `type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>` — Typed narrow over OverrideRegistry for values declared on purpose as tunables. `src/core/override-registry.ts:142`
 
 ## Profiler
 
@@ -44,7 +44,7 @@ generic typed registry with scoped push/pop, plus the typed `TuningRegistry` nar
 
 ## Engine-internal registries
 
-three per-engine enumerable collections that external introspection tools (balance workbenches, sim pickers, devtools) read to walk "every X this engine knows about":
+three per-engine enumerable collections that external introspection tools (balance workbenches, the picker, devtools) read to walk "every X this engine knows about":
 
 - `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:53`
 - `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:61`
@@ -58,11 +58,11 @@ three per-engine enumerable collections that external introspection tools (balan
 
 ## Engine safeguards
 
-iteration caps, depth limits, and dev diagnostics
+iteration caps, depth limits, and safeguard diagnostics
 
-- `function disableDevMode(): void` — Disable dev-mode diagnostics. `src/core/safeguards.ts:23`
-- `function enableDevMode(): void` — Enable dev-mode diagnostics: a console warning on every safeguard trip. `src/core/safeguards.ts:18`
-- `function getSafeguardDiagnostics(): Readonly<SafeguardDiagnostics>` — Read-only snapshot of safeguard diagnostics counters. `src/core/safeguards.ts:57`
+- `function disableDevMode(): void` — Disable dev mode. `src/core/safeguards.ts:23`
+- `function enableDevMode(): void` — Enable dev mode: a console warning each time a safeguard cap is hit. `src/core/safeguards.ts:18`
+- `function getSafeguardDiagnostics(): Readonly<SafeguardDiagnostics>` — Read-only snapshot of the safeguard diagnostics. `src/core/safeguards.ts:57`
 - `function isDevMode(): boolean` — Check whether dev mode is active. `src/core/safeguards.ts:28`
-- `function resetSafeguardDiagnostics(): void` — Reset all diagnostics counters to zero. `src/core/safeguards.ts:62`
-- `interface SafeguardDiagnostics` — Diagnostic counters captured by the runtime safeguards — how often the emit-depth cap and sequencer advance cap have tripped, plus the last offender of each. `src/core/safeguards.ts:38`
+- `function resetSafeguardDiagnostics(): void` — Reset every safeguard diagnostic to zero. `src/core/safeguards.ts:62`
+- `interface SafeguardDiagnostics` — Safeguard diagnostics — how often the emit-depth cap and the sequencer advance cap were hit, plus the last offender of each. `src/core/safeguards.ts:38`

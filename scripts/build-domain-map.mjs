@@ -11,16 +11,16 @@
  * = one game = one committed map. Scope globs resolve relative to the config
  * file's own directory, so a config travels with the code it describes.
  *
- * The mechanism lives in the engine because the engine is published + link:-
- * shared — a tool here propagates to every consumer on bump, whereas one housed
- * in copy-and-deleted starter would fork-drift. The OUTPUT still regenerates
- * from each consumer's own structure, so the map itself can never drift.
+ * The mechanism is in the engine because every consumer installs the engine.
+ * A tool here reaches every consumer on its next engine update, where a copy in
+ * each consumer would drift. The OUTPUT still regenerates from each consumer's
+ * own structure, so the map itself can never drift.
  *
  * @typedef {object} DomainMapConfig
  * @property {string[]} scope       Globs (relative to the config dir) selecting
  *   ONLY this game's domain files. Hard boundary — see domain-extract.mjs.
- * @property {string[]} [defSuffixes]  Definition-type suffixes. Default `['Def']`.
- *   The dialect knob that varies most across games (`Def` / `Spec` / `Entry`).
+ * @property {string[]} [defSuffixes]  Def-type suffixes. Default `['Def']`.
+ *   The dialect setting that varies most across games (`Def` / `Spec` / `Entry`).
  * @property {string[]} [viewSuffixes] Read-view interface suffixes excluded from
  *   the def inventory. Default `['State', 'GameState']`.
  * @property {string[]} [nouns]     Explicit domain vertices. Omit to auto-seed
@@ -28,7 +28,7 @@
  * @property {string[]} [stopwords] Field names (lowercased) to skip in the edge
  *   miner — the escape hatch for residual false positives.
  * @property {Array<{term:string,note:string}>} [curated] The hand-authored
- *   disambiguator block: module-level concepts no single type owns.
+ *   disambiguator block: game-level concepts no single type owns.
  * @property {string} [title]       Map heading.
  * @property {string} [description] One-line blurb under the heading.
  * @property {string} [output]      Map path relative to the config dir. Default

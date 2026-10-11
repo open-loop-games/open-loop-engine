@@ -96,7 +96,7 @@ function time(
 // --------------------------------------------------------------------
 
 function benchAddTight(iters: number) {
-  console.log('\n### Scenario 1: tight add loop (shape-labeled, OL-690)');
+  console.log('\n### Scenario 1: tight add loop (shape-labeled)');
 
   const a0 = 1;
   const b0 = 3;
@@ -198,7 +198,7 @@ function benchAddTight(iters: number) {
 // --------------------------------------------------------------------
 
 function benchModifierChain(iters: number) {
-  console.log('\n### Scenario 5: 5-step additive ModifierChain (OL-690 sentinel)');
+  console.log('\n### Scenario 5: 5-step additive ModifierChain (regression sentinel)');
 
   const chain = createSequentialModifier([
     createAdditiveModifier({ addend: 1 }),
@@ -343,7 +343,7 @@ function benchAllocation(iters: number) {
 
 async function main() {
   const iters = Number(process.argv[2] ?? 5_000_000);
-  console.log(`OL-686 framing (5) microbench`);
+  console.log(`Numeric backend framing (5) microbench`);
   console.log(`Iterations per case: ${iters.toLocaleString()}`);
   console.log(`Node: ${process.argv[0]}`);
 

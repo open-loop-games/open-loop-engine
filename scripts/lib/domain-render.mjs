@@ -1,13 +1,13 @@
 /**
  * Domain-map renderer — turns an extractor result into the committed markdown
- * map. Mirrors build-api-docs.mjs's hybrid: an always-fresh GENERATED surface
- * (vocabulary, definitions, relationships, thin spots) followed by a small
- * CURATED disambiguator block lifted verbatim from the per-game config.
+ * map. Mirrors build-api-docs.mjs's hybrid: always-fresh GENERATED sections
+ * (vocabulary, defs, relationships, thin spots) followed by a small
+ * CURATED disambiguator block copied verbatim from the per-game config.
  *
- * Anti-drift rests on three properties, not on generation alone: the curated
- * block is small, it lives co-located in the versioned config (not a sidecar
- * doc), and it renders adjacent to the generated surface so staleness is
- * visible on every regenerate. These are exactly what a hand-maintained
+ * Anti-drift depends on three properties, not on generation alone: the curated
+ * block is small, it is stored in the versioned config (not a sidecar doc), and
+ * it renders next to the generated sections, so staleness is visible on every
+ * regenerate. These are exactly what a hand-maintained
  * glossary lacks.
  */
 
@@ -69,20 +69,18 @@ export function renderDomainMap(result, config) {
   }
   lines.push('');
 
-  // --- DEFINITIONS ---
-  lines.push('## Definitions', '');
-  lines.push(
-    defs.length ? defs.map((d) => `\`${d}\``).join(', ') : '_(no definition types in scope)_',
-  );
+  // --- DEFS ---
+  lines.push('## Defs', '');
+  lines.push(defs.length ? defs.map((d) => `\`${d}\``).join(', ') : '_(no def types in scope)_');
   lines.push('');
 
   // --- RELATIONSHIPS ---
   lines.push('## Relationships', '');
   if (edges.length) {
     lines.push(
-      'Field-name reference edges — untyped IDs in named fields that point at',
-      'another domain noun. (These are name-encoded, not type-encoded, so',
-      'type-graph tools like dependency-cruiser/findReferences miss them.)',
+      'Field-name reference edges: untyped ids in named fields that point at',
+      'another domain noun. These are name-encoded, not type-encoded, so',
+      'type-graph tools such as dependency-cruiser and findReferences miss them.',
       '',
     );
     for (const [owner, group] of groupEdges(edges)) {
@@ -98,7 +96,7 @@ export function renderDomainMap(result, config) {
   if (thinSpots.length) {
     lines.push('## Thin spots', '');
     lines.push(
-      'Definitions with no structural signal (no vocabulary, no incident edge).',
+      'Defs with no structural signal (no vocabulary, no incident edge).',
       'These are candidates for a curated note below — or for richer typing.',
       '',
       thinSpots.map((d) => `\`${d}\``).join(', '),
@@ -106,14 +104,14 @@ export function renderDomainMap(result, config) {
     );
   }
 
-  // --- CURATED DISAMBIGUATORS (adjacent to the generated surface) ---
+  // --- CURATED DISAMBIGUATORS (next to the generated sections) ---
   lines.push('## Disambiguators (curated)', '');
   const curated = config.curated ?? [];
   if (curated.length) {
     lines.push(
-      'Hand-authored. The module-level concepts no single type owns — the',
-      'relationships structure cannot derive. Kept small and co-located in the',
-      'config so staleness stays visible against the generated surface above.',
+      'Hand-authored: the game-level concepts no single type owns, which',
+      'structure cannot derive. Kept small and stored in the config, so',
+      'staleness stays visible against the generated sections above.',
       '',
     );
     for (const c of curated) {
@@ -121,7 +119,7 @@ export function renderDomainMap(result, config) {
     }
   } else {
     lines.push(
-      '_(none yet — add `curated` entries to the config as cross-symbol concepts surface)_',
+      '_(none yet — add `curated` entries to the config as cross-symbol concepts appear)_',
     );
   }
   lines.push('');

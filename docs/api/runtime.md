@@ -1,6 +1,6 @@
 # Runtime
 
-How an engine assembles and ticks. `createEngine` and the module/event/save wiring, TickDriver (variable-dt and fixed-step), typed event emitter, throttle, play-clock, transition-distance math, the ambient accessor context.
+How an engine instance is assembled and ticks: `createEngine` and its module, event and save wiring. Also TickDriver (variable and fixed tick modes), the typed event emitter, throttle, play time, transition-distance math and the ambient accessor.
 
 ## Canonical entrypoints
 
@@ -9,27 +9,27 @@ How an engine assembles and ticks. `createEngine` and the module/event/save wiri
 - `createTickDriver` — standalone tick scheduler when not using the full engine facade.
 - `createEmitHandle` — typed per-instance events for systems and categories.
 - `timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
-- `ref` / `computed` / `watch` / `effect` (re-exported from Vue) — reactivity API; import via the engine, not directly from `vue`, so subscriptions share the engine's `activeEffect` scope.
+- `ref` / `computed` / `watch` / `effect` — Vue's reactivity API, re-exported. Import it from the engine, not from `vue`, so subscriptions share the engine's `activeEffect`.
 
 ## Engine assembly
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineOptions_, and the built-in injection keys
 
-- `function createEngine(options: EngineOptions): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:433`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:320`
-- `interface EngineContext` — Per-module collaboration surface, handed to each EngineModule's `install` and `connect` callbacks. `src/engine.ts:122`
-- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:100`
-- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:186`
-- `interface EngineOptions` — Configuration passed to createEngine. `src/engine.ts:230`
-- `type LoadHandler = (result: SaveLoadResult) => void` — Callback invoked after a save loads successfully through any entry point: `engine.load()`, the save manager's `load` / `importSave`, or a harness engine hydrated from a save. `src/engine.ts:78`
-- `interface ModDef` — A selectable game mod — metadata plus the module to install when active. `src/engine.ts:208`
-- `type SaveHandler = () => void` — Callback invoked before live state is serialized — by `engine.save()`, the autosave, and the save manager's `save` / `saveToSlot` / `exportSave` — so it can flush derived state into persistent refs. `src/engine.ts:66`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:109`
-- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:106`
+- `function createEngine(options: EngineOptions): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:436`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:323`
+- `interface EngineContext` — The engine context: the object each EngineModule's `install` and `connect` receive. `src/engine.ts:123`
+- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:101`
+- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:187`
+- `interface EngineOptions` `src/engine.ts:230`
+- `type LoadHandler = (result: SaveLoadResult) => void` — A handler called after a save loads successfully, by any entry point. `src/engine.ts:79`
+- `interface ModDef` — A mod: a whole-game ruleset the player selects when a new game starts, with its metadata and its modules. `src/engine.ts:209`
+- `type SaveHandler = () => void` — A handler called before live state is serialized, so it can write derived state into persistent refs. `src/engine.ts:67`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:110`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:107`
 
 ## Reactivity re-exports
 
-Vue's reactivity API surfaced through the engine — import these from `@open-loop/engine`, not from `vue`: a separately-resolved `vue` won't subscribe to engine refs and updates silently miss. Signatures and semantics are Vue's own; read them in Vue's docs.
+Vue's reactivity API, re-exported by the engine. Import these from `@open-loop/engine`, not from `vue`. A separately resolved `vue` does not subscribe to engine refs, so updates are missed silently. Signatures and semantics are Vue's own; read them in Vue's docs.
 
 `computed` · `ComputedRef` · `effect` · `effectScope` · `EffectScope` · `isRef` · `onScopeDispose` · `reactive` · `ref` · `Ref` · `shallowRef` · `ShallowRef` · `triggerRef` · `unref` · `watch` · `watchEffect` · `WatchStopHandle` · `WritableComputedRef`
 
@@ -37,34 +37,34 @@ Vue's reactivity API surfaced through the engine — import these from `@open-lo
 
 Typed per-instance event emitter primitive
 
-- `function createEmitHandle<E>(options?: EmitHandleOptions): EmitHandle<E>` — Create a typed event handle for use inside a factory closure. `src/core/events.ts:57`
+- `function createEmitHandle<E>(options?: EmitHandleOptions): EmitHandle<E>` — Create a typed event handle for use inside a factory closure. `src/core/events.ts:60`
 - `interface EmitHandle<E>` — Internal event interface held inside factory closures — subscribe and emit. `src/core/events.ts:25`
-- `interface EmitHandleOptions` `src/core/events.ts:36`
+- `interface EmitHandleOptions` `src/core/events.ts:39`
 - `interface Emittable<E>` — Public event interface exposed on system instances — subscribe only, emit is internal. `src/core/events.ts:19`
 
 ## TickDriver
 
-worker-timer scheduled tick dispatcher with EWMA lag compensation. Two dt modes: variable (default, genre-standard) and fixed-step accumulator (opt-in, for source-faithful ports with clamp-on-overshoot tick math)
+the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: variable (the default and the genre standard) and a fixed-dt accumulator (opt-in, for faithful ports of tick math that clamps on overshoot)
 
-- `function createTickDriver(options?: TickDriverOptions): TickDriver` — Creates a TickDriver with EWMA lag compensation, speed control, named phase hooks, and a choice of variable-dt (default) or fixed-step accumulator mode. `src/core/tick-driver.ts:249`
-- `interface PhaseHandlers` — Lifecycle hooks for a named game phase, registered via `tickDriver.registerPhase()`. `src/core/tick-driver.ts:130`
-- `interface TickDriver` — The TickDriver instance returned by createTickDriver. `src/core/tick-driver.ts:149`
-- `interface TickDriverOptions` — Configuration accepted by createTickDriver. `src/core/tick-driver.ts:63`
-- `type TickHandler = (dt: number) => void` — Tick-handler signature for `tickDriver.onTick`: dt in seconds — the real (speed-scaled, capped) elapsed time in variable mode, always `fixedDt` in fixed mode. `src/core/tick-driver.ts:141`
-- `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:53`
+- `function createTickDriver(options?: TickDriverOptions): TickDriver` — Creates the game loop: a TickDriver with EWMA lag compensation, game speed, tick phases, and a variable-dt (default) or fixed-dt tick mode. `src/core/tick-driver.ts:254`
+- `interface PhaseHandlers` — Handlers for a tick phase, registered with `tickDriver.registerPhase()`. `src/core/tick-driver.ts:134`
+- `interface TickDriver` — The TickDriver returned by createTickDriver. `src/core/tick-driver.ts:153`
+- `interface TickDriverOptions` `src/core/tick-driver.ts:65`
+- `type TickHandler = (dt: number) => void` — A tick handler for `tickDriver.onTick`. `src/core/tick-driver.ts:145`
+- `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:55`
 
-## Ambient game-state-accessor context
+## Ambient game-state accessor
 
-one of the cross-cutting ambient scopes `createEngine` sets around `install()` / `connect()`, alongside the chain, effect-system, resource and tuning registries, the engine categories, and the persistence namespace
+one of the cross-cutting ambient values `createEngine` sets around `install()` / `connect()`. The others are the chain, effect-system, resource and tuning registries, the engine categories, and the persistence namespace
 
-- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:29`
+- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:27`
 
 ## Throttle
 
-lightweight tick-callback rate limiter
+lightweight rate limiter for tick handlers
 
-- `function createThrottle(options: ThrottleOptions): Throttle` — Create a throttle gate for rate-limiting tick callbacks. `src/core/throttle.ts:66`
-- `interface Throttle` — A gate that rate-limits execution within a tick callback. `src/core/throttle.ts:35`
+- `function createThrottle(options: ThrottleOptions): Throttle` — Create a throttle that rate-limits work inside a tick handler. `src/core/throttle.ts:66`
+- `interface Throttle` — A rate limiter for work inside a tick handler. `src/core/throttle.ts:35`
 - `interface ThrottleOptions` `src/core/throttle.ts:24`
 
 ## Time tracking
@@ -73,14 +73,14 @@ persistent elapsed and total play time
 
 - `function createTimeSystem(options?: TimeSystemOptions): TimeSystem` — Creates a time tracking system with persistent elapsed/total play time and a formatted display. `src/systems/time.ts:69`
 - `interface TimeSystem` — Time tracking system with persistent elapsed and total play time. `src/systems/time.ts:35`
-- `interface TimeSystemOptions` — Configuration for createTimeSystem. `src/systems/time.ts:26`
+- `interface TimeSystemOptions` `src/systems/time.ts:26`
 
 ## Transition-distance primitives
 
-"when does X happen?" math over current engine state
+"when does X happen?" math over current game state
 
 - `interface AffordableLike` — Minimal shape satisfied by Purchasable. `src/core/transitions.ts:80`
-- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until the next level of a purchasable becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:124`
+- `function timeUntilAffordable(purchasable: AffordableLike, accessor: GameStateAccessor): TransitionDistance` — Distance until a purchasable's next purchase becomes affordable — delegates to timeUntilResource using `purchasable.resource` and `purchasable.getCost(1)`. `src/core/transitions.ts:124`
 - `function timeUntilResource(resourceId: string, target: DecimalSource, accessor: GameStateAccessor): TransitionDistance` — Distance until `resource` reaches `target`, in seconds, assuming current rate holds. `src/core/transitions.ts:101`
-- `interface TransitionDeps` — Accessor slots a transition's distance arithmetic reads. `src/core/transitions.ts:59`
+- `interface TransitionDeps` — The ids and paths a transition's distance arithmetic reads through the accessor. `src/core/transitions.ts:59`
 - `type TransitionDistance` — Distance until a state transition occurs, with a reason when the distance is uncomputable. `src/core/transitions.ts:41`

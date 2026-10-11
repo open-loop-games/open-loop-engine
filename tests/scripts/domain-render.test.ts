@@ -41,7 +41,7 @@ describe('renderDomainMap', () => {
   it('renders all generated sections in order, then the curated block', () => {
     const order = [
       '## Vocabulary',
-      '## Definitions',
+      '## Defs',
       '## Relationships',
       '## Thin spots',
       '## Disambiguators (curated)',

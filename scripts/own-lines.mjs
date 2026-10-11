@@ -2,16 +2,16 @@
  * Own-lines density scan — find function bodies that are dense rather than long.
  *
  * Length alone is blind on this tree: the longest functions are `create*`
- * factories, whose bodies are namespaces of nested helpers (the shape
- * `.claude/CLAUDE.md` § Systems-layer factory decomposition mandates). Two
+ * factories, whose bodies mostly hold nested helpers (the shape
+ * `AGENTS.md` § Systems-layer factory decomposition requires). Two
  * columns separate the two shapes:
  *
  * - **own** — body lines minus the lines of the functions nested directly
  *   inside it. A factory's own-lines count is small however long the factory is.
- * - **ratio** — own / total. At or below ~0.30 the body is a namespace and not a
- *   finding; at or above ~0.70 it is genuinely dense code.
+ * - **ratio** — own / total. At or below ~0.30 the body is mostly nested helpers
+ *   and not a finding; at or above ~0.70 it is genuinely dense code.
  *
- * Anonymous callbacks are included, which is the point — they are invisible to
+ * Anonymous functions are included, which is the point — they are invisible to
  * every named-function metric and to review-by-name alike.
  *
  * Usage: `node scripts/own-lines.mjs [minRatio] [limit]` (defaults 0.7, 25).
@@ -19,7 +19,7 @@
  *
  * Cyclomatic complexity is deliberately not joined in here. It was measured
  * once over this tree and came back near-flat, so it discriminated nothing that
- * own-lines did not already surface; reintroduce it only if that stops holding.
+ * own-lines did not already find; reintroduce it only if that stops holding.
  */
 
 import { Project, SyntaxKind } from 'ts-morph';

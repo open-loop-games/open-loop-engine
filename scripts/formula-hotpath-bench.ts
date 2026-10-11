@@ -1,18 +1,18 @@
 #!/usr/bin/env npx tsx --tsconfig tsconfig.scripts.json
 /**
  * Formula hot-path bench. Measures Formula.evaluate() and ModifierChain.apply()
- * overhead at borglike's hot-path call volumes, against inline native math
- * and direct Decimal-chain baselines. Run before borglike starts migrating
- * formula-shaped sites so any engine gap surfaces as its own ticket rather
- * than inside the port.
+ * overhead at a roguelike consumer's hot-path call volumes, against inline
+ * native math and direct Decimal-chain baselines. Run it before a consumer
+ * migrates formula-shaped sites, so any engine gap is found as its own ticket
+ * rather than inside the port.
  *
- * Scenarios cover borglike's hot-path inventory:
+ * Scenarios cover a roguelike consumer's hot-path inventory:
  *   - linear monster HP: baseHp * (1 + depth * 0.15), per-monster-per-tick
  *   - polynomial spell damage: baseDmg * spellLevel ^ 1.2, per-cast
  *   - exponential XP curve: xpPerLevel * 1.1 ^ level, on XP change
- *   - modifier-chain accumulation: 5 stacked buffs on a base value, per-query
+ *   - modifier-chain accumulation: 5 stacked modifiers on a base value, per-query
  *
- * Call volume target: 10k+/s per F3 (60 fps × 100 monsters × 2 formulas).
+ * Call volume target: 10k+/s (60 fps × 100 monsters × 2 formulas).
  * 100k iters/case gives stable ns/op; extend if noise dominates.
  *
  * Usage:
@@ -51,8 +51,8 @@ function time<T>(label: string, fn: (i: number) => T, iters: number): T {
 // ---------------------------------------------------------------------------
 // Scenario A: Linear monster HP scaling
 // baseHp * (1 + depth * 0.15)
-// Borglike reference: monster stat scaling per depth (data/monsters.ts). Per
-// monster, evaluated every tick for UI/AI.
+// Reference: monster stat scaling per depth. Per monster, evaluated every
+// tick for UI/AI.
 // ---------------------------------------------------------------------------
 function scenarioLinear(): void {
   console.log('\n### Scenario A — linear monster HP: baseHp * (1 + depth * 0.15)');
@@ -143,11 +143,11 @@ function scenarioExponential(): void {
 // ---------------------------------------------------------------------------
 // Scenario D: Modifier-chain accumulation
 // 5 stacked modifiers on a base value, chain.apply(base) per query.
-// Borglike reference: class tier thresholds with equipment/buff modifiers
-// stacked, evaluated during AI tier-selection per monster per tick.
+// Reference: a game's class-tier thresholds with equipment and status
+// modifiers stacked, evaluated during AI class-tier selection per monster per tick.
 // ---------------------------------------------------------------------------
 function scenarioModifierChain(): void {
-  console.log('\n### Scenario D — modifier chain apply: 5 stacked buffs on base value');
+  console.log('\n### Scenario D — modifier chain apply: 5 stacked modifiers on base value');
   console.log('### Shape: +add, +add, ×mul, ×mul, ^exp. Representative per-query.');
   const iters = 100_000;
   const base = 100;
@@ -207,7 +207,7 @@ function scenarioFormulaConstruction(): void {
 }
 
 /**
- * Scenario F — the "buy max" threshold guard.
+ * Scenario F — the "purchase max" threshold guard.
  *
  * `calculateMaxAffordable` caches an affordability band so a tick that only
  * moves the resource answers without re-solving the curve. The guard is keyed
@@ -217,11 +217,11 @@ function scenarioFormulaConstruction(): void {
  * Two things to keep in mind when reading or extending this. The function
  * returns a `computed`, so a reactive dep has to be dirtied every iteration or
  * the timing is of Vue's cache rather than the guard. And the guard-miss case
- * has to move the *level*, not the resource, or it stays a hit.
+ * has to move the *purchase count*, not the resource, or it stays a hit.
  */
 function scenarioMaxAffordableGuard(): void {
   console.log('\n### Scenario F — calculateMaxAffordable threshold guard');
-  console.log('### Shape: exponential cost 10 x 1.15^level, "buy max" over a growing wallet');
+  console.log('### Shape: exponential cost 10 x 1.15^count, "purchase max" over a growing amount');
   const iters = 100_000;
 
   const hitLevel = ref<DecimalSource>(0);
@@ -233,7 +233,7 @@ function scenarioMaxAffordableGuard(): void {
   time(
     'guard hit (resource nudged inside the band)',
     (i) => {
-      // Tiny relative moves keep the wallet inside the cached band while still
+      // Tiny relative moves keep the amount inside the cached band while still
       // dirtying the computed, which is exactly the production tick the guard exists for.
       hitWallet.value = Decimal.add(1e6, (i % 100) * 1e-6);
       return hitAffordable.value;
@@ -247,7 +247,7 @@ function scenarioMaxAffordableGuard(): void {
   const missAffordable = calculateMaxAffordable(missCost, missResource, true, 1e9);
   void missAffordable.value; // prime the guard before timing
   time(
-    'guard miss — level moved (full recomputation)',
+    'guard miss — count moved (full recomputation)',
     (i) => {
       missLevel.value = i % 50;
       return missAffordable.value;
@@ -264,7 +264,7 @@ function scenarioMaxAffordableGuard(): void {
   time('baseline: formula.evaluate() (the guard key)', () => baseCost.evaluate(), iters);
 }
 
-console.log('OL-525 F3 pre-bench — Formula.evaluate() vs inline vs Decimal chain');
+console.log('Formula hot-path bench — Formula.evaluate() vs inline vs Decimal chain');
 console.log(`Node: ${process.argv[0]}`);
 console.log('All timings after 10k-iter warmup; results are ns/op.');
 

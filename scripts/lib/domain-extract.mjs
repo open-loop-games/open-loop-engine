@@ -3,10 +3,10 @@
  * a field-name reference graph for a single consumer game's domain.
  *
  * Consumers lack the engine's tsdoc discipline, so the source of truth is CODE
- * STRUCTURE, not prose: TS enums and string-literal/discriminated unions carry
- * the vocabulary (enum/union membership = is-a), `*Def`-style interfaces carry
- * the def inventory, and untyped IDs in named fields (`requiredExplorations:
- * number[]`) carry the domain edges — which type-graph tools (knip,
+ * STRUCTURE, not prose: TS enums and string-literal/discriminated unions hold
+ * the vocabulary (enum/union membership = is-a), `*Def`-style interfaces hold
+ * the def inventory, and untyped ids in named fields (`requiredExplorations:
+ * number[]`) hold the domain edges — which type-graph tools (knip,
  * dependency-cruiser, findReferences) miss because the relationships are
  * name-encoded, not type-encoded.
  *
@@ -29,7 +29,7 @@ import { createRequire } from 'node:module';
 /**
  * ts-morph is an optional peer dependency — declared in package.json
  * `peerDependenciesMeta` as optional so the engine install stays lean.
- * Loaded lazily so importing this module never fails; only running the
+ * Loaded lazily so importing this file never fails; only running the
  * extractor without ts-morph installed does, with an actionable message.
  */
 function loadProject() {
@@ -46,7 +46,7 @@ function loadProject() {
 
 // === CONSTANTS ===
 
-/** Discriminator field names probed on union members for is-a arms. */
+/** Discriminant field names probed on union members for is-a arms. */
 const DISCRIMINATORS = ['type', 'kind', 'tier'];
 
 /** Trailing field-name tokens that mark a reference, not a domain noun. */
@@ -142,7 +142,7 @@ export function extractDomain(config, opts = {}) {
   const files = added;
 
   // Exported declarations only (invariant 2). Owners = interfaces + type-aliases;
-  // enums + unions additionally carry vocabulary.
+  // enums + unions also hold vocabulary.
   const interfaces = [];
   const typeAliases = [];
   const enums = [];

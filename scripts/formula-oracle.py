@@ -11,7 +11,7 @@ diff. Regenerate when a sample point or op is added:
     pip install mpmath        # dev-only; not a package dependency
     python3 scripts/formula-oracle.py
 
-What the oracle buys that a round-trip cannot: a round-trip passes whenever
+What the oracle gives that a round-trip cannot: a round-trip passes whenever
 forward and inverse are *consistently* wrong, and it cannot distinguish an
 implementation defect from the conditioning of the function. Comparing the
 forward value against an independent high-precision reference separates those.
@@ -154,7 +154,7 @@ SERIES = [
 
 
 def fmt(value) -> str:
-    """Render at full working precision, so the JSON carries every digit."""
+    """Render at full working precision, so the JSON contains every digit."""
     return mp.nstr(value, DPS, strip_zeros=False)
 
 

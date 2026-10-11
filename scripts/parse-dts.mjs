@@ -5,7 +5,7 @@
  * Walks just the root entrypoint via the TypeScript compiler API; TS resolves
  * the re-export tree (`export * from './primitives'` etc.) automatically, so
  * cross-layer dedup happens naturally — every symbol resolves to one
- * declaration site, which pins it to its source layer.
+ * declaration site, which fixes its source layer.
  *
  * Each public symbol becomes one record:
  *   {
@@ -57,7 +57,7 @@ const KIND_FROM_NODE = new Map([
  * Resolve an exported symbol to two declarations:
  *   - `terminal`: the actual declaration (provides kind, JSDoc, signature).
  *     For external re-exports (e.g. `Notation` from `eternal_notations`) this
- *     lives in `node_modules/` and gives us the right kind/shape.
+ *     is in `node_modules/` and gives us the right kind/shape.
  *   - `anchor`: the in-project source file we point readers at — the terminal
  *     when in-project, otherwise the last engine-side ExportSpecifier in the
  *     alias chain (typically the re-exporting file like `primitives/notations`).
@@ -121,10 +121,10 @@ function kindFromDeclaration(decl) {
 /**
  * Extract the first sentence of the symbol's TSDoc, stripped of `{@link}`
  * syntax and trailing markdown links. Looks at JSDoc on the declaration;
- * overload declarations each carry (or lack) their own comment.
+ * overload declarations each have (or lack) their own comment.
  *
  * Returns the empty string when the symbol has no TSDoc summary — the docs
- * generator (OL-929) treats that as a coverage gap.
+ * generator treats that as a coverage gap.
  */
 function extractTsdocSummary(declaration) {
   const jsDoc = ts.getJSDocCommentsAndTags(declaration).find((d) => ts.isJSDoc(d));
@@ -191,7 +191,7 @@ function extractSignature(declaration) {
 
   // For interfaces/classes, `getText()` includes the body — fine for short
   // bodies but for richly-documented members (OverrideRegistry) the signature
-  // balloons to hundreds of chars and breaks the tier file's scan pattern.
+  // grows to hundreds of chars and breaks the API tier file's scan pattern.
   // Truncate at the body's opening brace so the signature is just the header.
   if (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) {
     const openBrace = node.getChildren().find((c) => c.kind === ts.SyntaxKind.OpenBraceToken);
@@ -225,10 +225,10 @@ function distToSrc(distPath) {
 }
 
 /**
- * Layer derivation from a repo-relative src path. `src/index.ts` is the engine
- * façade and gets its own layer id so the tier manifest can route those symbols
- * (`createEngine`, `Engine`, `EngineContext`, etc.) without colliding with the
- * four real layers.
+ * Source layer derivation from a repo-relative src path. `src/index.ts` gets the
+ * layer id `engine`; any other file directly under `src/`, such as the façade
+ * `engine.ts` (`createEngine`, `Engine`, `EngineContext`), gets its file name.
+ * Neither collides with the four source layers.
  */
 function layerFromSrcPath(srcPath) {
   const m = srcPath.match(/^src\/([^/]+)(?:\/|$)/);
@@ -306,7 +306,7 @@ export function parseEntrypoint(rootDts, opts = {}) {
     const cluster = clusterFor(srcPath, header);
 
     // Overloaded functions emit one record per overload declaration, so every
-    // shape is visible in the tier files. Only in-project same-file
+    // shape is visible in the API tier files. Only in-project same-file
     // FunctionDeclaration sets qualify — external re-exports (Vue's `ref`,
     // `watch`, …) and mixed declaration lists collapse to the terminal as
     // before; their overload detail belongs to the upstream package.
@@ -370,7 +370,7 @@ if (isCLI) {
     if (r.tag === 'internal') internalCount++;
     else publicCount++;
     if (r.line == null) missingLine++;
-    // Overload continuations may lean on the first declaration's doc — only
+    // Overload continuations may use the first declaration's doc — only
     // the set's lead record counts toward summary coverage.
     if (!r.tsdocSummary && !(r.overloadIndex > 0)) missingSummary++;
   }
