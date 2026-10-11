@@ -131,7 +131,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | SV4 | **load** | apply a save to live state, by any entry point | hydrate, for the load |
 | SV5 | **serialize**, **serialized form** | encode as plain data; an object's plain-data form, typed `Serialized<Name>`, which `serialize()` produces and `restore(x)` writes back | snapshot, for this sense; export state, import state |
 | SV6 | **snapshot** | a copy taken at one moment: a non-reactive read, a captured copy, a balance-harness view | snapshot, for a serialized form |
-| SV7 | **hydration**, **hydrate** | the rebuild of runtime state from persistent refs, once a load's or a reset's writes settle | reconcile, rehydrate, load reconstruction, resync |
+| SV7 | **hydration**, **hydrate** | the rebuild of live state from persistent refs, once a load's or a reset's writes settle | reconcile, rehydrate, load reconstruction, resync |
 | SV8 | **revive** | decode one save leaf against its ref's default | rehydrate, for a leaf |
 | SV9 | **settle**, **settle guard** | the end of a load's or a reset's writes; the hold that keeps those writes out of lifetime refs such as `cumulative` and `best` | load guard |
 | SV10 | **save migration**, **API migration** | a step from save version N to N+1; the consumer code change a breaking release needs | bare "migration" |
@@ -177,7 +177,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | RX2 | **slot** | a save slot, or a position in a modifier chain | slot, for a loadout or an auto-purchase turn |
 | RX3 | **mod** | a whole-game ruleset (`ModDef`) | mod, for an add-on; game variant |
 | RX4 | **wrap** | a modifier wrapped around a chain entry (`BindingSlots.wrap`) | overlay, wrapped form |
-| RX5 | **patch**, **update** | a content registry's field merge; a sequencer item's replacement (`updateItem`) | patch, for a replacement |
+| RX5 | **patch**, **pushed patch**, **update** | a content registry's field merge; a set of patches that `pushPatches` adds and its cleanup removes; a sequencer item's replacement (`updateItem`) | patch, for a replacement; scoped override, for a pushed patch |
 | RX6 | **override** | an override registry's replacement of a named function; scoped overrides are CS10 | takeover, swap, substitution |
 | RX7 | **ref default**, **option default**, **registry default** | a ref's start value; an option's value when absent; an override registry key's first implementation | bare "default" where two could be meant |
 | RX8 | **perturbation** | the balance harness's change to one address, made by a wrap or a scoped override | — |
@@ -192,7 +192,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | CI4 | **instance** | the live object a category or system builds from one def | instance, for a pool run (→ RN3) |
 | CI5 | **sequencer item**, **inventory**, **inventory item** | one element of a sequencer queue; the `Inventory` system; one kind of thing it holds | instance, for a queued action; inventory, for any full list |
 | CI6 | **entry** | everyday: one element of a list, log or table | sequencer entry |
-| CI7 | **content**, **content registry** | the game content a consumer supplies; a category's id-to-def store, with patching | content, for effect-system bindings |
+| CI7 | **content**, **content registry** | the game content a consumer supplies; a category's id-to-def store, with patching | content, for lowered grants |
 | CI8 | **chain registry**, **effect-system registry**, **resource registry**, **override registry**, **tuning registry**, **persistent-ref registry** | the per-engine registries, always qualified | bare "registry", global engine registry |
 | CI9 | **category** | a batch-registration system for one kind of content | category system |
 | CI10 | **Gate service**, **handle** | a named engine service a Gate kind reads (`GateService`); an object returned to control one thing | handle, for a Gate service |
@@ -246,8 +246,8 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | BH4 | **simulate**, **simulation** | advance an engine through given seconds; a design method against a closed form | sim, as a noun for a run |
 | BH5 | **headless** | an adjective: with no browser or DOM | headless, as a name for the harness |
 | BH6 | **balance workbench** | a consumer's interactive balance tool | sim workbench, sim picker, balance panel |
-| BH7 | **runner**, **analyzer** | a function that drives runs; an observer of one headless run that collects metrics | tracker, for an analyzer |
-| BH8 | **transition walker**, **discovery walker**, **walk** | the walkers over challenges, purchasables and producers; the picker's walkers over effect-system bindings, chains and tunables; everyday traversal | content walker |
+| BH7 | **runner**, **analyzer** | a function that drives headless runs; an observer of one headless run that collects metrics | tracker, for an analyzer |
+| BH8 | **transition walker**, **discovery walker**, **walk** | the walkers over challenges, purchasables and producers; the picker's walkers over lowered grants, chains and tunables; everyday traversal | content walker |
 | BH9 | **picker** | the balance harness's enumeration of perturbable addresses; a goal picker is always qualified | — |
 | BH10 | **sweep**, **matrix** | a set of runs over cells and seeds; its `cells × seeds` shape | batch |
 | BH11 | **cell**, **variant**, **baseline**, **sweep axis** | one named configuration in a matrix ("matrix cell" beside grids); a named change to the baseline cell; the reference cell; one dimension a sweep varies | config, for a cell; param axis |
@@ -430,11 +430,11 @@ Calculus and numerics words (image, pre-image, domain, bracket, tolerance) keep 
 | ID | term | meaning | not |
 |---|---|---|---|
 | ME1 | **aggregate** | the balance harness's reduction of analyzer output across seeds | aggregate, for the rule advisor's history |
-| ME2 | **digest** | the rule advisor's reduced history, which its analyzers read | profile, aggregate (for it) |
+| ME2 | **digest**, **advisor analyzer** | the rule advisor's reduced history; a rule advisor function that reads it (`AdvisorAnalyzerFn`) | profile, aggregate (for it); bare "analyzer", for an advisor analyzer |
 | ME3 | **profile**, **profiler** | time a call; the timing tool | profiling hook, for an observe-only callback |
 | ME4 | **summary** | an analyzer's end-of-run output (`AnalyzerSummary`) | result, readout, measurements |
 | ME5 | **safeguard diagnostics** | the engine's developer health counters | bare "diagnostics" |
-| ME6 | **trace**, **attribution** | the trace system that records chain evaluation; the record of which binding produced a value | trace, for attribution |
+| ME6 | **trace**, **attribution** | the trace that records chain evaluation; the record of which binding produced a value | trace, for attribution |
 | ME7 | **tracked metric**, **analyzer metric** | a named quantity a cycle log tracks; a value an analyzer reports. Bare "metric" where only one is in reach | — |
 | ME8 | **report**, **stats**, **tally** | a returned failure kind; descriptive statistics; a count kept over runs | report, for logging |
 
