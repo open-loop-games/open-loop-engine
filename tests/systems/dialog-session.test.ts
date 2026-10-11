@@ -366,16 +366,16 @@ describe('createDialogSession', () => {
     expect(session.getVisitCount('rask-greeting', 'secret')).toBe(0);
   });
 
-  it('releases its saved state on dispose, so the same id can be recreated', () => {
+  it('keeps its saved state on dispose, and a session built with the same id resumes it', () => {
     const accessor = buildAccessor();
     const first = createDialogSession({ id: 'per-talk', graphs: [greetingGraph], accessor });
     first.start('rask-greeting');
     first.dispose();
-    expect(getAllPersistentRefs().has('dialog-sessions/per-talk.state')).toBe(false);
+    expect(getAllPersistentRefs().has('dialog-sessions/per-talk.state')).toBe(true);
 
     const second = createDialogSession({ id: 'per-talk', graphs: [greetingGraph], accessor });
-    expect(second.isActive()).toBe(false);
-    expect(getAllPersistentRefs().has('dialog-sessions/per-talk.state')).toBe(true);
+    expect(second.isActive()).toBe(true);
+    expect(second.getVisitCount('rask-greeting', 'open')).toBe(1);
   });
 
   it('throws when no ambient accessor is available and none was passed', () => {

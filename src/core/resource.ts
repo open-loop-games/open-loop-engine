@@ -303,7 +303,7 @@ function buildResource<T>(
         // against it rather than the raw previous write, which may be an
         // over-cap value the bag clamped back. So gain is always measured
         // between two clamped amounts.
-        let landed = initial;
+        let landed = (resource as Ref<DecimalSource>).value;
 
         // flush: 'sync' so balance-harness runners driving
         // engine.tickDriver.tickOnce() in a tight loop (no microtask boundary

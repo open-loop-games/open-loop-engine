@@ -12,6 +12,7 @@ import {
   getPersistentRefs,
   getPersistentContextRefs,
   setPersistentId,
+  disownPersistent,
   PersistentId,
   isAtDefault,
   filterDefaultedRefs,
@@ -343,6 +344,18 @@ describe('Persistence', () => {
       expect(() => setPersistentId(b, 'score')).toThrow(/collision.*test-collision.*score/);
       // a retains its name
       expect(a[PersistentId]).toBe('score');
+    });
+
+    it('an unowned ref keeps saving, and a ref built with its id takes over its value', () => {
+      const old = withPersistentContext('test-take-over', () => persistent(0, { id: 'score' }));
+      old.value = 40;
+      disownPersistent(old);
+      expect(serializePersistents(getAllPersistentRefs())['test-take-over']).toEqual({ score: 40 });
+
+      const next = withPersistentContext('test-take-over', () => persistent(0, { id: 'score' }));
+      expect(next.value).toBe(40);
+      expect(getAllPersistentRefs().get('test-take-over.score')).toBe(next);
+      expect(getPersistentRefs('test-take-over')?.has(old)).toBe(false);
     });
 
     it('setPersistentId is idempotent for the same name', () => {

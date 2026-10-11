@@ -20,7 +20,12 @@
 
 import { computed, type ComputedRef } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { persistent, withPersistentContext, type Serializable } from '@/core/persistence';
+import {
+  disownPersistent,
+  persistent,
+  withPersistentContext,
+  type Serializable,
+} from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { attachPersistentContextReset } from '@/core/resettable';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
@@ -178,9 +183,9 @@ export interface BestOf {
    */
   setRecencyHalfLifeRuns(halfLifeRuns: number | undefined): void;
   /**
-   * Unsubscribe from the CycleLog, if connected. The stored bests stay
-   * registered and keep saving, so building one under the same id again takes
-   * a new engine.
+   * Unsubscribe from the CycleLog, if connected. The stored bests become
+   * unowned: they keep saving, and a best-of built with the same id in the same
+   * persistent context takes them over.
    */
   dispose(): void;
 }
@@ -460,6 +465,7 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
     dispose() {
       unsubCycleLog?.();
+      disownPersistent(store);
     },
   };
   return attachPersistentContextReset(bestOf, id);

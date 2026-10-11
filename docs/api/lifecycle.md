@@ -22,31 +22,32 @@ catch-up progress by replaying elapsed seconds through the TickDriver in chunks
 
 auto-saved refs, registered per persistent context
 
-- `function aliasPersistent<T extends Persistent<S>, S>(persistentRef: T): T[typeof PersistentAlias]` — Get the persistent alias of a persistent ref. `src/core/persistence.ts:732`
-- `function aliasPersistent<T extends object>(obj: T): T` `src/core/persistence.ts:735`
-- `function createDefStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of def states. `src/core/persistence.ts:1028`
-- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:774`
-- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1205`
-- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map without the refs whose value equals their ref default. `src/core/persistence.ts:876`
-- `function getAllPersistentRefs(persistenceNamespace?: string): Map<string, Persistent>` — Build a Map of every persistent ref across every persistent context. `src/core/persistence.ts:1107`
-- `function getPersistentContextRefs(contextId: string): Set<Persistent>` — Get every non-lifetime persistent ref under a persistent context, child persistent contexts included (categories, def states and the like). `src/core/persistence.ts:908`
-- `type IfSerializable<T, Ok> = [T] extends [SerializableConstraint<T>] ? Ok : never` — Resolves to `Ok` when `T` is a serializable value and to `never` otherwise. `src/core/persistence.ts:590`
-- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's value equals its ref default. `src/core/persistence.ts:810`
-- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:722`
-- `function persistent<T>(defaultValue: T | Ref<T>, ...[options]: IfSerializable<T, [options?: PersistentOptions<T>]>): Persistent<T>` — Create a persistent ref, which the save manager saves and loads. `src/core/persistence.ts:598`
-- `type Persistent<T = Serializable> = Ref<T> & { readonly [PersistentState]: Ref<T>; readonly [DefaultValue]: T; readonly [StackTrace]: string; [Deleted]: boolean; readonly [PersistentAlias]: PersistentAlias<T>; [SaveDataPath]: string[] | undefined; readonly [CheckNaN]: boolean; [PersistentId]: string | undefined; readonly [PersistentSchema]: unknown; readonly [PersistentDecimal]: boolean; readonly [Lifetime]: boolean; }` — A ref that is automatically saved and loaded. `src/core/persistence.ts:133`
-- `const PersistentAlias: unique symbol` — Symbol for the persistent alias: a writable computed the save walk skips. `src/core/persistence.ts:92`
-- `const PersistentDecimal: unique symbol` — Marks a ref as Decimal-valued for schema derivation. `src/core/persistence.ts:119`
-- `const PersistentId: unique symbol` — Stable id of this persistent ref inside its persistent context. `src/core/persistence.ts:105`
-- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:538`
-- `const PersistentSchema: unique symbol` — Explicit Zod schema for this ref's runtime save validation. `src/core/persistence.ts:112`
-- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its ref default. `src/core/persistence.ts:785`
+- `function aliasPersistent<T extends Persistent<S>, S>(persistentRef: T): T[typeof PersistentAlias]` — Get the persistent alias of a persistent ref. `src/core/persistence.ts:758`
+- `function aliasPersistent<T extends object>(obj: T): T` `src/core/persistence.ts:761`
+- `function createDefStates<D, K, S>(contextId: string, definitions: readonly D[], stateFactory: (def: D) => S, keyAccessor?: (def: D) => K): Map<K, S>` — Create a Map of def states. `src/core/persistence.ts:1084`
+- `function deletePersistent(persistentRef: Persistent): void` — Mark a persistent ref as deleted, so it won't be saved or loaded. `src/core/persistence.ts:800`
+- `function deserializePersistents(refs: Map<string, Persistent>, save: Record<string, unknown>): void` — Load save data into persistent refs. `src/core/persistence.ts:1261`
+- `function disownPersistent<T>(persistentRef: Persistent<T>): void` — Mark a persistent ref as unowned, for an object's `dispose()`. `src/core/persistence.ts:822`
+- `function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent>` — Return a new Map without the refs whose value equals their ref default. `src/core/persistence.ts:920`
+- `function getAllPersistentRefs(persistenceNamespace?: string): Map<string, Persistent>` — Build a Map of every persistent ref across every persistent context. `src/core/persistence.ts:1163`
+- `function getPersistentContextRefs(contextId: string): Set<Persistent>` — Get every non-lifetime persistent ref under a persistent context, child persistent contexts included (categories, def states and the like). `src/core/persistence.ts:952`
+- `type IfSerializable<T, Ok> = [T] extends [SerializableConstraint<T>] ? Ok : never` — Resolves to `Ok` when `T` is a serializable value and to `never` otherwise. `src/core/persistence.ts:597`
+- `function isAtDefault<T>(persistentRef: Persistent<T>): boolean` — True when a persistent ref's value equals its ref default. `src/core/persistence.ts:854`
+- `function isPersistent(value: unknown): value is Persistent` — Check if a value is a persistent ref. `src/core/persistence.ts:748`
+- `function persistent<T>(defaultValue: T | Ref<T>, ...[options]: IfSerializable<T, [options?: PersistentOptions<T>]>): Persistent<T>` — Create a persistent ref, which the save manager saves and loads. `src/core/persistence.ts:605`
+- `type Persistent<T = Serializable> = Ref<T> & { readonly [PersistentState]: Ref<T>; readonly [DefaultValue]: T; readonly [StackTrace]: string; [Deleted]: boolean; [Unowned]: boolean; readonly [PersistentAlias]: PersistentAlias<T>; [SaveDataPath]: string[] | undefined; readonly [CheckNaN]: boolean; [PersistentId]: string | undefined; readonly [PersistentSchema]: unknown; readonly [PersistentDecimal]: boolean; readonly [Lifetime]: boolean; }` — A ref that is automatically saved and loaded. `src/core/persistence.ts:139`
+- `const PersistentAlias: unique symbol` — Symbol for the persistent alias: a writable computed the save walk skips. `src/core/persistence.ts:98`
+- `const PersistentDecimal: unique symbol` — Marks a ref as Decimal-valued for schema derivation. `src/core/persistence.ts:125`
+- `const PersistentId: unique symbol` — Stable id of this persistent ref inside its persistent context. `src/core/persistence.ts:111`
+- `interface PersistentOptions<T = unknown>` — Options for creating a persistent ref. `src/core/persistence.ts:545`
+- `const PersistentSchema: unique symbol` — Explicit Zod schema for this ref's runtime save validation. `src/core/persistence.ts:118`
+- `function resetPersistent<T>(persistentRef: Persistent<T>): void` — Reset a persistent ref to its ref default. `src/core/persistence.ts:829`
 - `type Serializable` — The serializable values a persistent ref may hold, which save and load safely. `src/core/persistence.ts:35`
 - `type SerializableConstraint<T>` — Compile-time constraint that checks T is a serializable value without explicit index signatures on interfaces. `src/core/persistence.ts:63`
 - `type SerializablePrimitive = string | number | boolean | null | undefined` — The primitive subset of Serializable, for conditional type branches. `src/core/persistence.ts:47`
-- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize the collected persistent refs to save data. `src/core/persistence.ts:1061`
-- `function setPersistentId(ref: Persistent, id: string): void` — Assign a stable id to a persistent ref inside its persistent context; the id forms the ref's save key. `src/core/persistence.ts:695`
-- `function withPersistentContext<T>(id: string, fn: () => T): T` — Run a block inside a persistent context, and close it even if the block throws. `src/core/persistence.ts:427`
+- `function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown>` — Serialize the collected persistent refs to save data. `src/core/persistence.ts:1117`
+- `function setPersistentId(ref: Persistent, id: string): void` — Assign a stable id to a persistent ref inside its persistent context; the id forms the ref's save key. `src/core/persistence.ts:705`
+- `function withPersistentContext<T>(id: string, fn: () => T): T` — Run a block inside a persistent context, and close it even if the block throws. `src/core/persistence.ts:434`
 
 ## Reset
 

@@ -110,6 +110,7 @@ export {
   isPersistent,
   aliasPersistent,
   deletePersistent,
+  disownPersistent,
   resetPersistent,
   isAtDefault,
   filterDefaultedRefs,

@@ -34,7 +34,12 @@
 
 import { computed, effectScope, onScopeDispose, type ComputedRef } from 'vue';
 import type { Persistent } from '@/core/persistence';
-import { onHydrated, persistent } from '@/core/persistence';
+import {
+  bindPersistenceNamespace,
+  disownPersistentContextRefs,
+  onHydrated,
+  persistent,
+} from '@/core/persistence';
 import type { RegisterTick } from '@/core/sequencer';
 import {
   setupDeclarativeBindings,
@@ -332,9 +337,11 @@ export interface ChallengeCategory<
 
   /**
    * End the runtime wiring: pop every scoped override, remove every pushed
-   * patch, and stop the goal tick and the load handler. No `onExit` runs.
-   * `entered` and `completions` stay saved, so a save taken after
-   * `dispose()` keeps the challenge.
+   * patch, unbind the `restricts` and `rewards` grants, and stop the goal tick
+   * and the load handler. No `onExit` runs. Each def's saved state becomes
+   * unowned: it keeps saving, and a category built with the same id in the same
+   * persistent context takes it over. An entered challenge pushes its scoped
+   * overrides again as it registers.
    */
   dispose(): void;
 }
@@ -518,19 +525,21 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
       // chain.bind auto-derives attribution ids like
       // `{categoryId}/{def.id}/{role}/{description}`; the role keeps a
       // restriction and a reward with the same description apart on one chain.
-      setupDeclarativeBindings(
-        def.restricts,
-        active,
-        predicates,
-        `challenge '${def.id}' restricts`,
-        'restricts',
-      );
-      setupDeclarativeBindings(
-        def.rewards,
-        completed,
-        predicates,
-        `challenge '${def.id}' rewards`,
-        'rewards',
+      bindingCleanups.push(
+        ...setupDeclarativeBindings(
+          def.restricts,
+          active,
+          predicates,
+          `challenge '${def.id}' restricts`,
+          'restricts',
+        ),
+        ...setupDeclarativeBindings(
+          def.rewards,
+          completed,
+          predicates,
+          `challenge '${def.id}' rewards`,
+          'rewards',
+        ),
       );
 
       const challenge: Challenge = {
@@ -555,6 +564,14 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
       active: challenge.completed,
       count: computed(() => challenge.completions.value),
     }),
+  });
+
+  // The unbinds of every def's `restricts` and `rewards` grants, for dispose().
+  const bindingCleanups: Array<() => void> = [];
+  let disposed = false;
+  // Bound at build, because dispose() usually runs outside the engine's persistence namespace.
+  const disownEntries = bindPersistenceNamespace(() => {
+    for (const entry of base.getAll()) disownPersistentContextRefs(`${categoryId}/${entry.def.id}`);
   });
 
   const scope = effectScope();
@@ -590,7 +607,22 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
   const category: ChallengeCategory<Def, DefState> = {
     id: base.id,
     registry: base.registry,
-    register: base.register,
+    // A def that registers already entered, as after a take-over, pushes its
+    // scoped overrides here: no load or reset will run hydrateOverrides for it.
+    register(defs: Def | Def[]): void {
+      try {
+        base.register(defs);
+      } catch (error) {
+        // The defs before the failing one stay registered, so they still settle.
+        try {
+          hydrateOverrides();
+        } catch {
+          // The register error is the one to report.
+        }
+        throw error;
+      }
+      hydrateOverrides();
+    },
     getDef: base.getDef,
 
     getChallenge(id: string): Challenge | undefined {
@@ -630,8 +662,13 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
     },
 
     dispose(): void {
+      if (disposed) return;
+      disposed = true;
       scope.stop();
       for (const id of [...activeCleanups.keys()]) popOverrides(id);
+      for (const unbind of bindingCleanups.splice(0)) unbind();
+      // Once only: the walk is by id, so a second one would disown a rebuild's refs.
+      disownEntries();
     },
 
     [Resettable]: base[Resettable],

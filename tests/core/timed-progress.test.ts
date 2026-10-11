@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
-import { beginPersistentContext, endPersistentContext, isPersistent } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  endPersistentContext,
+  getAllPersistentRefs,
+  isPersistent,
+} from '@/core/persistence';
 import { createTimedProgress, resourcePaidAt, stepProgressiveCosts } from '@/core/timed-progress';
 
 type TickFn = (dt: number) => void;
@@ -320,7 +325,7 @@ describe('createTimedProgress — reset and dispose', () => {
     expect(Decimal.eq(tp.progress.value, 0)).toBe(true);
   });
 
-  it('dispose() releases the saved progress, so the same id can be built again', () => {
+  it('dispose() keeps the saved progress, and a rebuild with the same id resumes it', () => {
     const bus = makeTickBus();
     beginPersistentContext('tp-recreate');
     try {
@@ -329,13 +334,17 @@ describe('createTimedProgress — reset and dispose', () => {
         needed: 10,
         registerTick: bus.registerTick,
       });
+      bus.tick(4);
       first.dispose();
+      expect(getAllPersistentRefs().get('tp-recreate/job.progress')).toBe(first.progress);
       const second = createTimedProgress({
         id: 'job',
         needed: 10,
         registerTick: bus.registerTick,
       });
       expect(isPersistent(second.progress)).toBe(true);
+      expect(Decimal.eq(second.progress.value, 4)).toBe(true);
+      expect(getAllPersistentRefs().get('tp-recreate/job.progress')).toBe(second.progress);
       second.dispose();
     } finally {
       endPersistentContext();

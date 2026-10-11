@@ -338,6 +338,20 @@ describe('createCycle', () => {
     expect(cycle.elapsed.value).toBeCloseTo(1); // unchanged
   });
 
+  it('a cycle built with the id of a disposed one resumes its saved state', () => {
+    const { registerTick, tick } = createManualTicks();
+    const first = createCycle({ id: 'cycle-rebuild', thingsToReset: [], registerTick });
+    first.resume();
+    tick(2);
+    first.end();
+    tick(1);
+    first.dispose();
+
+    const second = createCycle({ id: 'cycle-rebuild', thingsToReset: [], registerTick });
+    expect(second.count.value).toBe(1);
+    expect(second.elapsed.value).toBeCloseTo(1);
+  });
+
   it('emits instance cycle events', () => {
     const { registerTick } = createManualTicks();
     const events: string[] = [];

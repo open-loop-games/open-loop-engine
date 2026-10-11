@@ -52,7 +52,13 @@ import {
 } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { resolveComputable, type Computable } from '@/core/computed';
-import { onHydrated, persistent, withPersistentContext } from '@/core/persistence';
+import {
+  disownPersistent,
+  onHydrated,
+  persistent,
+  settling,
+  withPersistentContext,
+} from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { getCurrentEffectSystemRegistry } from '@/core/registries';
 import { attachPersistentContextReset } from '@/core/resettable';
@@ -179,9 +185,10 @@ export interface TemporaryEffectSystem {
   /** Subscribe to system events */
   on: Emittable<TemporaryEffectEvents>['on'];
   /**
-   * Stop ticking and remove the live instances without firing events. The
-   * saved instances stay registered and keep saving, so building the system
-   * under the same id again takes a new engine.
+   * Stop ticking and remove the live instances without firing events. The saved
+   * instances become unowned: they keep saving, and a system built with the
+   * same id in the same persistent context restores each one as its def
+   * registers.
    */
   dispose(): void;
 }
@@ -271,11 +278,16 @@ export function createTemporaryEffectSystem(
   }
 
   function syncSavedState(): void {
-    savedState.value = instances.value.map((i) => ({
-      defId: i.defId,
-      timeRemaining: i.timeRemaining.value,
-      duration: i.duration,
-    }));
+    // A snapshot whose def is not registered yet stays saved until it registers.
+    const unregistered = savedState.value.filter((snap) => !defs.has(snap.defId));
+    savedState.value = [
+      ...instances.value.map((i) => ({
+        defId: i.defId,
+        timeRemaining: i.timeRemaining.value,
+        duration: i.duration,
+      })),
+      ...unregistered,
+    ];
     lastSynced = savedState.value;
   }
 
@@ -378,6 +390,13 @@ export function createTemporaryEffectSystem(
       defs.set(d.id, d);
       slotsByDef.set(d.id, slots);
     }
+    // Saved instances of defs that register late, as after a take-over: no
+    // load or reset will rehydrate them. Mid-load, the pending rehydrate does.
+    if (settling.value && savedState.value !== lastSynced) return;
+    for (const snap of savedState.value) {
+      const d = list.find((x) => x.id === snap.defId);
+      if (d) restoreInstance(d, snap);
+    }
   }
 
   function getDef(id: string): TemporaryEffectDef | undefined {
@@ -457,16 +476,15 @@ export function createTemporaryEffectSystem(
 
     for (const snap of savedState.value) {
       const def = defs.get(snap.defId);
-      if (!def) continue; // def removed by a later game build
-      const dur = snap.duration ?? Math.max(resolveDuration(def), snap.timeRemaining);
-      const instance = createInstance(
-        def,
-        dur,
-        snap.timeRemaining,
-        lowestFreeStackIndex(snap.defId),
-      );
-      (def.onHydrate ?? def.onActivate)?.(instance);
+      if (def) restoreInstance(def, snap); // no def yet: it restores as it registers
     }
+  }
+
+  /** Build the live instance for a saved snapshot, firing `onHydrate`. */
+  function restoreInstance(def: TemporaryEffectDef, snap: EffectSnapshot): void {
+    const dur = snap.duration ?? Math.max(resolveDuration(def), snap.timeRemaining);
+    const instance = createInstance(def, dur, snap.timeRemaining, lowestFreeStackIndex(def.id));
+    (def.onHydrate ?? def.onActivate)?.(instance);
   }
 
   const scope = effectScope();
@@ -487,6 +505,7 @@ export function createTemporaryEffectSystem(
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
     slotsByDef.clear();
+    disownPersistent(savedState);
   }
 
   const system: TemporaryEffectSystem = {

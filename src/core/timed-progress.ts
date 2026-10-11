@@ -21,7 +21,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { toMaybeRef, type Computable } from './computed';
 import {
-  deletePersistent,
+  disownPersistent,
   getCurrentPersistentContext,
   persistent,
   withPersistentContext,
@@ -105,9 +105,10 @@ export interface TimedProgress {
   /** Clear `progress` back to 0 and zero `tickProgressDelta`. */
   reset(): void;
   /**
-   * Unsubscribe from the game loop and delete the saved `progress`, so a
-   * tracker with the same id can be built again. Call it when the tracker's
-   * owner is disposed.
+   * Unsubscribe from the game loop. The saved `progress` becomes unowned: it
+   * keeps saving, and a tracker built with the same id in the same persistent
+   * context takes it over and resumes. Call it when the tracker's owner is
+   * disposed.
    */
   dispose(): void;
 }
@@ -297,7 +298,7 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
     },
     dispose(): void {
       unsubTick();
-      if (state.contextId !== undefined) deletePersistent(state.progress as Persistent);
+      if (state.contextId !== undefined) disownPersistent(state.progress as Persistent);
     },
   };
   return state.contextId === undefined

@@ -24,6 +24,7 @@ import {
   persistent,
   type Persistent,
   withPersistentContext,
+  disownPersistent,
   resolveSystemPersistentContextId,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
@@ -200,8 +201,9 @@ export interface Cycle extends ScopedReset {
   on: Emittable<CycleEvents>['on'];
 
   /**
-   * Unregister the tick handler. The run count and timers stay registered and
-   * keep saving, so building a cycle under the same id again takes a new engine.
+   * Unregister the tick handler. The run count and timers become unowned: they
+   * keep saving, and a cycle built with the same id in the same persistent
+   * context takes them over.
    */
   dispose(): void;
 }
@@ -352,6 +354,7 @@ export function createCycle(options: CycleOptions): Cycle {
     },
     dispose() {
       unregisterTick();
+      for (const r of [count, bestTime, elapsed]) disownPersistent(r);
     },
   };
 

@@ -28,7 +28,7 @@
 import { computed, effectScope, ref, shallowRef, watch, type Ref } from 'vue';
 import { runInEffectScope } from './common';
 import { createEmitHandle, type Emittable } from './events';
-import { onHydrated, persistent, withPersistentContext } from './persistence';
+import { disownPersistent, onHydrated, persistent, withPersistentContext } from './persistence';
 import { attachPersistentContextReset } from './resettable';
 
 // === TYPES ===
@@ -172,9 +172,9 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
   reset(): void;
   /**
    * Stop the run pool's load re-seed and every handle's aliveness mirror. The
-   * saved map stays registered and keeps saving, so building a run pool under
-   * the same id again takes a new engine. A run pool built during `install()`
-   * stops with `engine.dispose()` without this call.
+   * saved map becomes unowned: it keeps saving, and a run pool built with the
+   * same id in the same persistent context takes it over. A run pool built
+   * during `install()` stops with `engine.dispose()` without this call.
    */
   dispose(): void;
 }
@@ -425,6 +425,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     on: bus.on,
     dispose(): void {
       scope.stop();
+      disownPersistent(aliveStates);
     },
   };
 

@@ -51,46 +51,46 @@ batch-registered ordered-execution queue with per-execution state machine
 
 progressive unlock of automation features
 
-- `interface AutomationTierDef` — Def for one automation tier. `src/systems/automation.ts:51`
-- `interface AutomationTiers` — The automation tier system createAutomationTiers returns. `src/systems/automation.ts:104`
-- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:73`
-- `interface AutomationTiersOptions` `src/systems/automation.ts:82`
-- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:176`
+- `interface AutomationTierDef` — Def for one automation tier. `src/systems/automation.ts:52`
+- `interface AutomationTiers` — The automation tier system createAutomationTiers returns. `src/systems/automation.ts:105`
+- `interface AutomationTiersEvents` — Events emitted by an AutomationTiers instance. `src/systems/automation.ts:74`
+- `interface AutomationTiersOptions` `src/systems/automation.ts:83`
+- `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:177`
 
 ## BestOf tracker
 
 per-metric best-of-run recording
 
-- `interface BestOf` — A BestOf instance — the returned object from createBestOf. `src/systems/best-of.ts:153`
-- `interface BestOfCandidate` — A candidate submission for best-of comparison. `src/systems/best-of.ts:113`
-- `interface BestOfEntry` — A single metric's best recorded outcome. `src/systems/best-of.ts:81`
-- `interface BestOfEvents` — Events emitted by a BestOf instance. `src/systems/best-of.ts:127`
-- `interface BestOfMetricDef` — One metric's def for createBestOf. `src/systems/best-of.ts:41`
-- `interface BestOfOptions` `src/systems/best-of.ts:133`
-- `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:78`
-- `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:38`
-- `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:35`
-- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best run outcome per metric. `src/systems/best-of.ts:254`
+- `interface BestOf` — A BestOf instance — the returned object from createBestOf. `src/systems/best-of.ts:158`
+- `interface BestOfCandidate` — A candidate submission for best-of comparison. `src/systems/best-of.ts:118`
+- `interface BestOfEntry` — A single metric's best recorded outcome. `src/systems/best-of.ts:86`
+- `interface BestOfEvents` — Events emitted by a BestOf instance. `src/systems/best-of.ts:132`
+- `interface BestOfMetricDef` — One metric's def for createBestOf. `src/systems/best-of.ts:46`
+- `interface BestOfOptions` `src/systems/best-of.ts:138`
+- `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:83`
+- `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:43`
+- `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:40`
+- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best run outcome per metric. `src/systems/best-of.ts:259`
 
 ## Challenge Category
 
 batch-create Challenges from content defs
 
-- `interface Challenge` — A challenge instance with saved state and lifecycle methods. `src/systems/challenge-category.ts:159`
-- `interface ChallengeCategory<Def extends ChallengeDef, DefState = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:290`
-- `interface ChallengeCategoryEntry<Def extends ChallengeDef, DefState = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:212`
-- `interface ChallengeCategoryOptions<Def extends ChallengeDef, DefState = void>` `src/systems/challenge-category.ts:225`
-- `interface ChallengeDef<Overrides extends { [K in keyof Overrides]: (...args: never[]) => unknown; } = Record<string, (...args: never[]) => unknown>>` — Def for a challenge. `src/systems/challenge-category.ts:65`
-- `function createChallengeCategory<Def extends ChallengeDef, DefState = void>(options: ChallengeCategoryOptions<Def, DefState>): ChallengeCategory<Def, DefState>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:350`
+- `interface Challenge` — A challenge instance with saved state and lifecycle methods. `src/systems/challenge-category.ts:164`
+- `interface ChallengeCategory<Def extends ChallengeDef, DefState = void> extends ResettableObject` — A challenge category — batch-registered challenges with shared lifecycle. `src/systems/challenge-category.ts:295`
+- `interface ChallengeCategoryEntry<Def extends ChallengeDef, DefState = void>` — A registered entry in a challenge category. `src/systems/challenge-category.ts:217`
+- `interface ChallengeCategoryOptions<Def extends ChallengeDef, DefState = void>` `src/systems/challenge-category.ts:230`
+- `interface ChallengeDef<Overrides extends { [K in keyof Overrides]: (...args: never[]) => unknown; } = Record<string, (...args: never[]) => unknown>>` — Def for a challenge. `src/systems/challenge-category.ts:70`
+- `function createChallengeCategory<Def extends ChallengeDef, DefState = void>(options: ChallengeCategoryOptions<Def, DefState>): ChallengeCategory<Def, DefState>` — Create a challenge category for batch registration of challenges. `src/systems/challenge-category.ts:357`
 
 ## Cycle
 
 bounded runs that end, reset, and start the next run
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — bounded runs that end, reset, and start the next run. `src/systems/cycle.ts:241`
-- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:139`
-- `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:38`
-- `interface CycleOptions` `src/systems/cycle.ts:51`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — bounded runs that end, reset, and start the next run. `src/systems/cycle.ts:243`
+- `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:140`
+- `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:39`
+- `interface CycleOptions` `src/systems/cycle.ts:52`
 
 ## CycleLog
 

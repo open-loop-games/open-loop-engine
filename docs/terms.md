@@ -51,7 +51,9 @@ Each sense has a stable ID: two letters for the family and a number.
 | CS12 | **module** | an `EngineModule`: the consumer-provided unit of game content | engine module (except as the type name) |
 | CS13 | **file**, **ES module** | a source file; the JavaScript module sense | module, for a file |
 | CS14 | **install**, **install/connect** | a module's `install` phase; the start-up window of both phases | install for adding a watcher or a callback; install-time |
-| CS15 | **owner** | the def, module, category or node a thing belongs to | — |
+| CS15 | **owner** | the def, module, category, node or object a thing belongs to | — |
+| CS16 | **unowned** | a persistent ref whose object was disposed. It keeps saving, and the next ref with its id in its persistent context takes it over (`disownPersistent`) | released, orphaned |
+| CS17 | **take over** | a ref given an unowned ref's id takes its value, and the unowned ref is deleted | adopt, reclaim, inherit |
 
 "Scope" has two engine senses, CS8 and CS9, and they never share a subsystem.
 
@@ -389,7 +391,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | LV2 | **complete**, **finish**, **end**, **finalize**, **terminal** | reach the natural end; a dialog's; a run's; a cycle-log entry's; a dialog line with no way on | finished, as a flag |
 | LV3 | **cancel**, **dismiss** | end early, without completing; set a suggestion aside | abandon |
 | LV4 | **stop**, **pause**, **resume** | suspend the tick clock; suspend a system's own flag; restart it | halt, freeze |
-| LV5 | **dispose**, **teardown** | end an object's runtime wiring; the balance harness's `teardown` option callback. Each `dispose()` TSDoc says what stays saved | tear down, detach, release, drop, evict, stop (for dispose) |
+| LV5 | **dispose**, **teardown** | end an object's runtime wiring; the balance harness's `teardown` option callback. An object's `dispose()` leaves its saved refs unowned. `engine.dispose()` deletes its persistent contexts instead | tear down, detach, release, drop, evict, stop (for dispose) |
 | LV6 | **cleanup**, **unsubscribe** | the undo function a push, add or bind returns; the one an `on()` returns | disposer |
 | LV7 | **release** | give up a reservation or a protection | release, for saved refs |
 | LV8 | **remove**, **clear**, **deselect** | take one entry out of a collection; take all out; take a loadout item out | drop, for remove |

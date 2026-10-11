@@ -34,6 +34,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import {
   persistent,
   withPersistentContext,
+  disownPersistent,
   resolveSystemPersistentContextId,
   type Persistent,
   type Serializable,
@@ -272,9 +273,9 @@ export interface RecommendationSystem {
   on: Emittable<RecommendationSystemEvents>['on'];
 
   /**
-   * Unsubscribe from the cycle's `afterEnd` event. The stored
-   * recommendation and `autoApply` stay registered and keep saving, so building
-   * a system under the same id again takes a new engine.
+   * Unsubscribe from the cycle's `afterEnd` event. The stored recommendation
+   * and `autoApply` become unowned: they keep saving, and a system built with
+   * the same id in the same persistent context takes them over.
    */
   dispose(): void;
 }
@@ -516,6 +517,8 @@ export function createRecommendationSystem(
 
     dispose() {
       unsubAfterEnd();
+      disownPersistent(storedRecommendation);
+      disownPersistent(autoApply);
     },
   };
   return attachPersistentContextReset(system, contextId);

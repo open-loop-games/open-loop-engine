@@ -12,7 +12,9 @@ import {
   withPersistentContext,
   getAllPersistentRefs,
   deserializePersistents,
+  withSettling,
 } from '@/core/persistence';
+import { saveAndClear } from '../helpers/save-roundtrip';
 import { createMemoryStorage, type StorageAdapter } from '@/core/save-manager';
 import { createEngine, type Engine } from '@/engine';
 import { createReset } from '@/systems/reset';
@@ -758,6 +760,66 @@ describe('dispose', () => {
 
     // Tick should be unsubscribed (no error, no effect)
     tick(1);
+  });
+
+  it('a system built with the id of a disposed one restores its instances as each def registers', () => {
+    const tm = createManualTicks();
+    const onActivate = vi.fn();
+    const onHydrate = vi.fn();
+    const def = { id: 'burn', duration: 10, onActivate, onHydrate };
+    const first = createSystem(tm).system;
+    first.register(def);
+    first.activate('burn');
+    tm.tick(3);
+    first.dispose();
+    onActivate.mockClear();
+
+    const second = createSystem(tm).system;
+    expect(second.getActive()).toHaveLength(0);
+    second.register(def);
+    expect(second.getActive().map((i) => [i.defId, i.timeRemaining.value])).toEqual([['burn', 7]]);
+    expect(onHydrate).toHaveBeenCalledOnce();
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it('a saved instance of a def not registered yet survives a sync', () => {
+    const tm = createManualTicks();
+    const burn = { id: 'burn', duration: 10 };
+    const other = { id: 'other', duration: 10 };
+    const first = createSystem(tm).system;
+    first.register([burn, other]);
+    first.activate('burn');
+    first.dispose();
+
+    const second = createSystem(tm).system;
+    second.register(other);
+    second.activate('other');
+    tm.tick(1);
+    second.register(burn);
+    expect(
+      second
+        .getActive()
+        .map((i) => i.defId)
+        .sort(),
+    ).toEqual(['burn', 'other']);
+  });
+
+  it('a def registered during a load restores its saved instance once', () => {
+    const tm = createManualTicks();
+    const onHydrate = vi.fn();
+    const def = { id: 'burn', duration: 10, onHydrate };
+    const first = createSystem(tm).system;
+    first.register(def);
+    first.activate('burn');
+    const save = saveAndClear();
+
+    const second = createSystem(tm).system;
+    withSettling(() => {
+      deserializePersistents(getAllPersistentRefs(), save);
+      second.register(def);
+    });
+    expect(second.getActive()).toHaveLength(1);
+    expect(onHydrate).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { nextTick } from 'vue';
 import { Decimal, bn } from '@/primitives/decimal';
-import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  disownPersistent,
+  endPersistentContext,
+  withPersistentContext,
+} from '@/core/persistence';
 import { createCostRequirement, payByReset } from '@/core/requirements';
 import { createSaveManager, createMemoryStorage } from '@/core/save-manager';
 import { createReset } from '@/systems/reset';
@@ -109,6 +114,17 @@ describe('Resource', () => {
     expect(gold.value.toNumber()).toBe(0);
     expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
     expect(new Decimal(gold.best!.value).toNumber()).toBe(50);
+  });
+  it('a resource that takes over an unowned amount counts no gain for it', () => {
+    const build = () =>
+      withPersistentContext('tracker-take-over', () => createResource(bn(0), { id: 'gold' }));
+    const first = build();
+    addResource(first, 100);
+    for (const r of [first, first.cumulative!, first.best!]) disownPersistent(r);
+
+    const second = build();
+    addResource(second, 1);
+    expect(new Decimal(second.cumulative!.value).toNumber()).toBe(101);
   });
   it('lifetime trackers round-trip through a save, and the load itself is no gain', () => {
     const mgr = createSaveManager({

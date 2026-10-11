@@ -26,6 +26,15 @@ describe('AutomationTiers', () => {
     );
   });
 
+  it('automation tiers built with the id of disposed ones keep the unlocks', () => {
+    const first = createAutomationTiers({ id: 'auto-rebuild', tiers: TIERS });
+    first.unlock('basic');
+    first.dispose();
+
+    const second = createAutomationTiers({ id: 'auto-rebuild', tiers: TIERS });
+    expect(second.isUnlocked('basic')).toBe(true);
+  });
+
   it('creates with tiers sorted by order', () => {
     const at = createAutomationTiers({
       tiers: [

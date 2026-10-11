@@ -692,6 +692,23 @@ describe('createRecommendationSystem', () => {
   // lastRecommendation updates on each evaluate
   // ==========================================================================
 
+  it('a system built with the id of a disposed one keeps autoApply', () => {
+    const { cycle, cycleLog, bestOf } = createTestStack('rebuild');
+    const options = {
+      id: 'rec-rebuild',
+      cycle,
+      cycleLog,
+      bestOf,
+      getCurrentSnapshot: () => ({}),
+      applySnapshot: () => {},
+    };
+    const first = createRecommendationSystem(options);
+    first.autoApply.value = true;
+    first.dispose();
+
+    expect(createRecommendationSystem(options).autoApply.value).toBe(true);
+  });
+
   it('evaluate() replaces previous recommendation', () => {
     const { cycle, cycleLog, bestOf } = createTestStack('replace');
     let callCount = 0;

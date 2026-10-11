@@ -88,6 +88,12 @@ export const StackTrace = Symbol('StackTrace');
 /** Symbol that marks a persistent ref as deleted, so it is not saved */
 export const Deleted = Symbol('Deleted');
 
+/**
+ * Symbol that marks a persistent ref as unowned: it keeps saving, and a ref
+ * that gets its id takes it over. See {@link disownPersistent}.
+ */
+export const Unowned = Symbol('Unowned');
+
 /** Symbol for the persistent alias: a writable computed the save walk skips */
 export const PersistentAlias = Symbol('PersistentAlias');
 
@@ -135,6 +141,7 @@ export type Persistent<T = Serializable> = Ref<T> & {
   readonly [DefaultValue]: T;
   readonly [StackTrace]: string;
   [Deleted]: boolean;
+  [Unowned]: boolean;
   readonly [PersistentAlias]: PersistentAlias<T>;
   [SaveDataPath]: string[] | undefined;
   readonly [CheckNaN]: boolean;
@@ -155,7 +162,7 @@ export type PersistentAlias<T = Serializable> = WritableComputedRef<T> & {
 // === FILE STATE ===
 
 /**
- * True while a save load or a reset writes persistent refs. Watchers that
+ * True while a save load, a reset or a take-over writes persistent refs. Watchers that
  * react to player actions skip these writes: they restore state, they don't
  * change it. Written only by {@link withSettling}.
  */
@@ -170,7 +177,7 @@ let hydrationDeferrals = 0;
 let hydrationPending = false;
 
 /**
- * Run `callback` each time a save load or a reset finishes writing persistent
+ * Run `callback` each time a save load, a reset or a take-over finishes writing persistent
  * refs, once the whole state is consistent. A reset runs it as its writes
  * settle. A save manager load runs it after `save:loaded`, and so after the
  * engine's `onLoad` handlers. A watcher that reacts to a hydration's write
@@ -650,6 +657,7 @@ export function persistent<T>(
     [DefaultValue]: actualDefault,
     [StackTrace]: getStackTrace(),
     [Deleted]: false,
+    [Unowned]: false,
     [PersistentAlias]: alias,
     [SaveDataPath]: undefined,
     [CheckNaN]: checkNaN,
@@ -685,8 +693,10 @@ export function persistent<T>(
  * id forms the ref's save key.
  *
  * A collision inside one persistent context throws, because a silent
- * overwrite is the bug this guards against. Assigning a ref the id it already
- * has is a no-op. Assigning a ref a new id frees the old one.
+ * overwrite is the bug this guards against. The exception is an unowned ref
+ * ({@link disownPersistent}): this ref takes over its value, and the unowned
+ * ref is deleted. Assigning a ref the id it already has is a no-op. Assigning
+ * a ref a new id frees the old one.
  *
  * {@link persistent} calls it for an explicit `id` option. Collector factories
  * ({@link createDefStates}, a category's `mapState`) call it too, because they
@@ -708,12 +718,28 @@ export function setPersistentId(ref: Persistent, id: string): void {
   for (const other of persistentRefs[contextId]) {
     if (other === ref || other[Deleted]) continue;
     if (other[PersistentId] === id) {
+      if (other[Unowned]) {
+        takeOver(ref, other);
+        break;
+      }
       throw new Error(
         `Persistent id collision in persistent context "${contextId}": "${id}" is already in use.`,
       );
     }
   }
   ref[PersistentId] = id;
+}
+
+/**
+ * Move an unowned ref's value into the ref taking it over. The write is a
+ * restore, so it settles like a load: watchers that skip a load skip it.
+ */
+function takeOver(ref: Persistent, unowned: Persistent): void {
+  const value = cloneDefault(unowned[PersistentState].value);
+  deletePersistent(unowned);
+  withSettling(() => {
+    ref[PersistentState].value = value;
+  });
 }
 
 /**
@@ -777,6 +803,24 @@ export function deletePersistent(persistentRef: Persistent): void {
     persistentRefs[originContext].delete(persistentRef);
   }
   persistentRef[Deleted] = true;
+}
+
+/**
+ * Mark a persistent ref as unowned, for an object's `dispose()`. The ref keeps
+ * its value and keeps saving. The next ref that gets the same id in the same
+ * persistent context takes over a copy of the value, so a rebuilt object
+ * resumes. The take-over deletes the old ref. Code that still holds it, such
+ * as a reset's `keep` list, must take the new ref instead.
+ *
+ * A build after `install` runs outside the module's persistent context and the
+ * engine's persistence namespace. There, only an object whose id names a whole
+ * persistent context takes over, and only in an engine without a persistence
+ * namespace.
+ *
+ * A ref without an id keeps saving under its index, and nothing takes it over.
+ */
+export function disownPersistent<T>(persistentRef: Persistent<T>): void {
+  persistentRef[Unowned] = true;
 }
 
 /**
@@ -923,6 +967,18 @@ export function getPersistentContextRefs(contextId: string): Set<Persistent> {
  */
 export function deletePersistentContextRefs(contextId: string): void {
   for (const r of [...walkContextTree(contextId)]) deletePersistent(r);
+}
+
+/**
+ * Mark every ref in a persistent context and in its child persistent contexts
+ * as unowned, lifetime refs included. A `dispose()` calls it, so a rebuild
+ * with the same ids takes the refs over.
+ *
+ * @param contextId - The raw persistent context id, resolved in the active persistence namespace
+ * @internal
+ */
+export function disownPersistentContextRefs(contextId: string): void {
+  for (const r of walkContextTree(contextId)) disownPersistent(r);
 }
 
 /** Every ref in a persistent context and its child persistent contexts. */

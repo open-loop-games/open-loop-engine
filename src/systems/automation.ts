@@ -37,6 +37,7 @@ import { computed, effectScope, type ComputedRef } from 'vue';
 import {
   persistent,
   withPersistentContext,
+  disownPersistent,
   resolveSystemPersistentContextId,
   latchWhenSettled,
   type Persistent,
@@ -141,8 +142,8 @@ export interface AutomationTiers {
 
   /**
    * Stop the watchers that unlock automation tiers with `unlockWhen`.
-   * `unlocked` stays registered and keeps saving, so a rebuild under the
-   * same id needs a new engine.
+   * `unlocked` becomes unowned: it keeps saving, and automation tiers built
+   * with the same id in the same persistent context take it over.
    */
   dispose(): void;
 }
@@ -278,6 +279,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
 
     dispose(): void {
       scope.stop();
+      disownPersistent(unlocked);
     },
   };
 

@@ -26,7 +26,7 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
 import {
   beginPersistentContext,
-  deletePersistent,
+  disownPersistent,
   endPersistentContext,
   settling,
   persistent,
@@ -122,9 +122,9 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** How many times a node has been entered across the saved history; 0 for a never-visited node. */
   getVisitCount(graphId: string, nodeId: string): number;
   /**
-   * Dispose the session: stop the state-sync watcher and delete the
-   * session's saved state. So a later save omits it, and the same id can be
-   * created again.
+   * Stop the state-sync watcher. The saved state becomes unowned: it keeps
+   * saving, and a session built with the same id in the same persistent context
+   * takes it over and resumes, visit counts included.
    */
   dispose(): void;
 }
@@ -188,8 +188,8 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   const adapter = factory(options.graphs, accessorMutator, accessorMutator);
 
   // Restore the adapter from the persistent ref on creation. This covers a
-  // session built after a load (a lazily built session), and a new game,
-  // where the restore writes the defaults back harmlessly.
+  // session that took over a disposed session's state, and a new game, where
+  // the restore writes the defaults back harmlessly.
   adapter.restore(stateRef.value);
 
   // Restore again on a load. The typical engine start order is
@@ -288,9 +288,9 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     dispose() {
       // Stop the sync watch on stateRef; without this, a disposed session
       // leaks a watcher that restores save state into a stale adapter on
-      // every later load (a session built lazily per conversation).
+      // every later load.
       scope.stop();
-      deletePersistent(stateRef as unknown as Persistent);
+      disownPersistent(stateRef);
     },
   };
   return attachPersistentContextReset(session, contextId);

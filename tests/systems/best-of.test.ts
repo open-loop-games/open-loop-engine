@@ -564,6 +564,16 @@ describe('createBestOf', () => {
     expect(received).toHaveLength(0);
   });
 
+  it('a best-of built with the id of a disposed one keeps the bests', () => {
+    const metrics = { gold: { mode: 'absolute' as const } };
+    const first = createBestOf({ id: 'bo-rebuild', metrics });
+    first.submit({ key: 'gold', value: 100, elapsed: 10, runNumber: 0 });
+    first.dispose();
+
+    const second = createBestOf({ id: 'bo-rebuild', metrics });
+    expect(second.entries.value.gold!.value.eq(100)).toBe(true);
+  });
+
   it('dispose stops auto-tracking from CycleLog', () => {
     const { registerTick } = createManualTicks();
     beginPersistentContext('bo-dispose');

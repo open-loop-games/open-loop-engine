@@ -594,6 +594,27 @@ describe('RunPool — edge cases', () => {
 // Reactivity
 // ---------------------------------------------------------------------------
 
+describe('RunPool — dispose', () => {
+  it('a run pool built with the id of a disposed one keeps the saved aliveness', () => {
+    const first = createRunPool({ id: 'pool-rebuild', deathDisposition: 'park' });
+    first.addRun({ id: 'a', step: deadStep }).step();
+    first.dispose();
+
+    const second = createRunPool({ id: 'pool-rebuild', deathDisposition: 'park' });
+    expect(second.addRun({ id: 'a', step: aliveStep }).alive.value).toBe(false);
+  });
+
+  it('the disposed run pool no longer writes the saved map its rebuild took over', () => {
+    const first = createRunPool({ id: 'pool-detach', deathDisposition: 'park' });
+    first.addRun({ id: 'a', step: deadStep }).step();
+    first.dispose();
+    const second = createRunPool({ id: 'pool-detach', deathDisposition: 'park' });
+
+    first.removeRun('a');
+    expect(second.addRun({ id: 'a', step: aliveStep }).alive.value).toBe(false);
+  });
+});
+
 describe('RunPool — reactivity', () => {
   it('liveCount reacts to step-death and restart', () => {
     const pool = makePool({ deathDisposition: 'park' });

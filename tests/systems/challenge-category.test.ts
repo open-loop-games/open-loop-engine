@@ -249,6 +249,48 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
     expect(combat()).toBe(10);
   });
 
+  it('a category built with the id of a disposed one resumes the entered challenge', () => {
+    const first = build();
+    first.zombie.enter();
+    first.challenges.dispose();
+
+    const { combat, cost, rules, zombie, log } = build();
+    expect(zombie.entered.value).toBe(true);
+    expect(combat()).toBe(0);
+    expect(cost()).toBe(1);
+    expect(rules.overrideDepth).toBe(1);
+    expect(log).toEqual([]);
+  });
+
+  it('a second dispose of the old category leaves the rebuild owning its state', () => {
+    const first = build();
+    first.challenges.dispose();
+    build();
+    first.challenges.dispose();
+    expect(() => build()).toThrow(/collision/);
+  });
+
+  it('dispose unbinds `restricts` from a chain that outlives the category', () => {
+    const chain = createModifierChain('ch-rebind-chain');
+    const def = {
+      id: 'halved',
+      displayName: 'Halved',
+      goal: () => false,
+      restricts: [{ chain, mult: 0.5, description: 'halve' }],
+    };
+    const first = createChallengeCategory({ id: 'ch-rebind' });
+    first.register(def);
+    first.getChallenge('halved')!.enter();
+    first.dispose();
+    expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
+
+    const second = createChallengeCategory({ id: 'ch-rebind' });
+    second.register(def);
+    expect(Decimal.eq(chain.apply(100), 50)).toBe(true);
+    second.getChallenge('halved')!.exit();
+    expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
+  });
+
   it('a second load of the same save adds no second scope', () => {
     build().zombie.enter();
     const midChallenge = saveAndClear();

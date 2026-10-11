@@ -38,16 +38,16 @@ between-run arbitration across registered recommenders
 
 - `interface BestReplayRecommenderOptions` `src/systems/recommenders.ts:28`
 - `function createBestReplayRecommender(metricKey: string, options?: BestReplayRecommenderOptions): Recommender` — Create a recommender that replays the configuration that produced the best value for a given metric. `src/systems/recommenders.ts:94`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered recommenders after each run ends, and presents or auto-applies the winning configuration. `src/systems/recommendation.ts:371`
-- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:127`
-- `interface RecommendationContext` — The evaluation context passed to every recommender's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:53`
-- `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:67`
-- `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:74`
-- `interface RecommendationResult` — The output of a recommender's `recommend()` method. `src/systems/recommendation.ts:84`
-- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:219`
-- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:154`
-- `interface RecommendationSystemOptions` `src/systems/recommendation.ts:164`
-- `interface Recommender` — A recommender. `src/systems/recommendation.ts:97`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered recommenders after each run ends, and presents or auto-applies the winning configuration. `src/systems/recommendation.ts:372`
+- `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:128`
+- `interface RecommendationContext` — The evaluation context passed to every recommender's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:54`
+- `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:68`
+- `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:75`
+- `interface RecommendationResult` — The output of a recommender's `recommend()` method. `src/systems/recommendation.ts:85`
+- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:220`
+- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:155`
+- `interface RecommendationSystemOptions` `src/systems/recommendation.ts:165`
+- `interface Recommender` — A recommender. `src/systems/recommendation.ts:98`
 
 ## Rule advisor
 

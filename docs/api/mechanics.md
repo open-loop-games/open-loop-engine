@@ -39,14 +39,14 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface ConditionalEffectSystem` — Manages conditional effects: registration, predicate watching, and binding on activation. `src/systems/conditional-effect.ts:97`
 - `interface ConditionalEffectSystemOptions` `src/systems/conditional-effect.ts:91`
 - `function createConditionalEffectSystem(options: ConditionalEffectSystemOptions): ConditionalEffectSystem` — Create a conditional effect system for managing condition-driven effects. `src/systems/conditional-effect.ts:179`
-- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:236`
+- `function createTemporaryEffectSystem(options: TemporaryEffectSystemOptions): TemporaryEffectSystem` — Create a temporary effect system for managing time-limited effects. `src/systems/temporary-effect.ts:243`
 - `function replacementGrants(options: ReplacementGrantsOptions): Grant[]` — Build a cancel-then-replace grant pair for a modifier chain. `src/systems/replacement-grants.ts:105`
 - `interface ReplacementGrantsOptions` `src/systems/replacement-grants.ts:44`
-- `interface TemporaryEffectDef` — A temporary effect's def, registered at startup. `src/systems/temporary-effect.ts:67`
-- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:136`
-- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.activate. `src/systems/temporary-effect.ts:116`
-- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:154`
-- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:146`
+- `interface TemporaryEffectDef` — A temporary effect's def, registered at startup. `src/systems/temporary-effect.ts:73`
+- `interface TemporaryEffectEvents` — Events emitted by the temporary effect system. `src/systems/temporary-effect.ts:142`
+- `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.activate. `src/systems/temporary-effect.ts:122`
+- `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:160`
+- `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:152`
 
 ## Formulas
 
@@ -173,11 +173,11 @@ the costs and tests that block purchases, unlocks and actions
 
 tickable progress toward a needed value, with no state machine
 
-- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates progress that ticks toward a needed value on every registered tick, advancing `progress` by `rate * dt` each time. `src/core/timed-progress.ts:268`
-- `interface ProgressiveCostEntry` — One progressive-cost entry — the total amount over one completion, plus a getter for the resource's current amount, which decides affordability. `src/core/timed-progress.ts:344`
-- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:352`
-- `function resourcePaidAt(progress: DecimalSource, needed: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units are paid at a given progress. `src/core/timed-progress.ts:315`
-- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; needed: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:437`
+- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates progress that ticks toward a needed value on every registered tick, advancing `progress` by `rate * dt` each time. `src/core/timed-progress.ts:269`
+- `interface ProgressiveCostEntry` — One progressive-cost entry — the total amount over one completion, plus a getter for the resource's current amount, which decides affordability. `src/core/timed-progress.ts:345`
+- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:353`
+- `function resourcePaidAt(progress: DecimalSource, needed: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units are paid at a given progress. `src/core/timed-progress.ts:316`
+- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; needed: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:438`
 - `interface TimedProgress` — Ticking progress toward a needed value, created by createTimedProgress. `src/core/timed-progress.ts:88`
 - `interface TimedProgressBaseOptions` — Options every createTimedProgress tracker shares. `src/core/timed-progress.ts:58`
 - `type TimedProgressOptions` `src/core/timed-progress.ts:43`

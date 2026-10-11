@@ -302,8 +302,9 @@ export function setupDeclarativeBindings(
   predicates: PredicateResolver,
   owner: string,
   role?: string,
-): void {
-  if (grants == null || grants.length === 0) return;
+): Array<() => void> {
+  const unbinds: Array<() => void> = [];
+  if (grants == null || grants.length === 0) return unbinds;
   const whens = adoptGrantWhens(grants, predicates, owner);
   for (const grant of grants) {
     const when = whens.get(grant);
@@ -319,8 +320,9 @@ export function setupDeclarativeBindings(
     }
     const description = role == null ? grant.description : `${role}/${grant.description}`;
     for (const chain of grantChains(grant))
-      chain.bind({ active: composedActive, modifier, text: description });
+      unbinds.push(chain.bind({ active: composedActive, modifier, text: description }));
   }
+  return unbinds;
 }
 
 // === TICK WALKER ===
