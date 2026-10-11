@@ -782,7 +782,7 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
       throw new LoadFailure('validation');
     }
 
-    deserializePersistents(refs, validation.data);
+    deserializePersistents(refs, validation.data, persistenceNamespace);
   }
 
   /** Parse raw save text as an envelope of this game. Throws a `LoadFailure`. */

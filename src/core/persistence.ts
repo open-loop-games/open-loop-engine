@@ -325,6 +325,15 @@ const NAMESPACE_SEP = '::';
  * engine sees only its own refs. */
 const contextNamespaces: Record<string, string> = {};
 
+/**
+ * The save data the last load read, per persistence namespace (`''` for
+ * none). A ref that takes one of its keys later missed that value.
+ */
+const lastLoadedSaves = new Map<string, Record<string, unknown>>();
+
+/** The persistent contexts that warned about a ref built after a load, since that load */
+const lateBuildWarnedContexts = new Set<string>();
+
 // === HELPERS ===
 
 /**
@@ -720,7 +729,8 @@ export function setPersistentId(ref: Persistent, id: string): void {
     if (other[PersistentId] === id) {
       if (other[Unowned]) {
         takeOver(ref, other);
-        break;
+        ref[PersistentId] = id;
+        return;
       }
       throw new Error(
         `Persistent id collision in persistent context "${contextId}": "${id}" is already in use.`,
@@ -728,6 +738,26 @@ export function setPersistentId(ref: Persistent, id: string): void {
     }
   }
   ref[PersistentId] = id;
+  warnIfBuiltAfterLoad(contextId, id);
+}
+
+/**
+ * Warn once per persistent context per load when ref `id` takes the key of a
+ * value the last load read. No ref owned that key at the load, so the value
+ * never reached this one.
+ */
+function warnIfBuiltAfterLoad(fullContextId: string, id: string): void {
+  const save = lastLoadedSaves.get(contextNamespaces[fullContextId] ?? '');
+  if (save === undefined || lateBuildWarnedContexts.has(fullContextId)) return;
+  const contextId = stripNamespace(fullContextId);
+  if (getNested(save, `${contextId}.${id}`) === undefined) return;
+  lateBuildWarnedContexts.add(fullContextId);
+  console.warn(
+    `[persistence] Persistent ref "${id}" in persistent context "${contextId}" was built ` +
+      'after a load, so its saved value did not load. It starts at its default, and the ' +
+      'next save replaces the saved value. Build saved objects in install(), or make this ' +
+      'one ephemeral.',
+  );
 }
 
 /**
@@ -1014,6 +1044,8 @@ export function resetAllPersistentContexts(): void {
     delete contextChildren[key];
   }
   unnamedWarnedContexts.clear();
+  lastLoadedSaves.clear();
+  lateBuildWarnedContexts.clear();
 }
 
 /**
@@ -1045,7 +1077,9 @@ export function deletePersistenceNamespace(persistenceNamespace?: string): void 
     delete contextNamespaces[fullId];
     delete contextChildren[fullId];
     unnamedWarnedContexts.delete(fullId);
+    lateBuildWarnedContexts.delete(fullId);
   }
+  lastLoadedSaves.delete(wantNs);
   // Persistent contexts in another persistence namespace may still list
   // deleted ids as children; remove those edges so getPersistentContextRefs
   // doesn't walk into deleted entries.
@@ -1256,12 +1290,22 @@ function isRevivableObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Load save data into persistent refs
+ * Load save data into persistent refs.
+ *
+ * A ref built later that takes a key this save holds warns: its value did not load.
+ *
+ * @param persistenceNamespace - The persistence namespace `refs` came from, as passed to {@link getAllPersistentRefs}
  */
 export function deserializePersistents(
   refs: Map<string, Persistent>,
   save: Record<string, unknown>,
+  persistenceNamespace?: string,
 ): void {
+  const ns = persistenceNamespace ?? '';
+  lastLoadedSaves.set(ns, save);
+  for (const fullId of lateBuildWarnedContexts) {
+    if ((contextNamespaces[fullId] ?? '') === ns) lateBuildWarnedContexts.delete(fullId);
+  }
   withSettling(() => {
     for (const [path, persistentRef] of refs) {
       const current = getNested(save, path);

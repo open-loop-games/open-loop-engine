@@ -17,6 +17,7 @@ import {
   isAtDefault,
   filterDefaultedRefs,
   resetAllPersistentContexts,
+  deletePersistenceNamespace,
   withPersistenceNamespace,
   withPersistentContext,
 } from '@/core/persistence';
@@ -818,5 +819,94 @@ describe('save-key shape', () => {
   it('refuses a context id containing "." — the save path splits on it', () => {
     resetAllPersistentContexts();
     expect(() => withPersistentContext('upgrades/tier.1', () => persistent(0))).toThrow(/"\."/);
+  });
+});
+
+describe('a saved ref built after a load', () => {
+  const lateBuildWarning = /built after a load/;
+
+  /** Save `{ late: { a: 5 } }` from a ref, then clear the registry, as a new session would be. */
+  function savedSession(persistenceNamespace?: string): Record<string, unknown> {
+    resetAllPersistentContexts();
+    const save = withPersistenceNamespace(persistenceNamespace, () => {
+      const a = withPersistentContext('late', () => persistent(0, { id: 'a' }));
+      a.value = 5;
+      return serializePersistents(getAllPersistentRefs(persistenceNamespace));
+    });
+    resetAllPersistentContexts();
+    return save;
+  }
+
+  it('warns when it takes the key of a value the load read', () => {
+    const save = savedSession();
+    deserializePersistents(getAllPersistentRefs(), save);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const a = withPersistentContext('late', () => persistent(0, { id: 'a' }));
+
+    expect(a.value).toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(lateBuildWarning));
+    warn.mockRestore();
+  });
+
+  it('warns once per persistent context per load', () => {
+    resetAllPersistentContexts();
+    const save = withPersistentContext('late', () => {
+      persistent(1, { id: 'a' }).value = 5;
+      persistent(1, { id: 'b' }).value = 6;
+      return serializePersistents(getAllPersistentRefs());
+    });
+    resetAllPersistentContexts();
+    deserializePersistents(getAllPersistentRefs(), save);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    withPersistentContext('late', () => [persistent(1, { id: 'a' }), persistent(1, { id: 'b' })]);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    deserializePersistents(getAllPersistentRefs(), save);
+    withPersistentContext('late', () => persistent(1, { id: 'c' }));
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('is silent for a ref built before the load, or one taking over an unowned ref', () => {
+    const save = savedSession();
+    const a = withPersistentContext('late', () => persistent(0, { id: 'a' }));
+    deserializePersistents(getAllPersistentRefs(), save);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    disownPersistent(a);
+    const rebuilt = withPersistentContext('late', () => persistent(0, { id: 'a' }));
+
+    expect(rebuilt.value).toBe(5);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('is silent once the loaded persistence namespace is deleted', () => {
+    const save = savedSession();
+    deserializePersistents(getAllPersistentRefs(), save);
+    deletePersistenceNamespace();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    withPersistentContext('late', () => persistent(0, { id: 'a' }));
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("reads only the load of the ref's own persistence namespace", () => {
+    const save = savedSession('engine-a');
+    deserializePersistents(getAllPersistentRefs('engine-a'), save, 'engine-a');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    withPersistentContext('late', () => persistent(0, { id: 'a' }));
+    expect(warn).not.toHaveBeenCalled();
+
+    withPersistenceNamespace('engine-a', () =>
+      withPersistentContext('late', () => persistent(0, { id: 'a' })),
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(lateBuildWarning));
+    warn.mockRestore();
   });
 });

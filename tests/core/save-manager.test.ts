@@ -6,6 +6,9 @@ import {
   endPersistentContext,
   resetPersistent,
   createDefStates,
+  deletePersistenceNamespace,
+  withPersistenceNamespace,
+  withPersistentContext,
 } from '@/core/persistence';
 import { bn, Decimal } from '@/primitives/decimal';
 
@@ -35,6 +38,31 @@ describe('SaveManager', () => {
     const result = mgr.load();
     expect(result.success).toBe(true);
     expect(gold.value).toBe(500);
+  });
+
+  it("warns when a ref in the manager's persistence namespace is built after its load", () => {
+    const storageAdapter = createMapStorage();
+    const mgr = createSaveManager({
+      gameId: 'test',
+      persistenceNamespace: 'late-ns',
+      storageAdapter,
+    });
+    const buildGold = () =>
+      withPersistenceNamespace('late-ns', () =>
+        withPersistentContext('sm-late', () => persistent(0, { id: 'gold' })),
+      );
+    buildGold().value = 500;
+    mgr.save();
+    // A new session: the engine is gone, and the load runs before gold exists.
+    deletePersistenceNamespace('late-ns');
+    expect(mgr.load().success).toBe(true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const gold = buildGold();
+
+    expect(gold.value).toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/"gold".*built after a load/));
+    warn.mockRestore();
   });
 
   it('load returns timestamp', () => {

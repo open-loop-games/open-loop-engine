@@ -176,6 +176,8 @@ A Gate kind that holds a closure is not part of the union, on purpose. It would 
 
 The game start-up is `use(...)` → `start()` → `load()`. `start()` installs the modules, so their persistent refs exist, but does not load the save. `load()` applies the save to them, and on first launch it reports `not-found`. `load()` before `start()`, or after `dispose()`, throws.
 
+Build every saved object in `install`. One built after a load starts at its ref default, and its next save replaces the saved value; the engine warns. One built after `install` is also outside the module's persistent context and persistence namespace. Make a late object ephemeral, as `TimedProgress` allows.
+
 With persistence on, the engine autosaves every 30 s. `autoSaveInterval` sets the period, and 0 turns autosave off. `engine.autoSaveInterval` changes it while the game runs, so a player's autosave setting writes there. Autosave waits until a load has run, so a late `load()` never finds its save overwritten with defaults. In dev, a first tick before any load warns while autosave is on. Call `engine.save()` at moments such as a run's end, in addition to the interval.
 
 A load that fails for any reason except `not-found` protects its slot from writes until `saveManager.releaseSlot(id)` or `deleteSave()`. It emits `save:slot-protected` for a UI that offers to discard the unreadable save. `ctx.onLoad` runs after every successful load path, and `ctx.onSave` before every serialization. A "Saved" UI listens to `save:written`, not `onSave`, which is emitted only once a slot is written.
