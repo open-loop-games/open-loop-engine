@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repo conventions are harness-neutral and live in `AGENTS.md` at the repo root, imported below.
+Repo conventions are in `AGENTS.md` at the repo root, imported below.
 Edit that file, not this one — this is only the Claude Code entry point into it.
 
 @../AGENTS.md
