@@ -51,9 +51,9 @@ export type {
 } from './walker';
 
 // === CROSS-LAYER TYPE RE-EXPORTS ===
-// Harness surfaces types from every lower layer (engine build helpers,
-// perturbation targets, sensitivity analyzers). Selective re-exports only;
-// values live in their owning layer.
+// The balance harness re-exports types from the lower source layers and
+// `engine.ts`: engine build helpers, perturbation targets, analyzers. Each is
+// re-exported by name. Values stay in their owning source layer, except `Decimal`.
 
 export type {
   DecimalSource,

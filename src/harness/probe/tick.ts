@@ -1,18 +1,19 @@
 /**
- * `runBeatProbe` — the single beat-timing probe. Dispatches on
- * {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s three loop modes.
+ * `runBeatProbe` — the one beat-timing probe. Dispatches on
+ * {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s three run modes.
  *
- * For each beat, drives `seeds.length` fresh engines until the predicate
- * fires (or `maxSimTime` is reached, or stasis is observed in non-tick
- * modes), aggregated into per-beat termination-time distributions.
+ * For each beat, drives `seeds.length` new engines until the predicate
+ * holds, `maxSimTime` is reached, or stasis is observed outside `'uniform'`
+ * mode. The results are aggregated into per-beat termination-time
+ * distributions.
  *
- * When {@link Beat.tuningWindow} is set, the per-beat result carries
- * `inTuningWindow = terminationTime.p50 ∈ tuningWindow`. Pure interpretation —
- * the underlying distribution is unchanged.
+ * When {@link Beat.tuningWindow} is set, the per-beat result has
+ * `inTuningWindow = terminationTime.p50 ∈ tuningWindow`. This only
+ * interprets the result; the underlying distribution is unchanged.
  *
- * One call to `runMatrixUntil` per beat (rather than one big matrix)
- * because the predicate varies by beat; the input that varies is the
- * predicate, and engine builds are fresh per `(beat × seed)` either way.
+ * One call to `runMatrixUntil` per beat (rather than one big matrix),
+ * because the predicate varies by beat. Engines are built new per
+ * `(beat × seed)` either way.
  */
 
 import { runMatrixUntil } from '../run-matrix-until';
@@ -21,25 +22,26 @@ import type { UntilCell, UntilPredicate } from '../types';
 import type { BeatResult, BeatProbeOptions } from './types';
 
 /**
- * For each beat, drive `seeds.length` fresh engines until the beat predicate
- * fires (or `maxSimTime` elapses, or — in non-tick modes — stasis is
- * observed), aggregated into per-beat termination-time distributions.
+ * For each beat, drive `seeds.length` new engines until the beat predicate
+ * holds, `maxSimTime` elapses, or stasis is observed outside `'uniform'`
+ * mode. The results are aggregated into per-beat termination-time
+ * distributions.
  *
  * Mode dispatch (`options.mode`, default `'uniform'`):
  * - `'uniform'` — fixed-tick loop, content-blind. Default.
- * - `'next-event'` — walker-visible event-stepping for live-rate-insufficient legs.
- *   Requires `options.buildAccessor`.
- * - `'stasis-aware'` — per-tick stasis check; terminates with
- *   `counts.unreachable` for seeds the walker confirms cannot fire. Requires
+ * - `'next-event'` — walker-visible event stepping, for a beat whose live
+ *   rate is too low to reach it soon. Requires `options.buildAccessor`.
+ * - `'stasis-aware'` — a stasis check each iteration; counts a seed in
+ *   `counts.unreachable` when the walker confirms its beat cannot be reached. Requires
  *   `options.buildAccessor`.
  *
- * @param options — beats, seeds, fresh-engine factory, sim-time ceiling,
- *   optional tick granularity, optional `mode` + `buildAccessor`.
+ * @param options — beats, seeds, new-engine factory, sim-time cap,
+ *   optional `tickDelta`, optional `mode` + `buildAccessor`.
  * @returns one {@link BeatResult} per beat, with termination-time stats
- *   over predicate-fired seeds, counts split by termination reason, and
- *   `inTuningWindow` when the beat carried a `tuningWindow`.
+ *   over the seeds whose predicate held, counts split by termination reason,
+ *   and `inTuningWindow` when the beat has a `tuningWindow`.
  *
- * The probe stops and disposes each run's engine; pass a no-op `teardown`
+ * The probe stops and disposes the engine of each headless run; pass a no-op `teardown`
  * to keep them alive.
  *
  * @example

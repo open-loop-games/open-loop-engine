@@ -1,10 +1,10 @@
 /**
  * Probe substrate — types.
  *
- * A probe collects per-beat termination-time distributions from a
- * `seeds`-wide sweep. {@link runBeatProbe} is the single shipped implementation;
+ * A beat probe collects per-beat termination-time distributions from a
+ * `seeds`-wide sweep. {@link runBeatProbe} is the one shipped implementation;
  * it dispatches on {@link BeatProbeOptions.mode} into one of `runMatrixUntil`'s
- * three loop modes (`'uniform'` / `'next-event'` / `'stasis-aware'`).
+ * three run modes (`'uniform'` / `'next-event'` / `'stasis-aware'`).
  */
 
 import type { Engine } from '@/engine';
@@ -12,22 +12,21 @@ import type { GameStateAccessor } from '@/primitives/types';
 import type { MetricStats, RunContext, RunMode } from '../types';
 
 /**
- * One beat's predicate + identity. Archetype-agnostic — no game-specific
- * spec window, just the predicate to evaluate and an optional tuning window
+ * One beat's predicate + identity. Game-agnostic: no game-specific
+ * window, only the predicate to evaluate and an optional tuning window
  * for `inTuningWindow` classification on the result.
  */
 export interface Beat {
   id: string;
-  /** Predicate evaluating engine state, fired when the beat lands. */
+  /** Predicate over engine state; it holds once the beat is reached. */
   predicate: (engine: Engine) => boolean;
   /**
    * Optional hand-authored tuning window in sim-seconds, `[lower, upper]`,
    * for design-time balance iteration — a hypothesis a balance script tunes
    * toward, not a claim about recorded behavior. When set,
    * {@link BeatResult.inTuningWindow} is `true` iff `terminationTime.p50`
-   * falls inside the window. Pure interpretation layer on top of the
-   * termination distribution; absent when consumers aren't tuning against
-   * a window.
+   * falls inside the window. It only interprets the termination
+   * distribution; absent when consumers are not tuning against a window.
    */
   tuningWindow?: [number, number];
 }
@@ -37,50 +36,53 @@ export interface Beat {
  *
  * `counts.unreachable` is non-zero only when the probe ran in `'next-event'` or
  * `'stasis-aware'` mode and a seed terminated with
- * `RunUntilResult.terminated === 'unreachable'`. Tick-mode probes always
- * report `unreachable: 0` — tick-mode is content-blind.
+ * `RunUntilResult.terminated === 'unreachable'`. `'uniform'`-mode probes always
+ * report `unreachable: 0`, because `'uniform'` mode is content-blind.
  */
 export interface BeatResult {
   beatId: string;
-  /** Stats over predicate-terminated runs only. Absent when no seed fired. */
+  /**
+   * Stats over predicate-terminated headless runs only. Absent when no seed
+   * reached the beat.
+   */
   terminationTime: MetricStats | undefined;
   /** Counts of how each seed terminated. Sums to `seeds.length`. */
   counts: { predicate: number; maxSimTime: number; unreachable: number };
   /**
-   * Echoed from {@link Beat.tuningWindow} when set, so renderers can
-   * display the window without holding the originating `Beat[]`.
+   * Copied from {@link Beat.tuningWindow} when set, so a UI can
+   * show the window without holding the originating `Beat[]`.
    */
   tuningWindow?: [number, number];
   /**
    * Present iff {@link Beat.tuningWindow} is set. `true` iff
-   * `terminationTime.p50` falls inside the window. Allows windowed-arc
-   * tuning usage as a first-class probe field without a wrapper.
+   * `terminationTime.p50` falls inside the window. So tuning an arc against
+   * a window needs no wrapper.
    */
   inTuningWindow?: boolean;
 }
 
 /**
- * Configuration for {@link runBeatProbe}. `buildEngine` is invoked per
+ * Options for {@link runBeatProbe}. `buildEngine` is invoked per
  * `(beat, seed)` — the probe reuses the fresh-engine contract from
- * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'uniform'`
- * because event-stepping and stasis-aware-tick modes introspect content
+ * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'uniform'`,
+ * because the `'next-event'` and `'stasis-aware'` modes read content
  * through the walker.
  */
 export interface BeatProbeOptions {
   /**
-   * Build a fresh, started engine for each `(beat × seed)` run. Seeding and
+   * Build a new, started engine for each `(beat × seed)` headless run. Seeding and
    * stopping follow {@link UntilCell.buildEngine}.
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**
-   * Build a read-side accessor for a freshly-built engine. Required when
+   * Build a read-side accessor for a newly built engine. Required when
    * `mode !== 'uniform'`. Called once per `(beat, seed)` alongside
    * `buildEngine`; the accessor must read the same state the engine ticks
    * against.
    */
   buildAccessor?: (engine: Engine) => GameStateAccessor;
   /**
-   * Called once per `(beat, seed)` run as {@link UntilCell.teardown} —
+   * Called once per `(beat, seed)` headless run as {@link UntilCell.teardown} —
    * release what `buildEngine` built. Defaults to `engine.dispose()`.
    */
   teardown?: (engine: Engine, ctx: RunContext) => void;
@@ -88,20 +90,21 @@ export interface BeatProbeOptions {
   /** Seeds to run per beat. */
   seeds: number[];
   /**
-   * Sim-seconds ceiling per run. Should comfortably exceed the largest
-   * expected beat fire time so outlier seeds don't get truncated.
+   * Sim-time cap per headless run, in sim-seconds. It should exceed the largest
+   * expected fire time by a clear margin, so outlier seeds are not cut short.
    */
   maxSimTime: number;
   /**
-   * Seconds of sim-time per tick. Defaults to 1 — balance work is
-   * measured in minutes, so sub-second tick fidelity is wasted cost.
-   * Lower only when a beat predicate depends on sub-second timing.
+   * Sim-seconds per iteration. Defaults to 1: balance work is
+   * measured in minutes, so sub-second resolution is wasted cost.
+   * Lower it only when a beat predicate depends on sub-second timing.
    */
   tickDelta?: number;
   /**
-   * Run mode. Defaults to `'uniform'`. `'next-event'` event-steps via the walker
-   * (attacks never-fires cost for live-rate-insufficient legs); `'stasis-aware'`
-   * short-circuits unreachable runs with a per-tick walker check. See {@link RunMode}.
+   * Run mode. Defaults to `'uniform'`. `'next-event'` steps from event to
+   * event via the walker. It cuts the cost of a beat whose live rate is too
+   * low to reach it soon. `'stasis-aware'` ends unreachable headless runs
+   * early with a walker check each iteration. See {@link RunMode}.
    */
   mode?: RunMode;
   /** See `RunUntilOptions.bisectTolSec`. Ignored when `mode !== 'next-event'`. */

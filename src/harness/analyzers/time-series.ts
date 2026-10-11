@@ -1,20 +1,20 @@
 /**
- * Per-tick series tracker — samples a single resource every tick and emits
+ * Time-series analyzer — samples a single resource every tick and reports
  * one scalar metric per tick (`time-series:{id}.t{i}`) instead of a reduced
  * peak/final/avg trio. Keys use {@link Resource.id}, unique per engine, so
  * two resources sharing a display name never merge.
  *
- * The design leans on the harness aggregator rather than adding a new
+ * The design depends on the harness aggregator rather than adding a new
  * Decimal-array metric type. {@link AnalyzerSummary.metrics} is scalar-only,
- * so a trajectory can't ride through as one value — but by fanning each tick
- * out to its own key, the `${analyzerName}.${metricKey}` aggregation scheme
- * computes min/mean/max/percentiles *per tick across seeds* automatically.
- * That per-tick distribution is exactly the variance band a balance UI wants
- * to chart, produced with no bespoke aggregation. The cost is `ticks` metric
- * keys per tracked resource — acceptable for dev balance tooling, which is
- * the only caller; the default analyzer pack stays scalar-only.
+ * so a trajectory cannot pass through as one value. But each tick has its own
+ * key, so the `${analyzerId}.${metricKey}` aggregation scheme computes
+ * min/mean/max/percentiles *per tick across seeds* automatically. That
+ * per-tick distribution is exactly the variance range a balance UI charts,
+ * with no bespoke aggregation. The cost is `ticks` metric keys per sampled
+ * resource. Balance work in development is the only caller, so that cost is
+ * acceptable; the default analyzer pack stays scalar-only.
  *
- * Because every run in a fixed-tick sweep executes the same tick count, the
+ * Because every headless run in a fixed-tick sweep executes the same tick count, the
  * `t{i}` keyspace is identical across seeds, so each per-tick metric has a
  * full seed sample and the aggregate's `count` matches the seed count.
  *
@@ -31,17 +31,17 @@ import { Decimal } from '@/primitives/decimal';
 
 /**
  * Create an {@link Analyzer} that records a single resource's value at every
- * tick and emits it as `time-series:{id}.t{i}` (zero-based tick index).
+ * tick and reports it as `time-series:{id}.t{i}` (zero-based tick index).
  *
- * The analyzer's `id` is `time-series:{id}` so multiple time-series analyzers
- * coexist in one run without metric-key collisions under the harness's
- * `${analyzerName}.${metricKey}` aggregation scheme.
+ * The analyzer's `id` is `time-series:{id}`, so multiple time-series analyzers
+ * coexist in one headless run without metric-key collisions under the harness's
+ * `${analyzerId}.${metricKey}` aggregation scheme.
  *
  * @example
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
  * const analyzer = createTimeSeriesAnalyzer(gold);
- * runHeadless({ analyzers: [analyzer], ticks: 200, ... });
+ * runHeadless({ setup: () => [analyzer], ticks: 200, ... });
  * // analyzer.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }
  * ```
  */
@@ -62,8 +62,8 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
       sample();
     },
     summarize(): AnalyzerSummary {
-      // Zero-tick runs still report a single-point series so the trajectory
-      // is never empty — mirrors the resource-peak tracker's fallback.
+      // Zero-tick headless runs still report a single-point series so the trajectory
+      // is never empty — mirrors the resource-peak analyzer's fallback.
       if (samples.length === 0) sample();
       const metrics: Record<string, number> = {};
       for (let i = 0; i < samples.length; i++) {
@@ -81,7 +81,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
  * Kept separate from the default pack (rather than merged behind a flag)
  * because the per-tick fan-out is expensive relative to the scalar default,
  * so callers opt in explicitly. Intended to be called from inside a harness
- * `Cell.setup()` so it sees the live per-run resource set.
+ * `Cell.setup()` so it sees the live resource set of its headless run.
  */
 export function timeSeriesAnalyzerPack(engine: Engine): Analyzer[] {
   const registry = engine.tryInject(ResourceRegistryKey);

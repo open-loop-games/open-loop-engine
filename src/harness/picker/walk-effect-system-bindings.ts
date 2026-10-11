@@ -1,6 +1,7 @@
 /**
- * Effect-system binding walker — emit one {@link ModifierPickerEntry} per grant binding
- * on every effect-system def registered in {@link EffectSystemRegistryKey}.
+ * Effect-system grant walker — return one {@link ModifierPickerEntry} per
+ * lowered grant on every effect-system def registered in
+ * {@link EffectSystemRegistryKey}.
  *
  * @internal
  */
@@ -12,21 +13,20 @@ import { effectDefBindings, forEachEffectDef } from '../walk';
 import type { ModifierPickerEntry } from './types';
 
 /**
- * Walk every effect system (temporary + persistent) auto-registered into
- * the engine's {@link EffectSystemRegistryKey} and emit one
- * {@link ModifierPickerEntry} per binding on each def — one per chain a
- * grant targets, so a chain array contributes one entry per chain.
+ * Walk every effect system (temporary and conditional) auto-registered into
+ * the engine's {@link EffectSystemRegistryKey}. Return one
+ * {@link ModifierPickerEntry} per lowered grant on each def: one per chain a grant
+ * targets, so a chain array gives one entry per chain.
  *
- * Every declared binding is emitted, whether or not its effect is active.
- * Factory-form `modifiers` lists, modifier factories and the shorthands are
- * built once at walk time, as the effect systems do on activation, so such
- * an entry carries a fresh object that isn't the one living in the chain.
- * That only affects `modifier` identity and `indexInChain`: perturbation
- * addresses the binding by system, def and index, and wraps whatever each
- * activation binds.
+ * The walker returns every declared lowered grant, whether or not its effect is
+ * active. It builds factory-form `grants` lists, modifier factories and the
+ * shorthands once at walk time, as the effect systems do on activation. So
+ * such an entry holds a fresh object, not the one in the chain. That only
+ * affects `modifier` identity and `indexInChain`. Perturbation addresses the
+ * lowered grant by system, def and index, and wraps whatever each activation binds.
  *
- * Missing registry (e.g. an engine constructed outside the standard
- * `createEngine` flow) degrades to an empty array — not a crash.
+ * A missing registry (e.g. an engine built outside the standard
+ * `createEngine` flow) gives an empty array, not a crash.
  *
  * @internal
  */

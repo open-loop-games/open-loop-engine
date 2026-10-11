@@ -5,7 +5,7 @@
  * - {@link floorSteps} counts whole steps in a span without losing the last
  *   one to floating-point quotient error.
  * - {@link reachedTime} compares an accumulated sim-time against a target
- *   with the same tolerance, so a step that lands on the target counts.
+ *   with the same tolerance, so a sum of steps that ends on the target counts.
  *
  * @cluster runners
  * @internal
@@ -19,7 +19,7 @@ const STEP_QUOTIENT_EPSILON = 1e-12;
 
 /**
  * Whole `step`s in `span` — `Math.floor(span / step)`, tolerant of a quotient
- * that lands a hair under an integer.
+ * that ends a hair under an integer.
  *
  * @internal
  */
@@ -29,7 +29,7 @@ export function floorSteps(span: number, step: number): number {
 }
 
 /**
- * Whether `simTime` has reached `target`, counting a sum of steps that lands
+ * Whether `simTime` has reached `target`, counting a sum of steps that ends
  * a rounding error short (`3 × 0.3` is `0.8999…`) as there.
  *
  * @internal

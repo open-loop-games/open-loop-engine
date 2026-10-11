@@ -1,10 +1,10 @@
 /**
- * Scratch engine from a save — a fresh `createEngine` under an isolated
- * persistence namespace backed by in-memory storage, hydrated from a save
- * blob. Predictors, workers and the balance workbench load a player's save
- * into one to simulate ahead without touching the live game;
- * `createSensitivityCell` composes it into a harness `Cell` for per-run
- * scratch engines.
+ * Scratch engine from a save — a fresh `createEngine` engine in an isolated
+ * persistence namespace with in-memory storage, loaded from save text.
+ * Predictors, Web Workers and the balance workbench load a player's save
+ * into one, to simulate ahead without touching the live game.
+ * `createSensitivityCell` composes it into a `Cell` that builds one scratch
+ * engine per headless run.
  *
  * @cluster runners
  */
@@ -22,20 +22,20 @@ const NOOP_TIMER_PROVIDER: TimerProvider = {
 
 /** Options for {@link createEngineFromSave}. */
 export interface CreateEngineFromSaveOptions {
-  /** Exported save string (from `saveManager.exportSave()`). */
+  /** Save text, as `saveManager.exportSave()` returns it. */
   saveText: string;
   /** Modules to install on the new engine, in order. */
   modules: EngineModule[];
   /**
-   * Persistence namespace. Must be unique among engines not yet disposed so
-   * persistent-ref contexts and storage keys don't alias. Defaults to a
-   * fresh `'workbench-scratch-<n>'` per call.
+   * Persistence namespace. Keep it unique among engines not yet disposed,
+   * so persistent contexts and storage keys don't alias. Defaults to a fresh
+   * `'workbench-scratch-<n>'` per call.
    */
   persistenceNamespace?: string;
   /**
-   * Overrides for the inner `createEngine` call. `gameId`, `persistence`,
-   * `persistenceNamespace`, `storageAdapter`, and `autoSaveInterval` are
-   * fixed by this helper and cannot be overridden.
+   * Extra options for the inner `createEngine` call. This factory sets
+   * `gameId`, `persistence`, `persistenceNamespace`, `storageAdapter` and
+   * `autoSaveInterval` itself, and the caller cannot change them.
    */
   engineOptions?: Omit<
     EngineOptions,
@@ -46,23 +46,24 @@ export interface CreateEngineFromSaveOptions {
 let scratchCounter = 0;
 
 /**
- * Load a save into a fresh, isolated engine running the given modules — a
- * scratch copy of the game to simulate or inspect without touching the live
- * one. It adopts the save's own `gameId`, so any save your game exported
- * loads, and it installs the modules, starts the engine and imports the save.
+ * Load a save into a fresh, isolated engine running the given modules. The
+ * result is a scratch copy of the game, to simulate or inspect without
+ * touching the live one. It adopts the save's own `gameId`, so any save your
+ * game exported loads. It installs the modules, starts the engine and imports
+ * the save.
  *
- * The engine gets a no-op timer, so `start()` arms no real `setInterval`:
- * drive it with `tickDriver.tickOnce()` / `advanceTime`, or a harness
- * runner. Pass `engineOptions.timerProvider` for a self-ticking one (then stop it
- * yourself). The caller owns the engine: its namespaced persistent refs stay
- * in the process-wide registry until `engine.dispose()`, so dropping the
- * reference alone retains them.
+ * The engine gets a no-op timer, so `start()` arms no real `setInterval`.
+ * Drive it with `tickDriver.tickOnce()` / `advanceTime`, or a balance-harness
+ * runner. Pass `engineOptions.timerProvider` for a self-ticking one, and stop
+ * it yourself. The caller owns the engine. Its namespaced persistent refs stay
+ * in the persistent-ref registry until `engine.dispose()`, so dropping the
+ * reference alone does not free them.
  *
- * @param options - The save blob, the modules to install, and optionally a
+ * @param options - The save text, the modules to install, and optionally a
  *   persistence namespace and extra `createEngine` options.
- * @returns The started engine, with the save applied.
- * @throws {Error} when the blob isn't valid JSON or the save fails to import;
- *   the half-built engine is disposed first.
+ * @returns The started engine, with the save loaded.
+ * @throws {Error} when the save text isn't valid JSON, or when the import
+ *   fails. On an import failure the engine is disposed first.
  *
  * @example
  * ```ts
@@ -86,10 +87,9 @@ export function createEngineFromSave(options: CreateEngineFromSaveOptions): Engi
     engineOptions: config = {},
   } = options;
 
-  // Adopt the source envelope's gameId so saveManager.importSave's gameId
-  // guard accepts the blob. The scratch engine is otherwise isolated via
-  // memory storage and a unique persistence namespace, so the label itself
-  // carries no further meaning here.
+  // Adopt the envelope's gameId so saveManager.importSave's gameId guard
+  // accepts the save text. Memory storage and a unique persistence namespace
+  // isolate the scratch engine, so the gameId has no other meaning here.
   let envelopeGameId: string;
   try {
     envelopeGameId = (JSON.parse(saveText) as { gameId: string }).gameId;

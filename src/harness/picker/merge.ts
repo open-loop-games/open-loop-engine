@@ -1,7 +1,7 @@
 /**
  * Picker merge — run the discovery walkers and deduplicate modifier output
  * by `Modifier` object identity. The `createPickerSnapshot` factory is the
- * single public entry point for the picker subsystem.
+ * picker's one public function.
  */
 
 import type { Engine } from '@/engine';
@@ -11,12 +11,11 @@ import { walkEffectSystemBindings } from './walk-effect-system-bindings';
 import { walkTunables } from './walk-tunables';
 
 /**
- * Priority order for deduplication of modifier entries: when the same
- * `Modifier` instance is reachable via multiple walkers, the entry with
- * the higher-priority source wins. `effect-system` is most specific
- * (user-intuitive), `chain-registry` is the derived auto-registration
- * path. Tunable entries don't compete with modifier identity and skip
- * this dedup.
+ * Priority order for deduplication of modifier entries. When several walkers
+ * reach the same `Modifier` instance, the entry from the higher-priority
+ * walker wins. `effect-system` is the most specific and the most intuitive;
+ * `chain-registry` is the derived auto-registration path. Tunable entries
+ * don't compete on modifier identity and skip this deduplication.
  */
 const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', number> = {
   'effect-system': 2,
@@ -24,28 +23,27 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
 };
 
 /**
- * Build a single {@link PickerSnapshot} by running all discovery walkers,
- * deduplicating modifier-entry output by `Modifier` object identity, and
- * grouping the result by discovery layer.
+ * Build one {@link PickerSnapshot}: run all discovery walkers, deduplicate
+ * modifier entries by `Modifier` object identity, and group the result by
+ * walker.
  *
- * Modifier dedup: a `Map<Modifier, ModifierPickerEntry>` collects one
+ * Modifier deduplication: a `Map<Modifier, ModifierPickerEntry>` collects one
  * canonical entry per modifier. Walkers run in effect-system → chain-registry
- * order; ties are broken by priority (see {@link MODIFIER_SOURCE_PRIORITY}).
- * Because the map keys on object identity, this is snapshot-scoped — a
- * later `createPickerSnapshot` call rebuilds the map from scratch and a
- * modifier that's been replaced in-place will naturally miss the old
- * identity.
+ * order; priority breaks ties (see {@link MODIFIER_SOURCE_PRIORITY}). The map
+ * keys on object identity, so it is snapshot-scoped. A later
+ * `createPickerSnapshot` call rebuilds the map from scratch, and a modifier
+ * replaced in place misses the old identity.
  *
- * Tunable entries are emitted directly into the `tunables` group, keyed
- * by `(registryId, key)` at construction time. They never collide with
- * modifier entries — perturbation dispatches by `entry.kind` so the two
- * layers stay independent.
+ * Tunable entries go directly into the `tunables` group, keyed by
+ * `(registryId, key)` when they are built. They never collide with modifier
+ * entries: perturbation dispatches by `entry.kind`, so the two kinds stay
+ * independent.
  *
  * @param engine - The engine to enumerate. Walkers read auto-registered
  *   entries from `ChainRegistryKey`, `EffectSystemRegistryKey`, and
  *   `TuningRegistriesKey` via `engine.tryInject` — engines without those
  *   keys produce empty groups rather than crashing.
- * @returns {@link PickerSnapshot} with entries grouped by discovery layer
+ * @returns {@link PickerSnapshot} with entries grouped by walker
  *   (`effectSystem`, `chains`, `tunables`) plus a flat `all` list.
  *
  * @example

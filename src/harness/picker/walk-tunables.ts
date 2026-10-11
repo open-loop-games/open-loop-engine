@@ -1,21 +1,21 @@
 /**
- * Tunables walker — emit one {@link TunablePickerEntry} per `tunable()`
+ * Tunables walker — return one {@link TunablePickerEntry} per `tunable()`
  * key registered into a {@link TuningRegistry} auto-registered with the
  * engine's {@link TuningRegistriesKey}.
  *
- * This walker reflects the **designer-flagged tuning surface**: only
- * values explicitly declared via `tunable()` against a `TuningRegistry`
- * surface here. Implementation constants, derived values, and structural
- * modifier identities (already discoverable via chain-registry) stay
- * invisible — the principle lives in `override-registry.ts` under
- * `tunable()` and `createTuningRegistry()`.
+ * This walker reflects the **designer-flagged tunables**: only values
+ * explicitly declared via `tunable()` against a `TuningRegistry` appear
+ * here. Implementation constants, derived values and structural modifier
+ * identities (which the chain-registry walker already finds) stay out
+ * of it. The principle is in `override-registry.ts`, under `tunable()`
+ * and `createTuningRegistry()`.
  *
- * Scope-only keys (transient `pushOverrides` overrides) are intentionally
- * excluded — `getBaseKeys()` returns the base map only. See the
+ * Keys that only a scoped override sets (`pushOverrides`) are excluded on
+ * purpose: `getBaseKeys()` returns the base map only. See the
  * `OverrideRegistry.getBaseKeys` TSDoc for the rationale.
  *
- * Missing registry (e.g. an engine constructed outside the standard
- * `createEngine` flow) degrades to an empty array — not a crash.
+ * A missing registry (e.g. an engine built outside the standard
+ * `createEngine` flow) gives an empty array, not a crash.
  *
  * @internal
  */

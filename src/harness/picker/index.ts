@@ -1,8 +1,8 @@
 /**
- * Picker — walk engine state to enumerate addressable choices for solvers
+ * Picker — walk engine state to enumerate perturbable addresses for solvers
  * and UIs. `createPickerSnapshot` runs the discovery walkers (effect-system,
- * chain-registry, tunables), dedupes modifier entries by `Modifier`
- * identity, and exposes the result grouped by discovery layer.
+ * chain-registry, tunables). It deduplicates modifier entries by `Modifier`
+ * identity, and groups the result by walker.
  */
 
 export type {

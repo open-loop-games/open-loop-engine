@@ -1,9 +1,9 @@
 /**
- * Work-plan planner — the parallelism seam. The matrix runners do sync
- * iteration; this planner returns the same flat `WorkItem[]` they iterate,
- * so a consumer that wires a worker pool maps through the array instead
- * of reshaping the harness loop. Keeping the planner generic over cell
- * shape lets fixed-tick ({@link Cell}) and until-runner ({@link UntilCell})
+ * Work-plan planner — the parallelism seam. The matrix runners iterate
+ * synchronously; this planner returns the same flat `WorkItem[]` they iterate.
+ * So a consumer that spreads headless runs over Web Workers maps over the array instead
+ * of reshaping the balance harness loop. The planner is generic over cell
+ * shape, so fixed-tick ({@link Cell}) and until-runner ({@link UntilCell})
  * sweeps share one plan format.
  *
  * @cluster runners
@@ -18,7 +18,7 @@ import type { WorkItem } from './types';
  *
  * @param options - `{ cells, seeds }` — only the iterable dimensions matter,
  *   so this accepts any superset of `MatrixOptions` / `MatrixUntilOptions`.
- * @returns Flat `WorkItem<C>[]` carrying the original cell reference, cell
+ * @returns Flat `WorkItem<C>[]` with the original cell reference, cell
  *   index, seed value, and seed index for each `(cell, seed)` pair.
  *
  * @example
@@ -30,7 +30,7 @@ import type { WorkItem } from './types';
  *   handle(item, result);
  * }
  *
- * // Worker-pool fan-out — same plan, distributed:
+ * // Web Worker fan-out — same plan, distributed:
  * const plan = createWorkPlan({ cells, seeds });
  * await Promise.all(plan.map((item) => pool.run(serialize(item))));
  * ```

@@ -1,39 +1,38 @@
 /**
- * Predicate-bounded sim runner — engine-aware counterpart to `runHeadless`.
+ * Predicate-bounded runner — the engine-aware counterpart to `runHeadless`.
  *
- * `runHeadless` takes a tick callback and a fixed tick budget. `runUntil`
- * takes an `Engine` and a predicate, driving the engine via
- * `engine.tickDriver.advanceTime(tickDelta)` until the predicate fires or
- * `maxSimTime` is reached. Headless beat-timing tests (archetype sim
- * suites) are the canonical consumer — they want "how long does it take
- * for state X to hold?" rather than "what does state look like after N
+ * `runHeadless` takes a `tick` function and a fixed tick count. `runUntil`
+ * takes an `Engine` and a predicate. It drives the engine via
+ * `engine.tickDriver.advanceTime(tickDelta)` until the predicate holds or
+ * `maxSimTime` is reached. Beat-timing tests are the typical consumer: they
+ * ask "how long until state X holds?", not "what is the state after N
  * ticks?".
  *
- * tickDelta is caller-authoritative: each iteration advances the engine by
- * exactly `tickDelta` seconds via `advanceTime`, which respects fixed-mode
- * accumulator semantics for source-faithful ports. A `tickDelta` above the
- * driver's `maxDeltaTime` runs as several engine ticks under the cap, so
- * reported sim-time is always simulated sim-time. This
- * decouples the harness from the engine's live `intervalRate` — coarsening
- * tickDelta at the harness level is a real speedup, not a reporting phantom,
- * up to the cap. (`tickOnce()` exists for deterministic-replay paths that
+ * The caller's `tickDelta` decides the advance: each iteration advances the
+ * engine by exactly `tickDelta` seconds via `advanceTime`, which keeps
+ * fixed-mode accumulator semantics for source-faithful ports. A `tickDelta`
+ * above the driver's `maxDeltaTime` runs as several engine ticks under the
+ * cap, so reported sim-time is always the sim-time the engine simulated. This
+ * decouples the balance harness from the engine's live `intervalRate`.
+ * Coarsening `tickDelta` is a real speedup up to the cap, not only a
+ * reporting change. (`tickOnce()` exists for deterministic-replay paths that
  * want the engine's own fixedDt regardless of caller dt; `runUntil`
  * deliberately does not call it.)
  *
- * The predicate receives an {@link UntilContext} snapshot (`tick`,
+ * The predicate receives an {@link UntilContext} snapshot (`iteration`,
  * `simTime`) and reads game state via closure over the caller's engine.
- * Predicate is evaluated *before* each tick, including the zero-tick case,
- * so a run that starts already in the target state terminates immediately
+ * The predicate is evaluated *before* each iteration, including iteration 0.
+ * So a headless run that starts already in the target state terminates at once
  * with `totalTicks: 0`.
  *
  * Run mode (`options.mode`):
  *
- * - `'uniform'` (default) — fixed-tick loop above. Content-blind.
- * - `'next-event'` — walker-visible event-stepping with fast-tick fallbacks.
- *   Requires `options.accessor`, and takes no analyzers. Predicate fire-time
- *   can be resolved within an advance via `options.bisectTolSec`.
- * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check.
- *   When the walker reports no finite or opaque-predicate transition,
+ * - `'uniform'` (default) — the fixed-tick loop above. Content-blind.
+ * - `'next-event'` — walker-visible event stepping with fast-tick fallbacks.
+ *   Requires `options.accessor`, and takes no analyzers. `options.bisectTolSec`
+ *   can resolve the predicate's fire time within an advance.
+ * - `'stasis-aware'` — the fixed-tick loop with a stasis check each iteration.
+ *   When the walker reports no finite or opaque-predicate transition, it
  *   terminates with `terminated: 'unreachable'`. Requires `options.accessor`.
  *
  * {@link runMatrixUntil} is the `cells × seeds` counterpart.
@@ -50,11 +49,11 @@ import type { RunUntilOptions, RunUntilResult } from './types';
 /**
  * Drive `options.engine` via `engine.tickDriver.advanceTime(tickDelta)` until
  * `options.until` returns `true` or `options.maxSimTime` sim-seconds have
- * elapsed, whichever comes first. Returns the tick count, elapsed sim-time,
- * termination reason, and analyzer results.
+ * elapsed, whichever comes first. Returns the iteration count, elapsed sim-time,
+ * termination reason, and analyzer summaries.
  *
- * @param options - {@link RunUntilOptions} — engine, predicate, max sim-time
- *   ceiling, optional tickDelta/setup/seed, optional mode + accessor.
+ * @param options - {@link RunUntilOptions} — engine, predicate, sim-time
+ *   cap, optional tickDelta/setup/seed, optional mode + accessor.
  * @returns {@link RunUntilResult} — superset of `HeadlessResult` with a
  *   `terminated: 'predicate' | 'maxSimTime' | 'unreachable'` field.
  *
@@ -92,7 +91,7 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
   const analyzers = options.setup?.() ?? [];
   if (mode === 'next-event' && analyzers.length > 0) {
     throw new Error(
-      'runUntil: mode "event" steps variable distances and cannot drive the analyzer tick lifecycle — use mode "tick" for analyzers',
+      'runUntil: mode "next-event" advances by varying distances and cannot drive the analyzer tick lifecycle — use mode "uniform" for analyzers',
     );
   }
 

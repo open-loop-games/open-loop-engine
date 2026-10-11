@@ -24,18 +24,18 @@ import type {
 /**
  * Run baseline plus every variant, then compute per-variant
  * `{ absolute, relative }` deltas against the baseline per metric. Each
- * variant's cell name is forced to the variant identity (axis-expanded
- * variants get `${axisName}=${value}` × … names) — the variant's identity
- * comes from the config, not whatever the `patch` function chose.
+ * variant's cell id is set to the variant's id (axis-expanded variants get
+ * `${axisId}=${value}` × … ids). So the variant's identity comes from the
+ * options, not from what the `patch` function set.
  *
  * Cell shape picks the runner: a {@link Cell} baseline drives
  * {@link runMatrix} (fixed-tick), an {@link UntilCell} baseline drives
- * {@link runMatrixUntil} (predicate-bounded). Until-mode requires
- * {@link SensitivityOptions.until} and `maxSimTime`.
+ * {@link runMatrixUntil} (predicate-bounded). A predicate-bounded sweep
+ * requires {@link SensitivityOptions.until} and `maxSimTime`.
  *
  * @param options - {@link SensitivityOptions} — baseline cell, flat variants
- *   and/or axes, seeds, optional callbacks, histogram opt-in, and (for
- *   until-mode) the shared predicate + ceiling.
+ *   and/or axes, seeds, optional option callbacks, histogram opt-in, and (for
+ *   a predicate-bounded sweep) the shared predicate + sim-time cap.
  * @returns {@link SensitivityResult} — baseline {@link CellResult} plus
  *   one {@link SensitivityVariantResult} per variant in expansion order
  *   (flat variants first, then axis-expanded cartesian product).
@@ -43,13 +43,13 @@ import type {
  * @example Fixed-tick
  * ```ts
  * const result = runSensitivity({
- *   baseline: { id: 'baseline', setup: () => [createGoldTracker()], tick, ticks: 1000 },
+ *   baseline: { id: 'baseline', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
  *   variants: [
- *     { id: 'fast-gold', patch: (b) => ({ ...b, setup: () => [createFastGoldTracker()] }) },
+ *     { id: 'fast-gold', patch: (b) => ({ ...b, setup: () => [createFastGoldAnalyzer()] }) },
  *   ],
  *   seeds: [1, 2, 3],
  * });
- * result.variants[0].deltas['gold-tracker.peak'].relative; // e.g. +0.42
+ * result.variants[0].deltas['gold-analyzer.peak'].relative; // e.g. +0.42
  * ```
  *
  * @example Predicate-bounded with axis-grouped variants
@@ -82,7 +82,7 @@ export function runSensitivity<C extends Cell | UntilCell = Cell>(
   }
   if (options.maxSimTime !== undefined || options.mode !== undefined) {
     throw new Error(
-      'runSensitivity: `maxSimTime` / `mode` require `until` to switch the sweep to predicate-bounded mode',
+      'runSensitivity: `maxSimTime` / `mode` require `until`, which makes the sweep predicate-bounded',
     );
   }
   return runFixedTickPath(
@@ -172,7 +172,7 @@ function runUntilPath<C extends Cell | UntilCell>(
   variants: Variant<C>[],
 ): SensitivityResult {
   if (options.maxSimTime === undefined) {
-    throw new Error('runSensitivity: predicate-bounded mode requires `maxSimTime`');
+    throw new Error('runSensitivity: a predicate-bounded sweep requires `maxSimTime`');
   }
   const untilBaseline = options.baseline as unknown as UntilCell;
   const untilVariants = variants as unknown as Variant<UntilCell>[];

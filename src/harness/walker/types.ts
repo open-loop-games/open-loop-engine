@@ -1,14 +1,13 @@
 /**
- * Shared types for the transition-walker family. Three leaf walkers —
+ * Shared types for the transition walkers. Three leaf walkers —
  * {@link walkChallengeTransitions}, walkPurchasableTransitions,
- * walkProducerTransitions — emit the same {@link Transition} shape so
- * `createTransitionSnapshot` can concatenate, sort, and group uniformly.
+ * walkProducerTransitions — return the same {@link Transition} shape. So
+ * `createTransitionSnapshot` can concatenate, sort and group them uniformly.
  *
- * Unified shape so the canonical engine-internal consumers (`runUntil`'s
- * `'next-event'` and `'stasis-aware'` modes) and any future broader-adoption
- * consumer (`InfeasibilityOracle` graduation, devtools, UI hints) can treat
- * every discovered pending state change the same way regardless of which
- * subsystem produced it.
+ * With one shape, every consumer treats each transition the same way,
+ * whichever walker found it. The consumers are `runUntil`'s `'next-event'`
+ * and `'stasis-aware'` modes inside the engine, and could include devtools
+ * and UI hints.
  */
 
 import type { DecimalSource } from '@/primitives/decimal';
@@ -24,33 +23,38 @@ export type { TransitionDeps } from '@/core/transitions';
 export type TransitionWalker = 'challenge' | 'purchasable' | 'producer';
 
 /**
- * A pending state change surfaced by the transition walkers.
+ * A transition that a transition walker found.
  *
- * `kind` is narrowed per `source`: challenge emits `visibility-reveal`,
- * `becomes-enterable`, `goal-complete` and `challenge-maxed`; purchasable emits
- * `becomes-affordable` and `purchasable-maxed`; producer emits
- * `producer-becomes-affordable`. Consumers that need exhaustive narrowing
- * pattern-match on `source` first, then on `kind`.
+ * `kind` is narrowed per `walker`. The challenge walker returns
+ * `visibility-reveal`, `becomes-enterable`, `goal-complete` and
+ * `challenge-maxed`. The purchasable walker returns `becomes-affordable` and
+ * `purchasable-maxed`. The producer walker returns
+ * `producer-becomes-affordable`. For exhaustive narrowing, narrow on `walker`
+ * first, then on `kind`.
  */
 export interface Transition {
   /** Which transition walker produced this transition. */
   walker: TransitionWalker;
-  /** Per-source kind tag; string-typed to keep leaves independent. */
+  /** The transition's kind, narrowed per walker; a `string` to keep the leaf walkers independent. */
   kind: string;
-  /** Owning category's `registry.name` (e.g. `'challenges'`, `'buildings'`). */
+  /** Owning category's `registry.id` (e.g. `'challenges'`, `'buildings'`). */
   categoryId: string;
-  /** Entity's `def.id` within the category. */
+  /** The def's `def.id` within the category. */
   defId: string;
   /**
-   * Snapshot of the value whose transition is being predicted. Shape depends
-   * on `kind`: boolean for visibility / unlock / goal flips, the owned level
-   * or completion count for `*-maxed` thresholds, and for the affordability
-   * kinds the accessor-reported amount of the cost resource the distance is
-   * metered against (the first cost requirement's, on a multi-cost entity).
+   * Snapshot of the value whose transition is predicted. Shape depends on
+   * `kind`. It is a boolean for the visibility, enterable and goal flips,
+   * and the purchase count or completion count for the `*-maxed` kinds. For
+   * the affordability kinds it is the accessor-reported amount of the cost
+   * resource the distance is metered against. On a def with several costs,
+   * that is the first cost requirement's resource.
    */
   currentValue: DecimalSource | boolean | number;
   /** Distance to the predicted transition. See {@link TransitionDistance}. */
   distance: TransitionDistance;
-  /** Display-ready label, conventionally `{categoryId}.{defId}.{kind}`. */
+  /**
+   * Unique key, `{categoryId}.{defId}.{kind}`. It breaks sort ties, and the
+   * incremental snapshot keys its cache by it.
+   */
   key: string;
 }

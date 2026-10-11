@@ -4,21 +4,21 @@
  *
  * `runUntil` / `runBeatProbe` deliberately decouple from the driver's live `intervalRate`
  * and `speedMultiplier` (caller-authoritative `tickDelta`); `processOfflineTime`
- * replays wall-clock seconds with no speed scaling. Neither reproduces the *live*
- * path. `replayLive` is the one that does: it fires `seconds × intervalRate` interval
- * ticks, each calling `driver.processInterval(1 / intervalRate)` — the same speed-aware live
- * body `intervalTick` runs per interval, just fed an injected clock. The dt math
- * (cap, `speedMultiplier`, fixed-mode accumulator) lives in `processInterval`, so replay
- * reproduces live play by invoking it rather than re-deriving the formula; the two
+ * replays wall-clock seconds with no game-speed scaling. Neither reproduces the *live*
+ * path. `replayLive` is the one that does: it fires `seconds × intervalRate` intervals,
+ * each calling `driver.processInterval(1 / intervalRate)`. That is the same speed-aware
+ * live body `intervalTick` runs per interval, fed an injected clock. The dt math
+ * (cap, `speedMultiplier`, fixed-mode accumulator) is in `processInterval`, so replay
+ * reproduces live play by calling it rather than re-deriving the formula. So the two
  * cannot drift apart.
  *
- * Speed is applied the live way — by setting `driver.speedMultiplier` for the
- * duration of the replay (restored on exit) — not by pre-scaling dt. `processInterval`
- * folds it in exactly where the timer loop does.
+ * Game speed is applied the live way: by setting `driver.speedMultiplier` for the
+ * duration of the replay (restored on exit), not by pre-scaling dt. `processInterval`
+ * applies it exactly where the timer loop does.
  *
- * This makes the fixed-mode speed-invariance guarantee testable: equal game-time
- * at 1× and N× drains the same total sub-tick count through identical per-tick
- * math, so state must converge. See {@link createTickCounter} for the sub-tick
+ * This makes the fixed-mode speed-invariance guarantee testable. Equal game time
+ * at 1× and N× drains the same total tick count through identical per-tick
+ * math, so state must converge. See {@link createTickCounter} for the tick-count
  * assertion side.
  *
  * @cluster runners
@@ -32,17 +32,18 @@ export interface ReplayLiveOptions {
   /** Wall-clock seconds to replay. Negative clamps to zero (no ticks fired). */
   seconds: number;
   /**
-   * Speed multiplier. Set on `driver.speedMultiplier` for the duration of the
-   * replay (its prior value is restored on exit) so `processInterval` scales dt exactly
-   * as the live loop does. Default 1. Total simulated game-time is `seconds × speed`.
+   * Game speed. It is set on `driver.speedMultiplier` for the duration of the
+   * replay, and the prior value is restored on exit. So `processInterval`
+   * scales dt exactly as the live loop does. Default 1. Total game time is
+   * `seconds × speed`.
    */
   speed?: number;
   /**
-   * Awaited after each interval tick. The escape hatch for consumers whose tick
-   * pipeline defers work to a microtask (e.g. an action dispatcher that advances
-   * its queue via `queueMicrotask`): pass `() => Promise.resolve()` to flush
-   * between ticks so replay matches live cadence instead of batching at the end.
-   * Omit for pure synchronous tick logic.
+   * Awaited after each interval. It is for consumers whose tick handlers
+   * defer work to a microtask, e.g. a consumer's own action queue that
+   * advances via `queueMicrotask`. Pass `() => Promise.resolve()` to flush
+   * between intervals. Then replay matches the live cadence instead of
+   * batching at the end. Omit it for pure synchronous tick logic.
    */
   afterTick?: () => void | Promise<void>;
 }
@@ -51,8 +52,8 @@ export interface ReplayLiveOptions {
  * Replay `seconds` of live play at `speed` through `driver`, reproducing
  * `intervalTick`'s dt math deterministically.
  *
- * @returns the number of interval ticks fired (`floor(seconds × intervalRate)`). The
- *   sub-tick count (relevant in fixed mode) is observed via {@link createTickCounter},
+ * @returns the number of intervals fired (`floor(seconds × intervalRate)`). The
+ *   tick count, which differs in fixed mode, is observed via {@link createTickCounter},
  *   not returned here.
  */
 export async function replayLive(driver: TickDriver, options: ReplayLiveOptions): Promise<number> {
@@ -74,20 +75,20 @@ export async function replayLive(driver: TickDriver, options: ReplayLiveOptions)
   return intervalTicks;
 }
 
-/** A live sub-tick counter returned by {@link createTickCounter}. */
+/** A live tick counter returned by {@link createTickCounter}. */
 export interface TickCounter {
   /** Current count of `onTick` fires since creation or last `reset`. */
   get(): number;
   /** Zero the count. */
   reset(): void;
-  /** Unsubscribe from the driver. */
+  /** Unsubscribe from the driver. The counter saves nothing. */
   dispose(): void;
 }
 
 /**
- * Count `onTick` fires on `driver` — one per sub-tick in fixed mode, one per
- * interval tick in variable mode. The canonical use is asserting that equal
- * game-time produces equal sub-tick counts across speeds (fixed-mode invariant).
+ * Count `onTick` fires on `driver`, one per tick. An interval runs one tick in
+ * variable mode and can run several in fixed mode. The typical use asserts that
+ * equal game time produces equal tick counts across game speeds (fixed-mode invariant).
  */
 export function createTickCounter(driver: TickDriver): TickCounter {
   let count = 0;

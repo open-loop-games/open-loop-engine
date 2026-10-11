@@ -1,8 +1,8 @@
 /**
- * Chain-registry walker — emit one {@link ModifierPickerEntry} per existing
+ * Chain-registry walker — return one {@link ModifierPickerEntry} per existing
  * modifier in every auto-registered {@link ModifierChain}, plus one
- * `chain-apply` entry per chain (perturbation target that lives on the
- * chain itself rather than any individual modifier).
+ * `chain-apply` entry per chain: a perturbation target that is the chain
+ * itself rather than any one modifier.
  *
  * @internal
  */
@@ -17,20 +17,20 @@ import type { ModifierPickerEntry } from './types';
 
 /**
  * Walk every {@link ModifierChain} auto-registered into the engine's
- * {@link ChainRegistryKey} and emit:
- * - one `chain-apply` entry per chain (targets the chain as a whole —
- *   perturbation appends a scalar wrapper, so empty-at-walk-time chains
- *   remain perturbable once they populate via purchases/binds).
+ * {@link ChainRegistryKey} and return:
+ * - one `chain-apply` entry per chain. It targets the chain as a whole, and
+ *   perturbation appends a scalar wrapper. So a chain empty at walk time
+ *   stays perturbable once purchases or binds fill it.
  * - one `modifier-index` entry per existing modifier in each chain, except
- *   those an effect binding put there — the effect-system binding walker offers those,
- *   and a chain-side swap would outlive the effect.
+ *   those an effect system placed there as lowered grants. The
+ *   effect-system walker offers those, and a chain-side replacement would outlast the effect.
  *
- * Missing registry (e.g. an engine constructed outside the standard
- * `createEngine` flow) degrades to an empty array — not a crash.
+ * A missing registry (e.g. an engine built outside the standard
+ * `createEngine` flow) gives an empty array, not a crash.
  *
- * The `chain-apply` entry carries a fresh identity-passthrough marker as
- * its `modifier` field. Identity is snapshot-scoped and never collides
- * with real modifiers reached by other walkers, so dedup behaves.
+ * The `chain-apply` entry holds a fresh identity-passthrough marker as its
+ * `modifier` field. Identity is snapshot-scoped and never collides with
+ * real modifiers that other walkers reach, so deduplication stays correct.
  *
  * @internal
  */

@@ -2,10 +2,8 @@
  * Probe barrel — `runBeatProbe` (beat-timing) and `runWaypointProbe`
  * (snapshot-at-time per waypoint) plus their types.
  *
- * Optimization-research that used to ship as wrappers
- * (`eventDrivenProbe`, `stasisAwareTickProbe`, `coarseFineProbe`,
- * `advanceToNextEvent`) has moved into `runMatrixUntil`/`runUntil` modes —
- * consumers select via `BeatProbeOptions.mode`.
+ * Event stepping and stasis checks are run modes of `runMatrixUntil` and
+ * `runUntil`; a beat probe selects one via `BeatProbeOptions.mode`.
  */
 
 export { runBeatProbe } from './tick';

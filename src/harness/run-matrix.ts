@@ -1,14 +1,14 @@
 /**
- * Matrix runner — sync cartesian sweep over `cells × seeds`, built on
- * `runHeadless`. Raw `HeadlessResult[]` are preserved per cell; aggregates
- * are a convenience layer over the raw data, not a replacement for it.
+ * Matrix runner — a synchronous cartesian sweep over `cells × seeds`, built on
+ * `runHeadless`. Raw `HeadlessResult[]` are kept per cell; aggregates
+ * are a convenience over the raw data, not a replacement for it.
  *
- * Each cell's `setup` constructs and returns its analyzer list per run, so
- * stateful analyzers reset between runs and can close over freshly-built
- * engine state. Parallelism is out of scope here — a pool-wiring consumer
- * maps through {@link createWorkPlan}'s output instead of reshaping this
- * loop. {@link runSensitivity} is a thin wrapper over `runMatrix` for the
- * baseline-vs-variant case.
+ * Each cell's `setup` builds and returns its analyzer list per headless run.
+ * So stateful analyzers reset between headless runs and can close over newly
+ * built engine state. Parallelism is out of scope here. A consumer that
+ * spreads headless runs over Web Workers maps over {@link createWorkPlan}'s output instead of
+ * reshaping this loop. {@link runSensitivity} is a thin wrapper over
+ * `runMatrix` for the baseline-vs-variant case.
  *
  * @cluster runners
  */
@@ -21,12 +21,12 @@ import type { CellResult, MatrixOptions, MatrixResult } from './types';
 
 /**
  * Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner
- * order. `onRunComplete` and `onCellComplete` fire as the sweep progresses,
- * silent by default — progressive UI consumers opt in.
+ * order. `onRunComplete` and `onCellComplete` fire as the sweep progresses.
+ * Both are absent by default; a consumer with a progressive UI opts in.
  *
- * @param options - {@link MatrixOptions} — cells, seeds, optional callbacks
- *   and histogram opt-in.
- * @returns {@link MatrixResult} carrying one {@link CellResult} per cell,
+ * @param options - {@link MatrixOptions} — cells, seeds, optional option
+ *   callbacks and histogram opt-in.
+ * @returns {@link MatrixResult} with one {@link CellResult} per cell,
  *   in input order. Empty-seed cells get a placeholder result with empty
  *   `metrics`.
  *
@@ -34,12 +34,12 @@ import type { CellResult, MatrixOptions, MatrixResult } from './types';
  * ```ts
  * const result = runMatrix({
  *   cells: [
- *     { name: 'fast', setup: () => [createGoldTracker()], tick, ticks: 1000 },
- *     { name: 'slow', setup: () => [createGoldTracker()], tick, ticks: 1000 },
+ *     { id: 'fast', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
+ *     { id: 'slow', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
  *   ],
  *   seeds: [1, 2, 3],
  * });
- * result.cells[0].aggregate.metrics['gold-tracker.peak'];
+ * result.cells[0].aggregate.metrics['gold-analyzer.peak'];
  * ```
  */
 export function runMatrix(options: MatrixOptions): MatrixResult {

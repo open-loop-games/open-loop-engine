@@ -1,17 +1,17 @@
 /**
- * Shared traversal helpers over the three discovery surfaces the engine
- * exposes to external introspection tools: `CategoriesKey` (opt-in),
+ * Shared traversal helpers over the three lookups the engine exposes to
+ * external introspection tools: `CategoriesKey` (opt-in),
  * `EffectSystemRegistry` (auto-registered), and `ChainRegistry`
  * (auto-registered).
  *
- * The picker walkers (`src/harness/picker/walk-*.ts`) and the content
- * walker family diverge only in emission shape — same iteration, different
- * per-visit projection. Pull the iteration out once so both projections share
- * one traversal.
+ * The discovery walkers (`src/harness/picker/walk-*.ts`) and the transition
+ * walkers differ only in output shape: same iteration, different per-visit
+ * projection. The iteration is here once, so both projections share one
+ * traversal.
  *
- * Helpers are opinion-free: they yield every entity / def / chain-entry
- * the registry knows about. Emitters decide which to skip, how to warn
- * about unhandled keys, and how to shape their output.
+ * Helpers are opinion-free: they yield every category entry, def or chain
+ * modifier the registry knows about. Callers decide which to skip, how to
+ * warn about unhandled keys, and how to shape their output.
  */
 
 import type {
@@ -29,21 +29,21 @@ import { flattenGrants } from '@/systems/replacement-grants';
 // ============================================================================
 
 export interface CategoryEntryVisit {
-  /** Which {@link EngineCategories} key the entity came from. */
+  /** Which {@link EngineCategories} key the category entry came from. */
   categoryKey: keyof EngineCategories;
-  /** The owning category's `registry.name`. */
+  /** The owning category's `registry.id`. */
   categoryId: string;
-  /** The entity's `def.id`. */
+  /** The category entry's `def.id`. */
   defId: string;
   /**
-   * The `.getAll()[N]` object for this entity. Exact shape depends on
+   * The `.getAll()[N]` category entry. Exact shape depends on
    * `categoryKey`:
    *
-   * - `skills`: `{ def, skill, state }`
-   * - `producers`: `{ def, producer, state }`
-   * - `purchasables`: `{ def, purchasable, state }`
-   * - `achievements`: `{ def, achievement, state }`
-   * - `challenges`: `{ def, challenge, state }`
+   * - `skills`: `{ def, skill, state, signals }`
+   * - `producers`: `{ def, producer, state, signals }`
+   * - `purchasables`: `{ def, purchasable, state, signals }`
+   * - `achievements`: `{ def, achievement, state, signals }`
+   * - `challenges`: `{ def, challenge, state, signals }`
    *
    * Narrow via `categoryKey` at the call site.
    */
@@ -68,14 +68,14 @@ function isWalkableCategory(value: unknown): value is WalkableCategory {
 }
 
 /**
- * Walk every entity across every category slice published under
+ * Walk every category entry across every category slice published under
  * {@link EngineCategories}. Yields `{ categoryKey, categoryId, defId,
- * entity }` per entity.
+ * entry }` per category entry.
  *
- * Duck-types each slice entry for `{ registry.name, getAll() }` — the
- * shared `CategoryBase` shape — so non-category keys like `resources`
- * (`Resource[]`) are silently skipped. Handled/unhandled filtering and
- * any per-key warnings are the emitter's responsibility.
+ * Duck-types each slice element for `{ registry.id, getAll() }`, the shared
+ * `CategoryBase` shape. So non-category keys like `resources`
+ * (`Resource[]`) are silently skipped. Handled/unhandled filtering and any
+ * per-key warnings are the caller's responsibility.
  */
 export function forEachCategoryEntry(
   categories: EngineCategories | undefined,
@@ -102,14 +102,14 @@ export function forEachCategoryEntry(
 export interface EffectDefVisit {
   /** The owning system's id, e.g. `'buffs'`, `'auras'`. */
   systemId: string;
-  /** `'temporary'` vs `'conditional'` — read from the system's `kind` tag. */
+  /** `'temporary'` vs `'conditional'` — read from the system's `kind` field. */
   systemKind: EnumerableEffectSystem['kind'];
   def: EffectDefLike;
 }
 
 /**
  * Walk every def across every auto-registered effect system (temporary
- * and persistent). Missing registry degrades to a no-op.
+ * and conditional). A missing registry makes it a no-op.
  */
 export function forEachEffectDef(
   registry: EffectSystemRegistry | undefined,
@@ -124,8 +124,8 @@ export function forEachEffectDef(
 }
 
 /**
- * A def's bindings in `grantIndex` order — each grant paired with each
- * chain it targets, calling a factory-form `modifiers` once.
+ * A def's lowered grants in `grantIndex` order — each grant paired with each
+ * chain it targets, calling a factory-form `grants` once.
  */
 export function effectDefBindings(def: EffectDefLike): { grant: Grant; chain: ModifierChain }[] {
   const raw = def.grants;
@@ -141,7 +141,7 @@ export interface ChainRegistryVisit {
   chain: ModifierChain;
   /**
    * Present for per-modifier visits; absent for the chain-as-a-whole
-   * visit that fires once per chain before any modifier visits.
+   * visit, which comes once per chain before any modifier visit.
    */
   modifier?: Modifier;
   /**
@@ -152,13 +152,13 @@ export interface ChainRegistryVisit {
 }
 
 /**
- * Walk every auto-registered {@link ModifierChain}. For each chain, emit
- * one chain-as-a-whole visit (no `modifier`) followed by one visit per
- * modifier currently in the chain.
+ * Walk every auto-registered {@link ModifierChain}. For each chain, visit
+ * once for the chain as a whole (no `modifier`), then once per modifier
+ * currently in the chain.
  *
- * The chain-as-a-whole visit lets emitters target chains that are
- * registered empty and populated later — there's no modifier to perturb
- * or address yet, but the chain itself is a valid target.
+ * The chain-as-a-whole visit lets callers target a chain that is registered
+ * empty and filled later. It has no modifier to perturb or address yet, but
+ * the chain itself is a valid target.
  */
 export function forEachChainRegistryEntry(
   registry: ChainRegistry | undefined,

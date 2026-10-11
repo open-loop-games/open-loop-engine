@@ -1,24 +1,24 @@
 /**
- * Content walker — enumerate pending challenge transitions.
+ * Challenge transition walker — enumerate pending challenge transitions.
  *
- * `ChallengeDef` carries `visible`, `canEnter` and `goal` as a Predicate — a
- * boolean, ref, getter or {@link Gate}. A field emits a transition whenever
- * it could still flip the way the transition names:
+ * `ChallengeDef` has `visible`, `canEnter` and `goal`, each a Predicate: a
+ * boolean, ref, getter or {@link Gate}. The walker returns a transition for
+ * a field whenever it could still flip the way the transition names:
  *
  * - a Gate predicts its flip through {@link timeUntilGateFlip}, over the
- *   runtime the challenge category evaluates it with and the walker's
- *   accessor — a computed distance for resource and cumulative leaves,
- *   `opaque-predicate` for category, flag and state leaves;
- * - a getter or ref has no mechanical distance and emits `opaque-predicate`,
+ *   Gate services the challenge category evaluates it with and the walker's
+ *   accessor. That gives a computed distance for resource and cumulative
+ *   leaves, and `opaque-predicate` for category, flag and state leaves;
+ * - a getter or ref has no mechanical distance and gives `opaque-predicate`,
  *   so stasis detection never mistakes it for a field that can't change;
- * - a constant never flips and emits nothing.
+ * - a constant never flips and gives nothing.
  *
- * Emissions per challenge entity:
+ * Transitions per challenge:
  *
  * - `visibility-reveal` — `visible` is currently false.
- * - `becomes-enterable` — the challenge is neither active nor maxed and its
- *   `canEnter` gate is currently false.
- * - `goal-complete` — the challenge is active and its goal doesn't hold yet.
+ * - `becomes-enterable` — the challenge is neither entered nor maxed, and its
+ *   `canEnter` is currently false.
+ * - `goal-complete` — the challenge is entered and its goal doesn't hold yet.
  * - `challenge-maxed` — as `goal-complete`, on the last completion
  *   (`completions === completionLimit - 1`), with the same distance.
  */
@@ -113,8 +113,8 @@ function collectForEntity(
     }
   }
 
-  // `Challenge.canEnter` is the gate with the active and maxed guards folded
-  // in, so outside those two states it reads the gate's own truth.
+  // `Challenge.canEnter` is the def's `canEnter` combined with the entered and
+  // maxed guards. So outside those two states it reads the def field's own truth.
   if (!challenge.entered.value && !challenge.maxed.value && !challenge.canEnter.value) {
     const flip = predictFieldFlip(def.canEnter, runtime);
     if (flip) {
@@ -157,16 +157,16 @@ function collectForEntity(
 // ============================================================================
 
 /**
- * Walk every challenge across every `CategoriesKey.challenges` slice and
- * emit one {@link Transition} per field that could still flip — with a
- * computed distance where its gate has one, `opaque-predicate` where not.
+ * Walk every challenge across every `CategoriesKey.challenges` slice. Return
+ * one {@link Transition} per field that could still flip: with a computed
+ * distance where its Gate has one, `opaque-predicate` where not.
  *
  * @param engine - Engine to introspect. Categories are read via
- *   `engine.tryInject(CategoriesKey)`; missing key degrades to `[]`.
- * @param accessor - Read-side accessor gates read resources, rates, flags
- *   and state through for their flip distances. Explicit rather than
- *   ambient so the walker can be called from non-install contexts (probes,
- *   devtools, tests).
+ *   `engine.tryInject(CategoriesKey)`; a missing key gives `[]`.
+ * @param accessor - The game-state accessor through which each Gate reads
+ *   resources, rates, flags and state for its flip distance. It is a
+ *   parameter, not an ambient value, so callers outside install/connect can
+ *   call the walker (probes, devtools, tests).
  */
 export function walkChallengeTransitions(
   engine: Engine,
@@ -176,11 +176,11 @@ export function walkChallengeTransitions(
 }
 
 /**
- * Variant of {@link walkChallengeTransitions} that also reports the accessor
- * slots each transition's distance arithmetic reads: the field's gate
- * leaves, with `cumulative-gte` named by its base resource, and nothing for
- * a closure. Consumed by
- * {@link createIncrementalSnapshot} to populate its reverse indices.
+ * Like {@link walkChallengeTransitions}, but also reports the accessor reads
+ * each transition's distance arithmetic depends on: the field's Gate leaves,
+ * with `cumulative-gte` named by its base resource, and nothing for a
+ * closure. {@link createIncrementalSnapshot} uses them to fill its reverse
+ * indices.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */
@@ -200,11 +200,11 @@ export function collectChallengeTransitionsWithDeps(
 }
 
 /**
- * Re-emit challenge transitions for a single cached entity. Consumed by
- * {@link createIncrementalSnapshot}'s selective-rebuild path: given
- * an entity reference cached at the last full rebuild, produce the same
- * `{ transition, deps }` emissions {@link collectChallengeTransitionsWithDeps}
- * would yield for that one entity — no `forEachCategoryEntry` walk, no
+ * Rebuild the challenge transitions of one cached category entry, for
+ * {@link createIncrementalSnapshot}'s selective rebuild. Given a category
+ * entry cached at the last full rebuild, it returns the same
+ * `{ transition, deps }` pairs {@link collectChallengeTransitionsWithDeps}
+ * would yield for that entry. It does no `forEachCategoryEntry` walk and no
  * engine lookup.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.

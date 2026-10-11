@@ -2,12 +2,11 @@
  * `runWaypointProbe` — snapshot-at-time per-waypoint inspector.
  *
  * Sibling of {@link runBeatProbe}, not a subtype. For each waypoint, drives a
- * freshly-built engine via {@link runMatrixUntil} until the waypoint's
+ * newly built engine via {@link runMatrixUntil} until the waypoint's
  * `snapshotAtSec` is reached, then calls `inspect(engine)` to extract a
- * consumer-shaped snapshot. The canonical use case is methodology-#2
- * predictor-walks-a-schedule: "at sim-second X, what's the per-producer
- * pacing texture?" — the consumer supplies the snapshot shape via the
- * `inspect` callback.
+ * consumer-shaped snapshot. The typical use checks a predictor against a
+ * schedule: "at sim-second X, what is each producer's pacing?" The
+ * consumer supplies the snapshot shape via the `inspect` function.
  *
  * One engine per (waypoint × seed). Default `seeds: [0]` runs a single
  * deterministic engine per waypoint; pass a wider seed list when waypoint-time
@@ -33,36 +32,36 @@ export interface WaypointSnapshot<T> {
   seed: number;
   /**
    * Actual sim-time at snapshot: the first tick at or past `snapshotAtSec`
-   * (a tick that lands on it within rounding counts), so it overshoots by
+   * (a tick that ends on it within rounding counts), so it overshoots by
    * less than `tickDelta` when `tickDelta` doesn't divide the waypoint time.
    */
   snapshotSimTime: number;
   /**
-   * `true` when the run reached `snapshotAtSec`. Always `true` while
-   * `maxSimTimePad` is at least `tickDelta`, since the ceiling then lies
-   * past the first tick at or after the waypoint; a smaller pad can cut
-   * the run short.
+   * `true` when the headless run reached `snapshotAtSec`. Always `true` while
+   * `maxSimTimePad` is at least `tickDelta`, because the sim-time cap then
+   * ends past the first tick at or after the waypoint. A smaller pad can cut
+   * the headless run short.
    */
   reachedTarget: boolean;
   /** Consumer-shaped snapshot returned by `inspect(engine)`. */
   snapshot: T;
 }
 
-/** Configuration for {@link runWaypointProbe}. */
+/** Options for {@link runWaypointProbe}. */
 export interface WaypointProbeOptions<T> {
   /**
-   * Build a fresh, started engine for each `(waypoint × seed)` run, as
+   * Build a new, started engine for each `(waypoint × seed)` headless run, as
    * {@link UntilCell.buildEngine}.
    */
   buildEngine: (ctx: RunContext) => Engine;
   waypoints: Waypoint[];
   /**
    * Extract a consumer-shaped snapshot from the engine at the waypoint time.
-   * Runs once the engine is stopped, so its state reads as of the last tick.
+   * Runs once the engine is stopped, so it reads the state after the last tick.
    */
   inspect: (engine: Engine) => T;
   /**
-   * Called once per `(waypoint, seed)` run after `inspect`, as
+   * Called once per `(waypoint, seed)` headless run after `inspect`, as
    * {@link UntilCell.teardown} — release what `buildEngine` built. Defaults
    * to `engine.dispose()`.
    */
@@ -77,20 +76,21 @@ export interface WaypointProbeOptions<T> {
   tickDelta?: number;
   /**
    * Sim-seconds added to each waypoint's `snapshotAtSec` to form the
-   * `runUntil` `maxSimTime` ceiling — slack for the first tick at or past
-   * the waypoint, not a budget the run is expected to spend. Defaults to `60`.
+   * `runUntil` `maxSimTime` cap. It is slack for the first tick at or past
+   * the waypoint, not time the headless run is expected to spend. Defaults
+   * to `60`.
    */
   maxSimTimePad?: number;
 }
 
 /**
- * For each waypoint × seed: build a fresh engine, advance it until
+ * For each waypoint × seed: build a new engine, advance it until
  * `simTime >= waypoint.snapshotAtSec`, call `inspect(engine)`, and return one
  * {@link WaypointSnapshot} per `(waypoint, seed)` in iteration order. Each
  * waypoint is a single-cell {@link runMatrixUntil} sweep over `seeds`, so
- * seeding, stopping and `teardown` follow that runner's per-run lifecycle.
+ * seeding, stopping and `teardown` follow that runner's lifecycle for each headless run.
  *
- * The probe stops each run's engine and disposes it once `inspect` has read
+ * The probe stops the engine of each headless run and disposes it once `inspect` has read
  * it; pass a no-op `teardown` to keep them alive.
  *
  * @example

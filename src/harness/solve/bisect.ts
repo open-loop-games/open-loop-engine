@@ -2,27 +2,27 @@
  * Bisection tuner — the default {@link Tuner} implementation.
  *
  * Auto-detects direction from `sampler(lo)` vs `sampler(hi)`. That costs
- * two calibration runs up front but removes a per-call decision the
- * caller would otherwise have to make correctly (and getting it wrong
+ * two calibration samples up front, but removes a per-call decision the
+ * caller would otherwise have to make correctly (and a wrong choice
  * silently gives a wrong answer). Forward slope = higher value → later
- * fire (cost-like knobs); inverted = higher value → earlier fire
- * (multiplier-like knobs).
+ * fire (cost-like parameters); inverted = higher value → earlier fire
+ * (multiplier-like parameters).
  */
 
 import type { TunerOptions, TunerResult } from './types';
 
 /**
- * Binary-search 1-D tuner. Two calibration runs at `lo` and `hi` auto-detect
+ * Binary-search 1-D tuner. Two calibration samples at `lo` and `hi` auto-detect
  * direction and check the target lies between them: an endpoint already
  * within `tolSec` is returned as is, and a target outside the calibrated
  * range returns the nearer endpoint with `bracketed: false` rather than
  * spending the iteration budget. Otherwise iteration halves the bracket
- * toward `targetSec`, returning early once the sample lands within `tolSec`.
- * If the iteration ceiling fires first, the closest-observed sample is
+ * toward `targetSec`, returning early once a sample is within `tolSec`.
+ * If the iteration budget runs out first, the closest-observed sample is
  * returned.
  *
  * @param options - {@link TunerOptions} — search bracket, target fire time,
- *   sampler, optional tolerance + iteration ceiling.
+ *   sampler, optional tolerance + iteration budget.
  * @returns {@link TunerResult} — the converged value, its sampled fire time,
  *   the iteration count, and the auto-detected direction.
  *
@@ -50,7 +50,7 @@ export function bisectTuner(options: TunerOptions): TunerResult {
   // hit at this setting" — semantically a *late* fire (infinitely late), not
   // an early one. Both endpoints map ∞ → +∞ for direction detection. Forward
   // = higher value → later fire (cost-like); inverted = higher value → earlier
-  // fire (multiplier/bonus-like).
+  // fire (multiplier-like).
   const tLoFinite = isFinite(tLo) ? tLo : Infinity;
   const tHiFinite = isFinite(tHi) ? tHi : Infinity;
   const direction: 'forward' | 'inverted' = tHiFinite >= tLoFinite ? 'forward' : 'inverted';

@@ -1,34 +1,34 @@
 /**
- * Event-mode inner loop for {@link runUntil} — walker-visible event stepping.
+ * The `'next-event'` loop of {@link runUntil} — walker-visible event stepping.
  *
- * Attacks the never-fires cost where rate is live but insufficient to fire
- * within budget. Tick-count-reduction approaches cannot attack this leg because
- * the walker sees a nonzero rate every tick and refuses to short-circuit;
- * event-stepping advances directly to the next state change instead.
+ * Cuts the cost of a predicate whose rate is live but too low to make it hold
+ * within the sim-time cap. Approaches that reduce the tick count cannot help here,
+ * because the walker sees a nonzero rate every tick and refuses to end early.
+ * Event stepping advances directly to the next state change instead.
  *
  * Composition:
  *
  * 1. {@link createIncrementalSnapshot} each iteration — finite-distance head is
  *    the next walker-visible event.
  * 2. {@link resolveNextEvent} picks the smallest finite distance, floored at
- *    `tickDelta` so dense auto-purchase cadence can't collapse the advance
- *    into a per-step snapshot-rebuild cliff, and capped at the remaining
- *    budget so no advance crosses `maxSimTime`. A distance beyond the
+ *    `tickDelta` so dense auto-purchase cadence cannot shrink the advance
+ *    into a snapshot rebuild per tick, and capped at the remaining
+ *    sim-time so no advance crosses `maxSimTime`. A distance beyond the
  *    driver's `maxDeltaTime` is simulated in full, as several engine ticks.
  * 3. Refuse handling splits by reason:
  *    - `'opaque-present'` — fall back to a `tickDelta` step. Opaque
  *      transitions could flip after a tick, so we tick and re-resolve.
- *    - `'no-finite-transition'` — enter fast-tick stasis mode. Non-walker
- *      sources (clicks, `ctx.onTick` subscribers, `TimedInput`) may still
+ *    - `'no-finite-transition'` — enter the stasis fast-tick loop. Sources the
+ *      walker cannot see (clicks, `ctx.onTick` handlers) may still
  *      push state forward. Fast-tick at `tickDelta` without rebuilding the
- *      walker each iteration, checking the predicate per tick; every
- *      `stasisCheckInterval` ticks, rebuild once to detect exit-from-stasis.
- *      When the fast-tick loop exhausts `maxSimTime` without exit, the run
- *      terminates `'unreachable'` if the walker's tracked dependencies held
- *      still throughout, and `'maxSimTime'` if something it can't see moved
- *      them.
+ *      walker each iteration, checking the predicate per tick. Every
+ *      `stasisCheckInterval` ticks, rebuild once to detect an exit from stasis.
+ *      When the fast-tick loop uses up `maxSimTime` without an exit, the
+ *      headless run terminates `'unreachable'` if the walker's tracked dependencies stayed
+ *      unchanged throughout, and `'maxSimTime'` if something it cannot see
+ *      moved them.
  * 4. Predicate re-checked at the top of each iteration; termination as soon
- *    as it fires. Optional sub-advance bisection via `bisectTolSec`.
+ *    as it holds. Optional bisection within an advance via `bisectTolSec`.
  *
  * @internal
  */
@@ -69,15 +69,16 @@ export type NextEvent =
  *   `distance.seconds`. Pure stasis, empty snapshot, or all distances
  *   uncomputable / no-rate.
  *
- * The realized advance is floored at `tickDelta`: dense auto-purchase cadence
- * can collapse the head distance to a few milliseconds, and stepping by that
- * raw distance pays a full incremental-snapshot rebuild per micro-step — the
- * performance cliff this floor exists to avoid. Flooring makes event mode
- * asymptotically never worse than tick mode; `fired` still reports only the
+ * The realized advance is floored at `tickDelta`. Dense auto-purchase cadence
+ * can shrink the head distance to a few milliseconds, and advancing by that
+ * raw distance costs a full incremental-snapshot rebuild per tiny advance:
+ * the performance cliff this floor exists to avoid. The floor makes
+ * `'next-event'` mode asymptotically never worse than `'uniform'` mode;
+ * `fired` still reports only the
  * transitions tied at the raw head distance; the caller's bisection
  * (triggered whenever `dt > bisectTolSec`) covers the case where the floor
  * overshoots the walker-reported fire time. The `remaining` cap applies after the floor, so
- * an advance cut short by the budget leaves `fired` unfired.
+ * an advance cut short by the cap leaves `fired` unfired.
  *
  * @internal
  */
@@ -121,8 +122,8 @@ export interface NextEventModeResult {
 }
 
 /**
- * Drive a freshly-built (and pre-seeded) engine through the event-stepping
- * loop until `predicate(engine)` fires, `maxSimTime` is reached, or the
+ * Drive a newly built (and pre-seeded) engine through the next-event
+ * loop until `predicate(engine)` holds, `maxSimTime` is reached, or the
  * walker confirms stasis cannot be mechanically broken.
  *
  * @param engine - Engine to drive. Caller seeds RNG before this call, and
@@ -130,9 +131,9 @@ export interface NextEventModeResult {
  * @param accessor - Read-side accessor matching the engine; used by the
  *   incremental snapshot.
  * @param predicate - Termination predicate. Closes over the engine; returning
- *   `true` ends the run with `terminated: 'predicate'`.
- * @param maxSimTime - Sim-seconds ceiling.
- * @param tickDelta - Advance floor, and the fixed-tick delta of the stasis
+ *   `true` ends the headless run with `terminated: 'predicate'`.
+ * @param maxSimTime - Sim-time cap, in sim-seconds.
+ * @param tickDelta - Advance floor, and the fixed-tick dt of the stasis
  *   fast-tick and of opaque-present refuses.
  * @param options - {@link NextEventModeOptions} — bisect tolerance and stasis
  *   probe interval.
@@ -183,10 +184,10 @@ export function runNextEventLoop(
       engine.tickDriver.advanceTime(result.dt);
       profileEnd('runUntil.event.advance', advanceStart);
       if (checkpoint !== null && predicate({ iteration: steps, simTime: simTime + result.dt })) {
-        // Predicate flipped during this advance. Restore + replay sub-intervals
+        // Predicate flipped during this advance. Restore + replay shorter advances
         // to narrow the fire time to within `bisectTolSec`; otherwise the
         // top-of-loop check on the next iteration would record
-        // `simTime + result.advanced` as the fire time.
+        // `simTime + result.dt` as the fire time.
         const fireDt = bisectTerminationTime(
           engine,
           predicate,
@@ -204,7 +205,7 @@ export function runNextEventLoop(
       before = commitDeps(inc, sample, before);
     } else if (result.reason === 'no-finite-transition') {
       // Walker sees nothing advancing. Tick at `tickDelta` without rebuilding
-      // the walker until state flips, the predicate fires, or budget runs out.
+      // the walker until state changes, the predicate holds, or the cap is reached.
       const windowStart = sample();
       const outcome = profile('runUntil.event.stasisFastTick', () =>
         fastTickDuringStasis(
@@ -227,9 +228,9 @@ export function runNextEventLoop(
         break;
       }
       if (outcome.exit === 'maxSimTime') {
-        // Budget ran out in stasis. Only a window in which nothing the walker
+        // The cap was reached in stasis. Only a window in which nothing the walker
         // tracks moved shows the wedge held; if a source it can't see moved
-        // state, a longer budget might still fire, so it's a plain miss.
+        // state, a longer cap might still fire, so it's a plain miss.
         terminated = depsChanged(windowStart, before) ? 'maxSimTime' : 'unreachable';
         break;
       }
@@ -257,10 +258,10 @@ export function runNextEventLoop(
 }
 
 /**
- * One sample of the slots the walker tracks. A tracked resource also carries
- * its lifetime total and a tracked rate its inflow, where either is served:
- * a `cumulative-gte` distance reads both, and a drain matching the inflow
- * holds the balance and net rate still while the total climbs.
+ * One sample of the values the walker tracks. A tracked resource also records
+ * its lifetime total, and a tracked rate its inflow, where either is available:
+ * a `cumulative-gte` distance reads both, and an outflow matching the inflow
+ * keeps the amount and net rate unchanged while the total climbs.
  */
 interface DepSnapshot {
   resources: Map<string, Decimal>;
@@ -383,8 +384,9 @@ function fastTickDuringStasis(
     simTime += dt;
     ticks++;
 
-    // `startSteps + ticks` keeps ctx.tick run-absolute — consistent with the
-    // main loop's `steps`, not a per-entry local counter restarting at 1.
+    // `startSteps + ticks` keeps ctx.iteration absolute over the headless run,
+    // consistent with the main loop's `steps`, not a per-entry local counter
+    // restarting at 1.
     if (predicate({ iteration: startSteps + ticks, simTime })) {
       return { simTime, ticks, exit: 'predicate' };
     }
@@ -423,14 +425,15 @@ function bisectTerminationTime(
     restore();
     engine.tickDriver.advanceTime(mid);
     // `mid` is relative to the checkpoint (the advance's start); the predicate
-    // reads run-absolute `simTime`, so feed it `baseSimTime + mid`. Passing the
-    // raw `mid` here silently defeats bisection for any simTime-reading
-    // predicate — the exact idiom in runUntil's @example.
+    // reads `simTime` absolute over the headless run, so feed it
+    // `baseSimTime + mid`. Passing the raw `mid` here silently defeats
+    // bisection for any simTime-reading predicate — the exact idiom in
+    // runUntil's @example.
     if (predicate({ iteration: baseSteps, simTime: baseSimTime + mid })) high = mid;
     else low = mid;
   }
   // Leave the engine at the smallest dt for which the predicate is true so
-  // the run ends in the fired state rather than a bisect intermediate.
+  // the headless run ends in the fired state rather than a bisect intermediate.
   restore();
   engine.tickDriver.advanceTime(high);
   return high;
@@ -440,7 +443,7 @@ function bisectTerminationTime(
  * True when the snapshot is in a state that mechanically cannot produce a
  * predicate-firing transition — no opaque-predicates, no finite distances.
  * Used by `'stasis-aware'` mode in `runUntil` to short-circuit unreachable
- * runs. Conservative: any opaque-predicate distance aborts the classification
+ * headless runs. Conservative: any opaque-predicate distance aborts the classification
  * (false-negatives preferred over false-positives).
  *
  * @internal

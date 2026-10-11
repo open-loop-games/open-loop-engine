@@ -1,13 +1,13 @@
 /**
  * Predicate-bounded matrix runner — the `cells × seeds` counterpart to
- * {@link runUntil}. Drives a freshly-built engine per `(cell, seed)`,
- * checks the shared predicate each tick, and aggregates per-cell
+ * {@link runUntil}. Drives a newly built engine per `(cell, seed)`,
+ * checks the shared predicate each iteration, and aggregates per-cell
  * termination-time distributions as first-class fields on
  * {@link CellAggregate}.
  *
- * Beat-timing probes are the canonical consumer: "across 50 seeds, when
- * does beat-N fire? is the mean in [100, 140] min?" — the kind of question
- * `runMatrix` can't answer because it presumes a fixed tick budget.
+ * Beat-timing probes are the typical consumer: "across 50 seeds, when
+ * is beat N reached? Is the mean in [100, 140] min?" `runMatrix` cannot
+ * answer that kind of question, because it assumes a fixed tick count.
  *
  * @cluster runners
  */
@@ -19,19 +19,19 @@ import { createWorkPlan } from './work-plan';
 import type { CellResult, MatrixUntilOptions, MatrixUntilResult, RunUntilResult } from './types';
 
 /**
- * Sync cartesian run over `cells × seeds` where each run terminates on a
- * shared predicate (or `maxSimTime`). Mirrors `runMatrix`'s structure —
+ * Sync cartesian sweep over `cells × seeds` where each headless run
+ * terminates on a shared predicate (or `maxSimTime`). Mirrors `runMatrix`'s structure:
  * stable cell-outer/seed-inner order, progressive `onRunComplete` /
- * `onCellComplete` callbacks, opt-in histogram bucketing — but every cell
- * builds its own engine per run and the aggregate carries
+ * `onCellComplete` option callbacks, opt-in histogram bucketing. But every
+ * cell builds its own engine per headless run, and the aggregate has
  * `terminationTime` / `terminationCounts`.
  *
- * The runner stops each run's engine, then disposes it once `onRunComplete`
- * has read it (or after a throwing run). A cell's `teardown` replaces that
- * dispose — pass a no-op to keep the engines alive past the sweep.
+ * The runner stops the engine of each headless run, then disposes it once
+ * `onRunComplete` has read it (or after a throwing headless run). A cell's
+ * `teardown` replaces that dispose; pass a no-op to keep the engines alive past the sweep.
  *
  * @param options - {@link MatrixUntilOptions} — until-cells, seeds, shared
- *   predicate, max sim-time ceiling, optional callbacks + aggregate opts.
+ *   predicate, sim-time cap, optional option callbacks + aggregate options.
  * @returns {@link MatrixUntilResult} with per-cell {@link CellResult}.
  *
  * @example
@@ -39,11 +39,11 @@ import type { CellResult, MatrixUntilOptions, MatrixUntilResult, RunUntilResult 
  * const result = runMatrixUntil({
  *   cells: [
  *     {
- *       name: 'meta-cost × 0.85',
+ *       id: 'meta-cost × 0.85',
  *       buildEngine: () => buildDirectorEngine({ metaCostMul: 0.85 }),
  *     },
  *     {
- *       name: 'meta-cost × 1.15',
+ *       id: 'meta-cost × 1.15',
  *       buildEngine: () => buildDirectorEngine({ metaCostMul: 1.15 }),
  *     },
  *   ],
@@ -94,7 +94,7 @@ export function runMatrixUntil(options: MatrixUntilOptions): MatrixUntilResult {
         });
       } finally {
         // buildEngine returns a *started* engine (contract); with the default
-        // TickDriver that is a live setInterval. Stop each run's engine or the
+        // TickDriver that is a live setInterval. Stop the engine of each headless run or the
         // sweep leaks one ticking engine per (cell × seed) that keeps the Node
         // process alive. `stop?.` tolerates lightweight test fakes.
         engine.stop?.();

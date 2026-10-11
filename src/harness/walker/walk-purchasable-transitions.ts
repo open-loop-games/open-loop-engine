@@ -1,27 +1,27 @@
 /**
- * Content walker — enumerate pending purchasable transitions.
+ * Purchasable transition walker — enumerate pending purchasable transitions.
  *
- * Purchasables are the canonical "becomes affordable" transition: the cost
+ * A purchasable is the typical "becomes affordable" transition. The cost
  * requirement names a resource, the accessor reports its current amount and
- * rate, and {@link timeUntilResource} turns those into a distance. For
- * leveled purchasables the walker also surfaces `purchasable-maxed` when
- * the next purchase would cap the level — it falls out of the same math.
+ * rate, and {@link timeUntilResource} turns those into a distance. For a
+ * purchasable with a finite limit, the walker also returns
+ * `purchasable-maxed` when the next purchase would reach the limit. The same
+ * math gives it.
  *
- * Emissions per purchasable entity:
+ * Transitions per purchasable:
  *
- * - `becomes-affordable` — `!maxed` and the entity has at least one
+ * - `becomes-affordable` — `!maxed` and the purchasable has at least one
  *   {@link CostRequirement}. Uses the first cost requirement's resource
  *   and `purchasable.getCost(1)`.
- * - `purchasable-maxed` — `amount === limit - 1` with a finite limit, so the
- *   next purchase would max out. Same distance as `becomes-affordable`.
+ * - `purchasable-maxed` — `count === limit - 1` with a finite limit, so the
+ *   next purchase would max it. Same distance as `becomes-affordable`.
  *
- * The purchasable keeps no Gate for `visible`, so the walker cannot
- * compute a flip distance for it. Hidden purchasables emit no
- * `visibility-reveal` — the entity still surfaces via `becomes-affordable`
- * once a cost resource is present. Multi-cost purchasables (N>1 cost
- * requirements) use the first requirement's resource; this matches the
- * single-distance emission shape and avoids imposing a "slowest resource
- * wins" semantic without a consumer asking for it.
+ * The purchasable keeps no Gate for `visible`, so the walker cannot compute
+ * a flip distance for it. A purchasable with `visible` false gives no
+ * `visibility-reveal`. It still appears through `becomes-affordable` once a
+ * cost resource is present. A purchasable with several cost requirements
+ * uses the first requirement's resource. That matches the single-distance
+ * shape, and adds no "slowest resource wins" rule before a consumer asks.
  */
 
 import type { Purchasable } from '@/systems/purchasable';
@@ -50,9 +50,9 @@ interface PurchasableEntity {
 // ============================================================================
 
 /**
- * The affordability emission's shared parts for a purchasable (a producer's
- * `repeatable` included), or undefined when it's maxed or has no cost
- * resource to meter against.
+ * The shared parts of a purchasable's affordability transition (a producer's
+ * `repeatable` included). Undefined when it's maxed or has no cost resource
+ * to meter against.
  *
  * @internal
  */
@@ -69,7 +69,7 @@ export function predictAffordable(
   if (purchasable.maxed.value) return undefined;
 
   // TODO(expansion): multi-cost purchasables. When a purchasable has N>1 cost
-  // requirements, emit one becomes-affordable per resource (or the slowest)?
+  // requirements, return one becomes-affordable per resource (or the slowest)?
   // Today we pick the first. Promote on the first consumer that notices.
   const reqs = purchasable.requirements;
   const costReq = (Array.isArray(reqs) ? reqs : [reqs]).find(isCostRequirement);
@@ -78,8 +78,8 @@ export function predictAffordable(
   const costId = costReq.resource.id;
   return {
     distance: timeUntilResource(costId, purchasable.getCost(1), accessor),
-    // `timeUntilResource` reads amount + rate of the cost resource. Amount,
-    // limit and cost are gating state, which the incremental snapshot's gate
+    // `timeUntilResource` reads amount + rate of the cost resource. Count,
+    // limit and cost are blocking state, which the incremental snapshot's
     // signature covers, so they stay out of the dep set.
     deps: {
       resources: new Set([costId]),
@@ -118,8 +118,8 @@ function collectForEntity(
   const { def, purchasable } = entity;
   const defId = def.id;
 
-  // Maxed, or boolean-only gates and unlock/state predicates with no cost
-  // resource to run distance math against.
+  // Maxed, or only boolean, flag or state requirements, with no cost
+  // resource to compute a distance from.
   const affordable = predictAffordable(purchasable, accessor);
   if (!affordable) return;
   const { distance, deps } = affordable;
@@ -135,9 +135,9 @@ function collectForEntity(
     deps,
   });
 
-  // purchasable-maxed: when the next purchase caps the level. Only meaningful
-  // for finite limits. `amount === limit - 1` reads off the same distance as
-  // the affordability flip — one more purchase and we're at `limit`.
+  // purchasable-maxed: when the next purchase reaches the limit. Only meaningful
+  // for finite limits. `count === limit - 1` uses the same distance as the
+  // affordability flip: one more purchase and the count is at `limit`.
   const limit = unref(purchasable.limit);
   if (Decimal.isFinite(limit) && Decimal.eq(purchasable.count.value, Decimal.sub(limit, 1))) {
     out.push({
@@ -158,14 +158,15 @@ function collectForEntity(
 // ============================================================================
 
 /**
- * Walk every purchasable across every `CategoriesKey.purchasables` slice and
- * emit one {@link Transition} per pending affordability flip.
+ * Walk every purchasable across every `CategoriesKey.purchasables` slice.
+ * Return one {@link Transition} per pending affordability flip.
  *
  * @param engine - Engine to introspect. Categories are read via
- *   `engine.tryInject(CategoriesKey)`; missing key degrades to `[]`.
- * @param accessor - Read-side accessor used to look up each cost resource's
- *   current amount and rate. Explicit rather than ambient so the walker can
- *   be called from non-install contexts (probes, devtools, tests).
+ *   `engine.tryInject(CategoriesKey)`; a missing key gives `[]`.
+ * @param accessor - The game-state accessor that reads each cost resource's
+ *   current amount and rate. It is a parameter, not an ambient value, so
+ *   callers outside install/connect can call the walker (probes, devtools,
+ *   tests).
  */
 export function walkPurchasableTransitions(
   engine: Engine,
@@ -175,10 +176,10 @@ export function walkPurchasableTransitions(
 }
 
 /**
- * Variant of {@link walkPurchasableTransitions} that also reports the accessor
- * slots each transition's distance arithmetic reads. Consumed by
- * {@link createIncrementalSnapshot} to invalidate the right transitions on
- * resource/rate change.
+ * Like {@link walkPurchasableTransitions}, but also reports the accessor reads
+ * each transition's distance arithmetic depends on.
+ * {@link createIncrementalSnapshot} uses them to invalidate the right
+ * transitions on a resource or rate change.
  *
  * `becomes-affordable` and its paired `purchasable-maxed` share the same dep
  * set — both read the same cost resource to compute the same distance.
@@ -201,8 +202,8 @@ export function collectPurchasableTransitionsWithDeps(
 }
 
 /**
- * Re-emit purchasable transitions for a single cached entity. Consumed by
- * {@link createIncrementalSnapshot}'s selective-rebuild path.
+ * Rebuild the purchasable transitions of one cached category entry, for
+ * {@link createIncrementalSnapshot}'s selective rebuild.
  *
  * @internal — harness-internal. Not re-exported from the walker barrel.
  */

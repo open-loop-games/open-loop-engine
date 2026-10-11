@@ -28,8 +28,8 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
     getFlag: cached((id) => accessor.getFlag(id)),
     getStateAt: cached((path) => accessor.getStateAt(path)),
   };
-  // Only where the source serves it: an absent hook is what tells a
-  // predictor to fall back to the net rate.
+  // Only where the wrapped accessor has it: an absent `getInflowRate` is what
+  // tells a predictor to fall back to the net rate.
   const { getInflowRate } = accessor;
   if (getInflowRate) memo.getInflowRate = cached((id) => getInflowRate.call(accessor, id));
   return memo;

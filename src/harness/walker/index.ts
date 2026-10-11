@@ -1,26 +1,26 @@
 /**
  * Transition-walker merger — engine-public introspection contract.
  *
- * Runs the three transition walkers (challenges, purchasables, producers)
- * and returns a single {@link TransitionSnapshot} with the merged list sorted
- * by {@link TransitionDistance} plus per-source group arrays. The leaves
- * themselves stay internal to harness; consumers go through this merger so
- * they get consistent ordering and never have to re-sort across sources.
+ * Runs the three transition walkers (challenges, purchasables, producers).
+ * Returns one {@link TransitionSnapshot}: the merged list sorted by
+ * {@link TransitionDistance}, plus one group array per walker. The leaf
+ * walkers stay internal to the balance harness. Consumers go through this
+ * merger, so they get one ordering and never re-sort across walkers.
  *
- * Canonical consumers today are `runUntil`'s `'next-event'` mode (via
- * {@link createIncrementalSnapshot}) and `runUntil`'s `'stasis-aware'`
- * mode (via this one-shot merger, called per tick). Both flow through
- * `runBeatProbe` and `runMatrixUntil`. The walker is the substrate underneath
- * the probe ecosystem, not a generic consumer-facing API.
+ * The engine's own consumers are `runUntil`'s `'next-event'` mode (via
+ * {@link createIncrementalSnapshot}) and its `'stasis-aware'` mode (via this
+ * one-shot merger, called each iteration). `runBeatProbe` and `runMatrixUntil`
+ * reach both. The walker is the substrate under the probes, not a generic
+ * consumer-facing API.
  *
- * Broader consumer adoption (devtools panels, UI unlock hints, tutorial
- * reachability, mod-QA) wants a budget-bounded reachability layer above
- * this one — deliberately not built here. The walker is the substrate.
+ * Wider uses (devtools panels, UI unlock hints, tutorial reachability, mod
+ * testing) need a budget-bounded reachability search on top of this one.
+ * The engine deliberately does not build it here.
  *
- * Null-distance handling is intentionally left to the consumer: `null`
- * distances surface as-is at the tail of `all`. A stasis analyzer treats null
- * as "cannot rule out this transition"; a countdown UI hides null rows
- * entirely. The walker does not make that call.
+ * The consumer decides how to handle a null distance: `null` distances appear
+ * unchanged at the end of `all`. A stasis analyzer treats null as "cannot
+ * rule out this transition"; a countdown UI hides null rows. The walker does
+ * not make that call.
  */
 
 import type { Engine } from '@/engine';
@@ -39,13 +39,12 @@ export { createIncrementalSnapshot, type IncrementalSnapshot } from './increment
 /**
  * Merged output of {@link createTransitionSnapshot}.
  *
- * `all` is the flat sorted list (finite seconds ascending, null distances
- * last, tie-broken by {@link Transition.key}). The per-source arrays
- * preserve the same order as `all`, so consumers can walk one group
- * without needing to re-sort.
+ * `all` is the flat sorted list: finite seconds ascending, null distances
+ * last, ties broken by {@link Transition.key}. The per-walker arrays keep
+ * the order of `all`, so consumers can walk one group without re-sorting.
  */
 export interface TransitionSnapshot {
-  /** Sorted merged transitions — finite seconds asc, null last, label tie-break. */
+  /** Sorted merged transitions — finite seconds asc, null last, `key` tie-break. */
   readonly all: readonly Transition[];
   /** Challenge transitions only, in the same order as `all`. */
   readonly challenges: readonly Transition[];
@@ -56,21 +55,21 @@ export interface TransitionSnapshot {
 }
 
 /**
- * Build a single merged snapshot of pending state transitions across the
- * engine's auto-registered content.
+ * Build one merged snapshot of the transitions across the engine's
+ * auto-registered content.
  *
  * Runs each transition walker (challenges, purchasables, producers) against
- * `engine` and concatenates the output into a sorted, grouped snapshot.
+ * `engine`, and concatenates the output into a sorted, grouped snapshot.
  *
- * Missing `CategoriesKey` or empty category slices degrade silently — each
- * leaf returns `[]` and the merger emits an empty snapshot. There's no
- * failure mode: a fresh engine with no content produces
+ * A missing `CategoriesKey` or empty category slices give an empty result:
+ * each leaf walker returns `[]`, and the merger returns an empty snapshot.
+ * There's no failure mode. A fresh engine with no content produces
  * `{ all: [], challenges: [], purchasables: [], producers: [] }`.
  *
  * @param engine - Engine to introspect. Categories are read via
  *   `engine.tryInject(CategoriesKey)`.
- * @param accessor - Read-side accessor used by every leaf to resolve
- *   resource amounts, rates, unlocks, and state paths into prediction
+ * @param accessor - The game-state accessor every leaf walker reads. It
+ *   turns resource amounts, rates, flags and state paths into transition
  *   distances.
  *
  * @example

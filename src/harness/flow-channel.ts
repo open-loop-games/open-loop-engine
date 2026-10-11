@@ -1,12 +1,12 @@
 /**
- * Flow-channel classification — maps beat duration to Csikszentmihalyi's
- * Flow Theory engagement bands. Opinionated balance-tooling surface: lives
- * in harness because the bands encode player-engagement theory, which the
- * mechanics-tier kernel deliberately avoids.
+ * Flow-channel classification — maps beat time to Csikszentmihalyi's
+ * Flow Theory engagement classes. An opinionated balance-harness utility: it
+ * is in the balance harness because the classes encode player-engagement
+ * theory, which the Mechanics API tier avoids on purpose.
  *
- * The thresholds come from automation-pacing analysis across the
- * incremental-games corpus, and match Flow Theory's original engagement
- * bands (Csikszentmihalyi 1990):
+ * The thresholds come from automation-pacing analysis across a corpus of
+ * incremental games, and match Flow Theory's original engagement
+ * classes (Csikszentmihalyi 1990):
  *
  * - **arousal** `[0, 30)` — learning phase, building engagement
  * - **flow** `[30, 120)` — optimal engagement zone (target)
@@ -15,14 +15,14 @@
  * - **frustration** `[900, 3600)` — high disengagement
  * - **breakdown** `[3600, ∞)` — player abandonment likely
  *
- * Consumed alongside a beat-time quotient — a cost `Formula` in level over
- * a production rate. The algebra is the mechanics tier's; this file is the
- * theory layer over it.
+ * Used with a beat-time quotient: a cost `Formula` in purchase count over
+ * a production rate. The algebra is in the Mechanics API tier; this file
+ * adds the theory on top of it.
  */
 
 /**
  * Flow-channel classification based on Csikszentmihalyi's Flow Theory (1990).
- * Maps beat duration to a player engagement band.
+ * Maps beat time to a player engagement class.
  */
 export type FlowChannel =
   | 'arousal'
@@ -33,12 +33,12 @@ export type FlowChannel =
   | 'breakdown';
 
 /**
- * Classify a beat duration (in seconds) into its flow channel.
+ * Classify a beat time (in seconds) into its flow channel.
  *
- * Boundaries are half-open `[min, max)`: a beat of exactly `30s` is `'flow'`,
- * not `'arousal'`. Negative or zero durations classify as `'arousal'`.
+ * Boundaries are half-open `[min, max)`: a beat time of exactly `30s` is
+ * `'flow'`, not `'arousal'`. Negative or zero beat times classify as `'arousal'`.
  *
- * @param beatTimeSeconds - Beat duration in seconds
+ * @param beatTimeSeconds - Beat time in seconds
  * @returns Flow channel classification
  *
  * @example
@@ -61,8 +61,8 @@ export function classifyFlowChannel(beatTimeSeconds: number): FlowChannel {
 /**
  * Get flow-channel threshold boundaries as `[min, max)` pairs in seconds.
  *
- * Useful for rendering boundary markers on a beat chart, or for consumer
- * code that needs to quantize beats into channels without re-calling the
+ * Useful for drawing boundary markers on a beat-time chart, or for consumer
+ * code that quantizes beat times into channels without calling the
  * classifier per value.
  */
 export function getFlowChannelBoundaries(): Record<FlowChannel, [number, number]> {

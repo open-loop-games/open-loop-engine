@@ -1,9 +1,9 @@
 /**
- * Cell-aggregation kernel — reduces raw per-run results into per-metric
- * stats, optional histograms, and (for until-runs) termination-time
- * distributions. Also exports `diffAggregates`, the baseline-vs-variant
- * delta primitive consumed directly by custom-sweep callers when the
- * canned `runSensitivity` shape doesn't fit.
+ * Cell-aggregation kernel — reduces the raw results of headless runs into
+ * per-metric stats, optional histograms, and termination-time distributions
+ * for predicate-bounded headless runs. Also exports `diffAggregates`, the
+ * baseline-vs-variant delta primitive that custom-sweep callers use directly
+ * when the canned `runSensitivity` shape does not fit.
  *
  * @cluster runners
  */
@@ -21,8 +21,8 @@ import type {
 
 /**
  * Floor-index percentile on a pre-sorted ascending array. Matches the
- * convention in `core/profiler.ts` and the bench runner so the three
- * percentile-reporting surfaces in the repo stay comparable. Returns `0`
+ * convention in `core/profiler.ts` and the bench runner, so the three
+ * percentile reporters in the repo stay comparable. Returns `0`
  * for an empty input.
  */
 function percentile(sorted: number[], p: number): number {
@@ -37,11 +37,11 @@ function percentile(sorted: number[], p: number): number {
  * honest, and a cell with no numeric samples leaves the metric out instead.
  *
  * Public because the cell aggregators are not the only shape a seed sweep
- * takes: a consumer whose per-run readout is a domain object rather than an
- * analyzer's `Record<string, number>` would otherwise fabricate
- * `HeadlessResult`s to reach this, or re-implement percentiles beside it —
- * and a second percentile convention in the tree is exactly what the
- * floor-index note above exists to prevent.
+ * takes. A consumer whose output per headless run is a domain object, not an
+ * analyzer's `Record<string, number>`, would otherwise fabricate
+ * `HeadlessResult`s to reach this, or re-implement percentiles beside it.
+ * A second percentile convention in the tree is what the floor-index note
+ * above exists to prevent.
  */
 export function computeMetricStats(values: number[]): MetricStats {
   if (values.length === 0) throw new Error('computeMetricStats needs at least one value');
@@ -62,7 +62,7 @@ export function computeMetricStats(values: number[]): MetricStats {
     sqSum += d * d;
   }
   // Population stddev (divisor n) — single-sample cells report 0 instead
-  // of NaN, and balance probes treat the seed batch as the observed
+  // of NaN, and balance probes treat a cell's seeds as the observed
   // population rather than a sample of a larger distribution.
   const stddev = Math.sqrt(sqSum / values.length);
   const sorted = [...values].sort((a, b) => a - b);
@@ -86,8 +86,8 @@ export function computeMetricStats(values: number[]): MetricStats {
  * Bucket a numeric sample into consumer-declared edges. `edges` has N+1
  * entries defining N buckets, half-open `[edges[i], edges[i+1])` except
  * the final bucket which is closed on both ends. Samples below `edges[0]`
- * count into `underflow`, above `edges[N]` into `overflow` — lossless by
- * construction.
+ * count into `underflow`, above `edges[N]` into `overflow`, so no sample
+ * is lost.
  */
 function bucketize(values: number[], spec: HistogramOptions): MetricHistogram {
   const edges = spec.edges;
@@ -124,10 +124,10 @@ function bucketize(values: number[], spec: HistogramOptions): MetricHistogram {
 }
 
 /**
- * Aggregate a cell's raw runs into per-metric stats, keyed
- * `${analyzerName}.${metricKey}`. Only numeric values contribute — string
+ * Aggregate the raw headless runs of a cell into per-metric stats, keyed
+ * `${analyzerId}.${metricKey}`. Only numeric values contribute — string
  * and boolean metric values are silently dropped, so `count` reflects the
- * number of numeric samples observed, not the number of runs. Metric keys
+ * number of numeric samples observed, not the number of headless runs. Metric keys
  * that produced no numeric samples are omitted from the result.
  *
  * Percentiles (`p5`/`p50`/`p95`) and `stddev` are always computed;
@@ -166,17 +166,17 @@ export function aggregateCell(runs: HeadlessResult[], options?: AggregateOptions
 }
 
 /**
- * Aggregate an until-run seed sweep. Extends {@link aggregateCell}'s output
- * with first-class termination data: `terminationTime` stats over the
- * `elapsedSimulated` of predicate-terminated runs, `terminationCounts` by
+ * Aggregate a seed sweep of predicate-bounded headless runs. Extends
+ * {@link aggregateCell}'s output with first-class termination data: `terminationTime` stats over the
+ * `elapsedSimulated` of predicate-terminated headless runs, `terminationCounts` by
  * reason, and (opt-in via {@link AggregateOptions.terminationTimeHistogram})
  * a histogram of predicate-termination sim-times.
  *
- * Runs that hit `maxSimTime` are excluded from `terminationTime` stats so
- * the ceiling doesn't pollute the distribution — consumers inspect
- * `terminationCounts.maxSimTime` to see how often the predicate failed to
- * fire. When no runs terminated on the predicate, `terminationTime` is
- * omitted entirely (rather than returning a zero-filled `MetricStats`).
+ * Headless runs that hit `maxSimTime` are excluded from `terminationTime`
+ * stats, so the sim-time cap does not distort the distribution. Consumers
+ * inspect `terminationCounts.maxSimTime` to see how often the predicate
+ * never held. When no headless run terminated on the predicate,
+ * `terminationTime` is omitted entirely (rather than returning a zero-filled `MetricStats`).
  *
  * @internal
  */
@@ -227,23 +227,23 @@ function metricDelta(cell: MetricStats, baseline: MetricStats): MetricDelta {
  * the baseline average is zero (avoids `±Infinity` without hiding the
  * sign of `absolute`). Metrics present on only one side are skipped —
  * callers that need the union shape can walk both aggregates directly.
- * Two until-aggregates that both carry a `terminationTime` add
+ * Two until-aggregates that both have a `terminationTime` add
  * `'termination.time'`, the delta of the mean predicate fire time.
  *
  * Used both internally by {@link runSensitivity} and directly by consumers
  * composing custom sensitivity-shape sweeps over `runMatrix` or
  * `runMatrixUntil`.
  *
- * @param cell - The variant cell's aggregate, keyed `${analyzerName}.${metricKey}`.
+ * @param cell - The variant cell's aggregate, keyed `${analyzerId}.${metricKey}`.
  * @param baseline - The baseline cell's aggregate, same key namespace.
- * @returns Per-metric `{ absolute, relative }` delta, keyed by the metric
- *   name. Empty when the two aggregates share no metric keys.
+ * @returns Per-metric `{ absolute, relative }` delta, keyed by metric
+ *   key. Empty when the two aggregates share no metric keys.
  *
  * @example
  * ```ts
  * const result = runMatrix({ cells: [baseline, ...variants], seeds });
  * const deltas = diffAggregates(result.cells[1]!.aggregate, result.cells[0]!.aggregate);
- * deltas['gold-tracker.peak'].relative; // e.g. +0.42
+ * deltas['gold-analyzer.peak'].relative; // e.g. +0.42
  * ```
  */
 export function diffAggregates(

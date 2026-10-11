@@ -1,8 +1,9 @@
 /**
- * Measurement harness types — cartesian `cells × seeds` plan over `runHeadless`,
- * preserving raw per-run results and producing namespaced numeric aggregates.
+ * Balance harness types — the cartesian `cells × seeds` plan over `runHeadless`.
+ * It keeps the raw result of each headless run and produces numeric aggregates
+ * under namespaced keys.
  *
- * Sync-pure — parallelism lives in consumer code; see {@link WorkItem} and
+ * Synchronous and pure: parallelism is in consumer code. See {@link WorkItem} and
  * the `createWorkPlan` seam.
  */
 
@@ -11,28 +12,27 @@ import type { HeadlessResult } from '@/core/headless';
 import type { Engine } from '@/engine';
 
 /**
- * Run-loop mode shared by {@link runUntil} and {@link runMatrixUntil}.
+ * The run mode shared by {@link runUntil} and {@link runMatrixUntil}.
  *
- * - `'uniform'` (default) — fixed-tick `advanceTime(tickDelta)` loop, predicate
- *   evaluated each iteration. Content-blind.
- * - `'next-event'` — walker-visible event-stepping. Builds an {@link createIncrementalSnapshot}
- *   per iteration, advances by the smallest finite transition distance, falls
- *   back to fixed-tick on `'opaque-present'` / fast-tick on `'no-finite-transition'`.
- *   Predicate fire-time can be resolved within an advance via
- *   {@link RunUntilOptions.bisectTolSec}. Requires an accessor — modes other
- *   than `'uniform'` introspect content through the walker — and takes no
- *   analyzers, since advances are variable-length.
- * - `'stasis-aware'` — fixed-tick loop with a per-tick stasis check via
+ * - `'uniform'` (default) — a fixed-tick `advanceTime(tickDelta)` loop that
+ *   evaluates the predicate each iteration. Content-blind.
+ * - `'next-event'` — walker-visible event stepping. Builds an {@link createIncrementalSnapshot}
+ *   per iteration and advances by the smallest finite transition distance. It falls
+ *   back to a fixed tick on `'opaque-present'`, and to fast-ticks on `'no-finite-transition'`.
+ *   {@link RunUntilOptions.bisectTolSec} can resolve the predicate's fire time
+ *   within an advance. Requires an accessor, because modes other than `'uniform'`
+ *   read content through the walker. Takes no analyzers, because advances vary in length.
+ * - `'stasis-aware'` — a fixed-tick loop with a stasis check each iteration via
  *   {@link createTransitionSnapshot}. When the snapshot reports no finite or
- *   opaque-predicate transition, the run terminates with `terminated: 'unreachable'`.
- *   Requires an accessor.
+ *   opaque-predicate transition, the headless run terminates with
+ *   `terminated: 'unreachable'`. Requires an accessor.
  */
 export type RunMode = 'uniform' | 'next-event' | 'stasis-aware';
 
 /**
- * Context passed to a {@link Cell}'s `setup` function. Carries the seed in
- * use for this run — setup owns analyzer construction and returns the list
- * itself, so runHeadless can wire them to a freshly-built engine.
+ * The context passed to a {@link Cell}'s `setup` function: the seed for this
+ * headless run. `setup` builds the analyzers and returns the list, so
+ * `runHeadless` can wire them to a newly built engine.
  */
 export interface RunContext {
   seed: number;
@@ -40,8 +40,8 @@ export interface RunContext {
 
 /**
  * One named configuration in a matrix. Mirrors {@link HeadlessOptions} but
- * without the `seed` field — the harness supplies that per work item. Setup
- * constructs and returns the analyzer list for this run; metric-free cells
+ * without the `seed` field: the balance harness supplies it per work item.
+ * `setup` builds and returns the analyzer list for this headless run; metric-free cells
  * return `[]`.
  */
 export interface Cell {
@@ -50,20 +50,21 @@ export interface Cell {
   tick: (dt: number) => void;
   /** Total number of ticks to simulate for this cell. */
   ticks: number;
-  /** Seconds of simulated time per tick (default 0.05, i.e. 20 TPS). */
+  /** Sim-seconds per tick. Defaults to `0.05`. */
   tickDelta?: number;
   /**
-   * Called after each run's analyzers have summarized, before the next run
-   * sets up — release what `setup` built (e.g. dispose the run's engine).
+   * Called after the analyzers of each headless run have summarized, before
+   * the next headless run sets up. Release what `setup` built here (e.g.
+   * dispose its engine).
    */
   teardown?: () => void;
 }
 
 /**
  * One unit of work in a flat cell×seed plan. `createWorkPlan` returns an
- * array of these in stable iteration order; consumers wiring a worker pool
- * map through the array instead of reshaping the loop. Parameterized by
- * cell shape so until-runners (with {@link UntilCell}) can share the same
+ * array of these in stable iteration order. A consumer that spreads headless runs over
+ * Web Workers maps over the array instead of reshaping the loop. Parameterized
+ * by cell shape, so until-runners (with {@link UntilCell}) share the same
  * planner.
  */
 export interface WorkItem<C = Cell> {
@@ -74,7 +75,7 @@ export interface WorkItem<C = Cell> {
 }
 
 /**
- * Numeric summary of one metric across a cell's runs. `count` reflects the
+ * Numeric summary of one metric across the headless runs of a cell. `count` reflects the
  * number of numeric samples observed — non-numeric samples (strings,
  * booleans) are dropped during aggregation, so a metric that produced four
  * numeric and two string samples reports `count: 4`.
@@ -105,7 +106,7 @@ export interface MetricStats {
  * samples in `[edges[i], edges[i+1])` for `i < N-1`, and `[edges[N-1],
  * edges[N]]` (closed on both sides) for the final bucket. Samples below
  * `edges[0]` count into `underflow`; samples above `edges[N]` count into
- * `overflow` — so the histogram is lossless by construction.
+ * `overflow`. So the histogram loses no sample.
  */
 export interface MetricHistogram {
   edges: number[];
@@ -115,8 +116,8 @@ export interface MetricHistogram {
 }
 
 /**
- * Consumer-supplied histogram spec for one metric. Keyed by the same
- * `${analyzerName}.${metricKey}` namespace that `CellAggregate.metrics`
+ * Histogram options for one metric. Keyed by the same
+ * `${analyzerId}.${metricKey}` namespace that `CellAggregate.metrics`
  * uses. `edges` must have at least two entries in ascending order.
  */
 export interface HistogramOptions {
@@ -124,15 +125,15 @@ export interface HistogramOptions {
 }
 
 /**
- * Options threaded through {@link MatrixOptions} (and the batch/sensitivity
- * wrappers) to opt into histogram bucketing for specific metrics. Percentile
- * outputs (`p5`/`p50`/`p95`) are always computed — they're cheap relative
- * to the sort already done for `median`. Histograms are opt-in because
+ * Options passed through {@link MatrixOptions} (and {@link SensitivityOptions})
+ * to opt into histogram bucketing for specific metrics. Percentile outputs
+ * (`p5`/`p50`/`p95`) are always computed, because they cost little next to
+ * the sort already done for `median`. Histograms are opt-in because
  * edge choice is domain-specific.
  */
 export interface AggregateOptions {
   /**
-   * Per-metric histogram specs, keyed `${analyzerName}.${metricKey}`.
+   * Histogram options per metric, keyed `${analyzerId}.${metricKey}`.
    * Metrics not listed produce no histogram output; metrics listed that
    * produced no numeric samples are omitted from {@link
    * CellAggregate.histograms}.
@@ -147,48 +148,50 @@ export interface AggregateOptions {
 }
 
 /**
- * Per-cell aggregated metrics, keyed `${analyzerName}.${metricKey}` to
- * prevent cross-analyzer collisions. Numeric-only — string/boolean metric
- * aggregation (mode, distribution) is deferred until a consumer demands
- * it. `histograms` is present only when the matrix config opts in via
+ * Per-cell aggregated metrics, keyed `${analyzerId}.${metricKey}` to
+ * prevent cross-analyzer collisions. Numeric-only: string and boolean metric
+ * aggregation (statistical mode, distribution) is deferred until a consumer
+ * needs it. `histograms` is present only when the matrix options opt in via
  * {@link AggregateOptions.histograms}.
  *
  * The `termination*` fields are populated only by {@link runMatrixUntil};
  * `runMatrix` leaves them `undefined`. They describe *when* the
- * per-run predicate fired across the seed sweep — the headline metric for
+ * predicate of each headless run held across the seed sweep: the headline metric for
  * beat-timing probes that assert distributions of sim-time-to-condition
- * rather than presence at a fixed tick budget.
+ * rather than presence at a fixed tick count.
  */
 export interface CellAggregate {
   metrics: Record<string, MetricStats>;
   histograms?: Record<string, MetricHistogram>;
   /**
-   * Stats over `elapsedSimulated` for runs that ended with
-   * `terminated: 'predicate'`. Runs that hit `maxSimTime` are excluded so
-   * the distribution isn't polluted by the ceiling. Absent when no runs
-   * terminated on the predicate.
+   * Stats over `elapsedSimulated` for headless runs that ended with
+   * `terminated: 'predicate'`. Headless runs that hit `maxSimTime` are
+   * excluded, so the sim-time cap does not distort the distribution. Absent
+   * when no headless run terminated on the predicate.
    */
   terminationTime?: MetricStats;
   /**
-   * Count of runs by termination reason. `predicate + maxSimTime + unreachable`
+   * Count of headless runs by termination reason. `predicate + maxSimTime + unreachable`
    * always equals the seed count for a {@link runMatrixUntil} cell.
-   * `unreachable` is non-zero only for runs in `'next-event'` or
+   * `unreachable` is non-zero only for headless runs in `'next-event'` or
    * `'stasis-aware'` mode that observed stasis.
    */
   terminationCounts?: { predicate: number; maxSimTime: number; unreachable: number };
   /**
-   * Histogram of predicate-terminated runs' `elapsedSimulated`, present
-   * only when {@link AggregateOptions.terminationTimeHistogram} is
-   * supplied and at least one run terminated on the predicate.
+   * Histogram of the `elapsedSimulated` of predicate-terminated headless
+   * runs. It is present only when
+   * {@link AggregateOptions.terminationTimeHistogram} is supplied and at
+   * least one headless run terminated on the predicate.
    */
   terminationTimeHistogram?: MetricHistogram;
 }
 
 /**
- * A completed cell's output. Raw per-run results are preserved — consumers
- * that need medians, filtering, or per-run end-reason access read `runs`
- * directly; `aggregate` is a convenience layer. `R` is the per-run result:
- * {@link RunUntilResult} from the until-runners, which carries `terminated`.
+ * A completed cell's output. The raw result of each headless run is kept.
+ * Consumers that need medians, filtering, or the end reason of each headless
+ * run read `runs` directly; `aggregate` is a convenience over them. `R` is
+ * the result of one headless run:
+ * {@link RunUntilResult} from the until-runners, which has `terminated`.
  */
 export interface CellResult<R extends HeadlessResult = HeadlessResult> {
   id: string;
@@ -197,16 +200,16 @@ export interface CellResult<R extends HeadlessResult = HeadlessResult> {
 }
 
 /**
- * Top-level matrix runner config — N cells × M seeds, run synchronously in
- * deterministic order. The runner re-runs each cell against every seed and
- * surfaces both raw per-run results (via `runs`) and namespaced numeric
- * aggregates (via `aggregate`). Callback fields fire in iteration order;
- * histogram opt-in lives on `aggregate`.
+ * Options for the matrix runner: N cells × M seeds, run synchronously in
+ * deterministic order. The runner runs each cell against every seed. It
+ * returns both the raw headless-run results (via `runs`) and namespaced numeric
+ * aggregates (via `aggregate`). Option callbacks fire in iteration order;
+ * histogram opt-in is on `aggregate`.
  */
 export interface MatrixOptions {
   cells: Cell[];
   seeds: number[];
-  /** Fires after each individual `(cell, seed)` run completes, in deterministic order. */
+  /** Fires after each `(cell, seed)` headless run completes, in deterministic order. */
   onRunComplete?: (item: WorkItem, result: HeadlessResult) => void;
   /** Fires once a cell's full seed sweep is complete, in deterministic order. */
   onCellComplete?: (cell: CellResult) => void;
@@ -220,15 +223,13 @@ export interface MatrixResult {
 }
 
 /**
- * A named config patch — the generic equivalent of a domain-specific
+ * A named change to the baseline cell: the generic form of a domain-specific
  * axis such as excluding upgrades. `patch` receives the baseline cell and
- * returns a new cell; the harness re-labels the returned cell with
- * `variant.name` so variant identity is stable regardless of what the patch
- * does to the underlying name.
+ * returns a new cell. The balance harness sets the returned cell's id to
+ * `variant.id`, so variant identity is stable whatever id `patch` sets.
  *
- * Generic over cell shape so the same shape carries fixed-tick
- * ({@link Cell}) and predicate-bounded ({@link UntilCell}) variant
- * sweeps. Defaults to `Cell` for source-compatible fixed-tick callers.
+ * Generic over cell shape, so one type serves fixed-tick ({@link Cell}) and
+ * predicate-bounded ({@link UntilCell}) variant sweeps. Defaults to `Cell`.
  */
 export interface Variant<C extends Cell | UntilCell = Cell> {
   id: string;
@@ -236,14 +237,14 @@ export interface Variant<C extends Cell | UntilCell = Cell> {
 }
 
 /**
- * One axis in a cartesian sensitivity sweep — a label, the values to try,
- * and a `(baseline, value)` patch. Each axis desugars to one variant per
+ * One sweep axis of a cartesian sensitivity sweep: an id, the values to try,
+ * and a `(baseline, value)` patch. Each axis expands to one variant per
  * `values[]` entry; multiple axes produce the cartesian product, named
  * `"${axis1}=${v1} × ${axis2}=${v2} × …"`.
  *
- * Authoring ergonomic for the common "sweep this knob across these values"
- * case — equivalent to manually emitting one {@link Variant} per `value`,
- * but keeps the axis identity legible at the call site.
+ * A shorthand for the common case "sweep this tunable across these values".
+ * It equals writing one {@link Variant} per `value` by hand, but keeps the
+ * axis identity legible at the call site.
  */
 export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
   id: string;
@@ -253,8 +254,8 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
 }
 
 /**
- * Baseline-plus-variants sweep config consumed by {@link runSensitivity}.
- * Mirrors {@link MatrixOptions}'s callback + aggregate shape, with the
+ * Options for {@link runSensitivity}, a baseline-plus-variants sweep.
+ * Mirrors {@link MatrixOptions}'s option-callback + aggregate shape, with the
  * cell list split into baseline + variant patches so the runner knows
  * which result to diff against.
  *
@@ -267,9 +268,9 @@ export interface SweepAxis<V, C extends Cell | UntilCell = Cell> {
  *
  * Variants may be supplied flat (`variants[]`) or axis-grouped (`axes[]`,
  * each axis expanded to one variant per value). Both can be supplied at
- * once — axis-expanded variants are appended after flat ones. An empty
- * variant set is allowed (runs the baseline only) so consumers can
- * exercise per-run setup hooks like {@link createSensitivityCell}'s
+ * once: axis-expanded variants are appended after flat ones. An empty
+ * variant set is allowed (it runs the baseline only), so consumers can
+ * exercise the setup functions of a headless run, such as {@link createSensitivityCell}'s
  * `perturb` against the baseline alone.
  */
 export interface SensitivityOptions<C extends Cell | UntilCell = Cell> {
@@ -290,12 +291,12 @@ export interface SensitivityOptions<C extends Cell | UntilCell = Cell> {
   onCellComplete?: (cell: CellResult) => void;
   aggregate?: AggregateOptions;
   /**
-   * Termination predicate. Set this to switch the sweep to predicate-bounded
-   * mode — baseline + variants must all be {@link UntilCell}s, and
+   * Termination predicate. Set it to make the sweep predicate-bounded: the
+   * baseline and variants must all be {@link UntilCell}s, and
    * {@link maxSimTime} becomes required. Absent means fixed-tick.
    */
   until?: UntilPredicate;
-  /** Sim-seconds ceiling per run. Required when {@link until} is set. */
+  /** Sim-time cap per headless run, in sim-seconds. Required when {@link until} is set. */
   maxSimTime?: number;
   /**
    * Run mode applied uniformly to every cell. Defaults to `'uniform'`.
@@ -321,9 +322,9 @@ export interface MetricDelta {
 }
 
 /**
- * One variant's contribution to a {@link SensitivityResult}. `name` is the
- * variant identity (forced from {@link Variant.id}, not whatever the
- * `patch` function chose). `cell` is the variant's raw matrix output;
+ * One variant's part of a {@link SensitivityResult}. `id` is the variant
+ * identity, taken from {@link Variant.id}, not from what the `patch`
+ * function set. `cell` is the variant's raw matrix output;
  * `deltas` is the per-metric diff against the baseline cell.
  */
 export interface SensitivityVariantResult {
@@ -331,7 +332,7 @@ export interface SensitivityVariantResult {
   cell: CellResult;
   /**
    * Per-metric deltas vs the baseline cell, from {@link diffAggregates}:
-   * keyed by the same `${analyzerName}.${metricKey}` namespace as
+   * keyed by the same `${analyzerId}.${metricKey}` namespace as
    * {@link CellAggregate.metrics}, plus `'termination.time'` in a
    * predicate-bounded sweep.
    */
@@ -341,7 +342,7 @@ export interface SensitivityVariantResult {
 /**
  * Output of a sensitivity sweep — baseline cell plus one entry per variant,
  * in the same order as {@link SensitivityOptions.variants}. Each variant
- * carries its own {@link CellResult} and a metric-keyed delta map vs the
+ * has its own {@link CellResult} and a metric-keyed delta map vs the
  * baseline.
  */
 export interface SensitivityResult {
@@ -353,72 +354,73 @@ export interface SensitivityResult {
 // Until-runners — predicate-driven alternatives to the fixed-tick primitives.
 // Engine-aware (consume `Engine` directly and call
 // `engine.tickDriver.advanceTime(tickDelta)`), in contrast to the decoupled
-// `tick`-callback shape of {@link runHeadless} and {@link runMatrix}. The
+// `tick`-function shape of {@link runHeadless} and {@link runMatrix}. The
 // matrix variant's headline output is the distribution of *termination times*
-// — when each seed's predicate fired — surfaced as first-class fields on
+// (when each seed's predicate held), returned as first-class fields on
 // {@link CellAggregate}.
 // =============================================================================
 
 /**
- * Snapshot passed to an `until` predicate each time it's evaluated. Carries
- * the running tick count and the derived `simTime` so predicates can assert
- * sim-time windows without closing over the tick counter themselves. Game
- * state is out of scope — consumers read it via closure over their own
+ * Snapshot passed to an `until` predicate each time it is evaluated. Contains
+ * the iteration count and the derived `simTime`, so predicates can assert
+ * sim-time windows without closing over a counter themselves. Game
+ * state is out of scope: consumers read it via closure over their own
  * engine or setup-captured refs.
  */
 export interface UntilContext {
   /**
-   * Loop iterations completed so far — one per `tickDelta` step in the tick
-   * modes. In event mode it counts advances and fast-ticks, each of any length.
+   * Loop iterations completed so far: one per `tickDelta` advance in the
+   * fixed-tick modes. In `'next-event'` mode it counts advances and fast-ticks,
+   * each of any length.
    */
   iteration: number;
   /**
-   * Simulated seconds elapsed so far. Equals `tick * tickDelta` in tick mode;
-   * in event mode advances are variable-length (plus fast-ticks), so it tracks
-   * actual advanced sim-time and the `tick * tickDelta` identity does not hold.
+   * Sim-seconds elapsed so far. Equals `iteration * tickDelta` in the fixed-tick
+   * modes. In `'next-event'` mode advances vary in length (plus fast-ticks), so
+   * it tracks the sim-time actually advanced, and that identity does not hold.
    */
   simTime: number;
 }
 
 /**
- * Predicate evaluated before each tick in a {@link runUntil} loop. Returning
- * `true` terminates the run with `terminated: 'predicate'`.
+ * Predicate evaluated before each iteration of a {@link runUntil} loop.
+ * Returning `true` terminates the headless run with `terminated: 'predicate'`.
  */
 export type UntilPredicate = (ctx: UntilContext) => boolean;
 
 /**
- * Configuration for a single predicate-bounded run. The engine is consumed
- * directly — `runUntil` drives it via `engine.tickDriver.advanceTime(tickDelta)`
- * rather than a consumer-supplied tick callback. The engine must be started
+ * Options for one predicate-bounded headless run. `runUntil` drives the
+ * engine directly via `engine.tickDriver.advanceTime(tickDelta)`, not through
+ * a consumer-supplied `tick` function. The engine must be started
  * (`engine.start()`) before calling `runUntil`.
  */
 export interface RunUntilOptions {
   /** Engine to drive. Must be started before the call. */
   engine: Engine;
-  /** Termination predicate. Evaluated once before every advanceTime, including tick 0. */
+  /** Termination predicate. Evaluated once before every advanceTime, including iteration 0. */
   until: UntilPredicate;
   /**
-   * Upper bound on simulated time, in seconds. Required — prevents runaway
-   * predicates from hanging the caller. Runs that reach this bound without
-   * predicate satisfaction terminate with `terminated: 'maxSimTime'`.
+   * The sim-time cap, in sim-seconds. Required, so a predicate that never
+   * holds cannot hang the caller. A headless run that reaches it before the predicate
+   * holds terminates with `terminated: 'maxSimTime'`.
    */
   maxSimTime: number;
   /**
-   * Seconds of sim-time per tick. Defaults to `0.05` (matches
+   * Sim-seconds per iteration. Defaults to `0.05` (matches
    * {@link runHeadless}). The engine advances by exactly this amount per
    * iteration, independent of its live `intervalRate`. Variable-mode engines
    * process one tick at this dt, or equal ticks under `maxDeltaTime` when it
-   * exceeds the cap — so coarsening is a real speedup only up to the cap;
-   * fixed-mode engines drain the accumulator at their internal `fixedDt`
-   * until `tickDelta` is consumed. In event mode it is the minimum advance
-   * and the fast-tick step.
+   * exceeds the cap. So coarsening is a real speedup only up to the cap.
+   * Fixed-mode engines drain the accumulator at their internal `fixedDt`
+   * until `tickDelta` is consumed. In `'next-event'` mode it is the shortest
+   * advance and the fast-tick dt.
    */
   tickDelta?: number;
   /**
-   * Analyzer factory. Called once before the tick loop. In the tick modes
+   * Builds the analyzers. Called once before the loop. In the fixed-tick modes
    * the analyzer lifecycle (`onStart`/`onTick`/`onEnd`) mirrors
-   * {@link runHeadless}, and `onTick` receives the tick index that was just
-   * stepped. Event mode throws if it returns any analyzers.
+   * {@link runHeadless}, and `onTick` receives the zero-based index of the
+   * iteration just completed. `'next-event'` mode throws if it returns any analyzers.
    */
   setup?: () => Analyzer[];
   /** Optional RNG seed; seeds the global Alea instance before `setup`. */
@@ -441,60 +443,63 @@ export interface RunUntilOptions {
    * single advance, binary-searches `dt` in `[0, advanced]` until
    * `|high - low| <= bisectTolSec`. Requires the engine to have a
    * `saveManager` (i.e., `persistence !== false`); throws at entry otherwise,
-   * and mid-run if a checkpoint fails to restore. Without this option,
-   * predicate-fire `simTime` is bounded by the advance distance, which for
-   * event-mode runs can be hundreds of seconds. Ignored in other modes.
+   * and during the headless run if a checkpoint fails to restore. Without this option, the
+   * predicate's fire time is accurate only to the advance length, which in
+   * `'next-event'` mode can be hundreds of seconds. Ignored in other modes.
    */
   bisectTolSec?: number;
   /**
-   * In `'next-event'` mode, rebuild the snapshot every Nth tick while inside the
-   * stasis fast-tick loop to detect exit-from-stasis (clicks, onTick
-   * subscriptions, future `TimedInput`). Default `100`. Trades ~1%
-   * worst-case wall against bounded latency-to-resume for event-stepping.
+   * In `'next-event'` mode, rebuild the snapshot every Nth tick of the stasis
+   * fast-tick loop, to detect an exit from stasis (clicks, `onTick` handlers).
+   * Defaults to `100`. It trades about 1% worst-case wall-clock time for a
+   * bounded delay before event stepping resumes.
    */
   stasisCheckInterval?: number;
 }
 
 /**
- * Result of a predicate-bounded run. Shape is a superset of
- * {@link HeadlessResult}, adding `terminated` so consumers can distinguish
- * predicate satisfaction from hitting the sim-time ceiling.
+ * Result of a predicate-bounded headless run. Its shape is a superset of
+ * {@link HeadlessResult}. It adds `terminated`, so consumers can tell a
+ * predicate that held from a sim-time cap that was reached.
  */
 export interface RunUntilResult {
   /**
-   * Number of ticks actually stepped (0 when the predicate was true at tick 0).
-   * In event mode, the count of advances and fast-ticks, which vary in length.
+   * Loop iterations completed (0 when the predicate held at iteration 0).
+   * One iteration advances `tickDelta`, which the engine can run as several
+   * ticks. In `'next-event'` mode, the count of advances and fast-ticks, which
+   * vary in length.
    */
   totalTicks: number;
   /**
-   * The run's sim-time at termination. Equals `totalTicks * tickDelta` in tick
-   * mode; in event mode (variable-length advances + fast-ticks) it is the
-   * accumulated advanced sim-time, not that product.
+   * The sim-time of the headless run at termination. Equals `totalTicks * tickDelta` in the
+   * fixed-tick modes. In `'next-event'` mode (advances of varying length, plus
+   * fast-ticks) it is the accumulated advanced sim-time, not that product.
    */
   elapsedSimulated: number;
   /**
-   * How the run ended.
+   * How the headless run ended.
    *
-   * - `'predicate'` — the `until` predicate fired.
-   * - `'maxSimTime'` — the sim-time ceiling was reached without the predicate
-   *   firing.
+   * - `'predicate'` — the `until` predicate held.
+   * - `'maxSimTime'` — the sim-time cap was reached before the predicate held.
    * - `'unreachable'` — `'next-event'` or `'stasis-aware'` mode observed
    *   stasis (no walker-visible transition can mechanically push state
-   *   forward) before the predicate fired or the ceiling was reached.
+   *   forward) before the predicate held or the cap was reached.
    *   Conservative: opaque-predicate transitions block this classification.
-   *   Event mode reports it when the budget runs out in stasis with every
-   *   dependency the walker tracks unchanged across that stretch; if a source
-   *   the walker can't see moved one, the run is a plain `'maxSimTime'`.
+   *   `'next-event'` mode reports it when the cap is reached in stasis with
+   *   every dependency the walker tracks unchanged across that stretch. If a
+   *   source the walker cannot see moved one, the headless run is a plain
+   *   `'maxSimTime'`.
    */
   terminated: 'predicate' | 'maxSimTime' | 'unreachable';
-  /** One result object per analyzer, in setup order. */
+  /** One summary per analyzer, in setup order. */
   analyzerSummaries: HeadlessResult['analyzerSummaries'];
 }
 
 /**
  * One cell in a {@link runMatrixUntil} sweep. Each `(cell, seed)` pair gets
- * a freshly-built engine via `buildEngine(ctx)`; analyzers close over that
- * engine per run so per-run state bleed can't happen.
+ * a newly built engine via `buildEngine(ctx)`. Analyzers close over that
+ * engine per headless run, so no state leaks from one headless run to the
+ * next.
  */
 export interface UntilCell {
   id: string;
@@ -504,7 +509,7 @@ export interface UntilCell {
    * started (the helper or consumer calls `engine.start()`). The global RNG
    * is seeded with `ctx.seed` just before the call, so construction draws
    * don't depend on sweep order, and reseeded before the first tick. The
-   * runner stops the engine after its run, and disposes it unless
+   * runner stops the engine after its headless run, and disposes it unless
    * `teardown` is passed.
    */
   buildEngine: (ctx: RunContext) => Engine;
@@ -513,21 +518,22 @@ export interface UntilCell {
    * is `'next-event'` or `'stasis-aware'` — those modes introspect content
    * through the walker. Called once per `(cell, seed)` alongside
    * `buildEngine`. The accessor must read the same state the engine ticks
-   * against; stasis/event resolution is only as sound as the distances the
-   * walker computes from it.
+   * against. Stasis detection and event stepping are only as sound as the
+   * distances the walker computes from it.
    */
   buildAccessor?: (engine: Engine) => GameStateAccessor;
   /**
-   * Analyzer factory. Closes over the freshly-built engine so analyzers
-   * can read engine state without reaching for module-level refs.
-   * Omit for metric-free cells. Event mode throws if it returns any
-   * analyzers — see {@link RunUntilOptions.setup}.
+   * Builds the analyzers. It closes over the newly built engine, so analyzers
+   * can read engine state without module-level refs.
+   * Omit for metric-free cells. `'next-event'` mode throws if it returns any
+   * analyzers; see {@link RunUntilOptions.setup}.
    */
   analyzers?: (engine: Engine, ctx: RunContext) => Analyzer[];
-  /** Optional per-cell tick delta override. Defaults to `0.05`. */
+  /** Per-cell `tickDelta`. Defaults to `0.05`. */
   tickDelta?: number;
   /**
-   * Called once per run after `onRunComplete`, and after a run that throws —
+   * Called once per headless run after `onRunComplete`, and after a headless
+   * run that throws —
    * release what `buildEngine` built. Defaults to `engine.dispose()`; pass a
    * no-op to keep the engine alive past the sweep.
    */
@@ -538,18 +544,18 @@ export interface UntilCell {
 export type MatrixUntilWorkItem = WorkItem<UntilCell>;
 
 /**
- * Configuration for {@link runMatrixUntil} — `cells × seeds` predicate-bounded
- * sweep. The shared `until` predicate and `maxSimTime` ceiling apply to every
- * run; callbacks mirror {@link MatrixOptions}.
+ * Options for {@link runMatrixUntil}, a `cells × seeds` predicate-bounded
+ * sweep. The shared `until` predicate and `maxSimTime` cap apply to every
+ * headless run; option callbacks mirror {@link MatrixOptions}.
  */
 export interface MatrixUntilOptions {
   cells: UntilCell[];
   seeds: number[];
-  /** Termination predicate shared across every `(cell, seed)` run. */
+  /** Termination predicate shared across every `(cell, seed)` headless run. */
   until: UntilPredicate;
-  /** Sim-seconds ceiling per run. Required. */
+  /** Sim-time cap per headless run, in sim-seconds. Required. */
   maxSimTime: number;
-  /** Fires after each individual `(cell, seed)` run completes, in deterministic order. */
+  /** Fires after each `(cell, seed)` headless run completes, in deterministic order. */
   onRunComplete?: (item: MatrixUntilWorkItem, result: RunUntilResult) => void;
   /** Fires once a cell's full seed sweep is complete, in deterministic order. */
   onCellComplete?: (cell: CellResult<RunUntilResult>) => void;

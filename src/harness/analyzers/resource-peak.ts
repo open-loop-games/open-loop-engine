@@ -1,28 +1,28 @@
 /**
- * Resource-peak tracker — samples a single resource every tick and reports
+ * Resource-peak analyzer — samples a single resource every tick and reports
  * its peak, final, and average value at the end of a headless run. One of
  * the two default analyzers in {@link defaultAnalyzerPack}.
  *
  * The runtime contract is the metric-key naming under the harness's
- * `${analyzerName}.${metricKey}` aggregation scheme:
+ * `${analyzerId}.${metricKey}` aggregation scheme:
  * `resource-peak:{id}.peak`, `.final`, `.avg`. Keys use {@link Resource.id},
  * unique per engine, so two resources sharing a display name never merge;
  * label a key via `ResourceRegistry.findById(id).displayName`.
  *
- * The tracker closure-captures the ref directly so it can read `.value` on
- * every tick without a per-tick registry lookup. Discovery happens one level up in {@link defaultAnalyzerPack},
- * which walks the engine's resource registry (via `ResourceRegistryKey`)
- * and constructs one tracker per entry.
+ * The analyzer captures the resource in its closure, so it reads `.value` on
+ * every tick without a per-tick registry lookup. Discovery is one level up, in
+ * {@link defaultAnalyzerPack}, which walks the engine's resource registry
+ * (via `ResourceRegistryKey`) and builds one analyzer per entry.
  *
  * Precision note: resource values are `Decimal`, but `AnalyzerSummary.metrics`
  * is `number | string | boolean`. Each sample is converted via `.toNumber()`
  * at observation time; values beyond `Number.MAX_VALUE` saturate to `Infinity`.
- * v1 accepts this — astronomical resources are a consumer problem until the
- * harness aggregator grows Decimal-aware metric types.
+ * The analyzer accepts this: an astronomical resource is the consumer's
+ * problem until the harness aggregator has Decimal-aware metric types.
  *
- * Sampling lifecycle: sampling happens in `onTick` so each observation reflects
- * post-tick state. Zero-tick runs fall back to a single read inside
- * `summarize` so the tracker still reports a meaningful `peak/final/avg` trio.
+ * Sampling lifecycle: sampling happens in `onTick`, so each observation shows
+ * post-tick state. Zero-tick headless runs fall back to a single read inside
+ * `summarize`, so the analyzer still reports a meaningful `peak/final/avg` trio.
  */
 
 import type { Analyzer, AnalyzerSummary } from '@/primitives/types';
@@ -51,18 +51,18 @@ export interface ResourcePeakMetrics {
 
 /**
  * Create an {@link Analyzer} that samples a single resource every tick and
- * emits `{ peak, final, avg }` at the end of the run.
+ * reports `{ peak, final, avg }` at the end of the headless run.
  *
- * The analyzer's `name` is `resource-peak:{id}` so multiple peak
- * trackers coexist in a single run without metric-key collisions under the
- * harness's `${analyzerName}.${metricKey}` aggregation scheme.
+ * The analyzer's `id` is `resource-peak:{id}`, so multiple peak
+ * analyzers coexist in a single headless run without metric-key collisions under the
+ * harness's `${analyzerId}.${metricKey}` aggregation scheme.
  *
  * @example
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
- * const tracker = createResourcePeakAnalyzer(gold);
- * runHeadless({ analyzers: [tracker], ... });
- * // tracker.summarize().metrics → { peak, final, avg }
+ * const analyzer = createResourcePeakAnalyzer(gold);
+ * runHeadless({ setup: () => [analyzer], ... });
+ * // analyzer.summarize().metrics → { peak, final, avg }
  * ```
  */
 export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
