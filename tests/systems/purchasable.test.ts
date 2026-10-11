@@ -70,6 +70,25 @@ describe('Purchasable (one-shot, limit: 1)', () => {
     expect(p.purchaseMaxByDefault).toBe(false);
   });
 
+  it('takes a display with a title and no description', () => {
+    const p = createPurchasable({
+      id: 'p-title-only',
+      display: { title: 'Forge' },
+      requirements: [],
+      limit: 1,
+    });
+    expect(unref(p.display.title)).toBe('Forge');
+    expect(unref(p.display.description)).toBe('');
+  });
+
+  it('reads a ref display as the description', () => {
+    const text = ref('first');
+    const p = createPurchasable({ id: 'p-ref-display', display: text, requirements: [], limit: 1 });
+    text.value = 'second';
+    expect(unref(p.display.description)).toBe('second');
+    expect(unref(p.display.title)).toBeUndefined();
+  });
+
   it('defaults showAmount to false when limit is 1', () => {
     const p = createPurchasable({
       id: 'p6',

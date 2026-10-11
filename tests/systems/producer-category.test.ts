@@ -16,7 +16,7 @@ import { createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
-import { ref } from 'vue';
+import { ref, unref } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
 import { createTestResource } from '../helpers/test-resource';
 
@@ -357,6 +357,54 @@ describe('createProducerCategory', () => {
     tick(0.5);
     // 5 rate * 3 count * 0.5 dt = 7.5
     expect(new Decimal(gold.value).eq(7.5)).toBe(true);
+  });
+
+  it("passes a display object to the producer's repeatable", () => {
+    const { registerTick } = createManualTicks();
+    const cookies = createTestResource('cookies');
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'test-display',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+        display: { title: def.name, effectDescription: '+5/s each', showAmount: false },
+      }),
+      registerTick,
+    });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 });
+
+    const { display } = category.getProducer('mine')!.repeatable!;
+    expect(unref(display.title)).toBe('Mine');
+    expect(unref(display.description)).toBe('');
+    expect(unref(display.effectDescription)).toBe('+5/s each');
+    expect(display.showAmount).toBe(false);
+  });
+
+  it("reads a string display as the repeatable's description, defaulting to the def id", () => {
+    const { registerTick } = createManualTicks();
+    const cookies = createTestResource('cookies');
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'test-display-string',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+        display: def.id === 'mine' ? def.name : undefined,
+      }),
+      registerTick,
+    });
+    category.register([
+      { id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 },
+      { id: 'well', name: 'Well', baseRate: 1, baseCost: 10, costScaling: 1.15 },
+    ]);
+
+    expect(unref(category.getProducer('mine')!.repeatable!.display.description)).toBe('Mine');
+    expect(unref(category.getProducer('well')!.repeatable!.display.description)).toBe('well');
   });
 
   it('continuous producer without purchase has count 1', () => {

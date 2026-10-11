@@ -22,7 +22,12 @@ import {
 } from './category-base';
 import { type ContentRegistryView } from './content-registry';
 import { Resettable, type ResettableObject } from '@/core/resettable';
-import { createScalingPurchasable, type Purchasable } from './purchasable';
+import {
+  createScalingPurchasable,
+  toPurchasableDisplay,
+  type Purchasable,
+  type PurchasableDisplay,
+} from './purchasable';
 import { getCurrentEngineCategories } from './engine-categories';
 import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
 import type { RegisterTick } from '@/core/sequencer';
@@ -83,8 +88,11 @@ export interface ProducerMapping {
    * skips a `'manual'` producer's purchase.
    */
   purchase?: ProducerPurchaseOptions;
-  /** Description text for the repeatable (when `purchase` is set) */
-  display?: string;
+  /**
+   * The repeatable's display, when `purchase` is set: a {@link PurchasableDisplay},
+   * or a string, ref or getter for its description. Default: the def's id.
+   */
+  display?: PurchasableDisplay | Computable<string>;
   /**
    * Extra count beyond the purchasable's owned count, added into
    * `Producer.count` as `owned + extra`. Use it in a production cascade, where
@@ -303,10 +311,16 @@ function buildProducer<Def extends { id: string }>(
   let repeatable: Purchasable | undefined;
   if (mapping.purchase) {
     const pc = mapping.purchase;
+    const { title, description, effectDescription, showAmount } = toPurchasableDisplay(
+      mapping.display ?? def.id,
+    );
     repeatable = createScalingPurchasable(
       {
         id: def.id,
-        description: mapping.display ?? def.id,
+        title,
+        description,
+        effectDescription,
+        showAmount,
         resource: pc.costResource,
         baseCost: pc.baseCost,
         costScaling: pc.costScaling,

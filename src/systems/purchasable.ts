@@ -19,7 +19,7 @@
  * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
  */
 
-import { computed, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
+import { computed, isRef, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
 import { toMaybeRef, type Computable } from '@/core/computed';
 import {
@@ -58,8 +58,8 @@ export interface PurchasableEvents {
 export interface PurchasableDisplay {
   /** Title shown at the top of the purchasable card */
   title?: Computable<string>;
-  /** Main description explaining what this purchasable does */
-  description: Computable<string>;
+  /** Main description explaining what this purchasable does. Default: `''` */
+  description?: Computable<string>;
   /** Formatted current effect (e.g., "×8 production"). Shown below description. */
   effectDescription?: Computable<string>;
   /**
@@ -233,8 +233,8 @@ export type ScalingPurchasableOptions = {
   id: string;
   /** Display title */
   title?: Computable<string>;
-  /** Description of what this purchasable does */
-  description: Computable<string>;
+  /** Description of what this purchasable does. Default: `''` */
+  description?: Computable<string>;
   /** The resource spent to purchase */
   resource: Resource;
   /**
@@ -243,6 +243,8 @@ export type ScalingPurchasableOptions = {
    * followed by the effect, when an effect is set.
    */
   effectDescription?: Computable<string>;
+  /** Whether to show the current count. Default: `false` when limit is 1, `true` otherwise. */
+  showAmount?: boolean;
   /** The limit: the most purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
   /** Starting count. Default: `0` */
@@ -334,7 +336,18 @@ function isCountFunction(
   return typeof effect === 'function' && effect.length >= 1;
 }
 
-/** Resolve display option (full object vs description-shorthand) into reactive fields. */
+/**
+ * The display object a display option names; a string, ref or getter is the description.
+ *
+ * @internal Also read by the producer category.
+ */
+export function toPurchasableDisplay(
+  display: PurchasableDisplay | Computable<string>,
+): PurchasableDisplay {
+  return typeof display === 'object' && !isRef(display) ? display : { description: display };
+}
+
+/** Resolve a display option into reactive fields. */
 function buildPurchasableDisplay(
   display: PurchasableDisplay | Computable<string>,
   isOneShot: boolean,
@@ -344,20 +357,12 @@ function buildPurchasableDisplay(
   effectDescription: MaybeRef<string | undefined>;
   showAmount: boolean;
 } {
-  if (typeof display === 'object' && display !== null && 'description' in display) {
-    const disp = display;
-    return {
-      title: toMaybeRef(disp.title),
-      description: toMaybeRef(disp.description),
-      effectDescription: toMaybeRef(disp.effectDescription),
-      showAmount: disp.showAmount ?? !isOneShot,
-    };
-  }
+  const disp = toPurchasableDisplay(display);
   return {
-    title: undefined,
-    description: toMaybeRef(display as Computable<string>),
-    effectDescription: undefined,
-    showAmount: !isOneShot,
+    title: toMaybeRef(disp.title),
+    description: toMaybeRef(disp.description ?? ''),
+    effectDescription: toMaybeRef(disp.effectDescription),
+    showAmount: disp.showAmount ?? !isOneShot,
   };
 }
 
@@ -740,6 +745,7 @@ export function createScalingPurchasable(
     title,
     description,
     effectDescription,
+    showAmount,
     limit,
     initialCount,
     onPurchase,
@@ -760,6 +766,7 @@ export function createScalingPurchasable(
         effectDescription:
           effectDescription ??
           (effectFn ? computed(() => `×${formatSmall(effectFn(count.value), 2)}`) : undefined),
+        showAmount,
       },
       requirements: costRequirement,
       limit,
