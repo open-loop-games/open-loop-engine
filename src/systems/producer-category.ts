@@ -1,10 +1,10 @@
 /**
- * Producer Category — batch-create Producers from content definitions.
+ * Producer Category — batch-create Producers from defs.
  *
- * Captures the resource-generator pattern shared by buildings (continuous,
- * per-tick) and manual click sources: base rate + modifier chain + optional
- * Purchasable for count + resource target. Two trigger modes (`'continuous'`,
- * `'manual'`); persistent context is scoped per-definition automatically.
+ * Captures the producer shape shared by buildings (continuous, every tick)
+ * and manual click sources: a base rate, a modifier chain, an optional
+ * Purchasable for the count, and a target resource. Two trigger modes
+ * (`'continuous'`, `'manual'`); each def gets its own persistent context.
  *
  * See {@link createProducerCategory} for a worked example.
  */
@@ -38,37 +38,37 @@ export interface ProducerCategoryContext {
 }
 
 /**
- * Purchase configuration for producers that can be bought multiple times.
- * Creates a {@link Purchasable} via `createScalingPurchasable` under the hood.
+ * Purchase options for a producer purchased more than once.
+ * Builds a {@link Purchasable} through `createScalingPurchasable`.
  */
 export interface ProducerPurchaseOptions {
   /** Resource spent to purchase */
   costResource: Resource;
-  /** Cost of the first purchase. Can be a ref/getter for scoped tuning. */
+  /** Cost of the first purchase. Can be a ref or getter, for a tunable or a scoped override. */
   baseCost: Computable<DecimalSource>;
-  /** Multiplicative cost increase per level. Can be a ref/getter for scoped tuning. */
+  /** The cost ratio each purchase multiplies the next cost by. Can be a ref or getter, for a tunable or a scoped override. */
   costScaling: Computable<DecimalSource>;
-  /** Maximum purchasable count */
+  /** The limit: the most purchases */
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */
   initialCount?: DecimalSource;
-  /** Called after each purchase */
+  /** Option callback called after each purchase */
   onPurchase?: (count: DecimalSource) => void;
   /** Whether this producer is visible in the UI. Default: `true` */
   visible?: Predicate;
   /**
-   * Whether a bare `repeatable.purchase()` buys as many as affordable rather
-   * than one; `purchase(1)` buys one either way. Default: `true`
+   * Whether a bare `repeatable.purchase()` purchases max rather than one;
+   * `purchase(1)` purchases one either way. Default: `true` (`false` at `limit: 1`)
    */
   purchaseMaxByDefault?: Computable<boolean>;
 }
 
 /**
  * Return type of the {@link ProducerCategoryOptions.mapProducer} callback.
- * Describes how a content definition maps to a producer.
+ * Describes how a def maps to a producer.
  */
 export interface ProducerMapping {
-  /** The resource this producer generates */
+  /** The resource this producer produces */
   resource: Resource;
   /** Base production: per unit per second (continuous) or per activation (manual) */
   baseRate: DecimalSource;
@@ -78,37 +78,35 @@ export interface ProducerMapping {
    */
   trigger: 'continuous' | 'manual';
   /**
-   * If present, creates a ScalingPurchasable for purchase count. The policy
-   * auto-buyer (`setupPolicyAutoPurchase`) skips a `'manual'`
-   * producer's purchase.
+   * If present, builds a scaling purchasable (`createScalingPurchasable`) for
+   * the purchase count. The policy auto-purchase (`setupPolicyAutoPurchase`)
+   * skips a `'manual'` producer's purchase.
    */
   purchase?: ProducerPurchaseOptions;
-  /** Display description for the repeatable (if purchase config present) */
+  /** Description text for the repeatable (when `purchase` is set) */
   display?: string;
   /**
-   * Additional count contribution beyond the purchasable's owned amount,
-   * folded into `Producer.count` as `owned + extra`. Use for cascade-feed
-   * patterns where T(N) reads a consumer-maintained "generated" tally
-   * (typically a {@link Resource}) so its tick output reflects
-   * `(owned + generated) × rate × dt`. Can be a ref or getter for dynamic
-   * values.
+   * Extra count beyond the purchasable's owned count, added into
+   * `Producer.count` as `owned + extra`. Use it in a production cascade, where
+   * a cascade tier reads a consumer-kept "generated" count (typically a
+   * {@link Resource}). Its tick output is then `(owned + generated) × rate × dt`.
+   * Can be a ref or getter for reactive values.
    *
-   * When no purchasable is present, count = `extraCount` alone. When neither
-   * is present, count = 1 (existing default).
+   * With no purchasable, count is `extraCount` alone. With neither, count is 1.
    *
-   * Reset semantics for the underlying generated source are the consumer's
-   * responsibility — engine does nothing here.
+   * Resetting the generated source is the consumer's job; the engine does
+   * nothing here.
    */
   extraCount?: Computable<DecimalSource>;
   /**
    * Let the resource fall below zero when the composed rate is net-negative.
    *
-   * A rate chain carrying consumption modifiers can resolve negative, in which
-   * case the tick drains instead of producing. By default the drain stops at
-   * zero, taking whatever remains — unlike {@link subtractResource}, which
-   * refuses a shortfall outright, since a continuous rate has no atomic
-   * purchase to reject. Set `true` when the deficit is itself a game signal
-   * (starvation detectors reading a negative balance).
+   * A rate chain with consumption modifiers can evaluate negative. Then the
+   * tick subtracts instead of producing. By default the subtraction stops at
+   * zero, taking whatever remains. {@link subtractResource} instead refuses a
+   * shortfall outright, but a continuous rate has no atomic purchase to
+   * reject. Set `true` when the deficit is itself game information (e.g.
+   * starvation detectors that read a negative amount).
    */
   allowNegative?: boolean;
 }
@@ -116,27 +114,27 @@ export interface ProducerMapping {
 /**
  * Options for {@link createProducerCategory}.
  *
- * @typeParam Def - The content definition type (must have `id: string`)
- * @typeParam State - Per-instance state created alongside each Producer.
- *   Use `void` if no extra state is needed.
+ * @typeParam Def - The def type (must have `id: string`)
+ * @typeParam DefState - Def state created beside each Producer.
+ *   Use `void` if no def state is needed.
  */
 export interface ProducerCategoryOptions<Def extends { id: string }, DefState = void> {
-  /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
+  /** Persistent context id. Each def gets a child persistent context `{id}/{def.id}`. */
   id: string;
 
   /**
-   * Map a content definition to producer configuration.
+   * Map a def to a {@link ProducerMapping}.
    *
-   * Called once per definition during {@link ProducerCategory.register}.
-   * The returned mapping drives what primitives are created.
+   * Called once per def during {@link ProducerCategory.register}.
+   * The returned mapping decides which primitives are built.
    */
   mapProducer: (def: Def, ctx: ProducerCategoryContext) => ProducerMapping;
 
   /**
-   * Create per-instance state alongside the Producer.
+   * Create the def state beside the Producer.
    *
-   * Called inside the definition's persistent context, so `persistent()` calls
-   * here are scoped to `{categoryId}/{def.id}`.
+   * Called inside the def's persistent context, so `persistent()` calls
+   * here save under `{categoryId}/{def.id}`.
    */
   mapState?: (def: Def, producer: Producer) => DefState;
 
@@ -145,23 +143,23 @@ export interface ProducerCategoryOptions<Def extends { id: string }, DefState = 
 }
 
 /**
- * A producer instance — generates resources continuously or on demand.
+ * A producer instance — produces resources continuously or when activated.
  *
- * The `rateChain` is the primary extension point: upgrades and synergies
- * add modifiers here to boost production.
+ * The `rateChain` is the main extension point: upgrades and synergies
+ * add modifiers here to raise production.
  */
 export interface Producer {
-  /** The id of the definition this producer was registered from */
+  /** The id of the def this producer was registered from */
   readonly id: string;
   /**
    * Modifier chain for this producer's rate — the seam where upgrades,
-   * synergies and headline multipliers reach its output. A shared chain
+   * synergies and global multipliers reach its output. A shared chain
    * counts only once bound in (`producer.rateChain.bind({ modifier: shared })`,
    * typically from `mapState`, which also runs for producers a mod registers).
    *
    * Applies to `baseRate` per unit, before `count` multiplies in, so a flat
-   * `+5` here yields `5 × count`. A flat production-wide bonus belongs on the
-   * resource side, e.g. a producer with no purchase config, whose count is 1.
+   * `+5` here gives `5 × count`. A flat addition to all production belongs on
+   * the resource side, e.g. a producer with no `purchase`, whose count is 1.
    */
   readonly rateChain: ModifierChain;
   /**
@@ -169,62 +167,61 @@ export interface Producer {
    * per activation (manual). The producer's output is this × `count`.
    */
   readonly computedRate: ComputedRef<DecimalSource>;
-  /** The resource this producer generates */
+  /** The resource this producer produces */
   readonly resource: Resource;
-  /** Whether a net-negative rate may drain the resource below zero */
+  /** Whether a net-negative rate may take the resource below zero */
   readonly allowNegative: boolean;
   /** Trigger mode */
   readonly trigger: 'continuous' | 'manual';
-  /** The Purchasable, if purchase config was provided */
+  /** The Purchasable, when `purchase` was set */
   readonly repeatable: Purchasable | undefined;
-  /** For manual producers: fire one production event */
+  /** For manual producers: produce once (`computedRate × count`) */
   readonly activate: (() => void) | undefined;
   /**
-   * Owned count: the purchasable's `amount`, or 0 when no purchase config is
+   * Owned count: the purchasable's `count`, or 0 when no `purchase` is
    * set. Bind this — not `count` — for effects and costs that apply only to
-   * what the player has purchased (e.g. "+10% per owned T1",
-   * next-tier-cost-scales-with-owned).
+   * what the player has purchased (e.g. "+10% per owned unit", a next
+   * cascade tier's cost that scales with the owned count).
    */
   readonly ownedCount: ComputedRef<DecimalSource>;
   /**
-   * Resolved extra count contribution from the mapping's `extraCount` source,
-   * or 0 when not set. In cascade-feed shapes this is the consumer-maintained
-   * "generated" tally (typically a {@link Resource} fed by an upstream
-   * tier's tick output). Exposed separately from `ownedCount` so effects
-   * and costs that apply to one axis don't conflate the two — `ownedCount`
-   * tracks purchases, `extraCount` tracks accumulation.
+   * The mapping's `extraCount`, resolved, or 0 when not set. In a production
+   * cascade this is the consumer-kept "generated" count (typically a
+   * {@link Resource} fed by the previous cascade tier's tick output). Exposed
+   * apart from `ownedCount`, so effects and costs that apply to one of the two
+   * don't mix them: `ownedCount` tracks purchases, `extraCount` tracks accumulation.
    */
   readonly extraCount: ComputedRef<DecimalSource>;
   /**
-   * Effective production count: `ownedCount + extraCount`, falling back to 1
-   * when neither is configured (the click-clicker default). Drives the tick
-   * body, `activate`, `purchaseBeatSeconds`, total-rate aggregation, and the
-   * entry's `count` signal. For effects or costs that should
-   * apply to a single axis, bind `ownedCount` or `extraCount` directly instead.
+   * Effective count: `ownedCount + extraCount`, falling back to 1 when neither
+   * is set (the default for a click source). Drives the tick body,
+   * `activate`, `purchaseBeatSeconds`, the total rate, and the category
+   * entry's `count` signal. For effects or costs that should apply to only
+   * one of the two, bind `ownedCount` or `extraCount` directly instead.
    */
   readonly count: ComputedRef<DecimalSource>;
   /**
-   * Seconds this producer's whole stack takes to earn the price of its next
+   * Seconds this producer's whole stack takes to produce the cost of its next
    * unit: `getCost(1) / (computedRate * max(1, count))`. Returns `Infinity`
-   * when nothing is buyable, rate is zero or the producer is manual.
+   * when there is no purchase, the rate is zero or the producer is manual.
    *
-   * A stack-amortized beat, not a payback period. The next unit adds only
-   * `computedRate`, so its own payback is `getCost(1) / computedRate`, longer
-   * than this by the stack height: a tall stack reads as a short beat even
-   * when its marginal unit pays back slowly. Compute marginal payback inline
-   * when that is the question.
+   * A stack-amortized beat time, not a payback period. The next unit adds only
+   * `computedRate`, so its own payback period is `getCost(1) / computedRate`,
+   * longer than this by the stack height. So a tall stack shows a short beat
+   * time even when its marginal unit's payback period is long. Compute the
+   * marginal payback period inline when that is the question.
    *
-   * Not a prediction of when the producer will become buyable from the
-   * player's funding sources — that distinction is documented inline at
+   * Not a prediction of when the producer will become affordable from the
+   * player's rates — that distinction is documented inline at
    * `harness/walker/walk-producer-transitions.ts`.
    *
-   * When `extraCount` is wired (cascade-feed), the denominator's `count`
-   * carries the cascade-amplified `(owned + generated)`.
+   * When `extraCount` is wired (a production cascade), the denominator's `count`
+   * contains the cascade's `(owned + generated)`.
    */
   readonly purchaseBeatSeconds: ComputedRef<number>;
 }
 
-/** A registered entry: definition + Producer instance + optional state + introspection signals */
+/** A category entry: def, Producer instance, def state and signals */
 export interface ProducerCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly producer: Producer;
@@ -235,48 +232,48 @@ export interface ProducerCategoryEntry<Def extends { id: string }, DefState = vo
 /**
  * A producer category — batch-registered Producers with a shared production shape.
  *
- * @typeParam Def - Content definition type
- * @typeParam State - Per-instance state type (void if none)
+ * @typeParam Def - The def type
+ * @typeParam DefState - The def state type (void if none)
  */
 export interface ProducerCategory<
   Def extends { id: string },
   DefState = void,
 > extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** Persistent context id this category was built under. */
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance and def state.
    */
   readonly registry: ContentRegistryView<Def>;
 
   /**
-   * Register definitions and create their Producer instances.
+   * Register defs and create their Producer instances.
    *
-   * Can be called multiple times (base game + mods).
+   * Can be called more than once (base game, then a mod's content).
    */
   register(defs: Def | Def[]): void;
 
-  /** Get the Producer instance for a definition ID */
+  /** Get the Producer instance for a def id */
   getProducer(id: string): Producer | undefined;
 
-  /** Get the per-instance state for a definition ID */
+  /** Get the def state for a def id */
   getState(id: string): DefState | undefined;
 
-  /** Get the definition for an ID (delegates to registry.get) */
+  /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
-  /** Get the full entry (def + producer + state) */
+  /** Get the category entry (def, producer, def state, signals) */
   getEntry(id: string): ProducerCategoryEntry<Def, DefState> | undefined;
 
-  /** All entries in registration order */
+  /** All category entries in registration order */
   getAll(): ProducerCategoryEntry<Def, DefState>[];
 
   /**
-   * Aggregate production rate across all continuous producers targeting a resource.
+   * The total rate of all continuous producers of a resource.
    * Returns `sum(computedRate * count)` for matching producers, where `count`
-   * reflects each producer's effective `(owned + extraCount)` per its mapping.
+   * is each producer's effective count, `owned + extraCount`.
    */
   getTotalRate(resource: Resource): DecimalSource;
 
@@ -287,9 +284,9 @@ export interface ProducerCategory<
 // === PRIVATE BUILDERS ===
 
 /**
- * Build a Producer instance from a content definition. Module-private; called
- * by `createProducerCategory` inside the per-definition persistent context
- * opened by {@link createCategoryBase}.
+ * Build a Producer instance from a def. Private to this file; called
+ * by `createProducerCategory` inside the def's persistent context
+ * that {@link createCategoryBase} opens.
  */
 function buildProducer<Def extends { id: string }>(
   def: Def,
@@ -344,8 +341,8 @@ function buildProducer<Def extends { id: string }>(
     };
   }
 
-  // Stack-amortized beat: cost / (rate * max(1, count)). Infinity when nothing
-  // is buyable, the rate is zero or the producer is manual (no rate per
+  // Stack-amortized beat time: cost / (rate * max(1, count)). Infinity when there
+  // is no purchase, the rate is zero or the producer is manual (no rate per
   // second to amortize against) so consumers can branch on a finite check
   // without wrapping the call.
   const purchaseBeatSeconds = computed<number>(() => {
@@ -377,11 +374,11 @@ function buildProducer<Def extends { id: string }>(
  * Per-tick body for a continuous producer entry. Skips manual producers so
  * mixed-trigger categories don't double-credit on `activate()`.
  *
- * A rate chain carrying consumption modifiers can compose net-negative, so the
+ * A rate chain with consumption modifiers can compose net-negative, so the
  * integration is signed: the same `rate × count × dt` that credits a positive
- * rate debits a negative one. The drain floors at zero unless the producer opts
- * into `allowNegative` — it takes what remains rather than refusing the whole
- * shortfall, since a continuous rate has no atomic purchase to reject.
+ * rate debits a negative one. The subtraction stops at zero unless the producer
+ * opts into `allowNegative`. It takes what remains rather than refusing the
+ * whole shortfall, because a continuous rate has no atomic purchase to reject.
  */
 function tickContinuousProducer(entry: { instance: Producer }, dt: number): void {
   const producer = entry.instance;
@@ -399,9 +396,9 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
 // === FACTORIES ===
 
 /**
- * Create a producer category — batch registration of Producers from definitions.
+ * Create a producer category — batch registration of Producers from defs.
  *
- * @param options - Category ID, mapping function, and tick registration
+ * @param options - Category id, `mapProducer`, and tick registration
  * @returns A {@link ProducerCategory} with registry, lookup, and registration
  *
  * @example

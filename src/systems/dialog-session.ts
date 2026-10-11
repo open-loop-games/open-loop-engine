@@ -3,18 +3,18 @@
  * with lifecycle event emission.
  *
  * The session is the public surface a UI subscribes to:
- * - `start`/`choose`/`finish` delegate to the runtime, then snapshot its state
- *   into a {@link Persistent} ref so save round-trips automatically.
+ * - `start`/`choose`/`advance`/`finish` delegate to the adapter, then write
+ *   its serialized form into a {@link Persistent} ref, so a save round-trips it.
  * - `presented` / `chosen` / `finished` events are emitted by the session
- *   itself (not the runtime), so adapters that don't expose events still
+ *   itself (not the adapter), so adapters that don't expose events still
  *   produce a clean event stream.
- * - On engine load (when the persistent ref hydrates from save data), the
- *   session imports the snapshot back into the runtime — call sites don't
- *   need to know whether they're in a fresh or restored game.
+ * - On a load, when save data writes the persistent ref, the session
+ *   restores the adapter from it. Call sites don't need to know whether the
+ *   game is new or loaded.
  *
- * The runtime is a private implementation detail. Default factory is
- * {@link createNativeDialogAdapter}; pass `adapterFactory` to swap in an
- * external adapter (Ink, Yarn, Ren'Py).
+ * The adapter is private to the session. The default factory is
+ * {@link createNativeDialogAdapter}; pass `adapterFactory` for an external
+ * adapter (Ink, Yarn, Ren'Py).
  *
  * @see ./dialog-category for the content-authoring surface that supplies `graphs`
  *
@@ -47,23 +47,24 @@ import {
 
 /** Lifecycle events emitted by a {@link DialogSession}. */
 export interface DialogSessionEvents {
-  /** Fired after each landing on a presentable node (post-start, post-choose, post-advance). */
+  /** Emitted each time the session stops on a presentable node (after start, choose or advance). */
   presented: (snapshot: DialogPresentation) => void;
   /**
-   * Fired once a choice has fully resolved: its outcomes have applied, the
+   * Emitted once a choice has fully resolved: its outcomes have applied, the
    * pointer has advanced, and every node it entered has run its onEnter.
    * Precedes the `presented` or `finished` that choice leads to.
    */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
   /**
-   * Fired when the conversation ends: `finish()`, or a choice with no `next`
-   * or whose `next` is gated off. Landing on a line presented with
-   * `terminal: true` does not fire it — the UI calls `finish()` to close it.
+   * Emitted when the conversation ends: `finish()`, or a choice with no
+   * `next` or whose `next` node's `when` does not hold. Stopping on a line
+   * presented with `terminal: true` does not emit it; the UI calls
+   * `finish()` to close it.
    */
   finished: (info: { graphId: string }) => void;
 }
 
-/** Factory signature for swapping in alternative DialogAdapter implementations (Ink, Yarn, etc.). */
+/** Factory signature for alternative DialogAdapter implementations (Ink, Yarn, etc.). */
 export type DialogAdapterFactory = (
   graphs: DialogGraph[],
   accessor: GameStateAccessor,
@@ -71,23 +72,26 @@ export type DialogAdapterFactory = (
 ) => DialogAdapter;
 
 /**
- * Options for {@link createDialogSession} — the persistent id, the authored
- * graphs available in this session, and optional runtime-factory + accessor
- * overrides for swapping the dialog backend.
+ * Options for {@link createDialogSession} — the persistent context id, the
+ * authored graphs, and an optional adapter factory and accessor for another
+ * dialog backend.
  */
 export interface DialogSessionOptions {
-  /** Persistence sub-context name. The session's state ref lives at `dialog-sessions/{id}/state`. */
+  /**
+   * Persistent context id under `dialog-sessions/`. The session's state ref
+   * has the save key `dialog-sessions/{id}.state`.
+   */
   id: string;
   /** Authored graphs available to this session. Typically `category.getAll().flatMap(e => e.graphs)`. */
   graphs: DialogGraph[];
   /**
-   * Optional alternative runtime implementation. Defaults to
-   * {@link createNativeDialogAdapter}. Pass an Ink/Yarn adapter factory to
-   * swap implementations without changing call sites.
+   * Builds the adapter. Defaults to {@link createNativeDialogAdapter}. Pass
+   * an Ink or Yarn adapter factory to change backends without changing call
+   * sites.
    */
   adapterFactory?: DialogAdapterFactory;
   /**
-   * Override the ambient {@link GameStateAccessor} + {@link GameStateMutator}.
+   * Replaces the ambient {@link GameStateAccessor} + {@link GameStateMutator}.
    * Most consumers leave this unset and rely on the engine's ambient accessor.
    */
   accessor?: GameStateAccessor & GameStateMutator;
@@ -96,9 +100,9 @@ export interface DialogSessionOptions {
 /** A dialog session — the public surface for driving conversations from a UI / module. */
 export interface DialogSession extends Emittable<DialogSessionEvents> {
   /**
-   * Activate a graph at its entry node (or an explicit node id). Replaces an
+   * Start a graph at its entry node (or an explicit node id). Replaces an
    * active conversation without emitting `finished` for it. When the entry
-   * node's condition fails, no conversation starts and an active one
+   * node's `when` does not hold, no conversation starts, and an active one
    * continues without presenting again.
    */
   start(graphId: string, entryNode?: string): void;
@@ -107,9 +111,9 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** Apply the chosen choice's outcomes and advance the pointer. */
   choose(choiceId: string): void;
   /**
-   * Continue past a line whose choices gated off after it presented them —
-   * the one `present()` reports with no choices and `terminal: false`.
-   * Enters `next` and presents where it lands; throws on any other line.
+   * Continue past a line whose choices were blocked after it presented them:
+   * the line `present()` reports with no choices and `terminal: false`.
+   * Enters `next` and presents the node it stops on; throws on any other line.
    */
   advance(): void;
   /** End the conversation; clears the active pointer. */
@@ -118,25 +122,26 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** How many times a node has been entered across the saved history; 0 for a never-visited node. */
   getVisitCount(graphId: string, nodeId: string): number;
   /**
-   * Discard the session: stops the state-sync watcher and drops the session's
-   * saved state, so a later save omits it and the same id can be created again.
+   * Dispose the session: stop the state-sync watcher and delete the
+   * session's saved state. So a later save omits it, and the same id can be
+   * created again.
    */
   dispose(): void;
 }
 
 // === CONSTANTS ===
 
-const defaultNativeFactory: DialogAdapterFactory = (graphs, accessor, mutator) =>
+const defaultAdapterFactory: DialogAdapterFactory = (graphs, accessor, mutator) =>
   createNativeDialogAdapter({ graphs, accessor, mutator });
 
 // === FACTORIES ===
 
 /**
- * Create a dialog session — the runtime envelope that drives a UI through a
- * {@link DialogGraph}. Wraps a {@link DialogAdapter} with persistent state
- * (round-trips through save) and lifecycle event emission.
+ * Create a dialog session — the envelope that drives a UI through a
+ * {@link DialogGraph}. Wraps a {@link DialogAdapter} with persistent state,
+ * which a save round-trips, and lifecycle events.
  *
- * @param options - Persistence-context id, the authored `graphs` available to
+ * @param options - Persistent context id, the authored `graphs` available to
  *   this session, optional `adapterFactory` for adapter swaps (Ink / Yarn /
  *   Ren'Py), and optional `accessor` override.
  * @returns A {@link DialogSession} with `start` / `present` / `choose` /
@@ -177,23 +182,23 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   );
   endPersistentContext();
 
-  // --- Runtime instantiation + hydration ---
+  // --- Adapter build + restore ---
 
-  const factory = options.adapterFactory ?? defaultNativeFactory;
+  const factory = options.adapterFactory ?? defaultAdapterFactory;
   const adapter = factory(options.graphs, accessorMutator, accessorMutator);
 
-  // Hydrate runtime from the persistent state on creation. Covers the
-  // session-created-after-load path (lazy-instantiated sessions, fresh-game
-  // init where the snapshot lands harmlessly).
+  // Restore the adapter from the persistent ref on creation. This covers a
+  // session built after a load (a lazily built session), and a new game,
+  // where the restore writes the defaults back harmlessly.
   adapter.restore(stateRef.value);
 
-  // Re-import on save load. The typical engine init order is
-  // createEngine → mod.install (where sessions are built) → saveManager.load,
-  // so deserializePersistents writes stateRef *after* the eager import
-  // above. The flush:sync + settling gate mirrors the resource.ts pattern
-  // (inverted gate — we want to act *during* load, not avoid acting then).
-  // snapshot() writes to stateRef outside any load, so the guard returns
-  // immediately on those firings.
+  // Restore again on a load. The typical engine start order is
+  // createEngine → module install (where sessions are built) → saveManager.load,
+  // so deserializePersistents writes stateRef *after* the eager restore
+  // above. The flush:sync watch and the `settling` check mirror resource.ts,
+  // inverted: this acts *during* a load's writes, where resource.ts holds back.
+  // snapshot() writes stateRef outside any load, so the check skips those
+  // writes.
   const scope = effectScope();
   scope.run(() =>
     watch(
@@ -213,9 +218,9 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     stateRef.value = adapter.serialize();
   }
 
-  // A runtime throw (an authored next-only cycle) can land after effects have
-  // applied and the pointer has moved, so the snapshot runs regardless and the
-  // saved state never disagrees with the runtime.
+  // An adapter throw (an authored next-only cycle) can come after effects have
+  // applied and the pointer has moved. So the write runs regardless, and the
+  // saved state never disagrees with the adapter.
   function synced<T>(op: () => T): T {
     try {
       return op();
@@ -236,8 +241,8 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
   }
 
   function choose(choiceId: string): void {
-    // Capture the active context *before* delegating — runtime.choose advances
-    // the pointer (or finishes), so post-call state would lose the source nodeId.
+    // Capture the active graph and node *before* delegating: adapter.choose
+    // advances the pointer (or finishes), so the state after it lacks the source nodeId.
     const before = adapter.serialize();
     synced(() => adapter.choose(choiceId));
     if (before.activeGraphId && before.activeNodeId) {
@@ -281,9 +286,9 @@ export function createDialogSession(options: DialogSessionOptions): DialogSessio
     getVisitCount: (graphId, nodeId) => adapter.getVisitCount(graphId, nodeId),
     on: events.on,
     dispose() {
-      // Stop the sync watch on stateRef; without this, a discarded session
-      // leaks a live watcher that re-imports save state into a stale runtime on
-      // every subsequent load (the per-conversation lazy-instantiation path).
+      // Stop the sync watch on stateRef; without this, a disposed session
+      // leaks a watcher that restores save state into a stale adapter on
+      // every later load (a session built lazily per conversation).
       scope.stop();
       deletePersistent(stateRef as unknown as Persistent);
     },

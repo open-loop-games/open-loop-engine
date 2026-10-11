@@ -1,32 +1,32 @@
 /**
- * Recommendation system — inter-cycle arbitration across registered defs
+ * Recommendation system — between-run arbitration across registered recommenders
  *
- * Composes CycleLog (per-cycle metric history), BestOf (best-of-run records),
- * and Cycle (lifecycle events) into a score-based recommendation surface.
- * Registered defs evaluate historical data and propose configurations for
- * the next cycle; the system picks the highest-scoring winner.
+ * Combines CycleLog (per-run tracked metric history), BestOf (best-of
+ * records) and Cycle (run-end events) into score-based recommendations.
+ * Registered recommenders read past runs and propose a configuration for the
+ * next run; the system picks the highest-scoring one.
  *
- * - {@link createRecommendationSystem} — sole factory, wires into Cycle lifecycle
+ * - {@link createRecommendationSystem} — sole factory; it subscribes to the cycle's `afterEnd`
  *
  * Key features:
- * - Pluggable def registration with `canApply` / `score` / `recommend`
- * - Score-based arbitration across registered defs (highest wins)
+ * - Recommender registration with `canApply` / `score` / `recommend`
+ * - Score-based arbitration across registered recommenders (highest wins)
  * - Persistent last recommendation with dismiss/apply lifecycle
- * - Auto-apply mode for full automation (T6 Optimizer pattern)
- * - Advisory mode for surfacing suggestions (T5 Advisor pattern)
+ * - Auto-apply mode for full automation
+ * - Advisory mode, which presents a recommendation for the player to apply
  *
- * `Recommender` is the inter-cycle sibling of {@link FillStrategy}:
- * FillStrategy picks the next action *within* a cycle; recommendation defs
- * pick the configuration *between* cycles.
+ * `Recommender` is the between-run sibling of {@link FillStrategy}: a fill
+ * strategy picks the next sequencer item *within* a run; a recommender picks
+ * the configuration *between* runs.
  *
- * @see {@link createCycleLog} for the per-cycle metric source
- * @see {@link createBestOf} for per-metric best tracking with snapshots
- * @see {@link createCycle} for the lifecycle this wires into
+ * @see {@link createCycleLog} for the per-run tracked metric source
+ * @see {@link createBestOf} for per-metric best tracking with configuration snapshots
+ * @see {@link createCycle} for the cycle whose run end triggers evaluation
  * @see ./recommenders.ts for built-in recommender factories
- * @see {@link createRuleAdvisor} for the intra-session sibling — same advisory
- *   shape, but re-fired on consumer signals (rule edits, encounter changes)
- *   instead of `cycle.afterEnd`, and emits a ranked list of independent
- *   suggestions rather than one winning configuration
+ * @see {@link createRuleAdvisor} for the sibling for use within a play
+ *   session. It has the same advisory shape, but consumer triggers (rule
+ *   edits, encounter changes) re-evaluate it instead of `cycle.afterEnd`. It returns a ranked list of
+ *   independent suggestions, not one winning configuration.
  */
 
 import { computed, type ComputedRef } from 'vue';
@@ -47,19 +47,19 @@ import type { BestOf } from './best-of';
 // === TYPES ===
 
 /**
- * The evaluation context passed to every def's `canApply`, `score`,
+ * The evaluation context passed to every recommender's `canApply`, `score`,
  * and `recommend` methods. Built fresh each `evaluate()` call.
  */
 export interface RecommendationContext {
-  /** The CycleLog providing per-cycle metric history */
+  /** The CycleLog providing per-run tracked metric history */
   cycleLog: CycleLog;
-  /** The BestOf providing per-metric best records and snapshots */
+  /** The BestOf providing per-metric best records and configuration snapshots */
   bestOf: BestOf;
   /** The Cycle instance (access count, elapsed, etc.) */
   cycle: Cycle;
   /** Current game configuration snapshot, from `getCurrentSnapshot()` */
   currentSnapshot: Serializable;
-  /** Consumer-provided game state for strategy evaluation, from `getGameState()` */
+  /** Consumer-provided game state for recommender evaluation, from `getGameState()` */
   gameState: Record<string, unknown>;
 }
 
@@ -72,59 +72,60 @@ export interface RecommendationMetricComparison {
 
 /** Structured explanation of why a recommendation was made */
 export interface RecommendationRationale {
-  /** Which def produced this recommendation */
+  /** Which recommender produced this recommendation */
   recommenderId: string;
-  /** Per-metric comparison: current performance vs projected with recommended config */
+  /** Per-metric comparison: current performance vs projected with the recommended configuration */
   metrics: Record<string, RecommendationMetricComparison>;
-  /** Human-readable summary for UI display (consumer-provided via def) */
+  /** Display text for the UI, written by the recommender */
   summary: string;
 }
 
-/** The output of a def's `recommend()` method */
+/** The output of a recommender's `recommend()` method */
 export interface RecommendationResult {
-  /** The proposed configuration to apply next cycle (opaque to the engine) */
+  /** The proposed configuration to apply next run (opaque to the engine) */
   snapshot: Serializable;
   /** Structured explanation data */
   rationale: RecommendationRationale;
 }
 
 /**
- * A recommendation definition. Consumers implement this interface and
- * register it with the system; the system scores registered defs and runs
- * the winner.
+ * A recommender. Consumers implement this interface and register it with
+ * the system; the system scores registered recommenders and runs the winner.
  *
  * Evaluation order: `canApply` → `score` (if applicable) → `recommend` (winner only).
  */
 export interface Recommender {
-  /** Unique def identifier */
+  /** Unique among a system's recommenders */
   id: string;
   /**
-   * Returns `true` if this def can produce a meaningful recommendation.
-   * Defs where `canApply` returns `false` are excluded from arbitration.
+   * Returns `true` if this recommender can produce a meaningful
+   * recommendation. Recommenders whose `canApply` returns `false` are
+   * excluded from arbitration.
    */
   canApply: (ctx: RecommendationContext) => boolean;
   /**
    * Numeric score for arbitration. Higher wins. Only called when `canApply`
-   * returns `true`. On ties, the first-registered def wins.
+   * returns `true`. On ties, the first-registered recommender wins.
    *
-   * Scores are compared raw across every registered def, so defs sharing a
-   * system must score on one scale. The built-in `createBestReplayRecommender` scores
-   * log10 improvement: log10 of the metric's best minus log10 of the last
-   * cycle's, each magnitude floored at 1, in the metric's BestOf mode (value
-   * for `'absolute'`, rate for `'perSecond'`). A custom def sharing a system
-   * with it should score on that scale.
+   * Scores are compared raw across every registered recommender, so
+   * recommenders sharing a system must score on one scale. The built-in
+   * `createBestReplayRecommender` scores log10 improvement in the metric's
+   * BestOf mode (value for `'absolute'`, rate for `'perSecond'`). That is
+   * log10 of the metric's best minus log10 of the last run's. Each magnitude
+   * is raised to 1 when it is below 1. A custom recommender sharing a system with it should score
+   * on that scale.
    */
   score: (ctx: RecommendationContext) => number;
   /**
-   * Produce the recommendation. Only called for the winning def
-   * (highest score among applicable defs).
+   * Produce the recommendation. Only called for the winning recommender
+   * (highest score among applicable recommenders).
    */
   recommend: (ctx: RecommendationContext) => RecommendationResult;
 }
 
 /** A produced recommendation stored by the system */
 export interface Recommendation {
-  /** Which def produced this */
+  /** Which recommender produced this */
   recommenderId: string;
   /** The proposed configuration snapshot */
   snapshot: Serializable;
@@ -136,7 +137,7 @@ export interface Recommendation {
   applied: boolean;
 }
 
-/** Serialized form stored in persistent — DecimalSource values as strings */
+/** The serialized form the persistent ref stores; DecimalSource values as strings */
 interface SerializedRecommendation {
   recommenderId: string;
   snapshot: Serializable;
@@ -151,35 +152,34 @@ interface SerializedRecommendation {
 
 /** Events emitted by a {@link RecommendationSystem} instance */
 export interface RecommendationSystemEvents {
-  /** Fired after a new recommendation is produced by `evaluate()` */
+  /** Emitted after a new recommendation is produced by `evaluate()` */
   recommended: (recommendation: Recommendation) => void;
-  /** Fired after a recommendation's snapshot is applied (auto or manual) */
+  /** Emitted after a recommendation's snapshot is applied (auto or manual) */
   applied: (recommendation: Recommendation) => void;
-  /** Fired after the last recommendation is dismissed */
+  /** Emitted after the last recommendation is dismissed */
   dismissed: () => void;
 }
 
-/** Configuration for {@link createRecommendationSystem} */
+/** Options for {@link createRecommendationSystem} */
 export interface RecommendationSystemOptions {
   /**
-   * Save context. Defaults to `${module}/recommendation` inside a module; pass one
-   * when a module builds more than one.
+   * Persistent context id. Defaults to `${module}/recommendation` inside a
+   * module; pass one when a module builds more than one.
    */
   id?: string;
 
   /** The Cycle whose `afterEnd` event triggers evaluation */
   cycle: Cycle;
 
-  /** The CycleLog providing per-cycle metric history */
+  /** The CycleLog providing per-run tracked metric history */
   cycleLog: CycleLog;
 
   /**
-   * The BestOf providing per-metric best records and snapshots.
+   * The BestOf providing per-metric best records and configuration snapshots.
    *
-   * Pass a static instance for single-context games, or a resolver function
-   * for games with multiple contexts (zones, encounters, areas). The resolver
-   * is called each `evaluate()` — return `null` to skip evaluation when no
-   * context is active.
+   * Pass a fixed instance for a game with one BestOf, or a resolver for a
+   * game with one per zone, encounter or area. The resolver is called each
+   * `evaluate()`; return `null` to skip evaluation when none applies.
    */
   bestOf: BestOf | (() => BestOf | null);
 
@@ -196,13 +196,13 @@ export interface RecommendationSystemOptions {
   applySnapshot: (snapshot: Serializable) => void;
 
   /**
-   * Definitions to register at construction time; a repeated `id` throws.
-   * Additional defs can be added later via `.register()`.
+   * Recommenders to register at construction; a repeated `id` throws. Add
+   * more later with `.register()`.
    */
   recommenders?: Recommender[];
 
   /**
-   * Called each `evaluate()` to provide game-specific state for def
+   * Called each `evaluate()` to provide game-specific state for recommender
    * evaluation. Populates {@link RecommendationContext.gameState}.
    */
   getGameState?: () => Record<string, unknown>;
@@ -212,13 +212,13 @@ export interface RecommendationSystemOptions {
  * A recommendation system instance — the returned object from
  * {@link createRecommendationSystem}.
  *
- * Evaluates registered defs after each cycle restart, picks the
- * highest-scoring applicable one, and either surfaces it as an advisory
+ * Evaluates registered recommenders after each run ends, and picks the
+ * highest-scoring applicable one. It either presents that as an advisory
  * recommendation or auto-applies it.
  */
 export interface RecommendationSystem {
   /**
-   * The last produced recommendation, or null. Persistent — survives save/load.
+   * The last produced recommendation, or null. Persistent: a save keeps it.
    * Cleared by `dismiss()`, replaced by each `evaluate()` that produces a winner.
    */
   readonly lastRecommendation: ComputedRef<Recommendation | null>;
@@ -226,34 +226,35 @@ export interface RecommendationSystem {
   /**
    * When `true`, `evaluate()` automatically calls `applySnapshot` with the
    * winning recommendation's snapshot. Persistent toggle, defaults to `false`.
-   * A player setting, so it and the stored recommendation are tagged
-   * `lifetime` and outlive a reset of the owning module.
+   * It is a player setting. So it and the stored recommendation are lifetime
+   * refs, and survive a reset of the owning module.
    */
   readonly autoApply: Persistent<boolean>;
 
-  /** Registered definitions (ordered; first-registered wins on tie) */
+  /** Registered recommenders (ordered; first-registered wins on tie) */
   readonly recommenders: readonly Recommender[];
 
   /**
-   * Register an additional def at runtime. Throws if a def with the same
-   * `id` is already registered; `unregister` it first to replace it.
+   * Register another recommender after construction. Throws if a recommender
+   * with the same `id` is already registered; `unregister` it first to
+   * replace it.
    */
   register(recommender: Recommender): void;
 
-  /** Remove a def by id. No-op if not found. */
+  /** Remove a recommender by id. No-op if not found. */
   unregister(recommenderId: string): void;
 
   /**
-   * Run the full evaluation cycle synchronously:
-   * 1. Build context from options callbacks
-   * 2. Filter defs via `canApply`
+   * Run one full evaluation synchronously:
+   * 1. Build context from the options' functions
+   * 2. Filter recommenders via `canApply`
    * 3. Score and pick highest (ties: first-registered wins)
    * 4. Call `recommend()` on the winner
    * 5. Store as `lastRecommendation`, emit `'recommended'`
    * 6. If `autoApply`, call `applySnapshot` + emit `'applied'`
    *
-   * Returns the produced {@link Recommendation} or `null` if no def applied
-   * or the BestOf resolver returned `null` (no active context).
+   * Returns the produced {@link Recommendation}. Returns `null` if no
+   * recommender applied, or the BestOf resolver returned `null` (none applies).
    * Called automatically on `cycle.on('afterEnd')` and can also be called manually.
    */
   evaluate(): Recommendation | null;
@@ -328,42 +329,42 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
 // === FACTORIES ===
 
 /**
- * Create a recommendation system that evaluates registered defs after
- * each cycle restart and surfaces or auto-applies the winning configuration.
+ * Create a recommendation system that evaluates registered recommenders
+ * after each run ends, and presents or auto-applies the winning configuration.
  *
- * Composes CycleLog (metric history), BestOf (best configs), and Cycle
- * (lifecycle) into a score-based recommendation surface. Defs are the
- * inter-cycle sibling of FillStrategy: they pick *what configuration to
- * use next*, not what action to run within a cycle.
+ * Combines CycleLog (tracked metric history), BestOf (best configurations)
+ * and Cycle (run ends) into score-based recommendations. Recommenders are
+ * the between-run sibling of fill strategies: they pick *the configuration
+ * to use next*, not the next sequencer item within a run.
  *
- * @param options - Cycle/CycleLog/BestOf to compose with, snapshot callbacks, and optional defs
- * @returns A RecommendationSystem with evaluate/apply/dismiss lifecycle and event hooks
+ * @param options - The Cycle, CycleLog and BestOf to combine, the snapshot functions, and optional recommenders
+ * @returns A RecommendationSystem with `evaluate` / `apply` / `dismiss` and events
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   id: 'advisor',
- *   cycle: gameLoop,
+ *   cycle: gameCycle,
  *   cycleLog: myCycleLog,
  *   bestOf: myBestOf,
- *   // Snapshots are opaque `State`; keep one shape across these callbacks
- *   // and bestOf's captureConfig.
+ *   // Snapshots are opaque `Serializable` values; keep one shape across
+ *   // these functions and bestOf's captureConfig.
  *   getCurrentSnapshot: () => currentLoadout.snapshot(),
  *   applySnapshot: (snap) => currentLoadout.restore(snap),
- *   // Each def scores log10 improvement of its metric's best over the
- *   // last cycle, so the metric with the most ground to recover wins.
- *   defs: [
+ *   // Each recommender scores the log10 improvement of its metric's best
+ *   // over the last run, so the metric furthest behind its best wins.
+ *   recommenders: [
  *     createBestReplayRecommender('gold'),
  *     createBestReplayRecommender('xp', { threshold: 100 }),
  *   ],
  * });
  *
- * // Advisory mode (T5 Advisor): surface recommendation in UI
+ * // Advisory mode: present the recommendation in the UI
  * recs.on('recommended', (rec) => {
  *   showAdvisorPanel(rec.rationale.summary, rec.rationale.metrics);
  * });
  *
- * // Optimizer mode (T6): auto-apply best config each cycle
+ * // Auto-apply mode: apply the best configuration after each run
  * recs.autoApply.value = true;
  * ```
  */
@@ -393,12 +394,12 @@ export function createRecommendationSystem(
 
   const handle = createEmitHandle<RecommendationSystemEvents>();
 
-  // --- Def registry ---
+  // --- Recommender registry ---
   const registeredRecommenders: Recommender[] = [];
   function registerRecommender(def: Recommender): void {
     if (registeredRecommenders.some((s) => s.id === def.id)) {
       throw new Error(
-        `RecommendationSystem "${contextId}": duplicate recommendation def id "${def.id}". Unregister the existing def before registering its replacement.`,
+        `RecommendationSystem "${contextId}": duplicate recommender id "${def.id}". Unregister the existing recommender before registering its replacement.`,
       );
     }
     registeredRecommenders.push(def);
@@ -463,7 +464,7 @@ export function createRecommendationSystem(
     if (autoApply.value) {
       applySnapshot(rec.snapshot);
       // Clone rather than mutate: `rec` was already handed to 'recommended'
-      // listeners, and the manual apply() path clones too. Mutating here would
+      // handlers, and the manual apply() path clones too. Mutating here would
       // flip `applied` under a retained 'recommended' payload only in auto mode.
       const appliedRec = { ...rec, applied: true };
       storedRecommendation.value = serialize(appliedRec);

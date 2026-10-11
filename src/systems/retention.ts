@@ -1,12 +1,12 @@
 /**
- * Retention policy for declarative carryover across resets
+ * Retention — declarative keep and retain of values through a reset
  *
- * Snapshot/restore pattern: saves retained values before reset,
- * restores them after. Composes with the existing Reset/Cycle hooks.
+ * A retention snapshots the kept and retained values before a reset and
+ * restores them after. It composes with `createReset` and `createCycle`.
  *
- * Covers the universal retention categories:
- * - keep: refs that survive reset unchanged
- * - retain: refs with custom transforms (fractional, formula-based)
+ * It has two kinds of entry:
+ * - `keep`: refs that survive a reset unchanged
+ * - `retain`: refs with a custom transform, such as `fractional` or a formula
  */
 
 import { Decimal, toNumber, type DecimalSource } from '@/primitives/decimal';
@@ -26,14 +26,14 @@ export interface RetentionOptions {
 }
 
 /**
- * Snapshot/restore pair that selectively preserves persistent refs across a
- * reset. Created by {@link createRetention}; consumers call `snapshot()`
- * before the reset fires and `restore()` after.
+ * A snapshot and restore pair that keeps chosen persistent refs through a
+ * reset. {@link createRetention} creates it. A consumer calls `snapshot()`
+ * before the reset runs and `restore()` after.
  */
 export interface Retention {
-  /** Snapshot all retained values. Call before reset fires. */
+  /** Snapshot all kept and retained values. Call before the reset runs. */
   snapshot(): void;
-  /** Restore retained values. Call after reset fires. */
+  /** Restore the snapshotted values. Call after the reset runs. */
   restore(): void;
 }
 
@@ -54,27 +54,27 @@ export function fractional(fraction: DecimalSource): (value: any) => any {
 // === FACTORIES ===
 
 /**
- * Creates a declarative retention policy for carrying values across resets.
+ * Create a retention: a declarative keep and retain of values through resets.
  *
- * Call `snapshot()` before a reset to capture current values, then `restore()`
- * after the reset to write them back. Composes with existing Reset/Cycle hooks
- * without modifying core.
+ * Call `snapshot()` before a reset to capture the values, then `restore()`
+ * after the reset to write them back. It composes with `createReset` and
+ * `createCycle`, and needs no change to core.
  *
  * @param options - Refs to `keep` unchanged and refs to `retain` with custom
  *   transform functions (e.g. `fractional(0.3)` to keep 30%)
- * @returns A retention policy with `snapshot()` and `restore()` methods
+ * @returns A retention with `snapshot()` and `restore()` methods
  *
  * @example
  * ```ts
- * const policy = createRetention({
- *   keep: [totalEarned, achievements],
+ * const retention = createRetention({
+ *   keep: [totalGained, achievements],
  *   retain: new Map([[skillLevel, fractional(0.1)]]),
  * });
- * // One policy shared by several resets. A single reset takes the same
+ * // One retention shared by several resets. A single reset takes the same
  * // `keep` / `retain` inline on `createReset` instead.
- * policy.snapshot();
- * prestige.reset();
- * policy.restore();
+ * retention.snapshot();
+ * prestigeReset.reset();
+ * retention.restore();
  * ```
  */
 export function createRetention(options: RetentionOptions): Retention {

@@ -18,37 +18,36 @@ import { createModifierChain, type Modifier } from '@/core/modifier';
 
 /** Options for {@link createInventory} — capacity, overflow behavior, and the initial item list. */
 export interface InventoryOptions {
-  /** Unique identifier */
   id: string;
   /** Starting per-item capacity */
   baseCapacity: DecimalSource;
   /** What happens when adding beyond capacity (default: 'block') */
   overflow?: 'block' | 'discard';
-  /** Optional total weight-style limit across all items */
+  /** Optional total capacity across all items, like a weight limit */
   totalCapacity?: DecimalSource;
   /** Display name for UI */
   displayName?: string;
   /** Initial item amounts */
   initial?: Record<string, DecimalSource>;
   /**
-   * Known item IDs for auto-persistence.
+   * Known item ids for automatic persistence.
    * When provided, creates a persistent Resource ref per item, linked into
-   * the bag, so inventory state is automatically saved/loaded by the
-   * engine's persistence system. Each saves under its item id in the
-   * inventory's context and registers as `${inventoryId}/${itemId}`, so
-   * inventories sharing item ids coexist.
+   * the bag, so the engine's persistence saves and loads the inventory.
+   * Each saves under its item id in the inventory's persistent context and
+   * registers as `${inventoryId}/${itemId}`, so inventories sharing item ids
+   * coexist.
    */
   items?: string[];
 }
 
 /**
  * Inventory instance created by {@link createInventory}. Wraps a
- * {@link ResourceBag} with capacity-aware add/remove operations, item
- * accessors, and an optional auto-persistence layer for known item ids.
+ * {@link ResourceBag} with capacity-aware add/subtract operations, item
+ * accessors, and optional automatic persistence for known item ids.
  */
 export interface Inventory {
   readonly id: string;
-  /** Underlying ResourceBag — escape hatch for advanced use */
+  /** Underlying ResourceBag, for advanced use */
   readonly bag: ResourceBag;
 
   // --- Item operations ---
@@ -63,9 +62,9 @@ export interface Inventory {
   clear(): void;
 
   // --- Capacity ---
-  /** Current evaluated per-item cap (reactive) */
+  /** Current evaluated per-item capacity (reactive) */
   capacity: ComputedRef<Decimal>;
-  /** Add a modifier to the per-item capacity chain; returns a remover. */
+  /** Add a modifier to the per-item capacity chain; returns its cleanup. */
   addCapacityModifier(modifier: Modifier): () => void;
   /** How much more of this item can fit */
   remainingSpace(itemId: string): Decimal;
@@ -75,9 +74,9 @@ export interface Inventory {
   // --- Persistence ---
   /**
    * When `items` was provided, the underlying persistent Resource refs
-   * keyed by item ID. These are auto-saved by the persistence system. Each
-   * resource's `id` — the key for Gates, trackers and the resource registry —
-   * is `${inventoryId}/${itemId}`; its `displayName` is the item id.
+   * keyed by item id. Persistence saves them. Each resource's `id` (the id
+   * Gates, analyzers and the resource registry use) is
+   * `${inventoryId}/${itemId}`; its `displayName` is the item id.
    */
   readonly resources: ReadonlyMap<string, Resource<DecimalSource>>;
   /** Manual serialization — only needed when NOT using items-based persistence */
@@ -90,11 +89,11 @@ export interface Inventory {
 
 /**
  * Creates a game inventory with per-item capacity driven by modifier chains,
- * backed by a ResourceBag with optional auto-persistence.
+ * backed by a ResourceBag with optional automatic persistence.
  *
- * @param options - Inventory configuration including base capacity, overflow behavior,
- *   and optional `items` array to auto-create persistent Resource refs per item type
- * @returns An inventory with add/remove/has/canFit operations, reactive capacity via
+ * @param options - Inventory options: base capacity, overflow behavior,
+ *   and an optional `items` array that creates a persistent Resource ref per item type
+ * @returns An inventory with add/subtract/has/canFit operations, reactive capacity via
  *   `addCapacityModifier()`, and access to linked Resource refs for UI binding
  *
  * @example
@@ -121,9 +120,9 @@ export function createInventory(options: InventoryOptions): Inventory {
 
   // --- Capacity modifier chain ---
   // A named `{id}/capacity` chain rather than a hand-rolled reactive array:
-  // it auto-registers under ChainRegistry (so balance-sim / devtools can
-  // attribute each capacity contribution), composes reactively, and hands
-  // back a removal function on add. Matches Producer/Skill chain wiring.
+  // it registers in the chain registry (so the balance harness and devtools
+  // can attribute each capacity modifier), composes reactively, and returns
+  // a cleanup on add. Matches Producer/Skill chain wiring.
   const capacityChain = createModifierChain(`${id}/capacity`);
 
   const capacity: ComputedRef<Decimal> = computed(() =>
@@ -144,7 +143,7 @@ export function createInventory(options: InventoryOptions): Inventory {
     withPersistentContext(id, () => {
       for (const itemId of items) {
         const initialCount = initial[itemId] ?? 0;
-        // Saved as the bare item id inside the inventory's context; the
+        // Saved as the bare item id inside the inventory's persistent context; the
         // engine-unique id is qualified so inventories can share item ids.
         const resource = createPersistentContextScopedResource<DecimalSource>(
           initialCount,
@@ -218,8 +217,8 @@ export function createInventory(options: InventoryOptions): Inventory {
     capacity,
     resources: linkedResources,
 
-    addCapacityModifier(mod: Modifier): () => void {
-      return capacityChain.add(mod);
+    addCapacityModifier(modifier: Modifier): () => void {
+      return capacityChain.add(modifier);
     },
 
     remainingSpace(itemId: string): Decimal {
@@ -245,6 +244,6 @@ export function createInventory(options: InventoryOptions): Inventory {
     },
   };
 
-  // Only known items persist, under the inventory's own context.
+  // Only known items persist, under the inventory's own persistent context.
   return items ? attachPersistentContextReset(inventory, id) : inventory;
 }

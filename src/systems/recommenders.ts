@@ -1,15 +1,16 @@
 /**
- * Built-in recommendation defs — common inter-cycle patterns
+ * Built-in recommenders — common between-run patterns
  *
- * Sugar factory for the most common recommendation pattern found across
- * incremental games with cycle mechanics:
+ * A shorthand factory for a common recommendation shape in incremental games
+ * with runs:
  *
- * - {@link createBestReplayRecommender} — "replay the best-known config for this metric"
- *   (a best route, a combat loadout), optionally gated on a goal threshold
+ * - {@link createBestReplayRecommender} — "replay the best-known configuration
+ *   for this metric" (a best route, a combat loadout), optionally blocked
+ *   until a threshold is reached
  *
  * A thin wrapper over {@link BestOf} data. Games with more complex needs
- * (adaptive responses, trend detection, route generation) implement custom
- * defs against the {@link Recommender} interface.
+ * (adaptive responses, trend detection, route generation) implement their
+ * own recommenders against the {@link Recommender} interface.
  *
  * @see {@link createRecommendationSystem} for the system these register with
  * @see {@link createBestOf} for the data source these read from
@@ -25,16 +26,16 @@ import type { BestOfEntry } from './best-of';
 
 /** Options for {@link createBestReplayRecommender} */
 export interface BestReplayRecommenderOptions {
-  /** Override the def id. Default: `best-replay:${metricKey}` */
+  /** The recommender id. Default: `best-replay:${metricKey}` */
   id?: string;
   /**
-   * Minimum completed cycles before this def becomes applicable.
+   * Minimum completed runs before this recommender is applicable.
    * Default: 1 (needs at least one recorded best).
    */
   minRuns?: number;
   /**
-   * Minimum best value (the metric's observed cycle delta) before this def
-   * becomes applicable — a goal the player must have reached once.
+   * Minimum best value (the metric's observed per-run delta) before this
+   * recommender is applicable: a threshold the player must have reached once.
    */
   threshold?: DecimalSource;
 }
@@ -45,7 +46,7 @@ export interface BestReplayRecommenderOptions {
  * Bounded, order-preserving arbitration score for an unbounded game quantity.
  * `Decimal.toNumber()` overflows to `Infinity` above ~1e308 — and
  * `Decimal.isFinite()` stays true there — so raw `.toNumber()` scores collapse
- * every large config to `Infinity`, degenerating arbitration to registration
+ * every large configuration to `Infinity`, degenerating arbitration to registration
  * order across the exact range this engine exists to support. `log10` of the
  * magnitude stays finite and monotonic, preserving the ranking.
  */
@@ -53,7 +54,7 @@ function magnitudeScore(x: DecimalSource): number {
   return Decimal.max(x, 1).log10().toNumber();
 }
 
-/** A cycle's per-second rate; a zero-elapsed cycle has none and rates as 0. */
+/** A run's per-second rate; a run with zero elapsed time has none, so its rate is 0. */
 function ratePerSecond(value: DecimalSource, elapsed: number): Decimal {
   return elapsed > 0 ? Decimal.div(value, elapsed) : Decimal.dZero;
 }
@@ -61,27 +62,27 @@ function ratePerSecond(value: DecimalSource, elapsed: number): Decimal {
 // === FACTORIES ===
 
 /**
- * Create a def that replays the configuration that produced the best value
- * for a given metric. The simplest recommendation pattern — just load
- * whatever worked best last time.
+ * Create a recommender that replays the configuration that produced the best
+ * value for a given metric. The simplest recommendation shape — load
+ * whatever worked best before.
  *
- * Scores the log10 improvement of the metric's best over the last cycle, in
- * the metric's {@link BestOfMetricDef.mode}: the projected (else observed)
- * value for `'absolute'`, the per-second rate for `'perSecond'`. A best the
- * last cycle matched scores 0 and stays applicable.
+ * Scores the log10 improvement of the metric's best over the last run, in
+ * the metric's {@link BestOfMetricDef.mode}. That is the projected (else
+ * observed) value for `'absolute'`, and the per-second rate for `'perSecond'`. A best the
+ * last run matched scores 0 and stays applicable.
  *
- * Requires that {@link BestOf} was created with a `captureConfig` callback
- * so that strategy snapshots are recorded alongside best entries.
+ * Requires that {@link BestOf} was created with a `captureConfig` option, so
+ * configuration snapshots are recorded beside best entries.
  *
  * @param metricKey - The BestOf metric key to optimize for
- * @param options - Optional id override, minimum cycle count and goal threshold
+ * @param options - Optional id, minimum run count and threshold
  * @returns A {@link Recommender} ready to register
  *
  * @example
  * ```ts
  * const recs = createRecommendationSystem({
  *   // ...
- *   defs: [
+ *   recommenders: [
  *     createBestReplayRecommender('gold'),
  *     createBestReplayRecommender('xp', { minRuns: 3 }),
  *     // Quiet until the best run has produced 1000 damage.
@@ -151,7 +152,7 @@ export function createBestReplayRecommender(
               delta,
             },
           },
-          summary: `Replay best ${metricKey} config (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, run #${entry.runNumber})`,
+          summary: `Replay best ${metricKey} configuration (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, run #${entry.runNumber})`,
         },
       };
     },

@@ -1,26 +1,24 @@
 /**
- * Engine categories — the typed cross-category accumulator the engine
- * self-publishes for external introspection tools (sim pickers, devtools,
- * balance workbenches, harness walkers).
+ * Engine categories — the typed cross-category collection the engine
+ * self-publishes for external introspection tools (the picker, devtools,
+ * balance workbenches, balance-harness walkers).
  *
- * Problem it solves: every archetype that needed cross-category
- * enumeration grew the same `categories.ts` aggregator module — re-injecting
- * each owner module and re-publishing the union by hand. Four independent
- * archetypes shipped the same workaround before it became clear the engine
- * itself should fill {@link EngineCategories}, parallel to how
- * `createModifierChain` auto-registers into `ChainRegistry` and
- * `createResource` auto-registers into `ResourceRegistry`.
+ * Problem it solves: without it, every consumer that needs cross-category
+ * enumeration writes the same aggregator module. That module injects each
+ * owner module's categories and publishes the union by hand. So the engine
+ * fills {@link EngineCategories} itself, as `createModifierChain`
+ * auto-registers into `ChainRegistry` and `createResource` auto-registers
+ * into `ResourceRegistry`.
  *
- * Mechanism: {@link createEngine} creates a per-engine accumulator,
- * pre-provides it under {@link CategoriesKey}, and makes it the ambient
- * target during `install()` and `connect()`. Each category factory appends
- * itself to the appropriate slot at construction time. Categories
- * constructed outside an engine (tests,
- * throwaway scripts) silently skip registration — the primitive still
- * works, just isn't discoverable via `tryInject`.
+ * Mechanism: {@link createEngine} creates a per-engine collection, provides
+ * it under {@link CategoriesKey} in advance, and sets it as the ambient
+ * value during install/connect. Each category factory appends itself to
+ * the matching field at construction time. A category built outside an
+ * engine (tests, throwaway scripts) skips registration silently. The
+ * category still works; `tryInject` just does not find it.
  *
  * The key is engine-owned: `ctx.provide(CategoriesKey, ...)` throws, so
- * tooling, Gates and category factories always share the one accumulator.
+ * tooling, Gates and category factories always share the one collection.
  */
 
 import type { InjectionKey } from '@/primitives/types';
@@ -34,21 +32,21 @@ import type { SubjectCategory } from './subject-category';
 import type { CategoryEntrySignals } from './category-base';
 
 /**
- * Discovery map for external introspection tools (sim, devtools, balance
- * workbenches). The engine self-publishes this object under
- * {@link CategoriesKey}: each category factory appends to the corresponding
- * slot at construction time, so a consumer can read the
- * full inventory via `engine.tryInject(CategoriesKey)` without any
- * archetype-side publication step.
+ * Discovery map for external introspection tools (the balance harness,
+ * devtools, balance workbenches). The engine self-publishes this object
+ * under {@link CategoriesKey}. Each category factory appends to the
+ * matching field at construction time. So a consumer reads every category
+ * through `engine.tryInject(CategoriesKey)`, with no publication step of
+ * its own.
  *
- * Every field is optional — a slot is only present if at least one
+ * Every field is optional — a field is only present if at least one
  * category of that kind was constructed. A consumer that constructs no
  * categories sees an empty object.
  *
  * Extend via declaration merging when shipping custom category types
- * that shouldn't hide behind `any`. A merged slot is for tooling only:
- * {@link findCategoryEntrySignals} walks the built-in slots, so `count-gte`
- * and `unlock` Gates never see a category held in a merged one.
+ * that shouldn't hide behind `any`. A merged field is for tooling only.
+ * {@link findCategoryEntrySignals} walks the built-in fields only. So
+ * `count-gte` and `active` Gates never see a category held in a merged one.
  * ```ts
  * declare module '@open-loop/engine' {
  *   interface EngineCategories {
@@ -60,7 +58,7 @@ import type { CategoryEntrySignals } from './category-base';
  * @see {@link CategoriesKey} — the injection key
  */
 export interface EngineCategories {
-  /** Purchasable upgrade/buyable categories */
+  /** Purchasable categories (one-shot upgrades and repeatable purchases) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   purchasables?: PurchasableCategory<any, any>[];
   /** Skill/leveling categories */
@@ -72,10 +70,10 @@ export interface EngineCategories {
   /** Challenge categories */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   challenges?: ChallengeCategory<any, any>[];
-  /** Producer categories (generators, pools) */
+  /** Producer categories */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   producers?: ProducerCategory<any, any>[];
-  /** Subject categories (named entities with typed multi-field state — NPCs, factions, regions) */
+  /** Subject categories (subjects with typed schema fields — NPCs, factions, regions) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   subjects?: SubjectCategory<any>[];
   /** Action categories (ordered-execution queues with per-execution state machine) */
@@ -84,10 +82,10 @@ export interface EngineCategories {
 }
 
 /**
- * Discovery key for external introspection tools (sim, devtools). The
- * engine pre-provides an {@link EngineCategories} accumulator under this
- * key and self-populates it as category factories run during `install()`
- * and `connect()`. Consume via `engine.tryInject(CategoriesKey)`. The key
+ * Injection key for external introspection tools (the balance harness,
+ * devtools). The engine provides an {@link EngineCategories} collection
+ * under this key in advance, and fills it as category factories run during
+ * install/connect. Consume via `engine.tryInject(CategoriesKey)`. The key
  * is engine-owned — `ctx.provide(CategoriesKey, ...)` throws. Resources
  * are discovered through `ResourceRegistryKey`.
  *
@@ -96,20 +94,20 @@ export interface EngineCategories {
 export const CategoriesKey: InjectionKey<EngineCategories> = Symbol('engine:categories');
 
 // ---------------------------------------------------------------------------
-// Ambient current-accumulator context
+// Ambient categories collection
 // ---------------------------------------------------------------------------
 
 let _current: EngineCategories | undefined;
 
 /**
- * Run `fn` with `target` set as the ambient categories accumulator. Any
+ * Run `fn` with `target` set as the ambient categories collection. Any
  * category-factory call inside `fn` appends itself to `target`'s
- * appropriate slot.
+ * matching field.
  *
- * Used by {@link createEngine} to scope category registration to the
- * current engine during its `install()` / `connect()` phases. Nested
- * calls save and restore the previous ambient so multiple engines
- * starting concurrently don't stomp each other.
+ * {@link createEngine} calls it to limit category registration to its own
+ * engine during install/connect. Nested calls save and restore the
+ * previous ambient value. So engines built one inside another do not
+ * overwrite each other's collection.
  *
  * @internal Consumer code should not call this directly.
  */
@@ -124,7 +122,7 @@ export function withEngineCategories<T>(target: EngineCategories, fn: () => T): 
 }
 
 /**
- * Read the current ambient categories accumulator, if any. Returns
+ * Read the current ambient categories collection, if any. Returns
  * `undefined` when called outside a `withEngineCategories` block (e.g.
  * tests, throwaway scripts that build a category without an engine).
  *
@@ -139,27 +137,26 @@ export function getCurrentEngineCategories(): EngineCategories | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve `(categoryId, defId)` to the entry's introspection signals across
- * every typed slot in {@link EngineCategories}. The cohesive cross-cut over
+ * Resolve `(categoryId, defId)` to the category entry's signals across
+ * every typed field in {@link EngineCategories}. The cohesive cross-cut over
  * heterogeneous category types — every category factory derives a uniform
- * {@link CategoryEntrySignals} view from its instance refs, so a Gate
- * primitive (or walker, devtool, UI hint) can read "is this entity active /
- * how many do I have" without consumer-side path conventions.
+ * {@link CategoryEntrySignals} view from its instance refs. So a Gate
+ * (or walker, devtool, UI hint) can read "is this entry active / how many
+ * do I have" without consumer-side path conventions.
  *
- * Walks the seven built-in slots in order (`purchasables`, `skills`,
+ * Walks the built-in fields in order (`purchasables`, `skills`,
  * `achievements`, `challenges`, `producers`, `subjects`, `actions`); the
- * first category whose `id` matches `categoryId` is consulted. Slots added
- * by declaration merging aren't walked, so their categories aren't
- * gate-visible. Returns
- * `undefined` if no matching category is registered, or if the matching
- * category has no entry under `defId`.
+ * first category whose `id` matches `categoryId` is consulted. Fields added
+ * by declaration merging aren't walked, so Gates never see their
+ * categories. Returns `undefined` if no matching category is registered,
+ * or if the matching category has no entry under `defId`.
  *
  * @example
  * ```ts
  * const categories = engine.tryInject(CategoriesKey)!;
- * const signals = findCategoryEntrySignals(categories, 'pk/jobs', 'beggar');
- * signals?.count.value;   // current job level
- * signals?.unlock.value;  // is the job advanced past zero?
+ * const signals = findCategoryEntrySignals(categories, 'crafting', 'smithing');
+ * signals?.count.value;   // current skill level
+ * signals?.active.value;  // is the skill's level above zero?
  * ```
  */
 export function findCategoryEntrySignals(

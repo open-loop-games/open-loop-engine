@@ -297,7 +297,7 @@ describe('predicates its own edge flips', () => {
         active: () => Decimal.lt(chain.apply(1), 10),
         grants: [{ chain, modifier: createMultiplicativeModifier({ multiplier: 100 }) }],
       }),
-    ).toThrow(/its own bindings/);
+    ).toThrow(/its own grants/);
   });
 });
 

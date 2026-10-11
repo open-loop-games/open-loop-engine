@@ -1,17 +1,16 @@
 /**
- * Dialog — authored conversation graphs and the engine-native runtime that
- * walks them. The runtime composes engine substrate (Gate predicates, effects,
- * events) into a save-friendly conversation driver.
+ * Dialog — authored dialog graphs and the native dialog adapter that walks
+ * them. The adapter combines engine primitives (Gates, effects, events) into
+ * a conversation driver whose state serializes.
  *
  * Composes with:
- * - `Gate` + `evaluateGate` (resolved via the ambient Gate runtime) — both
- *   dialog node-entry conditions and per-choice visibility gates dispatch
- *   through Gate evaluation.
+ * - `Gate` + `evaluateGate`, against Gate services captured when the adapter
+ *   is created. A node's `when` and a choice's `visible` are both Gates.
  * - `IEffect` + `applyEffect` for `onEnter` and choice `outcomes`.
  * - `createEmitHandle` for lifecycle events.
  *
- * State is held in-memory; persistence wraps externally via `createDialogSession`'s
- * persistent envelope.
+ * The adapter keeps its state in memory; `createDialogSession`'s persistent
+ * envelope saves it.
  *
  * @cluster dialog
  */
@@ -24,17 +23,18 @@ import { createPredicateResolver, evaluateGate, type Gate } from './gate';
 // === TYPES ===
 
 /**
- * A single line/branch in a dialog graph. Pure data — references to host
- * variables flow through {@link Gate} / {@link IEffect}, not closures, so
- * graphs serialize and survive save/load.
+ * One line or branch in a dialog graph. Pure data: reads and writes of game
+ * state go through {@link Gate} and {@link IEffect}, not closures, so graphs
+ * serialize.
  */
 export interface DialogNode {
   id: string;
-  /** Displayed line. Template variables `{name}` are interpolated by the host. */
+  /** The line shown. The consumer interpolates template variables such as `{name}`. */
   text: string;
   /**
-   * Skip this node when present and falsy. Evaluated as a {@link Gate}
-   * through the ambient Gate runtime — typed predicate spec, no closures.
+   * Blocks entry to this node when present and it does not hold. A
+   * {@link Gate}, evaluated against the Gate services the adapter captured;
+   * no closures.
    */
   when?: Gate;
   /**
@@ -42,12 +42,12 @@ export interface DialogNode {
    * and is terminal without one.
    */
   choices?: DialogChoice[];
-  /** Effects emitted on node entry, before choice presentation. */
+  /** Effects applied on node entry, before its choices are presented. */
   onEnter?: IEffect[];
   /**
    * Fall-through target, entered when this node has no visible choice — on
-   * arrival, or through `advance()` once its presented choices gate off. When
-   * the target's condition fails, the conversation stops at this node.
+   * arrival, or through `advance()` once its presented choices are blocked.
+   * When the target's `when` does not hold, the conversation stops at this node.
    */
   next?: string;
 }
@@ -57,11 +57,11 @@ export interface DialogChoice {
   id: string;
   text: string;
   /**
-   * Hide this choice from the presented list when present and falsy. Same
-   * {@link Gate} contract as {@link DialogNode.when}.
+   * Hide this choice from the presented list when present and it does not
+   * hold. Same {@link Gate} contract as {@link DialogNode.when}.
    */
   visible?: Gate;
-  /** Effects emitted when this choice is selected. */
+  /** Effects applied when this choice is chosen. */
   outcomes?: IEffect[];
   /** Target node id. Omit for "end conversation". */
   next?: string;
@@ -69,7 +69,7 @@ export interface DialogChoice {
 
 /** A complete authored conversation: nodes plus an entry pointer. */
 export interface DialogGraph {
-  /** Stable graph id — also the persistence sub-context name. */
+  /** Stable dialog graph id, unique across an adapter's graphs. Visit counts are saved under it. */
   id: string;
   /** First node id walked when a session starts. */
   entry: string;
@@ -80,22 +80,22 @@ export interface DialogGraph {
 export interface DialogPresentation {
   nodeId: string;
   text: string;
-  /** Choices already filtered by condition evaluation. */
+  /** Choices whose `visible` holds. */
   choices: ReadonlyArray<{ id: string; text: string }>;
   /**
    * True when the line offers no visible choice and no enterable `next`. The
    * conversation stays active until the UI calls `finish()`. False with no
-   * visible choice means the choices gated off after the line presented and
-   * `next` can be entered: the UI offers a continue that calls `advance()`.
+   * visible choice means the choices were blocked after the line presented,
+   * and `next` can be entered. The UI then offers a continue that calls
+   * `advance()`.
    */
   terminal: boolean;
 }
 
 /**
- * Persistable runtime state — engine-canonical fields that every DialogAdapter
- * implementation lowers into on `serialize()`. Adapters that need to persist
- * additional internal state (Ink JSON dump, Yarn VM state) can extend this
- * type via declaration merging in their package.
+ * The adapter's serialized form: the fields every DialogAdapter writes on
+ * `serialize()`. An adapter that must save more state (an Ink JSON dump,
+ * Yarn VM state) can extend this type by declaration merging in its package.
  *
  * TODO(expansion): when an external adapter needs to persist adapter-private
  * payload across save/load, add an `adapter?` field constrained to
@@ -104,28 +104,28 @@ export interface DialogPresentation {
 export interface SerializedDialogAdapter {
   activeGraphId?: string;
   activeNodeId?: string;
-  /** Per-graph per-node visit counts. Survives sessions. */
+  /** Per-graph, per-node visit counts. Saved; kept across conversations and across loads. */
   visitCounts: Record<string, Record<string, number>>;
 }
 
 /**
  * Adapter contract: anything that can drive a dialog conversation against
- * host state. The engine ships {@link createNativeDialogAdapter} which walks
+ * game state. The engine ships {@link createNativeDialogAdapter}, which walks
  * `DialogGraph[]`. External adapters — Ink, Yarn Spinner, Ren'Py, Dialogic —
- * implement the same interface against their own content shape and runtime.
+ * implement the same interface against their own content format.
  *
- * Adapters MUST NOT hold typed refs to host state — they read/write through
- * the supplied accessor + mutator only. This keeps adapters host-agnostic and
- * lets `createDialogSession` swap implementations through its `adapterFactory`
- * option without consumer changes.
+ * Adapters MUST NOT hold typed refs to game state; they read and write only
+ * through the supplied accessor and mutator. So an adapter is independent of
+ * the game, and `createDialogSession` can change adapters through its
+ * `adapterFactory` option without consumer changes.
  */
 export interface DialogAdapter {
   /**
-   * Activate a graph at its entry node (or an explicit node), running onEnter
+   * Start a graph at its entry node (or an explicit node), running onEnter
    * effects and falling through `next` until a node presents. Replaces an
    * active conversation without finishing it. Does nothing when the entry
-   * node's condition fails, and returns `false` to say so; a return of
-   * nothing reads as started, so adapters written before it still conform.
+   * node's `when` does not hold, and returns `false` to say so. An adapter
+   * that returns nothing counts as started.
    */
   start(graphId: string, entryNode?: string): boolean | void;
   /** Return the current presentation snapshot, or null when no graph is active. */
@@ -134,37 +134,37 @@ export interface DialogAdapter {
   choose(choiceId: string): void;
   /**
    * Fall through `next` from a line that presents no visible choice and isn't
-   * finished — its choices gated off after it presented them. Throws on any
-   * other line. Optional so adapters written before it still conform; a
-   * session over one without it throws from its own `advance()`.
+   * terminal: its choices were blocked after it presented them. Throws on any
+   * other line. Optional; a session over an adapter without it throws from
+   * its own `advance()`.
    */
   advance?(): void;
   /** End the conversation; clears the active pointer. */
   finish(): void;
   isActive(): boolean;
   /**
-   * How many times a node has been entered, across the full persisted history
-   * (survives save/load). Returns 0 for a never-visited node. No Gate kind
-   * reads it: a consumer that branches on "first time here" / "seen N times"
-   * reads it here and publishes it through its own accessor or flags.
+   * How many times a node has been entered, across the saved history.
+   * Returns 0 for a never-visited node. No Gate kind reads it. A consumer
+   * that branches on "first time here" / "seen N times" reads it here, and
+   * exposes it through its own accessor or flags.
    */
   getVisitCount(graphId: string, nodeId: string): number;
-  /** Return persistable state for save inclusion. */
+  /** Return the serialized form a save stores. */
   serialize(): SerializedDialogAdapter;
-  /** Restore from previously exported state. Replaces current state wholesale. */
+  /** Write back a serialized form from `serialize()`. Replaces the current state entirely. */
   restore(state: SerializedDialogAdapter): void;
 }
 
 /** Lifecycle events emitted by a {@link NativeDialogAdapter} instance. */
 export interface DialogAdapterEvents {
-  /** Fired whenever the adapter lands on a presentable node (after start, choose or advance). */
+  /** Emitted each time the adapter stops on a presentable node (after start, choose or advance). */
   presented: (snapshot: DialogPresentation) => void;
-  /** Fired immediately after a choice's outcomes apply, before pointer advancement. */
+  /** Emitted immediately after a choice's outcomes apply, before the pointer advances. */
   chosen: (info: { graphId: string; nodeId: string; choiceId: string }) => void;
   /**
-   * Fired when the runtime clears its active pointer: `finish()`, or a choice
-   * with no `next` or whose `next` is gated off. Landing on a line presented
-   * with `terminal: true` does not fire it.
+   * Emitted when the adapter clears its active pointer: `finish()`, or a
+   * choice with no `next` or whose `next` node's `when` does not hold.
+   * Stopping on a line presented with `terminal: true` does not emit it.
    */
   finished: (info: { graphId: string }) => void;
 }
@@ -172,18 +172,18 @@ export interface DialogAdapterEvents {
 /**
  * Options for {@link createNativeDialogAdapter} — the authored graphs plus
  * the read/write side ({@link GameStateAccessor} for predicates,
- * {@link GameStateMutator} for outcome dispatch).
+ * {@link GameStateMutator} for outcome effects).
  */
 export interface NativeDialogAdapterOptions {
   /**
-   * Authored graphs available to this runtime, looked up by graph.id on
+   * Authored graphs available to this adapter, looked up by graph.id on
    * start(). A graph id repeated across the list, or a node id repeated within
    * one graph, throws at construction.
    */
   graphs: DialogGraph[];
   /** Read side — predicate evaluation and outcome read-back. */
   accessor: GameStateAccessor;
-  /** Write side — outcome dispatch. */
+  /** Write side — outcome effects. */
   mutator: GameStateMutator;
 }
 
@@ -193,39 +193,39 @@ export interface NativeDialogAdapter extends DialogAdapter, Emittable<DialogAdap
 // === FACTORIES ===
 
 /**
- * Construct a native dialog runtime backed by the supplied graphs + accessor + mutator.
+ * Create a native dialog adapter over the supplied graphs, accessor and mutator.
  *
- * `condition` fields on nodes and choices accept `Gate` — predicates dispatch
- * through {@link evaluateGate} against a {@link GateServices} captured once here
- * at construction, where every condition's handles are asserted. Construct
- * inside `createEngine`'s install/connect, where the ambient handles are wired:
- * dialog is driven from player input long after that scope closes, so a
- * lazily-resolved runtime would come back empty.
+ * A node's `when` and a choice's `visible` are Gates. They evaluate through
+ * {@link evaluateGate} against {@link GateServices} captured once, here,
+ * where each Gate's services are asserted. Create the adapter inside
+ * `createEngine`'s install/connect, where the ambient Gate services are
+ * wired. Player input drives dialog long after install/connect ends, so
+ * Gate services read later would be empty.
  *
- * Standard composition path: register dialog content via `createDialogCategory`,
- * then pass `category.getAll().flatMap(e => e.graphs)` as `graphs`. For tests
- * or one-off use, construct graphs inline.
+ * The usual path: register dialog content via `createDialogCategory`, then
+ * pass `category.getAll().flatMap(e => e.graphs)` as `graphs`. For tests or
+ * one-off use, construct graphs inline.
  *
- * @param options Graphs + accessor/mutator. The runtime captures these for
- *   outcome dispatch and condition read-back; `accessor` also seeds the
- *   captured Gate runtime.
- * @returns A {@link NativeDialogAdapter} — the {@link DialogAdapter} adapter
- *   contract plus an event subscription handle.
+ * @param options Graphs, accessor and mutator. The adapter keeps them for
+ *   outcome effects and Gate reads; `accessor` also goes into the captured
+ *   Gate services.
+ * @returns A {@link NativeDialogAdapter} — the {@link DialogAdapter}
+ *   contract plus `on` for its events.
  *
  * @example
  * ```ts
- * const runtime = createNativeDialogAdapter({ graphs, accessor, mutator });
- * runtime.on('presented', (snap) => uiStore.setCurrentLine(snap));
- * runtime.start('rask-greeting');
+ * const adapter = createNativeDialogAdapter({ graphs, accessor, mutator });
+ * adapter.on('presented', (snap) => uiStore.setCurrentLine(snap));
+ * adapter.start('rask-greeting');
  * ```
  */
 export function createNativeDialogAdapter(
   options: NativeDialogAdapterOptions,
 ): NativeDialogAdapter {
   const { graphs, accessor, mutator } = options;
-  // Capture the Gate runtime now, not per evaluation: start/choices/choose are
-  // player-driven and run long after the engine's install/connect ambient
-  // closes. Mirrors the eager capture in createReset.
+  // Capture the Gate services now, not per evaluation: start, present and
+  // choose are player-driven and run long after install/connect ends.
+  // Mirrors the eager capture in createReset.
   const predicates = createPredicateResolver({ accessor });
   const gateServices = predicates.services;
   const graphsById = new Map<string, DialogGraph>();
@@ -243,10 +243,10 @@ export function createNativeDialogAdapter(
       }
       nodes.set(node.id, node);
       const label = `dialog '${g.id}' node '${node.id}'`;
-      if (node.when) predicates.assert(node.when, `${label} condition`);
+      if (node.when) predicates.assert(node.when, `${label} when`);
       for (const choice of node.choices ?? []) {
         if (choice.visible) {
-          predicates.assert(choice.visible, `${label} choice '${choice.id}' condition`);
+          predicates.assert(choice.visible, `${label} choice '${choice.id}' visible`);
         }
       }
     }
@@ -276,7 +276,7 @@ export function createNativeDialogAdapter(
     return evaluateGate(predicate, gateServices);
   }
 
-  /** Whether a node's or choice's gate is absent or passes. */
+  /** Whether a node's or choice's Gate is absent or holds. */
   function passes(gate: Gate | undefined): boolean {
     return !gate || holds(gate);
   }
@@ -304,15 +304,15 @@ export function createNativeDialogAdapter(
     }
   }
 
-  /** Whether a node's fall-through `next` exists and its gate passes. */
+  /** Whether a node's fall-through `next` exists and its `when` holds. */
   function canEnterNext(graphId: string, node: DialogNode): boolean {
     return !!node.next && canEnter(graphId, node.next);
   }
 
   /**
    * Auto-advance through fall-through nodes — no visible choices and an
-   * enterable `next` — until landing on a node with a visible choice or one
-   * whose `next` is absent or gated off. Each entered node fires its onEnter
+   * enterable `next` — until it stops on a node with a visible choice, or one
+   * whose `next` is absent or blocked. Each entered node applies its onEnter
    * and increments its visit count.
    */
   function settle(): void {
@@ -378,7 +378,7 @@ export function createNativeDialogAdapter(
       throw new Error(`Unknown choice ${choiceId} on dialog node ${nodeId}`);
     }
     if (!passes(choice.visible)) {
-      throw new Error(`Choice ${choiceId} on node ${nodeId} is currently gated off`);
+      throw new Error(`Choice ${choiceId} on dialog node ${nodeId} is not visible`);
     }
     if (choice.outcomes) {
       for (const eff of choice.outcomes) applyEffect(eff, accessor, mutator);
@@ -420,7 +420,7 @@ export function createNativeDialogAdapter(
       activeGraphId: state.activeGraphId,
       activeNodeId: state.activeNodeId,
       // JSON-clone visit counts so the consumer's persistent envelope owns its
-      // snapshot. JSON (rather than structuredClone) handles Vue's reactive
+      // copy. JSON (rather than structuredClone) handles Vue's reactive
       // proxies, which the structured-clone algorithm refuses.
       visitCounts: jsonClone(state.visitCounts),
     };

@@ -1,20 +1,21 @@
 /**
  * Purchasable system — unified purchase primitives for incremental games
  *
- * A Purchasable represents anything the player buys: one-shot upgrades,
- * leveled generators, capped perks. The `limit` option determines shape:
+ * A Purchasable represents anything the player purchases: one-shot upgrades,
+ * repeatable upgrades, perks with a limit. The `limit` option decides the shape:
  *
- * - `limit: 1` — one-shot upgrade (boolean `active` convenience, no amount display)
- * - `limit: N` — capped leveled purchase (amount tracks levels, maxes at N)
- * - `limit: Infinity` — uncapped repeatable (buy forever, default)
+ * - `limit: 1` — one-shot upgrade (a boolean `active` read, no count shown)
+ * - `limit: N` — repeatable purchase with a limit (the count tracks purchases, maxed at N)
+ * - `limit: Infinity` — unlimited repeatable purchase (the default)
  *
- * The category factory {@link createPurchasableCategory} is the consumer
- * front door. {@link createScalingPurchasable} is the L3 escape hatch for
- * per-instance customized leveled purchases that don't fit a category's
- * map shape — it does Formula-aware cost+effect setup the raw factory
- * can't express cleanly. {@link createPurchasable} is engine-internal.
+ * Consumers build purchasables through the category factory
+ * {@link createPurchasableCategory} (L2). {@link createScalingPurchasable}
+ * is the L3 factory for one customized repeatable purchase that doesn't fit
+ * a category's map shape. It sets up a Formula-aware cost and effect that
+ * the raw factory can't express cleanly. {@link createPurchasable} is
+ * engine-internal.
  *
- * For auto-buy, see {@link setupSweepAutoPurchase} /
+ * For auto-purchase, see {@link setupSweepAutoPurchase} /
  * {@link setupPolicyAutoPurchase} in `./auto-purchase`.
  */
 
@@ -49,11 +50,11 @@ import { createPredicateResolver, type Predicate, type PredicateResolver } from 
 
 /** Events emitted by a {@link Purchasable} instance */
 export interface PurchasableEvents {
-  /** Fired after each purchase, with the number of levels bought in this transaction */
+  /** Emitted after each purchase, with the count that purchase took */
   purchased: (count: DecimalSource) => void;
 }
 
-/** UI text for a purchasable. All fields accept refs/getters for dynamic content. */
+/** UI text for a purchasable. Each text field can be a ref or getter for reactive text. */
 export interface PurchasableDisplay {
   /** Title shown at the top of the purchasable card */
   title?: Computable<string>;
@@ -62,40 +63,39 @@ export interface PurchasableDisplay {
   /** Formatted current effect (e.g., "×8 production"). Shown below description. */
   effectDescription?: Computable<string>;
   /**
-   * Whether to display the current amount (e.g., "Level 5").
+   * Whether to show the current count (e.g., "5 owned").
    * Default: `false` when limit is 1, `true` otherwise.
    */
   showAmount?: boolean;
 }
 
-// TODO(expansion): staged definitions — a purchasable that transforms between
+// TODO(expansion): staged purchasables — a purchasable that transforms between
 // N phases (a stages[] list, charged overlays). Add optional `stages`
 // array to options, expose `stage` ref on instance. Deferred: no consumer need yet.
 
 /**
  * Full options for {@link createPurchasable} — the engine-internal raw
- * factory. Consumers reach this shape through `mapPurchasable` on
- * {@link createPurchasableCategory}; the field set is the contract that
- * shape returns.
+ * factory. Consumers build this shape through `mapPurchasable` on
+ * {@link createPurchasableCategory}; this field set types what it returns.
  *
- * For leveled cost scaling outside a category, use
+ * For a scaling cost outside a category, use
  * {@link ScalingPurchasableOptions} on {@link createScalingPurchasable}.
  */
 export interface PurchasableOptions {
   /**
-   * Save identity, unique among the purchasables created in the same context.
-   * The owned amount saves under it, so it must not change between builds.
+   * Save identity, unique among the purchasables in the same persistent context.
+   * The purchase count saves under it, so it must not change between game builds.
    */
   id: string;
   /** UI text — either a full {@link PurchasableDisplay} or a plain string/getter for description-only */
   display: PurchasableDisplay | Computable<string>;
   /**
-   * What the player must have/spend per purchase (cost requirements, boolean gates, etc.).
+   * What the player must have or spend per purchase (cost requirements, boolean predicates, etc.).
    *
-   * Pass a **factory** to build requirements over this purchasable's own level.
-   * The callback receives the live `amount` ref, which doesn't exist yet when
-   * the plain form is evaluated — so it's the only way to declare a cost that
-   * scales on the thing being bought:
+   * Pass a **function** to build requirements over this purchasable's own count.
+   * The function receives the live `count` ref, which doesn't exist yet when
+   * the plain form is evaluated. So it's the only way to declare a cost that
+   * scales on the thing being purchased:
    *
    * ```ts
    * requirements: (count) =>
@@ -106,61 +106,62 @@ export interface PurchasableOptions {
    *   })
    * ```
    *
-   * Prefer it over a `cost: () => …` getter that reads the level back out of a
-   * category: a getter cost is priced linearly at the *current* level, so
-   * buy-max silently undercharges a scaling ladder (see
-   * {@link CostRequirementOptions.cost}). A Formula over `level` is invertible,
-   * so bulk purchasing walks the real curve. Multiple resources work too —
-   * return an array of cost requirements over the same `level`.
+   * Prefer it over a `cost: () => …` getter that reads the count back out of a
+   * category. A getter cost treats every unit of a bulk purchase as costing
+   * what the next unit costs now. So purchase max undercharges a scaling cost
+   * (see {@link CostRequirementOptions.cost}). A Formula over `count` is invertible,
+   * so bulk purchasing walks the real curve. Multiple resources work too:
+   * return an array of cost requirements over the same `count`.
    */
   requirements: Requirements | ((count: MaybeRef<DecimalSource>) => Requirements);
-  /** Maximum number of purchases. Default: `Infinity` (uncapped) */
+  /** The limit: the most purchases. Default: `Infinity` (no limit) */
   limit?: Computable<DecimalSource>;
-  /** Starting amount (useful for purchasables that begin pre-purchased). Default: `0` */
+  /** Starting count (useful for purchasables that begin purchased). Default: `0` */
   initialCount?: DecimalSource;
   /**
    * Effect value or function.
    *
-   * - `Computable<DecimalSource>` — static/reactive value (typical for one-shot).
-   *   Exposed directly and ungated: it reports the full bonus before the
-   *   upgrade is bought, so read it behind `active` (or through `grants`,
-   *   which gate) wherever it applies rather than previews.
-   * - `(amount: DecimalSource) => DecimalSource` — computed from amount (typical for leveled).
+   * - `Computable<DecimalSource>` — static or reactive value (typical for one-shot).
+   *   Exposed directly and not blocked: it reports the full effect value before
+   *   the upgrade is purchased. So read it behind `active` (or through `grants`,
+   *   which apply only while active) wherever it applies rather than previews.
+   * - `(count: DecimalSource) => DecimalSource` — computed from the count (typical for repeatable).
    *
    * If omitted, effect defaults to `1` (identity for multiplication).
    */
   effect?: Computable<DecimalSource> | ((count: DecimalSource) => DecimalSource);
-  /** Callback fired after each purchase with the number of levels bought */
+  /** Option callback called after each purchase, with the count purchased */
   onPurchase?: (count: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
   visible?: Predicate;
   /**
-   * Whether bulk purchasing (buy-max) is enabled.
+   * Whether a purchase purchases max. Off, every `purchase()` and
+   * `purchaseMax()` takes one unit.
    * Default: `false` when limit is 1, `true` otherwise.
    */
   purchaseMaxByDefault?: Computable<boolean>;
 }
 
-/** Formula factory over a purchasable's level — receives the engine-owned level ref. */
+/** Curve factory over a purchasable's count — receives the engine-owned count ref. */
 type CountCurve = (count: MaybeRef<DecimalSource>) => FormulaSource;
 
 /**
- * Cost configuration for {@link ScalingPurchasableOptions}. Discriminated
- * union — provide exactly one shape:
+ * Cost options for {@link ScalingPurchasableOptions}. A discriminated
+ * union: provide exactly one shape.
  *
- * - **Geometric** (`baseCost + costScaling`) — closed-form `baseCost × costScaling^amount`.
+ * - **Geometric** (`baseCost + costScaling`) — closed-form `baseCost × costScaling^count`.
  * - **Formula** (`costFormula`) — any curve the Formula vocabulary expresses.
  *   Invertible, so bulk purchasing walks the real curve.
- * - **Function** (`cost`) — arbitrary cost shape the Formula vocabulary can't
- *   express (super-exponential, piecewise, a table lookup). Single-purchase only.
+ * - **Function** (`cost`) — any cost shape the Formula vocabulary can't
+ *   express (super-exponential, piecewise, a table lookup). One unit per purchase only.
  */
 export type ScalingPurchasableCost =
   | {
-      /** Cost of the first purchase. Can be a ref/getter for scoped tuning. */
+      /** Cost of the first purchase. Can be a ref or getter, for a tunable or a scoped override. */
       baseCost: Computable<DecimalSource>;
       /**
-       * Multiplicative cost increase per level (e.g., `1.15` for 15% increase).
-       * Can be a ref/getter for scoped tuning.
+       * The cost ratio (e.g., `1.15` for a 15% rise per purchase).
+       * Can be a ref or getter, for a tunable or a scoped override.
        */
       costScaling: Computable<DecimalSource>;
       costFormula?: never;
@@ -168,10 +169,10 @@ export type ScalingPurchasableCost =
     }
   | {
       /**
-       * Formula factory for the cost of the next level. Called once at
-       * creation with the level ref; the returned Formula supports `.invert()`
-       * and bulk-purchase math via `calculateMaxAffordable`. A plain value
-       * returned instead prices every level at that value.
+       * Curve factory for the cost of the next purchase. Called once at
+       * creation with the count ref. The returned Formula supports `.invert()`,
+       * so `calculateMaxAffordable` can do bulk-purchase math. A plain value
+       * returned instead is the cost of every purchase.
        */
       costFormula: CountCurve;
       baseCost?: never;
@@ -180,9 +181,9 @@ export type ScalingPurchasableCost =
     }
   | {
       /**
-       * Cost of the next level as a plain function of the current level,
-       * re-read whenever the level changes. Single-purchase only — bulk math
-       * needs a Formula.
+       * Cost of the next purchase as a plain function of the current count,
+       * re-read whenever the count changes. One unit per purchase only: bulk
+       * math needs a Formula.
        */
       cost: (count: DecimalSource) => DecimalSource;
       baseCost?: never;
@@ -191,19 +192,19 @@ export type ScalingPurchasableCost =
     };
 
 /**
- * Effect configuration for {@link ScalingPurchasableOptions} — at most one of
- * `effect` (a static base or a plain function) or `effectFormula` (a Formula
- * factory). Omitted, the purchasable carries no effect.
+ * Effect options for {@link ScalingPurchasableOptions} — at most one of
+ * `effect` (a static base or a plain function) or `effectFormula` (a curve
+ * factory). With neither, the purchasable has no effect.
  */
 export type ScalingPurchasableEffect =
   | {
       /**
-       * Effect per level. Two shapes:
+       * Effect per purchase. Two shapes:
        *
-       * - `DecimalSource` — static base applied as `base^amount`. Auto-wrapped as
-       *   an invertible/integrable `Formula` internally; exposed on the result as
-       *   `effectCurve` for inversion queries ("level required for ×100?").
-       * - `(amount: DecimalSource) => DecimalSource` — genuinely custom logic.
+       * - `DecimalSource` — static base applied as `base^count`. Wrapped as an
+       *   invertible, integrable `Formula` internally, and exposed on the result
+       *   as `effectCurve` for inversion queries ("count required for ×100?").
+       * - `(count: DecimalSource) => DecimalSource` — custom logic.
        *   Forward evaluation only; `effectCurve` is undefined.
        */
       effect?: DecimalSource | ((count: DecimalSource) => DecimalSource);
@@ -211,7 +212,7 @@ export type ScalingPurchasableEffect =
     }
   | {
       /**
-       * Formula factory for the effect. Receives the level ref; the returned
+       * Curve factory for the effect. Receives the count ref; the returned
        * Formula becomes `effectCurve` on the result. Use this for
        * non-exponential curves (linear, polynomial, soft-capped) that still
        * need invertibility.
@@ -221,8 +222,8 @@ export type ScalingPurchasableEffect =
     };
 
 /**
- * Shorthand options for {@link createScalingPurchasable} — leveled purchases
- * with geometric, Formula or function cost scaling. Defaults `limit: Infinity`.
+ * Shorthand options for {@link createScalingPurchasable} — repeatable purchases
+ * with a geometric, Formula or function cost. Defaults `limit: Infinity`.
  *
  * Cost and effect shapes each take their own key — see
  * {@link ScalingPurchasableCost} and {@link ScalingPurchasableEffect}.
@@ -237,20 +238,23 @@ export type ScalingPurchasableOptions = {
   /** The resource spent to purchase */
   resource: Resource;
   /**
-   * Formatted current effect, for effects a `×N` readout misrenders
-   * (additive bonuses, flat amounts). Can be a ref or getter. Default: `×`
+   * Formatted current effect, for effects a `×N` text misstates
+   * (additive effects, flat amounts). Can be a ref or getter. Default: `×`
    * followed by the effect, when an effect is set.
    */
   effectDescription?: Computable<string>;
-  /** Maximum number of purchases. Default: `Infinity` */
+  /** The limit: the most purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
-  /** Starting amount. Default: `0` */
+  /** Starting count. Default: `0` */
   initialCount?: DecimalSource;
-  /** Callback fired after each purchase */
+  /** Option callback called after each purchase */
   onPurchase?: (count: DecimalSource) => void;
   /** Whether this purchasable is visible. Default: `true` */
   visible?: Predicate;
-  /** Whether bulk purchasing is enabled. Default: `true` */
+  /**
+   * Whether a purchase purchases max; off, each purchase takes one unit.
+   * Default: `false` when limit is 1, `true` otherwise.
+   */
   purchaseMaxByDefault?: Computable<boolean>;
 } & ScalingPurchasableCost &
   ScalingPurchasableEffect;
@@ -258,29 +262,28 @@ export type ScalingPurchasableOptions = {
 /**
  * A purchasable — the returned object from {@link createPurchasable}.
  *
- * Read `amount.value` for the current level, or `active.value` for "is it on?" checks.
- * Call `purchase()` or `purchaseMax()` to buy.
+ * Read `count.value` for the purchase count, or `active.value` for "is it on?" checks.
+ * Call `purchase()` or `purchaseMax()` to purchase.
  */
 export interface Purchasable {
-  /** Unique identifier */
   id: string;
-  /** Current number of purchases (persistent, saved/loaded automatically) */
+  /** Purchase count (a persistent ref) */
   count: Persistent<DecimalSource>;
   /**
-   * Latch — `true` when `amount >= 1`. The primary status read for callers
-   * who only care whether this is "on" (one-shot upgrades, predicate-gated
-   * unlocks). Leveled purchasables read `amount` directly instead.
+   * `true` when `count >= 1`, derived from the count. The status read for
+   * callers that only ask whether this is "on" (one-shot upgrades, unlocks
+   * behind a predicate). Repeatable purchasables read `count` instead.
    */
   active: ComputedRef<boolean>;
-  /** Reactive flag — `true` when requirements are met and limit isn't reached */
+  /** `true` when the purchasable is visible, its requirements are met and its limit isn't reached */
   canPurchase: ComputedRef<boolean>;
-  /** How many levels would be bought by a `purchase()` call (respects bulk and limit) */
+  /** The count a `purchase()` call would take (respects `purchaseMaxByDefault`, bulk count and limit) */
   countToPurchase: ComputedRef<DecimalSource>;
-  /** True when amount has reached the configured limit */
+  /** `true` when the count has reached the limit */
   maxed: ComputedRef<boolean>;
-  /** The configured purchase limit */
+  /** The purchase limit */
   limit: MaybeRef<DecimalSource>;
-  /** Active requirements (includes the internal limit requirement) */
+  /** All requirements, the internal limit requirement included */
   requirements: Requirements;
   /** Resolved display text (reactive) */
   display: {
@@ -289,31 +292,31 @@ export interface Purchasable {
     effectDescription: MaybeRef<string | undefined>;
     showAmount: boolean;
   };
-  /** Current effect value — computed from amount for leveled, or static for one-shot */
+  /** Current effect value — computed from the count for a function effect, or the static value */
   effect: ComputedRef<DecimalSource>;
   /**
    * The underlying effect Formula when one exists — present when
    * {@link ScalingPurchasableOptions} set `effectFormula` or a `DecimalSource`
-   * `effect`. Use `.invert(target)` for "level required for effect ≥ target"
-   * queries. Undefined when the effect was configured as a plain function.
+   * `effect`. Use `.invert(target)` for "count required for effect ≥ target"
+   * queries. Undefined when the effect is a plain function.
    */
   effectCurve?: GenericFormula;
   /** Whether this purchasable is currently visible */
   visible: ComputedRef<boolean>;
-  /** Whether bulk purchasing is enabled */
+  /** Whether a purchase purchases max; off, each purchase takes one unit */
   purchaseMaxByDefault: MaybeRef<boolean>;
   /**
-   * Buy levels. Pass an amount to cap the purchase. Omitted, it buys as many
-   * as are affordable when `purchaseMaxByDefault` is on (the default for anything but
-   * a one-shot), up to the cost's `maxBulkCount`, and one when it's off.
-   * Returns levels bought.
+   * Purchase. A passed count caps the purchase. Omitted, it purchases max when
+   * `purchaseMaxByDefault` is on (the default for anything but a one-shot), up
+   * to the cost's `maxBulkCount`, and one when it's off.
+   * Returns the count purchased.
    */
   purchase: (count?: DecimalSource) => DecimalSource;
-  /** Buy as many levels as affordable. Returns total levels bought. */
+  /** Purchase max, or one unit when `purchaseMaxByDefault` is off. Returns the count purchased. */
   purchaseMax: () => DecimalSource;
-  /** Estimate the total cost for a given number of additional levels. Default: `1` */
+  /** Estimate the total cost of the next `count` purchases. Default count: `1` */
   getCost: (count?: DecimalSource) => DecimalSource;
-  /** Callback from options, if provided */
+  /** The `onPurchase` option callback, if set */
   onPurchase?: (count: DecimalSource) => void;
   /** Subscribe to purchasable lifecycle events */
   on: Emittable<PurchasableEvents>['on'];
@@ -322,8 +325,8 @@ export interface Purchasable {
 // === PRIVATE BUILDERS ===
 
 /**
- * Detect whether an effect option is an amount-function or a Computable.
- * Amount-functions have `length >= 1` (they take an `amount` parameter).
+ * Detect whether an effect option is a count function or a Computable.
+ * Count functions have `length >= 1` (they take a `count` parameter).
  */
 function isCountFunction(
   effect: Computable<DecimalSource> | ((count: DecimalSource) => DecimalSource),
@@ -331,7 +334,7 @@ function isCountFunction(
   return typeof effect === 'function' && effect.length >= 1;
 }
 
-/** Resolve display option (full object vs description-shorthand) into reactive slots. */
+/** Resolve display option (full object vs description-shorthand) into reactive fields. */
 function buildPurchasableDisplay(
   display: PurchasableDisplay | Computable<string>,
   isOneShot: boolean,
@@ -358,7 +361,7 @@ function buildPurchasableDisplay(
   };
 }
 
-/** Synthetic limit requirement that gates purchases at the configured cap. */
+/** Synthetic limit requirement that blocks purchases at the limit. */
 function buildLimitRequirement(
   processedLimit: MaybeRef<DecimalSource>,
   count: Persistent<DecimalSource>,
@@ -411,7 +414,7 @@ function buildPurchasableComputeds(
   return { active, maxed, canPurchase, countToPurchase };
 }
 
-/** Resolve effect option (computable / amount-fn / undefined) into a single computed. */
+/** Resolve effect option (computable / count-fn / undefined) into a single computed. */
 function buildEffectComputed(
   effect: PurchasableOptions['effect'],
   count: Persistent<DecimalSource>,
@@ -443,11 +446,11 @@ function buildGetCost(baseReqs: Requirement[]): (purchaseCount?: DecimalSource) 
 }
 
 /**
- * Resolve the {@link ScalingPurchasableOptions} cost discriminator into a
- * {@link CostRequirement}. A `costFormula` factory is invoked once at creation
- * and its Formula makes the cost invertible, so bulk purchasing works via
- * `calculateMaxAffordable`. A `cost` function becomes a getter cost
- * (single-purchase only).
+ * Resolve the {@link ScalingPurchasableOptions} cost shape into a
+ * {@link CostRequirement}. A `costFormula` curve factory is called once at
+ * creation, and its Formula makes the cost invertible, so bulk purchasing works
+ * through `calculateMaxAffordable`. A `cost` function becomes a getter cost
+ * (one unit per purchase only).
  */
 function buildScalingCostRequirement(
   options: ScalingPurchasableOptions,
@@ -463,7 +466,7 @@ function buildScalingCostRequirement(
   }
 
   if (options.cost !== undefined) {
-    // Re-read against the live level; bulk math is unavailable
+    // Re-read against the live count; bulk math is unavailable
     // (createCostRequirement only supports it for Formula costs).
     const costFn = options.cost;
     return createCostRequirement({
@@ -476,8 +479,7 @@ function buildScalingCostRequirement(
   // Geometric path. toMaybeRef so a tunable()/ref baseCost or costScaling
   // flows reactively into the Formula. Formula sources accept
   // MaybeRef<DecimalSource>, so the exponential re-evaluates when either
-  // underlying ref updates (e.g., OverrideRegistry scope push swapping a
-  // tuning knob).
+  // underlying ref changes (e.g., a scoped override pushed on a tunable).
   const processedBaseCost = toMaybeRef(options.baseCost);
   const processedCostScaling = toMaybeRef(options.costScaling);
   return createCostRequirement({
@@ -507,18 +509,19 @@ function buildScalingEffect(
   if (effect === undefined || typeof effect === 'function') {
     return { effectCurve: undefined, effectFn: effect };
   }
-  // A static base auto-wraps as `base^amount`, an invertible Formula.
+  // A static base becomes `base^count`, an invertible Formula.
   return fromCurve(Formula.variable(count).pow_base(effect));
 }
 
 /**
- * The purchasable's saved level, in a sub-context of its own so purchasables
- * grouped under one outer context (e.g. `layer0`) don't collide on `amount`.
+ * The purchasable's saved count, in a child persistent context of its own. So
+ * purchasables under one enclosing persistent context (e.g. `layer0`) don't
+ * collide on `count`.
  */
 function buildPurchasableCount(
   id: string,
   initialCount: DecimalSource | undefined,
-): { contextId: string; amount: Persistent<DecimalSource> } {
+): { contextId: string; count: Persistent<DecimalSource> } {
   const parentContext = getCurrentPersistentContext();
   const contextId = parentContext ? `${parentContext}:${id}` : id;
   const count = withPersistentContext(contextId, () =>
@@ -531,10 +534,10 @@ function buildPurchasableCount(
       count.value = cloneDefault(initialCount);
     }
   }
-  return { contextId, amount: count };
+  return { contextId, count };
 }
 
-/** Everything a purchasable builds over its level, once `amount` exists. */
+/** Everything a purchasable builds over its count, once `count` exists. */
 function assemblePurchasable(
   options: PurchasableOptions,
   count: Persistent<DecimalSource>,
@@ -552,8 +555,8 @@ function assemblePurchasable(
 
   const resolvedDisplay = buildPurchasableDisplay(display, isOneShot);
 
-  // Factory form resolves here, after `amount` exists — that ordering is the
-  // whole point: a cost scaling on this purchasable's own level can't be
+  // The function form resolves here, after `count` exists. That ordering is
+  // the whole point: a cost scaling on this purchasable's own count can't be
   // declared before the ref it reads. `Requirements` is never a function, so
   // the typeof discriminates unambiguously.
   const resolvedRequirements =
@@ -623,8 +626,9 @@ function assemblePurchasable(
     },
   };
 
-  // A reset walk stops at the purchasable's own context: a ref passed as
-  // `limit`, `visible` or `purchaseMaxByDefault` belongs to whoever created it.
+  // A reset walk stops at the purchasable's own persistent context: a ref
+  // passed as `limit`, `visible` or `purchaseMaxByDefault` belongs to whoever
+  // created it.
   return attachPersistentContextReset(purchasable, contextId);
 }
 
@@ -632,24 +636,24 @@ function assemblePurchasable(
 
 /**
  * Engine-internal raw Purchasable factory. Consumers reach this through
- * {@link createPurchasableCategory} (the L2 front door) or
- * {@link createScalingPurchasable} (the L3 Formula-aware escape).
+ * {@link createPurchasableCategory} (L2) or
+ * {@link createScalingPurchasable} (L3, Formula-aware).
  *
- * State is always amount-based (`Persistent<DecimalSource>`). One-shot behavior
- * emerges from `limit: 1` — the `active` computed provides boolean convenience.
+ * The saved state is always a count (`Persistent<DecimalSource>`). One-shot
+ * behavior comes from `limit: 1`; the `active` computed gives the boolean read.
  *
  * @internal
- * @param options - Configuration for the purchasable
+ * @param options - The purchasable's options
  * @param predicates - resolver `visible` adopts through; a category passes
  *   its own, so content registered after install still resolves
- * @returns A {@link Purchasable} with `purchase()`, `amount`, `active`, `effect`, and event hooks
+ * @returns A {@link Purchasable} with `purchase()`, `count`, `active`, `effect`, and `on` for its events
  *
- * @example Leveled repeatable
+ * @example Repeatable purchase
  * ```ts
  * const generator = createPurchasable({
  *   id: 'generator',
  *   display: { description: 'Point Generator' },
- *   // Factory form — `count` is this purchasable's own count ref, so the
+ *   // Function form — `count` is this purchasable's own count ref, so the
  *   // cost is a Formula and `purchaseMax` walks the curve step by step.
  *   requirements: (count) =>
  *     createCostRequirement({
@@ -657,7 +661,7 @@ function assemblePurchasable(
  *       cost: Formula.exponential(count, 10, 1.15),
  *       maxBulkCount: Decimal.dInf,
  *     }),
- *   effect: (amt) => Decimal.pow(2, amt),
+ *   effect: (count) => Decimal.pow(2, count),
  * });
  * generator.purchaseMax();
  * ```
@@ -666,28 +670,28 @@ export function createPurchasable(
   options: PurchasableOptions,
   predicates: PredicateResolver = createPredicateResolver(),
 ): Purchasable {
-  const { contextId, amount: count } = buildPurchasableCount(options.id, options.initialCount);
+  const { contextId, count } = buildPurchasableCount(options.id, options.initialCount);
   return assemblePurchasable(options, count, contextId, predicates);
 }
 
 /**
- * Create a purchasable with leveled cost scaling — the L3 escape hatch for
- * per-instance customized leveled purchases.
+ * Create a purchasable whose cost scales with its count — the L3 factory for
+ * one customized repeatable purchase.
  *
- * Cost configuration is a discriminated union (see {@link ScalingPurchasableCost}):
- * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ amount`.
- * - **Formula**: `costFormula` takes a Formula factory (invertible, bulk-aware).
+ * The cost options are a discriminated union (see {@link ScalingPurchasableCost}):
+ * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ count`.
+ * - **Formula**: `costFormula` takes a curve factory (invertible, bulk-aware).
  * - **Function**: `cost` takes a plain `(count) => Decimal` function
- *   (single-purchase) for cost shapes no Formula expresses.
+ *   (one unit per purchase) for cost shapes no Formula expresses.
  *
  * The effect follows the same split: `effect` takes a static base or a plain
- * function, `effectFormula` a Formula factory (see {@link ScalingPurchasableEffect}).
+ * function, `effectFormula` a curve factory (see {@link ScalingPurchasableEffect}).
  *
  * Defaults to `limit: Infinity`.
  *
- * @param options - Shorthand configuration with resource and a cost shape
+ * @param options - Shorthand options with the resource and a cost shape
  * @param predicates - resolver `visible` adopts through. Defaults to one
- *   over the ambient runtime, so build inside engine install/connect when
+ *   over the ambient Gate services, so build inside engine install/connect when
  *   `visible` is a Gate
  * @returns A {@link Purchasable} (same return type as createPurchasable)
  *
@@ -699,7 +703,7 @@ export function createPurchasable(
  *   resource: points,
  *   baseCost: 10,
  *   costScaling: 1.15,
- *   effect: 2,            // ×2 per level (static base → 2^amount)
+ *   effect: 2,            // ×2 per purchase (static base → 2^count)
  * });
  * ```
  *
@@ -721,7 +725,7 @@ export function createPurchasable(
  *   description: 'Crystal upgrade',
  *   resource: prestigeShards,
  *   cost: (count) => Decimal.pow(10,
- *     baseLogCost + costIncrement * (0.5 * Math.pow(Decimal.sub(level, 0.5).toNumber(), 2) - 1/8)
+ *     baseLogCost + costIncrement * (0.5 * Math.pow(Decimal.sub(count, 0.5).toNumber(), 2) - 1/8)
  *   ),
  *   effect: (count) => Decimal.pow(2, count),
  * });
@@ -743,7 +747,7 @@ export function createScalingPurchasable(
     purchaseMaxByDefault,
   } = options;
 
-  const { contextId, amount: count } = buildPurchasableCount(id, initialCount);
+  const { contextId, count } = buildPurchasableCount(id, initialCount);
   const costRequirement = buildScalingCostRequirement(options, count, limit);
   const { effectFn, effectCurve } = buildScalingEffect(options, count);
 

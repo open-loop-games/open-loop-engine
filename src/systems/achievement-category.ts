@@ -1,32 +1,32 @@
 /**
- * Achievement Category — batch-create Achievements from content definitions
+ * Achievement Category — batch-create Achievements from defs
  *
- * Games commonly have dozens to hundreds of achievements sharing a common
- * structure: a condition to check, display info, and optional rewards.
- * `createAchievementCategory` captures this pattern with a content registry
+ * Games often have many achievements that share a structure: a goal to
+ * check, display text, and optional effect values.
+ * `createAchievementCategory` captures this shape with a content registry
  * and batch registration.
  *
- * The auto-complete mechanism is built into `createAchievement` via Vue `watch`
- * on the requirement — no tick-based polling needed.
+ * Automatic completion is built into `createAchievement` through a Vue `watch`
+ * on the goal, so no tick polling is needed.
  *
  * @example
  * ```ts
- * interface MilestoneDef { id: string; name: string; threshold: number }
+ * interface PointsAchievementDef { id: string; name: string; threshold: number }
  *
- * const milestones = createAchievementCategory<MilestoneDef>({
- *   id: 'milestones',
+ * const achievements = createAchievementCategory<PointsAchievementDef>({
+ *   id: 'achievements',
  *   mapAchievement: (def) => ({
  *     display: { title: def.name, description: `Reach ${def.threshold}` },
  *     goal: computed(() => Decimal.gte(points.value, def.threshold)),
  *   }),
  * });
  *
- * milestones.register(MILESTONE_DEFS);
+ * achievements.register(ACHIEVEMENT_DEFS);
  *
  * // Access
- * milestones.getAchievement('first-100');   // Achievement instance
- * milestones.earnedCount.value;             // reactive count
- * milestones.allEarned.value;               // true when all earned
+ * achievements.getAchievement('first-100');   // Achievement instance
+ * achievements.earnedCount.value;             // reactive count
+ * achievements.allEarned.value;               // true when all earned
  * ```
  *
  * @cluster achievement
@@ -55,50 +55,50 @@ import type { GameStateAccessor } from '@/primitives/types';
 /**
  * Options for {@link createAchievementCategory}.
  *
- * @typeParam Def - The content definition type (must have `id: string`)
- * @typeParam State - Per-instance state created alongside each Achievement.
- *   Use `void` if no extra state is needed.
+ * @typeParam Def - The def type (must have `id: string`)
+ * @typeParam DefState - Def state created beside each Achievement.
+ *   Use `void` if no def state is needed.
  */
 export interface AchievementCategoryOptions<Def extends { id: string }, DefState = void> {
-  /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
+  /** Persistent context id. Each def gets a child persistent context `{id}/{def.id}`. */
   id: string;
 
   /**
-   * Accessor Gate-form requirements read through. Falls back to the ambient
-   * accessor wired by `createEngine`. The category captures the Gate runtime
-   * (accessor + categories + registry) once, at construction, so
-   * achievements registered after install evaluate against it too.
+   * The accessor Gate-form goals read through. Falls back to the ambient
+   * accessor `createEngine` sets. The category captures the Gate services
+   * (accessor, categories, resource registry) once, at construction. So
+   * achievements registered after install evaluate against them too.
    */
   accessor?: GameStateAccessor;
 
   /**
-   * Map a content definition to AchievementOptions.
+   * Map a def to AchievementOptions.
    *
-   * Called once per definition during {@link AchievementCategory.register}.
+   * Called once per def during {@link AchievementCategory.register}.
    * The returned options are passed to `createAchievement()`.
    *
    * Note: `id` is provided by the category — don't include it in the
    * returned options (it will be overwritten).
    *
    * The optional `grants` field declares modifiers that bind to shared chains
-   * while the achievement is `earned`. Each {@link Grant} is lowered to a
-   * `chain.bind` call with `item.earned` as the implicit `active` predicate,
-   * surfacing the contribution through `chain.bindings()` for balance-sim.
+   * while the achievement is `earned`. Each {@link Grant} becomes a
+   * `chain.bind` call with the achievement's `earned` as its `active`
+   * predicate. So `chain.bindings()` shows the binding to the balance harness.
    */
   mapAchievement: (def: Def) => Omit<AchievementOptions, 'id'> & { grants?: Grant[] };
 
   /**
-   * Create per-instance state alongside the Achievement.
+   * Create the def state beside the Achievement.
    *
-   * Called inside the definition's persistent context, so `persistent()` calls
-   * here are scoped to `{categoryId}/{def.id}`.
+   * Called inside the def's persistent context, so `persistent()` calls
+   * here save under `{categoryId}/{def.id}`.
    *
-   * Omit if no extra state is needed.
+   * Omit if no def state is needed.
    */
   mapState?: (def: Def, achievement: Achievement) => DefState;
 }
 
-/** A registered entry: definition + Achievement instance + optional state + introspection signals */
+/** A category entry: def, Achievement instance, def state and signals */
 export interface AchievementCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly achievement: Achievement;
@@ -109,53 +109,53 @@ export interface AchievementCategoryEntry<Def extends { id: string }, DefState =
 /**
  * Minimum Def shape that {@link AchievementCategory.registerLadder}'s default
  * `buildDef` can synthesize without a consumer callback. Extend this when
- * authoring a Def type that participates in tier registration but doesn't
- * carry consumer-specific fields beyond the base authoring contract.
+ * authoring a Def type that takes part in ladder registration but has no
+ * consumer-specific fields beyond the base authoring contract.
  *
- * @typeParam T - Type of the tier's `effect` value
+ * @typeParam T - Type of the rung's `effect` value
  */
 export interface BaseLadderAchievementDef<T = unknown> {
   id: string;
   title: string;
   description: string;
   goal: () => boolean;
-  /** The tier's {@link AchievementRung.effect}, for `mapAchievement` to forward. */
+  /** The rung's {@link AchievementRung.effect}, for `mapAchievement` to forward. */
   effect?: T;
 }
 
 /**
- * One tier in a {@link AchievementLadderOptions}. Each tier becomes one
+ * One rung of an {@link AchievementLadderOptions}. Each rung becomes one
  * Achievement registered into the category.
  */
 export interface AchievementRung<T = number> {
   /**
-   * The value `getValue()` must reach to earn this tier.
+   * The value `getValue()` must reach to earn this rung.
    *
-   * Accepts a plain `DecimalSource` for static thresholds or a
-   * {@link FormulaSource} for dynamic thresholds that scale with other game
-   * state. Formula thresholds are re-evaluated each time the tier is checked;
+   * Accepts a plain `DecimalSource` for a static threshold, or a
+   * {@link FormulaSource} for a threshold that scales with other game
+   * state. A Formula threshold is re-evaluated each time the rung is checked;
    * the default description formats the threshold once, at registration.
    */
   threshold: DecimalSource | FormulaSource;
-  /** Appended to `baseName` for this tier's display title (e.g. `"I"`, `"II"`). */
+  /** Appended to `baseName` for this rung's display title (e.g. `"I"`, `"II"`). */
   suffix: string;
-  /** Override the auto-generated description for this tier. */
+  /** Override the auto-generated description for this rung. */
   description?: string;
-  /** Bonus value applied when this tier is earned. */
+  /** Effect value that applies once this rung is earned. */
   effect?: T;
 }
 
 /**
- * Spec for {@link AchievementCategory.registerLadder}. Fans a single
- * value-getter into N threshold-gated achievements, each registered into the
- * category via the standard `register()` path.
+ * Options for {@link AchievementCategory.registerLadder}. Fans a single
+ * value-getter into N achievements, each blocked by a threshold and
+ * registered into the category through the standard `register()` path.
  */
 export interface AchievementLadderBaseOptions<T = number> {
-  /** Prefix for generated achievement IDs (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`). */
+  /** Prefix for generated achievement ids (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`). */
   baseId: string;
-  /** Display name prefix shared by all tiers. */
+  /** Display name prefix shared by all rungs. */
   baseName: string;
-  /** Reactive getter for the tracked value compared against each tier's threshold. */
+  /** Reactive getter for the tracked value compared against each rung's threshold. */
   getValue: () => DecimalSource;
   /** Ordered list of thresholds, each producing one achievement. */
   rungs: ReadonlyArray<AchievementRung<T>>;
@@ -163,8 +163,8 @@ export interface AchievementLadderBaseOptions<T = number> {
 
 /**
  * Parameters passed to a {@link AchievementLadderOptions.buildDef} callback.
- * The base authoring fields (`id`/`title`/`description`/`requirement`) are
- * synthesized from the tier spec; tier metadata (`rungIndex`, `tier`) is
+ * The base authoring fields (`id`/`title`/`description`/`goal`) are
+ * synthesized from the rung; rung metadata (`rungIndex`, `rung`) is
  * available for consumer Def fields that need it.
  */
 export interface AchievementLadderBuildDefParams<T = number> {
@@ -177,8 +177,8 @@ export interface AchievementLadderBuildDefParams<T = number> {
 }
 
 /**
- * `buildDef` callback type for the `registerLadder` spec. Required when the
- * category's `Def` carries required fields beyond
+ * `buildDef` callback type for the `registerLadder` options. Required when the
+ * category's `Def` has required fields beyond
  * {@link BaseLadderAchievementDef}; optional when `Def` is the base shape
  * (default builds a base-shape Def).
  */
@@ -187,16 +187,16 @@ export type AchievementLadderBuildDef<Def, T = number> = (
 ) => Def;
 
 /**
- * `registerLadder` parameter type. Carries the spec plus a `buildDef` that
- * is *optional* (default = identity over base fields) only when `Def` is
+ * `registerLadder` parameter type. Contains the ladder options plus a `buildDef`
+ * that is *optional* (default = identity over base fields) only when `Def` is
  * the base shape, and *required* the moment `Def` widens beyond
  * {@link BaseLadderAchievementDef}.
  *
  * The test is mutual assignability, not one-way `extends`: a superset Def
- * still satisfies `Def extends Base`, so a one-way test leaves the callback
- * optional for a Def carrying required fields the default synthesizer
- * cannot populate — they resolve to `undefined` on every tier with no type
- * error, and the failure only surfaces when a tier is earned. A Def whose
+ * still satisfies `Def extends Base`. So a one-way test leaves the callback
+ * optional for a Def with required fields the default synthesizer
+ * cannot populate. They are `undefined` on every rung with no type
+ * error, and the failure only appears when a rung is earned. A Def whose
  * extra fields are all optional stays on the optional branch, since nothing
  * is lost by omitting the callback.
  *
@@ -214,64 +214,66 @@ export type AchievementLadderOptions<Def, T = number> = AchievementLadderBaseOpt
 /**
  * An achievement category — batch-registered Achievements with a shared shape.
  *
- * @typeParam Def - Content definition type
- * @typeParam State - Per-instance state type (void if none)
+ * @typeParam Def - The def type
+ * @typeParam DefState - The def state type (void if none)
  */
 export interface AchievementCategory<
   Def extends { id: string },
   DefState = void,
 > extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** Persistent context id this category was built under. */
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance and def state.
    */
   readonly registry: ContentRegistryView<Def>;
 
   /**
-   * Register definitions and create their Achievement instances.
-   * Can be called multiple times (base game + mods).
+   * Register defs and create their Achievement instances.
+   * Can be called more than once (base game, then a mod's content).
    */
   register(defs: Def | Def[]): void;
 
   /**
-   * Fan a single value-getter into N threshold-gated achievements, each
-   * registered into this category through the standard `register()` path.
+   * Fan a single value-getter into N achievements, each blocked by a
+   * threshold and registered into this category through the standard
+   * `register()` path.
    *
-   * Each tier becomes one `Def` (via the spec's `buildDef`, or a default
-   * identity over `{id, title, description, requirement, effect}` when the
+   * Each rung becomes one `Def` (through the options' `buildDef`, or a default
+   * identity over `{id, title, description, goal, effect}` when the
    * category's `Def` is the base shape). The category's `mapAchievement`
-   * must forward `requirement` and `effect`, or the tiers never earn and
-   * carry no bonus. The resulting achievements appear in `getAll()`,
-   * `registry`, reset traversal, and EngineCategories walks just like normal
-   * entries.
+   * must forward `goal` and `effect`, or the rungs are never earned and
+   * have no effect value. The resulting achievements appear in `getAll()`,
+   * `registry`, reset traversal, and EngineCategories walks just like other
+   * category entries.
    *
-   * @returns The tier achievements in tier order, suitable for binding
-   *   directly (e.g. `getEarnedCount(tiers)`) without re-querying.
+   * @returns The rung achievements in rung order, ready to pass on
+   *   directly without querying again: e.g. `getEarnedCount(ladder)`, where
+   *   `ladder` is the returned array.
    */
   registerLadder<T = number>(options: AchievementLadderOptions<Def, T>): Achievement<T>[];
 
-  /** Get the Achievement instance for a definition ID */
+  /** Get the Achievement instance for a def id */
   getAchievement(id: string): Achievement | undefined;
 
-  /** Get the per-instance state for a definition ID */
+  /** Get the def state for a def id */
   getState(id: string): DefState | undefined;
 
-  /** Get the definition for an ID (delegates to registry.get) */
+  /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
-  /** Get the full entry (def + achievement + state) */
+  /** Get the category entry (def, achievement, def state, signals) */
   getEntry(id: string): AchievementCategoryEntry<Def, DefState> | undefined;
 
-  /** All entries in registration order */
+  /** All category entries in registration order */
   getAll(): AchievementCategoryEntry<Def, DefState>[];
 
   /** Reactive count of earned achievements */
   readonly earnedCount: ComputedRef<number>;
 
-  /** True when all registered achievements have been earned */
+  /** `true` when all registered achievements have been earned */
   readonly allEarned: ComputedRef<boolean>;
 
   /** Number of registered entries */
@@ -281,10 +283,10 @@ export interface AchievementCategory<
 // === FACTORIES ===
 
 /**
- * Create an achievement category — batch registration of Achievements from definitions.
+ * Create an achievement category — batch registration of Achievements from defs.
  *
- * @param options - Category ID and mapping function
- * @returns An {@link AchievementCategory} with registry, lookup, and aggregate tracking
+ * @param options - Category id and `mapAchievement`
+ * @returns An {@link AchievementCategory} with registry, lookup, and earned counts
  *
  * @example
  * ```ts
@@ -338,27 +340,27 @@ export function createAchievementCategory<Def extends { id: string }, DefState =
     getDef: base.getDef,
 
     registerLadder<T = number>(spec: AchievementLadderOptions<Def, T>): Achievement<T>[] {
-      const { baseId, baseName, getValue, rungs: tiers } = spec;
+      const { baseId, baseName, getValue, rungs } = spec;
       const buildDef = (spec as { buildDef?: AchievementLadderBuildDef<Def, T> }).buildDef;
 
       const defs: Def[] = [];
-      for (let index = 0; index < tiers.length; index++) {
-        const tier = tiers[index];
+      for (let index = 0; index < rungs.length; index++) {
+        const rung = rungs[index];
         const rungId = `${baseId}-${index + 1}`;
-        const isFormulaThreshold = tier.threshold instanceof Formula;
+        const isFormulaThreshold = rung.threshold instanceof Formula;
         const evalThreshold = (): DecimalSource =>
           isFormulaThreshold
-            ? (tier.threshold as InstanceType<typeof Formula>).evaluate()
-            : (tier.threshold as DecimalSource);
+            ? (rung.threshold as InstanceType<typeof Formula>).evaluate()
+            : (rung.threshold as DecimalSource);
         const formatted = formatThreshold(new Decimal(evalThreshold()));
 
         const params: AchievementLadderBuildDefParams<T> = {
           id: rungId,
-          title: `${baseName} ${tier.suffix}`,
-          description: tier.description ?? `Reach ${formatted}`,
+          title: `${baseName} ${rung.suffix}`,
+          description: rung.description ?? `Reach ${formatted}`,
           goal: () => Decimal.gte(getValue(), evalThreshold()),
           rungIndex: index,
-          rung: tier,
+          rung,
         };
 
         const def = buildDef
@@ -368,7 +370,7 @@ export function createAchievementCategory<Def extends { id: string }, DefState =
               title: params.title,
               description: params.description,
               goal: params.goal,
-              effect: tier.effect,
+              effect: rung.effect,
             } as unknown as Def);
         defs.push(def);
       }
@@ -425,7 +427,7 @@ export function createAchievementCategory<Def extends { id: string }, DefState =
 // === INTERNAL HELPERS ===
 
 /**
- * Format a {@link AchievementRung} threshold for the default tier
+ * Format an {@link AchievementRung} threshold for the default rung
  * description: exponential for values ≥ 1e9, `"X.YM"` ≥ 1e6, `"X.YK"`
  * ≥ 1e3, integer otherwise.
  */

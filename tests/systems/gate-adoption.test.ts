@@ -943,7 +943,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
         trust: { kind: 'ladder', rungs: ['stranger', 'friend'], advanceWhen: [unwiredFlag] },
       },
     });
-    expect(() => npcs.register({ id: 'rask' })).toThrow(/tier 'trust' advanceWhen\[0\]: /);
+    expect(() => npcs.register({ id: 'rask' })).toThrow(/ladder 'trust' advanceWhen\[0\]: /);
   });
 
   it('dialog conditions, when the runtime is built', () => {
@@ -966,6 +966,6 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
         accessor: noAccessor,
         mutator: { applyResourceOp: () => {}, setFlag: () => {}, setStateAt: () => {} },
       }),
-    ).toThrow(/dialog 'g' node 'a' condition: /);
+    ).toThrow(/dialog 'g' node 'a' when: /);
   });
 });

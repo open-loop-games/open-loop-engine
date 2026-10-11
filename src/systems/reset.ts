@@ -1,21 +1,20 @@
 /**
- * Reset system — prestige and layer mechanics
+ * Reset system — the reset mechanic behind prestige layers
  *
- * A Reset zeroes a configurable scope of persistent refs back to their
- * default values, with optional retention transforms for refs that should
- * survive (or partially survive) the reset. Scope can be defined manually
- * (a list of objects to walk) or by module ID (resolved via the persistent
- * ref registry), and Reset objects compose — one Reset's resolved scope can
- * feed another's `resetPersistentContexts`.
+ * A Reset returns a configurable reset scope of persistent refs to their ref
+ * defaults. Optional retention transforms let refs survive the reset, in whole
+ * or in part. A reset scope is a list of objects to walk, or persistent
+ * context ids that the persistent-ref registry resolves. Reset objects
+ * compose: one Reset's resolved scope can feed another's `resetPersistentContexts`.
  *
  * Factories:
- * - {@link createReset} — the reset mechanic itself (scope, retention, hooks)
- * - {@link createResetTimer} — satellite helper that creates a `Ref<number>`
- *   wired to a reset's `afterReset` event for tracking time-since-last-reset
+ * - {@link createReset} — the reset mechanic itself (reset scope, retention, option callbacks)
+ * - {@link createResetTimer} — a utility that creates a `Ref<number>` zeroed by
+ *   a reset's `afterReset` event, for the time since the last reset
  *
  * Inline `keep`/`retain` options on `createReset` are shorthand for
- * {@link createRetention} — drop down to a standalone retention policy
- * when the policy needs to outlive any single Reset.
+ * {@link createRetention}. Use a standalone retention when one must serve
+ * more than one Reset.
  */
 
 import { ref, unref, type Ref } from 'vue';
@@ -41,22 +40,23 @@ import { createPredicateResolver, type Predicate } from './gate';
 // === TYPES ===
 
 /**
- * Any object exposing a resolved set of persistent refs for composable reset
- * scope. Both {@link Reset} and Cycle implement this — using a structural type
- * avoids circular imports between reset.ts and cycle.ts.
+ * Any object exposing a resolved set of persistent refs for a composable reset
+ * scope. Both {@link Reset} and Cycle implement this. A structural type
+ * avoids an import cycle between reset.ts and cycle.ts.
  */
 export interface ScopedReset {
   readonly resolvedScope: ReadonlySet<Persistent>;
 }
 
 /**
- * A reset scope entry: either a module ID (string) resolved via the persistent
- * ref registry, or another Reset/Cycle whose resolved scope is unioned in.
+ * A reset scope entry, one of:
+ * - a persistent context id (string), which the persistent-ref registry resolves;
+ * - another Reset or Cycle, whose resolved scope is unioned in.
  */
 export type ResetScope = string | ScopedReset;
 
 /**
- * Configuration for a reset mechanic
+ * Options for a reset mechanic
  */
 export interface ResetOptions {
   /**
@@ -64,8 +64,8 @@ export interface ResetOptions {
    * - Objects with persistent refs (recursively searched)
    * - Resources
    * - Individual persistent refs
-   * - Categories and stateful systems, which reset what a module reset
-   *   would reset of their own persistent context
+   * - Categories and systems that own a persistent context, which reset what
+   *   a `resetPersistentContexts` reset of that persistent context would
    *
    * The walk skips lifetime refs, and a lifetime ref given here as its own
    * entry is reset (see `PersistentOptions.lifetime`).
@@ -75,16 +75,18 @@ export interface ResetOptions {
   thingsToReset?: Computable<unknown[]>;
 
   /**
-   * Module-scoped reset: declare which modules to reset by ID, or compose
-   * with other Reset/Cycle objects to inherit their scope. The engine resolves
-   * each module ID to all persistent refs created during that module's
-   * install/connect phase (including nested category/definition contexts).
+   * Reset by persistent context: name the persistent contexts to reset by
+   * id. Or compose with other Reset or Cycle objects to take in their reset
+   * scope. The engine resolves each id to every non-lifetime persistent ref
+   * under that persistent context, child persistent contexts included. A
+   * module's id names the persistent context of its install/connect, with its
+   * categories and def states.
    *
    * Resolved each time the reset runs (and each time `resolvedScope` is
-   * read), so refs a module creates after `createReset` — in `connect`, or
+   * read). So refs a module creates after `createReset` — in `connect`, or
    * in a module installed later — are in scope. An id that names no
-   * registered module resets nothing and logs a warning on the first
-   * `reset()`.
+   * registered persistent context resets nothing, and logs a warning on the
+   * first `reset()`.
    *
    * @example
    * ```ts
@@ -95,13 +97,13 @@ export interface ResetOptions {
   resetPersistentContexts?: ResetScope[];
 
   /**
-   * Readiness gate. When supplied, {@link Reset.reset} returns `false`
-   * without performing the reset whenever this evaluates falsy — matches the
-   * `onBeforeReset: () => false` cancellation contract. A Gate is
+   * Readiness predicate. When supplied, {@link Reset.reset} returns `false`
+   * without performing the reset whenever this evaluates falsy. That matches
+   * the `onBeforeReset: () => false` cancellation contract. A Gate is
    * also visible to the predictor and to UI hints (call
-   * `timeUntilGateFlip(canReset, runtime)` for "time-until-prestige-ready").
+   * `timeUntilGateFlip(canReset, services)` for "time until prestige is ready").
    *
-   * Evaluated when `reset()` is called; a Gate resolves through the runtime
+   * Evaluated when `reset()` is called; a Gate reads the ambient Gate services
    * captured at `createReset` time. Omit to default to "always allowed".
    *
    * Order of cancellation checks at `reset()`:
@@ -109,7 +111,7 @@ export interface ResetOptions {
    * 2. `onBeforeReset` (if supplied) — short-circuits if it returns `false`
    *
    * Both are opt-in and either can cancel; `canReset` is for declarative /
-   * predictor visibility, `onBeforeReset` is for imperative side-effects
+   * predictor visibility, `onBeforeReset` is for imperative side effects
    * that may also want to veto.
    */
   canReset?: Predicate;
@@ -139,10 +141,10 @@ export interface ResetOptions {
   /**
    * Called after the reset has written its refs, before `afterReset` fires.
    *
-   * Runs under the same load guard as the reset itself, so resource writes
+   * Runs under the same settle guard as the reset itself, so resource writes
    * here never reach `cumulative` / `best` (nor a `cumulative-gte` Gate).
-   * That suits scripted setup; grant earnings — prestige currency — after
-   * `reset()` returns instead.
+   * That suits scripted setup. Add the prestige gain after `reset()` returns
+   * instead.
    */
   onReset?: () => void;
 }
@@ -157,7 +159,7 @@ export interface Reset extends ScopedReset {
   /**
    * The flattened set of persistent refs resolved from {@link ResetOptions.resetPersistentContexts},
    * re-resolved on every read. Empty when only `thingsToReset` is used.
-   * Exposed so other resets/cycles can compose with this reset's scope via
+   * Exposed so other resets and cycles can compose with this reset scope via
    * `resetPersistentContexts: [thisReset]`.
    */
   readonly resolvedScope: ReadonlySet<Persistent>;
@@ -165,10 +167,10 @@ export interface Reset extends ScopedReset {
   /** Trigger the reset */
   reset: () => boolean;
 
-  /** Pre-reset hook */
+  /** The `onBeforeReset` option callback */
   onBeforeReset?: () => boolean | void;
 
-  /** Post-reset hook */
+  /** The `onReset` option callback */
   onReset?: () => void;
 
   /** Subscribe to this reset's events */
@@ -182,9 +184,9 @@ export interface ResetEvents {
   /** Fired before this reset executes */
   beforeReset: () => void;
   /**
-   * Fired after this reset completes, still under its load guard: resource
-   * writes in a listener never reach `cumulative` / `best`. Grant earnings
-   * after `reset()` returns.
+   * Fired after this reset completes, still under its settle guard: resource
+   * writes in a handler never reach `cumulative` / `best`. Add the prestige
+   * gain after `reset()` returns.
    */
   afterReset: () => void;
 }
@@ -192,7 +194,7 @@ export interface ResetEvents {
 // === RESET CREATION ===
 
 /**
- * Each Reset's scope resolution with its own unknown-id warning attached, so a
+ * Each Reset's reset scope resolution with its own unknown-id warning attached, so a
  * reset composing it warns as running it alone would. The `resolvedScope`
  * getter stays silent: a read before every module has installed would warn
  * falsely.
@@ -201,8 +203,9 @@ const warningResolvers = new WeakMap<object, () => Set<Persistent>>();
 
 /**
  * Resolve a list of reset scope entries into a flat set of persistent refs.
- * Module IDs are resolved via the persistent ref registry (including nested
- * contexts); `onUnknown` hears each id with no registered context.
+ * Persistent context ids are resolved through the persistent-ref registry,
+ * child persistent contexts included; `onUnknown` receives each id with no
+ * registered persistent context.
  * ScopedReset objects contribute their own resolved scope, and with
  * `onUnknown` given, warn about their own unknown ids.
  */
@@ -216,7 +219,7 @@ function resolveScope(
       if (onUnknown && getPersistentRefs(entry) === undefined) onUnknown(entry);
       for (const ref of getPersistentContextRefs(entry)) result.add(ref);
     } else {
-      // A Cycle's scope is its `reset`'s, so it warns through that entry.
+      // A Cycle's reset scope is its `reset`'s, so it warns through that entry.
       const inner = (entry as { reset?: object }).reset;
       const resolveWarning =
         onUnknown && (warningResolvers.get(entry) ?? (inner && warningResolvers.get(inner)));
@@ -229,20 +232,20 @@ function resolveScope(
 /**
  * Create a reset mechanic.
  *
- * Supports two scoping modes (can be combined):
- * - **`thingsToReset`** — manual list of objects/refs, reset via recursive walking
- * - **`resetPersistentContexts`** — module IDs and/or other Reset/Cycle objects, resolved
- *   via the persistent ref registry
+ * Two ways to set the reset scope, which combine:
+ * - **`thingsToReset`** — a list of objects and refs, reset by a recursive walk
+ * - **`resetPersistentContexts`** — persistent context ids and other Reset or Cycle
+ *   objects, resolved through the persistent-ref registry
  *
  * Inline `keep`/`retain` options provide retention without a separate
  * {@link createRetention} call.
  *
- * @param options - Configuration for the reset (scope, retention, hooks)
+ * @param options - Options for the reset (reset scope, retention, option callbacks)
  * @returns A Reset object with `resolvedScope` for composable nesting
  *
  * @example
  * ```ts
- * // Module-scoped with retention:
+ * // By persistent context, with retention:
  * const prestigeReset = createReset({
  *   resetPersistentContexts: ['gathering', 'economy'],
  *   keep: [lifetimeBonus],
@@ -250,10 +253,10 @@ function resolveScope(
  * })
  *
  * function prestige() {
- *   const earned = pending.value // read before the reset zeroes its inputs
+ *   const gain = pending.value // read before the reset zeroes its inputs
  *   if (!prestigeReset.reset()) return
- *   // Granted after reset() returns, so it counts toward cumulative / best
- *   prestigePoints.value = Decimal.add(prestigePoints.value, earned)
+ *   // Added after reset() returns, so it counts toward cumulative / best
+ *   prestigePoints.value = Decimal.add(prestigePoints.value, gain)
  * }
  *
  * // Composable:
@@ -261,7 +264,7 @@ function resolveScope(
  *   resetPersistentContexts: [prestigeReset, 'prestige'],
  * })
  *
- * // Manual mode:
+ * // By object walk:
  * const manualReset = createReset({
  *   thingsToReset: [points, upgrades],
  * })
@@ -274,11 +277,11 @@ export function createReset(options: ResetOptions): Reset {
   const processedThingsToReset = thingsToReset != null ? toMaybeRef(thingsToReset) : undefined;
   const handle = createEmitHandle<ResetEvents>();
 
-  // Adopted now — reset() fires post-install, when the ambient runtime is no
-  // longer set.
+  // Adopted now — reset() runs after install, when the ambient Gate services
+  // are no longer set.
   const ready = createPredicateResolver().adopt(canReset, true, 'createReset canReset');
 
-  // Build retention policy if keep/retain provided
+  // Build a retention if keep or retain is given
   const hasRetention = (keep && keep.length > 0) || (retain && retain.size > 0);
   const retention = hasRetention ? createRetention({ keep, retain }) : undefined;
 
@@ -296,12 +299,12 @@ export function createReset(options: ResetOptions): Reset {
       resetPersistentContexts ? resolveScope(resetPersistentContexts, onUnknown) : new Set(),
   );
 
-  // Refs to skip during module-scoped reset (kept or retained refs)
+  // Refs the persistent context reset skips (kept or retained refs)
   const retainedRefs = new Set<Persistent>([...(keep ?? []), ...(retain ? retain.keys() : [])]);
 
   // A reset is a snapshot → wipe → restore sequence wrapped around synchronous
-  // emits and hooks, so a listener re-entering it runs a whole second sequence
-  // against half-reset state: the retain transforms compose (a 10% carry-over
+  // emits and option callbacks, so a handler re-entering it runs a whole second sequence
+  // against half-reset state: the retain transforms compose (a 10% retain
   // becomes 1%) and onReset fires per entry rather than per reset. Depth is
   // never meaningful here — a reset already in progress will reach the same
   // end state — so re-entry is refused rather than queued.
@@ -319,12 +322,12 @@ export function createReset(options: ResetOptions): Reset {
     reset(): boolean {
       if (_resetting) return false;
 
-      // Declarative readiness gate fires before any side-effects. Predictor /
-      // UI consumers read the same Gate, so the imperative gate matches the
-      // declarative projection.
+      // The declarative readiness predicate is evaluated before any side
+      // effect. Predictor and UI consumers read the same Gate, so the
+      // imperative check matches the declarative projection.
       if (!ready.read()) return false;
 
-      // Pre-reset hook
+      // onBeforeReset option callback
       if (onBeforeReset) {
         const result = onBeforeReset();
         if (result === false) return false;
@@ -337,10 +340,10 @@ export function createReset(options: ResetOptions): Reset {
         // Snapshot retained values before reset
         retention?.snapshot();
 
-        // Load-guarded so watchers that react to player actions skip these
-        // writes, hooks and listeners included.
+        // Settle-guarded, so watchers that react to player actions skip these
+        // writes, option callbacks and handlers included.
         withSettling(() => {
-          // Reset via recursive object walking (legacy thingsToReset path)
+          // Reset by recursive object walk (the thingsToReset path)
           if (processedThingsToReset) {
             const things = unref(processedThingsToReset);
             for (const thing of things) {
@@ -349,7 +352,7 @@ export function createReset(options: ResetOptions): Reset {
             }
           }
 
-          // Reset via module-scoped refs
+          // Reset the refs under the named persistent contexts
           for (const ref of resolveModules(warnUnknownContext)) {
             if (!retainedRefs.has(ref)) resetPersistent(ref);
           }
@@ -357,7 +360,7 @@ export function createReset(options: ResetOptions): Reset {
           // Restore retained values
           retention?.restore();
 
-          // Post-reset hook
+          // onReset option callback
           onReset?.();
 
           handle.emit('afterReset');
@@ -440,9 +443,9 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
  * `afterReset` event and zeroes the ref each time it fires; the consumer is
  * responsible for advancing the ref each tick (`elapsed.value += dt`).
  *
- * Session-only: the ref isn't persisted, so it restarts at 0 on every load.
- * For a "time this prestige" that survives reloads, keep a `persistent(0)`
- * in the module and zero it from the reset's `afterReset` yourself. The
+ * Ephemeral: the ref is not saved, so it restarts at 0 on every load.
+ * For a saved "time this run", keep a `persistent(0)` in the module and
+ * zero it from the reset's `afterReset` yourself. The
  * subscription lasts as long as the reset; build one timer per reset, not
  * one per view.
  *

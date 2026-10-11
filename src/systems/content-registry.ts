@@ -1,13 +1,13 @@
 /**
- * Content Registry — generic typed registry for game content definitions
+ * Content Registry — generic typed registry for game content defs
  *
- * Provides a central store for typed content entries (actions, zones, skills, etc.)
- * that base game modules populate and mod modules can extend or patch.
+ * Provides a central store for typed content defs (actions, zones, skills, etc.)
+ * that modules register and can patch.
  *
  * Key features:
  * - Type-safe generic registry constrained to `{ id: string }`
  * - Atomic batch registration (all-or-nothing on arrays)
- * - Shallow patching for mod overrides
+ * - Shallow patching of def fields
  * - Insertion-order preservation
  *
  * Use with the engine's provide/inject system to share registries across modules.
@@ -20,7 +20,7 @@
  *   { id: 'cave', name: 'Dark Cave', difficulty: 3 },
  * ]);
  *
- * // Mod module patches existing content
+ * // Another module patches existing content
  * zones.patch('forest', { name: 'Enchanted Forest', difficulty: 2 });
  *
  * // Systems read content
@@ -33,66 +33,67 @@ import { ref } from 'vue';
 // === TYPES ===
 
 /**
- * A typed, Map-backed registry for game content definitions.
+ * A typed, Map-backed registry for game content defs.
  *
- * Entries are stored by `id` and returned by reference (no cloning). The
- * entries are plain objects, but the reads (`get`, `getAll`, `has`, `size`)
- * are reactive: a computed that reads an entry through them re-evaluates
+ * Defs are stored by `id` and returned by reference (no cloning). The
+ * defs are plain objects, but the reads (`get`, `getAll`, `has`, `size`)
+ * are reactive. A computed that reads a def through them re-evaluates
  * after any `register`, `patch` or `pushPatches`. One that read a copied
- * field, or a field off an entry reference it held, does not.
+ * field, or a field off a def reference it held, does not.
  */
 export interface ContentRegistry<T extends { id: string }> {
-  /** Human-readable name, included in error messages */
+  /** Human-readable id, included in error messages */
   readonly id: string;
 
   /**
-   * Register a single entry or an array of entries.
+   * Register a single def or an array of defs.
    *
-   * Array registration is atomic: if any entry has a duplicate or empty id,
-   * none of the entries in the batch are added.
+   * Array registration is atomic: if any def has a duplicate or empty id,
+   * none of the defs in the batch are added.
    *
-   * @throws If any entry's id is empty or already exists in the registry
+   * @throws If any def's id is empty or already exists in the registry
    */
   register(entry: T): void;
   register(entries: T[]): void;
 
   /**
-   * Shallow-patch an existing entry's fields (Object.assign semantics).
-   * The `id` field cannot be changed. Only the entry object changes: a value
-   * copied out of it earlier keeps the old one. A field a {@link pushPatches} scope
-   * covers keeps the scope's value until every covering scope reverts, and
-   * then takes the patched value.
+   * Shallow-patch an existing def's fields (Object.assign semantics).
+   * The `id` field cannot be changed. Only the def object changes: a value
+   * copied out of it earlier keeps the old one. A field that a pushed patch
+   * ({@link pushPatches}) covers keeps the pushed value. It takes the patched
+   * value once every pushed patch covering it is cleaned up.
    *
-   * @throws If the id does not exist in the registry, or the partial carries a different `id`
+   * @throws If the id does not exist in the registry, or the partial contains a different `id`
    */
   patch(id: string, partial: Partial<Omit<T, 'id'>>): void;
 
-  /** Retrieve an entry by id, or undefined if not found */
+  /** Retrieve a def by id, or undefined if not found */
   get(id: string): T | undefined;
 
-  /** Return all entries in insertion order */
+  /** Return all defs in insertion order */
   getAll(): T[];
 
-  /** Check whether an entry with the given id exists */
+  /** Check whether a def with the given id exists */
   has(id: string): boolean;
 
   /**
-   * Push temporary patches onto entries. Returns a cleanup function
-   * that reverts all patched entries to their pre-patch state.
+   * Push a set of patches onto defs, as one pushed patch. Returns a cleanup function
+   * that reverts all patched defs to their pre-patch state.
    *
    * Patches are shallow-merged (Object.assign semantics), same as patch().
-   * Multiple pushPatches calls stack, and cleanups may run in any order: a
-   * field takes the value of the latest live scope that sets it, or its
-   * unscoped value once none does.
+   * Multiple pushPatches calls stack, and cleanups may run in any order. A
+   * field takes the value of the latest pushed patch that sets it and is not
+   * yet cleaned up. Once no such patch is left, the field takes its unpushed
+   * value.
    *
-   * @param patches - Map of entry id → partial fields to override
+   * @param patches - Map of def id → partial fields to set
    * @returns Idempotent cleanup function that reverts all patches
-   * @throws If any id does not exist in the registry, or its partial carries a different
+   * @throws If any id does not exist in the registry, or its partial contains a different
    *   `id`; no patch in the batch applies
    */
   pushPatches(patches: Record<string, Partial<Omit<T, 'id'>>>): () => void;
 
-  /** Number of registered entries */
+  /** Number of registered defs */
   readonly size: number;
 }
 
@@ -100,17 +101,18 @@ export interface ContentRegistry<T extends { id: string }> {
  * A {@link ContentRegistry} without `register` — what a category exposes as
  * its `registry`. `registry.patch()` / `pushPatches()` change a def in
  * place, so code reading `def.x` when it runs sees the change. Defs aren't
- * reactive, though: a computed reading `def.x` directly isn't re-run by a
- * patch, one reading through `getDef(id)` or `registry.get(id)` is, and a
- * field given as a value is copied at register and keeps its old one. The
+ * reactive, though. A patch doesn't re-run a computed that reads `def.x`
+ * directly, but it re-runs one that reads through `getDef(id)` or
+ * `registry.get(id)`. A field given as a value is copied at register and keeps
+ * its old one. The
  * view has no `register`: a def is added through the category's own
- * `register`, which builds the def's instance and state alongside it.
+ * `register`, which builds the def's instance and def state beside it.
  */
 export type ContentRegistryView<T extends { id: string }> = Omit<ContentRegistry<T>, 'register'>;
 
 /**
- * A content registry plus the hooks an owner needs to keep it in step with
- * what it builds per entry.
+ * A content registry plus the functions an owner needs to keep it in step with
+ * what it builds per def.
  *
  * @internal
  */
@@ -118,13 +120,13 @@ export interface ContentRegistryHandle<T extends { id: string }> {
   readonly registry: ContentRegistry<T>;
   /** Throw exactly as `register(entries)` would, without adding anything. */
   assertRegistrable(entries: T[]): void;
-  /** Drop an entry, for undoing a registration its owner failed to build. */
+  /** Remove a def, for undoing a registration its owner failed to build. */
   remove(id: string): void;
 }
 
 // === CONSTANTS ===
 
-/** Base-value marker for a key the entry didn't have before a scope set it. */
+/** Base-value marker for a key the def didn't have before a pushed patch set it. */
 const ABSENT: unique symbol = Symbol('absent');
 
 // === FACTORIES ===
@@ -149,7 +151,7 @@ export function createContentRegistry<T extends { id: string }>(
 }
 
 /**
- * Create a content registry together with its owner-side hooks.
+ * Create a content registry together with its owner-side functions.
  *
  * @internal
  */
@@ -159,9 +161,9 @@ export function createContentRegistryHandle<T extends { id: string }>(
   const store = new Map<string, T>();
   // Read barrier for the plain store: every read touches it, every write bumps it.
   const version = ref(0);
-  // Pushed scopes in push order. Entries are patched in place, so for every key
-  // a live scope covers, `bases` holds the value beneath all scopes; a revert
-  // re-resolves each key it touched as that base overlaid by the scopes left.
+  // Pushed patches in push order. Defs are patched in place, so for every key
+  // a pushed patch covers, `bases` holds the value beneath all of them; a revert
+  // recomputes each key it touched as that base overlaid by the patches left.
   const liveScopedOverrides: Map<string, Record<string, unknown>>[] = [];
   const bases = new Map<string, Map<string, unknown>>();
 
@@ -190,20 +192,20 @@ export function createContentRegistryHandle<T extends { id: string }>(
     const seen = new Set<string>();
     for (const entry of entries) {
       if (entry.id === '') {
-        throw new Error(`[${registryId}] Cannot register entry with empty id`);
+        throw new Error(`[${registryId}] Cannot register a def with an empty id`);
       }
       if (seen.has(entry.id)) {
-        throw new Error(`[${registryId}] Duplicate entry id in batch: "${entry.id}"`);
+        throw new Error(`[${registryId}] Duplicate def id in batch: "${entry.id}"`);
       }
       if (store.has(entry.id)) {
-        throw new Error(`[${registryId}] Duplicate entry id: "${entry.id}"`);
+        throw new Error(`[${registryId}] Duplicate def id: "${entry.id}"`);
       }
       seen.add(entry.id);
     }
   }
 
-  // The store key is the entry's id, so a partial that renames it would leave
-  // the entry filed under an id it no longer carries.
+  // The store key is the def's id, so a partial that renames it would leave
+  // the def filed under an id it no longer has.
   function assertKeepsId(verb: string, id: string, partial: object): void {
     if (Object.hasOwn(partial, 'id') && (partial as { id?: unknown }).id !== id) {
       throw new Error(`[${registryId}] Cannot change the id of "${id}" by ${verb}`);
@@ -267,7 +269,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
         assertKeepsId('pushPatches', id, partial);
       }
 
-      // The new scope is the top one, so applying it in place is its resolution.
+      // The new pushed patch is the top one, so applying it in place resolves it.
       const scope = new Map<string, Record<string, unknown>>();
       for (const [id, partial] of Object.entries(patches)) {
         const entry = store.get(id) as Record<string, unknown>;

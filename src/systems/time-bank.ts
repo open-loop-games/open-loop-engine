@@ -1,28 +1,29 @@
 /**
- * Time bank — banked-time reservoir with acceleration and burst spend surfaces.
+ * Time bank — a store of banked seconds, spent as acceleration or a burst discharge.
  *
- * The genre's fourth offline-progress family (after extrapolation, tick-sim,
- * and cap-and-trickle): absence — or dropped live time, or an explicit
- * consumer policy — accumulates into a spendable reservoir of seconds, spent
- * later as accelerated play. Three surfaces, layered so each spend shape
- * composes on the same core:
+ * The genre's fourth offline-progress family (after extrapolation, tick
+ * simulation and cap-and-trickle). Offline time, dropped live time or an
+ * explicit consumer policy deposits seconds into a time bank. The seconds are
+ * spent later as accelerated play. Three factories, each spend shape
+ * built on the same core:
  *
- * - {@link createTimeBank} — the spend-agnostic reservoir: deposit (with an
- *   earn-efficiency factor and optional cap) and withdraw. Consumers with
- *   bespoke spend shapes (per-subsystem fast-tick such as stored
- *   cycles) wire `withdraw()` at their own cadence.
- * - {@link createBankedAcceleration} — the dominant corpus shape: toggle a live
- *   `TickDriver.speedMultiplier` boost, drain the bank per tick, auto-stop
- *   at depletion. Sessions always start unaccelerated.
- * - {@link burstDischarge} — the "stored time" shape:
- *   dump (a fraction of) the reservoir through `processOfflineTime` as one
- *   immediate fast-forward, optionally at an efficiency penalty.
+ * - {@link createTimeBank} — the spend-agnostic time bank: deposit (with a
+ *   deposit efficiency and an optional capacity) and withdraw. A consumer
+ *   with a bespoke spend shape (a per-subsystem fast tick, such as stored
+ *   cycles) calls `withdraw()` at its own cadence.
+ * - {@link createBankedAcceleration} — the most common shape: toggle a raise of
+ *   `TickDriver.speedMultiplier`, withdraw from the time bank each tick, and
+ *   stop when it is empty. A play session always starts unaccelerated.
+ * - {@link burstDischarge} — the "stored time" shape: replay (a fraction of)
+ *   the time bank through `processOfflineTime` as one immediate fast-forward,
+ *   optionally at an efficiency penalty.
  *
- * Earn *policy* — which elapsed time counts, log curves over offline excess,
- * borrow-against-future ledgers — stays consumer-side: compute seconds, call
- * `deposit()`. The one engine-owned earn source is `depositLiveOverflow` on the
- * acceleration wrapper, which banks the dropped seconds `TickDriver` reports
- * via `onDeltaOverflow` when a tab-hide outruns `maxDeltaTime`.
+ * Deposit *policy* — which elapsed time counts, log curves over offline
+ * excess, borrow-against-future ledgers — stays in the consumer: compute
+ * seconds, then call `deposit()`. The one engine-owned deposit is
+ * `depositLiveOverflow` on the acceleration wrapper. It banks the dropped
+ * seconds `TickDriver` reports through `onDeltaOverflow` when a hidden tab
+ * outruns `maxDeltaTime`.
  *
  * Time is plain `number` seconds throughout, matching `TickDriver` dt,
  * `processOfflineTime`, and `createTimeSystem`.
@@ -44,62 +45,63 @@ import { createPredicateResolver, type Predicate } from './gate';
 
 // === TIME BANK ===
 
-/** Configuration for {@link createTimeBank}. */
+/** Options for {@link createTimeBank}. */
 export interface TimeBankOptions {
   /**
-   * Save context for the reservoir. Defaults to `${module}/time-bank` inside a
-   * module; pass one when a module holds several banks (per-subsystem reserves).
+   * Persistent context id for the time bank. Defaults to `${module}/time-bank`
+   * inside a module. Pass one when a module holds several time banks (one per subsystem).
    */
   id?: string;
   /**
-   * Fraction of each deposit that lands in the bank (default 1). Corpus
-   * range: 1, 0.7, 2/3.
-   * Can be a ref or getter for dynamic values (upgradeable efficiency).
+   * Fraction of each deposit that goes into the time bank (default 1).
+   * Typical values: 1, 0.7, 2/3.
+   * Can be a ref or getter, for a value that changes (an upgradeable efficiency).
    */
   depositEfficiency?: Computable<number>;
   /**
-   * Reservoir ceiling in seconds (default unlimited). Hard clamp — deposits
-   * beyond it are discarded. Can be a ref or getter for dynamic values
-   * (upgradeable caps).
+   * The most seconds the time bank holds (default unlimited). Deposits beyond
+   * it are discarded. Can be a ref or getter, for a value that changes (an
+   * upgradeable capacity).
    */
   capacity?: Computable<number>;
 }
 
-/** Banked-time reservoir returned by {@link createTimeBank}. */
+/** The time bank {@link createTimeBank} returns. */
 export interface TimeBank {
   /**
-   * Banked seconds (persistent). Prefer `deposit`/`withdraw` over direct writes.
+   * Banked seconds (saved). Prefer `deposit`/`withdraw` over direct writes.
    *
-   * Run-scoped, unlike most system-owned state: a reset naming the module
-   * the bank was built in empties it. Whether banked time survives a
-   * prestige is the game's call — pass `keep: [bank.banked]` to carry it.
+   * Not lifetime, unlike most system-owned state: a reset naming the module
+   * the time bank was built in empties it. Whether banked time survives a
+   * reset is the game's call; pass `keep: [bank.banked]` to keep it.
    */
   banked: Persistent<number>;
   /**
-   * Add seconds to the reservoir, scaled by `depositEfficiency` and clamped at
-   * `cap`. Returns the seconds actually banked. Non-positive input is a no-op.
+   * Deposit seconds into the time bank, scaled by `depositEfficiency` and
+   * clamped at `capacity`. Returns the seconds actually banked. Non-positive
+   * input is a no-op.
    */
   deposit(seconds: number): number;
   /**
-   * Remove up to `seconds` from the reservoir. Returns the seconds actually
-   * withdrawn (short when the reservoir runs dry). Non-positive input is a
+   * Withdraw up to `seconds` from the time bank. Returns the seconds actually
+   * withdrawn (fewer when the time bank runs out). Non-positive input is a
    * no-op.
    */
   withdraw(seconds: number): number;
 }
 
 /**
- * Create a banked-time reservoir: a persistent pool of seconds earned by
- * consumer policy and spent through {@link createBankedAcceleration},
- * {@link burstDischarge}, or a bespoke consumer drain.
+ * Create a time bank: a saved store of seconds that consumer policy deposits.
+ * {@link createBankedAcceleration}, {@link burstDischarge} or bespoke consumer
+ * code spends them.
  *
- * @param options - Earn efficiency, cap, and persistent-context id.
- * @returns The reservoir with `deposit`/`withdraw` and the persistent
+ * @param options - Deposit efficiency, capacity and persistent context id.
+ * @returns The time bank, with `deposit`/`withdraw` and the persistent
  *   `banked` ref.
  *
  * @example
  * ```ts
- * const bank = createTimeBank({ cap: () => toNumber(capUpgrade.effect.value) });
+ * const bank = createTimeBank({ capacity: () => toNumber(capacityUpgrade.effect.value) });
  * // on load, bank offline time instead of simulating it:
  * bank.deposit(offlineSeconds);
  * ```
@@ -115,12 +117,12 @@ export function createTimeBank(options: TimeBankOptions = {}): TimeBank {
     banked,
     deposit(seconds) {
       if (!(seconds > 0)) return 0;
-      const earned = seconds * resolveComputable(depositEfficiency);
+      const toDeposit = seconds * resolveComputable(depositEfficiency);
       const before = banked.value;
       const ceiling = cap === undefined ? Infinity : resolveComputable(cap);
-      // max(before, …) so a cap lowered below the current balance only
-      // blocks new deposits — it never confiscates already-banked time.
-      const after = Math.max(before, Math.min(ceiling, before + earned));
+      // max(before, …) so a capacity lowered below the banked amount only
+      // blocks new deposits — it never removes already-banked time.
+      const after = Math.max(before, Math.min(ceiling, before + toDeposit));
       banked.value = after;
       return after - before;
     },
@@ -136,40 +138,40 @@ export function createTimeBank(options: TimeBankOptions = {}): TimeBank {
 
 // === BANKED ACCELERATION ===
 
-/** Configuration for {@link createBankedAcceleration}. */
+/** Options for {@link createBankedAcceleration}. */
 export interface BankedAccelerationOptions {
   /** The driver whose `speedMultiplier` the spend loop owns while spending. */
   tickDriver: TickDriver;
-  /** The reservoir the spend loop drains. */
+  /** The time bank the spend loop withdraws from. */
   bank: TimeBank;
   /**
    * Speed factor applied on top of the driver's baseline multiplier while
-   * spending (e.g. 10 for 10×). Can be a ref or getter for dynamic values —
-   * a rate ladder re-resolves on the next tick.
+   * spending (e.g. 10 for 10×). Can be a ref or getter, for a value that
+   * changes; a change takes effect on the next tick.
    */
   spendMultiplier: Computable<number>;
   /**
-   * What a tick of accelerated play costs the bank.
-   * - `'excess'` (default) — only the boost beyond baseline, charged in real
-   *   seconds: a spend at n× costs n − 1 banked seconds per real second,
-   *   whatever the driver's baseline multiplier. The corpus-dominant
-   *   conservation shape; real time is charged even while a challenge
-   *   doubles game speed.
-   * - `'full'` — the whole accelerated dt: banked seconds are raw sim-seconds
+   * How many banked seconds a tick of accelerated play withdraws.
+   * - `'excess'` (default) — only the speed beyond baseline, in wall-clock
+   *   seconds. A spend at n× withdraws n − 1 banked seconds per wall-clock
+   *   second, whatever the driver's baseline multiplier. The most common
+   *   shape, and it conserves time: wall-clock time is withdrawn even while a
+   *   challenge doubles game speed.
+   * - `'full'` — the whole accelerated dt: banked seconds are game seconds
    *   delivered at speed. Deliberately lossier.
    */
   withdrawMode?: 'excess' | 'full';
   /**
-   * Predicate re-resolved each tick; while false, acceleration and drain
-   * suspend (driver back at baseline) without ending the spend. For "only
-   * while actively playing" gates. A Gate resolves through the runtime
+   * Predicate evaluated each tick; while false, acceleration and withdrawals
+   * pause (driver back at baseline) without ending the spend. For "only
+   * while actively playing" tests. A Gate reads the ambient Gate services
    * captured at `createBankedAcceleration` time.
    */
   when?: Predicate;
   /**
-   * When true, banks the seconds `TickDriver` drops when a tab-hide or hitch
-   * outruns `maxDeltaTime`, by chaining onto `onDeltaOverflow`. The one
-   * engine-owned earn source; everything else deposits explicitly.
+   * When true, banks the seconds `TickDriver` drops when a hidden tab or a
+   * hitch outruns `maxDeltaTime`, by chaining onto `onDeltaOverflow`. The one
+   * engine-owned deposit; everything else deposits explicitly.
    */
   depositLiveOverflow?: boolean;
 }
@@ -177,31 +179,36 @@ export interface BankedAccelerationOptions {
 /** Spend-loop handle returned by {@link createBankedAcceleration}. */
 export interface BankedAcceleration {
   /**
-   * Begin spending: boosts the driver to `baseline × spendMultiplier` and
-   * drains the bank per tick until stopped or depleted. Returns false (and
-   * does nothing) when the bank is empty or a spend is already running.
+   * Begin spending: raises the driver to `baseline × spendMultiplier` and
+   * withdraws from the time bank each tick until stopped or empty. Returns
+   * false (and does nothing) when the time bank is empty or a spend is
+   * already running.
    */
   startSpending(): boolean;
   /** End the spend and restore the driver's baseline multiplier. No-op when idle. */
   stopSpending(): void;
   /**
-   * Whether a spend is running. Deliberately transient, never persisted —
-   * sessions always start unaccelerated (corpus-universal invariant).
+   * Whether a spend is running. Deliberately ephemeral, never saved: a play
+   * session always starts unaccelerated, as in every game of the genre.
    */
   isSpending: Ref<boolean>;
-  /** Detach the tick handler and overflow chain, ending any running spend. */
+  /**
+   * End the tick handler and overflow-chain wiring, and stop any running
+   * spend. The time bank's `banked` ref stays saved.
+   */
   dispose(): void;
 }
 
 /**
- * The live-multiplier spend loop over a {@link TimeBank}: toggle a speed
- * boost on the TickDriver, pay for it from the bank each tick, auto-stop at
- * depletion. The wrapper owns `tickDriver.speedMultiplier` while a spend is
- * running; the baseline is captured at `startSpending` and restored on stop.
+ * The live game speed spend loop over a {@link TimeBank}. It toggles a game
+ * speed raise on the TickDriver and withdraws for it from the time bank each
+ * tick. It stops when the time bank is empty. The wrapper owns
+ * `tickDriver.speedMultiplier` while a spend is running; the baseline is
+ * captured at `startSpending` and restored on stop.
  *
- * @param options - Driver + bank wiring, spend multiplier, drain accounting,
- *   optional gate and live-overflow banking.
- * @returns Start/stop controls, the transient `isSpending` flag, and
+ * @param options - Driver and time bank wiring, spend multiplier, withdraw
+ *   mode, an optional predicate and live-overflow banking.
+ * @returns Start/stop controls, the ephemeral `isSpending` flag, and
  *   `dispose()`.
  *
  * @example
@@ -214,7 +221,7 @@ export interface BankedAcceleration {
  *   depositLiveOverflow: true,
  * });
  * bank.deposit(offlineSeconds); // on load, instead of simulating
- * accel.startSpending();        // player toggles the boost
+ * accel.startSpending();        // the player turns on acceleration
  * ```
  */
 export function createBankedAcceleration(options: BankedAccelerationOptions): BankedAcceleration {
@@ -224,7 +231,7 @@ export function createBankedAcceleration(options: BankedAccelerationOptions): Ba
   const isSpending = ref(false);
   let baseline = 1;
   // The bonus factor the driver is currently scaled by beyond baseline —
-  // tracked closure-side so drain math never re-derives it from the driver.
+  // tracked closure-side so withdraw math never re-derives it from the driver.
   let appliedBonus = 1;
 
   function applyBonus(bonus: number): void {
@@ -239,25 +246,25 @@ export function createBankedAcceleration(options: BankedAccelerationOptions): Ba
   }
 
   const offTick = tickDriver.onTick((dt) => {
-    // A burst replay's simulated chunks reach this handler like live dt, but
-    // that time was already paid for by the burst's withdraw — draining it
-    // again would double-charge. (A consumer-initiated raw processOfflineTime
-    // mid-spend has the same hazard; stop the spend around it.)
+    // A burst replay's chunks reach this handler like live dt, but the
+    // burst's withdraw already covered that time; withdrawing again would
+    // count it twice. (A consumer's own processOfflineTime call mid-spend has
+    // the same hazard; stop the spend around it.)
     if (!isSpending.value || burstInFlight) return;
-    // Pay for the tick that just ran at appliedBonus. dt arrives already
-    // scaled by baseline × appliedBonus, so the real seconds it covers are
-    // dt / (baseline × appliedBonus).
+    // Withdraw for the tick that just ran at appliedBonus. dt arrives already
+    // scaled by baseline × appliedBonus, so the wall-clock seconds it covers
+    // are dt / (baseline × appliedBonus).
     if (appliedBonus > 1) {
       const excess = baseline > 0 ? (dt * (appliedBonus - 1)) / (baseline * appliedBonus) : 0;
-      const drain = withdrawMode === 'full' ? dt : excess;
-      const paid = bank.withdraw(drain);
-      if (paid < drain) {
+      const toWithdraw = withdrawMode === 'full' ? dt : excess;
+      const withdrawn = bank.withdraw(toWithdraw);
+      if (withdrawn < toWithdraw) {
         stopSpending();
         return;
       }
     }
-    // Arm the factor for the next tick: gate suspension and reactive
-    // spendMultiplier changes take effect one tick later.
+    // Arm the factor for the next tick: a predicate that pauses the spend and
+    // reactive spendMultiplier changes take effect one tick later.
     const open = spendGate.read();
     applyBonus(open ? resolveComputable(spendMultiplier) : 1);
   });
@@ -296,16 +303,16 @@ export function createBankedAcceleration(options: BankedAccelerationOptions): Ba
 // === BURST DISCHARGE ===
 
 // True while a burst replay is in flight, so a running BankedAcceleration's
-// tick handler doesn't drain the bank for simulated chunks the burst already
-// paid for. Safe as module state: the replay is synchronous, so the flag
-// spans exactly the burst's own tick callbacks.
+// tick handler doesn't withdraw for replayed chunks the burst already
+// withdrew. Safe as file state: the replay is synchronous, so the flag spans
+// exactly the burst's own ticks.
 let burstInFlight = false;
 
 /** Options for {@link burstDischarge}. */
 export interface BurstDischargeOptions {
   /**
-   * Fraction of the current reservoir to discharge (default 1 — the whole
-   * bank). A slow auto-release is `0.01`.
+   * Fraction of the banked seconds to discharge (default 1, the whole time
+   * bank). A slow automatic discharge uses `0.01`.
    */
   fraction?: number;
   /**
@@ -316,8 +323,8 @@ export interface BurstDischargeOptions {
   efficiency?: number;
   /**
    * Pass-through to {@link processOfflineTime}. `maxOfflineSeconds` defaults
-   * to the full discharge amount so no withdrawn time is silently dropped —
-   * override with care.
+   * to the full discharged seconds, so no withdrawn time is silently
+   * dropped. Override it with care.
    */
   replay?: OfflineProgressOptions;
 }
@@ -326,12 +333,12 @@ export interface BurstDischargeOptions {
  * Spend (a fraction of) a {@link TimeBank} as one immediate fast-forward:
  * withdraw, then replay the seconds through {@link processOfflineTime} in a
  * single burst. The "stored time" discharge shape, as opposed to
- * {@link createBankedAcceleration}'s live boost.
+ * {@link createBankedAcceleration}'s live acceleration.
  *
- * Wall-clock faithful and speed-independent — the replay path never applies
- * `speedMultiplier`.
+ * It matches wall-clock time and ignores game speed: the replay path never
+ * applies `speedMultiplier`.
  *
- * @param bank - The reservoir to discharge.
+ * @param bank - The time bank to discharge.
  * @param tickDriver - The driver the burst replays through.
  * @param options - Discharge fraction, conversion efficiency, replay options.
  * @returns Seconds actually simulated.

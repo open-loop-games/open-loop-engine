@@ -1,12 +1,12 @@
 /**
- * Modifier binding — how effect systems bind {@link Grant}s, and grant helpers.
+ * Grant lowering — how effect systems lower {@link Grant}s into chain slots, and grant utilities.
  *
  * Effect systems (`createTemporaryEffectSystem`, `createConditionalEffectSystem`)
- * take `Grant[]` on their `modifiers` field — the vocabulary category
- * `grants` / `restricts` / `rewards` use. Categories bind a grant once, gated
- * on the owning item; effect systems bind it per activation into a reserved
- * chain slot, so they lower each grant to one factory per chain.
- * {@link replacementGrants} builds a common grant pair.
+ * take `Grant[]` on their defs' `grants` field — the shape category
+ * `grants` / `restricts` / `rewards` use. A category binds a grant once,
+ * in force only while its owner's `active` signal holds. An effect system
+ * binds it per activation into a reserved chain slot, so it lowers each
+ * grant to one factory per chain. {@link replacementGrants} builds a common grant pair.
  *
  * @cluster effects
  */
@@ -29,8 +29,8 @@ import type { PredicateResolver } from './gate';
 // === TYPES ===
 
 /**
- * One chain position an effect definition's grants lower to. Its index in the
- * lowered list is the binding's slot and its perturbation `grantIndex`.
+ * One chain position an effect-system def's grants lower to. Its index in the
+ * lowered list picks its slot and is its perturbation `grantIndex`.
  *
  * @internal
  */
@@ -42,11 +42,12 @@ export interface LoweredGrant {
 
 /** Options for {@link replacementGrants} */
 export interface ReplacementGrantsOptions {
-  /** Chain the cancel + replacement modifiers land on */
+  /** Chain the cancel + replacement modifiers are added to */
   chain: ModifierChain;
   /**
-   * Current value being cancelled. The helper applies `×(1/cancel())` so the
-   * downstream chain sees the target's effect nullified.
+   * Current value being cancelled. `replacementGrants` applies
+   * `×(1/cancel())`, so the rest of the chain sees the target's multiplier
+   * cancelled.
    */
   cancel: Computable<DecimalSource>;
   /** New value to apply in place of the cancelled one — applied as `×replacement()`. */
@@ -61,43 +62,42 @@ export interface ReplacementGrantsOptions {
 // === FACTORIES ===
 
 /**
- * Build a cancel-then-replace binding pair for a modifier chain.
+ * Build a cancel-then-replace grant pair for a modifier chain.
  *
  * The cancel-then-replace pattern ("while active, replace the existing `×1.1^n`
- * tickspeed multiplier with `×(1.05+0.005·g)^n`") expands to two correlated
- * chain entries: a cancel multiplier `× 1/cancel()` that nullifies the existing
- * value, and a replacement multiplier `× replacement()` that supplies the new
- * one. Both must be gated on the same predicate — typically via a
- * {@link createConditionalEffectSystem} binding.
+ * multiplier from `speed` purchases with `×(1.05+0.005·b)^n`") expands to two
+ * correlated chain entries. A cancel multiplier `× 1/cancel()` cancels the
+ * existing value, and a replacement multiplier `× replacement()` supplies the
+ * new one. Both must follow the same predicate — typically one
+ * {@link createConditionalEffectSystem} def's `active`.
  *
- * Chain-level introspection is preserved: both entries remain distinct modifiers
- * in the chain (descriptions suffixed `"(cancel)"` / `"(replacement)"`) so
- * BalanceWorkbench and modifier-breakdown UIs keep full source attribution.
+ * Chain-level introspection still works: both entries stay distinct modifiers
+ * in the chain (descriptions suffixed `"(cancel)"` / `"(replacement)"`). So
+ * balance workbenches and modifier-breakdown UIs keep full attribution.
  *
  * Uses a value-based target — callers pass the current cancelled value as a
  * getter, not an id pointer to an existing modifier. This fits intrinsic
- * targets (like a `1.1^n` baked into the production formula, which has no
- * corresponding chain entry to point at) as well as targets that are themselves
- * chain entries.
+ * targets, such as a `1.1^n` built into the production formula. Such a target
+ * has no chain entry to point at. It also fits targets that are chain entries.
  *
  * @param options - Cancel/replacement value sources + target chain + description
  * @returns Two grants (cancel + replacement) suitable for
- *   `ConditionalEffectDef.modifiers` / `TemporaryEffectDef.modifiers`.
+ *   `ConditionalEffectDef.grants` / `TemporaryEffectDef.grants`.
  *
  * @example
  * ```ts
  * effects.register({
- *   id: 'challenge:ic3:tickspeed-rewire',
- *   active: () => ic3.active.value && Decimal.gt(tickspeed.amount.value, 0),
+ *   id: 'challenge:geared-down:speed-rewire',
+ *   active: () => gearedDown.entered.value && Decimal.gt(speed.count.value, 0),
  *   grants: replacementGrants({
  *     chain: productionChain,
- *     cancel: () => Decimal.pow(1.1, tickspeed.amount.value),
+ *     cancel: () => Decimal.pow(1.1, speed.count.value),
  *     replacement: () =>
  *       Decimal.pow(
- *         Decimal.add(1.05, Decimal.mul(galaxies.value, 0.005)),
- *         tickspeed.amount.value,
+ *         Decimal.add(1.05, Decimal.mul(boosters.value, 0.005)),
+ *         speed.count.value,
  *       ),
- *     description: 'IC3 Tickspeed Rewire',
+ *     description: 'Geared Down speed rewire',
  *   }),
  * });
  * ```
@@ -140,9 +140,9 @@ export function buildGrantModifier(grant: Grant): Modifier {
     return createExponentialModifier({ exponent: grant.exp, description: grant.description });
   }
   const resolved = typeof grant.modifier === 'function' ? grant.modifier() : grant.modifier;
-  // Overlay an inline description onto a modifier that doesn't already carry
-  // one — keeps `chain.bind` auto-id derivation working for the escape-hatch
-  // variant without forcing consumers to wrap the modifier themselves.
+  // Add an inline description to a modifier that has none — keeps
+  // `chain.bind` auto-id derivation working for the escape-hatch variant,
+  // without forcing consumers to wrap the modifier themselves.
   if (grant.description != null && resolved.description == null) {
     const text = grant.description;
     return delegateModifier(resolved, {
@@ -154,7 +154,7 @@ export function buildGrantModifier(grant: Grant): Modifier {
 
 /**
  * Each grant paired with each chain it targets, in order: a chain array
- * contributes one entry per chain. The position is a binding's index.
+ * contributes one entry per chain. The position is a lowered grant's index.
  *
  * @internal
  */
@@ -175,7 +175,7 @@ export function grantChains(grant: Grant): readonly ModifierChain[] {
  * Adopt each grant's `when` through `predicates`, keyed by grant. A grant
  * without one has no entry.
  *
- * @param owner - names the definition in a `when` Gate's error, which then
+ * @param owner - names the def in a `when` Gate's error, which then
  *   names the grant by its description, else its index
  * @internal
  */
@@ -194,11 +194,11 @@ export function adoptGrantWhens(
 }
 
 /**
- * Lower an effect definition's grants to one modifier factory per chain,
+ * Lower an effect-system def's grants to one modifier factory per chain,
  * with each grant's `when` adopted through `predicates` and ANDed into the
  * modifier's `enabled`.
  *
- * @param owner - names the definition in a `when` Gate's error
+ * @param owner - names the def in a `when` Gate's error
  * @internal
  */
 export function lowerGrants(

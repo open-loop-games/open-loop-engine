@@ -1,37 +1,31 @@
 /**
- * Skill helper for dual-tier loop incremental skills
+ * Skill — XP, a level and a modifier per skill, in a level-driven or an accumulator mode
  *
- * Engine primitive for the Skill Systems pattern — validated at moderate
- * prevalence across the incremental-games corpus.
+ * Two modes:
+ * - **Level-driven:** modifier = levelToMultiplier(level). For a skill whose
+ *   current level drives the multiplier (e.g. a per-run stat level).
+ * - **Accumulator:** modifier = 1 + lifetimeBonus. For a skill whose lifetime
+ *   bonus accumulates across runs through retentionFormula.
  *
- * Two modes for the two universal patterns:
- * - **Level-driven:** modifier = levelToMultiplier(level). For tiers where the
- *   current level directly drives the multiplier (e.g. stat tiers,
- *   level bonuses).
- * - **Accumulator:** modifier = 1 + lifetimeBonus. For tiers where a bonus
- *   accumulates across loops via retentionFormula (e.g. soulstones,
- *   snapshots).
+ * A skill with both parts is two createSkill() calls, one per part. Each
+ * returns a `.modifier` for a sequential modifier to compose.
  *
- * Dual-tier skills compose as two createSkill() calls — one per tier — each
- * returning a .modifier that plugs into a sequential chain.
- *
- * Curves are **Formula factories**: `(variable: MaybeRef<DecimalSource>) => FormulaSource`.
+ * Curves are **curve factories**: `(variable: MaybeRef<DecimalSource>) => FormulaSource`.
  * The skill binds the returned Formula to its internal xp / level refs and
- * exposes the built formula (`xpCurve`, `multiplierCurve`, `retentionCurve`)
- * so consumers can invert ("XP needed for level N") or integrate via the
- * standard Formula API.
+ * exposes the built formula (`xpCurve`, `multiplierCurve`, `retentionCurve`).
+ * So consumers can invert it ("XP needed for level N") or integrate it through
+ * the standard Formula API.
  *
  * Key features:
- * - Persistence: xp + lifetimeBonus auto-collected via persistent context
- * - Modifier: reactive, updates as xp/level/bonus change
+ * - Persistence: `xp` and `lifetimeBonus` are persistent refs in the skill's persistent context
+ * - Modifier: reactive, updates as xp, level or lifetime bonus change
  * - Per-gain ModifierChain: always-created chain (`skill:<id>:gain`) for
- *   cross-cutting XP scaling (global boosts, zone multipliers)
- * - Optional maxXp cap: Computable, applied after gainChain
- * - Event subscription: `skill.on('leveledUp', handler)` for post-creation
- *   listeners. Optional `onLevelUp` creation-time sugar auto-subscribes.
- *   Events fire only on gameplay XP gain, not on save-load or direct xp mutation
- * - Reset integration: consumer includes skill.xp in thingsToReset or
- *   Retention as needed
+ *   cross-cutting XP scaling (global multipliers, zone multipliers)
+ * - Optional maxXp: a Computable XP maximum, applied after gainChain
+ * - Event subscription: `skill.on('leveledUp', handler)` for handlers added
+ *   after creation. The `onLevelUp` option callback subscribes at creation.
+ *   Events are emitted only on gameplay XP gain, not on a load or a direct xp write
+ * - Reset: a consumer names `skill.xp` in `thingsToReset` or a retention, as needed
  */
 
 import { computed, watch, unref, type ComputedRef, type MaybeRef } from 'vue';
@@ -60,53 +54,53 @@ import type { FormulaSource, GenericFormula } from '@/core/formulas/types';
  * Events emitted by a Skill instance.
  */
 export interface SkillEvents {
-  /** Fired when the skill's level increases during gameplay XP gain (via `addXp`).
-   *  Does NOT fire on save-load rehydration, reset, or direct `xp.value` mutation. */
+  /** Emitted when the skill's level changes during gameplay XP gain (through `addXp`).
+   *  Not emitted on a load's hydration, a reset, or a direct `xp.value` write. */
   leveledUp: (oldLevel: Decimal, newLevel: Decimal) => void;
 }
 
 /**
- * Factory that binds a Formula to an engine-owned reactive variable.
+ * Curve factory that binds a Formula to an engine-owned reactive variable.
  *
- * Return a {@link FormulaSource} built via `Formula.variable(x).…` so the
- * skill can both evaluate forward and invert backward. For simple curves
- * the `Formula.exponential` / `Formula.polynomial` helpers are the one-liner
- * path.
+ * Return a {@link FormulaSource} built through `Formula.variable(x).…` so the
+ * skill can both evaluate forward and invert backward. For simple curves,
+ * `Formula.exponential` and `Formula.polynomial` build one in a single line.
  */
 export type SkillCurve = (variable: MaybeRef<DecimalSource>) => FormulaSource;
 
 /** Shared option fields present in both skill modes */
 // TODO(expansion): add `unlockGate?: Gate` (and possibly `prerequisites?: Gate`) when a
-// consumer wants declarative skill unlocks instead of consumer-side gating closures.
+// consumer wants declarative skill unlocks instead of consumer-side closures that block them.
 // Gate already exists (src/systems/gate.ts); only consumer demand is pending.
 export interface SkillOptionsBase {
   id: string;
-  /** Formula factory — receives the internal xp ref, returns a FormulaSource. */
+  /** Curve factory — receives the internal xp ref, returns a FormulaSource. */
   xpToLevel: SkillCurve;
   /** Description shown in modifier breakdowns */
   description?: string;
   /**
-   * Optional XP cap. When present, `addXp` clamps accumulated XP to this value
-   * (after the gainChain is applied). Can be a static value or reactive
-   * (ref / getter) for scaling caps.
+   * Optional XP maximum. When present, `addXp` clamps accumulated XP to this
+   * value (after the gainChain is applied). Can be a static value, or a ref
+   * or getter for a maximum that changes.
    */
   maxXp?: Computable<DecimalSource>;
   /**
-   * Called when level transitions during gameplay XP gain (via `addXp`).
-   * Does NOT fire on save-load rehydration, reset, or direct `xp.value` mutation.
+   * Option callback called when the level changes during gameplay XP gain
+   * (through `addXp`). Not called on a load's hydration, a reset, or a direct
+   * `xp.value` write.
    */
   onLevelUp?: (oldLevel: Decimal, newLevel: Decimal) => void;
 }
 
 /**
- * Accumulator mode — permanent bonus accumulates across loops.
+ * Accumulator mode — a lifetime bonus accumulates across runs.
  *
- * Modifier = `1 + lifetimeBonus`. Call `accumulateBonus()` at loop end to
- * apply the retention formula. Good for soulstone-style or snapshot-style bonuses.
+ * Modifier = `1 + lifetimeBonus`. Call `accumulateBonus()` at a run's end to
+ * add the retention curve's value. Suits a bonus that grows from each run's level.
  */
 export interface AccumulatorSkillOptions extends SkillOptionsBase {
   /**
-   * Formula factory for the retention curve — receives the computed level ref,
+   * Curve factory for the retention curve — receives the computed level ref,
    * returns a FormulaSource. The curve's value at the current level is added
    * to `lifetimeBonus` each time `accumulateBonus()` is called.
    */
@@ -115,28 +109,28 @@ export interface AccumulatorSkillOptions extends SkillOptionsBase {
 }
 
 /**
- * Level-driven mode — modifier tracks level reactively.
+ * Level-driven mode — the modifier tracks the level reactively.
  *
  * Modifier = `levelToMultiplier(level)`. No lifetimeBonus or accumulation.
- * Good for stat tiers and level multipliers.
+ * Suits a per-run stat level and level multipliers.
  */
 export interface LevelDrivenSkillOptions extends SkillOptionsBase {
-  /** Formula factory — receives the computed level ref, returns a FormulaSource. */
+  /** Curve factory — receives the computed level ref, returns a FormulaSource. */
   levelToMultiplier: SkillCurve;
   retentionFormula?: never;
 }
 
 /**
  * Discriminated union of {@link createSkill} option shapes — accumulator
- * (XP banks for retention) vs level-driven (level multiplies a curve). Choose
- * by setting either `retentionFormula` or `levelToMultiplier`.
+ * (each run's level adds to a lifetime bonus) or level-driven (the level drives
+ * a curve). Choose by setting either `retentionFormula` or `levelToMultiplier`.
  */
 export type SkillOptions = AccumulatorSkillOptions | LevelDrivenSkillOptions;
 
 /** Fields present on all skills regardless of mode */
 export interface SkillBase {
   id: string;
-  /** Current XP — include in loop's thingsToReset or Retention as needed */
+  /** Current XP — name it in a reset's `thingsToReset` or a retention, as needed */
   readonly xp: Persistent<DecimalSource>;
   /** Current level, computed reactively from xp via xpToLevel */
   readonly level: ComputedRef<DecimalSource>;
@@ -145,17 +139,17 @@ export interface SkillBase {
   /**
    * The built XP→level formula, bound to `xp`. Use `.evaluate(xp)` for a
    * hypothetical value or `.invert(targetLevel)` to compute the XP required
-   * to reach a target level (closed-form when the chain is invertible).
+   * to reach a target level (closed-form when the op chain is invertible).
    */
   readonly xpCurve: GenericFormula;
   /**
    * Per-gain modifier chain (`skill:<id>:gain`). Always present — identity
    * when empty. Other modules bind modifiers onto this chain for cross-cutting
-   * XP scaling (global XP boosts, zone-specific multipliers).
-   * Auto-registered in the ChainRegistry.
+   * XP scaling (global XP multipliers, zone-specific multipliers).
+   * Registered in the chain registry.
    */
   readonly gainChain: ModifierChain;
-  /** Add XP to the pool (applies gainChain, then maxXp cap if configured) */
+  /** Add XP (applies gainChain, then the maxXp maximum when one is set) */
   addXp(amount: DecimalSource): void;
 
   /** Subscribe to skill events (e.g. `leveledUp`). Returns an unsubscribe function. */
@@ -177,8 +171,8 @@ export interface LevelDrivenSkill extends SkillBase {
 /** Accumulator skill — modifier = 1 + lifetimeBonus */
 export interface AccumulatorSkill extends SkillBase {
   /**
-   * Permanent bonus — tagged `lifetime`, so any reset that doesn't name it
-   * skips it. To wipe it in a hard reset, pass it to `thingsToReset` itself.
+   * Lifetime bonus — tagged `lifetime`, so any reset that doesn't name it
+   * leaves it alone. To clear it in a hard reset, name it in `thingsToReset` itself.
    */
   readonly lifetimeBonus: Persistent<DecimalSource>;
   /**
@@ -187,15 +181,15 @@ export interface AccumulatorSkill extends SkillBase {
    */
   readonly retentionCurve: GenericFormula;
   readonly multiplierCurve?: undefined;
-  /** Add retentionFormula(level) to lifetimeBonus. Call at loop end. */
+  /** Add retentionFormula(level) to lifetimeBonus. Call at a run's end. */
   accumulateBonus(): void;
   /**
-   * Project how much permanent bonus a given amount of additional XP would produce,
-   * without mutating state. Used by optimization systems (e.g. BestOf route tracker)
-   * to compare strategies by projected permanent gain.
+   * Project how much lifetime bonus a given amount of additional XP would add,
+   * without writing state. For comparing candidates by projected lifetime gain,
+   * e.g. in a best-of record (`BestOf`).
    *
    * @param additionalXP - The hypothetical XP to add on top of current XP
-   * @returns The projected permanent bonus delta (always >= 0)
+   * @returns The projected rise in lifetime bonus (never below 0)
    */
   projectGain(additionalXP: DecimalSource): DecimalSource;
 }
@@ -207,15 +201,15 @@ export type Skill = LevelDrivenSkill | AccumulatorSkill;
 
 /**
  * Allocate xp (and lifetimeBonus, accumulator-only) under the skill's
- * persistence context. When invoked inside an enclosing context (the
- * common case — `createSkillCategory`'s `registerOne` opens
- * `${categoryId}/${defId}` around `buildInstance`), the skill context
- * is prefixed by the enclosing one so two categories that share skill
- * ids (e.g. looper's stat-level + talent both keyed by `Dex` / `Str`)
- * don't collide on the per-skill `xp` persistent ref.
+ * persistent context. When called inside an enclosing persistent context (the
+ * common case — the category base's `registerOne` opens
+ * `${categoryId}/${defId}` around `buildInstance`), the skill's persistent
+ * context is prefixed by the enclosing one. So two categories that share
+ * skill ids (e.g. a per-run stat category and a lifetime talent category, both
+ * keyed by `Dex` / `Str`) don't collide on the per-skill `xp` persistent ref.
  *
- * Standalone `createSkill` calls (no enclosing context) keep the
- * legacy `skill:${id}` context unchanged.
+ * A standalone `createSkill` call (no enclosing persistent context) uses
+ * `skill:${id}`.
  */
 function buildSkillState(
   id: string,
@@ -275,13 +269,13 @@ function buildSkillCurves(
   return { xpCurve, level, multiplierCurve, retentionCurve, modifier };
 }
 
-/** Build the addXp closure (gainChain + maxXp cap) and the synchronous gameplay-XP guard flag. */
+/** Build the addXp closure (gainChain + maxXp clamp) and the synchronous gameplay-XP guard. */
 function buildAddXp(
   xp: Persistent<DecimalSource>,
   gainChain: ModifierChain,
   processedMaxXp: MaybeRef<DecimalSource> | undefined,
 ): { addXp: (amount: DecimalSource) => void; gainInProgress: { value: boolean } } {
-  // Plain object wrapper so buildOnLevelUp can read the flag synchronously.
+  // Plain object wrapper so buildLevelUpEmitter can read the guard synchronously.
   // Not a Vue ref — no reactivity needed, just a synchronous guard.
   const gainInProgress = { value: false };
 
@@ -322,7 +316,7 @@ function buildLevelUpEmitter(
 /**
  * Create a skill with XP tracking, computed level, and a reactive modifier.
  *
- * Curves are Formula factories — the skill calls each factory with its own
+ * Curves are curve factories — the skill calls each one with its own
  * internal ref (xp or level) and stores the returned Formula. Consumers can
  * evaluate, invert, or integrate these curves via the exposed `xpCurve`,
  * `multiplierCurve`, or `retentionCurve` properties.
@@ -337,7 +331,7 @@ function buildLevelUpEmitter(
  *   and (accumulator mode only) lifetimeBonus + accumulateBonus + projectGain
  *
  * @example
- * // Level-driven (stat tier) — power curve via Formula sugar
+ * // Level-driven (a per-run stat) — power curve via Formula sugar
  * const gen = createSkill({
  *   id: 'combat-gen',
  *   xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
@@ -347,11 +341,11 @@ function buildLevelUpEmitter(
  * // How much XP to reach level 20?
  * gen.xpCurve.invert(20)
  *
- * // Bind a global XP boost onto the gain chain
+ * // Add a global XP multiplier to the gain chain
  * gen.gainChain.add(createMultiplicativeModifier({ multiplier: 2 }))
  *
  * @example
- * // Accumulator (soulstones)
+ * // Accumulator (a lifetime bonus)
  * const mastery = createSkill({
  *   id: 'combat-mastery',
  *   xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
@@ -359,7 +353,7 @@ function buildLevelUpEmitter(
  * })
  *
  * @example
- * // With maxXp cap and onLevelUp callback
+ * // With an XP maximum and an onLevelUp option callback
  * const capped = createSkill({
  *   id: 'combat-capped',
  *   xpToLevel: (xp) => Formula.variable(xp).div(50).sqrt().floor(),
@@ -384,9 +378,9 @@ export function createSkill(options: SkillOptions): Skill {
     isLevelDriven,
   );
 
-  // Namespace the gain chain id by the enclosing context (when present)
-  // so two categories sharing a skill id don't collide on the ChainRegistry.
-  // Same posture as `buildSkillState` above.
+  // Prefix the gain chain id with the enclosing persistent context (when
+  // present), so two categories sharing a skill id don't collide in the chain
+  // registry. Same shape as `buildSkillState` above.
   const gainChainParent = getCurrentPersistentContext();
   const gainChainId = gainChainParent ? `${gainChainParent}/skill:${id}:gain` : `skill:${id}:gain`;
   const gainChain = createModifierChain(gainChainId);

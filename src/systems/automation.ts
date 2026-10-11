@@ -1,13 +1,12 @@
 /**
  * Automation tiers — progressive unlock of automation features
  *
- * Tracks tiered automation progression (manual → basic → conditional →
- * priority → AI), a near-universal pattern across incremental games (95%+
- * prevalence). The system manages unlock state; what each tier *enables*
- * is entirely consumer-side wiring.
+ * Tracks automation tier progression (manual → basic → conditional →
+ * priority → AI). The system manages unlock state; what each automation
+ * tier *enables* is consumer wiring.
  *
  * Mirrors the {@link createZoneSystem} pattern: persistent unlocked set,
- * events on unlock, `resetUnlocks()` for prestige.
+ * events on unlock, `resetUnlocks()` for a reset.
  *
  * - {@link createAutomationTiers} — sole factory
  *
@@ -16,15 +15,15 @@
  * const auto = createAutomationTiers({
  *   id: 'automation',
  *   tiers: [
- *     { id: 'manual', name: 'Manual', order: 0 },
- *     { id: 'basic', name: 'Auto-buy', order: 1,
- *       unlockWhen: () => upgrades.autoBuy.earned.value },
- *     { id: 'conditional', name: 'Conditionals', order: 2,
+ *     { id: 'manual', displayName: 'Manual', order: 0 },
+ *     { id: 'basic', displayName: 'Auto-purchase', order: 1,
+ *       unlockWhen: () => upgrades.autoPurchase.active.value },
+ *     { id: 'conditional', displayName: 'Conditionals', order: 2,
  *       unlockWhen: () => Decimal.gte(prestige.count.value, 5) },
  *   ],
  * });
  *
- * // Consumer wiring — what each tier enables:
+ * // Consumer wiring — what each automation tier enables:
  * if (auto.hasReached('basic')) {
  *   queue.fillStrategy = basicStrategy;
  * }
@@ -48,99 +47,102 @@ import { createPredicateResolver, type Predicate } from './gate';
 
 // === TYPES ===
 
-/** Definition for a single automation tier. */
+/** Def for one automation tier. */
 export interface AutomationTierDef {
-  /** Unique tier identifier (e.g., 'manual', 'basic', 'advanced'); a repeat throws. */
+  /** Automation tier id (e.g. 'manual', 'basic', 'advanced'); a repeat throws. */
   id: string;
-  /** Display name for the tier. */
   displayName: string;
   /**
-   * Numeric sort order. Lower = earlier tier. Must be unique across tiers.
-   * Tier 0 is typically the "no automation" baseline.
+   * Sort order; lower comes first. Must be unique across automation tiers.
+   * Order 0 is typically the "no automation" baseline.
    */
   order: number;
   /**
-   * Condition for auto-unlock. Whenever it holds, the tier unlocks
-   * automatically (like achievements): as it turns `true`, once a load or
-   * reset settles, and through {@link AutomationTiers.resetUnlocks}. Omit for
-   * tiers unlocked imperatively via {@link AutomationTiers.unlock}.
+   * Predicate that unlocks the automation tier. Whenever it holds, the
+   * automation tier unlocks, as an achievement is earned: on activation,
+   * once a load or reset settles, and in {@link AutomationTiers.resetUnlocks}.
+   * Omit it for an automation tier unlocked only by {@link AutomationTiers.unlock}.
    *
-   * A getter or ref re-evaluates reactively; a Gate resolves through the
-   * runtime captured at `createAutomationTiers` time.
+   * A getter or ref is reactive. A Gate evaluates against the Gate services
+   * captured when `createAutomationTiers` runs.
    */
   unlockWhen?: Predicate;
 }
 
 /** Events emitted by an {@link AutomationTiers} instance. */
 export interface AutomationTiersEvents {
-  /** Fired when a tier is newly unlocked. A load restoring a tier fires nothing. */
+  /**
+   * Emitted when an automation tier unlocks. A load that writes back an
+   * unlocked automation tier emits nothing.
+   */
   unlocked: (tierId: string, tierOrder: number) => void;
 }
 
 /** Options for {@link createAutomationTiers}. */
 export interface AutomationTiersOptions {
   /**
-   * Save context. Defaults to `${module}/automation` inside a module; pass one
-   * when a module builds more than one.
+   * Persistent context id. Defaults to `${module}/automation` inside a
+   * module; pass one when a module builds more than one.
    */
   id?: string;
-  /** Tier definitions (sorted internally by `order`). */
+  /** Automation tier defs, sorted internally by `order`. */
   tiers: AutomationTierDef[];
   /**
-   * Tier IDs that start unlocked. Defaults to the single lowest-order tier.
+   * Automation tier ids that start unlocked. Defaults to the lowest-order
+   * automation tier alone.
    */
   initiallyUnlocked?: string[];
 }
 
 /**
- * An automation tiers instance — the returned object from {@link createAutomationTiers}.
+ * The automation tier system {@link createAutomationTiers} returns.
  *
- * Manages tiered unlock progression for automation features. Does NOT dictate
- * what each tier enables — consumers wire tier checks to their specific
- * automation systems (strategies, auto-buy, conditional rules, etc.).
+ * It tracks which automation tiers are unlocked. It does NOT decide what an
+ * automation tier enables. Consumers connect automation tier checks to their
+ * own automation (fill strategies, auto-purchase, conditional rules).
  */
 export interface AutomationTiers {
-  /** All tier definitions sorted by order (ascending). */
+  /** Every automation tier def, sorted by `order` ascending. */
   readonly tiers: readonly AutomationTierDef[];
 
-  /** The highest unlocked tier's ID (reactive). */
+  /** The highest unlocked automation tier's id (reactive). */
   readonly currentTierId: ComputedRef<string>;
 
-  /** The highest unlocked tier's order value (reactive). */
+  /** The highest unlocked automation tier's `order` (reactive). */
   readonly currentTierOrder: ComputedRef<number>;
 
   /**
-   * Set of unlocked tier IDs (persistent). Tagged `lifetime`, so a reset of
-   * the owning module keeps it; `resetUnlocks()` is the wipe.
+   * Unlocked automation tier ids (persistent). It is a lifetime ref, so a
+   * reset of the owning module keeps it; `resetUnlocks()` clears it.
    */
   readonly unlocked: Persistent<string[]>;
 
-  /** Check whether a specific tier is unlocked. */
+  /** Whether an automation tier is unlocked. */
   isUnlocked(tierId: string): boolean;
 
   /**
-   * Check whether automation has progressed to at least the given tier.
+   * Whether automation has progressed to at least the given automation tier.
    * Equivalent to `currentTierOrder.value >= tier.order`.
    */
   hasReached(tierId: string): boolean;
 
-  /** Imperatively unlock a tier by ID. No-op if already unlocked or unknown. */
+  /** Unlock an automation tier by id. No-op if it is already unlocked or unknown. */
   unlock(tierId: string): void;
 
   /**
-   * Lock all tiers except those in the initially-unlocked set and those whose
-   * `unlockWhen` still holds, which stay unlocked without an `unlocked` event.
-   * Intended for prestige/reset scenarios.
+   * Lock every automation tier except the initially-unlocked set and those
+   * whose `unlockWhen` still holds. Those stay unlocked without an
+   * `unlocked` event. Intended for a reset.
    */
   resetUnlocks(): void;
 
-  /** Subscribe to tier lifecycle events. */
+  /** Subscribe to automation tier events. */
   on: Emittable<AutomationTiersEvents>['on'];
 
   /**
-   * Stop the auto-unlock watchers installed for tiers with `unlockWhen`.
-   * `unlocked` stays registered and keeps saving, so building tiers under the
-   * same id again takes a new engine.
+   * Stop the watchers that unlock automation tiers with `unlockWhen`.
+   * `unlocked` stays registered and keeps saving, so a rebuild under the
+   * same id needs a new engine.
    */
   dispose(): void;
 }
@@ -150,7 +152,7 @@ export interface AutomationTiers {
 /**
  * Create an automation tier system for progressive automation unlocks.
  *
- * @param options - Tier definitions, initial unlocks, persistence ID
+ * @param options - Automation tier defs, initial unlocks and the persistent context id
  * @returns An {@link AutomationTiers} with persistent unlock tracking and events
  *
  * @example
@@ -158,16 +160,16 @@ export interface AutomationTiers {
  * const auto = createAutomationTiers({
  *   id: 'automation',
  *   tiers: [
- *     { id: 'none', name: 'Manual', order: 0 },
- *     { id: 'sequencer', name: 'Sequencer', order: 1,
+ *     { id: 'none', displayName: 'Manual', order: 0 },
+ *     { id: 'sequencer', displayName: 'Sequencer', order: 1,
  *       unlockWhen: () => stats.manualCasts.value >= 10 },
- *     { id: 'conditionals', name: 'Conditionals', order: 3,
+ *     { id: 'conditionals', displayName: 'Conditionals', order: 3,
  *       unlockWhen: () => zones.isUnlocked('elemental_trials') },
  *   ],
  * });
  *
  * auto.on('unlocked', (id, order) => {
- *   notify(`Automation unlocked: ${auto.tiers.find(t => t.id === id)?.name}`);
+ *   notify(`Automation unlocked: ${auto.tiers.find(t => t.id === id)?.displayName}`);
  * });
  * ```
  */
@@ -180,13 +182,13 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
   for (const tier of tiers) {
     if (tierMap.has(tier.id)) {
       throw new Error(
-        `AutomationTiers: duplicate automation tier id "${tier.id}". Tier ids must be unique.`,
+        `AutomationTiers: duplicate automation tier id "${tier.id}". Automation tier ids must be unique.`,
       );
     }
     tierMap.set(tier.id, tier);
   }
 
-  // Default initial unlocks: lowest-order tier
+  // Default initial unlocks: the lowest-order automation tier
   const defaultUnlocked = initiallyUnlocked ?? (tiers.length > 0 ? [tiers[0].id] : []);
 
   // --- Persistent state ---
@@ -263,8 +265,8 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     resetUnlocks(): void {
       const before = new Set(unlocked.value);
       unlocked.value = [...defaultUnlocked];
-      // Re-latch every tier whose requirement still holds; one held before the
-      // reset comes back without announcing itself again.
+      // Re-latch every automation tier whose `unlockWhen` still holds; one
+      // unlocked before the reset comes back without an `unlocked` event.
       for (const { tier, met } of requirements) {
         if (!met.value || unlocked.value.includes(tier.id)) continue;
         if (before.has(tier.id)) unlocked.value = [...unlocked.value, tier.id];
@@ -279,7 +281,7 @@ export function createAutomationTiers(options: AutomationTiersOptions): Automati
     },
   };
 
-  // --- Auto-unlock latches for tiers with requirements ---
+  // --- Auto-unlock latches for automation tiers with `unlockWhen` ---
   scope.run(() => {
     for (const { tier, met } of requirements) {
       latchWhenSettled(met, () => automationTiers.unlock(tier.id));

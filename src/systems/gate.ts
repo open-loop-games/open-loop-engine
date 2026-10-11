@@ -1,20 +1,22 @@
 /**
- * Gate — consumer-facing predicate-spec data shape over the engine's existing
- * substrate. Cross-cuts every requirement-bearing field where today consumers
- * either reach for `C.*` (exposes engine-internal vocabulary) or fall back to
- * opaque `Computable<boolean>` closures (loses predictor introspection).
+ * Gate — evaluation, prediction and predicate adoption for the typed,
+ * serializable yes/no test. A Gate is the form of a predicate field that a
+ * predictor can read. Consumer code writes Gates, not the engine-internal
+ * `C.*` builders, and an opaque `Computable<boolean>` closure hides its test
+ * from the predictor.
  *
- * Gate composes four pieces that already exist independently:
+ * Gate composes four existing pieces:
  * - `ICondition` + {@link evaluateCondition} / {@link timeUntilConditionFlip} —
- *   rate-aware leaves project to this substrate; predictor reuses it directly.
+ *   rate-aware leaves project to the condition IR, and the predictor reuses it.
  * - {@link CategoryEntrySignals} via {@link findCategoryEntrySignals} — the
- *   uniform per-entry introspection axes shipped by every category factory.
- *   Gate's `count-gte` and `unlock` kinds read through it; no consumer-side
- *   path conventions, no synthetic state-paths.
+ *   signals every category factory builds for each category entry. The
+ *   `count-gte` and `active` kinds read through it, with no consumer-side
+ *   path conventions and no synthetic state paths.
  * - {@link ResourceRegistry} via `findById(...).cumulative` — `cumulative-gte`
- *   reads the resource's intrinsic cumulative-gain accumulator slot.
- * - {@link GameStateAccessor} — `state` kind delegates here (consumer-supplied
- *   path/value semantics, mirrors `StateCondition`).
+ *   reads the resource's `cumulative` ref.
+ * - {@link GameStateAccessor} — the `resource-gte`, `state` and `flag` kinds
+ *   read through it (consumer-defined path and value meaning, as in
+ *   `StateCondition`).
  *
  * Per-kind dispatch:
  *
@@ -28,24 +30,25 @@
  * | state          | compareState(accessor.getStateAt(...), op, val)     | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
- * `gateToCondition` partial-projects accessor-backed Gates (and their
- * combinators) to `ICondition`, the serializable IR `E.branch` embeds.
- * Throws on category descendants and on `cumulative-gte`, whose values live
- * behind the categories and the registry rather than the accessor.
- * Predictors read every kind through {@link timeUntilGateFlip} instead.
+ * `gateToCondition` partially projects accessor-backed Gates (and their
+ * combinators) to `ICondition`, the serializable condition IR `E.branch`
+ * embeds. It throws on category descendants and on `cumulative-gte`, whose
+ * values are behind the categories and the resource registry rather than the
+ * accessor. Predictors read every kind through {@link timeUntilGateFlip} instead.
  *
  * Predicate fields — where a Gate is one authoring form among several:
- * - Systems-layer predicate fields take {@link Predicate} (a boolean, ref,
- *   getter or Gate) and adopt it through a {@link PredicateResolver} the
- *   system builds once, at construction. A Gate's handles are asserted when
- *   the definition registers, so an unwired accessor fails at the authoring
- *   site rather than at first evaluation.
- * - Core-layer fields stay `Computable<boolean>`: core can name a Gate but
+ * - Predicate fields in systems take {@link Predicate} (a boolean, ref,
+ *   getter or Gate). They adopt it through a {@link PredicateResolver} the
+ *   system builds once, at construction. The Gate services a Gate reads are
+ *   asserted when its def registers. So a missing accessor fails at the
+ *   authoring site rather than at first evaluation.
+ * - Core fields stay `Computable<boolean>`: core can name a Gate but
  *   cannot evaluate one.
- * - Dialog `condition` fields stay Gate-only, since a dialog graph is pure
- *   data; the runtime asserts their handles when it's built.
- * - The `requirement` an achievement category synthesizes for a tiered
- *   achievement stays a closure; the engine builds it, no author writes it.
+ * - A dialog node's `when` and a choice's `visible` stay Gate-only, since a
+ *   dialog graph is pure data. The dialog adapter asserts their Gate services
+ *   when it is built.
+ * - The `goal` an achievement category synthesizes for each ladder rung
+ *   stays a closure; the engine builds it, and no author writes it.
  */
 
 import { computed, type ComputedRef } from 'vue';
@@ -84,9 +87,9 @@ import {
 
 // === TYPE RE-EXPORTS ===
 // Gate's pure-data shape (variant interfaces + Gate union + projection +
-// type guard) lives in core/gate.ts so core-layer builders can accept Gate
-// without a layer violation. Re-exported here so the public surface stays
-// a single import path.
+// type guard) is in core/gate.ts, so core builders can accept a Gate
+// without breaking the one-way imports. Re-exported here so the public API
+// surface keeps a single import path.
 export type {
   ResourceGteGate,
   CumulativeGteGate,
@@ -104,19 +107,19 @@ export type {
 export { isGate, gateToCondition, getRequiredGateServices } from '@/core/gate';
 
 /**
- * The engine handles {@link evaluateGate} and {@link timeUntilGateFlip} read
- * through. Adoption sites typically build one via
- * {@link getAmbientGateServices} during a factory's install/connect call and
- * close over it for evaluation. The plain-data bundle is also useful for tests
- * (construct directly to drive `evaluateGate` without standing up an engine)
- * and for partial overrides in factory options.
+ * The Gate services {@link evaluateGate} and {@link timeUntilGateFlip} read.
+ * Adoption sites typically build one via {@link getAmbientGateServices}
+ * during a factory's install/connect call, and close over it for evaluation.
+ * The plain-data bundle is also useful for tests: construct it directly to
+ * drive `evaluateGate` without standing up an engine. It also serves partial
+ * replacements in factory options.
  *
- * Every field is optional because the bundle describes what's *available*, not
- * what a given Gate needs — which handles are actually required is a function
- * of the gate's kinds ({@link getRequiredGateServices}). A consumer whose gates
- * are all category-resolved owes no {@link GameStateAccessor} at all. Reads
- * are demand-checked per kind at evaluation, so a gate that does need a
- * missing handle throws naming both.
+ * Every field is optional, because the bundle describes what's *available*,
+ * not what a given Gate needs. The Gate services a Gate requires are a
+ * function of its kinds ({@link getRequiredGateServices}). A consumer whose
+ * Gates are all category kinds needs no {@link GameStateAccessor} at all.
+ * Each kind checks its Gate services at evaluation, so a Gate that needs a
+ * missing one throws, naming both.
  *
  * Not auto-published under an injection key — the bundle is composition glue,
  * not a singleton.
@@ -128,22 +131,22 @@ export interface GateServices {
 }
 
 /**
- * Snapshot whichever ambient handles are currently wired into a
+ * Snapshot the ambient Gate services wired now into a
  * {@link GateServices} bundle.
  *
- * Reads from `getCurrentGameStateAccessor()` / `getCurrentEngineCategories()` /
- * `getCurrentResourceRegistry()` — the same install-time ambient triple every
- * other category factory already uses. Each piece can be overridden via
- * `override` for tests or for callers that want to thread a non-ambient
- * accessor (mirrors the option-then-ambient shape of `createChallengeCategory`).
+ * Reads `getCurrentGameStateAccessor()` / `getCurrentEngineCategories()` /
+ * `getCurrentResourceRegistry()` — the same ambient values every category
+ * factory reads during install/connect. `override` replaces any of them, for
+ * tests or for callers that pass a non-ambient accessor (the
+ * option-then-ambient shape of `createChallengeCategory`).
  *
- * Never throws: a missing handle is only an error for a gate whose kinds
- * actually read it, which isn't knowable here. Evaluation demand-checks per
- * kind, and adoption sites holding the gate at construction can fail earlier
- * via {@link getRequiredGateServices}.
+ * Never throws: a missing Gate service is only an error for a Gate whose
+ * kinds read it, which isn't knowable here. Evaluation checks per kind, and
+ * adoption sites that hold the Gate at construction can fail earlier via
+ * {@link getRequiredGateServices}.
  *
- * The ambient triple is only set during an engine `install()` / `connect()`,
- * so call this there and close over the result — resolving lazily from a
+ * The ambient values are set only during an engine `install()` / `connect()`.
+ * So call this there and close over the result — a later call from a
  * player-driven path gets an empty bundle.
  */
 export function getAmbientGateServices(override?: GateServices): GateServices {
@@ -157,18 +160,18 @@ export function getAmbientGateServices(override?: GateServices): GateServices {
 // === EVALUATOR ===
 
 /**
- * Resolve a Gate to its current truth value against the engine's live state.
+ * Evaluate a Gate against the engine's live state now.
  *
- * @throws when a `cumulative-gte` references a resource id that's not
- *   registered in the resource registry. Loud-fail catches the authoring
- *   error at first evaluation rather than silently returning `false`.
+ * @throws when a `cumulative-gte` names a resource id that's not
+ *   registered in the resource registry. The throw catches the authoring
+ *   error at first evaluation, rather than silently returning `false`.
  *
  * @example
  * ```ts
  * // Inside a factory called from engine install/connect:
- * const runtime = getAmbientGateServices();
+ * const services = getAmbientGateServices();
  * const earned = computed(() =>
- *   evaluateGate({ kind: 'count-gte', category: 'jobs', entry: 'beggar', value: 10 }, runtime)
+ *   evaluateGate({ kind: 'count-gte', category: 'buildings', entry: 'farm', value: 10 }, services)
  * );
  * ```
  */
@@ -214,22 +217,23 @@ export function evaluateGate(gate: Gate, services: GateServices): boolean {
 // === PREDICTOR ===
 
 /**
- * Distance until `gate` flips truth value at current rates. Per-kind dispatch:
+ * Transition distance until `gate` flips, at current rates. Per-kind dispatch:
  *
  * - `resource-gte` — projects to `ResourceCondition` and delegates to
  *   {@link timeUntilConditionFlip}, which owns the rate × operator truth table.
  * - `cumulative-gte` — divides the gap in the cumulative total by the
- *   resource's inflow rate, since the total counts gains and ignores drains.
- *   With {@link GameStateAccessor.getInflowRate} the answer is exact under
- *   current rates, and `'no-rate'` means nothing flows in. Without it the net
- *   rate stands in: the seconds are an upper bound on the time to flip, exact
- *   when nothing drains the resource, and a net rate that isn't positive gives
- *   `'uncomputable'`, since inflow may still carry the total over. A gate
- *   already met gives `'no-rate'`: the total never falls, so only a reset
- *   flips it back.
- * - `count-gte` / `unlock` / `state` / `flag` — `'opaque-predicate'`. Category
- *   counts advance imperatively (purchases, achievement firings); `state` and
- *   `flag` are consumer-write surfaces. None has a mechanical distance.
+ *   resource's inflow rate, since the total counts gains and ignores
+ *   subtractions. With {@link GameStateAccessor.getInflowRate} the answer is
+ *   exact at current rates, and `'no-rate'` means nothing flows in. Without
+ *   it the net rate stands in: the seconds are an upper bound on the time to
+ *   flip, exact when nothing subtracts from the resource. A net rate that
+ *   isn't positive gives `'uncomputable'`, since inflow may still raise the
+ *   total past the threshold. A Gate that already holds gives `'no-rate'`: the
+ *   total never falls, so only a reset flips it back.
+ * - `count-gte` / `active` / `state` / `flag` — `'opaque-predicate'`. Category
+ *   counts change by discrete events (purchases, earned achievements), and
+ *   consumer code writes `state` and `flag` values. None has a transition
+ *   distance the engine can compute.
  * - `all` / `any` / `not` — builds `{ currentlyTrue, distance }` per child via
  *   {@link evaluateGate} + recursive {@link timeUntilGateFlip}, then delegates
  *   to {@link combineFlipDistances} for the combinator truth-table dispatch.
@@ -256,13 +260,13 @@ export function timeUntilGateFlip(gate: Gate, services: GateServices): Transitio
 }
 
 /**
- * The accessor slots whose change can move {@link timeUntilGateFlip}'s answer
+ * The accessor values whose change can move {@link timeUntilGateFlip}'s answer
  * for `gate`, for caches that re-predict only when one of them moves.
- * `cumulative-gte` names its base resource on both axes, standing for its
- * lifetime total and its inflow rate as well as its balance and net rate: a
- * drain that matches the inflow holds the latter two still while the total
- * climbs. Category kinds contribute nothing, since they move without any
- * accessor slot moving.
+ * `cumulative-gte` names its base resource on both axes. That stands for its
+ * cumulative total and inflow rate, as well as its amount and net rate. A
+ * subtraction that matches the inflow holds the latter two still while the
+ * total climbs. Category kinds add nothing, since they change without any
+ * accessor value changing.
  *
  * @internal
  */
@@ -328,9 +332,9 @@ function combinatorFlip(
 const boundServices = new WeakMap<object, GateServices>();
 
 /**
- * Record the runtime a Gate-holding instance evaluates through, so a harness
- * predictor reading that instance's gates later resolves the same registry
- * and categories.
+ * Record the Gate services a Gate-holding instance evaluates through. So a
+ * balance-harness predictor that later reads that instance's Gates uses the
+ * same resource registry and categories.
  *
  * @internal
  */
@@ -339,7 +343,7 @@ export function bindGateServices(owner: object, services: GateServices): void {
 }
 
 /**
- * The runtime {@link bindGateServices} recorded for `owner`, if any.
+ * The Gate services {@link bindGateServices} recorded for `owner`, if any.
  *
  * @internal
  */
@@ -347,22 +351,22 @@ export function getBoundGateServices(owner: object): GateServices | undefined {
   return boundServices.get(owner);
 }
 
-// === HANDLE ASSERTION ===
+// === SERVICE ASSERTION ===
 
 /**
- * Throw unless `runtime` carries every handle evaluating `gate` will read.
+ * Throw unless `services` has every Gate service that evaluating `gate` reads.
  *
- * Turns what would be a first-evaluation throw (often inside a `computed`,
- * where the stack is far from the authoring mistake) into one at the
- * registration callsite. Systems reach it through a
- * {@link PredicateResolver}, per definition as it registers.
+ * This moves a first-evaluation throw to the registration callsite. The first
+ * evaluation is often inside a `computed`, where the stack is far from the
+ * authoring mistake. Systems call it through a
+ * {@link PredicateResolver}, per def as it registers.
  *
  * @param label prefix for the error, normally the calling factory's name.
  *
  * @example
  * ```ts
- * const runtime = getAmbientGateServices();
- * assertGateServices(def.requirement, runtime, 'createAchievement');
+ * const services = getAmbientGateServices();
+ * assertGateServices(goalGate, services, 'createAchievement');
  * ```
  */
 export function assertGateServices(gate: Gate, services: GateServices, label: string): void {
@@ -371,7 +375,7 @@ export function assertGateServices(gate: Gate, services: GateServices, label: st
   const kinds = new Set<Gate['kind']>();
   forEachGateLeaf(gate, (leaf) => kinds.add(leaf.kind));
   throw new Error(
-    `${label}: this gate reads the ${missing.join(' and ')}, which the services don't carry. ` +
+    `${label}: this Gate reads the ${missing.join(' and ')}, which the GateServices bundle lacks. ` +
       `Gate kinds in play: ${[...kinds].join(', ')}. ${missing.map(serviceRemedy).join(' ')}`,
   );
 }
@@ -393,11 +397,11 @@ export interface AdoptedPredicate {
 
 /** Adopts a system's predicate fields against one captured {@link GateServices}. */
 export interface PredicateResolver {
-  /** The handles every adopted Gate evaluates through. */
+  /** The Gate services every adopted Gate evaluates through. */
   readonly services: GateServices;
   /**
-   * Adopt one predicate field. A Gate's handles are asserted now, so an
-   * unwired handle throws here, labelled, instead of at first evaluation.
+   * Adopt one predicate field. The Gate services a Gate reads are asserted
+   * now, so a missing one throws here, labelled, instead of at first evaluation.
    *
    * @param predicate - the authored field, or `undefined` when omitted
    * @param fallback - what an omitted field holds
@@ -411,19 +415,19 @@ export interface PredicateResolver {
 /**
  * Build the resolver a system adopts its predicate fields through.
  *
- * Captures the runtime once, from the ambient handles `createEngine` wires
- * during install/connect plus any `override`, so definitions registered
- * after that scope closes (late content, mods) still resolve.
+ * Captures the Gate services once, from the ambient values `createEngine`
+ * sets during install/connect plus any `override`. So defs registered after
+ * install/connect ends (late content, mods) can still evaluate.
  *
- * @param override - handles that win over the ambient ones, typically a
- *   system's `accessor` option
+ * @param override - Gate services that win over the ambient ones, typically
+ *   a system's `accessor` option
  * @returns A {@link PredicateResolver} whose `adopt` turns each field into a
  *   reactive `holds`, keeping the Gate for predictors
  *
  * @example
  * ```ts
  * const predicates = createPredicateResolver({ accessor });
- * // per definition, at register:
+ * // per def, at register:
  * const goal = predicates.adopt(def.goal, false, `challenge '${def.id}' goal`);
  * const canComplete = computed(() => active.value && goal.holds.value);
  * ```
@@ -453,13 +457,13 @@ export function createPredicateResolver(override?: GateServices): PredicateResol
 }
 
 /**
- * Evaluate a {@link Predicate} once against `runtime` — for consumer code
- * that reads a predicate field back off a definition.
+ * Evaluate a {@link Predicate} once against `services` — for consumer code
+ * that reads a predicate field back off a def.
  *
  * @example
  * ```ts
- * const runtime = getAmbientGateServices(); // inside install/connect
- * if (evaluatePredicate(def.goal, runtime)) celebrate();
+ * const services = getAmbientGateServices(); // inside install/connect
+ * if (evaluatePredicate(def.goal, services)) celebrate();
  * ```
  */
 export function evaluatePredicate(predicate: Predicate, services: GateServices): boolean {
@@ -470,23 +474,23 @@ export function evaluatePredicate(predicate: Predicate, services: GateServices):
 
 /** Options for {@link createGateRequirement}. */
 export interface GateRequirementOptions {
-  /** Predicate spec; resolved through the ambient services captured at call time. */
+  /** The Gate, evaluated through the ambient Gate services captured at call time. */
   gate: Gate;
   /** Optional UI-facing description (passed through to the underlying boolean requirement). */
   description?: Computable<string>;
 }
 
 /**
- * Build a {@link Requirement} that's met whenever its {@link Gate} evaluates
- * truthy. Systems-layer counterpart to `createBooleanRequirement` for the
- * declarative-Gate authoring path — drops into `purchasable.requirements`
- * arrays alongside cost requirements without consumer-side closures.
+ * Build a {@link Requirement} that's met whenever its {@link Gate} holds.
+ * The systems counterpart to `createBooleanRequirement` for Gate authoring:
+ * it goes into `purchasable.requirements` arrays beside cost requirements,
+ * with no consumer-side closures.
  *
- * Resolves the {@link GateServices} eagerly via {@link getAmbientGateServices},
- * so call inside an engine `install()` / `connect()`. The returned
- * Requirement is layer-clean (a plain core-layer `Requirement` shape) — it's
- * the *factory* that lives at systems-layer because Gate composes
- * `CategoryEntrySignals` and friends.
+ * Captures the {@link GateServices} eagerly via {@link getAmbientGateServices},
+ * so call it inside an engine `install()` / `connect()`. The returned
+ * Requirement is a plain core `Requirement`. Only the *factory* is in
+ * systems, because evaluating a Gate reads `CategoryEntrySignals` and other
+ * systems state.
  *
  * @example
  * ```ts
@@ -515,9 +519,9 @@ export function createGateRequirement(options: GateRequirementOptions): Requirem
 // === PRIVATE ===
 
 /**
- * Read a handle the current gate kind needs, or throw naming both. The message
- * carries the kind because "missing accessor" alone doesn't tell an author
- * which of their gates is at fault — and category-only gates never reach here.
+ * Read a Gate service the current Gate kind needs, or throw naming both. The
+ * message names the kind, because "missing accessor" alone doesn't tell an
+ * author which of their Gates is at fault.
  */
 function demand<K extends GateService>(
   services: GateServices,
@@ -527,18 +531,18 @@ function demand<K extends GateService>(
   const value = services[service];
   if (!value) {
     throw new Error(
-      `evaluateGate: '${kind}' gate needs the ${service}, which was not available on the GateServices. ` +
+      `evaluateGate: a '${kind}' Gate needs the ${service}, which the GateServices bundle lacks. ` +
         serviceRemedy(service),
     );
   }
   return value;
 }
 
-/** Where an author gets a missing handle from, for the error messages. */
+/** Where an author gets a missing Gate service from, for the error messages. */
 function serviceRemedy(service: GateService): string {
   return service === 'accessor'
-    ? 'Wire the accessor via createEngine({ accessor }) or pass one explicitly, and resolve the services inside engine install/connect.'
-    : `The ${service} resolves only inside engine install/connect; build the predicate resolver there.`;
+    ? 'Pass the accessor to createEngine({ accessor }) or pass one explicitly, and collect the Gate services inside engine install/connect.'
+    : `The ${service} is set only inside engine install/connect; build the predicate resolver there.`;
 }
 
 function cumulativeRefFor(resourceId: string, services: GateServices, kind: Gate['kind']) {
@@ -546,12 +550,12 @@ function cumulativeRefFor(resourceId: string, services: GateServices, kind: Gate
   if (!resource) {
     throw new Error(`Gate cumulative-gte: no resource '${resourceId}' registered`);
   }
-  // The cumulative slot is intrinsic to every persistent resource — created
-  // by createResource. A missing slot means the resource was created via the
-  // ref-wrapping overload (derived/computed), which can't host trackers.
+  // createResource builds a `cumulative` ref for every persistent resource.
+  // A missing one means the resource came from the ref-wrapping overload
+  // (derived/computed), which keeps no cumulative total.
   if (!resource.cumulative) {
     throw new Error(
-      `Gate cumulative-gte: resource '${resourceId}' was created from an existing ref and has no cumulative slot`,
+      `Gate cumulative-gte: resource '${resourceId}' was created from an existing ref and has no cumulative ref`,
     );
   }
   return resource.cumulative;

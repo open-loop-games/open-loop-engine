@@ -1,15 +1,15 @@
 /**
- * CycleLog system — per-cycle metric delta recording
+ * CycleLog system — per-run metric delta recording
  *
- * Records the change in each registered metric across a single cycle,
- * building a ring buffer of entries for analytics and UI.
+ * Records the change in each tracked metric across one run, building a ring
+ * buffer of entries for analytics and UI.
  *
  * - {@link createCycleLog} — sole factory, wires into Cycle lifecycle events
  *
  * Key features:
  * - Explicit metric registration (Persistent refs or getter functions)
- * - Snapshot at cycle start, delta computed before restart
- * - Ring buffer with configurable capacity and per-entry pinning
+ * - Snapshot at run start, delta computed on `beforeEnd`, before the reset
+ * - Ring buffer with a set capacity and per-entry pinning
  * - `finalized` event for downstream consumers (e.g. best-of tracking)
  *
  * @see {@link createCycle} for the Cycle lifecycle this composes with
@@ -26,8 +26,8 @@ import type { Cycle } from './cycle';
 // === TYPES ===
 
 /**
- * Opt-in discovery key for introspection tools (sim, balance workbench,
- * devtools). Games that maintain a canonical CycleLog publish it during
+ * Opt-in injection key for introspection tools (balance harness, balance
+ * workbench, devtools). Games that maintain a canonical CycleLog publish it during
  * `install()` or `connect()`:
  *
  * ```ts
@@ -41,23 +41,23 @@ import type { Cycle } from './cycle';
  */
 export const CycleLogKey: InjectionKey<CycleLog> = Symbol('engine:cycle-log');
 
-/** Configuration for {@link createCycleLog} */
+/** Options for {@link createCycleLog} */
 export interface CycleLogOptions {
   /** The Cycle instance whose lifecycle drives snapshot/diff timing */
   cycle: Cycle;
 
   /**
-   * Named metrics to record each cycle. Each value is either a Persistent ref
+   * Tracked metrics to record each run. Each value is either a Persistent ref
    * (read via `.value`) or a getter function (called each snapshot).
    * Use getters for computed quantities not stored in persistent refs.
    */
   metrics: Record<string, Persistent<DecimalSource> | (() => DecimalSource)>;
 
-  /** Maximum unpinned entries to retain in the ring buffer. Default: 10. */
+  /** The capacity for unpinned entries in the ring buffer. Default: 10. */
   maxLogs?: number;
 }
 
-/** Per-metric change recorded during a single cycle */
+/** Per-metric change recorded during one run */
 export interface CycleLogDelta {
   key: string;
   start: Decimal;
@@ -66,15 +66,15 @@ export interface CycleLogDelta {
   delta: Decimal;
 }
 
-/** A single cycle's recorded outcome */
+/** One run's recorded outcome */
 export interface CycleLogEntry {
-  /** Cycle number at finalize time (cycle.count before increment) */
+  /** Run number at finalize time (`cycle.count` before the increment) */
   runNumber: number;
   /** Elapsed time in seconds at finalize time */
   elapsed: number;
   timestamp: number;
   deltas: CycleLogDelta[];
-  /** Consumer-populated structured annotations from the cycle */
+  /** Consumer-populated structured annotations from the run */
   annotations: Record<string, unknown>;
   pinned: boolean;
 }
@@ -89,7 +89,7 @@ export interface CycleLogEvents {
  * A CycleLog instance — the returned object from {@link createCycleLog}.
  *
  * Subscribes to a Cycle's `beforeEnd`/`afterEnd` events to record
- * per-cycle metric deltas in a reactive ring buffer.
+ * per-run metric deltas in a reactive ring buffer.
  */
 export interface CycleLog {
   /** Reactive history buffer — newest entry is last */
@@ -97,16 +97,16 @@ export interface CycleLog {
   /** Subscribe to CycleLog events */
   on: Emittable<CycleLogEvents>['on'];
   /**
-   * Attach a named annotation to the current cycle's context.
-   * Context resets each cycle (on afterEnd) and is captured into the
-   * finalized entry. Calling with the same key overwrites the previous value.
+   * Attach a named annotation to the current run. Annotations clear at each
+   * `afterEnd` and are captured into the finalized entry. Calling with the
+   * same key overwrites the previous value.
    */
   annotate(key: string, value: unknown): void;
-  /** Pin an entry by index so it survives ring buffer pruning */
+  /** Pin an entry by index so ring buffer pruning skips it */
   pin(index: number): void;
   /** Unpin an entry by index, allowing it to be pruned */
   unpin(index: number): void;
-  /** Unsubscribe from cycle events */
+  /** Unsubscribe from the cycle's events. The log is ephemeral: nothing it holds is saved. */
   dispose(): void;
 }
 
@@ -119,15 +119,15 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
 // === FACTORIES ===
 
 /**
- * Create a CycleLog that records per-cycle metric deltas from a Cycle's lifecycle.
+ * Create a CycleLog that records per-run metric deltas from a Cycle's lifecycle.
  *
- * Snapshots all registered metrics at cycle start and computes deltas before
- * each restart. Works for both resetting resources (delta = accumulated value)
- * and permanent stats (delta = growth during the cycle).
+ * Snapshots all registered metrics at run start and computes deltas on each
+ * `beforeEnd`, before the reset. Works for both resetting resources (delta = the run's gain) and
+ * lifetime stats (delta = growth during the run).
  *
- * The snapshot is not saved. A metric whose value a save load or a reset
- * changes is re-snapshotted once the load or reset settles, so the first cycle
- * after a load counts growth since the load, and a reset mid-cycle doesn't
+ * The snapshot is not saved. A metric whose value a load or a reset
+ * changes is re-snapshotted once the load or reset settles. So the first run
+ * after a load counts growth since the load, and a reset mid-run doesn't
  * show up as a negative delta.
  *
  * @param options - Cycle to observe, metrics to track, and optional ring buffer size
@@ -136,10 +136,10 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  * @example
  * ```ts
  * const log = createCycleLog({
- *   cycle: gameLoop,
+ *   cycle,
  *   metrics: {
- *     gold: goldResource,                    // Persistent ref (resets each cycle)
- *     totalStrength: () => strength.base,    // Getter (permanent stat)
+ *     gold: goldResource,                    // Persistent ref (reset at each end)
+ *     totalStrength: () => strength.base,    // Getter (lifetime stat)
  *   },
  *   maxLogs: 15,
  * });
@@ -189,7 +189,7 @@ export function createCycleLog(options: CycleLogOptions): CycleLog {
   // Metrics a load or reset moved, re-snapshotted once it settles: each is
   // sampled as the first write begins and compared once hydration runs, so a
   // nested or held load samples once. Comparing values (rather than
-  // re-snapshotting everything) keeps an unmoved permanent stat's growth so
+  // re-snapshotting everything) keeps an unmoved lifetime stat's growth so
   // far, and ignores another engine's load.
   let preLoad: Record<string, Decimal> | undefined;
   const scope = effectScope();

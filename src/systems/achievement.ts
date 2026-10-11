@@ -1,21 +1,21 @@
 /**
- * Achievement system — milestone tracking with auto-unlock and tiered rewards
+ * Achievement system — achievements earned automatically when their goal holds, with ladders and effect values
  *
- * Achievements record once-and-stay-earned progress markers. Each instance
- * carries persistent `earned` + `earnedAt` state, an optional reactive
- * `effect` value granted while earned, and a `requirement` watch that
- * auto-completes the achievement whenever the requirement holds and it isn't
- * earned. A save load restores `earned` as state: it fires no `onComplete`.
+ * Achievements record progress that stays earned once earned. Each instance
+ * has persistent `earned` and `earnedAt` refs, an optional reactive `effect`
+ * value that applies while earned, and a `goal` watch. The watch completes
+ * the achievement whenever the goal holds and it isn't earned. A load sets
+ * `earned` from the save: it calls no `onComplete`.
  *
- * The category factory {@link createAchievementCategory} is the consumer
- * front door for batch-registering achievements; its `registerLadder`
- * method fans one tracked value into a run of threshold-gated tiers.
+ * Consumers batch-register achievements through the category factory
+ * {@link createAchievementCategory}. Its `registerLadder` method fans one
+ * tracked value into a ladder of rungs, each blocked by a threshold.
  * {@link createAchievement} is engine-internal.
  *
- * Aggregator helpers ({@link getCombinedAchievementEffect} multiplicative,
- * {@link getEarnedCount} reactive count) live alongside the factory.
+ * Utilities over a list ({@link getCombinedAchievementEffect}, a product;
+ * {@link getEarnedCount}, a count) are beside the factory.
  *
- * Batch-registration over a content registry lives in
+ * Batch registration over a content registry is in
  * `./achievement-category` ({@link createAchievementCategory}).
  */
 
@@ -34,47 +34,47 @@ import { createPredicateResolver, type Gate, type Predicate, type PredicateResol
 
 // === TYPES ===
 
-/** Display text shown on an achievement tile */
+/** Display text shown on an achievement card */
 export interface AchievementDisplay {
   title: string;
-  /** Flavour text or requirement hint shown before the achievement is earned */
+  /** Flavour text or goal hint shown before the achievement is earned */
   description?: string;
-  /** Short description of the bonus granted when the achievement is earned */
+  /** Short description of the effect value that applies once the achievement is earned */
   effectDescription?: string;
 }
 
 /**
- * Configuration for {@link createAchievement}.
+ * Options for {@link createAchievement}.
  *
- * `requirement` and `effect` accept refs/getters and so participate in Vue
- * reactivity — while the requirement holds the achievement auto-completes on
- * the next sync flush, or once a load or reset settles. If `requirement` is
- * omitted the achievement only earns via an explicit
+ * `goal` and `effect` accept refs and getters, so they take part in Vue
+ * reactivity. While the goal holds, the achievement completes on the next
+ * sync flush, or once a load or reset settles. If `goal` is omitted, the
+ * achievement is earned only through an explicit
  * {@link Achievement.complete} call.
  *
  * @typeParam T - Type of the reactive `effect` value exposed once earned
  */
 export interface AchievementOptions<T = unknown> {
-  /** Unique identifier; also the persistence sub-context name. */
+  /** Unique among the achievements in its persistent context; also part of its child persistent context id. */
   id: string;
 
   /** Display information */
   display: AchievementDisplay;
 
   /**
-   * Requirement that must hold for the achievement to auto-earn.
+   * The goal: the predicate that earns the achievement when it holds.
    *
-   * A boolean, ref or getter closes over scope refs and is opaque to the
-   * predictor. A {@link Gate} resolves through the runtime the achievement
-   * category captured at construction, and predictor consumers read it back
-   * as `Achievement.gate` to call `timeUntilGateFlip` for distance projection.
+   * A boolean, ref or getter closes over consumer refs and is opaque to the
+   * predictor. A {@link Gate} evaluates through the Gate services the
+   * achievement category captured at construction. Predictor consumers read it
+   * back as `Achievement.gate` and call `timeUntilGateFlip` for its transition distance.
    *
-   * If omitted, the achievement only earns via an explicit
+   * If omitted, the achievement is earned only through an explicit
    * {@link Achievement.complete} call.
    */
   goal?: Predicate;
 
-  /** The effect/reward value when this achievement is earned. */
+  /** The effect value while this achievement is earned. */
   effect?: Computable<T>;
 
   /** Whether this achievement is hidden until earned. Default: `false` */
@@ -86,12 +86,12 @@ export interface AchievementOptions<T = unknown> {
   /** Optional image URL for the achievement */
   image?: Computable<string>;
 
-  /** Use smaller display variant */
+  /** Whether to show the compact card */
   compact?: Computable<boolean>;
 
   /**
-   * Callback when the achievement is earned. Never fires for an achievement a
-   * load restores as earned, so it can grant a reward.
+   * Option callback called when the achievement is earned. Never called for an
+   * achievement a load sets as earned, so it can give a reward.
    */
   onComplete?: () => void;
 
@@ -104,38 +104,38 @@ export interface Achievement<T = unknown> {
   id: string;
   display: AchievementDisplay;
   /**
-   * The {@link Gate} this achievement was constructed with, when its
-   * `requirement` was authored as a Gate. `undefined` for Computable-form
-   * requirements (closures opaque to the predictor) or no requirement.
-   * Predictor consumers call `timeUntilGateFlip(gate, runtime)` to project
-   * remaining distance.
+   * The {@link Gate} this achievement was built with, when its
+   * `goal` was authored as a Gate. `undefined` for a Computable-form
+   * goal (a closure opaque to the predictor) or no goal.
+   * Predictor consumers call `timeUntilGateFlip(gate, services)` for the
+   * remaining transition distance.
    */
   gate: Gate | undefined;
   /**
    * Whether the achievement has been earned (persistent). Tagged `lifetime`
    * with `earnedAt`, so no module reset or category walk un-earns it; a hard
-   * wipe names both refs in `thingsToReset`.
+   * reset names both refs in `thingsToReset`.
    */
   earned: Ref<boolean>;
   /** Unix timestamp (ms) when the achievement was earned, or null if not yet earned */
   earnedAt: Ref<number | null>;
-  /** Reactive bonus value, or undefined when no effect was configured */
+  /** Reactive effect value, or undefined when no `effect` is set */
   effect: Ref<T> | undefined;
-  /** Whether the achievement tile is hidden until earned */
+  /** Whether the achievement card is hidden until earned */
   hidden: Ref<boolean>;
-  /** Whether the achievement tile is shown in the achievements UI at all */
+  /** Whether the achievement card is shown in the achievements UI at all */
   visible: Ref<boolean>;
-  /** Optional badge image URL, or undefined when none was configured */
+  /** Optional badge image URL, or undefined when none is set */
   image: Ref<string> | undefined;
-  /** Whether to render the compact/small tile variant */
+  /** Whether to show the compact card */
   compact: Ref<boolean>;
-  /** Whether to emit a popup notification when this achievement is earned */
+  /** Whether to show a popup notification when this achievement is earned */
   showPopup: boolean;
-  /** Callback invoked when the achievement is earned */
+  /** The `onComplete` option callback, if set */
   onComplete?: () => void;
   /** Imperatively award the achievement. No-op if already earned. */
   complete: () => void;
-  /** True when the requirement is satisfied and the achievement is not yet earned */
+  /** `true` when the goal holds and the achievement is not yet earned */
   canComplete: Ref<boolean>;
   /** Subscribe to this achievement's events */
   on: Emittable<AchievementEvents>['on'];
@@ -145,7 +145,7 @@ export interface Achievement<T = unknown> {
  * Events emitted by an Achievement instance
  */
 export interface AchievementEvents {
-  /** Fired when the achievement transitions from unearned to earned */
+  /** Emitted when the achievement changes from unearned to earned */
   earned: () => void;
 }
 
@@ -153,15 +153,15 @@ export interface AchievementEvents {
 
 /**
  * Engine-internal raw Achievement factory. Consumers reach this through
- * {@link createAchievementCategory} (the L2 front door); tier ladders go
+ * {@link createAchievementCategory} (L2); ladders go
  * through `category.registerLadder({...})`.
  *
- * A once-and-stay-earned milestone with optional reactive effect and
- * auto-completing requirement watch.
+ * An achievement that stays earned once earned, with an optional reactive
+ * effect and a goal watch that completes it.
  *
  * @param predicates - resolver the predicate fields adopt through; the
  *   category passes the one it built, so content registered after install
- *   still resolves. Defaults to one over the ambient runtime.
+ *   still resolves. Defaults to one over the ambient Gate services.
  *
  * @internal
  */
@@ -182,12 +182,12 @@ export function createAchievement<T = unknown>(
     showPopup = true,
   } = options;
 
-  // Compose the ambient context with this achievement's id so save keys carry
-  // the parent scope (the category's `${categoryId}/${def.id}`, matching every
-  // sibling) while staying unique. A flat `achievement:${id}` dropped the scope
-  // (two categories reusing a def id collided); collapsing onto the bare parent
-  // instead collides when several achievements share one context. Mirrors
-  // category-base / timed-progress `${parent}/${local}` nesting.
+  // Nest this achievement's id under the enclosing persistent context, so save
+  // keys contain the category's `${categoryId}/${def.id}` like every sibling's
+  // and stay unique. A flat `achievement:${id}` would collide when two
+  // categories reuse a def id; the bare enclosing persistent context would
+  // collide when several achievements share it. Same `${parent}/${local}`
+  // nesting as category-base and timed-progress.
   const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/achievement:${id}` : `achievement:${id}`;
   const { earned, earnedAt } = withPersistentContext(contextId, () => ({
@@ -238,8 +238,8 @@ export function createAchievement<T = unknown>(
     },
   };
 
-  // A requirement that holds when a load or reset settles earns too: one
-  // added since the save, or one whose `earned` a reset wiped.
+  // A goal that holds when a load or reset settles earns too: one added
+  // since the save, or one whose `earned` a reset cleared.
   if (requirement !== undefined) latchWhenSettled(canComplete, () => achievement.complete());
 
   return attachPersistentContextReset(achievement, contextId);
@@ -269,7 +269,7 @@ export function getCombinedAchievementEffect(
   return result;
 }
 
-/** Reactive count of how many achievements in the list are currently earned. */
+/** Count of the earned achievements in the list; reactive when read inside a `computed`. */
 export function getEarnedCount(achievements: Achievement[]): number {
   return achievements.filter((a) => a.earned.value).length;
 }

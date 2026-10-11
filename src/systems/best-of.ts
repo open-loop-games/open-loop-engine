@@ -1,19 +1,19 @@
 /**
  * BestOf tracker — per-metric best-of-run recording
  *
- * Tracks which cycle run produced the best outcome for each registered metric,
- * with optional strategy snapshot capture for reproducibility.
+ * Tracks which run produced the best outcome for each registered metric,
+ * with optional configuration snapshot capture for reproducibility.
  *
  * - {@link createBestOf} — sole factory, optionally wires into CycleLog `finalized` events
  *
  * Key features:
- * - Declared metrics with configurable comparison mode (absolute or per-second)
- * - Optional projection functions to estimate permanent gain from observed deltas
+ * - Declared metrics with a selectable comparison mode (absolute or per-second)
+ * - Optional projection functions to estimate lifetime gain from observed deltas
  * - Automatic tracking via CycleLog integration or manual submit()
- * - Strategy snapshot capture for recording winning configurations
- * - Explicit invalidation with stale state preservation
- * - Persistent storage across sessions via persistent(), tagged `lifetime` so
- *   a reset of the owning module keeps the records (`clearAll()` wipes them)
+ * - Configuration snapshot capture for recording the winning configuration
+ * - Explicit invalidation that keeps stale records
+ * - Saved records (persistent()), tagged `lifetime`, so a reset keeps them
+ *   unless it names them (`clearAll()` clears them)
  *
  * @see {@link createCycleLog} for the delta source this composes with
  */
@@ -37,19 +37,19 @@ export type ComparisonMode = 'absolute' | 'perSecond';
 /** Which value to use for comparison when a projection function is provided */
 export type CompareBy = 'observed' | 'projected';
 
-/** Per-metric configuration for {@link createBestOf} */
+/** One metric's def for {@link createBestOf} */
 export interface BestOfMetricDef {
   /** How to compare: highest absolute delta, or highest delta per second */
   mode: ComparisonMode;
 
   /**
-   * Optional projection function that converts observed delta into estimated
-   * permanent gain. Called at submit time with the candidate's observed value
-   * and the current game state context.
+   * Optional projection function that converts an observed delta into an
+   * estimated lifetime gain. Called at submit time with the candidate's
+   * observed value.
    *
    * @example
    * ```ts
-   * // Project transient stat gain into permanent base increase
+   * // Project a run's stat gain into a lifetime base increase
    * project: (observed) => retentionFormula(observed, currentBase)
    * ```
    */
@@ -63,12 +63,12 @@ export interface BestOfMetricDef {
 
   /**
    * When set (and > 0), the stored incumbent's comparison value decays with
-   * age measured in cycle count: every `recencyHalfLifeRuns` cycles that pass
-   * between the incumbent's cycle and the current candidate's cycle halve its
-   * effective value. The candidate is always treated as fresh (no decay).
+   * its age in runs. Every `recencyHalfLifeRuns` runs between the incumbent's
+   * run and the current candidate's run halve its effective value. The
+   * candidate is always treated as fresh (no decay).
    *
    * Intended for "recency bias" features where the advisor should favor
-   * fresh runs over calcified high-water marks. Leave unset for classic
+   * fresh runs over old high-water marks. Leave unset for classic
    * strict best-of behavior.
    */
   recencyHalfLifeRuns?: number;
@@ -83,11 +83,11 @@ export interface BestOfEntry {
   value: Decimal;
   /** Delta per second — always computed, even for absolute mode (useful for display) */
   perSecond: Decimal;
-  /** Projected permanent gain, if a projection function was provided */
+  /** Projected lifetime gain, if a projection function was provided */
   projected: Decimal | undefined;
-  /** Cycle duration in seconds */
+  /** Run duration in seconds */
   elapsed: number;
-  /** Which cycle number produced this */
+  /** The run number that produced this */
   runNumber: number;
   /** When this record was set (Unix ms) */
   timestamp: number;
@@ -97,7 +97,7 @@ export interface BestOfEntry {
   status: BestOfStatus;
 }
 
-/** Serialized form stored in persistent — Decimals as strings */
+/** A BestOfEntry's serialized form, saved in the store — Decimals as strings */
 interface SerializedBestOfEntry {
   value: string;
   perSecond: string;
@@ -117,9 +117,9 @@ export interface BestOfCandidate {
   value: DecimalSource;
   /** Elapsed time in seconds */
   elapsed: number;
-  /** Cycle number */
+  /** Run number */
   runNumber: number;
-  /** Override for strategy snapshot (takes precedence over captureConfig) */
+  /** Configuration snapshot; takes precedence over `captureConfig` */
   configSnapshot?: Serializable;
 }
 
@@ -129,31 +129,31 @@ export interface BestOfEvents {
   bestImproved: (key: string, entry: BestOfEntry) => void;
 }
 
-/** Configuration for {@link createBestOf} */
+/** Options for {@link createBestOf} */
 export interface BestOfOptions {
-  /** Persistence namespace (required for save/load) */
+  /** Persistent context id */
   id: string;
 
-  /** Metric definitions: which keys to track and how to compare them */
+  /** Metric defs: which keys to track and how to compare them */
   metrics: Record<string, BestOfMetricDef>;
 
   /** Auto-subscribe to a CycleLog's `finalized` event for automatic tracking */
   cycleLog?: CycleLog;
 
-  /** Called to capture the current strategy/config when a new best is recorded */
+  /** Captures the current configuration when a new best is recorded */
   captureConfig?: () => Serializable;
 }
 
 /**
  * A BestOf instance — the returned object from {@link createBestOf}.
  *
- * Tracks per-metric best cycle outcomes with comparison, invalidation,
+ * Tracks the best run outcome per metric, with comparison, invalidation,
  * and optional CycleLog integration.
  */
 export interface BestOf {
   /** Reactive map of current best per metric key (null if no best recorded) */
   readonly entries: ComputedRef<Record<string, BestOfEntry | null>>;
-  /** The metric definitions this tracker was created with, by key */
+  /** The metric defs this tracker was created with, by key */
   readonly metrics: Readonly<Record<string, BestOfMetricDef>>;
   /** Subscribe to BestOf events */
   on: Emittable<BestOfEvents>['on'];
@@ -170,11 +170,11 @@ export interface BestOf {
   /**
    * Runtime override for incumbent recency decay, applied to every metric
    * on this instance. Pass a positive number to enable age-based decay
-   * (half-life in cycle count), or `undefined` to clear the override and
+   * (half-life in runs), or `undefined` to clear the override and
    * fall back to each metric's static `recencyHalfLifeRuns` option.
    *
-   * Useful for toggling decay at runtime without mutating shared metric
-   * config objects.
+   * Useful for toggling decay during play without mutating shared metric
+   * defs.
    */
   setRecencyHalfLifeRuns(halfLifeRuns: number | undefined): void;
   /**
@@ -225,13 +225,13 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
 // === FACTORIES ===
 
 /**
- * Create a BestOf tracker that records the best cycle outcome per metric.
+ * Create a BestOf tracker that records the best run outcome per metric.
  *
- * Compares each new cycle result against the stored best and replaces it when
+ * Compares each new run's result against the stored best and replaces it when
  * the new result wins. Supports both automatic tracking via CycleLog and manual
  * submission for custom metric sources.
  *
- * @param options - Persistence ID, metric definitions, optional CycleLog and strategy capture
+ * @param options - Persistent context id, metric defs, optional CycleLog and configuration capture
  * @returns A BestOf with reactive entries, submit/invalidate/clear API, and `bestImproved` event
  *
  * @example
@@ -283,10 +283,10 @@ export function createBestOf(options: BestOfOptions): BestOf {
 
   /**
    * Decay the incumbent's comparison value by its age. Age is measured in
-   * cycles between the incumbent and the current candidate. Returns the
-   * original value unchanged when no half-life is configured or the age
-   * is non-positive (candidate from same or earlier cycle — shouldn't happen
-   * in practice, but clamped defensively).
+   * runs between the incumbent and the current candidate. Returns the
+   * original value unchanged when no half-life is set or the age
+   * is non-positive (candidate from the same or an earlier run — shouldn't
+   * happen in practice, but clamped defensively).
    */
   function applyRecencyDecay(
     existingVal: Decimal,

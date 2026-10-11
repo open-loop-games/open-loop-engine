@@ -4,30 +4,30 @@
  * Turns N input resources into M output resources atomically: input costs are
  * snapshotted, outputs evaluate against the snapshot, inputs are paid, outputs
  * are added. Crafting recipes, market trades, and exchanges are the shape it
- * is built for — the machinery that earns its keep is multi-input atomicity
- * and the pre-payment snapshot.
+ * is built for. What it adds is multi-input atomicity and the pre-payment
+ * snapshot.
  *
- * Inputs adopt the Requirements surface — each input is a Requirement.
- * Multi-input gating and payment delegate to `requirementsMet()` /
- * `payRequirements()`. The snapshot is keyed by the user-chosen input keys and
- * only includes CostRequirements; boolean gates and other non-cost
- * Requirements contribute nothing to the snapshot but still gate `canConvert`.
+ * Each input is a Requirement. Multi-input checks and payment delegate to
+ * `requirementsMet()` / `payRequirements()`. The snapshot is keyed by the
+ * consumer-chosen input keys and only includes CostRequirements. Boolean and
+ * other non-cost Requirements contribute nothing to the snapshot, but they
+ * still block `canConvert`.
  *
  * That gives two legitimate shapes, and shipping code uses both:
  *
- * - **Paying exchange** — inputs are CostRequirements, the snapshot carries
- *   what was charged, outputs are a function of it. The recipe case.
- * - **Gated trigger** — inputs are `createBooleanRequirement`s (or costs with
- *   `requiresPay: false`) that pay nothing, the output amount is precomputed
- *   elsewhere, and the real "spend" is a `createReset` fired from
- *   `afterConvert`. The prestige case. Nothing about it is a misuse; a
- *   Requirement is not obliged to charge, which is why `anyOf` documents the
- *   pure-gate branch explicitly.
+ * - **Paying exchange** — inputs are CostRequirements, the snapshot records
+ *   what they cost, and outputs are a function of it. The recipe case.
+ * - **Unpaid trigger** — inputs are `createBooleanRequirement`s (or costs with
+ *   `requiresPay: false`) that pay nothing, and the output amount is
+ *   precomputed elsewhere. The real "spend" is a `createReset` run from
+ *   `afterConvert`. The prestige case. Nothing about it is a misuse: a
+ *   Requirement need not have a cost, which is why `anyOf` documents the
+ *   cost-free branch explicitly.
  *
  * Prestige does not *need* this factory — `createReset` plus a gain function
- * is the whole pattern, and several shipping games compose it that way. Reach
- * for a Conversion when you want the atomic gate + gain + reset bundled behind
- * one `convert()`, not because prestige is expected to live here.
+ * is the whole pattern, and several shipping games compose it that way. Use a
+ * Conversion when you want the atomic check + gain + reset bundled behind one
+ * `convert()`, not because prestige belongs here.
  *
  * - {@link createConversion} — the factory
  */
@@ -49,21 +49,21 @@ import {
  * One output of a conversion: which Resource gets the gain, and how much.
  *
  * `amount` is a {@link Computable} for static / reactive values, or a function
- * over the consumed-input snapshot for variable exchanges. Snapshot keys match
+ * over the input snapshot for variable exchanges. Snapshot keys match
  * the keys in the conversion's `inputs` record, and only CostRequirement
  * inputs appear.
  *
- * The two arms overlap by construction — `Computable` already admits a
- * zero-argument getter, so `() => gain.value` and `({ gold }) => …` are the
- * same arm as far as the type is concerned, distinguished only by whether the
- * body wants the snapshot. Both are called before any payment, so a getter
+ * The two arms necessarily overlap, because `Computable` already admits a
+ * zero-argument getter. To the type, `() => gain.value` and `({ gold }) => …`
+ * are the same arm. Only whether the body wants the snapshot tells them
+ * apart. Both are called before any payment, so a getter
  * reading a live resource sees pre-conversion state too; the snapshot exists
- * for the one thing a getter cannot reach, which is *what the inputs charged*.
+ * for the one thing a getter cannot reach, which is *what the inputs cost*.
  */
 export interface ConversionOutput {
-  /** The resource that receives the produced amount. */
+  /** The resource that receives the output amount. */
   resource: Resource;
-  /** Constant, reactive, or snapshot-aware amount specification. */
+  /** Constant, reactive, or snapshot-aware amount. */
   amount: Computable<DecimalSource> | ((consumed: Record<string, Decimal>) => DecimalSource);
 }
 
@@ -72,23 +72,24 @@ export interface ConversionOptions<
   I extends Record<string, Requirement> = Record<string, Requirement>,
   O extends Record<string, ConversionOutput> = Record<string, ConversionOutput>,
 > {
-  /** Input requirements keyed by user-chosen identifier. */
+  /** Input requirements keyed by consumer-chosen key. */
   inputs: I;
-  /** Outputs keyed by user-chosen identifier. */
+  /** Outputs keyed by consumer-chosen key. */
   outputs: O;
   /**
-   * Hook fired before payment + production. Receives the predicted produced
-   * amounts. Returning `false` cancels the conversion (no mutation occurs).
+   * Option callback run before payment and output. Receives the predicted
+   * output amounts. Returning `false` cancels the conversion (no mutation occurs).
    */
   onConvert?: (conversion: Conversion, produced: Record<string, Decimal>) => boolean | void;
   /**
-   * Hook fired after production. Compose layer resets here, log to telemetry,
-   * trigger animations. Receives the actual produced amounts.
+   * Option callback run after the outputs are added. Compose prestige-layer
+   * resets here, log to telemetry, or start animations. Receives the actual
+   * output amounts.
    */
   afterConvert?: (conversion: Conversion, produced: Record<string, Decimal>) => void;
 }
 
-/** A conversion instance returned by {@link createConversion}. */
+/** The conversion {@link createConversion} returns. */
 export interface Conversion {
   /** Input requirements keyed as supplied to the factory. */
   inputs: Record<string, Requirement>;
@@ -96,10 +97,10 @@ export interface Conversion {
   outputs: Record<string, Resource>;
   /** True when all input requirements are met. */
   canConvert: ComputedRef<boolean>;
-  /** Output amounts that would be produced if `convert()` ran right now. */
+  /** Output amounts `convert()` would add if it ran right now. */
   currentGain: ComputedRef<Record<string, Decimal>>;
   /**
-   * Execute the conversion. Returns the produced amounts, or an empty record
+   * Execute the conversion. Returns the output amounts, or an empty record
    * if `canConvert` is false or `onConvert` returns `false`.
    */
   convert(): Record<string, Decimal>;
@@ -115,10 +116,10 @@ export interface Conversion {
  * 1. Bail with `{}` if `!canConvert.value`.
  * 2. Build snapshot from `getCost(1)` per CostRequirement input.
  * 3. Compute `produced` from outputs against the snapshot.
- * 4. Fire `onConvert`. Bail with `{}` if it returns `false`.
+ * 4. Call `onConvert`. Bail with `{}` if it returns `false`.
  * 5. Pay all input requirements (left-to-right via `payRequirements`).
  * 6. Add `produced[key]` to each output resource.
- * 7. Fire `afterConvert`.
+ * 7. Call `afterConvert`.
  * 8. Return `produced`.
  *
  * Steps 2–3 run before step 5, so an output reading the snapshot is
@@ -155,11 +156,11 @@ export interface Conversion {
  *
  * @example
  * ```ts
- * // Gated trigger: no cost, the reset is the spend.
+ * // Unpaid trigger: no cost, the reset is the spend.
  * createConversion({
  *   inputs: {
  *     ready: createBooleanRequirement({
- *       requirement: () => Decimal.gte(runs.value, 50),
+ *       met: () => Decimal.gte(runs.value, 50),
  *       description: 'Reached run 50',
  *     }),
  *   },

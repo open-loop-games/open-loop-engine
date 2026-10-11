@@ -1,16 +1,16 @@
 /**
- * Binding slots — fixed chain positions for one effect definition's bindings
+ * Binding slots — fixed chain positions for one effect-system def's lowered grants
  *
- * Both effect systems bind a definition's modifiers when it activates and
- * unbind them when it ends. Appending on every activation would make a
- * chain's value depend on activation history; routing each binding through a
- * slot reserved on its chain keeps it where the definition first claimed it.
+ * Both effect systems bind a def's grants when it activates and unbind them
+ * when it ends. Appending on every activation would make a chain's value
+ * depend on activation history. Routing each lowered grant through a slot
+ * reserved on its chain keeps it where the def first claimed it.
  *
- * A binding can also carry wraps — functions applied to whatever it resolves
- * to, on the live activations and on every later one until removed. The
- * balance harness perturbs effect content through them, reaching a
- * definition's slots by its system and id via {@link wrapBinding}, and
- * tells an effect's modifiers from a chain's own via {@link isSlotBound}.
+ * A lowered grant can also have wraps — functions applied to whatever it
+ * resolves to, on the live activations and on every later one until removed.
+ * The balance harness perturbs effect content through them. It reaches a
+ * def's slots by its system and id via {@link wrapBinding}, and tells an
+ * effect's modifiers from a chain's own via {@link isSlotBound}.
  *
  * @cluster effects
  */
@@ -21,13 +21,13 @@ import { lowerGrants } from './replacement-grants';
 
 // === TYPES ===
 
-/** A transform over the modifier a binding resolves to. */
+/** A transform over the modifier a lowered grant resolves to. */
 export type ModifierWrap = (modifier: Modifier) => Modifier;
 
 /**
  * Wraps stacked over one base modifier, each wrapping the ones before it.
  *
- * @internal Binding wraps, and the balance harness's chain-modifier wraps.
+ * @internal Lowered-grant wraps, and the balance harness's chain-modifier wraps.
  */
 export interface WrapStack {
   /**
@@ -41,7 +41,7 @@ export interface WrapStack {
   readonly size: number;
 }
 
-/** One definition's reserved chain positions and live bindings. */
+/** One def's reserved chain positions and live lowered grants. */
 export interface BindingSlots {
   /**
    * Bind one activation's modifiers at their positions.
@@ -50,11 +50,11 @@ export interface BindingSlots {
    */
   bind(): () => void;
   /**
-   * Wrap binding `index` in every activation, live and later, until the
-   * returned cleanup runs. Overlays stack: each wraps the ones before it.
+   * Wrap lowered grant `index` in every activation, live and later, until the
+   * returned cleanup runs. Wraps stack: each wraps the ones before it.
    */
   wrap(index: number, wrap: ModifierWrap): () => void;
-  /** Release every slot this definition reserved. */
+  /** Release every slot this def reserved. */
   release(): void;
 }
 
@@ -62,7 +62,7 @@ export interface BindingSlots {
 interface LiveBinding {
   index: number;
   slot: ModifierChainSlot;
-  /** What the binding resolved to, before wraps. */
+  /** What the lowered grant resolved to, before wraps. */
   resolved: Modifier;
   /** Removes the object actually standing in the slot. */
   remove: () => void;
@@ -71,7 +71,7 @@ interface LiveBinding {
 // === FACTORIES ===
 
 /**
- * How many live bindings each object stands in, across every definition — a
+ * How many live lowered grants each object stands in, across every def — a
  * static modifier can stand in several activations at once.
  */
 const seated = new WeakMap<Modifier, number>();
@@ -108,21 +108,21 @@ export function createWrapStack(reseat: () => void): WrapStack {
 }
 
 /**
- * Create the slot table for one effect definition's `modifiers`.
+ * Create the slot table for one effect-system def's `grants`.
  *
  * A static list lowers here and claims its chain positions at once, so each
- * binding evaluates at the same place whenever the effect activates. A
+ * lowered grant evaluates at the same place whenever the effect activates. A
  * factory lowers on every `bind` and claims each position on first use.
  *
  * @param predicates - adopts each grant's `when`
- * @param owner - names the definition in a `when` Gate's error
+ * @param owner - names the def in a `when` Gate's error
  */
 export function createBindingSlots(
   modifiers: readonly Grant[] | (() => readonly Grant[]) | undefined,
   predicates: PredicateResolver,
   owner: string,
 ): BindingSlots {
-  // A factory-form binding list can aim one index at different chains across
+  // A factory-form grant list can aim one index at different chains across
   // activations, so each (index, chain) pair keeps its own slot.
   const byIndex = new Map<number, Map<ModifierChain, ModifierChainSlot>>();
   const wrapStacks = new Map<number, WrapStack>();
@@ -159,7 +159,7 @@ export function createBindingSlots(
     };
   }
 
-  /** Re-seat binding `index`'s live modifiers under the current wraps, keeping slot order. */
+  /** Re-seat lowered grant `index`'s live modifiers under the current wraps, keeping slot order. */
   function reseat(index: number): void {
     const affected = live.filter((binding) => binding.index === index);
     for (const binding of affected) binding.remove();
@@ -210,11 +210,11 @@ export function createBindingSlots(
 
 // === HARNESS ACCESS ===
 
-/** Effect system → its definitions' slot tables, by def id. */
+/** Effect system → its defs' slot tables, by def id. */
 const slotsBySystem = new WeakMap<object, (defId: string) => BindingSlots | undefined>();
 
 /**
- * Make `system`'s definitions reachable by {@link wrapBinding}.
+ * Make `system`'s defs reachable by {@link wrapBinding}.
  *
  * @internal Called once by each effect-system factory.
  */
@@ -226,11 +226,11 @@ export function registerBindingSlots(
 }
 
 /**
- * Overlay binding `index` of definition `defId` in `system`; see
+ * Wrap lowered grant `index` of def `defId` in `system`; see
  * {@link BindingSlots.wrap}.
  *
  * @internal The balance harness's content perturbation.
- * @throws {Error} when `system` doesn't bind through slots or has no such definition.
+ * @throws {Error} when `system` doesn't bind through slots or has no such def.
  */
 export function wrapBinding(
   system: object,
@@ -247,8 +247,8 @@ export function wrapBinding(
 
 /**
  * Whether `modifier` stands in a binding slot: an effect activation put it
- * in its chain and removes it when the effect ends, so only the effect's own
- * binding can perturb it without stranding a wrapper there.
+ * in its chain and removes it when the effect ends. So only a wrap on the
+ * effect's own lowered grant can perturb it without stranding a wrapper there.
  *
  * @internal The balance harness's picker and perturbation.
  */

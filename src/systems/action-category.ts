@@ -1,35 +1,37 @@
 /**
  * Action Category — batch-registered ordered-execution queue with per-execution state machine.
  *
- * Wraps `createSequencer` with engine-managed per-execution slots (lifecycle,
- * progress, attempt, error, timing) on each enqueued item. Polymorphism via
- * per-mapping `tick` closures supplied at register time — mirrors
- * {@link createProducerCategory}'s per-mapping discriminator discipline.
+ * Wraps `createSequencer` with engine-managed per-execution fields (`status`,
+ * `progress`, `attempt`, `error`, `timing`) on each enqueued item. Polymorphism
+ * comes from per-mapping `tick` closures supplied at register time. It is
+ * like {@link createProducerCategory}, where each mapping picks its behavior
+ * with a discriminant (`trigger`).
  *
  * Three-way state split:
- * - Per-def state → `entry.state` (createCategoryBase per-def slot, persistent
- *   across enqueues, resets per loop/prestige via `[Resettable]`)
+ * - Def state → `entry.state` (saved, kept across enqueues, and reset by the
+ *   category's `[Resettable]`)
  * - Per-enqueue consumer payload → typed `Payload` generic on item metadata
- * - Per-execution engine slots → `lifecycle`, `progress`, `attempt`, `error`,
+ * - Per-execution engine fields → `status`, `progress`, `attempt`, `error`,
  *   `timing` on item metadata
  *
  * Resetting: the category's `[Resettable]` (`thingsToReset: [category]`)
- * yields only per-def state. The player's queue or list, the running item and
- * its progress all survive it. Restart those explicitly: `replay()` for a list,
- * `sequencer.clear()` for a queue. A module-scoped reset (`resetPersistentContexts`)
- * reaching the category's context is different: it also sweeps the internal
- * sequencer's saved queue, current item, cursor and pause flag, and fires no
- * `cancelled`, so run it only where losing the queue is intended.
+ * covers only def state. The player's queue or list, the running item and
+ * its progress all survive it. Reset those explicitly: `replay()` for a list,
+ * `sequencer.clear()` for a queue. A reset whose `resetPersistentContexts`
+ * names the category's persistent context is different. It also resets the
+ * internal sequencer's saved queue, current item, cursor and pause flag, and
+ * emits no `cancelled`. So use it only where losing the queue is intended.
  *
- * ID-addressed verbs (`setItemStatus` / `tickItemProgress` / `setItemError` /
- * `updateItemPayload`) target the current item if its defId matches, else
- * linear-scan `sequencer.items.value` for the first match. Queues <~20 per
- * consumer annotation — indexed lookup is a `TODO(expansion)`.
+ * Def-id-addressed verbs (`setItemStatus` / `tickItemProgress` /
+ * `setItemError` / `updateItemPayload`) target the current item if its defId
+ * matches, else linear-scan `sequencer.items.value` for the first match.
+ * The queues seen so far hold under about 20 items; indexed lookup is a
+ * `TODO(expansion)`.
  *
  * Not a worker bundle — `TimedProgress` is not a hardcoded dependency.
  * Consumers wanting "single-active execution with duration-driven progress"
- * keep the documented Worker Bundle composition (`consumer-guide.md` §
- * Indirect-control worker pools). ActionCategory is the higher-opinion
+ * keep the documented worker bundle composition (`consumer-guide-recipes.md`
+ * § Indirect-control worker pools). ActionCategory is the higher-opinion
  * sibling shape for the per-execution state machine pattern.
  *
  * @cluster action-category
@@ -53,16 +55,16 @@ import { getCurrentEngineCategories } from './engine-categories';
 // === TYPES ===
 
 /**
- * Per-execution lifecycle state. Set by the engine on sequencer events and via
- * the `setItemStatus` verb. No `cancelled` terminal — cancellation removes the
- * entry from the queue (observable via `onCancel`).
+ * Per-execution status. Set by the engine on sequencer events and via the
+ * `setItemStatus` verb. No `cancelled` terminal — cancellation removes the
+ * item from the queue (observable via the `cancelled` event).
  */
 export type ActionItemStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'failed';
 
 /**
- * Sequencer-item metadata shape for an ActionCategory. Engine-managed slots
- * (lifecycle, progress, attempt, error, timing) sit alongside the consumer's
- * typed `Payload`. All fields are plain JSON-serializable — large Decimal
+ * Sequencer-item metadata shape for an ActionCategory. Engine-managed fields
+ * (`status`, `progress`, `attempt`, `error`, `timing`) are beside the
+ * consumer's typed `Payload`. All fields are plain JSON-serializable — large Decimal
  * quantities stay in sibling `Persistent<DecimalSource>` refs accessed via
  * `entry.state`.
  */
@@ -85,31 +87,31 @@ export interface ActionTickContext<Def extends { id: string }, DefState, Payload
 }
 
 /**
- * A registered entry: definition + per-def state + the current per-execution
- * metadata when this def is the running item.
+ * A category entry: def, def state, and the per-execution metadata while this
+ * def is the running item.
  */
 export interface ActionCategoryEntry<Def extends { id: string }, DefState, Payload> {
   readonly def: Def;
   readonly state: DefState;
-  /** Per-execution metadata when this def is the currently dispatched item, else null. */
+  /** Per-execution metadata when this def is the sequencer's current item, else null. */
   readonly current: ActionItemMetadata<Payload> | null;
   readonly signals: CategoryEntrySignals;
   /** Optional per-entry modifier chain (when `mapping.rateChain` is true). */
   readonly rateChain?: ModifierChain;
 }
 
-/** Return type of the `mapAction` callback. Describes per-def behavior + signals. */
+/** What the `mapAction` callback returns: per-def behavior and signals. */
 export interface ActionMapping<Def extends { id: string }, DefState, Payload> {
   /**
    * Per-def tick body. Called once per engine tick when this def is the
-   * sequencer's current item. Mutate engine slots via the verbs on `ctx.category`;
+   * sequencer's current item. Mutate engine fields via the verbs on `ctx.category`;
    * call `ctx.category.sequencer.complete()` (or `.repeat()`) when this execution finishes.
    */
   tick?: (ctx: ActionTickContext<Def, DefState, Payload>) => void;
   /**
-   * Per-def pre-run gate. Composed into the internal sequencer's `canStart` —
-   * the engine looks up the entry by `currentItem.metadata.defId` and invokes
-   * this if present, defaulting to `'now'` otherwise.
+   * Per-def start check, composed into the internal sequencer's `canStart`.
+   * The engine looks up the entry by the candidate item's `metadata.defId`
+   * and calls this if present, defaulting to `'now'` otherwise.
    */
   canStart?: (entry: ActionCategoryEntry<Def, DefState, Payload>) => StartResult;
   /** Required: unlock/count signals for the engine's CategoryEntrySignals cross-cut. */
@@ -134,13 +136,13 @@ export interface ActionCategoryEvents<Def extends { id: string }, DefState, Payl
    * `setItemStatus` or `sequencer.complete()`, whichever comes first.
    */
   completed: (entry: ActionCategoryEntry<Def, DefState, Payload>) => void;
-  /** Fired on every lifecycle transition for any item. */
+  /** Fired on every status change of any item. */
   itemStatusChanged: (
     entry: ActionCategoryEntry<Def, DefState, Payload>,
     from: ActionItemStatus,
     to: ActionItemStatus,
   ) => void;
-  /** Fired when an item is cancelled via `cancel()` (entry exits the queue). */
+  /** Fired when an item is cancelled via `cancel()` (the item leaves the queue). */
   cancelled: (entry: ActionCategoryEntry<Def, DefState, Payload>) => void;
 }
 
@@ -150,20 +152,20 @@ export interface ActionCategoryOptions<
   DefState = void,
   Payload = void,
 > {
-  /** Persistence context id. Each def gets `{id}/{def.id}` via createCategoryBase. */
+  /** Persistent context id. Each def's persistent context is `{id}/{def.id}`. */
   id: string;
   /**
-   * Sequencer mode. Default `'queue'`; `'list'` for cursor-walks-list shapes
-   * (looper, etc.), which replay the list with `replay()`.
+   * Sequencer mode. Default `'queue'`; `'list'` for shapes where a cursor
+   * walks a list, which replay the list with `replay()`.
    */
   mode?: 'queue' | 'list';
   /**
-   * Map a def to its tick/canStart/signals/rateChain configuration. Called at
+   * Map a def to its tick/canStart/signals/rateChain mapping. Called at
    * registration time, in the caller's persistent context — unlike `mapState`,
    * not the def's.
    */
   mapAction: (def: Def, ctx: ActionCategoryContext) => ActionMapping<Def, DefState, Payload>;
-  /** Optional per-def state factory. Called inside the def's persistent context. */
+  /** Optional builder of each def's def state. Called inside the def's persistent context. */
   mapState?: (def: Def) => DefState;
   /** Tick registration (typically `ctx.onTick`). */
   registerTick: RegisterTick;
@@ -201,7 +203,7 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
   // --- Queue surface (defId-addressed wrappers) ---
 
   /**
-   * Enqueue an instance of `defId` onto the internal sequencer.
+   * Enqueue a sequencer item for `defId` onto the internal sequencer.
    * `options.payload` is required when `Payload != void`.
    *
    * @returns `false` when `maxSize` would be exceeded.
@@ -211,17 +213,17 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
 
   /**
    * Cancel the current enqueue of `defId` if it's running, else remove the
-   * first matching pending instance. Fires `cancelled` event.
+   * first matching pending item. Emits the `cancelled` event.
    */
   cancel(defId: string): void;
 
   /**
-   * List mode: replay the list from the start, as a looper does on restart.
-   * Resets every item's execution slots (`lifecycle` to `'pending'`,
+   * List mode: replay the list from the start, as at the start of a new run.
+   * Resets every item's execution fields (`status` to `'pending'`,
    * `progress`, `attempt`, `error`, `timing`) while keeping its payload,
-   * cancels the running item, and dispatches from the first. A bare
-   * `sequencer.resetCursor()` leaves the slots from the last run, so every
-   * replayed item would finish on its first tick. No-op in queue mode.
+   * cancels the running item, and starts from the first. A bare
+   * `sequencer.resetCursor()` leaves the fields from the previous pass, so
+   * every replayed item would finish on its first tick. No-op in queue mode.
    */
   replay(): void;
 
@@ -231,14 +233,14 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
   /**
    * The internal sequencer. Exposed for ordering operations (`reorder`,
    * `clear`, `pause`, `resume`, `setCurrent`, `start`) and event subscription
-   * (`on`). Consumers reach for the sequencer for queue-shape ops; for
-   * per-execution state mutation use the ID-addressed verbs below.
+   * (`on`). Consumers use the sequencer for queue-shape ops; for
+   * per-execution state mutation use the def-id-addressed verbs below.
    */
   readonly sequencer: Sequencer<ActionItemMetadata<Payload>>;
 
-  // --- ID-addressed engine-slot verbs ---
+  // --- Def-id-addressed engine-field verbs ---
   // TODO(expansion): replace linear-scan lookup with Map<defId, index> when a
-  // consumer surfaces a queue routinely > 100. Today corpus queues <~20.
+  // consumer routinely holds a queue over 100. The queues seen so far stay under ~20.
 
   setItemStatus(defId: string, status: ActionItemStatus): void;
   setItemProgress(defId: string, value: number | Record<string, number>): void;
@@ -250,9 +252,9 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
 
   /**
    * Subscribe to changes on a specific def's per-execution metadata. Fires
-   * after any engine-slot or payload mutation that targets `defId`. Items
-   * stay value-semantics internally; entity-style per-row observation is
-   * simulated through subscription discipline (Akka / Temporal pattern).
+   * after any engine-field or payload mutation that targets `defId`. Items
+   * stay value-semantics internally; per-item observation comes from
+   * subscriptions instead (the Akka / Temporal pattern).
    */
   onItemChange(
     defId: string,
@@ -294,7 +296,7 @@ function buildInitialMetadata<Payload>(
  * ordered-execution queue with per-execution state machine.
  *
  * @param options - Category id, mode, mapAction, mapState, tick registration
- * @returns An {@link ActionCategory} with registry, queue surface, ID-addressed verbs, events
+ * @returns An {@link ActionCategory} with registry, queue surface, def-id-addressed verbs, events
  *
  * @example
  * ```ts
@@ -482,16 +484,16 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     return makeEntry(defId, getCurrentMetadataIfDefId(defId));
   }
 
-  // --- Lifecycle transition helper -----------------------------------------
+  // --- Status change helper ------------------------------------------------
 
   function transitionLifecycle(
     defId: string,
     next: ActionItemStatus,
     extra?: (m: ActionItemMetadata<Payload>) => Partial<ActionItemMetadata<Payload>>,
   ): void {
-    // Emit only once the patch is committed: a listener reading the category
-    // must see the new lifecycle, and one that calls a verb must not have its
-    // write overwritten by this patch's spread of the stale metadata.
+    // Emit only once the update is committed: a handler reading the category
+    // must see the new status, and one that calls a verb must not have its
+    // write overwritten by this update's spread of the stale metadata.
     const transition: { from?: ActionItemStatus; patched?: ActionItemMetadata<Payload> } = {};
     updateByDefId(defId, (m) => {
       const from = m.status;
@@ -514,7 +516,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     if (next === 'completed') handle.emit('completed', entry);
   }
 
-  // --- Wire sequencer events to lifecycle transitions ----------------------
+  // --- Wire sequencer events to status changes -----------------------------
 
   sequencer.on('started', (item) => {
     transitionLifecycle(item.metadata.defId, 'running', () => ({
@@ -528,7 +530,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
 
   sequencer.on('completed', (item) => {
     // The sequencer has already cleared `current` (and popped the item in
-    // queue mode), so the verbs can't reach it; build the terminal entry by
+    // queue mode), so the verbs can't reach it; build the terminal metadata by
     // hand. An item already set 'completed' through `setItemStatus` has emitted
     // both events, and `completed` fires once per execution.
     const meta = item.metadata;
@@ -541,8 +543,8 @@ export function createActionCategory<Def extends { id: string }, DefState = void
       status: 'completed',
       timing: { ...meta.timing, completedAt: Date.now() },
     };
-    // A list keeps the item, one slot behind the advanced cursor: record the
-    // terminal state there too, or the slot reads 'running' until replayed.
+    // A list keeps the item, one position behind the advanced cursor: record
+    // the terminal status there too, or it shows 'running' until replayed.
     if (mode === 'list') {
       const slot = sequencer.cursor - 1;
       if (sequencer.items.value[slot]?.id === item.id) sequencer.updateItem(slot, () => terminal);
@@ -561,12 +563,12 @@ export function createActionCategory<Def extends { id: string }, DefState = void
   });
 
   sequencer.on('skipped', (item) => {
-    // Skip means canStart returned 'never'. Surface as terminal 'failed' so UI
+    // Skip means canStart returned 'never'. Report it as terminal 'failed' so UI
     // can show the skip in the same channel as explicit setItemError.
     const meta = item.metadata;
     const terminal: ActionItemMetadata<Payload> = { ...meta, status: 'failed' };
-    // A list keeps the skipped item one slot behind the cursor, which advances
-    // before `skipped` fires: record the terminal state there or it reads 'pending'.
+    // A list keeps the skipped item one position behind the cursor, which advances
+    // before `skipped` fires: record the terminal status there or it shows 'pending'.
     if (mode === 'list') {
       const slot = sequencer.cursor - 1;
       if (sequencer.items.value[slot]?.id === item.id) sequencer.updateItem(slot, () => terminal);
@@ -650,7 +652,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
 
     replay() {
       if (mode !== 'list') return;
-      // Every slot, not the first match per defId: a list may hold one def twice.
+      // Every item, not the first match per defId: a list may hold one def twice.
       const items = sequencer.items.value;
       sequencer.items.value = items.map((item) => ({
         id: item.id,
@@ -738,7 +740,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
     [Resettable]: base[Resettable],
   };
 
-  // Engine-categories discovery hook.
+  // Engine-categories registration, for discovery.
   const ec = getCurrentEngineCategories();
   if (ec) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

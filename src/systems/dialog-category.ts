@@ -1,15 +1,15 @@
 /**
  * Dialog Category — batch-register {@link DialogGraph} content from per-NPC
- * (or per-character, per-scene) definitions. Mirrors the shape of other
- * category systems (Skill, Achievement, Producer): a content registry plus a
- * domain-specific instance per definition.
+ * (or per-character, per-scene) defs. Mirrors the shape of other categories
+ * (Skill, Achievement, Producer): a content registry plus a domain-specific
+ * instance per def.
  *
  * The category itself doesn't drive conversation flow — that's the
- * {@link DialogSession}'s job. The category is the authoring surface: register
- * a content def, the category produces the DialogGraph(s) for it and exposes
- * lookup helpers for the session to consume.
+ * {@link DialogSession}'s job. The category is the authoring surface. Register
+ * a content def, and the category produces its dialog graphs and lookup
+ * methods for the session to use.
  *
- * @see ./dialog-session for the runtime that drives a graph from this category
+ * @see ./dialog-session for the dialog session that drives a graph from this category
  *
  * @cluster dialog
  */
@@ -23,17 +23,17 @@ import { Resettable, type ResettableObject } from '@/core/resettable';
 
 /** Options for {@link createDialogCategory}. */
 export interface DialogCategoryOptions<Def extends { id: string }> {
-  /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
+  /** Persistent context id. Each def gets a child persistent context `{id}/{def.id}`. */
   id: string;
   /**
-   * Map a content def to one or more dialog graphs. Most NPCs have one graph
-   * (their canonical conversation tree); shop / quest givers may have several
-   * keyed by entry point. A graph id already mapped by any def throws.
+   * Map a content def to one or more dialog graphs. Most NPCs have one
+   * dialog graph; shop and quest givers may have several. A graph id
+   * already mapped by any def throws.
    */
   mapDialog: (def: Def) => DialogGraph | DialogGraph[];
 }
 
-/** A registered entry: definition + dialog graphs (no per-instance state). */
+/** A category entry: the def and its dialog graphs (no def state). */
 export interface DialogCategoryEntry<Def extends { id: string }> {
   readonly def: Def;
   readonly graphs: DialogGraph[];
@@ -44,14 +44,14 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's dialog graphs.
    */
   readonly registry: ContentRegistryView<Def>;
   register(defs: Def | Def[]): void;
   getDef(id: string): Def | undefined;
   getEntry(id: string): DialogCategoryEntry<Def> | undefined;
   getAll(): DialogCategoryEntry<Def>[];
-  /** Flat lookup of a graph by its `id` field across every registered entry; graph ids are unique across the category. */
+  /** Look up a dialog graph by `id` across every category entry; graph ids are unique across the category. */
   getGraph(graphId: string): DialogGraph | undefined;
   readonly size: number;
 }
@@ -62,11 +62,11 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
  * Create a dialog category — batch-registered NPC / scene dialog content with
  * a content registry and per-def {@link DialogGraph} production.
  *
- * @param options - Persistence-context id and a `mapDialog(def) => graph(s)`
- *   function. Most NPCs map to one graph; shop / quest givers may map to
- *   several keyed by entry point.
+ * @param options - Persistent context id and a `mapDialog(def) => graph(s)`
+ *   function. Most NPCs map to one graph; shop and quest givers may map to
+ *   several.
  * @returns A {@link DialogCategory} with `register` / `getDef` / `getEntry` /
- *   `getAll` / `getGraph(graphId)` accessors and a `registry.patch` extension
+ *   `getAll` / `getGraph(graphId)` methods and a `registry.patch` extension
  *   point for mods.
  *
  * @example

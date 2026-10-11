@@ -1,15 +1,15 @@
 /**
- * Skill Category — batch-create Skills from content definitions
+ * Skill Category — batch-create Skills from defs
  *
- * Loop incrementals typically have 5-25 skills sharing a common structure:
- * XP accumulation, level calculation, and a modifier output. Actions grant
+ * Run-based incrementals often have many skills that share a structure:
+ * XP accumulation, level calculation, and a modifier output. Actions give
  * XP to skills; skills produce modifiers that feed into modifier chains.
  *
- * `createSkillCategory` captures this pattern with a content registry
+ * `createSkillCategory` captures this shape with a content registry
  * and batch registration. Both level-driven and accumulator modes are
- * supported — each definition independently chooses its mode.
+ * supported — each def chooses its own mode.
  *
- * The `addXp` helper is the primary bridge between action categories and
+ * The `addXp` method is the main bridge between action categories and
  * skill categories: `onTick: () => skills.addXp(def.skillId, xpAmount)`.
  *
  * @example
@@ -53,23 +53,22 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 /**
  * Options for {@link createSkillCategory}.
  *
- * @typeParam Def - The content definition type (must have `id: string`)
- * @typeParam State - Per-instance state created alongside each Skill.
- *   Use `void` if no extra state is needed.
+ * @typeParam Def - The def type (must have `id: string`)
+ * @typeParam DefState - Def state created beside each Skill.
+ *   Use `void` if no def state is needed.
  */
 export interface SkillCategoryOptions<Def extends { id: string }, DefState = void> {
-  /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
+  /** Persistent context id. Each def gets a child persistent context `{id}/{def.id}`. */
   id: string;
 
   /**
-   * Map a content definition to SkillOptions.
+   * Map a def to SkillOptions.
    *
-   * Called once per definition during {@link SkillCategory.register}.
+   * Called once per def during {@link SkillCategory.register}.
    * The returned options are passed to `createSkill()`.
    *
    * Return exactly one of `levelToMultiplier` (level-driven mode) or
-   * `retentionFormula` (accumulator mode) — each definition chooses
-   * independently.
+   * `retentionFormula` (accumulator mode) — each def chooses its own.
    *
    * Note: `id` is provided by the category — don't include it in the
    * returned options (it will be overwritten).
@@ -77,17 +76,17 @@ export interface SkillCategoryOptions<Def extends { id: string }, DefState = voi
   mapSkill: (def: Def) => DistributiveOmit<SkillOptions, 'id'>;
 
   /**
-   * Create per-instance state alongside the Skill.
+   * Create the def state beside the Skill.
    *
-   * Called inside the definition's persistent context, so `persistent()` calls
-   * here are scoped to `{categoryId}/{def.id}`.
+   * Called inside the def's persistent context, so `persistent()` calls
+   * here save under `{categoryId}/{def.id}`.
    *
-   * Omit if no extra state is needed.
+   * Omit if no def state is needed.
    */
   mapState?: (def: Def, skill: Skill) => DefState;
 }
 
-/** A registered entry: definition + Skill instance + optional state + introspection signals */
+/** A category entry: def, Skill instance, def state and signals */
 export interface SkillCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly skill: Skill;
@@ -98,53 +97,53 @@ export interface SkillCategoryEntry<Def extends { id: string }, DefState = void>
 /**
  * A skill category — batch-registered Skills with a shared shape.
  *
- * @typeParam Def - Content definition type
- * @typeParam State - Per-instance state type (void if none)
+ * @typeParam Def - The def type
+ * @typeParam DefState - The def state type (void if none)
  */
 export interface SkillCategory<
   Def extends { id: string },
   DefState = void,
 > extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** Persistent context id this category was built under. */
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance and def state.
    */
   readonly registry: ContentRegistryView<Def>;
 
   /**
-   * Register definitions and create their Skill instances.
-   * Can be called multiple times (base game + mods).
+   * Register defs and create their Skill instances.
+   * Can be called more than once (base game, then a mod's content).
    */
   register(defs: Def | Def[]): void;
 
-  /** Get the Skill instance for a definition ID */
+  /** Get the Skill instance for a def id */
   getSkill(id: string): Skill | undefined;
 
-  /** Get the per-instance state for a definition ID */
+  /** Get the def state for a def id */
   getState(id: string): DefState | undefined;
 
-  /** Get the definition for an ID (delegates to registry.get) */
+  /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
-  /** Get the full entry (def + skill + state) */
+  /** Get the category entry (def, skill, def state, signals) */
   getEntry(id: string): SkillCategoryEntry<Def, DefState> | undefined;
 
-  /** All entries in registration order */
+  /** All category entries in registration order */
   getAll(): SkillCategoryEntry<Def, DefState>[];
 
   /**
    * Get the modifier for a skill — shorthand for `getSkill(id)?.modifier`.
-   * Primary use case: plugging skills into modifier chains.
+   * Main use: adding a skill's modifier to a modifier chain.
    */
   getModifier(id: string): Modifier | undefined;
 
   /**
    * Add XP to a skill — shorthand for `getSkill(id)?.addXp(amount)`.
    * The action→skill bridge: `onTick: () => skills.addXp(def.skillId, xpAmount)`.
-   * No-op if the skill ID doesn't exist.
+   * No-op if the skill id doesn't exist.
    */
   addXp(id: string, amount: DecimalSource): void;
 
@@ -155,10 +154,10 @@ export interface SkillCategory<
 // === FACTORIES ===
 
 /**
- * Create a skill category — batch registration of Skills from definitions.
+ * Create a skill category — batch registration of Skills from defs.
  *
- * @param options - Category ID and mapping function
- * @returns A {@link SkillCategory} with registry, lookup, and XP/modifier helpers
+ * @param options - Category id and `mapSkill`
+ * @returns A {@link SkillCategory} with registry, lookup, and XP and modifier methods
  *
  * @example
  * ```ts

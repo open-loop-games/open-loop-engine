@@ -2,18 +2,18 @@
  * Subject Category — addressable subjects with typed multi-field state
  *
  * One category, one Instance type, one Def type. Each registered subject
- * (NPC, faction, region, single entity) holds typed state per schema field:
- * scalar, vector, tier ladder, boolean flag, or named enum. Field kinds are
- * config data — `subject.fields.<name>` access is typed at the callsite, no
- * runtime narrowing.
+ * (NPC, faction, region, a singleton subject) holds typed state per schema
+ * field: scalar, vector, ladder, flag, or named enum. Field kinds are plain
+ * data: `subject.fields.<name>` access is typed at the call site, with no
+ * narrowing at run time.
  *
- * Wraps {@link createCategoryBase}; per-subject persistent context is
+ * Wraps {@link createCategoryBase}; each subject's persistent context is
  * `{categoryId}/{subjectId}`. Auto-registers into `EngineCategories.subjects`.
- * The five field kinds map to research's substrate shapes (scalar per-entity,
- * tier/rank ladder, multi-dim vector, flags) plus `enum` for nullable
- * single-choice state (commitment locks, path selection). Cross-cutting axes
- * (decay, propagation, layered perma+temp) are intentionally **not** schema
- * fields — compose at the consumer until a primitive earns itself.
+ * Four field kinds are a scalar per subject, a ladder, a multi-dimension
+ * vector and flags. The fifth, `enum`, holds nullable single-choice state
+ * (commitment locks, path selection). Cross-cutting axes (decay, propagation, layered
+ * lifetime and temporary values) are intentionally **not** schema fields.
+ * Compose them in the consumer until a primitive qualifies.
  *
  * @cluster subject-category
  */
@@ -45,9 +45,9 @@ import { getCurrentEngineCategories } from './engine-categories';
 // -- Field defs --
 
 /**
- * Single persistent number per subject. `derive` rewrites reads as a pure
- * projection over the stored inputs (Level13 trust shape: per-input
- * denominators with a `max` combinator sidesteps farmable affinity).
+ * Single persistent number per subject. `derive` is a pure function from the
+ * stored value to what `read()` returns. One example is a trust shape with
+ * per-input denominators combined by `max`, so affinity can't be farmed.
  */
 export interface ScalarFieldDef {
   kind: 'scalar';
@@ -65,10 +65,10 @@ export interface VectorFieldDef<Dims extends string = string> {
 }
 
 /**
- * Ordered tier ladder with per-transition advancement gates. `advanceWhen[from]`
- * must hold (or be absent) to advance from index `from` to `from+1`.
- * Per-subject overrides typically replace `advanceWhen` to give each subject its
- * own protocol; the tier list itself is schema-frozen.
+ * Ordered ladder with a predicate per step between rungs. `advanceWhen[from]`
+ * must hold (or be absent) to advance from rung `from` to `from+1`.
+ * Per-subject overrides typically replace `advanceWhen`, so each subject has
+ * its own protocol; the rung list itself is fixed by the schema.
  */
 export interface LadderFieldDef {
   kind: 'ladder';
@@ -102,7 +102,7 @@ export type FieldDef =
   | FlagFieldDef
   | EnumFieldDef;
 
-/** A schema describes the shared field shape every registered subject carries. */
+/** A schema describes the shared field shape every registered subject has. */
 export type FieldSchema = Record<string, FieldDef>;
 
 // -- Field instances --
@@ -111,7 +111,7 @@ interface ScalarFieldEvents {
   changed: (info: { old: number; next: number }) => void;
 }
 
-/** Live scalar accessor built from a {@link ScalarFieldDef}. */
+/** Live scalar field built from a {@link ScalarFieldDef}. */
 export interface ScalarFieldInstance extends Emittable<ScalarFieldEvents> {
   readonly kind: 'scalar';
   readonly ref: Persistent<number>;
@@ -126,7 +126,7 @@ interface VectorFieldEvents<Dims extends string> {
   changed: (info: { dim: Dims; old: number; next: number }) => void;
 }
 
-/** Live vector accessor built from a {@link VectorFieldDef}. */
+/** Live vector field built from a {@link VectorFieldDef}. */
 export interface VectorFieldInstance<Dims extends string = string> extends Emittable<
   VectorFieldEvents<Dims>
 > {
@@ -139,13 +139,14 @@ export interface VectorFieldInstance<Dims extends string = string> extends Emitt
 
 interface LadderFieldEvents {
   /**
-   * Fires on any tier-index change via `setIndex` — including regressions
-   * (`to < from`), despite the name. Read `from`/`to` to distinguish direction.
+   * Emitted on any rung index change through `setIndex` (and so `tryAdvance`),
+   * including regressions (`to < from`), despite the name. Read `from`/`to`
+   * for the direction.
    */
   advanced: (info: { from: number; to: number }) => void;
 }
 
-/** Live tier-ladder accessor built from a {@link LadderFieldDef}. */
+/** Live ladder field built from a {@link LadderFieldDef}. */
 export interface LadderFieldInstance extends Emittable<LadderFieldEvents> {
   readonly kind: 'ladder';
   readonly ref: Persistent<number>;
@@ -153,16 +154,17 @@ export interface LadderFieldInstance extends Emittable<LadderFieldEvents> {
   getIndex(): number;
   getRung(): string | undefined;
   /**
-   * Try to advance one tier. Evaluates `advanceWhen[currentIndex]` before
-   * incrementing. Returns the new tier name, or `null` when blocked / already
-   * at max.
+   * Try to advance one rung. Evaluates `advanceWhen[currentIndex]` before
+   * incrementing. Returns the new rung, or `null` when blocked or already at
+   * the last rung.
    *
-   * @param accessor - read in place of the category's for a Gate-form gate;
-   *   a getter or ref closes over its own state and ignores it. Its handles
-   *   are still asserted against the category's runtime at register.
+   * @param accessor - used instead of the category's accessor when the
+   *   predicate is a Gate; a getter or ref reads its own state and ignores
+   *   it. The Gate's services are still asserted against the category's
+   *   Gate services at register.
    */
   tryAdvance(accessor?: GameStateAccessor): string | null;
-  /** Hard set the tier index, bypassing gates. For migrations / reset / cheats. */
+  /** Set the rung index directly, without `advanceWhen`. For save migrations, resets and cheats. */
   setIndex(index: number): void;
 }
 
@@ -170,7 +172,7 @@ interface FlagFieldEvents {
   changed: (info: { value: boolean }) => void;
 }
 
-/** Live boolean accessor built from a {@link FlagFieldDef}. */
+/** Live flag field built from a {@link FlagFieldDef}. */
 export interface FlagFieldInstance extends Emittable<FlagFieldEvents> {
   readonly kind: 'flag';
   readonly ref: Persistent<boolean>;
@@ -183,7 +185,7 @@ interface EnumFieldEvents<V extends string> {
   changed: (info: { old: V | null; next: V | null }) => void;
 }
 
-/** Live nullable-enum accessor built from an {@link EnumFieldDef}. */
+/** Live nullable-enum field built from an {@link EnumFieldDef}. */
 export interface EnumFieldInstance<V extends string = string> extends Emittable<
   EnumFieldEvents<V>
 > {
@@ -194,7 +196,7 @@ export interface EnumFieldInstance<V extends string = string> extends Emittable<
   set(value: V | null): void;
 }
 
-/** Mapped type — produces the right accessor per field kind without runtime narrowing. */
+/** Conditional type — the right field instance per field kind, with no narrowing at run time. */
 export type FieldInstance<F extends FieldDef> = F extends ScalarFieldDef
   ? ScalarFieldInstance
   : F extends VectorFieldDef<infer Dims>
@@ -211,8 +213,8 @@ export type FieldInstance<F extends FieldDef> = F extends ScalarFieldDef
 
 /**
  * Per-subject overrides — only the obviously-per-subject bits (initial
- * values, tier gates). Structural shape (tiers list, dimensions, min/max)
- * stays schema-frozen so save round-trip is stable across subjects.
+ * values, a ladder's `advanceWhen`). Structural shape (rungs, dimensions,
+ * min/max) stays fixed by the schema, so every subject has the same save shape.
  */
 export type PerSubjectOverride<F extends FieldDef> = F extends ScalarFieldDef
   ? { initial?: number }
@@ -235,13 +237,13 @@ export interface SubjectDef<S extends FieldSchema> {
   fields?: { [K in keyof S]?: PerSubjectOverride<S[K]> };
 }
 
-/** Live subject — typed field accessors keyed by schema field name. */
+/** Live subject — typed fields keyed by schema field name. */
 export interface SubjectInstance<S extends FieldSchema> {
   readonly id: string;
   readonly fields: { [K in keyof S]: FieldInstance<S[K]> };
 }
 
-/** One entry inside a {@link SubjectCategory} — authored def + live instance. */
+/** One category entry of a {@link SubjectCategory} — authored def, live instance and signals. */
 export interface SubjectCategoryEntry<S extends FieldSchema> {
   readonly def: SubjectDef<S>;
   readonly instance: SubjectInstance<S>;
@@ -250,15 +252,15 @@ export interface SubjectCategoryEntry<S extends FieldSchema> {
 
 /** Options for {@link createSubjectCategory}. */
 export interface SubjectCategoryOptions<S extends FieldSchema> {
-  /** Persistence context name. Each registered subject gets a sub-context `{id}/{subjectId}`. */
+  /** Persistent context id. Each subject gets a child persistent context `{id}/{subjectId}`. */
   id: string;
   /** Shared field schema applied to every registered subject. */
   fields: S;
   /**
-   * Accessor tier gates read through. Falls back to the ambient accessor
-   * wired by `createEngine`. The category captures the Gate runtime
-   * (accessor + categories + registry) once, at construction, so subjects
-   * registered after install advance against it too.
+   * Accessor that ladder Gates read. Defaults to the ambient accessor
+   * `createEngine` wires. The category captures its Gate services (accessor,
+   * categories, resource registry) once, at construction. So subjects
+   * registered after install advance against them too.
    */
   accessor?: GameStateAccessor;
 }
@@ -267,26 +269,26 @@ export interface SubjectCategoryOptions<S extends FieldSchema> {
  * Container that registers subjects against a shared schema and builds the
  * matching typed instance for each.
  *
- * @typeParam S - Field schema shape; carries through to typed `fields` access.
+ * @typeParam S - Field schema shape; it types `fields` access.
  */
 export interface SubjectCategory<S extends FieldSchema> extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** Persistent context id this category was created under. */
   readonly id: string;
   /** Shared schema; readable for introspection and tooling. */
   readonly schema: S;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance.
    */
   readonly registry: ContentRegistryView<SubjectDef<S>>;
-  /** Register subjects against the shared schema. Can be called multiple times (base game + mods). */
+  /** Register subjects against the shared schema. Can be called multiple times (base content, then later content). */
   register(defs: SubjectDef<S> | SubjectDef<S>[]): void;
   /** Get the authored def for a subject id (delegates to the registry). */
   getDef(id: string): SubjectDef<S> | undefined;
-  /** Get the typed live instance for a subject id. Replaces variant-narrowing `getRun<K>`. */
+  /** Get the typed live instance for a subject id. */
   get(id: string): SubjectInstance<S> | undefined;
-  /** Get the full entry (def + instance) for a subject id. */
+  /** Get the category entry (def, instance, signals) for a subject id. */
   getEntry(id: string): SubjectCategoryEntry<S> | undefined;
   /** All entries in registration order. */
   getAll(): SubjectCategoryEntry<S>[];
@@ -397,7 +399,7 @@ function buildLadderField(
       : predicates.adopt(
           gate,
           true,
-          `subject '${subjectId}' tier '${fieldName}' advanceWhen[${i}]`,
+          `subject '${subjectId}' ladder '${fieldName}' advanceWhen[${i}]`,
         ),
   );
 
@@ -554,7 +556,7 @@ function buildField(
 /**
  * Bring a field's value back inside its schema: clamp numbers, and reset an
  * enum value the schema no longer declares to its seed. Writes the ref, not
- * `set()`, so no event fires, and Vue skips a write that changes nothing.
+ * `set()`, so no event is emitted, and Vue skips a write that changes nothing.
  */
 function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void {
   switch (schema.kind) {
@@ -589,17 +591,17 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  * Create a subject category. Registers subjects against a shared field
  * schema and builds typed live instances per subject.
  *
- * Replaces the variant-dispatched relationship surface. Each subject carries
- * the schema's fields under its own persistent context (`{id}/{subjectId}`);
- * `subject.fields.<name>` access is typed at the callsite from the inferred
- * schema, no runtime narrowing needed.
+ * Each subject has the schema's fields under its own persistent context
+ * (`{id}/{subjectId}`). `subject.fields.<name>` access is typed at the call
+ * site from the inferred schema, with no narrowing.
  *
- * @param options - Category id (persistence context root) + shared field schema.
+ * @param options - Category id (the root persistent context), the shared
+ *   field schema, and an optional accessor.
  * @returns A {@link SubjectCategory} with `register` / `get` / `getEntry` / `getAll`.
  *
  * @example
  * ```ts
- * // Many subjects, one tier field per subject (molcremental shape)
+ * // Many subjects, one ladder field each
  * const npcs = createSubjectCategory({
  *   id: 'npc-trust',
  *   fields: { trust: { kind: 'ladder', rungs: ['stranger', 'friend', 'confidant'] } },
@@ -643,8 +645,8 @@ export function createSubjectCategory<S extends FieldSchema>(
 ): SubjectCategory<S> {
   const { id: categoryId, fields: schema, accessor } = options;
   // Captured here, not per register: subjects registered after install (late
-  // content, mods) never see the ambient scope. `tryAdvance(accessor)` still
-  // layers a per-call override on top.
+  // content) never see the ambient values. `tryAdvance(accessor)` still
+  // layers a per-call accessor on top.
   const predicates = createPredicateResolver({ accessor });
 
   const base: CategoryBase<SubjectDef<S>, SubjectInstance<S>, void> = createCategoryBase<
@@ -671,7 +673,7 @@ export function createSubjectCategory<S extends FieldSchema>(
     buildSignals: (_def, instance) => buildSubjectSignals(instance),
   });
 
-  // A save load writes field refs directly, past set()'s clamp and enum check,
+  // A load writes field refs directly, past set()'s clamp and enum check,
   // and the schema may have narrowed since that save was written.
   onHydrated(() => {
     for (const { instance } of base.getAll()) {
@@ -712,11 +714,11 @@ export function createSubjectCategory<S extends FieldSchema>(
 // === PUBLIC UTILITIES ===
 
 /**
- * Default Signals projection for a subject instance — `unlock = any non-default
- * field value`, `count = number of fields with non-default state`. Coarse by
- * design; "unlock" doesn't map cleanly onto a multi-field subject the way it
- * does for purchasables (active) or achievements (earned). Consumers needing
- * different semantics can layer their own ComputedRefs in the consumer module.
+ * Default signals for a subject instance — `active = any field off its ref
+ * default`, `count = number of fields off their ref default`. Coarse by
+ * design: "active" doesn't map cleanly onto a multi-field subject the way it
+ * does for purchasables and achievements. Consumers needing different
+ * semantics can layer their own ComputedRefs in the consumer module.
  */
 function buildSubjectSignals<S extends FieldSchema>(
   instance: SubjectInstance<S>,

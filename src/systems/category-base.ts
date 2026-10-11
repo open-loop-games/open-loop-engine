@@ -1,16 +1,16 @@
 /**
  * Category Base — shared skeleton for batch-registration categories
  *
- * Provides the common structure: ContentRegistry, entry Map, persistent
- * context wrapping, and accessor methods. Per-system categories
+ * Provides the common structure: ContentRegistry, category-entry Map,
+ * persistent context wrapping, and read methods. Per-system categories
  * (createSkillCategory, createProducerCategory, etc.) wrap this and add
- * domain-specific logic; consumers whose definitions don't fit any
- * built-in shape can use it directly with `Instance = void` (omit
- * `buildInstance`) for pure per-def state.
+ * domain-specific logic. Consumers whose defs don't fit any built-in shape
+ * can use it directly with `Instance = void` (omit `buildInstance`) for def
+ * state only.
  *
- * `setupDeclarativeBindings` and `setupCategoryTick` remain `@internal` —
- * they're tied to specific category-system idioms (grants wiring, tick
- * loop integration) and not part of the public surface.
+ * `setupDeclarativeBindings` and `setupCategoryTick` are `@internal` —
+ * they're tied to specific category idioms (grants wiring, game loop
+ * integration) and not part of the API surface.
  */
 
 import { computed, getCurrentScope, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
@@ -36,37 +36,37 @@ import { adoptGrantWhens, buildGrantModifier, grantChains } from './replacement-
 /**
  * Uniform per-entry introspection axes — the engine's cohesive cross-cut over
  * heterogeneous category types. Every per-system category factory derives a
- * `CategoryEntrySignals` view from its instance refs, so a single helper
- * (`findCategoryEntrySignals`) can address any entry by `(categoryId, defId)`
- * without consumer-side path conventions.
+ * `CategoryEntrySignals` view from its instance refs. So a single utility
+ * (`findCategoryEntrySignals`) can address any category entry by
+ * `(categoryId, defId)` without consumer-side path conventions.
  *
  * Mapping per category type:
- * - Achievement → `{ unlock: earned, count: earned ? 1 : 0 }`
- * - Purchasable → `{ unlock: active, count: amount }`
- * - Producer    → `{ unlock: count > 0, count: ownedCount + extraCount }`
- * - Skill       → `{ unlock: level > 0, count: level }`
- * - Challenge   → `{ unlock: completed (completions > 0), count: completions }`
+ * - Achievement → `{ active: earned, count: earned ? 1 : 0 }`
+ * - Purchasable → `{ active: active, count: count }`
+ * - Producer    → `{ active: count > 0, count: ownedCount + extraCount }`
+ * - Skill       → `{ active: level > 0, count: level }`
+ * - Challenge   → `{ active: completed (completions > 0), count: completions }`
  *
- * Producer / Skill `unlock` derives from `count > 0` / `level > 0` — naive but
- * matches the pattern Gate's `unlock` services across the other categories.
+ * Producer / Skill `active` derives from `count > 0` / `level > 0` — naive but
+ * matches what the `active` Gate kind reads across the other categories.
  * Consumers that want to distinguish "addressable" from "advanced" expose a
  * separate unlock ref via a future expansion or use a `state` Gate kind.
  */
 export interface CategoryEntrySignals {
-  /** "Is this entity active / owned / earned / unlocked?" */
+  /** Whether the category entry is active, per the mapping above. */
   readonly active: ComputedRef<boolean>;
-  /** "How many / what level / how complete?" */
+  /** How many, what level, or how many completions, per the mapping above. */
   readonly count: ComputedRef<DecimalSource>;
 }
 
 /**
- * A registered entry in a category: definition + instance + optional state +
- * optional signals.
+ * A category entry: the record a category keeps per def — its def, instance,
+ * optional def state and optional signals.
  *
  * `instance` is `undefined` when the category was created with `Instance = void`
  * and no `buildInstance` was supplied. `signals` is `undefined` when the
- * category factory did not provide a `buildSignals` callback (e.g. raw
- * `createCategoryBase` uses with custom shapes); per-system factories
+ * category factory did not provide a `buildSignals` function, as in a direct
+ * `createCategoryBase` use with a custom shape. Per-system factories
  * (`createSkillCategory`, etc.) always populate it.
  */
 export interface CategoryEntry<Def extends { id: string }, Instance, DefState = void> {
@@ -78,31 +78,31 @@ export interface CategoryEntry<Def extends { id: string }, Instance, DefState = 
 
 /** Options for {@link createCategoryBase}. */
 export interface CategoryBaseOptions<Def extends { id: string }, Instance, DefState = void> {
-  /** Persistence context prefix. Each definition gets `{id}/{def.id}`. */
+  /** Persistent context prefix. Each def gets `{id}/{def.id}`. */
   id: string;
 
   /**
-   * Create the domain-specific instance from a definition.
-   * Called inside a persistent context scoped to `{id}/{def.id}`.
+   * Create the domain-specific instance from a def.
+   * Called inside the persistent context `{id}/{def.id}`.
    *
-   * Omit (with `Instance = void`) for pure per-def state categories — the
-   * entry's `instance` slot will be `undefined`.
+   * Omit it (with `Instance = void`) for a category of def state only — the
+   * category entry's `instance` is then `undefined`.
    */
   buildInstance?: (def: Def) => Instance;
 
   /**
-   * Create per-instance state alongside the instance.
+   * Create the def state beside the instance.
    * Called inside the same persistent context as buildInstance.
-   * Omit if no extra state is needed.
+   * Omit it if no def state is needed.
    */
   buildState?: (def: Def, instance: Instance) => DefState;
 
   /**
-   * Derive {@link CategoryEntrySignals} from the entry's instance + state.
+   * Derive {@link CategoryEntrySignals} from the entry's instance and def state.
    * Per-system category factories (`createAchievementCategory`, etc.) pass
-   * one to expose uniform unlock/count introspection through
-   * `findCategoryEntrySignals`. Raw consumers may omit it — the entry's
-   * `signals` slot will be `undefined`.
+   * one to expose uniform active/count introspection through
+   * `findCategoryEntrySignals`. A direct consumer may omit it — the entry's
+   * `signals` is then `undefined`.
    */
   buildSignals?: (def: Def, instance: Instance, state: DefState) => CategoryEntrySignals;
 }
@@ -116,58 +116,59 @@ export interface CategoryBase<
   Instance,
   DefState = void,
 > extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** The persistent context id this category was built under. */
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance and def state.
    */
   readonly registry: ContentRegistryView<Def>;
 
   /**
-   * Register definitions: validate the whole batch, then build instances.
-   * Can be called multiple times (base game + mods). A builder that throws
+   * Register defs: validate the whole batch, then build instances. It can be
+   * called more than once; a later call adds defs, such as content registered
+   * after install. A builder that throws
    * stops the batch at its def: the defs before it stay registered, and it
    * and the ones after it are not. The refs its build created are deleted,
    * so the same def can be registered again.
    */
   register(defs: Def | Def[]): void;
 
-  /** Get the definition for an ID (delegates to registry.get) */
+  /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
-  /** Get the full entry (def + instance + state) */
+  /** Get the full category entry (def, instance, def state) */
   getEntry(id: string): CategoryEntry<Def, Instance, DefState> | undefined;
 
-  /** All entries in registration order */
+  /** All category entries in registration order */
   getAll(): CategoryEntry<Def, Instance, DefState>[];
 
-  /** Number of registered entries */
+  /** Number of category entries */
   readonly size: number;
 }
 
 // === FACTORIES ===
 
 /**
- * Create the shared category base — registry + entry map + persistent context.
+ * Create the shared category base — registry + category-entry map + persistent context.
  *
  * Used by per-system category factories (createSkillCategory etc.) and by
- * consumers whose definitions don't fit any built-in category shape — pass
- * `Instance = void` and omit `buildInstance` for pure per-def state.
+ * consumers whose defs don't fit any built-in category shape. For def state
+ * only, pass `Instance = void` and omit `buildInstance`.
  *
  * @example
  * ```ts
- * // Bare per-def state, no behavior instance
- * const actionStates = createCategoryBase<ActionDef, void, ActionState>({
+ * // Def state only, no behavior instance
+ * const actionProgress = createCategoryBase<ActionDef, void, ActionProgress>({
  *   id: 'actions/basic',
  *   buildState: () => ({
  *     progress: persistent<DecimalSource>(0),
  *     timesCompleted: persistent<DecimalSource>(0),
  *   }),
  * });
- * actionStates.register(ACTIONS.filter((d) => d.type === 'basic'));
- * const state = actionStates.getEntry('chop')?.state;
+ * actionProgress.register(ACTIONS.filter((d) => d.kind === 'basic'));
+ * const progress = actionProgress.getEntry('chop')?.state;
  * ```
  */
 export function createCategoryBase<Def extends { id: string }, Instance, DefState = void>(
@@ -177,9 +178,9 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
 
   const { registry, assertRegistrable, remove } = createContentRegistryHandle<Def>(categoryId);
   const entries = new Map<string, CategoryEntry<Def, Instance, DefState>>();
-  // Registration-reactive read barrier for the plain Map: accessors read this
+  // Registration-reactive read barrier for the plain Map: read methods read this
   // ref so a computed whose first evaluation misses the map (e.g. a grants
-  // getter reading back through the category before its entry lands) tracks a
+  // getter reading back through the category before its entry is added) tracks a
   // dependency and re-evaluates after registration. Without it, a zero-dep
   // first run freezes the computed at its fallback permanently.
   const entriesVersion = ref(0);
@@ -187,9 +188,9 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
   // A reset walk stops there rather than walking the instance, whose fields
   // name resources and refs other code owns.
   const contextResets: ResettableObject[] = [];
-  // Content registered after install builds its watchers and hydration hooks
-  // here, so they stop with the scope that built the category (the engine's
-  // module scope) instead of outliving `engine.dispose()`.
+  // Content registered after install builds its watchers and hydration handlers
+  // here, so they stop with the Vue effect scope that built the category (the
+  // engine's `moduleScope`) instead of outliving `engine.dispose()`.
   const scope = getCurrentScope();
 
   function registerOne(def: Def): void {
@@ -202,8 +203,8 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
         const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
         const state = buildState ? buildState(def, instance) : (undefined as DefState);
 
-        // Auto-name persistent fields on the returned state object so save keys
-        // are stable across field reorders. Each definition lives in its own
+        // Auto-name persistent fields on the returned def state so save keys
+        // are stable across field reorders. Each def is in its own persistent
         // context (`${categoryId}/${def.id}`), so the field name alone is unique.
         if (state !== null && typeof state === 'object') {
           for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
@@ -275,20 +276,20 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
 
 /**
  * Apply a list of {@link Grant} entries to their target chains with a shared
- * `active` predicate (typically sourced from the owning category item — e.g.
+ * `active` predicate (typically from the owning instance — e.g.
  * `item.active` for purchasables, `item.earned` for achievements).
  *
  * Each entry may target a single chain or an array of chains; an array is
  * lowered to one `chain.bind` call per chain, all sharing the same composed
  * predicate. The per-entry `when` predicate, adopted through the category's
  * `predicates`, is AND-composed with the outer `active` — the resulting
- * binding is active iff both resolve to `true`.
+ * binding is active iff both evaluate to `true`.
  *
- * Intended to be invoked inside the persistent-context scope the category
- * opens for each definition (so `chain.bind` derives stable attribution ids
- * from the current context).
+ * Intended to be invoked inside the persistent context the category opens
+ * for each def (so `chain.bind` derives stable attribution ids from the
+ * enclosing persistent context).
  *
- * @param owner - names the definition in a `when` Gate's error, e.g.
+ * @param owner - names the def in a `when` Gate's error, e.g.
  *   `"purchasable 'u1'"`
  * @param role - for an owner that binds several grant lists onto the same
  *   chains (a challenge's restricts and rewards), prefixes each derived binding
@@ -327,8 +328,8 @@ export function setupDeclarativeBindings(
 // === TICK WALKER ===
 
 /**
- * Read a category's candidates lazily, so late registrations (mods, delayed
- * content unlocks) join the helper. Registration is additive-only, so `size`
+ * Read a category's candidates lazily, so later registrations (content
+ * registered after install) join the helper. Registration is additive-only, so `size`
  * is a sound cache key: while it holds, the entries are unchanged and the
  * previous list is reused rather than reallocated.
  *
@@ -358,7 +359,7 @@ export interface SetupCategoryTickOptions {
   /**
    * Profiler label for the per-tick walk. When set, the entire walk is timed
    * under this label so per-system tick cost shows up in
-   * {@link getProfileReport}. Omit if the per-entry callback already records
+   * {@link getProfileReport}. Omit if the per-entry function already records
    * its own labels.
    */
   profileLabel?: string;
@@ -367,17 +368,17 @@ export interface SetupCategoryTickOptions {
 /**
  * Register a single tick handler that walks every entry in a category once
  * per tick and invokes `perEntry` for each. Registers exactly one tick
- * callback regardless of how many entries the category holds.
+ * handler regardless of how many entries the category holds.
  *
  * The walked list is cached on `base.size` — registration is additive, so
- * the cache invalidates only when new definitions are registered. No
+ * the cache invalidates only when new defs are registered. No
  * allocation in the steady-state tick body.
  *
  * @param base - Category base whose entries to walk
  * @param registerTick - Tick registration (typically `ctx.onTick`)
  * @param perEntry - Called for each entry every tick. Filtering (e.g.
- *   skipping manual entries in a mixed continuous/manual category) is the
- *   callback's responsibility.
+ *   skipping manual entries in a mixed continuous/manual category) is this
+ *   function's job.
  * @param options - Optional profiler label
  * @returns Unsubscribe function from the underlying `registerTick` call
  *

@@ -1,21 +1,21 @@
 /**
  * Temporary Effect System — timed effects with modifier integration
  *
- * Manages time-limited effects (buffs, debuffs, DoTs, status effects, power-ups).
- * Register definitions at startup, activate instances at runtime. Each instance
- * counts down per tick, applies modifiers while active, and auto-cleans up on expiry.
+ * Manages time-limited effects (buffs, debuffs, DoTs, power-ups).
+ * Register defs at startup, and activate instances in live play. Each instance
+ * counts down per tick, binds its grants while active, and cleans up on expiry.
  *
  * Key features:
- * - Stacking: independent timers or duration refresh per definition
- * - Modifier integration: binds to `ModifierChain`s while active, auto-removes on expiry
- * - Query surface: reactive `isActive` / `activeCount`, tag-based filtering
- * - Persistence: summary-based save; every load and reset rebuilds the live instances
+ * - Stacking: independent timers or duration refresh per def
+ * - Modifier integration: binds to `ModifierChain`s while active, removes them on expiry
+ * - Queries: reactive `isActive` / `activeCount`, tag-based filtering
+ * - Persistence: saves each instance's remaining time; every load and reset rebuilds the live instances
  * - Events: activated, expired, dispelled
  *
  * Interactions between effects (e.g., "if Burn and Frost both active, trigger Steam")
  * are intentionally consumer-side. The system provides queries; consumers wire logic.
  *
- * @see ./conditional-effect for predicate-driven effects (active while a condition holds, no timer)
+ * @see ./conditional-effect for predicate-driven effects (active while a predicate holds, no timer)
  *
  * @example
  * ```ts
@@ -63,13 +63,13 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 
 // === TYPES ===
 
-/** Definition for a temporary effect, registered at startup. */
+/** A temporary effect's def, registered at startup. */
 export interface TemporaryEffectDef {
   id: string;
   displayName?: string;
   /**
    * Base duration in seconds. Can be reactive for dynamic durations. Must be
-   * finite: `register` and `apply` throw otherwise, since the saved
+   * finite: `register` and `activate` throw otherwise, since the saved
    * countdown cannot hold `Infinity`. Use a conditional effect system for an
    * effect that lasts until removed.
    */
@@ -77,8 +77,8 @@ export interface TemporaryEffectDef {
   /** Maximum concurrent instances of this effect. Default: 1 */
   maxStacks?: number;
   /**
-   * How additional applications behave when an instance already exists.
-   * - `'independent'`: each apply creates a new instance with its own timer (up to maxStacks)
+   * How another activation behaves when an instance already exists.
+   * - `'independent'`: each activation creates a new instance with its own timer (up to maxStacks)
    * - `'refresh'`: resets the existing instance's duration instead of creating a new one
    *
    * Default: `'independent'`
@@ -87,20 +87,19 @@ export interface TemporaryEffectDef {
   /** Tags for query filtering (e.g., `['echo', 'flame']`) */
   tags?: string[];
   /**
-   * Grants to bind while this effect is active — the `grants` vocabulary,
-   * with `when` ANDed onto the effect's own lifetime. Can be a static array
-   * or a factory evaluated at each `apply()` — use a factory when bindings
-   * depend on runtime state (e.g., which chain to target). The shorthands
-   * build a fresh modifier per stack; a hand-built `modifier` must be a
-   * factory when `maxStacks > 1`.
+   * Grants to bind while this effect is active, with each `when` ANDed onto
+   * the effect's own duration. Can be a static array, or a factory evaluated
+   * at each `activate()`. Use a factory when the grants depend on live state
+   * (e.g., which chain to target). The shorthands build a fresh modifier per
+   * stack; a hand-built `modifier` must be a factory when `maxStacks > 1`.
    *
-   * Each binding evaluates at a fixed place in its chain, whatever order
-   * effects are applied in: a static array claims its places at `register`,
-   * a factory on its first apply. Stacks of one def sit together there, in
-   * apply order.
+   * Each lowered grant evaluates at a fixed place in its chain, whatever
+   * order effects activate in. A static array claims its places at
+   * `register`, a factory on its first activation. Stacks of one def are
+   * together there, in activation order.
    */
   grants?: Grant[] | (() => Grant[]);
-  /** Called when the effect is applied */
+  /** Called when the effect activates */
   onActivate?: (instance: TemporaryEffectInstance) => void;
   /** Called every tick while the effect is active */
   onTick?: (instance: TemporaryEffectInstance, dt: number) => void;
@@ -115,18 +114,18 @@ export interface TemporaryEffectDef {
 
 /** A live instance of a temporary effect, created by {@link TemporaryEffectSystem.activate}. */
 export interface TemporaryEffectInstance {
-  /** Unique instance identifier (`${defId}:${counter}`) */
+  /** Unique instance id (`${defId}:${counter}`) */
   readonly id: string;
-  /** The definition this instance was created from */
+  /** The def this instance was created from */
   readonly defId: string;
   /** Seconds remaining. Reactive — decreases every tick. */
   readonly timeRemaining: Ref<number>;
-  /** The duration of the current application: resolved at apply, re-resolved by a refresh, kept through a save */
+  /** The duration of the current activation: resolved at activation, re-resolved by a refresh, kept through a save */
   readonly duration: number;
   /**
-   * Stack slot (0-based) among live instances of the same def: the lowest
-   * index no other live stack holds when this one was applied, so a slot a
-   * stack frees is reused. Not saved; a load reassigns slots from 0.
+   * Stack position (0-based) among live instances of the same def. It is the
+   * lowest index no other live stack held when this one activated, so an
+   * index a stack frees is reused. Not saved; a load reassigns indexes from 0.
    */
   readonly stackIndex: number;
   /** End this instance now, the way expiry does: fires onExpire and `expired`, then unbinds its modifiers */
@@ -135,7 +134,7 @@ export interface TemporaryEffectInstance {
 
 /** Events emitted by the temporary effect system */
 export interface TemporaryEffectEvents {
-  /** Fired when an effect instance is applied */
+  /** Fired when an effect instance activates */
   activated: (instance: TemporaryEffectInstance) => void;
   /** Fired when an effect instance expires or is ended early */
   expired: (instance: TemporaryEffectInstance) => void;
@@ -145,7 +144,7 @@ export interface TemporaryEffectEvents {
 
 /** Options for {@link createTemporaryEffectSystem} */
 export interface TemporaryEffectSystemOptions {
-  /** Unique identifier for persistence scoping */
+  /** Unique id; it names the system's persistent context */
   id: string;
   /** Tick registration function (typically `gameLoop.onTick`) */
   registerTick: RegisterTick;
@@ -153,21 +152,21 @@ export interface TemporaryEffectSystemOptions {
 
 /** Manages temporary effects: registration, activation, tick countdown, and cleanup. */
 export interface TemporaryEffectSystem {
-  /** System identifier (from {@link TemporaryEffectSystemOptions.id}) */
+  /** System id (from {@link TemporaryEffectSystemOptions.id}) */
   readonly id: string;
-  /** Kind tag used by the effect-system registry / picker discovery */
+  /** The variant `kind` the effect-system registry and picker discovery read */
   readonly kind: 'temporary';
-  /** Register one or more effect definitions. Throws on an id already registered. */
+  /** Register one or more effect defs. Throws on an id already registered. */
   register(def: TemporaryEffectDef | TemporaryEffectDef[]): void;
-  /** Get a registered definition by ID */
+  /** Get a registered def by id */
   getDef(id: string): TemporaryEffectDef | undefined;
-  /** Snapshot of every registered definition in insertion order. */
+  /** Snapshot of every registered def in insertion order. */
   allDefs(): readonly TemporaryEffectDef[];
   /** Activate an effect. Returns the instance, or null if at max stacks. */
   activate(defId: string): TemporaryEffectInstance | null;
-  /** Remove all active instances of a definition */
+  /** Dispel all active instances of a def */
   dispel(defId: string): void;
-  /** Remove all active instances of all definitions */
+  /** Dispel all active instances of all defs */
   dispelAll(): void;
   /** Whether any instance of the given def is active (reactive) */
   isActive(defId: string): ComputedRef<boolean>;
@@ -180,19 +179,19 @@ export interface TemporaryEffectSystem {
   /** Subscribe to system events */
   on: Emittable<TemporaryEffectEvents>['on'];
   /**
-   * Stop ticking and drop the live instances without firing events. The saved
-   * instances stay registered and keep saving, so building the system under
-   * the same id again takes a new engine.
+   * Stop ticking and remove the live instances without firing events. The
+   * saved instances stay registered and keep saving, so building the system
+   * under the same id again takes a new engine.
    */
   dispose(): void;
 }
 
-// === PERSISTENCE SNAPSHOT SHAPE ===
+// === SAVE SHAPE ===
 
 interface EffectSnapshot {
   defId: string;
   timeRemaining: number;
-  /** The duration applied; absent from saves written before it was recorded. */
+  /** The activation's duration; absent from saves an older engine wrote. */
   duration?: number;
 }
 
@@ -215,7 +214,7 @@ function toFiniteDuration(defId: string, duration: DecimalSource): number {
 /**
  * Create a temporary effect system for managing time-limited effects.
  *
- * @param options - System ID (for persistence scoping) and tick registration function
+ * @param options - System id (it names the persistent context) and tick registration function
  * @returns A {@link TemporaryEffectSystem} for registering, activating, and querying timed effects
  *
  * @example
@@ -313,7 +312,7 @@ export function createTemporaryEffectSystem(
   function expireInstance(instance: TemporaryEffectInstance): void {
     defs.get(instance.defId)?.onExpire?.(instance);
     handle.emit('expired', instance);
-    removeRun(instance);
+    removeInstance(instance);
   }
 
   function unbindInstance(instance: TemporaryEffectInstance): void {
@@ -321,7 +320,7 @@ export function createTemporaryEffectSystem(
     unbindByInstance.delete(instance.id);
   }
 
-  function removeRun(instance: TemporaryEffectInstance): void {
+  function removeInstance(instance: TemporaryEffectInstance): void {
     unbindInstance(instance);
     instances.value = instances.value.filter((i) => i.id !== instance.id);
   }
@@ -360,7 +359,7 @@ export function createTemporaryEffectSystem(
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
       if (defs.has(d.id)) {
-        throw new Error(`TemporaryEffect: duplicate definition '${d.id}'`);
+        throw new Error(`TemporaryEffect: duplicate def '${d.id}'`);
       }
       if (typeof d.duration !== 'function' && !isRef(d.duration)) {
         toFiniteDuration(d.id, d.duration);
@@ -370,7 +369,7 @@ export function createTemporaryEffectSystem(
         for (const grant of d.grants) {
           if ('modifier' in grant && typeof grant.modifier !== 'function') {
             throw new Error(
-              `TemporaryEffect '${d.id}': modifier bindings must be factories (functions) when maxStacks > 1`,
+              `TemporaryEffect '${d.id}': \`modifier\` grants must be factories (functions) when maxStacks > 1`,
             );
           }
         }
@@ -391,7 +390,7 @@ export function createTemporaryEffectSystem(
 
   function apply(defId: string): TemporaryEffectInstance | null {
     const def = defs.get(defId);
-    if (!def) throw new Error(`TemporaryEffect: unknown definition '${defId}'`);
+    if (!def) throw new Error(`TemporaryEffect: unknown def '${defId}'`);
 
     const maxStacks = def.maxStacks ?? 1;
     const behavior = def.stackBehavior ?? 'independent';
@@ -458,7 +457,7 @@ export function createTemporaryEffectSystem(
 
     for (const snap of savedState.value) {
       const def = defs.get(snap.defId);
-      if (!def) continue; // definition removed between versions
+      if (!def) continue; // def removed by a later game build
       const dur = snap.duration ?? Math.max(resolveDuration(def), snap.timeRemaining);
       const instance = createInstance(
         def,
@@ -483,7 +482,7 @@ export function createTemporaryEffectSystem(
   function dispose(): void {
     scope.stop();
     // Clean up all instances without firing events; releasing the slots unbinds them,
-    // and an instance's expire() returns early once its handle is gone.
+    // and an instance's expire() returns early once its unbind entry is gone.
     unbindByInstance.clear();
     instances.value = [];
     for (const slots of slotsByDef.values()) slots.release();
@@ -509,7 +508,7 @@ export function createTemporaryEffectSystem(
 
   // Auto-register into the per-engine effect-system registry if this
   // factory is running inside withEffectSystemRegistry(...) — i.e., during
-  // a module's install() or connect() phase. Systems constructed outside
+  // a module's install() or connect(). Systems constructed outside
   // an engine (tests, throwaway scripts) silently skip registration.
   getCurrentEffectSystemRegistry()?.register(system);
   registerBindingSlots(system, (defId) => slotsByDef.get(defId));

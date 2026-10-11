@@ -1,14 +1,14 @@
 /**
- * Systems Layer — batteries-included assemblies of core primitives.
+ * Systems source layer — batteries-included assemblies of core primitives.
  *
- * Each module encodes a known incremental game pattern. If a system doesn't
+ * Each file encodes a known incremental game pattern. If a system doesn't
  * fit your game, drop down to the core primitives it composes.
  */
 
 // === RESETTABLE PROTOCOL ===
 // Opt-in interface for objects (categories, stateful systems) that yield
 // persistent refs for recursive reset. Used by resetObject in the reset system.
-// Lives in core so core primitives can implement it too; re-exported here by
+// Is in core so core primitives can implement it too; re-exported here by
 // name (not `export *`) so the `@internal` `attachPersistentContextReset` stays internal.
 export { Resettable, type ResettableObject } from '@/core/resettable';
 
@@ -16,7 +16,7 @@ export { Resettable, type ResettableObject } from '@/core/resettable';
 // Generic registry + per-def persistent context + Resettable wiring. The
 // primitive that the per-system category factories build on. Use directly
 // for consumer registries that don't fit any built-in category shape (pass
-// Instance = void and omit buildInstance for pure per-def state).
+// Instance = void and omit buildInstance for def state only).
 export { createCategoryBase } from './category-base';
 export type {
   CategoryBase,
@@ -26,20 +26,20 @@ export type {
 } from './category-base';
 
 // === ENGINE CATEGORIES ===
-// EngineCategories accumulator + CategoriesKey injection. Self-populated by
-// the five category factories at construction time; tooling reads via
-// `engine.tryInject(CategoriesKey)` without any archetype-side publish step.
+// EngineCategories collection + CategoriesKey injection. Self-populated by
+// the category factories at construction time; tooling reads via
+// `engine.tryInject(CategoriesKey)` without a publish step in any module.
 // Explicit named re-exports keep the `@internal` `with*`/`getCurrent*` helpers
-// out of the published surface, matching the resource/chain/effect-system
+// out of the API surface, matching the resource/chain/effect-system
 // registry pattern in core/index.ts.
 export type { EngineCategories } from './engine-categories';
 export { CategoriesKey, findCategoryEntrySignals } from './engine-categories';
 
 // === GATE ===
-// Consumer-facing predicate-spec data shape over CategoryEntrySignals + ResourceRegistry +
-// GameStateAccessor. Authored as plain data in content definitions; evaluated through
+// Gate: the typed, serializable yes/no test over CategoryEntrySignals + ResourceRegistry +
+// GameStateAccessor. Authored as plain data in content defs; evaluated through
 // evaluateGate, predicted through timeUntilGateFlip. `gateToCondition` is engine-internal
-// (projects accessor-backed Gate leaves to the ICondition IR that E.branch embeds).
+// (projects accessor-backed Gate leaves to the condition IR, `ICondition`, that E.branch embeds).
 export type {
   Gate,
   ResourceGteGate,
@@ -78,14 +78,14 @@ export * from './conversion';
 // === DECLARATIVE BINDINGS ===
 // Types used by category `grants` / `restricts` / `rewards` fields and by
 // `ModifierChain.bind` / `bindings()`. Re-exported here so the
-// `@open-loop/engine/systems` entry point is self-contained for API extraction.
+// `@open-loop/engine/systems` subpath is self-contained for API extraction.
 export type { BindOptions, BindingRecord, Grant } from '@/core/modifier';
 
 // === PURCHASES ===
-// Purchasable: unified purchase system (one-shot via limit:1, leveled, infinite).
-// PurchasableCategory: batch-register Purchasables from content definitions.
+// Purchasable: unified purchase system (one-shot via limit:1, repeatable, infinite).
+// PurchasableCategory: batch-register Purchasables from content defs.
 // Raw `createPurchasable` is @internal — consumers use the category factory
-// (L2 default) or `createScalingPurchasable` (L3 escape) instead.
+// (L2 default) or `createScalingPurchasable` (L3) instead.
 export {
   createScalingPurchasable,
   type Purchasable,
@@ -99,9 +99,9 @@ export {
 export * from './purchasable-category';
 
 // === ACHIEVEMENTS ===
-// Milestone tracking with auto-unlock conditions and tiered rewards.
-// AchievementCategory: batch-register Achievements from content definitions,
-// with `registerLadder` fanning one tracked value into threshold-gated tiers.
+// Achievements earned automatically when their goal holds, with ladder rewards.
+// AchievementCategory: batch-register Achievements from content defs, with
+// `registerLadder` turning one tracked value into the rungs of a ladder, one per threshold.
 // Raw `createAchievement` is @internal — consumers use the category factory.
 export {
   getCombinedAchievementEffect,
@@ -114,8 +114,8 @@ export {
 export * from './achievement-category';
 
 // === PRODUCERS ===
-// Resource generators: continuous (per-tick buildings) and manual (on-click).
-// ProducerCategory: batch-register Producers from content definitions.
+// Producers: continuous (per-tick buildings) and manual (on-click).
+// ProducerCategory: batch-register Producers from content defs.
 export * from './producer-category';
 
 // === ACTIONS ===
@@ -126,20 +126,20 @@ export * from './producer-category';
 export * from './action-category';
 
 // === AUTO-PURCHASE ===
-// Tick-driven helpers that automate Purchasable / Producer purchases under
-// a selection policy. Sweep variant for upgrade lists, policy variant for
-// producer chains. See `core/policy.ts` for the SelectionPolicy primitives
-// these consume.
+// Tick-driven utilities that automate Purchasable / Producer purchases under
+// a selection policy: `setupSweepAutoPurchase` for upgrade lists,
+// `setupPolicyAutoPurchase` for producer chains. See `core/policy.ts` for the
+// SelectionPolicy primitives these consume.
 export * from './auto-purchase';
 
-// === LOOP INCREMENTALS ===
+// === CYCLES AND RUNS ===
 // Cycle: constrained-replay pattern
-// Skill: dual-tier XP/level with permanent bonus accumulation across cycles.
-// SkillCategory: batch-register Skills from content definitions.
-// Retention: policies for what persists between cycles.
-// CycleLog: per-cycle metric delta ring buffer for analytics.
-// BestOf: per-metric best-of-run tracking with config snapshots.
-// Recommendation: score-based inter-cycle strategy arbitration over CycleLog + BestOf data.
+// Skill: XP and level per run, plus a lifetime bonus that accumulates across runs.
+// SkillCategory: batch-register Skills from content defs.
+// Retention: what a reset keeps or retains.
+// CycleLog: a ring buffer of per-run tracked-metric changes, for analytics.
+// BestOf: per-metric best-of-run tracking with configuration snapshots.
+// Recommendation: score-based choice of a configuration between runs, over CycleLog + BestOf data.
 export * from './cycle';
 export * from './cycle-log';
 export * from './best-of';
@@ -154,22 +154,22 @@ export * from './retention';
 export * from './inventory';
 
 // === TIME ===
-// Time tracking and speed multipliers.
+// Play-time tracking.
 export * from './time';
 
 // === TIME BANK ===
-// Banked-time reservoir (the fourth offline-progress family): deposit/withdraw
-// core plus the live-acceleration and burst-discharge spend surfaces.
+// Time bank, an offline-progress family: the store of banked seconds. Deposit
+// and withdraw, plus two ways to spend: live acceleration and burst discharge.
 export * from './time-bank';
 
 // === CHALLENGES ===
-// Optional difficulty modifiers with enter/exit lifecycle and completion tracking.
-// ChallengeCategory: batch-register Challenges from content definitions.
+// Optional difficulty rules with enter/exit lifecycle and completion tracking.
+// ChallengeCategory: batch-register Challenges from content defs.
 export * from './challenge-category';
 
 // === CONTENT ===
-// Generic typed registry for game content definitions (actions, zones, etc.).
-// Named re-exports keep the `@internal` registry handle out of the surface.
+// Generic typed registry for game content defs (actions, zones, etc.).
+// Named re-exports keep the `@internal` registry handle out of the API surface.
 export {
   createContentRegistry,
   type ContentRegistry,
@@ -181,8 +181,9 @@ export {
 export * from './temporary-effect';
 
 // === CONDITIONAL EFFECTS ===
-// Condition-driven effects with modifier integration. Bindings track a reactive
-// predicate; state is implicit in the game so load reconstruction is automatic.
+// Effects held while a predicate holds, with modifier integration. Their grants
+// track a reactive predicate; their state follows from game state, so hydration
+// is automatic.
 export * from './conditional-effect';
 
 // === REPLACEMENT GRANTS ===
@@ -192,39 +193,38 @@ export * from './conditional-effect';
 export { replacementGrants, type ReplacementGrantsOptions } from './replacement-grants';
 
 // === LOADOUTS ===
-// Constrained persistent selection from a pool (equipment, spells, policy picks).
+// Constrained persistent selection from a candidate pool (equipment, spells, policy picks).
 export * from './loadout';
 
 // === GOAL PICKER ===
-// Weighted-goal selection over a candidate pool: sweep-completed + score + top-N fill.
+// Weighted-goal selection over a candidate pool: remove completed goals, score, fill the top N.
 // Composes Loadout for persistence. Distinct from createConditionalStrategy (FillStrategy,
-// sequencer-driven) and createRecommendationSystem (between-cycle arbitration).
+// sequencer-driven) and createRecommendationSystem (a choice between runs).
 export * from './goal-picker';
 
 // === RULE ADVISOR ===
-// Intra-session profile-history advisor: aggregates CycleLog history into a
-// profile, runs analyzer heuristics, surfaces a ranked + dismissable list of
-// suggestions. Sibling to createRecommendationSystem along the time-horizon
-// axis (RecommendationSystem = inter-cycle; RuleAdvisor = intra-session).
+// Within-play-session advisor: reduces CycleLog history to a digest, runs
+// advisor analyzers over it, and presents a ranked, dismissable list of suggestions.
+// Sibling to createRecommendationSystem along the time-horizon axis
+// (RecommendationSystem = between runs; RuleAdvisor = within a play session).
 export * from './rule-advisor';
 
 // === CHARACTER INTERACTION ===
-// Dialog: authored conversation graphs (DialogNode/DialogChoice/DialogGraph)
-// + the engine-native runtime that walks them. Choice/node conditions accept
-// Gate — predicates resolve via the ambient triple at evaluation.
+// Dialog: authored dialog graphs (DialogNode/DialogChoice/DialogGraph)
+// + the native adapter that walks them (`createNativeDialogAdapter`). A node's
+// or choice's `when` takes a Gate, evaluated against the ambient Gate services.
 // Dialog category: batch-register DialogGraph content per NPC / scene.
-// Dialog session: wraps a DialogAdapter in a persistent envelope with
-// lifecycle event emission. Default runtime is the engine-native walker;
-// pass `adapterFactory` to swap in an external adapter (Ink, Yarn, Ren'Py).
+// Dialog session: wraps a DialogAdapter with persistent state and lifecycle
+// events. The default adapter is the native one; pass `adapterFactory` for an
+// external adapter (Ink, Yarn, Ren'Py).
 export * from './dialog';
 export * from './dialog-category';
 export * from './dialog-session';
 
 // === SUBJECT CATEGORIES ===
-// Addressable subjects (NPCs, factions, regions, single entities) with typed
-// multi-field state under a shared schema. Field kinds: scalar / vector /
-// tier / flag / enum. Replaces the prior variant-dispatched relationship
-// category; `subject.fields.<name>` access is typed at the callsite, no
+// Addressable subjects (NPCs, factions, regions) with typed multi-field
+// state under a shared schema. Field kinds: scalar / vector / ladder / flag /
+// enum. `subject.fields.<name>` access is typed at the callsite, with no
 // runtime narrowing. Auto-registers into `EngineCategories.subjects`.
 export {
   createSubjectCategory,
@@ -254,14 +254,15 @@ export {
 export * from './zone';
 
 // === AUTOMATION ===
-// Tiered progressive unlock of automation features (manual → basic → conditional → priority).
+// Automation tiers: an ordered unlock of automation features
+// (manual → basic → conditional → priority).
 export * from './automation';
 
-// === CROSS-LAYER TYPE RE-EXPORTS ===
+// === TYPE RE-EXPORTS FROM LOWER SOURCE LAYERS ===
 
-// Types from primitives and core that leak through systems' public API.
+// Types from primitives and core that appear in systems' public API.
 // Selective, not broad: `@open-loop/engine/systems` stays focused on
-// systems-layer symbols; consumers still import values from the layer that
+// systems symbols; consumers still import values from the source layer that
 // owns them.
 
 export type {

@@ -1,29 +1,29 @@
 /**
- * Purchasable Category — batch-create Purchasables from content definitions
+ * Purchasable Category — batch-create Purchasables from defs
  *
- * Captures the common pattern of dozens to hundreds of purchasable items
- * sharing a structure: cost requirements, effects, visibility gating.
- * Handles both one-shot upgrades and leveled repeatables through the
- * unified {@link Purchasable} primitive.
+ * Captures the shape of many purchasables that share a structure: cost
+ * requirements, effects and visibility predicates. Handles both one-shot
+ * upgrades and repeatable purchases through the one {@link Purchasable}
+ * primitive.
  *
  * @example
  * ```ts
- * interface PerkDef { id: string; name: string; baseCost: number; maxLevel: number }
+ * interface PerkDef { id: string; name: string; baseCost: number; maxCount: number }
  *
  * const perks = createPurchasableCategory<PerkDef>({
  *   id: 'perks',
  *   mapPurchasable: (def) => ({
- *     display: { title: def.name, description: `Level up ${def.name}` },
+ *     display: { title: def.name, description: `Upgrade ${def.name}` },
  *     // `count` is the perk's own count ref — a Formula over it stays
- *     // invertible, so purchase max prices each count at its own step.
+ *     // invertible, so purchase max costs each unit at its own step.
  *     requirements: (count) =>
  *       createCostRequirement({
  *         resource: gold,
  *         cost: Formula.exponential(count, def.baseCost, 1.15),
  *         maxBulkCount: Decimal.dInf,
  *       }),
- *     limit: def.maxLevel,
- *     effect: (amount) => Decimal.pow(1.1, amount),
+ *     limit: def.maxCount,
+ *     effect: (count) => Decimal.pow(1.1, count),
  *   }),
  * });
  *
@@ -31,11 +31,11 @@
  *
  * // Access
  * perks.getPurchasable('dmgReduce');               // Purchasable instance
- * perks.getPurchasable('dmgReduce')!.purchase(1);  // buy one level
- * // (a bare `purchase()` buys as many as are affordable, up to `maxBulkCount`)
- * perks.purchasedCount.value;                      // how many have been bought at least once
- * perks.totalCount.value;                         // sum of all levels
- * perks.purchaseAffordable();                      // buy-max on every affordable
+ * perks.getPurchasable('dmgReduce')!.purchase(1);  // purchase one
+ * // (a bare `purchase()` purchases max, up to `maxBulkCount`)
+ * perks.purchasedCount.value;                      // how many are purchased at least once
+ * perks.totalCount.value;                          // sum of all purchase counts
+ * perks.purchaseAffordable();                      // purchase max on every affordable one
  * ```
  *
  * @cluster purchasable
@@ -61,50 +61,50 @@ import type { Grant } from '@/core/modifier';
 /**
  * Options for {@link createPurchasableCategory}.
  *
- * @typeParam Def - The content definition type (must have `id: string`)
- * @typeParam State - Per-instance state created alongside each Purchasable.
- *   Use `void` if no extra state is needed.
+ * @typeParam Def - The def type (must have `id: string`)
+ * @typeParam DefState - Def state created beside each Purchasable.
+ *   Use `void` if no def state is needed.
  */
 export interface PurchasableCategoryOptions<Def extends { id: string }, DefState = void> {
-  /** Persistence context name. Each definition gets a sub-context `{id}/{def.id}`. */
+  /** Persistent context id. Each def gets a child persistent context `{id}/{def.id}`. */
   id: string;
 
   /**
-   * Map a content definition to PurchasableOptions.
+   * Map a def to PurchasableOptions.
    *
-   * Called once per definition during {@link PurchasableCategory.register}.
+   * Called once per def during {@link PurchasableCategory.register}.
    * The returned options are passed to `createPurchasable()`.
    *
    * Note: `id` is provided by the category — don't include it in the
    * returned options (it will be overwritten).
    *
-   * For a cost that scales on the item's own level, return `requirements` in
-   * its factory form — the callback receives the live `amount` ref, which is
-   * what a Formula cost needs and what `def` alone cannot supply. See
-   * {@link PurchasableOptions.requirements}. Reading the level back out of the
-   * category with `getPurchasable(def.id)?.amount.value` is the shape to
-   * avoid: it works forwards but prices bulk purchases linearly.
+   * For a cost that scales on the purchasable's own count, return
+   * `requirements` in its function form. The function receives the live
+   * `count` ref, which a Formula cost needs and `def` alone cannot supply. See
+   * {@link PurchasableOptions.requirements}. Reading the count back out of the
+   * category with `getPurchasable(def.id)?.count.value` is the shape to avoid:
+   * it works forwards, but costs every unit of a bulk purchase at the current count.
    *
    * The optional `grants` field declares modifiers that bind to shared chains
-   * while the purchasable is active. Each {@link Grant} is lowered to a
-   * `chain.bind` call with `item.active` as the implicit predicate, so
-   * balance-sim and devtools can attribute the contribution back to this
-   * category + item without any per-binding wiring.
+   * while the purchasable is active. Each {@link Grant} becomes a `chain.bind`
+   * call with the purchasable's `active` as its predicate. So the balance
+   * harness and devtools can attribute the binding to this category and
+   * purchasable, with no wiring per binding.
    */
   mapPurchasable: (def: Def) => Omit<PurchasableOptions, 'id'> & { grants?: Grant[] };
 
   /**
-   * Create per-instance state alongside the Purchasable.
+   * Create the def state beside the Purchasable.
    *
-   * Called inside the definition's persistent context, so `persistent()` calls
-   * here are scoped to `{categoryId}/{def.id}`.
+   * Called inside the def's persistent context, so `persistent()` calls
+   * here save under `{categoryId}/{def.id}`.
    *
-   * Omit if no extra state is needed.
+   * Omit if no def state is needed.
    */
   mapState?: (def: Def, purchasable: Purchasable) => DefState;
 }
 
-/** A registered entry: definition + Purchasable instance + optional state + introspection signals */
+/** A category entry: def, Purchasable instance, def state and signals */
 export interface PurchasableCategoryEntry<Def extends { id: string }, DefState = void> {
   readonly def: Def;
   readonly purchasable: Purchasable;
@@ -115,59 +115,59 @@ export interface PurchasableCategoryEntry<Def extends { id: string }, DefState =
 /**
  * A purchasable category — batch-registered Purchasables with a shared shape.
  *
- * @typeParam Def - Content definition type
- * @typeParam State - Per-instance state type (void if none)
+ * @typeParam Def - The def type
+ * @typeParam DefState - The def state type (void if none)
  */
 export interface PurchasableCategory<
   Def extends { id: string },
   DefState = void,
 > extends ResettableObject {
-  /** Persistence context id this category was constructed under. */
+  /** Persistent context id this category was built under. */
   readonly id: string;
   /**
    * The content registry (see {@link ContentRegistryView} for what a patch
    * reaches). Add defs with the category's `register`, which builds each
-   * def's instance and state.
+   * def's instance and def state.
    */
   readonly registry: ContentRegistryView<Def>;
 
   /**
-   * Register definitions and create their Purchasable instances.
-   * Can be called multiple times (base game + mods).
+   * Register defs and create their Purchasable instances.
+   * Can be called more than once (base game, then a mod's content).
    */
   register(defs: Def | Def[]): void;
 
-  /** Get the Purchasable instance for a definition ID */
+  /** Get the Purchasable instance for a def id */
   getPurchasable(id: string): Purchasable | undefined;
 
-  /** Get the per-instance state for a definition ID */
+  /** Get the def state for a def id */
   getState(id: string): DefState | undefined;
 
-  /** Get the definition for an ID (delegates to registry.get) */
+  /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
 
-  /** Get the full entry (def + purchasable + state) */
+  /** Get the category entry (def, purchasable, def state, signals) */
   getEntry(id: string): PurchasableCategoryEntry<Def, DefState> | undefined;
 
-  /** All entries in registration order */
+  /** All category entries in registration order */
   getAll(): PurchasableCategoryEntry<Def, DefState>[];
 
-  /** Reactive count of purchasables that have been bought at least once (amount >= 1) */
+  /** Reactive count of purchasables purchased at least once (`count >= 1`) */
   readonly purchasedCount: ComputedRef<number>;
 
-  /** Reactive sum of all purchasables' amounts (total levels across all) */
+  /** Reactive sum of all purchasables' purchase counts */
   readonly totalCount: ComputedRef<DecimalSource>;
 
-  /** Reactive product of the effects of every purchasable bought at least once */
+  /** Reactive product of the effects of every purchasable purchased at least once */
   readonly totalEffect: ComputedRef<DecimalSource>;
 
-  /** True when every registered purchasable has reached its limit */
+  /** `true` when every registered purchasable has reached its limit */
   readonly allMaxed: ComputedRef<boolean>;
 
-  /** Return all purchasables that can currently be afforded */
+  /** Return every purchasable whose `canPurchase` is true */
   getAffordable(): Purchasable[];
 
-  /** Buy-max on every affordable purchasable. Returns total levels bought across all. */
+  /** Purchase max on every purchasable whose `canPurchase` is true. Returns the total count purchased. */
   purchaseAffordable(): DecimalSource;
 
   /** Number of registered entries */
@@ -177,12 +177,12 @@ export interface PurchasableCategory<
 // === FACTORIES ===
 
 /**
- * Create a purchasable category — batch registration of Purchasables from definitions.
+ * Create a purchasable category — batch registration of Purchasables from defs.
  *
- * @param options - Category ID and mapping function
+ * @param options - Category id and `mapPurchasable`
  * @returns A {@link PurchasableCategory} with registry, lookup, and bulk purchase
  *
- * @example One-shot upgrades — a static cost is exact at `limit: 1`; leveled costs take the factory form of `requirements`.
+ * @example One-shot upgrades — a static cost is exact at `limit: 1`; scaling costs take the function form of `requirements`.
  * ```ts
  * const upgrades = createPurchasableCategory<UpgDef>({
  *   id: 'upgrades',
@@ -195,7 +195,7 @@ export interface PurchasableCategory<
  * });
  *
  * upgrades.register(UPGRADE_DEFS);
- * upgrades.purchaseAffordable(); // buy all we can
+ * upgrades.purchaseAffordable(); // purchase all we can
  * ```
  */
 export function createPurchasableCategory<Def extends { id: string }, DefState = void>(
@@ -230,8 +230,8 @@ export function createPurchasableCategory<Def extends { id: string }, DefState =
     ),
   );
 
-  // Gated here rather than on `Purchasable.effect`, which a UI reads unbought
-  // to preview an upgrade's bonus.
+  // Blocked by `active` here rather than on `Purchasable.effect`, which a UI
+  // reads before purchase to preview an upgrade's effect value.
   const totalEffect = computed((): DecimalSource =>
     list().reduce<DecimalSource>(
       (product, p) =>

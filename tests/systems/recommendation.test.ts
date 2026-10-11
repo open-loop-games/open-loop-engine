@@ -592,7 +592,7 @@ describe('createRecommendationSystem', () => {
     });
 
     expect(() => recs.register(makeStrategy({ id: 'a', score: () => 999 }))).toThrow(
-      /duplicate recommendation def id "a"/,
+      /duplicate recommender id "a"/,
     );
     expect(recs.recommenders).toHaveLength(1);
   });
@@ -609,7 +609,7 @@ describe('createRecommendationSystem', () => {
         applySnapshot: () => {},
         recommenders: [makeStrategy({ id: 'a' }), makeStrategy({ id: 'a' })],
       }),
-    ).toThrow(/duplicate recommendation def id "a"/);
+    ).toThrow(/duplicate recommender id "a"/);
   });
 
   it('unregister() removes a strategy', () => {

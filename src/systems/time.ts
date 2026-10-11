@@ -1,14 +1,14 @@
 /**
  * Time tracking — persistent elapsed and total play time.
  *
- * Provides the "how long has the player been playing" surface: a `tick(dt)`-driven
+ * Answers "how long has the player been playing". It is a `tick(dt)`-driven
  * counter that splits between since-last-reset (`elapsed`) and lifetime
- * (`totalPlayTime`), and a formatted display string for the lifetime counter.
+ * (`totalPlayTime`), with a formatted display string for the lifetime counter.
  * Game speed is the tick driver's `speedMultiplier`: the dt fed to `tick()`
- * already carries it.
+ * already includes it.
  *
- * Offline-time chunking lives in `core/offline` — pair the two when a game
- * needs both surfaces.
+ * Offline-time chunking is in `core/offline` — pair the two when a game
+ * needs both.
  */
 
 import type { Ref } from 'vue';
@@ -22,11 +22,11 @@ import { formatTime } from '@/primitives/decimal';
 
 // === TYPES ===
 
-/** Configuration for {@link createTimeSystem}. */
+/** Options for {@link createTimeSystem}. */
 export interface TimeSystemOptions {
   /**
-   * Save context. Defaults to `${module}/time` inside a module; pass one when
-   * a module builds more than one.
+   * The persistent context id. Defaults to `${module}/time` inside a module;
+   * pass one when a module builds more than one.
    */
   id?: string;
 }
@@ -40,9 +40,9 @@ export interface TimeSystem {
    * so a reset of the owning module keeps it while zeroing `elapsed`.
    */
   totalPlayTime: Ref<number>;
-  /** Advance time by `dt` seconds. */
+  /** Add `dt` seconds to both counters. */
   tick(dt: number): void;
-  /** Reset elapsed to 0 (totalPlayTime preserved). */
+  /** Reset elapsed to 0 (totalPlayTime is kept). */
   reset(): void;
   formatPlayTime(): string;
 }
@@ -53,10 +53,10 @@ export interface TimeSystem {
  * Creates a time tracking system with persistent elapsed/total play time and
  * a formatted display.
  *
- * @param options - Save context id
+ * @param options - The persistent context id
  * @returns A time system with persistent `elapsed` and `totalPlayTime` refs,
- *   a `tick()` method to advance time, and `reset()` which zeroes elapsed
- *   but preserves total play time
+ *   a `tick()` method that adds to both, and `reset()`, which zeroes elapsed
+ *   but keeps total play time
  *
  * @example
  * ```ts

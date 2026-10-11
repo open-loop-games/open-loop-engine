@@ -1,36 +1,36 @@
 /**
- * Rule advisor — intra-session profile-history aggregator with ranked suggestions
+ * Rule advisor — reduces history to a digest and ranks advisor analyzer suggestions
  *
- * Pulls entries from a {@link CycleLog} (canonical case, entries are
- * cycle-log shaped) or a caller-supplied function (BYO history) through an
- * `aggregate` step, runs caller-supplied
- * `analyzers` over the resulting profile and a parallel `context` value, ranks
- * + caps the merged suggestion list, and exposes a dismissable view with
- * inferred-acceptance bookkeeping. Generic over entry, profile, payload, and
- * analyzer-context shapes — the engine never introspects any of them.
+ * Reads entries from a {@link CycleLog} (the usual case) or a caller-supplied
+ * function (BYO history). A `digest` function reduces them to a digest.
+ * Caller-supplied `analyzers` read the digest and a parallel `context` value.
+ * The advisor ranks and caps the merged suggestion list, and exposes a
+ * dismissable view with inferred-acceptance bookkeeping. Generic over entry,
+ * digest, payload and advisor-analyzer context shapes; the engine never
+ * inspects any of them.
  *
- * **Time-horizon split (vs {@link createRecommendationSystem}):** this primitive
- * covers the *intra-session* shape (re-fired on rule edits, encounter changes,
- * or any caller-defined signal). RecommendationSystem covers the *inter-cycle*
- * shape (re-fired by `cycle.on('afterEnd')`, picks one configuration to apply
- * next cycle). Both surfaces ship; both stay advisory by design.
+ * **Trigger split (vs {@link createRecommendationSystem}):** this system
+ * covers the *consumer-triggered* shape: it re-evaluates on rule edits,
+ * encounter changes or any caller-defined trigger. RecommendationSystem
+ * covers the *between-run* shape: `cycle.on('afterEnd')` re-evaluates it, and
+ * it picks one configuration for the next run. Both are advisory by design.
  *
- * **When to reach for this:**
- * - Multiple independent heuristics each emit zero-or-more suggestions
+ * **When to use this:**
+ * - Multiple independent heuristics each produce zero or more suggestions
  * - Output is a ranked list, individually dismissable
  * - Trigger cadence is consumer-driven (rule edits, encounter changes, ticks)
  *
- * **When not to reach for this:**
- * - Between-cycle configuration arbitration → use {@link createRecommendationSystem}
+ * **When not to use this:**
+ * - Between-run configuration arbitration → use {@link createRecommendationSystem}
  * - Sequencer-driven queue filling → use `createConditionalStrategy`
  * - Weighted top-N selection over a candidate pool → use `createGoalPicker`
  *
- * The advisor is **stateless across save/load**: it owns only an ephemeral
- * dismissal set and last-visible-keys cache. Persistent counters (apply/dismiss
- * tallies) live caller-side as `persistent()` refs.
+ * The advisor **saves nothing**: it owns only an ephemeral dismissal set and
+ * last-visible-ids cache. Persistent counters (apply and dismiss tallies) are
+ * the caller's own `persistent()` refs.
  *
- * @see {@link createCycleLog} for the canonical history source
- * @see {@link createRecommendationSystem} for the inter-cycle sibling
+ * @see {@link createCycleLog} for the usual history source
+ * @see {@link createRecommendationSystem} for the between-run sibling
  */
 
 import { shallowRef } from 'vue';
@@ -40,33 +40,33 @@ import type { CycleLog, CycleLogEntry } from './cycle-log';
 // === TYPES ===
 
 /**
- * One advisory output. The `key` is the stable identity used for dismissal
- * tracking and inferred-acceptance bookkeeping — a heuristic that produces
- * the same logical suggestion across reevaluate() calls MUST emit the same key.
+ * One entry of the advisor's ranked list. The `id` is its stable identity
+ * for dismissal and inferred acceptance. An advisor analyzer that produces
+ * the same logical suggestion across `reevaluate()` calls MUST give it the same id.
  */
 export interface Suggestion<TPayload = unknown> {
   /** Stable identity for dismissal + inferred-acceptance tracking. */
   id: string;
-  /** Sort tier in the default ranker (warnings beat infos). */
+  /** Sort rank in the default rank function (warnings before infos). */
   severity: 'info' | 'warning';
-  /** Human-readable summary text. Caller-formatted. */
+  /** Display text, formatted by the caller. */
   summary: string;
-  /** Domain-specific payload. The engine never introspects this. */
+  /** Domain-specific payload. The engine never inspects this. */
   payload: TPayload;
   /**
-   * Optional auto-apply thunk. When provided, callers MAY render an "apply"
-   * affordance; the engine never invokes this.
+   * Optional apply function. When present, a UI MAY show an "apply" control;
+   * the engine never calls it.
    */
   apply?: () => void;
 }
 
 /**
- * History source — either a {@link CycleLog} (canonical case, equivalent to
+ * History source — either a {@link CycleLog} (the usual case, equivalent to
  * `() => cycleLog.history.value`) or a caller-supplied function returning the
  * entry list. The function form is the typed path: `TEntry` is inferred from
  * the return type, so consumers don't spell generics. The CycleLog form is the
- * shorthand for the engine's canonical metric source; entries are
- * cycle-log shaped at runtime.
+ * shorthand for the engine's own tracked metric source; its entries are
+ * `CycleLogEntry` values.
  *
  * Read fresh on each `reevaluate()` — pass a stable function reference; the
  * engine doesn't memoize.
@@ -74,16 +74,16 @@ export interface Suggestion<TPayload = unknown> {
 export type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[]);
 
 /**
- * Aggregator function — the windowed-history substrate, generic over the
- * consumer's entry, profile, and parallel-context shapes.
+ * Digest function — reduces history to the digest the advisor analyzers read.
+ * Generic over the consumer's entry, digest and parallel-context shapes.
  *
  * Receives the entry list from {@link HistorySource} plus the same `context`
- * value the analyzers receive (see {@link AdvisorAnalyzerFn}). The aggregator
- * owns any windowing, fingerprint filtering, or minimum-sample gating — the
- * engine ships none of that.
+ * value the advisor analyzers receive (see {@link AdvisorAnalyzerFn}). The
+ * digest function owns any windowing, fingerprint filtering or minimum-sample check;
+ * the engine ships none of that.
  *
- * `TContext` defaults to `undefined`, so aggregators that don't need context
- * can ignore the second argument — the engine still calls with `undefined`.
+ * `TContext` defaults to `undefined`, so a digest function that doesn't need
+ * context can ignore the second argument; the engine still passes `undefined`.
  *
  * MUST be pure; called once per `reevaluate()`.
  */
@@ -93,12 +93,13 @@ export type AdvisorDigestFn<TEntry, TDigest, TContext = undefined> = (
 ) => TDigest;
 
 /**
- * Analyzer function — domain-specific heuristic that consumes the aggregate
- * plus the parallel `context` value and returns zero or more suggestions.
- * Multiple analyzers compose; their outputs are concatenated and re-ranked.
+ * Advisor analyzer function — a domain-specific heuristic that reads the
+ * digest and the parallel `context` value, and returns zero or more
+ * suggestions. Multiple advisor analyzers compose; their outputs are
+ * concatenated and re-ranked.
  *
- * `TContext` defaults to `undefined`, so analyzers that don't need context can
- * ignore the second argument — the engine still calls with `undefined`.
+ * `TContext` defaults to `undefined`, so an advisor analyzer that doesn't need
+ * context can ignore the second argument; the engine still passes `undefined`.
  */
 export type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (
   digest: TDigest,
@@ -107,7 +108,7 @@ export type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (
 
 /**
  * Comparator for ranking the merged suggestion list. Default: warnings first,
- * then analyzer registration order (stable).
+ * then advisor analyzer order (stable sort).
  */
 export type SuggestionRankFn<TPayload> = (
   a: Suggestion<TPayload>,
@@ -115,72 +116,70 @@ export type SuggestionRankFn<TPayload> = (
 ) => number;
 
 /**
- * Configuration for {@link createRuleAdvisor}.
+ * Options for {@link createRuleAdvisor}.
  *
- * Generic ordering: `TEntry` and `TDigest` reach the digest function and analyzers;
- * `TPayload` reaches the returned advisor. `TContext` defaults to `undefined`
+ * Generic ordering: `TEntry` and `TDigest` reach the digest function and the
+ * advisor analyzers; `TPayload` reaches the returned advisor. `TContext` defaults to `undefined`
  * so context-free callers can omit it entirely. With inference-first design,
- * none of these are spelled out at call sites in practice — the function form
- * of `historySource`, the value/getter form of `context`, and the analyzer
- * return types carry enough information for full inference.
+ * call sites spell none of these out in practice. The function form of
+ * `historySource`, the value/getter form of `context`, and the advisor analyzer
+ * return types give TypeScript enough to infer them all.
  */
 export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefined> {
   /**
-   * History source. Pass a {@link CycleLog} for the canonical engine case
-   * (entries are cycle-log shaped) or a function returning the entry list for
-   * BYO history. Function form is the typed path — `TEntry` is inferred from
-   * the return type.
+   * History source. Pass a {@link CycleLog} for the usual case, or a
+   * function returning the entry list for BYO history. Function form is the
+   * typed path — `TEntry` is inferred from the return type.
    */
   historySource: HistorySource<TEntry>;
 
   /**
-   * History-window aggregator. Called fresh each `reevaluate()` with the
-   * resolved `context` value as the second argument (mirroring the analyzer
-   * shape). The degenerate case (window = 1,
-   * current-state-only advisory) returns the last entry alone; a richer aggregator
-   * walks the history newest-to-oldest with a fingerprint filter keyed off
-   * the context's rule-set and a window cap.
+   * Reduces history to the digest. Called each `reevaluate()`, with the
+   * resolved `context` value as the second argument, as advisor analyzers
+   * are. The simplest digest (a window of 1) returns the last entry alone. A richer
+   * one reads the history newest-to-oldest, with a fingerprint filter on the
+   * context's rule set and a window cap.
    */
   digest: AdvisorDigestFn<TEntry, TDigest, TContext>;
 
   /**
-   * Analyzer list. Each is called with the aggregate and the resolved
+   * Advisor analyzer list. Each is called with the digest and the resolved
    * `context` value; outputs are merged. Order is the tiebreaker in the
    * default rank function. Domain-specific heuristics stay caller-side — the
-   * engine ships zero analyzers.
+   * engine ships zero advisor analyzers.
    */
   analyzers: ReadonlyArray<AdvisorAnalyzerFn<TDigest, TPayload, TContext>>;
 
   /**
-   * Parallel context passed to every analyzer alongside the aggregated
-   * profile. Use for state that *isn't* a function of history — e.g., the
-   * current rule set, the active encounter id. Plain value for static
-   * context, getter for live context (re-read each `reevaluate()`).
+   * Parallel context passed to the digest function and every advisor
+   * analyzer. Use for state that *isn't* a function of history — e.g. the current rule
+   * set, the current encounter id. A plain value for a fixed context, a
+   * getter for a changing one (re-read each `reevaluate()`).
    *
-   * Omit when analyzers don't need context; analyzers receive `undefined` and
-   * `TContext` infers to `undefined`.
+   * Omit when the advisor analyzers don't need context; they receive
+   * `undefined`, and `TContext` infers to `undefined`.
    */
   context?: TContext | (() => TContext);
 
   /**
    * Ranking comparator. Defaults to severity (warnings first), then array
-   * order (stable). Pass a custom comparator to override (e.g., a
-   * KIND_RANK lookup).
+   * order (stable). Pass your own comparator instead (e.g. a KIND_RANK
+   * lookup).
    */
   rank?: SuggestionRankFn<TPayload>;
 
   /**
-   * Hard cap on suggestions emitted per reevaluate. Plain number for static
-   * caps, getter for reactive caps (e.g., a UI density toggle). Default:
+   * Cap on suggestions per `reevaluate()`. A plain number for a fixed cap, a
+   * getter for a changing cap (e.g. a UI density toggle). Default:
    * `Infinity` (no cap).
    */
   maxSuggestions?: number | (() => number);
 
   /**
-   * Profiling hook. Fires once per `reevaluate()`, AFTER aggregation + rank +
-   * cap, BEFORE dismissal filtering. The list passed reflects what the
-   * heuristics produced — useful for tracking heuristic firing patterns
-   * independent of user dismissals.
+   * Observe-only option callback. Called once per `reevaluate()`, AFTER
+   * digest, rank and cap, BEFORE dismissed ids are removed. Its list is what
+   * the advisor analyzers produced, so it tracks their output apart from the
+   * player's dismissals.
    *
    * MUST NOT mutate state visible to the next `reevaluate()` call.
    */
@@ -189,19 +188,18 @@ export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefi
 
 /** Events emitted by a {@link RuleAdvisor} instance. */
 export interface RuleAdvisorEvents<TPayload> {
-  /** Fired after each `reevaluate()` with the new visible suggestion list. */
+  /** Emitted after each `reevaluate()` and `dismiss()` with the new visible suggestion list. */
   suggestionsUpdated: (suggestions: readonly Suggestion<TPayload>[]) => void;
-  /** Fired when `dismiss(key)` is called for a key not already dismissed. */
+  /** Emitted when `dismiss(id)` is called for an id not already dismissed. */
   dismissed: (id: string) => void;
   /**
-   * Fired when a `reevaluate()` finds the analyzers no longer produce one or
-   * more previously-visible, undismissed keys — the inferred-acceptance
-   * signal. A key a higher-ranked suggestion pushed below the cap is still
-   * produced, so it doesn't count. The
-   * `trigger` value is whatever the caller passed to `reevaluate()` (engine
-   * never inspects it), letting consumers distinguish edit-triggered
-   * disappearance (often counts as acceptance) from cycle-triggered drop
-   * (often doesn't).
+   * Emitted when a `reevaluate()` finds the advisor analyzers no longer
+   * produce one or more previously-visible, undismissed ids: the inferred acceptance. An
+   * id that a higher-ranked suggestion pushed below the cap is still
+   * produced, so it doesn't count. `trigger` is whatever the caller passed
+   * to `reevaluate()`; the engine never inspects it. So consumers can tell
+   * an edit-triggered disappearance (often an acceptance) from a run-end
+   * one (often not).
    */
   accepted: (info: { keys: readonly string[]; trigger: string | undefined }) => void;
 }
@@ -209,41 +207,41 @@ export interface RuleAdvisorEvents<TPayload> {
 /** A rule advisor instance, returned by {@link createRuleAdvisor}. */
 export interface RuleAdvisor<TPayload> {
   /**
-   * Currently-visible suggestions: ranked, dismissed keys removed, then
-   * capped — a dismissed suggestion's slot goes to the next-ranked one.
-   * Live: a computed over it recomputes after `reevaluate()` and `dismiss()`.
+   * Currently-visible suggestions: ranked, dismissed ids removed, then
+   * capped — a dismissed suggestion's place goes to the next-ranked one.
+   * Reactive: a computed over it recomputes after `reevaluate()` and `dismiss()`.
    */
   readonly suggestions: readonly Suggestion<TPayload>[];
 
   /**
-   * Re-run aggregation + analysis + rank, drop dismissed keys, cap, emit
-   * `'suggestionsUpdated'`, and fire `'accepted'` for previously-visible keys the
-   * analyzers no longer produce.
+   * Re-run digest, analysis and rank, remove dismissed ids, cap, emit
+   * `'suggestionsUpdated'`, and emit `'accepted'` for previously-visible ids
+   * the advisor analyzers no longer produce.
    *
-   * The optional `trigger` is opaque to the engine — it threads through to
-   * the `'accepted'` event payload, letting consumers filter (e.g., only
-   * count edit-triggered disappearance as inferred acceptance, ignore
-   * cycle-end ones).
+   * The optional `trigger` is opaque to the engine. It is passed through to
+   * the `'accepted'` payload, so consumers can filter (e.g. count only
+   * edit-triggered disappearance as inferred acceptance, and ignore run-end
+   * ones).
    *
-   * Idempotent over identical history + dismissal state. Caller decides when
-   * to invoke (cycle afterEnd, rule edits, encounter changes — the
-   * canonical triggers).
+   * Idempotent over identical history + dismissal state. The caller decides
+   * when to call it (cycle `afterEnd`, rule edits and encounter changes are
+   * the usual triggers).
    */
   reevaluate(trigger?: string): readonly Suggestion<TPayload>[];
 
   /**
-   * Hide a suggestion until {@link reset} is called. No-op if `key` is
-   * already dismissed. Removes the key from the live `suggestions` view
-   * immediately — the next-ranked suggestion from the last `reevaluate`
-   * takes its slot — and emits `'dismissed'`.
+   * Hide a suggestion until {@link reset} is called. No-op if `id` is
+   * already dismissed. Removes it from the `suggestions` view at once; the
+   * next-ranked suggestion from the last `reevaluate()` takes its place.
+   * Emits `'dismissed'`, then `'suggestionsUpdated'`.
    */
   dismiss(id: string): void;
 
   /**
-   * Clear the dismissal set AND the last-visible-keys cache. Use when the
-   * domain context changes such that old keys are no longer comparable
-   * (encounter switch, rule-set fingerprint change). Suppresses spurious
-   * `'accepted'` events on the next `reevaluate()`.
+   * Clear the dismissal set AND the last-visible-ids cache. Use when the
+   * game situation changes so old ids are no longer comparable (encounter
+   * switch, rule-set fingerprint change). Suppresses spurious `'accepted'`
+   * events on the next `reevaluate()`.
    */
   reset(): void;
 
@@ -289,28 +287,28 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
 // === FACTORIES ===
 
 /**
- * Create an intra-session advisor that aggregates history into a profile,
- * runs analyzers over the profile and a parallel context value, and surfaces
- * a ranked + dismissable suggestion list.
+ * Create a rule advisor. It reduces history to a digest, runs advisor
+ * analyzers over the digest and a parallel context value, and presents a ranked,
+ * dismissable suggestion list.
  *
  * Overloaded so that inference works for both `historySource` shapes — passing
  * a {@link CycleLog} pins `TEntry` to {@link CycleLogEntry}; passing a function
  * infers `TEntry` from its return type.
  *
- * @param options - History source, aggregate + analyzers, optional context/rank/cap/profile hook
- * @returns A {@link RuleAdvisor} with `reevaluate` / `dismiss` / `reset` and event hooks
+ * @param options - History source, digest function and advisor analyzers; optional context, rank, cap and `onDigest`
+ * @returns A {@link RuleAdvisor} with `reevaluate` / `dismiss` / `reset` and events
  *
  * @example
  * ```ts
- * // Profile-history advisor with parallel rule-set context:
+ * // History advisor with a parallel rule-set context:
  * const advisor = createRuleAdvisor({
  *   historySource: cycleLog,
  *   context: () => ({ ruleSet: currentRuleSet.value, encounterId: currentEncounterId.value }),
- *   aggregate: (history, ctx) => aggregateRuleProfiles(history, ctx.ruleSet, ctx.encounterId),
+ *   digest: (history, ctx) => digestRuleHistory(history, ctx.ruleSet, ctx.encounterId),
  *   analyzers: [
- *     (agg) => narrowOtherwiseSuggestion(agg),
- *     (agg, ctx) => hazardGapSuggestions(agg, ctx.ruleSet),
- *     (agg, ctx) => deadRuleSuggestions(agg, ctx.ruleSet),
+ *     (d) => narrowOtherwiseSuggestion(d),
+ *     (d, ctx) => hazardGapSuggestions(d, ctx.ruleSet),
+ *     (d, ctx) => unusedRuleSuggestions(d, ctx.ruleSet),
  *   ],
  *   rank: (a, b) => KIND_RANK[a.payload.kind] - KIND_RANK[b.payload.kind],
  *   maxSuggestions: 3,
@@ -328,7 +326,7 @@ function resolveContext<TContext>(context: TContext | (() => TContext) | undefin
  * // BYO history (function form — TEntry inferred from return type):
  * const advisor = createRuleAdvisor({
  *   historySource: () => cycleRecords,
- *   aggregate: (history) => aggregateCycleRecords(history),
+ *   digest: (history) => digestCycleRecords(history),
  *   analyzers: [emergingPatternAnalyzer],
  * });
  * ```
@@ -356,7 +354,7 @@ export function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefine
   let lastVisibleKeys: string[] = [];
   const visible = shallowRef<readonly Suggestion<TPayload>[]>([]);
   // The last reevaluate's ranked, uncapped output, so a dismissal re-projects
-  // it and the next-ranked suggestion takes the freed slot.
+  // it and the next-ranked suggestion takes the freed place.
   let ranked: readonly Suggestion<TPayload>[] = [];
 
   function project(cap: number): void {
@@ -383,7 +381,7 @@ export function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefine
     const cap = getMaxSuggestions();
     onDigest?.(digest, capList(merged, cap));
 
-    // Acceptance means the analyzers stopped producing the key; one a
+    // Acceptance means the advisor analyzers stopped producing the id; one a
     // higher-ranked suggestion pushed below the cap is still being produced.
     const producedKeys = new Set(merged.map((s) => s.id));
 

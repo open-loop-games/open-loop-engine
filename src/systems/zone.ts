@@ -1,12 +1,12 @@
 /**
  * Zone system — named content groupings with progressive unlock
  *
- * Zones are the universal "area/town/chapter/era" concept found in loop
- * incrementals. Each zone groups related content (actions, resources, etc.)
+ * Zones are the universal "area/town/chapter/era" concept found in games
+ * built from repeated runs. Each zone groups related content (actions, resources, etc.)
  * and unlocks through progression.
  *
- * Composes a {@link ContentRegistry} with persistent unlock/selection state.
- * The registry is exposed for mods to add or patch zone definitions.
+ * Composes a {@link ContentRegistry} with saved unlock and selection state.
+ * The registry is exposed, so another module can add or patch zone defs.
  *
  * - {@link createZoneSystem} — the sole factory
  *
@@ -18,9 +18,9 @@
  * ```ts
  * const zones = createZoneSystem({
  *   zones: [
- *     { id: 'village', name: 'Village', order: 0 },
- *     { id: 'forest', name: 'Forest', order: 1 },
- *     { id: 'caves', name: 'Deep Caves', order: 2 },
+ *     { id: 'village', displayName: 'Village', order: 0 },
+ *     { id: 'forest', displayName: 'Forest', order: 1 },
+ *     { id: 'caves', displayName: 'Deep Caves', order: 2 },
  *   ],
  *   initiallyUnlocked: ['village'],
  * });
@@ -44,10 +44,9 @@ import { createContentRegistry, type ContentRegistry } from './content-registry'
 
 // === TYPES ===
 
-/** Definition for a zone in the content registry */
+/** A zone's def in the content registry */
 export interface ZoneDef {
   id: string;
-  /** Display name */
   displayName: string;
   /**
    * Sort order for display (lower = first). Zones without one sort after every
@@ -67,14 +66,14 @@ export interface ZoneSystemEvents {
 /** Options for {@link createZoneSystem} */
 export interface ZoneSystemOptions {
   /**
-   * Save context. Defaults to `${module}/zone` inside a module; pass one
-   * when a module builds more than one.
+   * Persistent context id. Defaults to `${module}/zone` inside a module; pass
+   * one when a module builds more than one.
    */
   id?: string;
-  /** Initial zone definitions to register */
+  /** Initial zone defs to register */
   zones?: ZoneDef[];
   /**
-   * Zone IDs that start unlocked (defaults to the first registered zone).
+   * Zone ids that start unlocked (defaults to the first registered zone).
    * Must reference zones that are registered via `zones` or added before use.
    */
   initiallyUnlocked?: string[];
@@ -83,23 +82,23 @@ export interface ZoneSystemOptions {
 /**
  * A zone system instance — the returned object from {@link createZoneSystem}.
  *
- * Manages zone definitions, unlock state, and current selection.
- * Exposes the content registry for mod extension.
+ * Manages zone defs, unlock state, and the current zone.
+ * Exposes the content registry, so other modules can extend it.
  */
 export interface ZoneSystem {
-  /** Content registry — mods inject this to add/patch zones */
+  /** Content registry — another module adds or patches zones through it */
   readonly registry: ContentRegistry<ZoneDef>;
 
-  /** Currently selected zone ID (persistent) */
+  /** The current zone's id (saved) */
   readonly current: Persistent<string>;
 
-  /** Set of unlocked zone IDs (persistent) */
+  /** Unlocked zone ids (saved) */
   readonly unlocked: Persistent<string[]>;
 
   /** All zones sorted by order, then registration order (reactive) */
   readonly ordered: ComputedRef<ZoneDef[]>;
 
-  /** Unlock a zone by ID. No-op if already unlocked. */
+  /** Unlock a zone by id. No-op if already unlocked. */
   unlock(zoneId: string): void;
   // TODO(expansion): add `unlockGate?: Gate` to ZoneDef when a consumer wants declarative
   // auto-unlock instead of imperative `zones.unlock(id)` calls. Gate already exists
@@ -123,21 +122,21 @@ export interface ZoneSystem {
 /**
  * Create a zone system — content groupings with progressive unlock.
  *
- * @param options - Zone definitions, initially unlocked set, persistence ID
+ * @param options - Zone defs, the initially unlocked set, and the persistent context id
  * @returns A {@link ZoneSystem} with registry, unlock tracking, and selection
  *
  * @example
  * ```ts
  * const zones = createZoneSystem({
  *   zones: [
- *     { id: 'town', name: 'Starting Town', order: 0 },
- *     { id: 'wilderness', name: 'Wilderness', order: 1 },
+ *     { id: 'town', displayName: 'Starting Town', order: 0 },
+ *     { id: 'wilderness', displayName: 'Wilderness', order: 1 },
  *   ],
  *   initiallyUnlocked: ['town'],
  * });
  *
- * // Mod extends it:
- * zones.registry.register({ id: 'volcano', name: 'Volcano', order: 10 });
+ * // Another module extends it:
+ * zones.registry.register({ id: 'volcano', displayName: 'Volcano', order: 10 });
  * zones.unlock('volcano');
  * ```
  */

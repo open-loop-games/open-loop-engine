@@ -1,26 +1,25 @@
 /**
  * Loadout system — constrained persistent selection from a pool
  *
- * Manages "pick N from M" selection mechanics: equipment loadouts, spell loadouts,
- * dragon auras, housing choices, policy picks. Each loadout tracks which items
- * are selected, enforces capacity and pool constraints, and persists state
- * across saves.
+ * Manages "pick N from M" selection mechanics: equipped gear, prepared spells,
+ * a chosen home, a set of passive modifiers. Each loadout tracks which items are
+ * selected, enforces capacity and pool constraints, and saves the selection.
  *
  * Key features:
  * - Single-select (radio-button) and multi-select modes
  * - Optional pool constraint with reactive updates
- * - Custom `canSelect` predicate for complex gating (cross-loadout exclusions, unlock conditions)
- * - `onSelect`/`onDeselect` hooks for wiring modifiers, VFX, or side effects
+ * - Custom `canSelect` predicate for extra blocking rules (exclusions across loadouts, unlock conditions)
+ * - `onSelect`/`onDeselect` option callbacks for wiring modifiers, VFX, or side effects
  * - Insertion-order preservation (matters for queue-ordered systems)
- * - Snapshot/restore for loadout saving
- * - Restores, loads and resets revalidate the selection and bring the hooks in line
+ * - Snapshot/restore for saving a loadout
+ * - Restores, loads and resets revalidate the selection and bring the option callbacks in line
  *
  * The loadout manages **selection state only**. It does not know what the selected
- * items *are* — consumers map item IDs to definitions, modifiers, and effects.
+ * items *are* — consumers map item ids to defs, modifiers, and effects.
  *
  * @example
  * ```ts
- * // Single-select: one active housing property
+ * // Single-select: one chosen home
  * const housing = createLoadout({
  *   id: 'housing',
  *   mode: 'single',
@@ -30,15 +29,15 @@
  * });
  * housing.select('cabin'); // auto-deselects previous
  *
- * // Multi-select: support spell loadouts with growing capacity
- * const supportSlots = createLoadout({
+ * // Multi-select: support spells with growing capacity
+ * const support = createLoadout({
  *   id: 'support',
  *   mode: 'multi',
- *   maxSelections: () => 2 + purchasedSlots.value,
+ *   maxSelections: () => 2 + purchasedCapacity.value,
  *   pool: () => unlockedSpells.value,
  * });
- * supportSlots.select('fireball');
- * supportSlots.select('iceShield');
+ * support.select('fireball');
+ * support.select('iceShield');
  * ```
  */
 
@@ -51,9 +50,9 @@ import { attachPersistentContextReset } from '@/core/resettable';
 
 // === TYPES ===
 
-/** Configuration for {@link createLoadout}. */
+/** Options for {@link createLoadout}. */
 export interface LoadoutOptions {
-  /** Unique identifier, used as persistence context key */
+  /** Unique id; the persistent context id is `loadout:${id}` */
   id: string;
   /**
    * Selection behavior.
@@ -68,22 +67,22 @@ export interface LoadoutOptions {
    */
   maxSelections?: Computable<DecimalSource>;
   /**
-   * Valid item IDs for this loadout. Can be a ref or getter for dynamic pools
-   * (e.g., unlockable items). If omitted, any string ID is accepted.
+   * Valid item ids for this loadout. Can be a ref or getter for dynamic pools
+   * (e.g., unlockable items). If omitted, any string id is accepted.
    */
   pool?: Computable<string[]>;
   /** Additional constraint beyond pool membership and capacity */
   canSelect?: (itemId: string) => boolean;
   /**
-   * Called after an item is successfully selected. Use for runtime-only side
-   * effects — modifier wiring, VFX: once a load or reset settles, and after
-   * {@link Loadout.restore}, the loadout calls it for each selected item whose
-   * effect isn't applied yet, so it must not grant game state.
+   * Called after an item is successfully selected. Use for ephemeral side
+   * effects: modifier wiring, VFX. It is also called once a load or reset
+   * settles, and after {@link Loadout.restore}, for each selected item whose
+   * side effect isn't applied yet. So it must not grant game state.
    */
   onSelect?: (itemId: string) => void;
   /**
    * Called after an item is successfully deselected, and for an applied item
-   * a load, reset or restore removed. Use for modifier teardown.
+   * a load, reset or restore removed. Use to remove the modifier wiring.
    */
   onDeselect?: (itemId: string) => void;
 }
@@ -102,19 +101,19 @@ export interface LoadoutEvents {
  * A constrained persistent selection from a pool, created by {@link createLoadout}.
  *
  * Tracks which items are selected, enforces capacity and pool constraints,
- * emits events on state changes, and persists across saves.
+ * emits events on selection changes, and saves the selection.
  */
 export interface Loadout {
   readonly id: string;
   readonly mode: 'single' | 'multi';
 
-  /** Currently selected item IDs in insertion order (persistent underneath) */
+  /** Selected item ids in insertion order (saved) */
   readonly selected: ComputedRef<readonly string[]>;
-  /** Number of currently selected items */
+  /** Number of selected items */
   readonly count: ComputedRef<number>;
   /** Whether the loadout is at capacity */
   readonly isFull: ComputedRef<boolean>;
-  /** First selected item, or null. Primary accessor for single-select mode. */
+  /** First selected item, or null. The main read for single-select mode. */
   readonly current: ComputedRef<string | null>;
 
   /** Check if an item is currently selected. Reactive when called inside computed/watch. */
@@ -144,10 +143,12 @@ export interface Loadout {
   snapshot(): string[];
   /**
    * Bulk-replace selections from a {@link snapshot}. Silently skips invalid
-   * IDs and truncates to capacity. Brings the hooks in line — `onDeselect`
-   * for each applied item no longer selected, then `onSelect` for each
-   * selected item not yet applied — and fires no events: a restored loadout
-   * is state, not a player action. Loads and resets do the same on their own.
+   * ids and keeps only as many as the capacity allows. Then it brings the
+   * option callbacks in line. It calls `onDeselect` for each applied item not
+   * selected after the restore, then `onSelect` for each selected item not yet
+   * applied. It emits no events: a restored loadout is state, not a player
+   * action.
+   * Loads and resets do the same on their own.
    */
   restore(ids: string[]): void;
 
@@ -159,7 +160,7 @@ export interface Loadout {
 /**
  * Creates a loadout — a constrained persistent selection from a pool.
  *
- * @param options - Loadout configuration: mode, capacity, pool, constraints, and hooks
+ * @param options - Loadout options: mode, capacity, pool, constraints, and option callbacks
  * @returns A {@link Loadout} with reactive state, validation, mutation methods,
  *   snapshot/restore for loadout saving, and events for side-effect wiring
  *
@@ -239,7 +240,7 @@ export function createLoadout(options: LoadoutOptions): Loadout {
   function canSelectItem(itemId: string): boolean {
     if (isSelected(itemId)) return false;
     if (!isInPool(itemId)) return false;
-    // Single mode auto-replaces, so capacity isn't a gate
+    // Single mode auto-replaces, so capacity doesn't block it
     if (mode === 'multi' && count.value >= resolvedMax()) return false;
     if (options.canSelect && !options.canSelect(itemId)) return false;
     return true;

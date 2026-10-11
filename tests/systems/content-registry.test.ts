@@ -56,14 +56,14 @@ describe('ContentRegistry', () => {
     const reg = make();
     reg.register({ id: 'a', name: 'Alpha', value: 1 });
     expect(() => reg.register({ id: 'a', name: 'Again', value: 2 })).toThrow(
-      '[test] Duplicate entry id: "a"',
+      '[test] Duplicate def id: "a"',
     );
   });
 
   it('throws on empty string id', () => {
     const reg = make();
     expect(() => reg.register({ id: '', name: 'Bad', value: 0 })).toThrow(
-      '[test] Cannot register entry with empty id',
+      '[test] Cannot register a def with an empty id',
     );
   });
 
@@ -75,7 +75,7 @@ describe('ContentRegistry', () => {
         { id: 'new1', name: 'New', value: 1 },
         { id: 'existing', name: 'Dup', value: 2 },
       ]),
-    ).toThrow('[test] Duplicate entry id: "existing"');
+    ).toThrow('[test] Duplicate def id: "existing"');
     expect(reg.size).toBe(1);
     expect(reg.has('new1')).toBe(false);
   });
@@ -87,7 +87,7 @@ describe('ContentRegistry', () => {
         { id: 'x', name: 'X', value: 1 },
         { id: 'x', name: 'X2', value: 2 },
       ]),
-    ).toThrow('[test] Duplicate entry id in batch: "x"');
+    ).toThrow('[test] Duplicate def id in batch: "x"');
     expect(reg.size).toBe(0);
   });
 

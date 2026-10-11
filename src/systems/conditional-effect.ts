@@ -1,33 +1,32 @@
 /**
- * Persistent Effect System — condition-driven effects with modifier integration
+ * Conditional Effect System — predicate-driven effects with modifier integration
  *
  * Manages effects whose lifecycle is a pure function of game state. Register a
- * definition with an `active` predicate; when it flips `false → true` the
- * system binds the modifiers to their chains, and on `true → false` it removes
- * them. No timers, no countdown, no save-state duplication.
+ * def with an `active` predicate. On its activation the system binds the
+ * def's grants to their chains, and on its deactivation it removes them. No
+ * timers, no countdown, and nothing saved twice.
  *
- * Symmetric to {@link createTemporaryEffectSystem} with one swap:
- * `duration` → `active: Predicate`. Same `Grant[]` shape, so the two systems
- * are drop-in compatible for consumers migrating between time-limited and
- * condition-driven lifecycles.
+ * Symmetric to {@link createTemporaryEffectSystem}, with `active: Predicate`
+ * in place of `duration`. Same `Grant[]` shape, so a consumer can move an
+ * effect between a time-limited and a predicate-driven lifecycle unchanged.
  *
  * Key features:
- * - Declarative condition — bindings track a reactive predicate
- * - Automatic load reconstruction — predicate re-evaluates on rehydrate
- * - Zero save bloat — state is implicit in the game, nothing duplicated
+ * - Declarative test — grants follow a reactive predicate
+ * - Automatic hydration — the reactive predicate re-evaluates after a load
+ * - Nothing saved — the effect's state follows from game state
  *
  * For prestige-style "N copies of an effect" scaling, prefer a single reactive
  * modifier (`multiplier: computed(() => 1 + k * level.value)`) over stacked
- * instances — cleaner and doesn't need this system.
+ * instances. It is cleaner, and it doesn't need this system.
  *
  * @example
  * ```ts
- * const persistent = createConditionalEffectSystem({ id: 'constructions-effects' });
+ * const effects = createConditionalEffectSystem({ id: 'constructions-effects' });
  *
- * persistent.register({
+ * effects.register({
  *   id: 'belt-maxhealth',
  *   active: computed(() => constructionsCategory.getState(sid(47))?.isFinished.value ?? false),
- *   modifiers: [{ chain: maxHealthChain, mult: 4, description: 'Belt' }],
+ *   grants: [{ chain: maxHealthChain, mult: 4, description: 'Belt' }],
  * });
  * ```
  *
@@ -48,74 +47,73 @@ import { createBindingSlots, registerBindingSlots, type BindingSlots } from './b
 // `effects: { "goldPerTick": 0.01 }` mapped to Grant[].
 // Consumer-side helper first; promote to engine if two consumers converge.
 
-/** Definition for a conditional effect, registered at startup. */
+/** A conditional effect's def, registered at startup. */
 export interface ConditionalEffectDef {
   id: string;
   displayName?: string;
   /**
-   * Reactive predicate controlling whether bindings are applied.
-   * System watches this: `false → true` applies bindings, `true → false` removes them.
-   * When an edge flips the predicate back (an `onActivate` that spends what
-   * it reads), the opposite edge follows at once. A predicate that reads a
-   * value the effect's own bindings change has no stable state and throws.
-   * A Gate resolves through the runtime captured at
-   * `createConditionalEffectSystem` time.
+   * Reactive predicate that decides whether the grants are bound.
+   * The system watches it: activation binds the grants, deactivation removes them.
+   * When an activation or deactivation flips the predicate back (an
+   * `onActivate` that spends what it reads), the opposite one follows at
+   * once. A predicate that reads a value the effect's own grants change has
+   * no stable state, and throws. A Gate is evaluated through the Gate
+   * services captured when `createConditionalEffectSystem` runs.
    */
   active: Predicate;
   /** Tags for query filtering */
   tags?: string[];
   /**
-   * Grants to bind while `active` is true — the `grants` vocabulary, with
-   * `when` ANDed onto the effect's own lifecycle. Can be a static array or a
-   * factory evaluated on each activation — use a factory when bindings depend
-   * on runtime state.
+   * Grants to bind while `active` holds, with each `when` ANDed onto the
+   * effect's own lifecycle. Can be a static array, or a factory evaluated on
+   * each activation — use a factory when the grants depend on live state.
    *
-   * Each binding evaluates at a fixed place in its chain, however often the
-   * effect toggles: a static array claims its places at `register`, a
+   * Each lowered grant evaluates at a fixed place in its chain, however often
+   * the effect toggles. A static array claims its places at `register`, a
    * factory on its first activation.
    */
   grants?: Grant[] | (() => Grant[]);
-  /** Called on the rising edge (`false → true`), including on registration if already active */
+  /** Called on activation (`false → true`), including on registration if the predicate already holds */
   onActivate?: (def: ConditionalEffectDef) => void;
-  /** Called on the falling edge (`true → false`) */
+  /** Called on deactivation (`true → false`) */
   onDeactivate?: (def: ConditionalEffectDef) => void;
 }
 
 /** Events emitted by the conditional effect system */
 export interface ConditionalEffectEvents {
-  /** Fired on the rising edge of a def's `active` predicate */
+  /** Fired on the activation of a def's `active` predicate */
   activated: (def: ConditionalEffectDef) => void;
-  /** Fired on the falling edge of a def's `active` predicate */
+  /** Fired on the deactivation of a def's `active` predicate */
   deactivated: (def: ConditionalEffectDef) => void;
 }
 
 /** Options for {@link createConditionalEffectSystem} */
 export interface ConditionalEffectSystemOptions {
-  /** Unique identifier (for debugging / symmetry with temporary-effect) */
+  /** Unique id (for debugging, and symmetry with the temporary effect system) */
   id: string;
 }
 
-/** Manages conditional effects: registration, condition watching, and edge-triggered binding. */
+/** Manages conditional effects: registration, predicate watching, and binding on activation. */
 export interface ConditionalEffectSystem {
-  /** System identifier (from {@link ConditionalEffectSystemOptions.id}) */
+  /** System id (from {@link ConditionalEffectSystemOptions.id}) */
   readonly id: string;
-  /** Kind tag used by the effect-system registry / picker discovery */
+  /** The variant `kind` the effect-system registry and picker discovery read */
   readonly kind: 'conditional';
-  /** Register one or more effect definitions */
+  /** Register one or more effect defs */
   register(def: ConditionalEffectDef | ConditionalEffectDef[]): void;
-  /** Get a registered definition by ID */
+  /** Get a registered def by id */
   getDef(id: string): ConditionalEffectDef | undefined;
-  /** Snapshot of every registered definition in insertion order. */
+  /** Snapshot of every registered def in insertion order. */
   allDefs(): readonly ConditionalEffectDef[];
   /** Whether the given def is currently active (reactive) */
   isActive(defId: string): ComputedRef<boolean>;
-  /** All currently active definitions, as a fresh array each call (reactive) */
+  /** All currently active defs, as a fresh array each call (reactive) */
   getActive(): ConditionalEffectDef[];
-  /** Active definitions with the given tag (reactive) */
+  /** Active defs with the given tag (reactive) */
   getByTag(tag: string): ConditionalEffectDef[];
   /** Subscribe to system events */
   on: Emittable<ConditionalEffectEvents>['on'];
-  /** Stop all watchers and remove all bindings */
+  /** Stop every watcher and unbind every grant. The system saves nothing, so nothing stays saved. */
   dispose(): void;
 }
 
@@ -133,7 +131,7 @@ interface DefEntry {
 
 // === CONSTANTS ===
 
-/** Edges one predicate change may run before the effect is judged to feed back on itself. */
+/** Activations and deactivations one predicate change may run before the effect is judged to feed back on itself. */
 const MAX_SETTLE_FLIPS = 8;
 
 // === FACTORIES ===
@@ -141,39 +139,39 @@ const MAX_SETTLE_FLIPS = 8;
 /**
  * Create a conditional effect system for managing condition-driven effects.
  *
- * @param options - System ID
- * @returns A {@link ConditionalEffectSystem} for registering and querying state-driven effects
+ * @param options - System id
+ * @returns A {@link ConditionalEffectSystem} for registering and querying predicate-driven effects
  *
  * @example Basic conditional effect:
  * ```ts
- * const persistent = createConditionalEffectSystem({ id: 'buffs' });
+ * const effects = createConditionalEffectSystem({ id: 'buffs' });
  *
- * persistent.register({
+ * effects.register({
  *   id: 'library-bonus',
  *   active: computed(() => library.isBuilt.value),
- *   modifiers: [{ chain: xpChain, mult: 2, description: 'Library' }],
+ *   grants: [{ chain: xpChain, mult: 2, description: 'Library' }],
  * });
  * ```
  *
- * @example Per-action conditional modifiers on a surface-wide chain (the
- * idiomatic pattern for "item X boosts action Y"):
+ * @example Per-action modifiers on an engine-wide chain (the idiomatic
+ * pattern for "item X multiplies action Y's progress"):
  * ```ts
  * const effects = createConditionalEffectSystem({ id: 'equipment-effects' });
  *
- * // Each registration is an affectedBy binding: "glasses boost wander progress"
+ * // Each registration is an affectedBy grant: "a pickaxe boosts mining progress"
  * effects.register({
- *   id: 'affected-by:wander:glasses',
- *   active: computed(() => equipment.has('glasses')),
- *   // surface-wide chain from createModifierChain
- *   modifiers: [{ chain: progressChain, mult: 1.5, description: 'Glasses' }],
+ *   id: 'affected-by:mine:pickaxe',
+ *   active: computed(() => equipment.has('pickaxe')),
+ *   // engine-wide chain from createModifierChain
+ *   grants: [{ chain: progressChain, mult: 1.5, description: 'Pickaxe' }],
  * });
  *
- * // Balance-sim walks the EffectSystemRegistry for full attribution:
+ * // The balance harness walks the effect-system registry for full attribution:
  * const registry = engine.tryInject(EffectSystemRegistryKey)!;
  * for (const sys of registry.all()) {
  *   for (const def of sys.allDefs()) {
- *     // def.id → "affected-by:wander:glasses"
- *     // def.modifiers → [{ chain, mult, description }] — full source attribution
+ *     // def.id → "affected-by:mine:pickaxe"
+ *     // def.grants → [{ chain, mult, description }] — full attribution
  *   }
  * }
  * ```
@@ -184,9 +182,9 @@ export function createConditionalEffectSystem(
   const entries = new Map<string, DefEntry>();
   const handle = createEmitHandle<ConditionalEffectEvents>();
   const predicates = createPredicateResolver();
-  // Owns each definition's watch, including those registered after install.
+  // Owns each def's watch, including those registered after install.
   const scope = effectScope();
-  // Bumped on every edge so `getActive` / `getByTag` track the applied set.
+  // Bumped on every activation and deactivation, so `getActive` / `getByTag` track the applied set.
   const appliedVersion = ref(0);
 
   function applyBindings(entry: DefEntry): void {
@@ -203,9 +201,9 @@ export function createConditionalEffectSystem(
 
   /**
    * Activate or deactivate until the applied state matches the predicate. An
-   * activation can flip the predicate itself (a callback spends what it reads); the watcher
-   * call that flip triggers is swallowed by `settling`, and the loop
-   * re-reads the predicate instead.
+   * activation can flip the predicate itself (an option callback spends what
+   * it reads). `settling` swallows the watcher call that flip triggers, and
+   * the loop re-reads the predicate instead.
    */
   function settle(entry: DefEntry): void {
     if (entry.settling) return;
@@ -214,8 +212,8 @@ export function createConditionalEffectSystem(
       for (let flips = 0; entry.activeRef.value !== entry.isApplied; flips++) {
         if (flips === MAX_SETTLE_FLIPS) {
           throw new Error(
-            `ConditionalEffect '${entry.def.id}': 'active' keeps flipping as its own bindings ` +
-              `apply and remove — the predicate reads a value its bindings change.`,
+            `ConditionalEffect '${entry.def.id}': 'active' keeps flipping as its own grants ` +
+              `are bound and removed — the predicate reads a value its grants change.`,
           );
         }
         const { def } = entry;
@@ -238,7 +236,7 @@ export function createConditionalEffectSystem(
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
       if (entries.has(d.id)) {
-        throw new Error(`ConditionalEffect: duplicate definition '${d.id}'`);
+        throw new Error(`ConditionalEffect: duplicate def '${d.id}'`);
       }
 
       const owner = `conditional effect '${d.id}'`;
@@ -253,10 +251,10 @@ export function createConditionalEffectSystem(
         settling: false,
       };
 
-      // flush: 'sync' so a predicate that flips mid-run binds/unbinds its
-      // modifiers on the same synchronous step. Headless sims drive tickOnce()
-      // in a tight loop with no microtask boundary, so a default (pre) flush
-      // would leave the effect a step or more late. Mirrors achievement.ts /
+      // flush: 'sync' so a predicate that flips during a headless run
+      // binds/unbinds its grants in the same tick. Headless runs drive tickOnce() in a tight
+      // loop with no microtask boundary, so a default (pre) flush would leave
+      // the effect a tick or more late. Mirrors achievement.ts /
       // automation.ts / resource-bag link watchers.
       runInEffectScope(scope, () =>
         watch(activeRef, () => settle(entry), { immediate: true, flush: 'sync' }),
@@ -315,7 +313,7 @@ export function createConditionalEffectSystem(
 
   // Auto-register into the per-engine effect-system registry if this
   // factory is running inside withEffectSystemRegistry(...) — i.e., during
-  // a module's install() or connect() phase. Systems constructed outside
+  // a module's install() or connect(). Systems constructed outside
   // an engine (tests, throwaway scripts) silently skip registration.
   getCurrentEffectSystemRegistry()?.register(system);
   registerBindingSlots(system, (defId) => entries.get(defId)?.slots);
