@@ -485,7 +485,8 @@ Two flavors, one shape.
 export function shouldCollapse(exp: Expedition, p: CollapsePolicyParams): boolean { /* … */ }
 
 // live: inside ctx.onTick, blocked until the automation tier unlocks
-if (effectiveOrder.value >= 3 && shouldCollapse(exp, collapsePolicy.value)) exp.collapse();
+// (automation is the game's createAutomationTiers; a balance probe forces the tier with unlock())
+if (automation.hasReached('auto-collapse') && shouldCollapse(exp, collapsePolicy.value)) exp.collapse();
 
 // balance harness: the runUntil predicate calls the SAME function
 runUntil({ engine, until: () => shouldCollapse(exp, { tapOutSeconds }), maxSimTime });
@@ -496,7 +497,7 @@ runUntil({ engine, until: () => shouldCollapse(exp, { tapOutSeconds }), maxSimTi
 ```ts
 export function advanceCenter(s: CenterState, delta: number, lo: number, hi: number): CenterState { /* … */ }
 
-// live:            engine.onTick((dt) => { const n = advanceCenter(state, v * dt, lo, hi); /* … */ });
+// live:            ctx.onTick((dt) => { const n = advanceCenter(state, v * dt, lo, hi); /* … */ });
 // balance harness: buildCenterPath integrates advanceCenter at a fixed 1 s dt to precompute the path.
 ```
 

@@ -52,8 +52,8 @@ export interface ProducerPurchaseOptions {
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */
   initialCount?: DecimalSource;
-  /** Option callback called after each purchase */
-  onPurchase?: (count: DecimalSource) => void;
+  /** Option callback called after each purchase, with that purchase's bulk count, not the new `count` */
+  onPurchase?: (bulkCount: DecimalSource) => void;
   /** Whether this producer is visible in the UI. Default: `true` */
   visible?: Predicate;
   /**

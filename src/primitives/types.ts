@@ -154,10 +154,13 @@ export type ICondition =
   | AnyCondition
   | NotCondition;
 
-/** Structured output produced by an {@link Analyzer} after a headless run completes. */
+/**
+ * What an {@link Analyzer} reports after one headless run; cell aggregation keeps only its number metrics.
+ * A string or boolean metric stays in each run's summary, and no aggregate counts it.
+ */
 export interface AnalyzerSummary {
   id: string;
-  /** Scalar analyzer metrics collected during the headless run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
+  /** Scalar analyzer metrics collected during the headless run (e.g. `{ "peakGold": 4200, "runs": 12 }`). */
   metrics: Record<string, number | string | boolean>;
 }
 

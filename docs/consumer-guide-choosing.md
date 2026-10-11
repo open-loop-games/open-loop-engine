@@ -21,7 +21,7 @@ The split against [api/INDEX.md](api/INDEX.md) is by kind, not depth. INDEX answ
 
 The engine ships **the mechanism, not the choices**:
 
-- `processOfflineTime`: a blocking replay in chunks through the TickDriver, for extrapolation and tick replay;
+- `processOfflineTime`: a blocking replay in chunks through the TickDriver, for *tick replay*. Its `maxOfflineSeconds` option caps the replay. The elapsed seconds are yours to compute. A successful `engine.load()` returns the save's `timestamp`, in milliseconds since the epoch. So when `result.success` is true, pass `(Date.now() - result.timestamp!) / 1000`. An *extrapolation* is the consumer's closed form, and needs no replay;
 - `TickDriver.speedMultiplier`: the game speed of live play;
 - the `onTicksOverflow` and `onDeltaOverflow` option callbacks: where dropped live time can be re-routed instead of discarded;
 - the time bank, for the *banking* family.
@@ -79,10 +79,12 @@ Consumers use three paths, and each fits a different shape of need. "Purchase-sh
 | Need | Use |
 |---|---|
 | Building with a continuous rate (clicker buildings, passive producers) | `createProducerCategory` |
+| A click that produces through a rate chain | `createProducerCategory` with `trigger: 'manual'`, then `producer.activate?.()` per click |
 | Upgrades, unlocks and repeatables with a limit, in batch (perks, sequential upgrade rungs, visibility unlocks) | `createPurchasableCategory` |
 | Repeatable purchases customized per instance (a different `effect` / `onPurchase` per instance, wiring after creation) | raw `createScalingPurchasable` |
+| A purchase that owns nothing afterwards (a unit sent to a queue, a consumable) | `createPurchasableCategory` with no `limit` and a static cost, whose `onPurchase` does the work |
 
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `setupPolicyAutoPurchase` accepts it for auto-purchase:
+**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `costScaling` is the cost ratio: each purchase multiplies the next cost by it. A producer category with a purchase:
 
 ```ts
 const buildings = createProducerCategory<ProducerDef>({
@@ -97,6 +99,8 @@ const buildings = createProducerCategory<ProducerDef>({
   }),
 });
 ```
+
+`setupPolicyAutoPurchase` accepts the category for auto-purchase. To purchase the producer whose beat time is shortest, give it `policy: selectionPaybackPeriod((p) => p.purchaseBeatSeconds.value)`. To rank by payback period instead, pass cost over the rate one more unit adds: `(p) => Decimal.div(p.repeatable!.getCost(1), p.computedRate.value).toNumber()`. To block it until an automation tier unlocks, give it `enabled: () => automation.hasReached('auto-purchase')`.
 
 **No rate, batch shape → purchasable category.** When many instances share an effect mapping, `createPurchasableCategory` fits. Examples are repeatables with a limit, sequential upgrade rungs, and unlocks behind a predicate. The mapped `limit` selects the sub-shape: `1` for upgrades and unlocks, a finite limit for repeatable perks, omitted for no limit:
 
@@ -129,7 +133,8 @@ for (const def of spellDefs) {
     id: `level-${def.id}`, description: `${def.name} level`,
     resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
     effect: (count: DecimalSource) => Decimal.mul(count, Decimal.mul(def.baseDamage, 0.05)),
-    onPurchase: (count) => schoolSkills.get(def.school)?.addXp(Decimal.mul(count, 5)),
+    // onPurchase receives the purchase's bulk count, not the new count
+    onPurchase: (bulkCount) => schoolSkills.get(def.school)?.addXp(Decimal.mul(bulkCount, 5)),
   });
 
   // post-creation wiring closing over per-instance refs

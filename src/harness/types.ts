@@ -30,9 +30,10 @@ import type { Engine } from '@/engine';
 export type RunMode = 'uniform' | 'next-event' | 'stasis-aware';
 
 /**
- * The context passed to a {@link Cell}'s `setup` function: the seed for this
- * headless run. `setup` builds the analyzers and returns the list, so
- * `runHeadless` can wire them to a newly built engine.
+ * The seed of one headless run, passed to the option callbacks that build,
+ * perturb and tear down that run, such as a {@link Cell}'s `setup` and an {@link UntilCell}'s `buildEngine`.
+ * `setup` builds the analyzers and returns the list, so `runHeadless` can wire
+ * them to a newly built engine.
  */
 export interface RunContext {
   seed: number;

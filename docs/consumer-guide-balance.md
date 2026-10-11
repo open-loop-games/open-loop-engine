@@ -208,6 +208,27 @@ Often the answer combines two or three of these. The probe shows the choice, and
 
 The unifying rule: **your prediction never re-implements game mechanics.** The math predicts, and the engine is the truth. A predictor that re-derives cost curves in its own arithmetic silently diverges from later engine versions. One that asks the engine cannot.
 
+**Building one.** A probe's engine is a scratch engine: the game's own modules, on memory storage:
+
+```ts
+const engine = createEngine({
+  gameId: 'my-game',
+  storageAdapter: createMemoryStorage(), // nothing reaches the player's storage
+  persistenceNamespace: `probe-${cell}-${seed}`, // unique among engines not yet disposed
+  autoSaveInterval: 0,
+  timerProvider: { setInterval: () => 0, clearInterval: () => {} }, // no live interval
+});
+for (const m of gameModules) engine.use(m);
+engine.start(); // runUntil and the until-runners take a started engine
+try {
+  runUntil({ engine, until: () => beatReached(), maxSimTime: 3600 });
+} finally {
+  engine.dispose(); // frees its persistent refs for the next engine
+}
+```
+
+The runners advance time themselves, synchronously. `createEngineFromSave` builds the same scratch engine from a save text, with the no-op timer already set. A frozen-state query needs no ticks at all.
+
 Two kinds of query use the same engine instance.
 
 **Frozen-state queries.** Build the engine, write persistent refs into a hypothetical state, and *don't tick*. Then read:

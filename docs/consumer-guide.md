@@ -9,6 +9,31 @@ This guide explains **how to compose** the engine: the abstraction levels, which
 - [consumer-guide-balance.md](./consumer-guide-balance.md) — how balance constants are chosen and verified;
 - `CHANGELOG.md` — the API migrations of breaking changes.
 
+## A module and an engine
+
+A game is a set of modules. A module builds its state in `install`, and shares an API with other modules through an injection key. `install` can inject a module listed in `dependencies`. `connect` runs after every module has installed, for wiring that needs a module this one does not depend on:
+
+```ts
+export const EconomyKey: InjectionKey<{ gold: Resource }> = Symbol('economy');
+
+export const economyModule: EngineModule = {
+  id: 'economy',
+  dependencies: ['tuning'], // installed first
+  install(ctx) {
+    const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
+    ctx.onTick((dt) => addResource(gold, dt)); // dt in seconds
+    ctx.provide(EconomyKey, { gold });
+  },
+};
+
+const engine = createEngine({ gameId: 'my-game', persistence: true });
+engine.use(tuningModule).use(economyModule); // tuningModule: § Tunables
+engine.start(); // installs in dependency order, then ticks
+engine.load();  // after start, so the refs exist for the load to write
+```
+
+`ctx.inject(key)` reads another module's API, and `ctx.tryInject(key)` returns `undefined` when nothing provides it. The engine provides its own services the same way. For example, `ctx.inject(TickDriverKey)` is the TickDriver, which is also `engine.tickDriver`.
+
 ## The expression spectrum
 
 The engine offers several abstraction levels for the same problem. The core skill is to know which level to choose, and when to move between them.
@@ -187,7 +212,7 @@ So a resource, purchasable, producer or category entry you add inside a module j
 - BestOf records, run pool aliveness, automation unlocks, recommendation settings, dialog state;
 - achievement `earned` / `earnedAt`, challenge `active` / `completions`.
 
-Neither `resetPersistentContexts` nor a `thingsToReset` walk over an object or a category writes them. To clear one, name the ref itself in `thingsToReset`, or use the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state: skill `xp`, cycle `elapsed`, TimeBank `banked` (hold it with `keep`). So a reset between runs over a skill category's module clears xp and keeps the lifetime bonus, which is the intended cycle. A module reset also clears an `ActionCategory`'s queue or list, current item, cursor and pause flag, and emits no `cancelled`. `thingsToReset: [category]` reaches only its def state.
+Neither `resetPersistentContexts` nor a `thingsToReset` walk over an object or a category writes them. A consumer's own ref takes the same flag: `persistent(0, { id: 'careerWins', lifetime: true })` survives every reset of its module. To clear one, name the ref itself in `thingsToReset`, or use the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state: skill `xp`, cycle `elapsed`, TimeBank `banked` (hold it with `keep`). So a reset between runs over a skill category's module clears xp and keeps the lifetime bonus, which is the intended cycle. A module reset also clears an `ActionCategory`'s queue or list, current item, cursor and pause flag, and emits no `cancelled`. `thingsToReset: [category]` reaches only its def state.
 
 A system or category in `thingsToReset` resets what it owns: its own persistent context, or each entry's per-def persistent context. It does not reset what it only names: a purchasable's cost resource, a producer's output, a ref passed as `limit` or `visibility`. List those explicitly when the reset should clear them.
 
@@ -331,6 +356,8 @@ createProducerCategory<BuildingDef>({
 
 `bind` requires the `text` or an `id`. It never derives the binding id from the modifier's display text, so editing that text does not move the id.
 
+**The player-facing breakdown is `chain.description`.** It lists one `ModifierDescription` (`text`, `formattedValue`, `isBad`) per enabled modifier that has a description, in chain order. A binding's row is its modifier's own `description`; the binding's `text` is attribution text, and no row shows it. A grant's row is its `description`. A chain bound into another chain adds its own rows to the outer list. So a producer's `rateChain` lists every described modifier in force under it. A modifier that is not in force has no row. On a chain, `description` holds a getter, or `undefined` when no modifier has a description. So read it as `const d = chain.description; const rows = typeof d === 'function' ? d() : (d ?? []);`. It is reactive, so a `computed` over it updates when a binding's `active` predicate flips, or when a modifier is added or removed. `chain.bindings()` is the tooling read: it lists bindings for attribution, without their values.
+
 For a modifier in force only while a condition holds, there are three forms. Choose the most specific one that fits:
 
 - **Declarative category fields (`grants` / `restricts` / `rewards`)** — preferred when the modifier's lifecycle matches a category signal. Purchasable and achievement categories have `grants?: Grant[]`, in force while the purchasable's `active` ref is true or the achievement is earned. Challenge categories have `restricts?: Grant[]`, in force while the challenge is entered, and `rewards?: Grant[]`, in force after at least one completion. Each grant becomes a `chain.bind` call, with attribution from the persistent context. So a grant needs no per-binding setup, and the balance harness sees its modifier with an id like `research/overclock/Overclock`.
@@ -367,25 +394,44 @@ A challenge or prestige layer may replace one multiplier with another while it i
 Balance constants are declared where they are read, through `tunable()`. That puts them in a tuning registry that balance probes, dev panels and mods can read. Declare them there from the first pass, not in a separate constants file. Two homes for one number have no rule for which wins. [consumer-guide-balance.md](./consumer-guide-balance.md) covers where the values come from.
 
 ```ts
-// modules/tuning.ts — the registry, shared by every reader site
-export const tuning = createTuningRegistry('my-game');
+// modules/tuning.ts — built in install, so the picker finds it; shared by key
+export const TuningKey: InjectionKey<TuningRegistry> = Symbol('tuning');
+export const tuningModule: EngineModule = {
+  id: 'tuning',
+  install(ctx) { ctx.provide(TuningKey, createTuningRegistry('my-game')); },
+};
 
-// modules/producers.ts — declared where it's read
-const baseRate = tunable(tuning, 'producers/tier1/baseRate', () => 0.5);
-const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
+// modules/producers.ts — declared where it's read, and passed straight into options
+install(ctx) {
+  const tuning = ctx.inject(TuningKey);
+  const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
+  createProducerCategory<BuildingDef>({
+    id: 'buildings',
+    registerTick: ctx.onTick,
+    mapProducer: (def) => ({
+      resource: eggs, baseRate: def.baseRate, trigger: 'continuous',
+      // an option typed Computable takes a tunable as is
+      purchase: {
+        costResource: eggs,
+        baseCost: tunable(tuning, `producers/${def.id}/baseCost`, () => def.baseCost),
+        costScaling: costGrowth, // the cost ratio
+      },
+    }),
+  });
+}
 
 // data/producers.ts — structural, not a tunable: left unwrapped
 export const prestigeEligibleThreshold = 1_000_000;
 ```
 
-`tunable()` returns a `ComputedRef` that reads the tuning registry's scoped overrides, else its default. `tuning.pushOverrides(label, …)` pushes overrides, and the cleanup it returns pops them. The design gives two things:
+`tunable()` returns a `ComputedRef` that reads the tuning registry's scoped overrides, else its default. `tuning.pushOverrides(label, { 'producers/costGrowth': () => 1.2 })` pushes overrides: a map from tuning key to a function that returns the value. The cleanup it returns pops them. The design gives two things:
 
 - **The wraps document *what is a tunable*.** Wrap the values that external tools should change. Leave structural constants unwrapped: architectural thresholds, fixed step counts, level boundaries. A reviewer who scans the tuning registry then sees exactly what is safe to perturb.
 - **Temporary overrides need no manual cleanup.** Headless runs, what-if probes and balance bisections push overrides, run and pop them.
 
 Name a key by slash-separated segments for category, def and field (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Such keys are greppable, sortable, and clear about what each one controls when the tuning registry is listed.
 
-Built inside install/connect, `createTuningRegistry` enrolls itself in `TuningRegistriesKey`, which the picker enumerates. `createOverrideRegistry` is the broader primitive beneath it. Use it directly when the override target is a non-numeric function that the picker should not show. To replace a modifier, prefer `replacementGrants` over a raw `OverrideRegistry` override, because it keeps chain attribution intact.
+Built inside install/connect, `createTuningRegistry` enrolls itself in `TuningRegistriesKey`, which the picker enumerates. A registry built at a file's top level, outside install/connect, still serves `tunable()`, but the picker and a balance workbench do not find it. `createOverrideRegistry` is the broader primitive beneath it. Use it directly when the override target is a non-numeric function that the picker should not show. To replace a modifier, prefer `replacementGrants` over a raw `OverrideRegistry` override, because it keeps chain attribution intact.
 
 ## Introspection
 

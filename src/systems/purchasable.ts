@@ -50,8 +50,8 @@ import { createPredicateResolver, type Predicate, type PredicateResolver } from 
 
 /** Events emitted by a {@link Purchasable} instance */
 export interface PurchasableEvents {
-  /** Emitted after each purchase, with the count that purchase took */
-  purchased: (count: DecimalSource) => void;
+  /** Emitted after each purchase, with that purchase's bulk count, not the new `count` */
+  purchased: (bulkCount: DecimalSource) => void;
 }
 
 /** UI text for a purchasable. Each text field can be a ref or getter for reactive text. */
@@ -130,8 +130,8 @@ export interface PurchasableOptions {
    * If omitted, effect defaults to `1` (identity for multiplication).
    */
   effect?: Computable<DecimalSource> | ((count: DecimalSource) => DecimalSource);
-  /** Option callback called after each purchase, with the count purchased */
-  onPurchase?: (count: DecimalSource) => void;
+  /** Option callback called after each purchase, with that purchase's bulk count, not the new `count` */
+  onPurchase?: (bulkCount: DecimalSource) => void;
   /** Whether this purchasable is visible to the player. Default: `true` */
   visible?: Predicate;
   /**
@@ -247,8 +247,8 @@ export type ScalingPurchasableOptions = {
   limit?: Computable<DecimalSource>;
   /** Starting count. Default: `0` */
   initialCount?: DecimalSource;
-  /** Option callback called after each purchase */
-  onPurchase?: (count: DecimalSource) => void;
+  /** Option callback called after each purchase, with that purchase's bulk count, not the new `count` */
+  onPurchase?: (bulkCount: DecimalSource) => void;
   /** Whether this purchasable is visible. Default: `true` */
   visible?: Predicate;
   /**
@@ -309,7 +309,7 @@ export interface Purchasable {
    * Purchase. A passed count caps the purchase. Omitted, it purchases max when
    * `purchaseMaxByDefault` is on (the default for anything but a one-shot), up
    * to the cost's `maxBulkCount`, and one when it's off.
-   * Returns the count purchased.
+   * Returns the bulk count: how many units this purchase took.
    */
   purchase: (count?: DecimalSource) => DecimalSource;
   /** Purchase max, or one unit when `purchaseMaxByDefault` is off. Returns the count purchased. */
@@ -317,7 +317,7 @@ export interface Purchasable {
   /** Estimate the total cost of the next `count` purchases. Default count: `1` */
   getCost: (count?: DecimalSource) => DecimalSource;
   /** The `onPurchase` option callback, if set */
-  onPurchase?: (count: DecimalSource) => void;
+  onPurchase?: (bulkCount: DecimalSource) => void;
   /** Subscribe to purchasable lifecycle events */
   on: Emittable<PurchasableEvents>['on'];
 }

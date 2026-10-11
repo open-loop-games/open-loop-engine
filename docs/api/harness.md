@@ -104,42 +104,42 @@ Tune a value until a predicate holds (bisection, and others).
 
 the cartesian `cells × seeds` plan over `runHeadless`. It keeps the raw result of each headless run and produces numeric aggregates under namespaced keys
 
-- `interface AggregateOptions` — Options passed through MatrixOptions (and SensitivityOptions) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:134`
-- `interface Cell` — One named configuration in a matrix. `src/harness/types.ts:47`
-- `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerId}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:163`
-- `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:196`
-- `interface HistogramOptions` — Histogram options for one metric. `src/harness/types.ts:123`
-- `interface MatrixOptions` — Options for the matrix runner: N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:209`
-- `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:221`
-- `interface MatrixUntilOptions` — Options for runMatrixUntil, a `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:551`
-- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:577`
-- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:544`
-- `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:319`
-- `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:111`
-- `interface MetricStats` — Numeric summary of one metric across the headless runs of a cell. `src/harness/types.ts:91`
-- `interface RunContext` — The context passed to a Cell's `setup` function: the seed for this headless run. `src/harness/types.ts:37`
+- `interface AggregateOptions` — Options passed through MatrixOptions (and SensitivityOptions) to opt into histogram bucketing for specific metrics. `src/harness/types.ts:135`
+- `interface Cell` — One named configuration in a matrix. `src/harness/types.ts:48`
+- `interface CellAggregate` — Per-cell aggregated metrics, keyed `${analyzerId}.${metricKey}` to prevent cross-analyzer collisions. `src/harness/types.ts:164`
+- `interface CellResult<R extends HeadlessResult = HeadlessResult>` — A completed cell's output. `src/harness/types.ts:197`
+- `interface HistogramOptions` — Histogram options for one metric. `src/harness/types.ts:124`
+- `interface MatrixOptions` — Options for the matrix runner: N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:210`
+- `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:222`
+- `interface MatrixUntilOptions` — Options for runMatrixUntil, a `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:552`
+- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:578`
+- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:545`
+- `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:320`
+- `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:112`
+- `interface MetricStats` — Numeric summary of one metric across the headless runs of a cell. `src/harness/types.ts:92`
+- `interface RunContext` — The seed of one headless run, passed to the option callbacks that build, perturb and tear down that run, such as a Cell's `setup` and an UntilCell's `buildEngine`. `src/harness/types.ts:38`
 - `type RunMode = 'uniform' | 'next-event' | 'stasis-aware'` — The run mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
-- `interface RunUntilOptions` — Options for one predicate-bounded headless run. `src/harness/types.ts:397`
-- `interface RunUntilResult` — Result of a predicate-bounded headless run. `src/harness/types.ts:465`
-- `interface SensitivityOptions<C extends Cell | UntilCell = Cell>` — Options for runSensitivity, a baseline-plus-variants sweep. `src/harness/types.ts:276`
-- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityOptions.variants. `src/harness/types.ts:348`
-- `interface SensitivityVariantResult` — One variant's part of a SensitivityResult. `src/harness/types.ts:330`
-- `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One sweep axis of a cartesian sensitivity sweep: an id, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:249`
-- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:504`
-- `interface UntilContext` — Snapshot passed to an `until` predicate each time it is evaluated. `src/harness/types.ts:370`
-- `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each iteration of a runUntil loop. `src/harness/types.ts:389`
-- `interface Variant<C extends Cell | UntilCell = Cell>` — A named change to the baseline cell: the generic form of a domain-specific axis such as excluding upgrades. `src/harness/types.ts:234`
-- `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:70`
-- `interface Analyzer` — Observer of one headless run that collects metrics per tick, and optionally per finalized cycle-log entry. `src/primitives/types.ts:168`
-- `interface AnalyzerSummary` — Structured output produced by an Analyzer after a headless run completes. `src/primitives/types.ts:158`
+- `interface RunUntilOptions` — Options for one predicate-bounded headless run. `src/harness/types.ts:398`
+- `interface RunUntilResult` — Result of a predicate-bounded headless run. `src/harness/types.ts:466`
+- `interface SensitivityOptions<C extends Cell | UntilCell = Cell>` — Options for runSensitivity, a baseline-plus-variants sweep. `src/harness/types.ts:277`
+- `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityOptions.variants. `src/harness/types.ts:349`
+- `interface SensitivityVariantResult` — One variant's part of a SensitivityResult. `src/harness/types.ts:331`
+- `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One sweep axis of a cartesian sensitivity sweep: an id, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:250`
+- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:505`
+- `interface UntilContext` — Snapshot passed to an `until` predicate each time it is evaluated. `src/harness/types.ts:371`
+- `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each iteration of a runUntil loop. `src/harness/types.ts:390`
+- `interface Variant<C extends Cell | UntilCell = Cell>` — A named change to the baseline cell: the generic form of a domain-specific axis such as excluding upgrades. `src/harness/types.ts:235`
+- `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:71`
+- `interface Analyzer` — Observer of one headless run that collects metrics per tick, and optionally per finalized cycle-log entry. `src/primitives/types.ts:171`
+- `interface AnalyzerSummary` — What an Analyzer reports after one headless run; cell aggregation keeps only its number metrics. `src/primitives/types.ts:161`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:30`
 - `interface FlagEffect` — Sets a flag to true or false, for example to control whether content is available. `src/primitives/types.ts:14`
-- `interface GameStateAccessor` — Read-only view of game state used when evaluating predicates and resolving effects. `src/primitives/types.ts:209`
+- `interface GameStateAccessor` — Read-only view of game state used when evaluating predicates and resolving effects. `src/primitives/types.ts:212`
 - `type IEffect = ResourceEffect | FlagEffect | StateEffect | CompositeEffect` — Tagged-union root for declarative effects — the data shape consumers hand to category factories. `src/primitives/types.ts:63`
-- `type InjectionKey<T>` — Typed symbol key for module provide/inject — mirrors Vue's InjectionKey pattern. `src/primitives/types.ts:248`
+- `type InjectionKey<T>` — Typed symbol key for module provide/inject — mirrors Vue's InjectionKey pattern. `src/primitives/types.ts:251`
 - `interface ResourceEffect` — Changes a resource's amount by adding, subtracting, multiplying, or setting it. `src/primitives/types.ts:4`
 - `interface StateEffect` — Writes any value at a state path in game state (e.g. `src/primitives/types.ts:22`
-- `interface WeightedItem<T>` — A candidate value paired with a relative probability weight for weighted random selection. `src/primitives/types.ts:202`
+- `interface WeightedItem<T>` — A candidate value paired with a relative probability weight for weighted random selection. `src/primitives/types.ts:205`
 
 ## Transition walker
 

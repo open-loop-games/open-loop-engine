@@ -151,6 +151,11 @@ export type TickHandler = (dt: number) => void;
  * set while it runs.
  */
 export interface TickDriver {
+  /**
+   * Register a tick handler, and return its unsubscribe. Each tick runs the
+   * handlers in registration order, then the `onTick` of each entered tick
+   * phase, in the order the phases were entered.
+   */
   onTick(handler: TickHandler): () => void;
   /**
    * Run one interval of live play from an injected `rawDt`. This is the
@@ -179,8 +184,15 @@ export interface TickDriver {
   tickOnce(): void;
   start(): void;
   stop(): void;
+  /** Register a tick phase: handlers that run only while the phase is entered. */
   registerPhase(name: string, handlers: PhaseHandlers): void;
+  /**
+   * Enter a tick phase, and call its `onEnter`; entering an entered phase does
+   * nothing. Several phases can be entered at once. The entered set is not
+   * saved, so a game enters its phases again after a load.
+   */
   enterPhase(name: string): void;
+  /** Exit a tick phase, and call its `onExit`; exiting a phase not entered does nothing. */
   exitPhase(name: string): void;
   readonly running: boolean;
   /** Intervals per second. Setting it restarts the timer while the driver runs. */
