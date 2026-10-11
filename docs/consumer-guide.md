@@ -329,7 +329,7 @@ createProducerCategory<BuildingDef>({
 });
 ```
 
-Pass the `text`, or an `id`. Without them, bind derives the binding's attribution id from the modifier's description. A shared chain has no description while it is empty or holds a modifier without one. So a bare bind throws "cannot auto-derive binding id" whenever `mapState` runs before the chain fills.
+`bind` requires the `text` or an `id`. It never derives the binding id from the modifier's display text, so editing that text does not move the id.
 
 For a modifier in force only while a condition holds, there are three forms. Choose the most specific one that fits:
 

@@ -126,23 +126,23 @@ the typed, serializable yes/no test, as data. The type union and its pure-data p
 composable apply/invert steps and modifier chains
 
 - `interface AdditiveModifierOptions` `src/core/modifier.ts:70`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:899`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:913`
-- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:436`
-- `interface BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:397`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:952`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:880`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:894`
+- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:440`
+- `type BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:398`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:933`
 - `function createAdditiveModifier<T extends AdditiveModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that adds a value to the input. `src/core/modifier.ts:100`
 - `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:237`
-- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:638`
+- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:642`
 - `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:172`
 - `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose modifiers into one sequential modifier that applies them in order. `src/core/modifier.ts:318`
 - `interface ExponentialModifierOptions` `src/core/modifier.ts:201`
-- `type Grant` — A grant — the authored entry consumers use in a category's declarative fields (`grants` / `restricts` / `rewards`) and an effect-system def's `grants`. `src/core/modifier.ts:465`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:926`
+- `type Grant` — A grant — the authored entry consumers use in a category's declarative fields (`grants` / `restricts` / `rewards`) and an effect-system def's `grants`. `src/core/modifier.ts:469`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:907`
 - `interface Modifier` — One apply/invert step on a value. `src/core/modifier.ts:34`
-- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that other modules add to, via `add()` (raw) or `bind()` (with attribution). `src/core/modifier.ts:517`
+- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that other modules add to, via `add()` (raw) or `bind()` (with attribution). `src/core/modifier.ts:522`
 - `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:384`
-- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:575`
+- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:579`
 - `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:50`
 - `interface MultiplicativeModifierOptions` `src/core/modifier.ts:130`
 - `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:62`

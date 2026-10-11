@@ -310,16 +310,14 @@ export function setupDeclarativeBindings(
     const composedActive =
       when == null ? active : computed(() => unref(active) !== false && when.value);
     const modifier = buildGrantModifier(grant);
-    // Pass the grant's stable text so bind derives its attribution id without
-    // invoking the modifier's description getter — that getter formats the
-    // current value, and forcing a value getter's first evaluation here (before
-    // the entry is in the category map) freezes self-referential lookups at
-    // their fallback. Escape-hatch grants without a description still fall back
-    // to the getter inside bind.
-    const description =
-      role == null || grant.description == null
-        ? grant.description
-        : `${role}/${grant.description}`;
+    // The grant's own text, never the modifier's description getter: that
+    // getter formats the current value, and forcing a value getter's first
+    // evaluation here (before the entry is in the category map) freezes
+    // self-referential lookups at their fallback.
+    if (grant.description == null) {
+      throw new Error(`${owner}: a grant with a hand-built \`modifier\` needs a \`description\`.`);
+    }
+    const description = role == null ? grant.description : `${role}/${grant.description}`;
     for (const chain of grantChains(grant))
       chain.bind({ active: composedActive, modifier, text: description });
   }

@@ -725,6 +725,29 @@ describe('createPurchasableCategory grants', () => {
     expect(recs[0].persistentContextId).toBe('pc-grants1/double');
   });
 
+  it('refuses a hand-built modifier grant with no description, naming its owner', () => {
+    const gold = createTestResource('grants-nodesc', 1000);
+    const chain = createModifierChain('prod-nodesc');
+    const category = createPurchasableCategory<UpgradeDef>({
+      id: 'pc-grants-nodesc',
+      mapPurchasable: (def) => ({
+        display: { description: def.name },
+        requirements: createCostRequirement({ resource: gold, cost: def.cost }),
+        limit: 1,
+        grants: [
+          {
+            chain,
+            modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Shown' }),
+          },
+        ],
+      }),
+    });
+
+    expect(() => category.register([{ id: 'double', name: 'Double', cost: 10, bonus: 2 }])).toThrow(
+      /double.*needs a `description`/,
+    );
+  });
+
   it('supports multi-chain grants via array shorthand', () => {
     const gold = createTestResource('grants-g2', 1000);
     const chainA = createModifierChain('multi-g2-a');

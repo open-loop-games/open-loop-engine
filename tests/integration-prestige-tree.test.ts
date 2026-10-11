@@ -95,6 +95,7 @@ function createPrestigeTreeGame() {
 
   beginPersistentContext('prestige-tree/point-gain');
   pointGainModifier.bind({
+    text: 'Upgrade 1',
     active: () => pointUpgrade1.active.value,
     modifier: createMultiplicativeModifier({
       multiplier: () => bn(pointUpgrade1.effect.value).toNumber(),
@@ -102,6 +103,7 @@ function createPrestigeTreeGame() {
     }),
   });
   pointGainModifier.bind({
+    text: 'Upgrade 2',
     active: () => pointUpgrade2.active.value,
     modifier: createMultiplicativeModifier({
       multiplier: () => bn(pointUpgrade2.effect.value).toNumber(),
@@ -109,6 +111,7 @@ function createPrestigeTreeGame() {
     }),
   });
   pointGainModifier.bind({
+    text: 'Prestige boost',
     active: () => prestigeUpgrade1.active.value,
     modifier: createMultiplicativeModifier({
       multiplier: () => Decimal.add(prestige.value, 1).log10().add(1).toNumber(),

@@ -356,6 +356,7 @@ describe('chain.bind', () => {
     const chain = createModifierChain('bind-basic');
     withPersistentContext('category/item', () => {
       chain.bind({
+        text: 'Upgrade',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Upgrade' }),
       });
     });
@@ -371,6 +372,7 @@ describe('chain.bind', () => {
     const active = ref(false);
     withPersistentContext('ctx/item', () => {
       chain.bind({
+        text: 'Boost',
         active,
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Boost' }),
       });
@@ -390,6 +392,7 @@ describe('chain.bind', () => {
     const modEnabled = ref(true);
     withPersistentContext('ctx/item2', () => {
       chain.bind({
+        text: 'Dual-gated',
         active,
         modifier: createMultiplicativeModifier({
           multiplier: 2,
@@ -410,6 +413,7 @@ describe('chain.bind', () => {
     const chain = createModifierChain('bind-factory');
     withPersistentContext('factory-ctx', () => {
       chain.bind({
+        text: 'Plus',
         modifier: () => createAdditiveModifier({ addend: 25, description: 'Plus' }),
       });
     });
@@ -421,10 +425,12 @@ describe('chain.bind', () => {
     const chain = createModifierChain('bind-collide');
     withPersistentContext('dup-ctx', () => {
       chain.bind({
+        text: 'Same',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Same' }),
       });
       expect(() =>
         chain.bind({
+          text: 'Same',
           modifier: createMultiplicativeModifier({ multiplier: 3, description: 'Same' }),
         }),
       ).toThrow(/duplicate binding id/);
@@ -436,6 +442,7 @@ describe('chain.bind', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       chain.bind({
+        text: 'Rogue',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Rogue' }),
       });
       expect(warn).toHaveBeenCalledOnce();
@@ -449,11 +456,13 @@ describe('chain.bind', () => {
     }
   });
 
-  it('throws when neither id nor description is available', () => {
+  it('throws without text or id, and never derives the id from display text', () => {
     const chain = createModifierChain('bind-nodesc');
     withPersistentContext('no-desc-ctx', () => {
-      const bareMod = createMultiplicativeModifier({ multiplier: 2 });
-      expect(() => chain.bind({ modifier: bareMod })).toThrow(/cannot auto-derive binding id/);
+      const shown = createMultiplicativeModifier({ multiplier: 2, description: 'Shown' });
+      // @ts-expect-error: BindOptions requires `text` or `id`
+      expect(() => chain.bind({ modifier: shown })).toThrow(/pass `text` or `id`/);
+      expect(chain.bindings()).toEqual([]);
     });
   });
 
@@ -472,6 +481,7 @@ describe('chain.bind', () => {
     const chain = createModifierChain('bind-remove');
     const remove = withPersistentContext('rm-ctx', () =>
       chain.bind({
+        text: 'Temp',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Temp' }),
       }),
     );
@@ -517,6 +527,7 @@ describe('chain.bind', () => {
     const chain = createModifierChain('bind-tags');
     withPersistentContext('tag-ctx', () => {
       chain.bind({
+        text: 'Tagged',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Tagged' }),
         tags: ['source:upgrade', 'kind:mult'],
       });
@@ -529,6 +540,7 @@ describe('chain.bind', () => {
     chain.add(createAdditiveModifier({ addend: 5, description: 'Raw' }));
     withPersistentContext('mix-ctx', () => {
       chain.bind({
+        text: 'Bound',
         modifier: createMultiplicativeModifier({ multiplier: 2, description: 'Bound' }),
       });
     });

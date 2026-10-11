@@ -392,9 +392,30 @@ export interface ModifierChainEvents {
  * A binding is a {@link Modifier} added to a chain with auto-derived
  * attribution. The balance harness and devtools use it to trace each modifier
  * back to its owner. A binding may also have a reactive predicate that must
- * hold for it to evaluate.
+ * hold for it to evaluate. It requires `text` or `id`, so its id never comes
+ * from the modifier's display text.
  */
-export interface BindOptions {
+export type BindOptions = BindOptionsBase &
+  (
+    | {
+        /**
+         * Stable attribution text. The binding id is derived as
+         * `{persistentContextId}/{text}`, from the enclosing persistent context.
+         */
+        text: string;
+        /** An explicit binding id, in place of the derived one. */
+        id?: string;
+      }
+    | {
+        /** An explicit binding id, in place of the derived one. */
+        id: string;
+        /** Attribution text; the explicit `id` does not derive from it. */
+        text?: string;
+      }
+  );
+
+/** The fields of {@link BindOptions} other than its `text` / `id` identity. */
+export interface BindOptionsBase {
   /**
    * Reactive predicate controlling whether the bound modifier is active.
    * Composed AND-style with any existing `enabled` flag on the modifier itself.
@@ -408,23 +429,6 @@ export interface BindOptions {
    * (e.g. `modifier: () => createMultiplicativeModifier({...})`).
    */
   modifier: Modifier | (() => Modifier);
-  /**
-   * An explicit binding id, in place of the derived one. Normally omitted —
-   * the id is derived from the enclosing persistent context
-   * (`getCurrentFullPersistentContext`) and the attribution text, as
-   * `{persistentContextId}/{text}`.
-   */
-  id?: string;
-  /**
-   * Stable attribution text for id derivation (`{persistentContextId}/{text}`).
-   * When omitted (and no explicit `id`), bind falls back to invoking the
-   * modifier's `description` getter. For a factory modifier, that getter
-   * formats the *current value*, so the value getter first evaluates at bind
-   * time. A value getter whose first run reads zero reactive deps (e.g. a
-   * lookup that misses because its target registers later) freezes its
-   * computed permanently. So pass this whenever the text is known.
-   */
-  text?: string;
   /** Free-form attribution tags, returned by {@link ModifierChain.bindings}. */
   tags?: readonly string[];
 }
@@ -492,8 +496,9 @@ export type Grant =
     }
   | {
       chain: ModifierChain | ModifierChain[];
-      /** Hand-built modifier (or factory). Must have a description for attribution, or supply one inline. */
+      /** Hand-built modifier (or factory). */
       modifier: Modifier | (() => Modifier);
+      /** Stable display text for UI breakdowns, also used as the attribution text. A category's grant requires it. */
       description?: string;
       when?: Predicate;
     };
@@ -531,13 +536,12 @@ export interface ModifierChain extends Modifier {
    * the balance harness, devtools and modifier inspectors walk
    * {@link bindings} to attribute each modifier to its owner.
    *
-   * Auto-id format: `{persistentContextId}/{text}`, where
-   * `persistentContextId` is the enclosing persistent context. `text` is
-   * `opts.text` when given, else the modifier's own description text. That
-   * fallback invokes its getter, so prefer passing `opts.text` (see
-   * {@link BindOptions}). Outside any persistent context, it warns and uses
-   * the text alone as the id. Duplicate ids within one chain throw; pass
-   * `opts.id` when the repeat is intended.
+   * Pass `opts.text` or `opts.id`. The derived id is
+   * `{persistentContextId}/{text}`, where `persistentContextId` is the
+   * enclosing persistent context. The modifier's display text is never read,
+   * so editing it does not move the id. Outside any persistent context, it
+   * warns and uses the text alone as the id. Duplicate ids within one chain
+   * throw; pass `opts.id` when the repeat is intended.
    *
    * @returns A function that removes the binding (modifier + attribution record) from the chain.
    */
@@ -718,21 +722,16 @@ export function createModifierChain(id: string): ModifierChain {
       const modifier =
         activeRef == null ? rawModifier : delegateModifier(rawModifier, { when: activeRef });
 
-      // Resolve id — an explicit id wins, then explicit attribution text,
-      // then (fallback) the modifier's own description getter. The fallback
-      // *invokes* that getter, which for factory modifiers evaluates the
-      // underlying value — see BindOptions.text for the freeze hazard.
+      // An explicit id wins, then the attribution text. The modifier's display
+      // text is never read: editing it must not move the binding id.
       const persistentContextId = getCurrentFullPersistentContext();
       let bindingId = opts.id;
       if (bindingId == null) {
-        const descText = opts.text ?? resolveDescriptionText(modifier);
-        if (descText == null) {
-          throw new Error(
-            `chain.bind on "${chain.id}": cannot auto-derive binding id — no \`text\`, ` +
-              `the modifier has no description, and no explicit \`id\` was provided.`,
-          );
+        const text = opts.text;
+        if (text == null) {
+          throw new Error(`chain.bind on "${chain.id}": pass \`text\` or \`id\`.`);
         }
-        bindingId = persistentContextId == null ? descText : `${persistentContextId}/${descText}`;
+        bindingId = persistentContextId == null ? text : `${persistentContextId}/${text}`;
       }
 
       if (bindingsById.has(bindingId)) {
@@ -867,24 +866,6 @@ export function delegateModifier(
     },
     enabled,
   };
-}
-
-/**
- * Best-effort extraction of the attribution text from a modifier's description.
- * Returns the `.text` of a {@link ModifierDescription}, or the joined texts of
- * a description-array (sequential modifier output), or `undefined` when the
- * modifier has no description at all.
- */
-function resolveDescriptionText(modifier: Modifier): string | undefined {
-  const desc = modifier.description;
-  if (desc == null) return undefined;
-  const resolved = typeof desc === 'function' ? desc() : desc;
-  if (resolved == null) return undefined;
-  if (Array.isArray(resolved)) {
-    const texts = resolved.map((d) => d.text).filter((t) => t != null && t !== '');
-    return texts.length > 0 ? texts.join('+') : undefined;
-  }
-  return resolved.text;
 }
 
 // === UTILITY FUNCTIONS ===
