@@ -24,19 +24,22 @@ describe('falloff functions', () => {
     expect(linearFalloff(1, 1, 4)).toBeCloseTo(1 - Math.SQRT2 / 4);
   });
 
-  it('gaussianFalloff: 1 at d=0, exp(-2) at d=r, never zero (Euclidean)', () => {
+  it('gaussianFalloff: 1 at d=0, exp(-2) at d=r, 0 past r (Euclidean)', () => {
     expect(gaussianFalloff(0, 0, 5)).toBeCloseTo(1);
     expect(gaussianFalloff(5, 0, 5)).toBeCloseTo(Math.exp(-2));
     expect(gaussianFalloff(0, 5, 5)).toBeCloseTo(Math.exp(-2));
-    expect(gaussianFalloff(10, 0, 5)).toBeCloseTo(Math.exp(-8));
+    expect(gaussianFalloff(10, 0, 5)).toBe(0);
+    // Diagonal corner of the walked square: d = 4·√2 > 5.
+    expect(gaussianFalloff(4, 4, 5)).toBe(0);
     expect(gaussianFalloff(0, 0, 0)).toBe(0);
   });
 
-  it('exponentialFalloff: 1 at d=0, exp(-1) at d=r (Euclidean)', () => {
+  it('exponentialFalloff: 1 at d=0, exp(-1) at d=r, 0 past r (Euclidean)', () => {
     expect(exponentialFalloff(0, 0, 3)).toBeCloseTo(1);
     expect(exponentialFalloff(3, 0, 3)).toBeCloseTo(Math.exp(-1));
     expect(exponentialFalloff(0, 3, 3)).toBeCloseTo(Math.exp(-1));
-    expect(exponentialFalloff(6, 0, 3)).toBeCloseTo(Math.exp(-2));
+    expect(exponentialFalloff(6, 0, 3)).toBe(0);
+    expect(exponentialFalloff(3, 3, 3)).toBe(0);
     expect(exponentialFalloff(0, 0, 0)).toBe(0);
   });
 });
@@ -149,6 +152,16 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(layer.read().at(4, 4)).toBeCloseTo(6 * (1 - Math.SQRT2 / 3));
     // Beyond radius (distance 4 > radius 3): 0.
     expect(layer.read().at(0, 3)).toBe(0);
+  });
+
+  it('a built-in falloff reaches r on an axis and nothing past r on a diagonal', () => {
+    const grid = numericGrid(9, 9);
+    const layer = createInfluenceLayer(grid, { defaultRadius: 3, falloff: gaussianFalloff });
+    layer.addSource({ id: 'a', x: 4, y: 4, strength: 1 });
+    layer.update();
+    expect(layer.read().at(7, 4)).toBeCloseTo(Math.exp(-2));
+    // (7, 7) is in the walked square, at Euclidean distance 3·√2 > 3.
+    expect(layer.read().at(7, 7)).toBe(0);
   });
 
   it('respects per-source radius override', () => {

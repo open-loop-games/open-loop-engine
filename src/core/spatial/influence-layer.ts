@@ -21,8 +21,8 @@
  * collapse the coordinate offset into a scalar. Built-in falloffs are Euclidean
  * (`Math.hypot(dx, dy)`); custom falloffs are free to pick Chebyshev
  * (`Math.max(|dx|, |dy|)`), Manhattan (`|dx| + |dy|`), or hex-axial
- * (`(|dx| + |dy| + |dx + dy|) / 2`). Built-ins clamp or asymptote past
- * `radius`; custom falloffs are responsible for their own cutoff.
+ * (`(|dx| + |dy| + |dx + dy|) / 2`). Built-ins are 0 past `radius`; custom
+ * falloffs are responsible for their own cutoff.
  *
  * Update order: decay → accumulate. `retentionFactor` is the fraction kept
  * per tick (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = zero-fill).
@@ -83,10 +83,9 @@ export interface InfluenceSource {
  * - Manhattan: `Math.abs(dx) + Math.abs(dy)` (4-connected boards)
  * - Hex axial: `(Math.abs(dx) + Math.abs(dy) + Math.abs(dx + dy)) / 2`
  *
- * Implementations are responsible for clamping at distance ≥ radius if a
- * hard cutoff is desired; built-in falloffs do this where it makes sense
- * (`linearFalloff` clamps; `gaussianFalloff` and `exponentialFalloff`
- * asymptote).
+ * The layer walks the Chebyshev square of the radius, so a falloff that
+ * should not reach the square's corners returns 0 past its own cutoff. Every
+ * built-in returns 0 past Euclidean `radius`.
  *
  * @example Chebyshev lookup table for a roguelike danger layer
  * ```ts
@@ -231,7 +230,8 @@ export interface InfluenceLayer {
 }
 
 // === BUILT-IN FALLOFF FUNCTIONS ===
-// All built-ins use Euclidean distance (`Math.hypot(dx, dy)`). Custom
+// All built-ins use Euclidean distance (`Math.hypot(dx, dy)`) and are 0 past
+// `r`, so a source never reaches a cell farther than its radius. Custom
 // falloffs may pick any metric — see {@link FalloffFunction}.
 
 /** Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. */
@@ -241,17 +241,18 @@ export const linearFalloff: FalloffFunction = (dx, dy, r) => {
   return v > 0 ? v : 0;
 };
 
-/** Gaussian falloff `exp(-(d/r)^2 * 2)`, Euclidean `d`. Asymptotes; never zero. */
+/** Gaussian falloff `exp(-(d/r)^2 * 2)` up to `d = r`, then 0; Euclidean `d`. */
 export const gaussianFalloff: FalloffFunction = (dx, dy, r) => {
   if (r <= 0) return 0;
   const x = Math.hypot(dx, dy) / r;
-  return Math.exp(-(x * x) * 2);
+  return x > 1 ? 0 : Math.exp(-(x * x) * 2);
 };
 
-/** Exponential falloff `exp(-d/r)`, Euclidean `d`. Asymptotes; never zero. */
+/** Exponential falloff `exp(-d/r)` up to `d = r`, then 0; Euclidean `d`. */
 export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
   if (r <= 0) return 0;
-  return Math.exp(-Math.hypot(dx, dy) / r);
+  const d = Math.hypot(dx, dy);
+  return d > r ? 0 : Math.exp(-d / r);
 };
 
 // === CREATEINFLUENCELAYER ===
