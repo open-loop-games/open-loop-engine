@@ -237,7 +237,7 @@ Two kinds of query use the same engine instance.
 - `Purchasable.count` and `.active` for purchase state;
 - `Purchasable.countToPurchase` and `getCost(n)` for what a purchase would take and cost (a producer's purchasable is `producer.repeatable`);
 - the core functions `calculateCost` and `calculateMaxAffordable`, over a cost `Formula`;
-- `ModifierChain.bindings()` for attribution.
+- `ModifierChain.bindings()` for the attribution of bindings, and `EffectSystemRegistryKey` for lowered grants.
 
 So a walker steps through a schedule without simulating it.
 

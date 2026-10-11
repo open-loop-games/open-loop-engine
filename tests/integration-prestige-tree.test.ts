@@ -86,8 +86,8 @@ function createPrestigeTreeGame() {
 
   // --- Point gain modifier chain ---
   // Built as a ModifierChain so each conditional upgrade lands as an
-  // attributed `chain.bind` — balance-sim walks `pointGainModifier.bindings()`
-  // to see where each contribution comes from. Bindings apply synchronously:
+  // attributed `chain.bind`, so `pointGainModifier.bindings()` shows where
+  // each contribution comes from. Bindings apply synchronously:
   // the test below purchases an upgrade and reads `chain.apply(...)` in the
   // same tick without `await nextTick()`.
   const pointGainModifier = createModifierChain('prestige-tree/point-gain');

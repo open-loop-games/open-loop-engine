@@ -441,7 +441,7 @@ for (const ref of def.affectedBy ?? []) {
 }
 ```
 
-The enclosing persistent context gives each binding its attribution. `chain.bindings()` reports each binding to the balance harness with no extra wiring.
+The enclosing persistent context gives each binding its attribution. `chain.bindings()` lists each binding with that attribution, for a tooltip or devtools, with no extra wiring.
 
 **Level-scaled modifier (the source's level or XP multiplies the target).** The reactivity is in the modifier value, not in the `active` predicate. The binding is always active, and the multiplier evaluates to `1` when the source is at zero, so the modifier has no effect:
 

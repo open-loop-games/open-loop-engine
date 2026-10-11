@@ -83,7 +83,7 @@ export interface AchievementCategoryOptions<Def extends { id: string }, DefState
    * The optional `grants` field declares modifiers that bind to shared chains
    * while the achievement is `earned`. Each {@link Grant} becomes a
    * `chain.bind` call with the achievement's `earned` as its `active`
-   * predicate. So `chain.bindings()` shows the binding to the balance harness.
+   * predicate. So `chain.bindings()` lists it, attributed to the category.
    */
   mapAchievement: (def: Def) => Omit<AchievementOptions, 'id'> & { grants?: Grant[] };
 

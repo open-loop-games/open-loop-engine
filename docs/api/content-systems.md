@@ -116,14 +116,14 @@ game-dev-friendly wrapper over ResourceBag
 
 batch-create Producers from defs
 
-- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:434`
-- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:151`
-- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:238`
-- `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:35`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:225`
-- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:121`
-- `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:70`
-- `interface ProducerPurchaseOptions` — Purchase options for a producer purchased more than once. `src/systems/producer-category.ts:44`
+- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:448`
+- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:159`
+- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:246`
+- `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:40`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:233`
+- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:129`
+- `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:75`
+- `interface ProducerPurchaseOptions` — Purchase options for a producer purchased more than once. `src/systems/producer-category.ts:49`
 
 ## Purchasable
 
@@ -132,8 +132,8 @@ unified purchase primitives for incremental games
 Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. `createPurchasable` is the raw factory both build on. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.
 
 - `function createPurchasableCategory<Def extends { id: string; }, DefState = void>(options: PurchasableCategoryOptions<Def, DefState>): PurchasableCategory<Def, DefState>` — Create a purchasable category — batch registration of Purchasables from defs. `src/systems/purchasable-category.ts:201`
-- `function createScalingPurchasable(options: ScalingPurchasableOptions, predicates?: PredicateResolver): Purchasable` — Create a purchasable whose cost scales with its count — the L3 factory for one customized repeatable purchase. `src/systems/purchasable.ts:734`
-- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:268`
+- `function createScalingPurchasable(options: ScalingPurchasableOptions, predicates?: PredicateResolver): Purchasable` — Create a purchasable whose cost scales with its count — the L3 factory for one customized repeatable purchase. `src/systems/purchasable.ts:739`
+- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:270`
 - `interface PurchasableCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:121`
 - `interface PurchasableCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Purchasable instance, def state and signals. `src/systems/purchasable-category.ts:108`
 - `interface PurchasableCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/purchasable-category.ts:68`

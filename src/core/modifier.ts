@@ -565,9 +565,11 @@ export interface ModifierChain extends Modifier {
   /** Read-only snapshot of the current modifiers in the chain, in evaluation order */
   readonly modifiers: readonly Modifier[];
   /**
-   * Attribution records for every modifier added via {@link bind} (modifiers
-   * added via raw {@link add} do not appear here). Walk this to show where
-   * each modifier comes from, in balance-harness tools or devtools.
+   * Attribution records for every modifier added via {@link bind}. A modifier
+   * added via raw {@link add} or through a {@link reserve | reserved slot} is
+   * not listed. So an effect system's lowered grants are absent;
+   * `EffectSystemRegistryKey` attributes those. Walk this to show where each
+   * modifier comes from, in a tooltip or devtools.
    * A method (fresh snapshot per call), unlike the `modifiers` property.
    */
   bindings(): readonly BindingRecord[];

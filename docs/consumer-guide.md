@@ -246,9 +246,9 @@ These option callbacks differ between play and a load:
 - Challenge `onEnter` / `onExit` run only when a player enters or exits, so they may write game state. Derive ephemeral setup that must come back after a load from `challenge.active`.
 - A temporary-effect system calls `onHydrate`, else `onActivate`, and never `onExpire`. So a def whose `onActivate` writes game state needs an `onHydrate`. A reset that clears the system also drops its instances without `onExpire`.
 
-### Bindings are rebuilt at install, not loaded
+### Chain modifiers are rebuilt at install, not loaded
 
-Modifier bindings (`chain.bind`, grants, `ConditionalEffectSystem.register`) are not serialized, because closures cannot round-trip. They are in module install code, which runs once at `start()`, before `load()` writes anything. So install sees ref defaults. Bind unconditionally, with `active` / `multiplier` reading persistent refs. Those are reactive, so the chain follows the refs through every load, import and reset in the same tick.
+The modifiers on a chain are not serialized, because closures cannot round-trip. That covers bindings (`chain.bind`, a category's grants) and an effect system's lowered grants. They are in module install code, which runs once at `start()`, before `load()` writes anything. So install sees ref defaults. Bind unconditionally, with `active` / `multiplier` reading persistent refs. Those are reactive, so the chain follows the refs through every load, import and reset in the same tick.
 
 The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads the default once at install and never runs again. `active` is a `Computable<boolean>` (`T | Readonly<Ref<T>> | () => T`), so all three forms are valid:
 
@@ -326,7 +326,7 @@ For the gain curve itself, compose the arithmetic you need. The engine ships no 
 
 ## Modifier chains and effects
 
-"Effect" has two senses in this section. `IEffect`, the `E` builder and `GameStateMutator` are the **effect**: a declarative state write, evaluated against game state. `createConditionalEffectSystem` and `createTemporaryEffectSystem` are the **effect systems**. They hold live modifier bindings, and activate or deactivate them as predicates flip. The engine rebuilds those bindings from the defs, and never reads them from the save (§ Bindings are rebuilt at install, not loaded). A temporary-effect system does save which instances are active and how long each has left. After every load and reset, it rebuilds their bindings from that. Bindings from either source go onto a modifier chain.
+"Effect" has two senses in this section. `IEffect`, the `E` builder and `GameStateMutator` are the **effect**: a declarative state write, evaluated against game state. `createConditionalEffectSystem` and `createTemporaryEffectSystem` are the **effect systems**. They place each def's lowered grants in a reserved chain slot while the def is active, and remove them when it ends. The engine rebuilds those lowered grants from the defs, and never reads them from the save (§ Chain modifiers are rebuilt at install, not loaded). A temporary-effect system does save which instances are active and how long each has left. After every load and reset, it rebuilds their lowered grants from that. `chain.bindings()` does not list lowered grants. `EffectSystemRegistryKey` attributes each one to its system, def and grant index.
 
 `createModifierChain` is a named, composable modifier that several modules can add to. It is a shared chain for production multipliers, or for any value that many systems change:
 
