@@ -2,6 +2,528 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.5.0 (2026-10-11)
+
+### ⚠ Breaking changes
+
+* the save-key prefix is the persistent context, and an override push is a scoped override (e796c57)
+
+  The save-key prefix is the persistent context, and an override push is a scoped override. A cycle-log entry's extra data is its annotations.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    getModulePersistentRefs → getPersistentContextRefs
+    pushScope → pushOverrides (OverrideRegistry)
+    setContext → annotate (CycleLog)
+    scopeDepth → overrideDepth (OverrideRegistry)
+    scopeVersion → overrideVersion (OverrideRegistry)
+    context → annotations (CycleLogEntry, Analyzer)
+    resetModules → resetPersistentContexts (ResetOptions, CycleOptions) *
+    scope → persistentContextId (BindingRecord)
+    context → persistentContextId (ResourceRegistryEntry)
+    namespace → persistenceNamespace (CreateEngineFromSaveOptions, CreateSensitivityCellOptions) *
+
+* a field that holds a predicate is named for what the predicate decides (406cb58)
+
+  A field that holds a predicate is named for what the predicate decides. An achievement's predicate is its goal, and an automation tier unlocks when its unlockWhen holds.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    gate → ready (Throttle)
+    requirement → goal (AchievementOptions, BaseTieredAchievementDef, TieredAchievementBuildDefParams) *
+    requirement → unlockWhen (AutomationTierDef) *
+    requirement → met (BooleanRequirementOptions)
+    requirementMet → met (Requirement, CostRequirement)
+    gate → when (BankedAccelerationConfig) *
+    gates → advanceWhen (TierFieldDef, PerSubjectOverride) *
+    condition → when (DialogNode) *
+    condition → visible (DialogChoice) *
+
+* a pool member is a run, and an item's authored data is a def (1b0c2d7)
+
+  A pool member is a run, an item's authored data is a def, and a Gate names the category entry it reads.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    GateHandle → GateService
+    TieredAchievementSpec → AchievementLadderOptions
+    TieredAchievementBaseSpec → AchievementLadderBaseOptions
+    HistogramSpec → HistogramOptions
+    createDefinitionStates → createDefStates
+    forEachDefinition → forEachDef
+    getRequiredGateHandles → getRequiredGateServices
+    assertGateHandles → assertGateServices
+    addInstance → addRun (RunPool)
+    getInstance → getRun (RunPool)
+    removeInstance → removeRun (RunPool)
+    instances → runs (RunPool)
+    maxInstances → maxRuns (RunPoolOptions) *
+    entity → entry (CountGteGate, UnlockGate)
+    registry → resourceRegistry (GateRuntime) *
+    contentType → effectSystemId (ModifierPickerAddress)
+    contentId → defId (ModifierPickerAddress)
+    entityId → defId (Transition)
+    instance:added → run:added
+    instance:removed → run:removed
+    instance:died → run:died
+    instance:restarted → run:restarted
+    'registry' → 'resourceRegistry' (GateHandle)
+    'content' → 'effect-system' (PickerSource, ModifierPickerAddress)
+    src/harness/picker/walk-content.ts → src/harness/picker/walk-effect-system-bindings.ts
+    docs/api: harness.md#content-walker → harness.md#transition-walker
+
+* a named boolean is a flag, a category entry's on-state is active, and a challenge is entered (0a0bc04)
+
+  A named boolean in the game state is a flag, a category entry's on-state is active, and a challenge is entered. The Gate kind 'unlock' is now 'active', and the condition and effect type 'unlock' is now 'flag'.
+
+  Migration:
+    UnlockEffect → FlagEffect
+    UnlockGate → ActiveGate
+    isUnlocked → getFlag (GameStateAccessor)
+    setUnlocked → setFlag (GameStateMutator)
+    invalidateUnlock → invalidateFlag (IncrementalSnapshot)
+    isTierUnlocked → isUnlocked (AutomationTiers)
+    unlock → flag (E)
+    unlocks → flags (TransitionDeps)
+    unlock → active (CategoryEntrySignals)
+    active → entered (Challenge)
+    active → current (ChallengeCategory)
+    trackedUnlocks → trackedFlags (IncrementalSnapshot)
+    'unlock' → 'flag' (UnlockEffect, UnlockCondition, ResolvedEffect)
+    'unlock' → 'active' (UnlockGate)
+    'start-unlock' → 'becomes-enterable' (Transition)
+
+* bare "run" is the play between two resets, and a Cycle repeats runs (736585c)
+
+  The play between two resets is a run, and a Cycle repeats runs. Cycle.run() is now resume(), and the Cycle's restart events are its end events.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    createCycleFinalizeTracker → createRunFinalizeAnalyzer
+    run → resume (Cycle)
+    setRecencyHalfLifeCycles → setRecencyHalfLifeRuns (BestOf)
+    onCycleFinalize → onRunFinalize (Analyzer) *
+    cycleNumber → runNumber (BestOfEntry, BestOfCandidate, SerializedBestOfEntry, CycleLogEntry, Analyzer)
+    recencyHalfLifeCycles → recencyHalfLifeRuns (BestOfMetricDef) *
+    minCycles → minRuns (BestReplayDefOptions) *
+    onBeforeRestart → onBeforeEnd (CycleOptions) *
+    onRestart → onEnd (CycleOptions) *
+    beforeRestart → beforeEnd
+    afterRestart → afterEnd
+    'cycles' → 'runs' (the run-finalize analyzer's metric key)
+    'fresh-each-cycle' → 'fresh-each-pick' (GoalPickerOptions) *
+    'cycle-finalize' → 'run-finalize' (the analyzer's name, so metric keys read 'run-finalize.runs')
+
+* one verb per lifecycle act (c30585f)
+
+  Each lifecycle act has one verb. A challenge's start gate is canEnter, and the Sequencer's canRun is canStart. Rename the challenge field first, so the two do not merge.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    dropField → deleteField
+    canStart → canEnter (ChallengeDef, Challenge) *
+    canRun → canStart (SequencerOptions, Sequencer, ActionMapping) *
+    finished → terminal (DialogPresentation)
+    'destroy' → 'discard' (ResourceBagOptions, InventoryOptions) *
+
+* amount is a quantity of a resource, and count is how many (3b6e588)
+
+  An amount is a quantity of a resource, and a count is how many. A purchasable's owned level is its count, and the accessor reads a resource with getAmount. AchievementCategory.totalCount is removed: read size.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    getResource → getAmount (GameStateAccessor, HybridPaybackOptions)
+    amount → count (Purchasable)
+    amountToPurchase → countToPurchase (Purchasable)
+    initialAmount → initialCount (PurchasableOptions, ScalingPurchasableOptions, ProducerPurchaseConfig) *
+    maxBulkAmount → maxBulkCount (CostRequirementOptions, CostRequirement) *
+    bulkAmount → bulkCount (SetupPolicyAutoPurchaseOptions) *
+    totalAmount → totalCount (PurchasableCategory)
+    getHeadlineRate → getTotalRate (HybridPaybackOptions, HybridPaybackContext) *
+    cap → capacity (TimeBankConfig) *
+    totalCount → size: merged
+
+* an authored sequence of gated states is a ladder, and a purchasable's level is its count (36b97fc)
+
+  An authored sequence of gated states is a ladder, and a position on it is a rung. A purchasable's level is its count.
+
+  Migration:
+    TieredAchievementTier → AchievementRung
+    TieredAchievementBuildDef → AchievementLadderBuildDef
+    TieredAchievementBuildDefParams → AchievementLadderBuildDefParams
+    BaseTieredAchievementDef → BaseLadderAchievementDef
+    TierFieldDef → LadderFieldDef
+    TierFieldInstance → LadderFieldInstance
+    registerTiered → registerLadder (AchievementCategory)
+    getTier → getRung (TierFieldInstance)
+    tiers → rungs (TieredAchievementBaseSpec)
+    tierIndex → rungIndex (TieredAchievementBuildDefParams)
+    tier → rung (TieredAchievementBuildDefParams)
+    tiers → rungs (TierFieldDef, TierFieldInstance)
+    'tier' → 'ladder' (TierFieldDef, TierFieldInstance)
+
+* persistent means saved and loaded, and a reset leaves lifetime state alone (aa5ada2)
+
+  Persistent means saved and loaded only, and lifetime state is what a reset leaves alone. An influence layer's decay option is its retentionFactor: the fraction kept per tick.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    NonPersistent → PersistentAlias
+    noPersist → aliasPersistent
+    permanentBonus → lifetimeBonus (AccumulatorSkill, LevelDrivenSkill) *
+    decay → retentionFactor (InfluenceLayerOptions) *
+    'persistent' → 'until-completed' (GoalPickerOptions) *
+
+* the condition-driven effect system is the conditional effect system, and an effect def grants modifiers (6dd1a83)
+
+  The condition-driven effect system is the conditional effect system, and an effect def lists the modifiers it grants. E.conditional is now E.branch.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    PersistentEffectDef → ConditionalEffectDef
+    PersistentEffectEvents → ConditionalEffectEvents
+    PersistentEffectSystem → ConditionalEffectSystem
+    PersistentEffectSystemOptions → ConditionalEffectSystemOptions
+    ReplacementBindingOptions → ReplacementGrantsOptions
+    createPersistentEffectSystem → createConditionalEffectSystem
+    replacementBinding → replacementGrants
+    apply → activate (TemporaryEffectSystem)
+    conditional → branch (E)
+    modifiers → grants (TemporaryEffectDef, PersistentEffectDef, EffectDefLike) *
+    bindingIndex → grantIndex (ModifierPickerAddress)
+    onApply → onActivate (TemporaryEffectDef) *
+    applied → activated
+    'persistent' → 'conditional' (PersistentEffectSystem, EnumerableEffectSystem)
+    src/systems/persistent-effect.ts → src/systems/conditional-effect.ts
+    src/systems/modifier-binding.ts → src/systems/replacement-grants.ts
+
+* game state is what the accessor reads, and a phase value is a status (662c439)
+
+  Game state is what the accessor reads, at a state path through getStateAt and setStateAt. A phase value is a status, and the serializable value type is Serializable.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    State → Serializable
+    StatePrimitive → SerializablePrimitive
+    StateConstraint → SerializableConstraint
+    IfState → IfSerializable
+    ActionItemState → ActionItemStatus
+    ScopeState → ScopeStatus
+    InfluenceLayerReader → InfluenceLayerView
+    processGetter → toMaybeRef
+    getState → getStateAt (GameStateAccessor)
+    setState → setStateAt (GameStateMutator)
+    setItemState → setItemStatus (ActionCategory)
+    stateAt → statusAt (ScopeStack)
+    getState → getGameState (RecommendationSystemOptions) *
+    state → gameState (RecommendationContext)
+    lifecycle → status (ActionItemMetadata)
+    itemStateChanged → itemStatusChanged
+
+* a plain-data form is its serialized form, and the rebuild after a load is hydration (65cf6b8)
+
+  A plain-data form is a serialized form, written back by restore(), and one save as a string is save text. The rebuild after a load is hydration.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    SpatialGraphSnapshot → SerializedGraph
+    SpatialGridSnapshot → SerializedSpatialGrid
+    ScopeStackSnapshot → SerializedScopeStack
+    DialogRuntimeState → SerializedDialogAdapter
+    exportState → serialize (DialogRuntime)
+    importState → restore (DialogRuntime)
+    saveBlob → saveText (CreateEngineFromSaveOptions, CreateSensitivityCellOptions)
+    onRehydrate → onHydrate (TemporaryEffectDef) *
+    saveVersion → writtenVersion (SaveEvents)
+    currentVersion → supportedVersion (SaveEvents)
+    version → saveVersion (SaveManagerConfig) *
+    save:reconcile-failed → save:hydration-failed
+
+* a probe is a consumer's balance script, and an in-run observer is an analyzer (6d165f2)
+
+  A probe is a consumer's balance script, and the canned beat runner is runBeatProbe. An in-run observer is an analyzer. runBatch and BatchConfig are removed.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    runBatch({ configs, seeds, ... }) → runMatrix({ cells: configs, seeds, ... })
+    BatchConfig → MatrixOptions, with cells for configs
+    ProbeConfig → BeatProbeOptions
+    BeatProbe → Beat
+    createResourcePeakTracker → createResourcePeakAnalyzer
+    createSeriesTracker → createTimeSeriesAnalyzer
+    runProbe → runBeatProbe
+    stasisProbeInterval → stasisCheckInterval (SensitivityConfig, RunUntilConfig, MatrixUntilConfig, ProbeConfig, EventModeOptions) *
+
+* a tick is one run of the tick handlers in either mode, and an interval is one timer firing (df2ae69)
+
+  A tick is one run of the tick handlers in either mode, and an interval is one timer firing. TimeSystem.speedMultiplier is removed, so time.tick(dt) counts the dt it is given. Set game speed on the TickDriver.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    stepOnce → tickOnce (TickDriver)
+    simulateTick → advanceTime (TickDriver)
+    tickRaw → processInterval (TickDriver)
+    stepSize → fixedDt (EngineConfig, TickDriverConfig) *
+    maxStepsPerTick → maxTicksPerInterval (EngineConfig, TickDriverConfig) *
+    onStepsOverflow → onTicksOverflow (EngineConfig, TickDriverConfig) *
+    onStepsOverflow → onTicksOverflow (TickDriver)
+    tickRate → intervalRate (EngineConfig, TickDriverConfig) *
+    tickRate → intervalRate (TickDriver)
+    offline → replay (BurstDischargeOptions) *
+    tick → iteration (UntilContext)
+    speed → rate (TimedProgressBaseOptions) *
+    speed → rate (TimedProgress, ProcessedTimedProgressOptions)
+    duration → needed (TimedProgressBaseOptions, TimedProgress, ProcessedTimedProgressOptions)
+    duration → needed (stepProgressiveCosts and resourceConsumedAt options)
+    'tick' → 'uniform' (RunMode)
+    'stasis-aware-tick' → 'stasis-aware' (RunMode)
+    createTimeSystem({ speedMultiplier }) and TimeSystem.speedMultiplier: removed; set tickDriver.speedMultiplier, which the dt fed to time.tick() already carries
+
+* an XSource is an input form, and a picker entry names the walker that found it (8c50325)
+
+  An XSource type is an input form, and a picker or transition entry names the walker that found it. A grid offset is a GridOffset.
+
+  Migration:
+    PickerSource → PickerWalker
+    TransitionSource → TransitionWalker
+    GridDelta → GridOffset
+    source → walker (ModifierPickerAddress, TunablePickerAddress, Transition)
+
+* policy means a decision rule, and a registered behavior object is a recommender (fd67e2d)
+
+  Policy means a decision rule only, so a reset's carry-over rule is a Retention. A registered recommendation behavior is a Recommender, and BestOf captures a config.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    RecommendationDef → Recommender
+    BestReplayDefOptions → BestReplayRecommenderOptions
+    RetentionPolicy → Retention
+    RetentionPolicyOptions → RetentionOptions
+    createBestReplayDef → createBestReplayRecommender
+    createRetentionPolicy → createRetention
+    strategyId → recommenderId (Recommendation, RecommendationRationale, SerializedRecommendation)
+    deathPolicy → deathDisposition (RunPoolOptions, RunPool)
+    captureStrategy → captureConfig (BestOfOptions) *
+    strategySnapshot → configSnapshot (BestOfEntry, BestOfCandidate, SerializedBestOfEntry) *
+    defs → recommenders (RecommendationSystemOptions, RecommendationSystem) *
+    profiler labels 'autobuy.decide' / 'autobuy.purchase' → 'auto-purchase.decide' / 'auto-purchase.purchase'
+    src/systems/recommendation-strategies.ts → src/systems/recommenders.ts
+    docs/consumer-guide-balance-agents.md → docs/consumer-guide-balance-automated-player.md
+
+* id is the one identity word, displayName the one display word, and kind the discriminant field (de7728e)
+
+  An identity field is id, a name shown to the player is displayName, and a union's tag field is kind. A persistent ref takes { id } instead of { name }, and IEffect and ICondition switch on kind instead of type.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    setPersistentName → setPersistentId
+    PersistentName → PersistentId
+    findByName → findByDisplayName (ResourceRegistry)
+    findSlotByName → findSlotByDisplayName (SaveManager)
+    name → id (PersistentOptions) *
+    name → id (ContentRegistry, OverrideRegistry, WalkableCategory)
+    registryName → registryId (TunablePickerAddress, TunablePickerEntry)
+    name → id (Analyzer, AnalyzerResult, Cell, UntilCell, CellResult, Variant, SweepAxis, SensitivityVariantResult, CreateSensitivityCellOptions)
+    key → id (Suggestion)
+    name → displayName (ModDef, SaveSlot, ChallengeDef, AutomationTierDef, ZoneDef)
+    name → displayName (TemporaryEffectDef, PersistentEffectDef) *
+    key → path (StateGate)
+    target → path (StateEffect, StateCondition)
+    type → kind (ResourceEffect, UnlockEffect, StateEffect, CompositeEffect, ConditionalEffect, ResourceCondition, UnlockCondition, StateCondition, AndCondition, OrCondition, NotCondition, ResolvedEffect)
+    variant → kind (ModifierPickerAddress)
+    description → text (BindOptions) *
+    defaultSlotName → defaultSlotDisplayName (SaveManagerConfig) *
+    keys → ids (RuleAdvisorEvents.accepted)
+
+* the Slot selection system is a loadout, and a queued item is updated, not patched (80007f7)
+
+  The Slot selection system is a Loadout, saved under 'loadout:<id>'. A Sequencer item is updated, not patched.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    Slot → Loadout
+    SlotOptions → LoadoutOptions
+    SlotEvents → LoadoutEvents
+    createSlot → createLoadout
+    patchItem → updateItem (Sequencer)
+    patchCurrentItem → updateCurrentItem (Sequencer)
+    patchItemPayload → updateItemPayload (ActionCategory)
+    slot → loadout (GoalPickerOptions) *
+    src/systems/slot.ts → src/systems/loadout.ts; docs/api content-systems.md#slot → #loadout
+
+* a systems-layer piece is a system, the Gate's handle bundle is its services, and the dialog contract is an adapter (adc7424)
+
+  The Gate's handle bundle is GateServices, and the dialog backend contract is DialogAdapter. Runtime means only the JavaScript process.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    GateRuntime → GateServices
+    DialogRuntime → DialogAdapter
+    NativeDialogRuntime → NativeDialogAdapter
+    NativeDialogRuntimeOptions → NativeDialogAdapterOptions
+    DialogRuntimeFactory → DialogAdapterFactory
+    DialogRuntimeEvents → DialogAdapterEvents
+    getAmbientGateRuntime → getAmbientGateServices
+    createNativeDialogRuntime → createNativeDialogAdapter
+    runtime → services (PredicateResolver)
+    runtimeFactory → adapterFactory (DialogSessionOptions) *
+
+* a handler is any registered function, and RunMode names its next-event mode (649bc01)
+
+  A handler is any registered function, so TickCallback is merged into TickHandler. RunMode's 'event' mode is now 'next-event'.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    PhaseHooks → PhaseHandlers
+    profileHook → onProfile (InfluenceLayerOptions) *
+    'event' → 'next-event' (RunMode)
+    TickCallback → TickHandler: merged
+
+* decimals counts decimal places, sig figs counts significant figures, and format is the one formatter verb (99265d8)
+
+  A resource's display option is decimals, and the notation manager's is sig figs. displayResource is formatResource.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    displayResource → formatResource
+    getPrecision → getSigFigs (NotationManager)
+    setPrecision → setSigFigs (NotationManager)
+    precision → decimals (ResourceOptions, Resource) *
+    effectDisplay → effectDescription (PurchasableDisplay, ScalingPurchasableOptions, Purchasable) *
+    label → key (Transition)
+    name → label (ProfileEntry)
+    small → compact (AchievementOptions) *
+    small → compact (Achievement)
+
+* the time bank deposits and withdraws, a cost is paid, and a resource is subtracted (f77f66c)
+
+  The time bank deposits and withdraws, a cost is paid, and an inventory subtracts. bulkPurchase is purchaseMaxByDefault, and SpatialGrid's bulkChanged event is gridChanged.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    resourceConsumedAt → resourcePaidAt
+    bulkTransfer → transferAmountsBetweenBags
+    remove → subtract (Inventory)
+    drainMode → withdrawMode (BankedAccelerationConfig) *
+    bankLiveOverflow → depositLiveOverflow (BankedAccelerationConfig) *
+    earnEfficiency → depositEfficiency (TimeBankConfig) *
+    bulkPurchase → purchaseMaxByDefault (PurchasableOptions, ScalingPurchasableOptions, Purchasable, ProducerPurchaseConfig) *
+    bulkChanged → gridChanged
+
+* an antiderivative is never an integral, sum is the discrete series, and an inversion within tolerance is on-target (c08d6a7)
+
+  An antiderivative is never called an integral, and a cost sums its levels with sumLevels. An inversion within tolerance reports 'on-target', and a first passage reports 'reached' or 'not-reached'. 'exact' stays on IntegerRoot and Series.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    seriesAnalyzerPack → timeSeriesAnalyzerPack
+    evaluateIntegral → evaluateAntiderivative (Formula)
+    invertIntegral → invertAntiderivative (Formula)
+    tryInvertIntegral → tryInvertAntiderivative (Formula)
+    isIntegralInvertible → isAntiderivativeInvertible (Formula)
+    getIntegralFormula → getAntiderivative (Formula)
+    cumulativeCost → sumLevels (CostRequirementOptions, CostRequirement) *
+    'crossed' → 'reached' (Passage)
+    'no-crossing' → 'not-reached' (Passage)
+    'exact' → 'on-target' (Inversion)
+    'series:' → 'time-series:' (createTimeSeriesAnalyzer's id and metric-key prefix)
+
+* the rule advisor reduces history to a digest, and an analyzer's end-of-run output is its summary (f2eb79d)
+
+  The rule advisor's reduced history is a digest, and an analyzer's end-of-run output is an AnalyzerSummary. getDiagnostics is getSafeguardDiagnostics, and withChain is withTraceChain.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    AdvisorAggregatorFn → AdvisorDigestFn
+    AnalyzerResult → AnalyzerSummary
+    getDiagnostics → getSafeguardDiagnostics
+    resetDiagnostics → resetSafeguardDiagnostics
+    withChain → withTraceChain
+    aggregate → digest (RuleAdvisorOptions)
+    onAggregate → onDigest (RuleAdvisorOptions) *
+    analyzerResults → analyzerSummaries (HeadlessResult, RunUntilResult)
+
+* SpatialGraph is Graph, matching GraphNode and GraphEdge (e10a1b5)
+
+  SpatialGraph is Graph, and createSpatialGraph is createGraph.
+
+  Migration:
+    SpatialGraph → Graph
+    SpatialGraphOptions → GraphOptions
+    SpatialGraphEvents → GraphEvents
+    createSpatialGraph → createGraph
+
+* a settings object a factory or run takes is *Options (5455397)
+
+  Every *Config settings type is now *Options, such as EngineConfig to EngineOptions. createEngineFromSave and createSensitivityCell take engineOptions instead of config.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    EngineConfig → EngineOptions
+    TickDriverConfig → TickDriverOptions
+    TimeSystemConfig → TimeSystemOptions
+    TimeBankConfig → TimeBankOptions
+    BankedAccelerationConfig → BankedAccelerationOptions
+    SaveManagerConfig → SaveManagerOptions
+    ProducerPurchaseConfig → ProducerPurchaseOptions
+    HeadlessConfig → HeadlessOptions
+    RunUntilConfig → RunUntilOptions
+    MatrixConfig → MatrixOptions
+    MatrixUntilConfig → MatrixUntilOptions
+    SensitivityConfig → SensitivityOptions
+    TunerConfig → TunerOptions
+    WaypointProbeConfig → WaypointProbeOptions
+    config → engineOptions (CreateEngineFromSaveOptions, CreateSensitivityCellOptions) *
+    dimensionConfig → dimensionOptions (VectorFieldDef) *
+
+* a picker snapshot names its effect-system group effectSystem (a6f5c13)
+
+  `PickerSnapshot.content` is `effectSystem`.
+
+  Migration:
+    content → effectSystem (PickerSnapshot)
+
+* **core:** grid neighborhoods are offsets: *_DELTAS is *_OFFSETS (de08bea)
+
+  The grid neighborhood constants are `*_OFFSETS`.
+
+  Migration:
+    ORTHOGONAL_DELTAS → ORTHOGONAL_OFFSETS
+    DIAGONAL_DELTAS → DIAGONAL_OFFSETS
+    HEX_AXIAL_DELTAS → HEX_AXIAL_OFFSETS
+
+* **harness:** replayLive's hook is afterInterval, because it runs after each interval (778e2ef)
+
+  `ReplayLiveOptions.afterTick` is `afterInterval`.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    afterTick → afterInterval (ReplayLiveOptions) *
+
+* **core:** chain.bind requires text or id, and never derives an id from display text (48e661c)
+
+  `chain.bind` requires `text` or `id`; the binding id is never derived from the modifier's display text. A category's grant with a hand-built `modifier` requires a `description`, and registering one without it throws.
+
+  Migration:
+    chain.bind({ modifier })        → chain.bind({ modifier, text: '<stable text>' })
+    grants: [{ chain, modifier }]   → grants: [{ chain, modifier, description: '<text>' }]
+
+* **core:** built-in falloffs are 0 past their radius, so a source never reaches a cell farther than r (ef403fe)
+
+  `gaussianFalloff` and `exponentialFalloff` return 0 past Euclidean `radius`. An influence layer that uses either one no longer adds influence to the corner cells of a source's square that lie farther than `radius`; every other cell keeps its value.
+
+  Migration:
+    To keep the old reach, pass a custom falloff: (dx, dy, r) => Math.exp(-Math.hypot(dx, dy) / r)
+
+### Refactors
+
+* names the rename commits left behind (1021e6a)
+* **primitives:** TSDoc follows the term list (3a9ad51)
+* **core:** TSDoc and runtime messages follow the term list (20b166c)
+* **systems:** TSDoc and runtime messages follow the term list (1b1d054)
+* **harness:** TSDoc and runtime messages follow the term list (6468c08)
+* **harness:** the picker's effect-system walker walks lowered grants (f492048)
+
 ## 0.4.0 (2026-10-10)
 
 ### ⚠ Breaking changes
