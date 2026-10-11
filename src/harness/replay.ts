@@ -45,7 +45,7 @@ export interface ReplayLiveOptions {
    * between intervals. Then replay matches the live cadence instead of
    * batching at the end. Omit it for pure synchronous tick logic.
    */
-  afterTick?: () => void | Promise<void>;
+  afterInterval?: () => void | Promise<void>;
 }
 
 /**
@@ -67,7 +67,7 @@ export async function replayLive(driver: TickDriver, options: ReplayLiveOptions)
   try {
     for (let i = 0; i < intervalTicks; i++) {
       driver.processInterval(tickInterval);
-      if (options.afterTick) await options.afterTick();
+      if (options.afterInterval) await options.afterInterval();
     }
   } finally {
     driver.speedMultiplier = prevSpeed;

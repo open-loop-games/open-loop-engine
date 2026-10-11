@@ -50,13 +50,13 @@ describe('replayLive', () => {
     expect(driver.speedMultiplier).toBe(3); // prior value restored on exit
   });
 
-  it('awaits afterTick between ticks', async () => {
+  it('awaits afterInterval between intervals', async () => {
     const driver = createTickDriver({ intervalRate: 10 });
     const order: string[] = [];
     driver.onTick(() => order.push('tick'));
     await replayLive(driver, {
       seconds: 0.3,
-      afterTick: () => {
+      afterInterval: () => {
         order.push('after');
       },
     });
