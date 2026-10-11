@@ -141,7 +141,7 @@ Short answers only: which symbol does X. Where two of these overlap and a wrong 
 | Walk the live engine: its categories and registries | introspection registries → introspection.md |
 | Drive headless runs | balance harness runners → harness.md |
 | Bounded coordinate grid | `createSpatialGrid` → spatial.md#grid |
-| Hex grid, or any non-square adjacency | still `createSpatialGrid`: pass `neighborhood` (`HEX_AXIAL_DELTAS`, `DIAGONAL_DELTAS`, or your own offsets), and traversal follows it → spatial.md#grid |
+| Hex grid, or any non-square adjacency | still `createSpatialGrid`: pass `neighborhood` (`HEX_AXIAL_OFFSETS`, `DIAGONAL_OFFSETS`, or your own offsets), and traversal follows it → spatial.md#grid |
 | Arbitrary node topology / nested spaces | `createGraph` → spatial.md#graph |
 
 ## Predicate forms

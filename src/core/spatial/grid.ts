@@ -49,8 +49,8 @@ export interface SpatialGridOptions<T> {
    * `flood`, `distanceField`). So a board's adjacency is stated once, at
    * construction, and the traversal verbs follow.
    *
-   * Defaults to {@link ORTHOGONAL_DELTAS} (4-connected). Ships
-   * {@link DIAGONAL_DELTAS} (8-connected) and {@link HEX_AXIAL_DELTAS}
+   * Defaults to {@link ORTHOGONAL_OFFSETS} (4-connected). Ships
+   * {@link DIAGONAL_OFFSETS} (8-connected) and {@link HEX_AXIAL_OFFSETS}
    * (6-connected hex under axial-offset storage); any other adjacency —
    * knight moves, directed one-way lattices — is an array literal.
    *
@@ -61,7 +61,7 @@ export interface SpatialGridOptions<T> {
 }
 
 /** 4-connected orthogonal adjacency: E, W, N, S. The `neighborhood` default. */
-export const ORTHOGONAL_DELTAS: readonly GridOffset[] = [
+export const ORTHOGONAL_OFFSETS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: -1, dy: 0 },
   { dx: 0, dy: -1 },
@@ -69,7 +69,7 @@ export const ORTHOGONAL_DELTAS: readonly GridOffset[] = [
 ];
 
 /** 8-connected adjacency: the four orthogonals plus the four diagonals. */
-export const DIAGONAL_DELTAS: readonly GridOffset[] = [
+export const DIAGONAL_OFFSETS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: -1, dy: 0 },
   { dx: 0, dy: -1 },
@@ -92,7 +92,7 @@ export const DIAGONAL_DELTAS: readonly GridOffset[] = [
  * type, no hex distance, no pixel layout. Those stay consumer-side, where the
  * storage offset and the display convention already are.
  */
-export const HEX_AXIAL_DELTAS: readonly GridOffset[] = [
+export const HEX_AXIAL_OFFSETS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
   { dx: 1, dy: -1 },
   { dx: 0, dy: -1 },
@@ -412,7 +412,7 @@ export interface SpatialGrid<T> {
  * ```
  */
 export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T> {
-  const { width, height, initializer, neighborhood = ORTHOGONAL_DELTAS } = options;
+  const { width, height, initializer, neighborhood = ORTHOGONAL_OFFSETS } = options;
 
   if (width <= 0 || height <= 0 || !Number.isInteger(width) || !Number.isInteger(height)) {
     throw new Error(

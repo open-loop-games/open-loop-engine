@@ -306,14 +306,14 @@ interface Cell { type: 'open' | 'blocked'; occupantId: string | null }
 const grid = createSpatialGrid<Cell>({
   width, height,
   initializer: () => ({ type: 'open', occupantId: null }),
-  // neighborhood: DIAGONAL_DELTAS,  // or HEX_AXIAL_DELTAS, or your own offsets;
+  // neighborhood: DIAGONAL_OFFSETS,  // or HEX_AXIAL_OFFSETS, or your own offsets;
 });                                  // sets the grid's adjacency for every traversal method
 
 grid.at(x, y);                 // throws OOB; tryAt() returns undefined instead
 grid.set(x, y, { ...grid.at(x, y), occupantId: id });  // emits cellChanged
 grid.inBounds(x, y);
 grid.neighbors(x, y);          // the grid's own adjacency (4-connected by default)
-grid.neighbors(x, y, DIAGONAL_DELTAS);  // ad-hoc, this call only · inRange(x,y,r) Chebyshev
+grid.neighbors(x, y, DIAGONAL_OFFSETS);  // ad-hoc, this call only · inRange(x,y,r) Chebyshev
 grid.bfs({ x, y }, (cell) => cell.type !== 'blocked');   // PassabilityFn → parent-link map
 ```
 

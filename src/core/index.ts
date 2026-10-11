@@ -307,7 +307,7 @@ export type {
   InfluenceLayer,
 } from './spatial';
 export { createSpatialGrid, createGraph, createScopeStack } from './spatial';
-export { ORTHOGONAL_DELTAS, DIAGONAL_DELTAS, HEX_AXIAL_DELTAS } from './spatial';
+export { ORTHOGONAL_OFFSETS, DIAGONAL_OFFSETS, HEX_AXIAL_OFFSETS } from './spatial';
 export {
   createInfluenceLayer,
   composeInfluenceLayers,

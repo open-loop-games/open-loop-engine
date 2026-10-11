@@ -4,8 +4,8 @@ import { beginPersistentContext, endPersistentContext, persistent } from '@/core
 import { seedRNG } from '@/primitives/rng';
 import {
   createSpatialGrid,
-  DIAGONAL_DELTAS,
-  HEX_AXIAL_DELTAS,
+  DIAGONAL_OFFSETS,
+  HEX_AXIAL_OFFSETS,
   type GridCoord,
   type SerializedSpatialGrid,
 } from '@/core/spatial';
@@ -148,10 +148,10 @@ describe('createSpatialGrid — adjacency & range', () => {
     );
   });
 
-  it('neighbors(DIAGONAL_DELTAS): 8-connected, clipped at corners', () => {
-    expect([...grid.neighbors(1, 1, DIAGONAL_DELTAS)]).toHaveLength(8);
-    expect([...grid.neighbors(0, 0, DIAGONAL_DELTAS)]).toHaveLength(3);
-    expect([...grid.neighbors(2, 2, DIAGONAL_DELTAS)]).toHaveLength(3);
+  it('neighbors(DIAGONAL_OFFSETS): 8-connected, clipped at corners', () => {
+    expect([...grid.neighbors(1, 1, DIAGONAL_OFFSETS)]).toHaveLength(8);
+    expect([...grid.neighbors(0, 0, DIAGONAL_OFFSETS)]).toHaveLength(3);
+    expect([...grid.neighbors(2, 2, DIAGONAL_OFFSETS)]).toHaveLength(3);
   });
 
   it('inRange(): Chebyshev radius, clipped at bounds', () => {
@@ -183,13 +183,13 @@ describe('createSpatialGrid — adjacency & range', () => {
 });
 
 describe('createSpatialGrid — neighborhood topology', () => {
-  it('yields the six hex neighbors when built with HEX_AXIAL_DELTAS', () => {
+  it('yields the six hex neighbors when built with HEX_AXIAL_OFFSETS', () => {
     // Axial (q, r) stored at grid (q + radius, r + radius), so axial deltas
     // are grid deltas — the storage convention both hex consumers landed on.
     const grid = createSpatialGrid<Tile>({
       width: 5,
       height: 5,
-      neighborhood: HEX_AXIAL_DELTAS,
+      neighborhood: HEX_AXIAL_OFFSETS,
       initializer: floor,
     });
     expect(sortCoords([...grid.neighbors(2, 2)])).toEqual(
@@ -215,7 +215,7 @@ describe('createSpatialGrid — neighborhood topology', () => {
     const grid = createSpatialGrid<Tile>({
       width: 2 * radius + 1,
       height: 2 * radius + 1,
-      neighborhood: HEX_AXIAL_DELTAS,
+      neighborhood: HEX_AXIAL_OFFSETS,
       initializer: floor,
     });
     const hexDistance = (q: number, r: number): number =>
@@ -248,7 +248,7 @@ describe('createSpatialGrid — neighborhood topology', () => {
 
   it('accepts an ad-hoc delta set that overrides the configured neighborhood', () => {
     const grid = createSpatialGrid<Tile>({ width: 3, height: 3, initializer: floor });
-    expect([...grid.neighbors(1, 1, DIAGONAL_DELTAS)]).toHaveLength(8);
+    expect([...grid.neighbors(1, 1, DIAGONAL_OFFSETS)]).toHaveLength(8);
     // The grid's own topology is unchanged by the ad-hoc query.
     expect([...grid.neighbors(1, 1)]).toHaveLength(4);
   });
@@ -293,12 +293,12 @@ describe('createSpatialGrid — bfs', () => {
     expect(visited.has('2,2')).toBe(false);
   });
 
-  it('uses 8-connected neighbors when built with DIAGONAL_DELTAS', () => {
+  it('uses 8-connected neighbors when built with DIAGONAL_OFFSETS', () => {
     // Wall at (1,1) only — with diagonals you can still reach (2,2) from (0,0).
     const grid = createSpatialGrid<Tile>({
       width: 3,
       height: 3,
-      neighborhood: DIAGONAL_DELTAS,
+      neighborhood: DIAGONAL_OFFSETS,
       initializer: (x, y) => ({ kind: x === 1 && y === 1 ? 'wall' : 'floor' }),
     });
     const visited = grid.bfs({ x: 0, y: 0 }, passable);
@@ -389,11 +389,11 @@ describe('createSpatialGrid — distanceField', () => {
     expect([...grid.distanceField([], openCost)]).toEqual([Infinity, Infinity, Infinity, Infinity]);
   });
 
-  it('uses 8-connected neighbors when built with DIAGONAL_DELTAS', () => {
+  it('uses 8-connected neighbors when built with DIAGONAL_OFFSETS', () => {
     const grid = createSpatialGrid<Tile>({
       width: 3,
       height: 3,
-      neighborhood: DIAGONAL_DELTAS,
+      neighborhood: DIAGONAL_OFFSETS,
       initializer: () => ({ kind: 'floor' }),
     });
     const dist = grid.distanceField([{ x: 0, y: 0 }], openCost);
