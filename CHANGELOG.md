@@ -2,6 +2,17 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.5.1 (2026-10-11)
+
+### Features
+
+* **core:** dispose() leaves saved refs unowned, and a rebuild takes them over (40e9a87)
+* **systems:** a producer's display takes the purchasable display, and a display's description is optional (d32882d)
+
+### Fixes
+
+* **core:** a saved ref built after a load warns that its value did not load (c9efc51)
+
 ## 0.5.0 (2026-10-11)
 
 ### ⚠ Breaking changes
