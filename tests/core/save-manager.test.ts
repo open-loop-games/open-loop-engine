@@ -169,38 +169,38 @@ describe('SaveManager — slot management', () => {
     expect(mgr.slots[0].displayName).toBe('Main');
   });
 
-  it('createLoadout adds a new slot with auto-increment ID', () => {
+  it('createSlot adds a new slot with auto-increment ID', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
-    const id = mgr.createLoadout('Manual Save');
+    const id = mgr.createSlot('Manual Save');
     expect(id).toBe(1);
     expect(mgr.slots).toHaveLength(2);
     expect(mgr.slots[1]).toEqual({ id: 1, displayName: 'Manual Save' });
   });
 
-  it('createLoadout uses default name if none provided', () => {
+  it('createSlot uses default name if none provided', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
-    const id = mgr.createLoadout();
+    const id = mgr.createSlot();
     expect(mgr.slots.find((s) => s.id === id)?.displayName).toBe('Save 1');
   });
 
-  it('createLoadout throws when max slots reached', () => {
+  it('createSlot throws when max slots reached', () => {
     const mgr = createSaveManager({
       gameId: 'test',
       storageAdapter: createMapStorage(),
       maxSlots: 2,
     });
-    mgr.createLoadout('Second');
-    expect(() => mgr.createLoadout('Third')).toThrow('Maximum save slots (2) reached');
+    mgr.createSlot('Second');
+    expect(() => mgr.createSlot('Third')).toThrow('Maximum save slots (2) reached');
   });
 
-  it('createLoadout IDs skip deleted slots', () => {
+  it('createSlot IDs skip deleted slots', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
-    const id1 = mgr.createLoadout('A');
-    const id2 = mgr.createLoadout('B');
+    const id1 = mgr.createSlot('A');
+    const id2 = mgr.createSlot('B');
     expect(id1).toBe(1);
     expect(id2).toBe(2);
     mgr.deleteSlot(id1); // delete slot 1
-    const id3 = mgr.createLoadout('C');
+    const id3 = mgr.createSlot('C');
     expect(id3).toBe(3); // should be 3, not reuse 1
   });
 
@@ -216,7 +216,7 @@ describe('SaveManager — slot management', () => {
     mgr.save();
 
     // Create and switch to slot 1
-    const id1 = mgr.createLoadout('Other');
+    const id1 = mgr.createSlot('Other');
     mgr.selectSlot(id1);
     expect(mgr.activeSlotId).toBe(id1);
 
@@ -246,7 +246,7 @@ describe('SaveManager — slot management', () => {
     beginPersistentContext('sm-slot-del');
     persistent(0);
     endPersistentContext();
-    const id = mgr.createLoadout('Temp');
+    const id = mgr.createSlot('Temp');
     mgr.selectSlot(id);
     mgr.save();
     expect(storage.getItem(`test-slot-${id}`)).not.toBeNull();
@@ -286,7 +286,7 @@ describe('SaveManager — slot management', () => {
     endPersistentContext();
 
     mgr.save(); // save to slot 0
-    const id = mgr.createLoadout('Other');
+    const id = mgr.createSlot('Other');
     mgr.selectSlot(id);
     mgr.modId = 'omsi';
     mgr.save(); // save to slot 1
@@ -300,14 +300,14 @@ describe('SaveManager — slot management', () => {
 
   it('peekSlot returns null for empty slot', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
-    mgr.createLoadout('Empty');
+    mgr.createSlot('Empty');
     expect(mgr.peekSlot(1)).toBeNull();
   });
 
   it('slot index persists across instances', () => {
     const storage = createMapStorage();
     const mgr1 = createSaveManager({ gameId: 'test', storageAdapter: storage });
-    mgr1.createLoadout('Saved Slot');
+    mgr1.createSlot('Saved Slot');
     mgr1.renameSlot(0, 'Main');
 
     const mgr2 = createSaveManager({ gameId: 'test', storageAdapter: storage });
@@ -377,7 +377,7 @@ describe('SaveManager — slot-to-slot copy', () => {
     endPersistentContext();
     v.value = 1;
     mgr.save(); // slot 0 = 1
-    const destId = mgr.createLoadout('Dest');
+    const destId = mgr.createSlot('Dest');
     mgr.selectSlot(destId);
     v.value = 2;
     mgr.save(); // slot destId = 2
@@ -394,7 +394,7 @@ describe('SaveManager — slot-to-slot copy', () => {
     beginPersistentContext('sm-rep-clear');
     persistent(0);
     endPersistentContext();
-    const destId = mgr.createLoadout('Dest');
+    const destId = mgr.createSlot('Dest');
     mgr.selectSlot(destId);
     mgr.save();
     expect(storage.getItem(`test-slot-${destId}`)).not.toBeNull();
@@ -423,7 +423,7 @@ describe('SaveManager — slot-to-slot copy', () => {
 
   it('exportSlot returns null when the slot has no save data', () => {
     const mgr = createSaveManager({ gameId: 'test', storageAdapter: createMapStorage() });
-    const id = mgr.createLoadout('Empty');
+    const id = mgr.createSlot('Empty');
     expect(mgr.exportSlot(id)).toBeNull();
   });
 
@@ -457,7 +457,7 @@ describe('SaveManager — slot-to-slot copy', () => {
     endPersistentContext();
     mgr.save();
     const exp = mgr.exportSlot(0)!;
-    const destId = mgr.createLoadout('Dest');
+    const destId = mgr.createSlot('Dest');
 
     const result = mgr.importSlot(exp, destId);
     expect(result.success).toBe(true);
@@ -1169,7 +1169,7 @@ describe('SaveManager — events', () => {
 
       expect(mgr.load().success).toBe(false);
       expect(failed.mock.calls[0][0].reason).toBe('unknown');
-      expect(String(failed.mock.calls[0][0].detail)).toMatch(/migration from version 1/);
+      expect(String(failed.mock.calls[0][0].detail)).toMatch(/migration from save version 1/);
       expect(loaded).not.toHaveBeenCalled();
     });
 
@@ -1523,7 +1523,7 @@ describe('SaveManager — save:written', () => {
   it('saveToSlot() emits it for the target slot', () => {
     const storage = createMapStorage();
     const mgr = createSaveManager({ gameId: 'wr-slot', storageAdapter: storage });
-    const slot = mgr.createLoadout('other');
+    const slot = mgr.createSlot('other');
     const written = vi.fn();
     mgr.on('save:written', written);
 
@@ -1585,7 +1585,7 @@ describe('SaveManager live reads', () => {
     const mgr = make();
     const names = computed(() => mgr.slots.map((s) => s.displayName).join(','));
     expect(names.value).toBe('Autosave');
-    const id = mgr.createLoadout('A');
+    const id = mgr.createSlot('A');
     expect(names.value).toBe('Autosave,A');
     mgr.renameSlot(id, 'B');
     expect(names.value).toBe('Autosave,B');
@@ -1607,7 +1607,7 @@ describe('SaveManager live reads', () => {
     const mgr = make();
     const active = computed(() => mgr.activeSlotId);
     expect(active.value).toBe(0);
-    const id = mgr.createLoadout();
+    const id = mgr.createSlot();
     mgr.selectSlot(id);
     expect(active.value).toBe(id);
   });

@@ -1,21 +1,20 @@
 /**
- * TimedProgress — stateless tickable progress accumulator.
+ * TimedProgress — tickable progress toward a needed value, with no state machine.
  *
- * A pure `{duration, speed, progress, tickProgressDelta}` primitive with no
- * state machine, no active/cancel/cooldown, no start/complete gates, no
- * progressive costs, no chain. Ticks on every registered tick and accumulates
- * `speed * dt` into `progress`. Fires `onProgress(delta)` when the tick
- * advances progress; fires `onComplete(overflow)` once when progress reaches
- * `duration`, and not again while it stays parked there.
+ * A `{needed, rate, progress, tickProgressDelta}` primitive with no state
+ * machine: no active, cancel or cooldown, no start or complete checks, no
+ * progressive costs, no chain. On every registered tick it adds `rate * dt` to
+ * `progress`. It calls `onProgress(delta)` when the tick advances progress. It
+ * calls `onComplete(overflow)` once when progress reaches `needed`, and not
+ * again while progress stays there.
  *
- * The tracker never auto-resets, never carries overflow, never stalls or
- * fails. Those are consumer decisions — this is a value that accumulates
- * over time, nothing more.
+ * The tracker never resets on its own, never moves overflow into the next
+ * completion, and never stalls or fails. Those are consumer decisions — this
+ * is a value that grows over time, nothing more.
  *
- * Intended as the building block for N-parallel passive tick loops where a
- * single-active-at-a-time state machine (like Sequencer-driven execution)
- * doesn't fit — e.g., passive jobs, one tracker per job
- * ticking beside the action queue.
+ * Built for N parallel passive progressions, where a one-at-a-time state
+ * machine (like Sequencer-driven execution) doesn't fit. Example: passive
+ * jobs, one tracker per job, ticking beside the action queue.
  */
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
@@ -49,7 +48,7 @@ export type TimedProgressOptions = TimedProgressBaseOptions &
         /**
          * `progress` is a plain Vue ref instead of a persistent one: the
          * tracker works the same but never appears in save data — for
-         * predictors and headless simulation.
+         * predictors and headless runs.
          */
         ephemeral: true;
       }
@@ -65,49 +64,50 @@ export interface TimedProgressBaseOptions {
   registerTick: RegisterTick;
   /**
    * Called after each tick that advanced progress. `delta` is the full
-   * `speed * dt` progress moved this tick. It is never capped at the duration
-   * boundary, so the deltas of one completion sum to `duration + overflow`,
-   * not `duration`.
+   * `rate * dt` progress moved this tick. It is never clamped at `needed`, so
+   * the deltas of one completion sum to `needed + overflow`, not `needed`.
    */
   onProgress?: (delta: DecimalSource) => void;
   /**
-   * Called on the first advancing tick that leaves `progress >= duration` —
-   * whether progress crossed the boundary or a shrinking `duration` dropped
-   * below it. `overflow` is how far past duration progress now stands.
-   * Consumers decide what to do next — reset, carry overflow, leave progress
-   * parked, etc. A parked tracker is not called again until progress falls
-   * below duration (a `reset()`, a carry, or a longer duration) and reaches
-   * it anew; progress restored past duration by a save load counts as parked.
+   * Called on the first advancing tick that leaves `progress >= needed` —
+   * whether progress crossed the boundary or a shrinking `needed` dropped
+   * below it. `overflow` is how far past `needed` progress now stands.
+   * Consumers decide what to do next — reset, keep the overflow as progress,
+   * leave progress where it is, etc. A tracker at or past `needed` is not
+   * called again until progress falls below `needed` and reaches it anew. A
+   * `reset()`, kept overflow or a larger `needed` brings it below. Progress a load
+   * restores at or past `needed` counts as already complete.
    * The tracker does nothing else on completion.
    */
   onComplete?: (overflow: DecimalSource) => void;
 }
 
 /**
- * A stateless ticking progress accumulator created by {@link createTimedProgress}.
+ * Ticking progress toward a needed value, created by {@link createTimedProgress}.
  */
 export interface TimedProgress {
   id: string;
-  /** Accumulated progress. Persistent unless `ephemeral: true`. */
+  /** Progress so far. Saved unless `ephemeral: true`. */
   progress: Ref<DecimalSource>;
-  /** Total progress for one completion cycle. */
+  /** The progress one completion needs. */
   needed: MaybeRef<DecimalSource>;
   /** Progress gained per second. */
   rate: MaybeRef<DecimalSource>;
   /**
    * Progress advanced by the most recent tick, held until the next one. Zero
-   * after a tick that didn't advance (speed or dt ≤ 0) and after `reset()`.
+   * after a tick that didn't advance (rate or dt ≤ 0) and after `reset()`.
    */
   readonly tickProgressDelta: Ref<DecimalSource>;
-  /** Progress as a fraction [0, 1] of duration. */
+  /** Progress as a fraction [0, 1] of `needed`. */
   percentComplete: ComputedRef<number>;
-  /** Estimated seconds remaining at the current speed. */
+  /** Estimated seconds remaining at the current rate. */
   timeRemaining: ComputedRef<DecimalSource>;
   /** Clear `progress` back to 0 and zero `tickProgressDelta`. */
   reset(): void;
   /**
-   * Unsubscribe from the tick loop and release the saved `progress`, so a
-   * tracker with the same id can be built again. Call on teardown.
+   * Unsubscribe from the game loop and delete the saved `progress`, so a
+   * tracker with the same id can be built again. Call it when the tracker's
+   * owner is disposed.
    */
   dispose(): void;
 }
@@ -128,10 +128,10 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
       progress: ref<DecimalSource>(0),
     };
   }
-  // Compose the ambient context with this tracker's id rather than letting the
-  // ambient win — N parallel trackers built inside one module's install() share
-  // an ambient context, and collapsing them onto it collides their 'progress'
-  // refs. Mirrors category-base's `${parent}/${local}` nesting.
+  // Nest this tracker's id under the enclosing persistent context rather than
+  // using that context as is: N parallel trackers built inside one module's
+  // install() share it, and their 'progress' refs would collide there.
+  // Mirrors category-base's `${parent}/${local}` nesting.
   const parent = getCurrentPersistentContext();
   const contextId = parent ? `${parent}/${id}` : id;
   return withPersistentContext(contextId, (): TimedProgressState => ({
@@ -177,7 +177,7 @@ function buildComputeds(
 }
 
 // === PRIVATE TICK ===
-/** Runtime-only record of whether the tracker has already completed at its current progress. */
+/** Ephemeral record of whether the tracker has already completed at its current progress. */
 interface CompletionLatch {
   completed: boolean;
   /** The progress this tracker last wrote; any other value was written from outside. */
@@ -212,12 +212,12 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
   const next = prev.add(delta);
   const dur = new Decimal(unref(processed.needed));
 
-  // Fire onComplete once per completion, so a consumer that parks progress
-  // past duration without resetting isn't called again on every tick. The
-  // latch, not a `prev < dur` crossing test, is what stops the re-fire: a
-  // duration that drops below progress between ticks is never crossed.
-  // Progress written from outside (load, reset, carried overflow) re-derives
-  // it — a value already at or past duration counts as parked.
+  // Call onComplete once per completion, so a consumer that holds progress
+  // past `needed` without resetting isn't called again on every tick. The
+  // latch, not a `prev < dur` crossing test, is what stops the repeat call: a
+  // `needed` that drops below progress between ticks is never crossed.
+  // Progress written from outside (load, reset, kept overflow) re-derives
+  // it — a value already at or past `needed` counts as complete.
   if (prev.lt(dur)) latch.completed = false;
   else if (latch.lastWritten === undefined || !prev.eq(latch.lastWritten)) latch.completed = true;
 
@@ -235,19 +235,18 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
 
 // === FACTORY ===
 /**
- * Creates a stateless progress accumulator that ticks on every registered tick,
- * advancing `progress` by `speed * dt` each time. Use for parallel "many things
- * progressing at once" patterns where single-active-at-a-time execution
- * doesn't fit.
+ * Creates progress that ticks toward a needed value on every registered tick,
+ * advancing `progress` by `rate * dt` each time. Use for parallel "many things
+ * progressing at once" patterns, where one-at-a-time execution doesn't fit.
  *
- * The tracker has no opinion about what happens on completion — it fires
+ * The tracker has no opinion about what happens on completion — it calls
  * `onComplete(overflow)` once per completion and leaves everything else
- * to the consumer. Reset, carry overflow, grant rewards, subtract a cycle, or
- * do nothing: all are valid.
+ * to the consumer. Reset, keep the overflow, grant rewards, subtract one
+ * completion's worth, or do nothing: all are valid.
  *
- * @param options - Configuration: duration, optional speed, tick registration,
- *   optional `onProgress` / `onComplete` callbacks, optional `ephemeral` to
- *   skip persistence.
+ * @param options - Options: `needed`, optional `rate`, tick registration,
+ *   optional `onProgress` / `onComplete` option callbacks, and optional
+ *   `ephemeral` to skip saving.
  * @returns A {@link TimedProgress} with `progress` / `tickProgressDelta` refs,
  *   `percentComplete` / `timeRemaining` computeds, and `reset` / `dispose`.
  *
@@ -255,13 +254,13 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  * ```ts
  * const tracker = createTimedProgress({
  *   id: 'job:mine-ore',
- *   duration: () => def.requiredProgress,
- *   speed: () => skillMultiplier.value,
+ *   needed: () => def.requiredProgress,
+ *   rate: () => skillMultiplier.value,
  *   registerTick: engine.onTick,
  *   onComplete: (overflow) => {
- *     if (!canDeliverRewards()) return; // stall — tracker parks at duration
+ *     if (!canDeliverRewards()) return; // stall: progress stays at `needed`
  *     grantRewards();
- *     tracker.progress.value = overflow; // carry overflow into next cycle
+ *     tracker.progress.value = overflow; // keep overflow for the next completion
  *   },
  * });
  * ```
@@ -308,10 +307,10 @@ export function createTimedProgress(options: TimedProgressOptions): TimedProgres
 
 // === UTILITIES ===
 /**
- * How many whole resource units should be consumed at a given progress level.
- * Formula: ceil(progress / (duration / amount)), clamped to [0, amount].
- * Use for progressive-cost tracking where a resource drains at discrete
- * thresholds spread evenly across a duration.
+ * How many whole resource units are paid at a given progress.
+ * Formula: ceil(progress / (needed / amount)), clamped to [0, amount].
+ * Use for progressive costs, where a resource is paid at discrete thresholds
+ * spread evenly across `needed`.
  */
 export function resourcePaidAt(
   progress: DecimalSource,
@@ -324,28 +323,28 @@ export function resourcePaidAt(
   return Decimal.ceil(Decimal.div(progress, interval));
 }
 
-/** The furthest progress {@link resourcePaidAt} charges at most `units` for. */
+/** The furthest progress at which {@link resourcePaidAt} pays at most `units`. */
 function progressForUnits(units: Decimal, duration: DecimalSource, amount: DecimalSource): Decimal {
   // (units * duration) / amount, not units * (duration / amount): the latter
-  // rounds the intermediate ratio and lands further off the threshold.
+  // rounds the intermediate ratio and ends up further off the threshold.
   let prog = units.mul(duration).div(amount);
   // The product and resourcePaidAt's own `progress / (duration / amount)`
-  // round independently, so `prog` can sit a few ulps past the threshold, where
-  // ceil charges `units + 1` — one more than the caller holds. Walk it back
-  // until the helper agrees; charging is monotone in progress, and prog reaches
-  // 0 (charged 0) before the step does, so the loop ends.
+  // round independently, so `prog` can be a few ulps past the threshold, where
+  // ceil pays `units + 1` — one more than the caller holds. Walk it back
+  // until the helper agrees; paying is monotone in progress, and prog reaches
+  // 0 (pays 0) before the step does, so the loop ends.
   for (let step = 1e-15; resourcePaidAt(prog, duration, amount).gt(units); step *= 10) {
     prog = prog.sub(prog.abs().mul(step));
   }
   return prog;
 }
 
-/** One progressive-cost entry — amount total across a full run, plus a live
- * balance getter the primitive calls to decide affordability. */
+/** One progressive-cost entry — the total amount over one completion, plus a
+ * getter for the resource's current amount, which decides affordability. */
 export interface ProgressiveCostEntry {
-  /** Total units consumed when progress reaches duration. */
+  /** Total units paid by the time progress reaches `needed`. */
   amount: DecimalSource;
-  /** Callback returning the current resource balance. Called once per step. */
+  /** Returns the resource's current amount. Called at most once per call. */
   available: () => DecimalSource;
 }
 
@@ -358,15 +357,15 @@ export interface ProgressiveCostStep {
    */
   cappedProgress: Decimal;
   /**
-   * True when `cappedProgress <= prevProgress`. Caller decides policy
-   * (leave state.progress untouched, advance a queue, etc.). The primitive
-   * never writes state itself.
+   * True when `cappedProgress <= prevProgress`. The caller decides what
+   * follows (leave state.progress untouched, advance a queue, etc.). The
+   * primitive never writes state itself.
    */
   stalled: boolean;
   /**
-   * Per-entry amount to deduct this tick. Indices align with the `costs`
-   * input. Caller is responsible for calling its own `remove`/`deduct` — the
-   * primitive does not own resource mutation.
+   * Per-entry amount to pay this tick. Indices align with the `costs`
+   * input. The caller calls its own `subtract` — the primitive does not own
+   * resource mutation.
    */
   deltas: Decimal[];
 }
@@ -375,14 +374,14 @@ export interface ProgressiveCostStep {
  * Compute one tick of progressive-cost metering. Given a proposed progress
  * advance, walk each cost entry, cap the advance at whichever cost can't be
  * fully covered, and return the final progress plus the per-entry deltas the
- * caller should remove.
+ * caller should subtract.
  *
- * This wraps the canonical pattern around {@link resourcePaidAt}: each
- * cost drains at `ceil(progress / (duration / amount))` thresholds, and an
- * insufficient balance caps progress at the threshold of unit
- * `prevConsumed + floor(available)` — so no delta ever exceeds its entry's
+ * This wraps the canonical pattern around {@link resourcePaidAt}. Each cost
+ * is paid at `ceil(progress / (needed / amount))` thresholds. An amount too
+ * small to cover it caps progress at the threshold of unit
+ * `prevPaid + floor(available)`. So no delta ever exceeds its entry's
  * `available()`.
- * The caller writes back progress and calls its own resource-remove — the
+ * The caller writes back progress and calls its own resource subtract — the
  * primitive owns no state and makes no mutations.
  *
  * Typical call-site:
@@ -391,10 +390,10 @@ export interface ProgressiveCostStep {
  * const step = stepProgressiveCosts({
  *   prevProgress: state.progress.value,
  *   proposedProgress: Decimal.min(
- *     Decimal.add(state.progress.value, speed.mul(dt)),
+ *     Decimal.add(state.progress.value, rate.mul(dt)),
  *     def.duration,
  *   ),
- *   duration: def.duration,
+ *   needed: def.duration,
  *   costs: def.costs.map((c) => ({
  *     amount: c.amount,
  *     available: () => inventory.get(c.resourceId),
@@ -410,28 +409,28 @@ export interface ProgressiveCostStep {
  *
  * @param opts.prevProgress - Progress value at the start of this tick.
  * @param opts.proposedProgress - Progress the caller wants to advance to
- *   (normally `prev + speed*dt` clamped to duration). May be <= prevProgress
+ *   (normally `prev + rate * dt` clamped to `needed`). May be <= prevProgress
  *   — the step stalls and deltas are all zero.
- * @param opts.duration - Total progress for one full run; the consumption
- *   schedule is distributed evenly across [0, duration].
+ * @param opts.needed - Total progress for one completion; payments are spread
+ *   evenly across [0, needed].
  * @param opts.costs - Per-entry cost descriptors. Order is significant only
  *   for matching `deltas` back to entries; the capping result is independent
  *   of order.
  * @returns A {@link ProgressiveCostStep} with the capped progress, a stall
- *   flag, and the per-entry delta to consume this tick.
+ *   flag, and the per-entry delta to pay this tick.
  *
  * @example
  * // Two-cost construction, wood abundant, stone limited
  * const step = stepProgressiveCosts({
  *   prevProgress: 40,
  *   proposedProgress: 60,
- *   duration: 100,
+ *   needed: 100,
  *   costs: [
  *     { amount: 10, available: () => 5 }, // wood: 5 units on hand
  *     { amount: 20, available: () => 2 }, // stone: 2 units on hand
  *   ],
  * });
- * // step.cappedProgress = 50 (stone caps at 50: prevConsumed 8 + available 2 = 10 units → 50)
+ * // step.cappedProgress = 50 (stone caps at 50: prevPaid 8 + available 2 = 10 units → 50)
  * // step.stalled = false
  * // step.deltas = [1, 2] (wood goes 4→5 = 1, stone goes 8→10 = 2)
  */
@@ -449,14 +448,14 @@ export function stepProgressiveCosts(opts: {
   // original DecimalSource form (not re-wrapped). Decimal.div between two
   // already-wrapped Decimals can introduce a tiny precision artifact in the
   // intermediate `duration/amount`, splitting this primitive's view of
-  // prevConsumed from a caller that passes raw number args to the same helper.
+  // prevPaid from a caller that passes raw number args to the same helper.
   // Keeping the args raw here lines the two views up.
   for (const cost of costs) {
     if (Decimal.lte(cost.amount, 0)) continue;
 
-    const prevConsumed = resourcePaidAt(prev, duration, cost.amount);
-    const wouldConsume = resourcePaidAt(capped, duration, cost.amount);
-    const needed = wouldConsume.sub(prevConsumed);
+    const prevPaid = resourcePaidAt(prev, duration, cost.amount);
+    const wouldPay = resourcePaidAt(capped, duration, cost.amount);
+    const needed = wouldPay.sub(prevPaid);
     if (needed.lte(0)) continue;
 
     const available = new Decimal(cost.available());
@@ -465,7 +464,7 @@ export function stepProgressiveCosts(opts: {
       // that resourcePaidAt's ceil produces. Without it, a fractional
       // available propagates into maxProg and the later ceil rounds back up,
       // making the delta over-request by up to one unit (delta > available).
-      const maxProg = progressForUnits(prevConsumed.add(available.floor()), duration, cost.amount);
+      const maxProg = progressForUnits(prevPaid.add(available.floor()), duration, cost.amount);
       if (maxProg.lt(capped)) capped = maxProg;
     }
   }
@@ -474,9 +473,9 @@ export function stepProgressiveCosts(opts: {
 
   const deltas: Decimal[] = costs.map((cost) => {
     if (Decimal.lte(cost.amount, 0)) return Decimal.dZero;
-    const prevConsumed = resourcePaidAt(prev, duration, cost.amount);
-    const newConsumed = resourcePaidAt(capped, duration, cost.amount);
-    const delta = new Decimal(Decimal.sub(newConsumed, prevConsumed));
+    const prevPaid = resourcePaidAt(prev, duration, cost.amount);
+    const newPaid = resourcePaidAt(capped, duration, cost.amount);
+    const delta = new Decimal(Decimal.sub(newPaid, prevPaid));
     return delta.lte(0) ? Decimal.dZero : delta;
   });
 

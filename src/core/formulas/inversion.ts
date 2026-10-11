@@ -1,5 +1,5 @@
 /**
- * Inversion contract — the diagnosed result of running a formula backward.
+ * Inversion contract — the graded result of running a formula backward.
  *
  * `Formula.invert` answers with a bare `DecimalSource`. That is the algebraic
  * pre-image, and it is the shape the op table composes with recursively, so it
@@ -8,24 +8,24 @@
  *
  * - the chain has no inverse at all — `sign`, `abs`, a multi-variable chain;
  * - no pre-image was found for this target, by closed form or by search — a
- *   `tetrate` height at which the base can't influence the result, an integral
- *   inverse whose target sits outside the searchable range;
+ *   `tetrate` height at which the base can't influence the result, an
+ *   antiderivative inverse whose target is outside the searchable range;
  * - the target lies **outside the function's image**, so the pre-image the
  *   algebra hands back doesn't map forward onto it. An interior `.floor()`
  *   asked for a fractional level, a `step`/`if` splice whose modifier jumps at
  *   the breakpoint, a saturated `min`/`max` — one failure, not three.
  *
- * The third is the one that drove this contract. It is a property of *(chain,
- * target)*, not of the chain, which is why no chain-only boolean —
- * `isInvertible()` included — can answer it: the same skill curve is sound for
+ * The third is the reason for this contract. It is a property of *(chain,
+ * target)*, not of the chain. That is why no chain-only boolean —
+ * `isInvertible()` included — can answer it. The same skill curve is sound for
  * integer levels and unsound for 3.5. {@link Formula.tryInvert} settles it the
- * only way available, by evaluating the candidate forward and checking it lands
- * on the target.
+ * only way available: it evaluates the candidate forward and checks that it is
+ * on-target.
  *
  * Shape follows `TransitionDistance` in `@/core/transitions` — a value plus a
- * `reason` discriminator, `value: null` on the arms with no answer. Same
- * question in a different coordinate ("when does X happen" against "what input
- * gives this output"), so it gets the same shape rather than a new one.
+ * `reason` discriminant, `value: null` on the arms with no answer. It is the
+ * same question in a different coordinate: "when does X happen" against "what
+ * input gives this output". So it gets the same shape rather than a new one.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
@@ -34,7 +34,7 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 
 /**
  * Why an inversion has no usable answer. Reported from deep inside the op
- * table, where the specific cause is known, and surfaced on {@link Inversion}.
+ * table, where the specific cause is known, and returned on {@link Inversion}.
  */
 export type InversionFailureReason =
   /**
@@ -53,9 +53,10 @@ export type InversionFailureReason =
   | 'no-solution';
 
 /**
- * Diagnosed result of {@link Formula.tryInvert} / {@link Formula.tryInvertAntiderivative}.
+ * Graded result of {@link Formula.tryInvert} / {@link Formula.tryInvertAntiderivative}.
  *
- * - `exact` — the pre-image evaluates back onto the target. Use `value`.
+ * - `on-target` — the pre-image evaluates back onto the target, within the
+ *   tolerance. Use `value`.
  * - `outside-image` — `value` is the correct algebraic pre-image but the target
  *   isn't in the function's image, so it maps to `evaluatesTo` instead. Callers
  *   wanting "smallest input that reaches the target" want a first-passage
@@ -71,7 +72,7 @@ export type Inversion =
 // === FAILURE REPORTING ===
 
 /**
- * Active capture slot. Non-null only inside {@link captureInversionFailures},
+ * Active capture. Non-null only inside {@link captureInversionFailures},
  * i.e. for the duration of one `tryInvert` call.
  */
 let capture: InversionFailureReason[] | null = null;
@@ -80,11 +81,10 @@ let capture: InversionFailureReason[] | null = null;
  * Report that an inversion has no answer.
  *
  * The engine's convention is to report unsoundness by logging rather than
- * throwing, which keeps a mis-composed formula from taking down a running game.
- * That leaves the report observable only on the console, so this routes it to
- * an active capture when one is installed — which is what lets `tryInvert`
- * name the cause instead of inferring it. Uncaptured, it logs exactly as
- * before.
+ * throwing, which keeps a mis-composed formula from stopping a running game.
+ * That leaves the report observable only on the console. So this routes it to
+ * a capture when one is active, which lets `tryInvert` name the cause instead
+ * of inferring it. Without a capture, it logs.
  *
  * @internal
  */
@@ -118,10 +118,10 @@ export function captureInversionFailures<T>(body: () => T): {
 
 // === IMAGE CHECK ===
 
-/** Default relative tolerance for the image check at layer 0. */
+/** Default relative tolerance for the image check at break_eternity layer 0. */
 const BASE_TOLERANCE = 1e-10;
 
-/** float64 machine epsilon — the ulp of a stored exponent above layer 0. */
+/** float64 machine epsilon — the ulp of a stored exponent above break_eternity layer 0. */
 const EPSILON = 2.220446049250313e-16;
 
 /** Above this, break_eternity stores the logarithm, so value-space ratios stop meaning anything. */
@@ -130,24 +130,24 @@ const VALUE_SPACE_CEILING = '1e300';
 /**
  * Relative tolerance the image check can honestly demand at `target`'s magnitude.
  *
- * Past layer 0 a value is stored as its base-10 logarithm in a float64, so the
- * exponent itself carries ulp error, and exponentiating back turns that
- * straight into relative error in value space. At 1e1000000 the floor is ~2.7e-10
- * — measured, and not improvable. Demanding {@link BASE_TOLERANCE} up there
- * would report "outside the image" for arithmetic that is as exact as the
- * representation allows.
+ * Past break_eternity layer 0, a value is stored as its base-10 logarithm in a
+ * float64. So the exponent itself has ulp error, and exponentiating back turns
+ * that straight into relative error in value space. At 1e1000000 the
+ * representation floor is ~2.7e-10 — measured, and not improvable. Demanding
+ * {@link BASE_TOLERANCE} up there would report "outside the image" for
+ * arithmetic that is as exact as the representation allows.
  *
- * Consumer-facing consequence: an inversion at layer 1 carries roughly
- * `16 − log₁₀(log₁₀ x)` significant digits, not 16.
+ * Consumer-facing consequence: an inversion at break_eternity layer 1 has
+ * roughly `16 − log₁₀(log₁₀ x)` significant digits, not 16.
  */
 export function inversionTolerance(target: DecimalSource): number {
   return Math.max(BASE_TOLERANCE, representationFloor(target));
 }
 
 /**
- * Relative error `value` carries from being stored at all: zero at layer 0,
- * where the float64 holds the value itself, and the stored exponent's ulp
- * carried into value space above it.
+ * Relative error `value` has from being stored at all. It is zero at
+ * break_eternity layer 0, where the float64 holds the value itself. Above it,
+ * it is the stored exponent's ulp taken into value space.
  *
  * @internal
  */
@@ -158,8 +158,8 @@ export function representationFloor(value: DecimalSource): number {
 }
 
 /**
- * Whether `achieved` counts as landing on `target`, graded in the coordinate
- * the values are actually stored in: relative in value space below
+ * Whether `achieved` counts as on-target for `target`. It is graded in the
+ * coordinate the values are actually stored in: relative in value space below
  * {@link VALUE_SPACE_CEILING}, absolute in log₁₀ above it.
  *
  * @internal

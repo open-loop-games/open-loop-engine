@@ -1586,7 +1586,7 @@ describe('load order — engine reconcilers run after onLoad', () => {
     const g = game();
     const engine = started(g, 'order-slot');
     const mgr = engine.saveManager!;
-    const slot = mgr.createLoadout('second');
+    const slot = mgr.createSlot('second');
     g.saveMidChallenge(() => mgr.saveToSlot(slot));
 
     mgr.selectSlot(slot);

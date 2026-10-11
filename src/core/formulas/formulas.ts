@@ -4,8 +4,8 @@
  * Formulas are composable math expressions that support four operations:
  * - **Evaluate**: compute the output for a given input (e.g., cost at level N)
  * - **Invert**: find the input that produces a given output ("which level costs 350?")
- * - **Sum**: the discrete series `Σ f(from + i)` — what buying levels costs (`sum`)
- * - **Integrate**: the continuous area across a span (`cumulative`) — what a
+ * - **Sum**: the discrete series `Σ f(from + i)` — what purchasing levels costs (`sum`)
+ * - **Cumulative**: the continuous total across a span (`cumulative`) — what a
  *   rate accrues over time, a different number from the sum over the same span
  *
  * Build formulas by chaining operations on a variable:
@@ -15,7 +15,7 @@
  * cost.invert(350);   // ≈ 5
  * ```
  *
- * Buy-max counting and bulk pricing over a cost curve live in `affordability.ts`.
+ * Purchase-max counting and bulk-purchase cost over a cost curve are in `affordability.ts`.
  * Ported from Profectus (MIT) with significant refactoring; its notice is in
  * `THIRD-PARTY-NOTICES.md`.
  */
@@ -83,7 +83,7 @@ function integrateVariableInner(this: GenericFormula) {
 
 /**
  * Longest span {@link Formula.sum} adds term by term when no closed form
- * applies. Past it the sum is corrected from the integral or reported, rather
+ * applies. Past it the sum is corrected from the cumulative or reported, rather
  * than run as a loop long enough to stall a tick.
  */
 const DIRECT_SUM_LIMIT = 1000;
@@ -211,15 +211,15 @@ type OpDescriptor = {
   integrate?: (...args: any[]) => any;
   integrateInner?: (...args: any[]) => any;
   /**
-   * Discrete series rule. Bound only for the ops that carry an exact identity
-   * (linearity) or an exact closed form (geometric, Faulhaber) — an op with no
-   * entry here reports `not-summable` rather than guessing, which is why the
-   * table is short next to `integrate`.
+   * Discrete series rule. Bound only for the ops that have an exact identity
+   * (linearity) or an exact closed form (geometric, Faulhaber). An op with no
+   * entry here reports `not-summable` rather than guessing. That is why fewer
+   * ops bind `sum` than `integrate`.
    */
   sum?: (...args: any[]) => any;
   applySubstitution?: (...args: any[]) => any;
   /**
-   * Rebinds fields when the variable sits on the right (`k op g(x)`), for a
+   * Rebinds fields when the variable is on the right (`k op g(x)`), for a
    * binary op whose rules differ by orientation. Applied when the node is
    * built, so `isIntegrable()` reports what this orientation can integrate; a
    * field set to `undefined` withdraws that capability.
@@ -257,7 +257,7 @@ const unaryOps: Record<string, OpDescriptor> = {
   gamma: { evaluate: Decimal.gamma },
   lngamma: { evaluate: Decimal.lngamma },
   // `invertX` means "the inverse of X" — so each op binds its like-named
-  // invert. Upstream crossed the whole block (`sin` bound `invertAsin`, whose
+  // invert. Upstream swapped the whole block (`sin` bound `invertAsin`, whose
   // body is `Decimal.sin`), which applied the op twice instead of undoing it.
   sin: { evaluate: Decimal.sin, invert: ops.invertSin, integrate: ops.integrateSin },
   cos: { evaluate: Decimal.cos, invert: ops.invertCos, integrate: ops.integrateCos },
@@ -343,7 +343,7 @@ const binaryOps: Record<string, OpDescriptor> = {
 
 /**
  * A composable math expression that supports forward evaluation, backward
- * inversion, and cumulative integration.
+ * inversion, the discrete sum and the continuous cumulative.
  *
  * **Building formulas**: chain operations on a variable or constant:
  * ```ts
@@ -447,8 +447,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
     // An op with no substitution rule (`pow`, `pow_base`, `exp`, …) integrates
     // only by substituting through everything beneath it, so every op down to
     // the variable has to have one. Checked here, from structure, because the
-    // integral is built lazily and a failed build hands back a constant that
-    // every caller above would price as a real antiderivative.
+    // antiderivative is built lazily. A failed build returns a constant that
+    // every caller above would treat as a real antiderivative.
     const substitutable = applySubstitution != null && (variable?.substitutable ?? false);
     const integrable =
       (variable?.isIntegrable() ?? false) &&
@@ -462,8 +462,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
       internalIntegrateInner: integrateInner,
       // Bound unconditionally, unlike `integrate`: a sum op returns a graded
       // {@link Series} rather than a formula, so it reports `not-summable` for
-      // itself. Gating it on the inner's capability would move that report into
-      // a silent `undefined` and lose which op broke the chain.
+      // itself. Making it depend on the inner's capability would turn that
+      // report into a silent `undefined` and lose which op broke the chain.
       internalSum: sum,
       applySubstitution,
       substitutable,
@@ -504,10 +504,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   // === CORE EVALUATION ===
 
   evaluate(variable?: DecimalSource): DecimalSource {
-    // Arity-switched dispatch: every formula eval used to allocate an args
-    // array via `inputs.map(...)` plus a spread. For a 3-level exponential
-    // cost formula (Formula.exponential → mul → pow_base → variable), that's
-    // 2 array allocations every call × every purchasable × every tick. The
+    // Arity-switched dispatch, so an eval allocates no args array via
+    // `inputs.map(...)` plus a spread. For a three-op exponential cost formula
+    // (Formula.exponential → mul → pow_base → variable), that would be 2 array
+    // allocations every call × every purchasable × every tick. The
     // 1/2/3-input fast paths cover every op in the table; the default branch
     // serves consumer-built formulas with more inputs.
     const fn = this.internalEvaluate as
@@ -585,14 +585,14 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * @param value - The output to solve for.
    * @param tolerance - Relative tolerance for the image check. Defaults to
    *   {@link inversionTolerance} at `value`'s magnitude, which relaxes past
-   *   layer 0 because the representation cannot do better there.
-   * @returns An {@link Inversion}: `exact`, `outside-image` (with the value it
+   *   break_eternity layer 0 because the representation cannot do better there.
+   * @returns An {@link Inversion}: `on-target`, `outside-image` (with the value it
    *   does reach), or a failure reason with no value.
    *
    * @example
    * ```ts
    * const xpToLevel = Formula.variable(xp).div(50).sqrt().floor();
-   * xpToLevel.tryInvert(3);    // { value: 450, reason: 'exact' }
+   * xpToLevel.tryInvert(3);    // { value: 450, reason: 'on-target' }
    * xpToLevel.tryInvert(3.5);  // { value: 612.5, reason: 'outside-image', evaluatesTo: 3 }
    * ```
    */
@@ -610,10 +610,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * breakpoint, a saturated `min`/`max`. For the same reason it needs no inverse at
    * all — a chain reporting `isInvertible() === false` still answers here.
    *
-   * Reach for {@link invert} / {@link tryInvert} when you want the input that
-   * *maps to* the target (the XP at which a level begins); reach for this when
-   * you want the input at which the target is *first met* (when the burn
-   * overtakes production, when a wave breaches the wall).
+   * Use {@link invert} / {@link tryInvert} for the input that *maps to* the
+   * target (the XP at which a level begins). Use this for the input at which
+   * the target is *first met* (when the burn overtakes production, when a wave
+   * breaches the wall).
    *
    * The curve must be non-decreasing over the search domain. Where it isn't, the
    * two cases that would otherwise return a plausible number report
@@ -621,16 +621,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * @param target - The value to reach.
    * @param options - Domain bounds. See {@link FirstPassageOptions}.
-   * @returns A {@link Passage}: `crossed`, `already-reached` at the domain floor,
+   * @returns A {@link Passage}: `reached`, `already-reached` at the lower bound,
    *   or a reason with no value.
    *
    * @example
    * ```ts
    * // Burn steps ×g every Tg seconds — an interior floor, so the algebra
-   * // lands mid-step while the player crosses at the boundary.
+   * // answers mid-step while the player reaches the target at the boundary.
    * const burn = F.variable(0).div(15).floor().add(0.5).pow_base(2).mul(b0);
    * burn.invert(pMax);          // 37.5 — inside a step nothing evaluates into
-   * burn.firstPassage(pMax);    // { value: 45, reason: 'crossed' }
+   * burn.firstPassage(pMax);    // { value: 45, reason: 'reached' }
    * ```
    */
   firstPassage(target: DecimalSource, options?: FirstPassageOptions): Passage {
@@ -638,8 +638,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
 
   /**
-   * Invert this formula's integral and say whether the answer is usable — the
-   * checked counterpart to {@link invertAntiderivative}, graded the same way
+   * Invert this formula's antiderivative and say whether the answer is usable.
+   * The checked counterpart to {@link invertAntiderivative}, graded the same way
    * {@link tryInvert} grades a forward inversion.
    */
   tryInvertAntiderivative(value: DecimalSource, tolerance?: number): Inversion {
@@ -677,10 +677,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   /**
    * Antiderivative of this formula, evaluated at `variable`.
    *
-   * **This is not `∫₀ˣ`.** It carries an arbitrary constant, so the value at a
+   * **This is not `∫₀ˣ`.** It includes an arbitrary constant. So the value at a
    * single point is only meaningful relative to another one:
    * `Formula.exponential(0, 10, 1.15).evaluateAntiderivative(0)` is `71.55`, not 0.
-   * For the area over a span use {@link cumulative}, which differences it; for
+   * For the total over a span use {@link cumulative}, which differences it. For
    * a level-indexed cost use {@link sum}, which is a different operation again.
    */
   evaluateAntiderivative(variable?: DecimalSource): DecimalSource {
@@ -692,16 +692,16 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
 
   /**
-   * `∫ from→to` — the continuous area under this formula across a span.
+   * `∫ from→to` — the continuous total under this formula across a span.
    *
-   * The rate-function lineage's *cumulative*: integrate a rate over time and
-   * this is the total accrued, which is what {@link firstPassage} inverts. The
-   * arbitrary constant {@link evaluateAntiderivative} carries cancels in the
+   * Incremental-game math's *cumulative*: integrate a rate over time and this
+   * is the total accrued, which is what {@link firstPassage} inverts. The
+   * arbitrary constant in {@link evaluateAntiderivative} cancels in the
    * difference, so unlike that method this answers a well-posed question.
    *
-   * **Not the cost of buying levels.** A level-indexed cost curve is a series,
-   * and the two differ by a boundary term that is 7.3% on the canonical
-   * `1.15ⁿ` curve — use {@link sum} there.
+   * **Not the cost of purchasing levels.** A level-indexed cost curve is a series.
+   * The two differ by a boundary term, which is 7.3% on the canonical `1.15ⁿ`
+   * curve. Use {@link sum} there.
    *
    * @example
    * ```ts
@@ -722,24 +722,24 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * `Σ f(from + i)` for integer `i` in `[0, count)` — the discrete series. A
    * fractional `count` therefore takes `⌈count⌉` terms.
    *
-   * What a level-indexed cost actually is: buying `count` levels starting at
+   * What a level-indexed cost actually is: purchasing `count` levels starting at
    * level `from` costs this, and it is not {@link cumulative} over the same
-   * span. Exact where a closed form exists (the shipped `exponential` /
-   * `linear` / `polynomial` curves and anything built from them by `+`, `−`,
-   * and constant `×`/`÷`), and exact term by term over a span of up to
-   * `DIRECT_SUM_LIMIT` levels; beyond that `approximate` via
-   * Euler–Maclaurin, or `not-summable` when there is no integral to correct.
+   * span. Exact where a closed form exists: the shipped `exponential` /
+   * `linear` / `polynomial` curves, and anything built from them by `+`, `−`
+   * and constant `×`/`÷`. Exact term by term over a span of up to
+   * `DIRECT_SUM_LIMIT` levels. Beyond that, `approximate` via
+   * Euler–Maclaurin, or `not-summable` when the curve has no antiderivative.
    *
-   * There is deliberately no unchecked twin the way {@link invert} sits under
-   * {@link tryInvert}: `invert` is unchecked because the op table composes with
-   * it recursively, whereas summation composes over graded results, so nothing
-   * needs the bare number and no caller gets one by accident.
+   * There is deliberately no unchecked twin the way {@link invert} is under
+   * {@link tryInvert}. `invert` is unchecked because the op table composes with
+   * it recursively. Summation composes over graded results, so nothing needs
+   * the bare number and no caller gets one by accident.
    *
    * @example
    * ```ts
-   * const cost = Formula.exponential(level, 10, 1.15);
-   * const price = cost.sum(level.value, 19);   // what 19 more levels cost
-   * if (price.reason !== 'not-summable') charge(price.value);
+   * const cost = Formula.exponential(count, 10, 1.15);
+   * const total = cost.sum(count.value, 19);   // what 19 more purchases cost
+   * if (total.reason !== 'not-summable') pay(total.value);
    * ```
    */
   sum(from: DecimalSource, count: DecimalSource): Series {
@@ -888,7 +888,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * leaf values, and `===` identity of the operation functions
    * (`internalEvaluate` / `internalInvert` / `internalIntegrate`). Equal nodes
    * share the same operation, so their `integrateInner` / `applySubstitution`
-   * are also `===` by construction — those fields are not re-checked.
+   * are necessarily `===` too, and those fields are not re-checked.
    * `description` is decorative and intentionally ignored.
    */
   equals(other: GenericFormula): boolean {
@@ -921,7 +921,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   /**
    * Create a variable formula — the "x" in a cost function.
    *
-   * Pass a reactive ref (e.g., `repeatable.amount`) to make the formula
+   * Pass a reactive ref (e.g., `purchasable.count`) to make the formula
    * evaluate against live game state. Every formula chain needs exactly
    * one variable for inversion to work.
    *
@@ -942,24 +942,24 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   /**
    * Exponential cost curve: `base * mult^x`. The canonical incremental cost scaling.
    *
-   * Fully invertible and integrable, with a closed-form series — powers "buy max"
-   * via {@link calculateMaxAffordable} and bulk pricing via {@link calculateCost}
-   * without an O(n) loop.
+   * Fully invertible and integrable, with a closed-form series. So
+   * {@link calculateMaxAffordable} gives "purchase max" and {@link calculateCost}
+   * gives the bulk-purchase cost without an O(n) loop.
    *
-   * @param variable - Level input — typically a reactive ref (e.g., `purchasable.amount`),
+   * @param variable - Level input — typically a reactive ref (e.g., `purchasable.count`),
    *   or a raw `DecimalSource` for ad-hoc evaluation via `.evaluate(level)`.
    * @param base - Cost at level 0
-   * @param mult - Per-level multiplier (e.g., `1.15` = +15% per level)
+   * @param mult - Cost ratio per level (e.g., `1.15` = +15% per level)
    *
    * Every parameter after `variable` can be a ref or a variable-free Formula,
-   * for a value a modifier or a tuning knob moves at runtime.
+   * for a value a modifier or a tunable changes at runtime.
    *
    * @example
    * ```ts
-   * const cost = Formula.exponential(purchasable.amount, 10, 1.15);
+   * const cost = Formula.exponential(purchasable.count, 10, 1.15);
    * cost.evaluate();   // reactive — cost at current level
    * cost.invert(100);  // what level costs 100?
-   * cost.sum(0, 5);    // what levels 0..4 cost, bought one at a time
+   * cost.sum(0, 5);    // what levels 0..4 cost, purchased one at a time
    * ```
    */
   public static exponential(
@@ -1023,8 +1023,8 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * @example
    * ```ts
-   * const cost = Formula.preset(upgrade.amount, 'moderate', 10);
-   * // equivalent to Formula.exponential(upgrade.amount, 10, 1.15)
+   * const cost = Formula.preset(purchasable.count, 'moderate', 10);
+   * // equivalent to Formula.exponential(purchasable.count, 10, 1.15)
    * ```
    */
   public static preset(
@@ -1060,7 +1060,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * Below `start`, the value passes through unchanged. Above `start`,
    * `formulaModifier` is applied to `(value - start)` and `start` is added back.
-   * Useful for softcaps that only kick in past a breakpoint.
+   * Useful for softcaps that apply only past a breakpoint.
    *
    * @param value - The input formula or value
    * @param start - Threshold below which the value passes through
@@ -1324,11 +1324,11 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
 
   // === PASSTHROUGH BINARY OPS ===
 
-  // Saturating floor/ceiling on a curve — `x.max(lo).min(hi)` is the clamp.
+  // Saturating bounds on a curve — `x.max(lo).min(hi)` is the clamp.
   // Both invert as the identity through the op, into the variable-bearing
   // input, which also answers for a target past the bound that the curve can
-  // never produce; `tryInvert` grades that as `outside-image` and
-  // `firstPassage` reports `no-crossing`, so the permissiveness is visible
+  // never produce. `tryInvert` grades that as `outside-image` and
+  // `firstPassage` reports `not-reached`, so the permissiveness is visible
   // rather than silent.
   public static max = ops.createPassthroughBinaryFormula(Decimal.max);
   public static min = ops.createPassthroughBinaryFormula(Decimal.min);
@@ -1341,10 +1341,10 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   }
 }
 
-// Declaration merging: surfaces the dynamic instance methods written to
-// Formula.prototype by `registerOps` below, so `formula.add(other)` etc.
+// Declaration merging: declares to TypeScript the dynamic instance methods
+// `registerOps` below writes to Formula.prototype, so `formula.add(other)` etc.
 // type-check without an `any` escape hatch. The empty body + unused `T` are
-// load-bearing — merging requires matching type-parameter shape with the class.
+// required: merging needs a type-parameter shape that matches the class.
 /* eslint-disable @typescript-eslint/no-empty-object-type,
                   @typescript-eslint/no-unused-vars */
 interface Formula<
@@ -1406,11 +1406,11 @@ registerOps(binaryOps, 'binary');
 // === STANDALONE UTILITIES ===
 
 /**
- * Debug helper: find the operation that breaks invertibility in a formula chain.
+ * Debug utility: find the operation that breaks invertibility in a formula chain.
  *
  * Follows the variable down the chain and returns the deepest op that binds no
- * inverse — every op above it reports non-invertible too, but only because it
- * sits over this one. Returns `null` if the entire chain is invertible.
+ * inverse. Every op above it reports non-invertible too, but only because it
+ * is over this one. Returns `null` if the entire chain is invertible.
  *
  * @param formula - The formula to inspect
  * @returns The non-invertible node, or `null` if fully invertible

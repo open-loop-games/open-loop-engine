@@ -1,12 +1,12 @@
 /**
- * Gate — typed predicate-spec data shape. Type union and pure-data projection
- * live at core layer so `E.branch` and other core-layer builders can
- * accept Gate without a layer violation. The runtime side (evaluator,
- * predictor, ambient-runtime resolution, requirement adapter) lives in
- * `systems/gate.ts` — it depends on EngineCategories and ResourceRegistry,
- * which are systems-layer concerns.
+ * Gate — the typed, serializable yes/no test, as data. The type union and
+ * its pure-data projection are in core, so `E.branch` and other core
+ * builders can accept a Gate without breaking the one-way imports. The
+ * evaluator, predictor, ambient Gate services and requirement adapter are in
+ * `systems/gate.ts`, because they read `EngineCategories`, which is in
+ * systems.
  *
- * The public surface re-exports everything from `systems/gate.ts`.
+ * The public API surface reaches this file through `systems/gate.ts`'s re-exports.
  *
  * @cluster gate
  */
@@ -25,8 +25,8 @@ export interface ResourceGteGate {
 }
 
 /**
- * True when `resource.cumulative.value >= value`. The `cumulative` slot is
- * intrinsic to every persistent resource, so no tracker setup is required.
+ * True when `resource.cumulative.value >= value`. Every persistent resource
+ * has a `cumulative` ref, so this kind needs no setup.
  * Read through the resource registry, so it has no {@link gateToCondition}
  * projection; `timeUntilGateFlip` predicts it from the resource's inflow rate,
  * falling back to its net rate when the accessor reports no inflow.
@@ -38,10 +38,9 @@ export interface CumulativeGteGate {
 }
 
 /**
- * True when the entity's `count` signal is `>= value`. Reads through
- * `CategoryEntrySignals` so the same kind covers Purchasable.amount,
- * Producer.count, Skill.level, Achievement.earned, Challenge.completions
- * uniformly.
+ * True when the category entry's `count` signal is `>= value`. Reads through
+ * `CategoryEntrySignals`, so the one kind covers Purchasable.count,
+ * Producer.count, Skill.level, Achievement.earned and Challenge.completions.
  */
 export interface CountGteGate {
   kind: 'count-gte';
@@ -51,9 +50,9 @@ export interface CountGteGate {
 }
 
 /**
- * True when the entity's `unlock` signal is true. Same `CategoryEntrySignals`
- * cross-cut as `count-gte` — "is this entity active / owned / earned" without
- * consumer-side path conventions.
+ * True when the category entry's `active` signal is true. Reads through
+ * `CategoryEntrySignals` like `count-gte`, so it needs no consumer-side path
+ * conventions.
  */
 export interface ActiveGate {
   kind: 'active';
@@ -62,10 +61,10 @@ export interface ActiveGate {
 }
 
 /**
- * True when the comparison `accessor.getStateAt(key) <op> value` holds. Mirrors
- * `StateCondition` — same operator vocabulary, same coercion rules.
- * Consumer-supplied state-path escape hatch for predicates the typed kinds
- * don't cover (engine doesn't define what state paths mean).
+ * True when the comparison `accessor.getStateAt(path) <op> value` holds. Mirrors
+ * `StateCondition` — same operators, same coercion rules.
+ * The state-path escape hatch, for tests the typed kinds don't cover. The
+ * engine doesn't define what a state path means.
  */
 export interface StateGate {
   kind: 'state';
@@ -75,17 +74,16 @@ export interface StateGate {
 }
 
 /**
- * True when `accessor.getFlag(id)` returns true. Escape hatch for
+ * True when `accessor.getFlag(id)` returns true. The escape hatch for
  * progression flags the engine doesn't model as category entries
- * (knowledge-discovery IDs, UI-panel reveals, info-reveals). Peer to
- * {@link StateGate} for the unlock namespace — projects 1:1 to
- * `FlagCondition` via {@link gateToCondition}. Predictor-opaque,
- * matching how flat unlocks already behave at the ICondition layer.
+ * (knowledge-discovery ids, UI-panel reveals, info-reveals). Peer to
+ * {@link StateGate} for flags — projects 1:1 to `FlagCondition` via
+ * {@link gateToCondition}. Predictor-opaque, as a flag is in the condition IR.
  *
- * Use the category-aware {@link ActiveGate} when the unlock you're gating
- * on *is* a registered category entry — that path gets
- * `CategoryEntrySignals`-backed introspection. Use this when the
- * unlock is a consumer-side progression flag with no category structure.
+ * Use the category-aware {@link ActiveGate} when the test reads a registered
+ * category entry — that path gets introspection from
+ * `CategoryEntrySignals`. Use this when the flag is a consumer-side
+ * progression flag with no category structure.
  */
 export interface FlagGate {
   kind: 'flag';
@@ -111,12 +109,12 @@ export interface NotGate {
 }
 
 /**
- * Typed declarative predicate spec. String-id-keyed (resolved through engine
- * registries), category-aware, predictor-friendly for rate-aware kinds.
+ * The typed, serializable yes/no test. Keyed by string ids, which the
+ * engine's registries look up; category-aware; predictable for rate-aware kinds.
  *
- * Authored as plain data in content definitions; evaluated through
- * `evaluateGate` (systems-layer) or projected to `ICondition` (the internal
- * IR) via {@link gateToCondition}.
+ * Authored as plain data in defs. Evaluated through `evaluateGate` (in
+ * systems), or projected to `ICondition`, the condition IR, via
+ * {@link gateToCondition}.
  */
 export type Gate =
   | ResourceGteGate
@@ -130,10 +128,10 @@ export type Gate =
   | NotGate;
 
 /**
- * A yes/no condition in any authoring form: a constant, a ref or getter over
- * state in scope, or a {@link Gate} the engine can introspect and predict.
- * Systems-layer predicate fields take this; the Gate arm is only evaluable
- * there, so core fields stay `Computable<boolean>`.
+ * A yes/no test in any authoring form. It is a constant, a ref or getter over
+ * state in reach, or a {@link Gate} the engine can introspect and predict.
+ * Predicate fields in systems take this. Only systems can evaluate the Gate
+ * arm, so core fields stay `Computable<boolean>`.
  */
 export type Predicate = Computable<boolean> | Gate;
 
@@ -168,27 +166,26 @@ export function isGate(value: unknown): value is Gate {
 }
 
 /**
- * The engine handles a Gate kind reads through. Named here rather than in
- * `systems/gate.ts` so the pure walker below can stay at core layer;
- * `GateServices` keys off this union.
+ * A Gate service: a named engine service a Gate kind reads. Named here
+ * rather than in `systems/gate.ts`, so the pure walker below can stay in
+ * core. `GateServices` keys off this union.
  */
 export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
 
 /**
- * Which engine handles `gate` will actually reach for. Pure data → data;
+ * The Gate services that evaluating `gate` reads. Pure data → data;
  * combinators union their children.
  *
- * The reason this exists: the handles a Gate needs are a function of its
- * kinds, not of the union as a whole. Category-aware kinds (`count-gte`,
- * `unlock`) resolve entirely through `EngineCategories` and never touch an
- * accessor, so a consumer whose gates are category-only owes no
- * `GameStateAccessor` at all. Adoption sites that hold the gate at
- * construction call this to fail early and precisely instead of demanding the
- * full triple up front.
+ * The Gate services a Gate needs are a function of its kinds, not of the
+ * union as a whole. Category-aware kinds (`count-gte`, `active`) read only
+ * `EngineCategories` and never an accessor. So a consumer whose Gates are
+ * all category kinds needs no `GameStateAccessor` at all. Adoption sites
+ * that hold the Gate at construction call this to fail early and precisely,
+ * instead of requiring every Gate service up front.
  *
- * These are the handles `evaluateGate` reads. `timeUntilGateFlip` reads more
- * for `cumulative-gte`, the resource's rate through the accessor, and demands
- * it when it runs.
+ * These are the Gate services `evaluateGate` reads. For `cumulative-gte`,
+ * `timeUntilGateFlip` also reads the resource's rate through the accessor,
+ * and requires it when it runs.
  */
 export function getRequiredGateServices(gate: Gate): ReadonlySet<GateService> {
   const out = new Set<GateService>();
@@ -236,17 +233,18 @@ export function forEachGateLeaf(
 }
 
 /**
- * Project a Gate AST to {@link ICondition}. Pure data → data; no runtime
- * needed. Accessor-backed kinds map directly; combinators recurse.
+ * Project a Gate AST to {@link ICondition}, the condition IR. Pure data →
+ * data; no Gate services needed. Accessor-backed kinds map directly;
+ * combinators recurse.
  *
- * **Throws on kinds an `ICondition` can't read** — the category kinds
- * (`count-gte`, `unlock`) and `cumulative-gte`, whose value lives on the
- * registered resource rather than behind the accessor — and on combinators
- * with any such descendant. The projection is partial by design: a
+ * **Throws on kinds the condition IR can't read**: the category kinds
+ * (`count-gte`, `active`) and `cumulative-gte`, whose value is on the
+ * registered resource rather than behind the accessor. It also throws on
+ * combinators with any such descendant. The projection is partial by design: a
  * synthetic-path encoding would hand the consumer's accessor an id it
  * doesn't serve.
  *
- * `E.branch` embeds the projection, so an unprojectable gate fails when
+ * `E.branch` embeds the projection, so an unprojectable Gate fails when
  * the effect is built. Predictors read every kind through `timeUntilGateFlip`.
  *
  * @internal
@@ -269,11 +267,11 @@ export function gateToCondition(gate: Gate): ICondition {
     case 'active':
     case 'cumulative-gte':
       throw new Error(
-        `gateToCondition: ${gate.kind} has no ICondition projection (it resolves only through GateServices).`,
+        `gateToCondition: ${gate.kind} has no ICondition projection (it evaluates only through evaluateGate and its Gate services).`,
       );
   }
 }
 
-// `ResourceCondition` is re-imported here so the systems-layer barrel can
+// `ResourceCondition` is re-imported here so the systems barrel can
 // type-check the rate-aware projection without circular imports.
 export type { ResourceCondition };

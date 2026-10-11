@@ -1,8 +1,8 @@
 /**
- * Engine entrypoint — top-level facade composing every layer.
+ * Root barrel — the top-level facade composing every source layer.
  *
  * Re-exports the full API surface from primitives, core, systems, harness, and
- * the engine-assembly module ({@link createEngine}, {@link EngineContext},
+ * the engine-assembly file ({@link createEngine}, {@link EngineContext},
  * {@link EngineModule}) that consumers import to assemble a game.
  *
  * @cluster engine

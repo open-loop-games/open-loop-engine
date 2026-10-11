@@ -1,14 +1,13 @@
 /**
- * Requirements system for gating purchases, unlocks, and actions
+ * Requirements — the costs and tests that block purchases, unlocks and actions
  *
- * Requirements define conditions that must be met
- * before something can be purchased or activated.
+ * A requirement must be met before something can be purchased or activated.
  *
  * Key features:
- * - Cost requirements (spend resource to purchase)
- * - Boolean requirements (simple true/false conditions)
- * - Composable (multiple requirements can be combined)
- * - Supports bulk purchasing via formulas
+ * - Cost requirements (spend a resource to purchase)
+ * - Boolean requirements (simple true/false tests)
+ * - Composable (requirements combine with `anyOf` / `allOf`)
+ * - Bulk purchases via formulas
  */
 
 import { computed, unref, type MaybeRef } from 'vue';
@@ -39,14 +38,14 @@ export interface Requirement {
   requiresPay: MaybeRef<boolean>;
 
   /**
-   * Whether this requirement supports buying multiple at once.
-   * If true, `met` returns how many can be bought.
+   * Whether this requirement supports a bulk purchase.
+   * If true, `met` returns how many purchases are affordable.
    */
   canMaximize?: MaybeRef<boolean>;
 
   /**
    * Pay the cost of this requirement.
-   * Called when the requirement is consumed (e.g., purchasing an upgrade).
+   * Called when the requirement is used (e.g., purchasing an upgrade).
    *
    * @param count - Number of times to pay (for bulk purchases)
    */
@@ -58,7 +57,7 @@ export interface Requirement {
   description?: MaybeRef<string>;
 
   /**
-   * Mark as non-persistent (internal use)
+   * Mark as ephemeral, so the save walk skips it (internal use)
    */
   [SkipPersistence]: true;
 }
@@ -78,24 +77,24 @@ export interface CostRequirementOptions {
   resource: Resource;
 
   /**
-   * The price of one purchase. Three shapes, and the choice decides whether
-   * bulk purchasing is priced correctly:
+   * The cost of one purchase. Three shapes, and the choice decides whether a
+   * bulk purchase costs the right amount:
    *
    * - **A static value** — bulk is exact. `n` purchases cost `n × cost`.
-   * - **A getter or ref** — bulk is priced linearly off the *current* value,
-   *   which is exact only while that value doesn't move as you buy. A
-   *   level-independent getter (a tuning knob, a scoped override) is fine; a
-   *   getter that reads the buyer's own level is **silently mispriced** — three
-   *   rungs of a `1.15ⁿ` ladder charge `3c` rather than `c + 1.15c + 1.3225c`,
-   *   and affordability is over-reported to match.
+   * - **A getter or ref** — bulk cost is linear in the *current* value. That
+   *   is exact only while the value doesn't change as you purchase. A
+   *   getter that ignores the purchase count (a tunable, a scoped override) is
+   *   fine. A getter that reads the purchasable's own purchase count is
+   *   **silently wrong**. Three purchases on a `1.15ⁿ` curve cost `3c` rather
+   *   than `c + 1.15c + 1.3225c`, and affordability is over-reported to match.
    * - **A {@link GenericFormula}** — bulk walks the real curve, via inversion
    *   (`calculateMaxAffordable`) and closed-form summation (`calculateCost`).
-   *   The only correct shape for a cost that scales on what's being bought.
+   *   The only correct shape for a cost that scales on what's being purchased.
    *
-   * The mispricing needs `maxBulkCount > 1` to bite, so it can't be reached
-   * through `createPurchasableCategory` or `createScalingPurchasable` without
-   * asking for it. When a cost scales on a purchasable's own level,
-   * build it as a Formula over the level ref that
+   * The wrong cost appears only with `maxBulkCount > 1`. So
+   * `createPurchasableCategory` and `createScalingPurchasable` reach it only
+   * when asked to. When a cost scales on a purchasable's own purchase count,
+   * build it as a Formula over the count ref that
    * `PurchasableOptions.requirements` hands its factory form.
    */
   cost: Computable<DecimalSource> | GenericFormula;
@@ -104,24 +103,24 @@ export interface CostRequirementOptions {
   requiresPay?: Computable<boolean>;
 
   /**
-   * For a Formula cost `f` over the level `L`: whether buying `n` sums the
-   * levels bought. If true, it costs `f(L) + f(L+1) + … + f(L+n−1)`. If
-   * false, it costs one evaluation, `f(L+n)`, so even a single purchase is
-   * priced one level ahead of the cumulative mode.
+   * For a Formula cost `f` over the purchase count `L`: whether purchasing
+   * `n` sums the levels purchased. If true, it costs
+   * `f(L) + f(L+1) + … + f(L+n−1)`. If false, it costs one evaluation,
+   * `f(L+n)`, so even a single purchase costs one level ahead of the sum.
    * Default: true
    */
   sumLevels?: Computable<boolean>;
 
   /**
-   * Ceiling on how many purchases one bulk buy may satisfy. Default: `1`,
-   * which confines every cost shape to single purchases and is why a
-   * mispriced getter cost stays inert until this is raised. Raise it (to
-   * `Decimal.dInf` for uncapped) only alongside a Formula cost — see
+   * The most purchases one bulk purchase may cover. Default: `1`,
+   * which confines every cost shape to single purchases. That is why a
+   * wrong getter cost has no effect until this is raised. Raise it (to
+   * `Decimal.dInf` for no maximum) only with a Formula cost — see
    * {@link CostRequirementOptions.cost}.
    */
   maxBulkCount?: Computable<DecimalSource>;
 
-  /** Custom pay function (overrides default resource subtraction) */
+  /** Custom pay function (replaces the default resource subtraction) */
   pay?: (count?: DecimalSource) => void;
 
   /** Description for UI display */
@@ -138,23 +137,23 @@ export interface CostRequirement extends Requirement {
   /** The resource being spent */
   resource: Resource;
 
-  /** The cost amount or formula */
+  /** The cost value or formula */
   cost: MaybeRef<DecimalSource> | GenericFormula;
 
-  /** Whether costs are cumulative for bulk purchases */
+  /** Whether a bulk purchase sums the levels purchased */
   sumLevels: MaybeRef<boolean>;
 
-  /** Maximum bulk purchase amount */
+  /** Maximum bulk count */
   maxBulkCount: MaybeRef<DecimalSource>;
 
-  /** Get the actual cost for a given amount */
+  /** Get the actual cost for a given purchase count */
   getCost: (count?: DecimalSource) => DecimalSource;
 }
 
 /**
  * Create a requirement based on spending a resource.
  *
- * @param options - Configuration for the cost requirement
+ * @param options - Options for the cost requirement
  * @returns A cost requirement
  *
  * @example
@@ -165,11 +164,11 @@ export interface CostRequirement extends Requirement {
  *   description: "100 points"
  * })
  *
- * // Scaling cost for bulk purchases, over the level ref the purchasable
+ * // Scaling cost for bulk purchases, over the count ref the purchasable
  * // hands its `requirements` factory
  * const scalingCost = createCostRequirement({
  *   resource: points,
- *   cost: Formula.variable(level).pow_base(2).mul(10), // 10 * 2^level
+ *   cost: Formula.variable(count).pow_base(2).mul(10), // 10 * 2^count
  *   maxBulkCount: 10
  * })
  * ```
@@ -178,17 +177,17 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
   const { resource, cost, requiresPay, sumLevels, maxBulkCount, pay, description } = options;
 
   const processedCost = isFormula(cost) ? cost : toMaybeRef(cost);
-  const processedCumulativeCost = sumLevels != null ? toMaybeRef(sumLevels) : true;
-  const processedMaxBulk = maxBulkCount != null ? toMaybeRef(maxBulkCount) : 1;
+  const processedSumLevels = sumLevels != null ? toMaybeRef(sumLevels) : true;
+  const processedMaxBulkCount = maxBulkCount != null ? toMaybeRef(maxBulkCount) : 1;
 
   // Precomputed formula affordability — reactive via calculateMaxAffordable's own computed.
   const formulaMaxAffordable = isFormula(processedCost)
-    ? calculateMaxAffordable(processedCost, resource, processedCumulativeCost, processedMaxBulk)
+    ? calculateMaxAffordable(processedCost, resource, processedSumLevels, processedMaxBulkCount)
     : null;
 
   function getCost(amount: DecimalSource = 1): DecimalSource {
     if (isFormula(processedCost)) {
-      return calculateCost(processedCost, amount, unref(processedCumulativeCost));
+      return calculateCost(processedCost, amount, unref(processedSumLevels));
     }
     return Decimal.mul(unref(processedCost), amount);
   }
@@ -197,17 +196,17 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
     if (formulaMaxAffordable) return unref(formulaMaxAffordable);
 
     const available = resource.value;
-    const maxBulk = unref(processedMaxBulk);
+    const maxBulk = unref(processedMaxBulkCount);
     const singleCost = unref(processedCost as MaybeRef<DecimalSource>);
     if (Decimal.lte(singleCost, 0)) return maxBulk;
 
-    // Tolerance-aware floor: Decimal.div(x, x) returns 0.999...9 for layer-0
-    // inputs at certain scales, so a naive floor reports 0 affordable at exact
-    // equality. Snap to ceil when within FP-precision tolerance of an integer.
-    // Tolerance is tight (1e-12) — wide enough to catch the layer-0 div quirk
-    // (~1e-16 absolute), narrow enough not to falsely snap user-fractional
-    // balances (e.g., 49.99 vs 50). At higher layers, eq_tolerance compares
-    // log-magnitudes, so this stays safe at tetration scale.
+    // Tolerance-aware floor: Decimal.div(x, x) returns 0.999...9 for break_eternity
+    // layer-0 inputs at certain scales, so a naive floor reports 0 affordable at
+    // exact equality. Snap to ceil when within FP-precision tolerance of an integer.
+    // Tolerance is tight (1e-12) — wide enough to catch the break_eternity layer-0
+    // div quirk (~1e-16 absolute), narrow enough not to falsely snap fractional
+    // amounts (e.g., 49.99 vs 50). At higher break_eternity layers, eq_tolerance
+    // compares log-magnitudes, so this stays safe at tetration scale.
     const ratio = Decimal.div(available, singleCost);
     const ceilRatio = Decimal.ceil(ratio);
     const affordable = Decimal.eq_tolerance(ratio, ceilRatio, 1e-12)
@@ -219,15 +218,15 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
   const requirement: CostRequirement = {
     resource,
     cost: processedCost,
-    sumLevels: processedCumulativeCost,
-    maxBulkCount: processedMaxBulk,
+    sumLevels: processedSumLevels,
+    maxBulkCount: processedMaxBulkCount,
     getCost,
 
     met,
     requiresPay: requiresPay != null ? toMaybeRef(requiresPay) : true,
 
     canMaximize: computed(() => {
-      const max = unref(processedMaxBulk);
+      const max = unref(processedMaxBulkCount);
       return Decimal.gt(max, 1);
     }),
 
@@ -258,7 +257,7 @@ export function createCostRequirement(options: CostRequirementOptions): CostRequ
  * Options for creating a boolean requirement
  */
 export interface BooleanRequirementOptions {
-  /** The condition that must be true */
+  /** The test that must hold */
   met: Computable<boolean>;
   /** Description for UI display */
   description?: Computable<string>;
@@ -267,7 +266,7 @@ export interface BooleanRequirementOptions {
 /**
  * Create a simple true/false requirement.
  *
- * @param options - Configuration for the boolean requirement
+ * @param options - Options for the boolean requirement
  * @returns A boolean requirement
  *
  * @example
@@ -292,7 +291,7 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
 // === COMBINATORS ===
 
 // Combinators always expose boolean `met` and `canMaximize: false`.
-// Bulk semantics across mixed children (cost + boolean, OR-gated branches) are
+// Bulk meaning across mixed children (cost + boolean, OR branches) is
 // not well-defined, and `maxRequirementsMet` returns `dInf`/`0` for boolean
 // requirements — combinators are not bulk-aware. Use combinators where the
 // caller pays `amount = 1` (the conversion case); for bulk-aware composition,
@@ -301,23 +300,23 @@ export function createBooleanRequirement(options: BooleanRequirementOptions): Re
 /**
  * Compose requirements with OR semantics.
  *
- * The combinator is satisfied when any child is satisfied. At pay time, the
- * **first satisfied child** (in declaration order) is the satisfied branch:
- * if it's pay-bearing, it is charged; if it's a pure gate, no payment occurs.
- * Later children — even pay-bearing satisfied ones — are not charged.
+ * The combinator is met when any child is met. At pay time, the **first met
+ * child** (in declaration order) is the met branch: if it requires payment,
+ * it pays; if it is a pure test, nothing is paid. Later children — even met
+ * ones that require payment — do not pay.
  *
- * This matches the natural reading of "A OR B": when the earlier branch
- * satisfies, the later one is bypassed. Use it for cost-or-override gates
- * (e.g. `cost OR unlock-achievement`) where a pure-gate satisfaction should
+ * This matches the natural reading of "A OR B": when the earlier branch is
+ * met, the later one is bypassed. Use it for a cost with a test that waives
+ * it (e.g. `cost OR achievement earned`), where a met pure test should
  * waive the cost.
  *
  * @param children - Requirements to OR together
- * @returns A {@link Requirement} satisfied iff any child is satisfied
+ * @returns A {@link Requirement} met iff any child is met
  *
  * @example
  * ```ts
- * // Prestige gates on accumulated source OR computed gain floor; the gain
- * // branch is a pure gate, so it doesn't trigger payment of the cost branch.
+ * // Prestige needs enough coins OR enough prestige gain; the gain
+ * // branch is a pure test, so it doesn't make the cost branch pay.
  * createConversion({
  *   inputs: {
  *     trigger: anyOf(
@@ -360,13 +359,13 @@ export function anyOf(...children: Requirement[]): Requirement {
 /**
  * Compose requirements with AND semantics.
  *
- * The combinator is satisfied when every child is satisfied. At pay time, all
- * pay-bearing children are charged — matching today's flat-array semantics in
- * `payRequirements`. Useful for nesting inside `anyOf` to regain symmetry,
- * since the top-level conversion-input map is already implicit-AND.
+ * The combinator is met when every child is met. At pay time, every child
+ * that requires payment pays, as `payRequirements` does for a flat array.
+ * Useful for nesting inside `anyOf` to regain symmetry, since the top-level
+ * conversion-input map is already implicit-AND.
  *
  * @param children - Requirements to AND together
- * @returns A {@link Requirement} satisfied iff every child is satisfied
+ * @returns A {@link Requirement} met iff every child is met
  *
  * @example
  * ```ts
@@ -406,7 +405,7 @@ export function allOf(...children: Requirement[]): Requirement {
  * Check if all requirements are met
  *
  * @param requirements - One or more requirements to check
- * @returns true if all requirements are satisfied
+ * @returns true if all requirements are met
  */
 export function requirementsMet(requirements: Requirements): boolean {
   if (Array.isArray(requirements)) {
@@ -422,13 +421,13 @@ export function requirementsMet(requirements: Requirements): boolean {
  * Used for bulk purchases.
  *
  * @param requirements - One or more requirements to check
- * @returns Maximum times all requirements can be satisfied
+ * @returns Maximum times all requirements can be met
  */
 export function maxRequirementsMet(requirements: Requirements): DecimalSource {
   if (Array.isArray(requirements)) {
-    // Empty array is vacuously satisfied (matches `requirementsMet([])`'s
+    // Empty array is vacuously met (matches `requirementsMet([])`'s
     // `every` shape). Returning Decimal.dInf mirrors the boolean-true branch
-    // below — "satisfiable any number of times" — and avoids the empty-reduce
+    // below — "met any number of times" — and avoids the empty-reduce
     // throw the public bulk-purchase callers would otherwise propagate.
     if (requirements.length === 0) return Decimal.dInf;
     // Return the minimum across all requirements. Renorm after each min so the
@@ -484,7 +483,7 @@ export function getRequirementDescriptions(requirements: Requirements): string[]
 // === PAY FUNCTIONS ===
 
 /**
- * Pay strategy: divide resource instead of subtract.
+ * Pay function: divide the resource instead of subtracting.
  * Useful for prestige mechanics where you keep a fraction.
  */
 export function payByDivision(requirement: CostRequirement, amount: DecimalSource = 1): void {
@@ -493,7 +492,7 @@ export function payByDivision(requirement: CostRequirement, amount: DecimalSourc
 }
 
 /**
- * Pay strategy: reset resource to default value.
+ * Pay function: reset the resource to its ref default.
  * Standard prestige behavior.
  */
 export function payByReset(requirement: CostRequirement, overrideValue?: DecimalSource): void {
@@ -502,7 +501,7 @@ export function payByReset(requirement: CostRequirement, overrideValue?: Decimal
 }
 
 /**
- * Create a pay function that resets to default
+ * Create a pay function that resets the resource to its ref default
  */
 export function createResetPay(overrideValue?: DecimalSource): (amount?: DecimalSource) => void {
   return function (this: CostRequirement) {

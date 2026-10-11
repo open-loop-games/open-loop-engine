@@ -1,9 +1,9 @@
 /**
- * Resource bag — fixed-capacity holder backed by reactive {@link Resource}s.
+ * Resource bag — amounts per item type under shared capacities, linkable to {@link Resource}s.
  *
- * Wraps a set of named resource slots whose totals fit under a shared capacity
- * cap. Useful for inventories, stat pools, and any "budget across N labelled
- * pots" pattern where the cap is a first-class quantity (static or reactive).
+ * Holds an amount for each item type, under an optional total capacity and
+ * optional per-type capacities. Use it for held goods, stat totals, or any set
+ * of amounts that share a capacity, static or reactive.
  *
  * @cluster resource
  */
@@ -18,10 +18,10 @@ import { registerResourceClamp, type Resource } from './resource';
 export type CapacitySource = DecimalSource | (() => DecimalSource);
 
 /**
- * Sum a set of amounts into a single Decimal. Renormalizes the accumulator
+ * Sum a set of amounts into a single Decimal. Renormalizes the running sum
  * between iterations so the typeof fast path on `Decimal.add` fires on every
- * step, then wraps once at the boundary to honor the `Decimal` return contract
- * for callers that chain instance methods on the result.
+ * addition, then wraps once at the boundary to honor the `Decimal` return
+ * contract for callers that chain instance methods on the result.
  *
  * @internal
  */
@@ -39,11 +39,11 @@ function resolveCapacity(cap: CapacitySource | undefined): Decimal | undefined {
 
 /** Options for configuring a resource bag at creation time. */
 export interface ResourceBagOptions {
-  /** Starting amounts per type ID. Types not listed start at zero. */
+  /** Starting amounts per item type. An item type not listed starts at zero. */
   initial?: Record<string, DecimalSource>;
-  /** Total combined capacity across all types. Can be a getter for reactive limits. */
+  /** Combined capacity across all item types. Can be a getter for a reactive capacity. */
   capacity?: CapacitySource;
-  /** Per-type capacity limits, keyed by type ID. Can be getters for reactive limits. */
+  /** Capacity per item type. Each can be a getter for a reactive capacity. */
   capacityPerType?: Record<string, CapacitySource>;
   /**
    * Behavior when an add operation would exceed capacity.
@@ -52,87 +52,88 @@ export interface ResourceBagOptions {
    * Default: `'block'`.
    */
   overflow?: 'block' | 'discard';
-  /** Human-readable label used by UIs and debug output. */
+  /** Text the player sees for the bag. Default: `''` */
   displayName?: string;
 }
 
-/** A multi-type resource container with optional capacity limits and reactive Resource linking. */
+/** Amounts by item type, with optional capacities and reactive links to Resources. */
 export interface ResourceBag {
-  /** Return the current amount for a type (Decimal zero if absent). */
+  /** Return the current amount for an item type (Decimal zero if absent). */
   get(typeId: string): Decimal;
-  /** Set the amount for a type, clamped to capacity. */
+  /** Set the amount for an item type, clamped to capacity. */
   set(typeId: string, amount: DecimalSource): void;
   /**
-   * Add to a type. Returns the amount actually added.
+   * Add to an item type. Returns the amount actually added.
    * Returns zero when overflow is 'block' and the add would exceed capacity,
    * and for a non-positive amount, which is a no-op.
    */
   add(typeId: string, amount: DecimalSource): Decimal;
   /**
-   * Subtract from a type. Returns the amount actually subtracted.
-   * Pass `allowNegative: true` to allow the balance to go below zero.
+   * Subtract from an item type. Returns the amount actually subtracted.
+   * Pass `allowNegative: true` to allow the amount to go below zero.
    * A non-positive amount is a no-op and returns zero.
    */
   subtract(typeId: string, amount: DecimalSource, allowNegative?: boolean): Decimal;
-  /** Return true if the bag holds at least `amount` of the given type. */
+  /** Return true if the bag holds at least `amount` of the given item type. */
   has(typeId: string, amount: DecimalSource): boolean;
-  /** Return true if the bag satisfies all requirements simultaneously. */
+  /** Return true if the bag holds at least every listed amount at once. */
   hasAll(requirements: Record<string, DecimalSource>): boolean;
-  /** Sum of all type amounts. */
+  /** Sum of all amounts. */
   total(): Decimal;
-  /** All type IDs with a non-zero amount. */
+  /** All item types with a non-zero amount. */
   types(): string[];
   /** All [typeId, amount] pairs with non-zero amounts. */
   entries(): [string, Decimal][];
   /**
-   * Live map of non-zero type amounts. Exposed for hot-path consumers that
-   * iterate all holdings every tick and cannot afford the per-call
-   * allocation of `types()` / `entries()`, which each build a fresh array.
+   * Reactive map of non-zero amounts by item type. Exposed for hot-path
+   * consumers that iterate all amounts every tick. They cannot afford the
+   * per-call allocation of `types()` / `entries()`, which each build a fresh
+   * array.
    *
    * The map reference is stable across `clear()` and `restore()` —
-   * entries are rewritten in place. The bag's mutation funnel deletes any
-   * entry whose amount reaches zero, so iterating this map visits only
-   * non-zero types (matching `entries()` semantics) without the per-call
-   * zero-filter pass.
+   * entries are rewritten in place. The bag's single write path deletes any
+   * entry whose amount reaches zero. So iterating this map visits only
+   * non-zero item types, as `entries()` does, without a per-call zero filter.
    *
    * Callers must not mutate the map directly — writes bypass capacity
    * clamping, `Resource` link sync, and the cached total used by
    * `total()` / `remainingCapacity()`. Use `add` / `set` / `subtract` for
-   * writes. The underlying map is Vue-reactive; reads inside a reactive
-   * effect track dependencies as expected, reads outside are plain
+   * writes. The underlying map is Vue-reactive: reads inside a Vue effect
+   * track dependencies as expected, and reads outside are plain
    * proxy-forwarded lookups.
    */
   readonly amounts: ReadonlyMap<string, Decimal>;
-  /** True when every type amount is zero. */
+  /** True when every amount is zero. */
   isEmpty(): boolean;
   /** Remove all amounts from the bag. */
   clear(): void;
-  /** Remaining combined capacity (Infinity if no total cap is set). */
+  /** Remaining combined capacity (Infinity if no total capacity is set). */
   remainingCapacity(): Decimal;
-  /** Remaining capacity for a specific type, accounting for both per-type and total caps. */
+  /** Remaining capacity for one item type, under both its own capacity and the total. */
   remainingCapacityForType(typeId: string): Decimal;
   /**
-   * Establish a two-way reactive sync between this bag's type slot and a Resource ref.
-   * Writes to the resource are clamped to capacity, except during a save load or
-   * reset, when the written value is taken as saved. Returns an unsubscribe
-   * function that tears down the watchers. A resource links into one bag at a
-   * time; linking it into a second throws.
+   * Keep this bag's amount for an item type and a Resource ref in two-way
+   * reactive sync. Writes to the resource are clamped to capacity, except
+   * during a save load or reset, when the written value is taken as saved.
+   * Returns the cleanup, which removes the watchers and the link. A resource
+   * links into one bag at a time; linking it into a second throws.
    */
   link(typeId: string, resource: Resource<DecimalSource>): () => void;
   /** Serialize all non-zero amounts to a plain string-keyed record for persistence. */
   serialize(): Record<string, string>;
   /** Replace all current amounts with a record {@link serialize} produced. */
   restore(data: Record<string, string>): void;
-  /** Human-readable label used by UIs and debug output. */
+  /** Text the player sees for the bag. */
   displayName: string;
 }
 
 /**
- * Creates a multi-type resource container with optional per-type and total
- * capacity limits.
+ * Create a container of amounts by item type, with an optional total capacity
+ * and optional per-type capacities.
  *
- * @param options - Bag configuration including initial amounts, capacity limits,
- *   and overflow behavior ('block' rejects additions, 'discard' truncates to cap)
+ * @param options - Starting amounts, capacities and overflow behavior: `'block'`
+ *   rejects an add that exceeds capacity, `'discard'` adds up to capacity and
+ *   discards the rest
  * @returns A resource bag supporting add/subtract/has operations, two-way reactive
  *   linking to Resource refs, and serialization for persistence
  *
@@ -167,14 +168,14 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   // write, so a burst of writes pays for one sum and an uncapped bag's writes
   // pay for none. Re-summing rather than folding each delta in keeps it
   // exact: an incremental total drifts under fractional churn and absorbs
-  // any slot ~1e16 below another for good.
+  // any amount ~1e16 below another for good.
   let cachedTotal: Decimal = Decimal.dZero;
   let totalDirty = false;
   // The cache reads the raw map, so it tracks nothing; every write bumps this
-  // for effects to track the total through. A write marks the cache dirty
+  // for Vue effects to track the total through. A write marks the cache dirty
   // before touching the map, because a link's sync watcher runs inside the
-  // map write and may read the total, and bumps the version after, because a
-  // sync effect re-reading the total on the bump must sum the written map.
+  // map write and may read the total. It bumps the version after, because a
+  // sync Vue effect re-reading the total on the bump must sum the written map.
   const totalVersion = shallowRef(0);
 
   function getTotal(): Decimal {
@@ -191,9 +192,9 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
   }
 
   /**
-   * Single mutation funnel. All writes to `amounts` must go through this
-   * so the cached total is invalidated. Zero values drop the entry to keep
-   * the map sparse (preserving prior behavior of `storeAmount`).
+   * Single write path. All writes to `amounts` must go through this so the
+   * cached total is invalidated. A zero amount removes its entry, which keeps
+   * the map sparse.
    */
   function writeAmount(typeId: string, newVal: Decimal): void {
     const drop = newVal.eq(0);
@@ -268,10 +269,10 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), toAdd)));
         return toAdd;
       } else {
-        // destroy: add up to remaining
+        // discard: add up to remaining
         const actualAdd = toFinalDecimal(Decimal.min(toAdd, remaining));
         // `!gt(0)` rather than `lte(0)`: a NaN written here would poison the
-        // slot and every total read after it. `lte` admits NaN, `gt` rejects it.
+        // entry and every total read after it. `lte` admits NaN, `gt` rejects it.
         if (!actualAdd.gt(0)) return Decimal.dZero;
         writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), actualAdd)));
         return actualAdd;
@@ -333,7 +334,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       if (existingCleanup) existingCleanup();
 
       // First, so a resource already linked elsewhere throws before any
-      // watcher installs.
+      // watcher is added.
       const unregisterClamp = registerResourceClamp(resource, (amount) =>
         clampToCapacity(typeId, toFinalDecimal(amount)),
       );
@@ -343,7 +344,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       // Resource → bag, clamped to capacity, with any clamp written back so
       // the two can't diverge with the resource reading over-cap. A save load
       // (or reset) writes linked refs one at a time, so clamping then would
-      // measure each slot against the other slots' pre-load amounts, or
+      // measure each amount against the others' pre-load amounts, or
       // against a capacity whose inputs haven't loaded yet. The loaded state
       // was valid when saved: take it unclamped.
       function syncFromResource(value: DecimalSource): void {
@@ -356,13 +357,13 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         syncing = false;
       }
 
-      // Initial sync, before either watcher installs.
+      // Initial sync, before either watcher is added.
       syncFromResource(resource.value);
 
       // Watch bag → resource. `flush: 'sync'` fires on every ref mutation
-      // instead of coalescing via microtask. Required under the fixed-step
-      // game loop where many sub-ticks can drain in a single macrotask —
-      // downstream cost/cap checks read resource.value across sub-ticks and
+      // instead of coalescing via microtask. Required in fixed tick mode,
+      // where one interval can run many ticks in a single macrotask. Later
+      // cost and capacity checks read resource.value across those ticks and
       // must see the latest bag amount, not a stale pre-microtask value.
       const stopBagWatch = watch(
         () => amounts.get(typeId),
@@ -391,7 +392,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         stopBagWatch();
         stopResourceWatch();
         unregisterClamp();
-        // A superseded link's cleanup, run late, must not drop its successor.
+        // A superseded link's cleanup, run late, must not remove its successor.
         if (links.get(typeId) === cleanup) links.delete(typeId);
       };
 
@@ -425,8 +426,8 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
 /**
  * Move up to `amount` of `typeId` from one {@link ResourceBag} to another,
- * clamped by both the source's available stock and the destination's
- * remaining capacity. Returns the amount actually transferred.
+ * clamped by both the source's amount and the destination's remaining
+ * capacity. Returns the amount actually transferred.
  */
 export function transferBetweenBags(
   from: ResourceBag,
@@ -448,10 +449,10 @@ export function transferBetweenBags(
 }
 
 /**
- * Transfer multiple resource types between bags in one operation. With
- * `allOrNothing`, the transfer is atomic — if any type can't move fully (or
- * total exceeds destination capacity), nothing moves. Otherwise each type is
- * clamped independently via {@link transferBetweenBags}.
+ * Transfer several item types between bags in one call. With `allOrNothing`,
+ * the transfer is atomic: if any item type can't move fully, or the total
+ * exceeds the destination's capacity, nothing moves. Otherwise each item type
+ * is clamped on its own through {@link transferBetweenBags}.
  */
 export function transferAmountsBetweenBags(
   from: ResourceBag,

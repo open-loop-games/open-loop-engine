@@ -1,14 +1,15 @@
 /**
- * Modifier system — composable value calculation chains
+ * Modifier — composable apply/invert steps and modifier chains
  *
- * Modifiers are the building blocks for production rates, bonuses, and derived
- * values. Chain them with {@link createSequentialModifier} to build a pipeline
- * like `base → +10 → ×2 → ^0.5` that can run forward (apply) and backward (invert).
+ * Modifiers are the building blocks for production rates, multipliers and
+ * derived values. Compose them with {@link createSequentialModifier} into a
+ * sequential modifier like `base → +10 → ×2 → ^0.5`, which runs forward
+ * (apply) and backward (invert).
  *
  * - {@link createAdditiveModifier} — `value + addend`
  * - {@link createMultiplicativeModifier} — `value × multiplier`
  * - {@link createExponentialModifier} — `value ^ exponent`
- * - {@link createSequentialModifier} — compose modifiers into a pipeline
+ * - {@link createSequentialModifier} — compose modifiers into a sequential modifier
  * - {@link computeModifiedValue} — reactive computed applying modifiers to a base
  */
 
@@ -24,7 +25,7 @@ import { getCurrentFullPersistentContext } from './persistence';
 import { profile, profileEnd, profileStart } from './profiler';
 
 /**
- * A single step in a value calculation pipeline.
+ * One apply/invert step on a value.
  *
  * Every modifier can `apply` (forward) and optionally `invert` (backward).
  * Inversion enables "how much base do I need to reach X?" calculations —
@@ -67,10 +68,10 @@ export type OperationModifier<T> = WithRequired<
 
 /** Options for {@link createAdditiveModifier} */
 export interface AdditiveModifierOptions {
-  /** The amount to add. Can be a ref/getter for dynamic values (e.g., scaling with upgrades). */
+  /** The value to add. Can be a ref/getter for dynamic values (e.g., scaling with upgrades). */
   addend: Computable<DecimalSource>;
   /**
-   * Label for the UI breakdown (e.g., "Upgrade bonus"). Can be a getter for
+   * Text for the UI breakdown (e.g., "Upgrade bonus"). Can be a getter for
    * dynamic text. A plain string — the factory wraps it into the
    * `ModifierDescription` shape that `Modifier.description` exposes.
    */
@@ -84,8 +85,8 @@ export interface AdditiveModifierOptions {
 /**
  * Create a modifier that adds a value to the input.
  *
- * @param options - Configuration for the additive modifier
- * @returns A modifier that adds the specified amount
+ * @param options - Options for the additive modifier
+ * @returns A modifier that adds the given addend
  *
  * @example
  * ```ts
@@ -130,7 +131,7 @@ export interface MultiplicativeModifierOptions {
   /** The factor to multiply by. Can be a ref/getter for dynamic values. */
   multiplier: Computable<DecimalSource>;
   /**
-   * Label for the UI breakdown. Can be a getter for dynamic text. A plain
+   * Text for the UI breakdown. Can be a getter for dynamic text. A plain
    * string — the factory wraps it into the `ModifierDescription` shape that
    * `Modifier.description` exposes.
    */
@@ -144,8 +145,8 @@ export interface MultiplicativeModifierOptions {
 /**
  * Create a modifier that multiplies the input by a value.
  *
- * @param options - Configuration for the multiplicative modifier
- * @returns A modifier that multiplies by the specified amount
+ * @param options - Options for the multiplicative modifier
+ * @returns A modifier that multiplies by the given multiplier
  *
  * @example
  * ```ts
@@ -157,16 +158,16 @@ export interface MultiplicativeModifierOptions {
  *
  * @example Per-action conditional multiplier via `enabled` predicate:
  * ```ts
- * // Glasses boost wander progress, but only while equipped
- * const glassesBoost = createMultiplicativeModifier({
+ * // A pickaxe boosts mining progress, but only while equipped
+ * const pickaxeBoost = createMultiplicativeModifier({
  *   multiplier: 1.5,
- *   description: 'Glasses',
- *   enabled: computed(() => equipment.has('glasses')),
+ *   description: 'Pickaxe',
+ *   enabled: computed(() => equipment.has('pickaxe')),
  * });
  * ```
- * For lifecycle management + balance-sim attribution, bind conditional
- * modifiers through {@link createConditionalEffectSystem} rather than
- * toggling `enabled` manually.
+ * For lifecycle handling and balance-harness attribution, bind a modifier a
+ * predicate controls through {@link createConditionalEffectSystem}, rather
+ * than toggling `enabled` by hand.
  */
 export function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(
   options: T,
@@ -201,7 +202,7 @@ export interface ExponentialModifierOptions {
   /** The power to raise the input to. Can be a ref/getter for dynamic values. */
   exponent: Computable<DecimalSource>;
   /**
-   * Label for the UI breakdown. Can be a getter for dynamic text. A plain
+   * Text for the UI breakdown. Can be a getter for dynamic text. A plain
    * string — the factory wraps it into the `ModifierDescription` shape that
    * `Modifier.description` exposes.
    */
@@ -221,8 +222,8 @@ export interface ExponentialModifierOptions {
 /**
  * Create a modifier that raises the input to a power.
  *
- * @param options - Configuration for the exponential modifier
- * @returns A modifier that exponentiates by the specified amount
+ * @param options - Options for the exponential modifier
+ * @returns A modifier that raises the input to the given exponent
  *
  * @example
  * ```ts
@@ -288,9 +289,9 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
 // === SEQUENTIAL MODIFIER ===
 
 /**
- * Compose multiple modifiers into a single pipeline that applies them in order.
+ * Compose modifiers into one sequential modifier that applies them in order.
  *
- * This is the primary way to build a calculation chain in the engine. Disabled
+ * This is the engine's main way to compose modifiers. Disabled
  * modifiers are skipped. Inversion runs the chain in reverse (required: every
  * child modifier must have `invert` for the composite to be invertible).
  *
@@ -299,7 +300,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
  * mutations (push/splice on the original array) are visible at evaluation
  * time — consumers that want a stable snapshot must pass a copy.
  *
- * @param modifiers - Array of modifiers to compose into a pipeline
+ * @param modifiers - Array of modifiers to compose
  * @returns A single {@link Modifier} that applies all children in sequence, plus a readonly `children` array
  *
  * @example
@@ -370,7 +371,7 @@ export function createSequentialModifier<T extends Modifier>(
       return modifiers.some((m) => m.description != null) ? describeAll : undefined;
     },
 
-    /** Read-only access to the component modifiers in this chain */
+    /** Read-only access to the modifiers this sequential modifier composes */
     children: modifiers as readonly T[],
   } as ReturnType<typeof createSequentialModifier<T>>;
 }
@@ -388,17 +389,17 @@ export interface ModifierChainEvents {
 /**
  * Options for {@link ModifierChain.bind}.
  *
- * A "bound" modifier is a {@link Modifier} added to a chain with auto-derived
- * attribution (so balance-sim/devtools can trace each chain contribution back
- * to its originating category + item) and an optional reactive predicate that
- * gates evaluation.
+ * A binding is a {@link Modifier} added to a chain with auto-derived
+ * attribution. The balance harness and devtools use it to trace each modifier
+ * back to its owner. A binding may also have a reactive predicate that must
+ * hold for it to evaluate.
  */
 export interface BindOptions {
   /**
    * Reactive predicate controlling whether the bound modifier is active.
    * Composed AND-style with any existing `enabled` flag on the modifier itself.
-   * When omitted, the binding is always active (useful for permanent
-   * contributions with attribution metadata).
+   * When omitted, the binding is always active (useful for an always-on
+   * modifier with attribution).
    */
   active?: Computable<boolean>;
   /**
@@ -408,22 +409,23 @@ export interface BindOptions {
    */
   modifier: Modifier | (() => Modifier);
   /**
-   * Override the auto-derived binding id. Normally omitted — the id is
-   * derived from the ambient persistent context (`getCurrentFullPersistentContext`)
-   * and the attribution text, producing `{scope}/{text}`.
+   * An explicit binding id, in place of the derived one. Normally omitted —
+   * the id is derived from the enclosing persistent context
+   * (`getCurrentFullPersistentContext`) and the attribution text, as
+   * `{persistentContextId}/{text}`.
    */
   id?: string;
   /**
-   * Stable attribution text for id derivation (`{scope}/{text}`). When
-   * omitted (and no explicit `id`), bind falls back to invoking the
-   * modifier's `description` getter — which for factory modifiers formats
-   * the *current value*, forcing the value getter's first evaluation at
-   * bind time. A value getter whose first run reads zero reactive deps
-   * (e.g. a lookup that misses because its target registers later) freezes
-   * its computed permanently, so pass this whenever the text is known.
+   * Stable attribution text for id derivation (`{persistentContextId}/{text}`).
+   * When omitted (and no explicit `id`), bind falls back to invoking the
+   * modifier's `description` getter. For a factory modifier, that getter
+   * formats the *current value*, so the value getter first evaluates at bind
+   * time. A value getter whose first run reads zero reactive deps (e.g. a
+   * lookup that misses because its target registers later) freezes its
+   * computed permanently. So pass this whenever the text is known.
    */
   text?: string;
-  /** Free-form attribution tags surfaced through {@link ModifierChain.bindings}. */
+  /** Free-form attribution tags, returned by {@link ModifierChain.bindings}. */
   tags?: readonly string[];
 }
 
@@ -436,28 +438,29 @@ export interface BindingRecord {
   readonly id: string;
   /** The modifier that was bound. */
   readonly modifier: Modifier;
-  /** The active predicate (if any) gating this binding's evaluation. */
+  /** The active predicate (if any) that must hold for this binding to evaluate. */
   readonly active?: MaybeRef<boolean>;
   /** Free-form attribution tags supplied at bind time. */
   readonly tags: readonly string[];
   /**
-   * The full (namespaced) persistent context id this binding was registered
-   * in, or `undefined` if the binding was created outside any
-   * `withPersistentContext` scope.
+   * The full persistent context id, with its persistence namespace, that was
+   * open when this binding was made, or `undefined` if no
+   * `withPersistentContext` call was open.
    */
   readonly persistentContextId: string | undefined;
 }
 
 /**
- * Declarative binding entry — the shape consumers use inside per-category
- * declarative fields (`grants` / `restricts` / `rewards`). Each entry says
- * *what modifier* to bind to *which chain(s)* when the surrounding category
- * signal is active; the category supplies the implicit `active` predicate
- * (e.g. `item.active` for purchasables) so consumer code doesn't repeat it.
+ * A grant — the authored entry consumers use in a category's declarative
+ * fields (`grants` / `restricts` / `rewards`) and an effect-system def's
+ * `grants`. Each grant says *what modifier* to bind to *which chain(s)*
+ * while its owner is active. The owner supplies the implicit `active`
+ * predicate (e.g. `item.active` for purchasables), so consumer code doesn't
+ * repeat it.
  *
  * Use the `mult` / `add` / `exp` short-hands for the common modifier kinds;
  * the `modifier` variant is the escape hatch for hand-built modifiers
- * (invertible chains, sequential composites, replacement bindings).
+ * (invertible chains, sequential composites, replacement grants).
  */
 export type Grant =
   | {
@@ -465,7 +468,7 @@ export type Grant =
       chain: ModifierChain | ModifierChain[];
       /** Multiplier value (or reactive source). */
       mult: Computable<DecimalSource>;
-      /** Stable description used for attribution + UI breakdowns. */
+      /** Stable display text for UI breakdowns, also used as the attribution text. */
       description: string;
       /**
        * Optional additional predicate AND-composed with the owner's implicit
@@ -496,22 +499,23 @@ export type Grant =
     };
 
 /**
- * A named, auto-composing sequential modifier that acts as a registry.
- * Other modules add modifiers via `add()` (raw) or `bind()` (with attribution).
+ * A named, auto-composing sequential modifier that other modules add to,
+ * via `add()` (raw) or `bind()` (with attribution).
  * The chain composes them internally via {@link createSequentialModifier}
  * and exposes `apply` / `invert` / `description`.
  *
  * Evaluation follows insertion order, so a chain mixing `+10` and `×2`
- * gives a different value depending on which went in first. A contribution
- * that comes and goes keeps its place by staying in the chain: `bind` with
- * `active` gates it where it sits, {@link ModifierChain.reserve} holds an
- * empty position for it, and {@link ModifierChain.replace} swaps it in
- * place. Removing and re-adding moves it to the end.
+ * gives a different value depending on which went in first. A modifier
+ * that comes and goes keeps its place by staying in the chain. `bind` with
+ * `active` keeps it at its position, in force only while `active` holds.
+ * {@link ModifierChain.reserve} holds an empty position for it.
+ * {@link ModifierChain.replace} replaces it in place. Removing and re-adding
+ * moves it to the end.
  *
  * Implements the {@link Modifier} interface so it can be used anywhere a modifier is expected.
  */
 export interface ModifierChain extends Modifier {
-  /** Unique identifier for this chain */
+  /** Unique id for this chain */
   readonly id: string;
   /**
    * Add a modifier to the chain. Returns a function to remove it.
@@ -524,15 +528,16 @@ export interface ModifierChain extends Modifier {
   /**
    * Add a modifier with auto-derived attribution and an optional reactive
    * `active` predicate. Prefer this over {@link add} for consumer code:
-   * balance-sim, devtools, and modifier inspectors walk
-   * {@link bindings} to attribute each chain contribution to its source.
+   * the balance harness, devtools and modifier inspectors walk
+   * {@link bindings} to attribute each modifier to its owner.
    *
-   * Auto-id format: `{scope}/{text}` where `scope` comes from the ambient
-   * persistent context and `text` is `opts.description` when given, else
-   * the modifier's own description text (invoking its getter — prefer
-   * passing `opts.description`, see {@link BindOptions}). Outside any
-   * context, emits a warning and uses just the text as the id. Duplicate
-   * ids within one chain throw — override via `opts.id` when intentional.
+   * Auto-id format: `{persistentContextId}/{text}`, where
+   * `persistentContextId` is the enclosing persistent context. `text` is
+   * `opts.text` when given, else the modifier's own description text. That
+   * fallback invokes its getter, so prefer passing `opts.text` (see
+   * {@link BindOptions}). Outside any persistent context, it warns and uses
+   * the text alone as the id. Duplicate ids within one chain throw; pass
+   * `opts.id` when the repeat is intended.
    *
    * @returns A function that removes the binding (modifier + attribution record) from the chain.
    */
@@ -540,8 +545,8 @@ export interface ModifierChain extends Modifier {
   /** Remove a previously added modifier (its first occurrence, slots included) */
   remove(modifier: Modifier): void;
   /**
-   * Swap `current` for `next` at `current`'s position, recomposing once.
-   * Use it to substitute a modifier without moving it to the end.
+   * Put `next` at `current`'s position, recomposing once.
+   * Use it to replace a modifier without moving it to the end.
    *
    * @returns `false`, changing nothing, when `current` isn't in the chain.
    */
@@ -549,16 +554,16 @@ export interface ModifierChain extends Modifier {
   /**
    * Reserve a position at the end of the chain for modifiers added later.
    * Whatever goes through the slot evaluates at that position, however long
-   * it was empty, so a contribution that toggles, or that registers before
-   * it first applies, lands in the same place every time.
+   * it was empty. So a modifier that toggles, or that registers before it
+   * first applies, is at the same place every time.
    */
   reserve(): ModifierChainSlot;
   /** Read-only snapshot of the current modifiers in the chain, in evaluation order */
   readonly modifiers: readonly Modifier[];
   /**
    * Attribution records for every modifier added via {@link bind} (modifiers
-   * added via raw {@link add} do not appear here). Walk this to surface
-   * "where does each contribution come from?" in balance-sim / devtools.
+   * added via raw {@link add} do not appear here). Walk this to show where
+   * each modifier comes from, in balance-harness tools or devtools.
    * A method (fresh snapshot per call), unlike the `modifiers` property.
    */
   bindings(): readonly BindingRecord[];
@@ -594,11 +599,11 @@ export interface ModifierChainSlot {
  * Chains constructed outside an engine (tests, throwaway scripts) skip
  * registration silently — the primitive still works, just isn't discoverable.
  *
- * Duplicate ids within a single engine throw on construction. Use namespaced
- * ids (e.g., `"producers/coin-mine/rate"`) for per-entity chains.
+ * Duplicate ids within a single engine throw on construction. Use path-shaped
+ * ids (e.g., `"producers/coin-mine/rate"`) for per-def chains.
  *
- * @param id - Unique name for the chain (e.g., 'decay', 'maxHealth')
- * @returns A {@link ModifierChain} that acts as both a registry and a modifier
+ * @param id - Unique id for the chain (e.g., 'decay', 'maxHealth')
+ * @returns A {@link ModifierChain}: a modifier that other modules add modifiers to
  *
  * @example Single-module chain with direct add:
  * ```ts
@@ -609,17 +614,17 @@ export interface ModifierChainSlot {
  * }
  * ```
  *
- * @example Surface-wide chain shared across modules via a conditional effect:
+ * @example An engine-wide chain shared across modules through a conditional effect:
  * ```ts
  * // Module A creates the chain — auto-registered for discovery
  * const progressChain = createModifierChain('progress');
  *
  * // Module B binds a conditional modifier through a conditional effect
  * effects.register({
- *   id: 'affected-by:wander:glasses',
- *   active: computed(() => equipment.has('glasses')),
- *   modifiers: [{ chain: progressChain, modifier: () =>
- *     createMultiplicativeModifier({ multiplier: 1.5, description: 'Glasses' }) }],
+ *   id: 'affected-by:mine:pickaxe',
+ *   active: computed(() => equipment.has('pickaxe')),
+ *   grants: [{ chain: progressChain, modifier: () =>
+ *     createMultiplicativeModifier({ multiplier: 1.5, description: 'Pickaxe' }) }],
  * });
  *
  * // Balance tool enumerates all chains
@@ -627,8 +632,8 @@ export interface ModifierChainSlot {
  * for (const chain of registry.all()) console.log(chain.id);
  * ```
  * Prefer binding through {@link createConditionalEffectSystem} over raw
- * `chain.add()` so the {@link EffectSystemRegistryKey | EffectSystemRegistry}
- * can trace every modifier to its source for balance-sim attribution.
+ * `chain.add()`, so the {@link EffectSystemRegistryKey | effect-system registry}
+ * can trace every modifier to its owner for balance-harness attribution.
  */
 export function createModifierChain(id: string): ModifierChain {
   // `layout` is the chain in evaluation order, with reserved slots inline;
@@ -639,14 +644,14 @@ export function createModifierChain(id: string): ModifierChain {
   const handle = createEmitHandle<ModifierChainEvents>();
 
   // `enabled`, `apply`, `invert`, and `description` are all composition-reactive:
-  // reading any of them inside a reactive scope (e.g. `computed(() => chain.apply(x))`)
+  // reading any of them inside a computed or watcher (e.g. `computed(() => chain.apply(x))`)
   // tracks `itemsVersion`, so when `recompose` bumps it on add/remove the consumer
   // re-runs and re-binds to the freshly composed modifier set — and, via the fresh
   // apply/invert/description's own reads, to the inner enabled/multiplier refs.
   // `enabled` is a stable ComputedRef; the other three are getters that read
   // `itemsVersion` before delegating to the current `composed` snapshot. (A plain
   // reassigned property would NOT capture this — Vue tracks the inner ref/version,
-  // not the object's property slot.) Do NOT destructure these off the chain
+  // not the object's property.) Do NOT destructure these off the chain
   // (`const { apply } = chain`): that snapshots the function and severs composition
   // reactivity. `itemsVersion` is the single dependency `recompose` bumps to drive
   // all four.
@@ -690,8 +695,8 @@ export function createModifierChain(id: string): ModifierChain {
     enabled: computed<boolean>(() => {
       void itemsVersion.value;
       // Empty chain or no modifier declares an `enabled` flag → treat as
-      // always-enabled. Matches the pre-fix behavior where `composed.enabled`
-      // was `undefined` (and `applyModifier`'s `=== false` check passed).
+      // always-enabled, the same as an `undefined` `enabled`, which
+      // `applyModifier`'s `=== false` check passes.
       if (items.length === 0 || items.every((m) => m.enabled == null)) return true;
       return items.some((m) => unref(m.enabled) !== false);
     }),
@@ -713,11 +718,11 @@ export function createModifierChain(id: string): ModifierChain {
       const modifier =
         activeRef == null ? rawModifier : delegateModifier(rawModifier, { when: activeRef });
 
-      // Resolve id — explicit override wins, then explicit attribution text,
+      // Resolve id — an explicit id wins, then explicit attribution text,
       // then (fallback) the modifier's own description getter. The fallback
       // *invokes* that getter, which for factory modifiers evaluates the
-      // underlying value — see BindOptions.description for the freeze hazard.
-      const scope = getCurrentFullPersistentContext();
+      // underlying value — see BindOptions.text for the freeze hazard.
+      const persistentContextId = getCurrentFullPersistentContext();
       let bindingId = opts.id;
       if (bindingId == null) {
         const descText = opts.text ?? resolveDescriptionText(modifier);
@@ -727,7 +732,7 @@ export function createModifierChain(id: string): ModifierChain {
               `the modifier has no description, and no explicit \`id\` was provided.`,
           );
         }
-        bindingId = scope == null ? descText : `${scope}/${descText}`;
+        bindingId = persistentContextId == null ? descText : `${persistentContextId}/${descText}`;
       }
 
       if (bindingsById.has(bindingId)) {
@@ -737,7 +742,7 @@ export function createModifierChain(id: string): ModifierChain {
         );
       }
 
-      if (scope == null && opts.id == null) {
+      if (persistentContextId == null && opts.id == null) {
         console.warn(
           `chain.bind on "${chain.id}": called outside any persistent context. ` +
             `Binding will still work but won't be attributed to a category or module.`,
@@ -749,7 +754,7 @@ export function createModifierChain(id: string): ModifierChain {
         modifier,
         active: activeRef,
         tags: opts.tags ?? [],
-        persistentContextId: scope,
+        persistentContextId,
       };
       bindingsById.set(bindingId, record);
 
@@ -815,8 +820,8 @@ export function createModifierChain(id: string): ModifierChain {
   };
 
   // Auto-register into the current engine's chain registry when constructed
-  // inside an install()/connect() phase. Outside an engine (tests, ad-hoc
-  // scripts) the ambient is undefined and registration is a silent no-op.
+  // during install/connect. Outside an engine (tests, ad-hoc scripts) the
+  // ambient value is undefined and registration is a silent no-op.
   getCurrentChainRegistry()?.register(chain);
 
   return chain;
@@ -865,7 +870,7 @@ export function delegateModifier(
 }
 
 /**
- * Best-effort extraction of the stable text key from a modifier's description.
+ * Best-effort extraction of the attribution text from a modifier's description.
  * Returns the `.text` of a {@link ModifierDescription}, or the joined texts of
  * a description-array (sequential modifier output), or `undefined` when the
  * modifier has no description at all.

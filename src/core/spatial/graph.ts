@@ -5,15 +5,15 @@
  *
  * Plain-data, Vue-free. Authoritative storage is two `Map`s (nodes, edges)
  * plus an adjacency index. Nodes may own a nested `Graph` accessed
- * via `createChildGraph` / `getChildGraph`, enabling recursive scope
- * structures (ScopeStack composes on top).
+ * via `createChildGraph` / `getChildGraph`. That is what lets a
+ * `ScopeStack`, built on top, enter nested graph scopes.
  *
- * Persistence is structure-level: `serialize()` returns a plain-object
- * snapshot whose `children` field is a recursive map of child-graph
- * snapshots. `restore(snapshot)` rebuilds in place. The consumer wraps the
- * snapshot in a single `persistent()` ref — the engine never spawns per-
- * node refs. Deeply-nested structures hit the JS engine's JSON depth limit
- * (~10k levels); current consumers sit at 2–5.
+ * Persistence is structure-level: `serialize()` returns the graph's
+ * serialized form, whose `children` field maps each owner node to its child
+ * graph's serialized form, recursively. `restore(serialized)` rebuilds in
+ * place. The consumer wraps the serialized form in a single `persistent()`
+ * ref; the engine never creates a ref per node. Deeply nested structures
+ * hit the JavaScript runtime's JSON depth limit (about 10k levels).
  *
  * Events (camelCase, matching grid.ts):
  * - `nodeAdded(node)`
@@ -23,9 +23,9 @@
  * - `childGraphCreated(nodeId, child)`
  * - `childGraphDestroyed(nodeId)`
  *
- * `removeNode` cascades: all attached edges emit first, then any child
- * graph is destroyed (descendants emitted on the child's handle bottom-up),
- * then `childGraphDestroyed` fires on this graph, then `nodeRemoved`.
+ * `removeNode` cascades. All attached edges emit first. Then any child graph
+ * is destroyed, and its descendants emit on the child's handle bottom-up.
+ * Then `childGraphDestroyed` is emitted on this graph, and last `nodeRemoved`.
  *
  * Multigraph is permitted — `addEdge` does not dedupe. Undirected semantics:
  * `edgesBetween(a, b)` returns edges with either endpoint ordering.
@@ -55,14 +55,14 @@ export interface GraphEdge<E> {
 /** Options accepted by {@link createGraph}. */
 export interface GraphOptions {
   /**
-   * Stable ID generator used when `addNode` / `addEdge` are called without
+   * Stable id generator used when `addNode` / `addEdge` are called without
    * an explicit `id`. Defaults to a closure-local monotonic counter. Child
    * graphs inherit the parent's generator, and a draw already held by any
    * node or edge anywhere in the tree is skipped, so auto ids stay unique
    * across levels, a restore included. After a reload the default counter
-   * restarts, so a fresh id can reuse one a removed node or edge once held;
-   * to keep the sequence an uninterrupted session would draw, inject a
-   * counter and persist its position.
+   * restarts, so a fresh id can reuse one a removed node or edge once held.
+   * To keep the sequence an uninterrupted play session would draw, inject a
+   * counter and save its position.
    */
   readonly idGenerator?: () => string;
 }
@@ -78,16 +78,16 @@ export interface GraphEvents<N, E> {
 }
 
 /**
- * Plain-object snapshot of a graph's full state, including recursively any
- * child graphs. Returned by `serialize()` and accepted by `restore()`. Wrap
- * in a single `persistent()` ref to persist across saves; per-node
- * `persistent()` is explicitly rejected.
+ * Serialized form of a graph's full state, child graphs included
+ * recursively. Returned by `serialize()` and accepted by `restore()`. Wrap
+ * it in a single `persistent()` ref to save it; do not give each node its
+ * own `persistent()` ref.
  */
 export interface SerializedGraph<N, E> {
   version: 1;
   nodes: Array<{ id: string; data: N }>;
   edges: Array<{ id: string; fromId: string; toId: string; data: E }>;
-  /** nodeId → child graph snapshot. Keys must reference ids in `nodes`. */
+  /** nodeId → the child graph's serialized form. Keys must reference ids in `nodes`. */
   children: Record<string, SerializedGraph<N, E>>;
 }
 
@@ -96,7 +96,7 @@ export interface Graph<N, E> {
   // Node CRUD ----------------------------------------------------------------
 
   /**
-   * Adds a node carrying `data`. If `opts.id` is provided, it is used as-is
+   * Adds a node with `data`. If `opts.id` is provided, it is used as-is
    * and must be unique within this graph; otherwise the configured
    * `idGenerator` is called. The returned node's `parentId` reflects the
    * graph's owner — non-null for nodes in child graphs, null at root.
@@ -106,11 +106,11 @@ export interface Graph<N, E> {
   addNode(data: N, opts?: { id?: string }): GraphNode<N>;
 
   /**
-   * Removes a node by id. Cascade order: every attached edge is removed
-   * first (each emits `edgeRemoved`); any child graph is then destroyed
-   * bottom-up (its own nodes/edges emit on the child's handle), followed
-   * by `childGraphDestroyed(id)` on this graph; finally `nodeRemoved(id)`
-   * fires. Throws if the node does not exist.
+   * Removes a node by id. Every attached edge is removed first, and each
+   * emits `edgeRemoved`. Any child graph is then destroyed bottom-up, and its
+   * own nodes and edges emit on the child's handle. Then `childGraphDestroyed(id)`
+   * is emitted on this graph, and last `nodeRemoved(id)`. Throws if the node
+   * does not exist.
    */
   removeNode(id: string): void;
 
@@ -159,7 +159,7 @@ export interface Graph<N, E> {
   // Duplicate scanning -------------------------------------------------------
 
   /**
-   * Bucket nodes by a caller-supplied key. Returns only buckets with ≥ 2
+   * Group nodes by a caller-supplied key. Returns only groups with ≥ 2
    * entries — i.e. actual duplicates. O(n) over nodes; the caller owns any
    * dirty-flag caching (graph mutation shapes are domain-specific).
    */
@@ -186,20 +186,21 @@ export interface Graph<N, E> {
 
   serialize(): SerializedGraph<N, E>;
   /**
-   * Replace this graph's state from a snapshot: clears nodes, edges, and
-   * child graphs, then rebuilds from `snapshot`. Silent: no events fire, so
-   * a view over the graph re-reads it after a restore.
+   * Replace this graph's state from a serialized form: clears nodes, edges,
+   * and child graphs, then rebuilds from `serialized`. Silent: no events are
+   * emitted, so a view over the graph re-reads it after a restore.
    *
    * Every child graph is a new object afterwards, even under an owner id
-   * that survives, so anything holding one points at a detached graph whose
-   * writes never reach the next `serialize()`. Re-acquire held children via
+   * the restore keeps. So anything holding one points at a detached graph
+   * whose writes never reach the next `serialize()`. Re-acquire held children via
    * `getChildGraph`, and call `restore` on a `ScopeStack` over this graph
    * after this restore, never before.
    *
-   * Throws on a snapshot integrity violation anywhere in its tree (unknown
-   * version, duplicate id, edge referencing missing node, child keyed on
-   * missing node), before it changes anything: a rejected restore leaves the
-   * graph and its children as they were.
+   * Throws on an integrity violation anywhere in the serialized tree: an
+   * unknown format version, a duplicate id, an edge that references a missing
+   * node, or a child keyed on a missing node. It throws before it changes
+   * anything, so a rejected restore leaves the graph and its children as they
+   * were.
    */
   restore(serialized: SerializedGraph<N, E>): void;
 }
@@ -238,7 +239,7 @@ interface TreeOptions {
   readonly takenIds: Map<string, number>;
 }
 
-// `initial` is a snapshot validateSerialized has already passed, loaded as the
+// `initial` is a serialized form validateSerialized has already passed, loaded as the
 // graph is built.
 function makeGraph<N, E>(
   tree: TreeOptions,
@@ -265,7 +266,7 @@ function makeGraph<N, E>(
   // still rejects collisions). An auto id skips every id taken in the tree,
   // because restore() reloads ids the generator will hand out again — the
   // default counter starts fresh at 0 while the tree already holds "1".."N", so
-  // the next draw would clash. Bounded to surface a broken (non-advancing)
+  // the next draw would clash. Bounded to expose a broken (non-advancing)
   // consumer idGenerator instead of spinning forever.
   function resolveId(explicit: string | undefined): string {
     if (explicit !== undefined) return explicit;
@@ -536,7 +537,7 @@ function makeGraph<N, E>(
     },
   };
 
-  // Build from a snapshot validateSerialized has passed, into an empty graph.
+  // Build from a serialized form validateSerialized has passed, into an empty graph.
   function load(snapshot: SerializedGraph<N, E>): void {
     for (const entry of snapshot.nodes) {
       nodes.set(entry.id, { id: entry.id, data: entry.data, parentId: ownerNodeId });

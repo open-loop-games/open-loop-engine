@@ -28,7 +28,7 @@ export type MaybeGetter<T> = T | (() => T);
  * Unwrap a {@link Computable} to its current value in a single step.
  *
  * Unlike {@link toMaybeRef} (which wraps getters in `computed()`), this
- * evaluates eagerly — suitable for one-shot reads, not reactive chains.
+ * evaluates eagerly — suitable for one-shot reads, not reactive ones.
  *
  * @param value - A raw value, ref, or getter function
  * @returns The current value

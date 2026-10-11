@@ -1,7 +1,7 @@
 // === CONSUMER API ===
 // What game modules typically import.
 
-// === PRIMITIVES SURFACED BY CORE'S PUBLIC API ===
+// === PRIMITIVES IN CORE'S PUBLIC API ===
 export { Decimal } from '../primitives/decimal';
 export type { DecimalSource } from '../primitives/decimal';
 export type { RequiredKeys } from './common';
@@ -61,7 +61,7 @@ export {
   computeModifiedValue,
 } from './modifier';
 
-// === ENGINE-SCOPED REGISTRIES (CHAIN, EFFECT-SYSTEM, RESOURCE) ===
+// === PER-ENGINE REGISTRIES (CHAIN, EFFECT-SYSTEM, RESOURCE) ===
 export type {
   ChainRegistry,
   EffectSystemRegistry,
@@ -128,10 +128,10 @@ export {
 export * from './formulas';
 
 // === EFFECTS ===
-// ICondition + C and BranchEffect + IEffectInternal are engine-internal
-// IR — imported via `@/core/conditions` / `@/primitives/types` from tests and
-// from systems-layer callers that need the projection target. Not part of
-// the public surface.
+// ICondition + C (the condition IR) and BranchEffect + IEffectInternal are
+// engine-internal — imported via `@/core/conditions` / `@/primitives/types` from
+// tests and from systems callers that need the projection target. Not part of
+// the API surface.
 export type { ResolvedEffect, GameStateMutator } from './effects';
 export { resolveEffect, applyEffect, E } from './effects';
 
@@ -316,17 +316,18 @@ export {
   exponentialFalloff,
 } from './spatial';
 
-// === DEV TOOLS & ADVANCED CONSUMER HELPERS ===
+// === DEV TOOLS & ADVANCED CONSUMER UTILITIES ===
 
-// === COMPUTED / REACTIVITY HELPERS ===
+// === COMPUTED / REACTIVITY UTILITIES ===
 export type { MaybeGetter, Computable } from './computed';
 export { toMaybeRef, resolveComputable } from './computed';
 
-// === PERSISTENCE CONTEXT SCOPING ===
-// withPersistentContext is the scoping entry point for custom category
+// === PERSISTENT CONTEXTS ===
+// withPersistentContext opens a persistent context for custom category
 // factories. The raw begin/end pair and the remaining persistence symbols stay
 // engine-internal, reached by direct '@/core/persistence' imports from the
-// systems layer; withPersistentContext pops its context even when its body throws.
+// systems source layer; withPersistentContext pops its persistent context even
+// when its body throws.
 export { withPersistentContext } from './persistence';
 
 // === TRACE ===

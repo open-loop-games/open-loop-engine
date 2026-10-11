@@ -12,7 +12,7 @@
 import { createNanoEvents } from 'nanoevents';
 import { reportEmitDepthTrip } from './safeguards';
 
-/** Default maximum emit depth before recursive chains are blocked. */
+/** Default maximum emit depth before recursive emits are blocked. */
 export const DEFAULT_MAX_EMIT_DEPTH = 10;
 
 /** Public event interface exposed on system instances — subscribe only, emit is internal. */
@@ -23,7 +23,10 @@ export interface Emittable<E> {
 
 /** Internal event interface held inside factory closures — subscribe and emit. */
 export interface EmitHandle<E> {
-  /** Emit an event to all current subscribers. Blocked if recursive depth exceeds the configured limit. */
+  /**
+   * Emit an event to every current handler. Blocked when the emit depth
+   * exceeds the configured limit.
+   */
   emit<K extends keyof E>(
     event: K,
     ...args: E[K] extends (...args: infer A) => any ? A : never

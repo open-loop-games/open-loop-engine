@@ -1,22 +1,22 @@
 /**
- * Resource system — the fundamental currency of incremental games
+ * Resource — the reactive, saved quantities an incremental game is built on
  *
  * A resource is a named, persistent, reactive Decimal value. Everything in an
- * incremental game revolves around resources: earning points, spending gold,
- * converting prestige currency. This module provides:
+ * incremental game revolves around resources: gaining points, spending gold,
+ * converting prestige currency. This file provides:
  *
  * - {@link createResource} — create a named value with auto-persistence,
  *   engine-scoped registration, and the lifetime `cumulative` / `best`
  *   trackers (built when the resource is created inside a persistent context)
- * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic helpers
- * - {@link formatResource} — formatted string using the resource's precision settings
+ * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic utilities
+ * - {@link formatResource} — formatted string using the resource's `decimals` and `small` settings
  * - {@link unwrapResource} — dereference a `Resource | Ref<Resource>` to the underlying Resource
- * - {@link resetResource} — set a resource's value back to its persisted default (or 0)
+ * - {@link resetResource} — set a resource's value back to its ref default (or 0)
  *
- * Resources created inside an engine's `install()` / `connect()` phase are
- * automatically added to that engine's {@link ResourceRegistry} via the
- * ambient pattern established by `withResourceRegistry`. External tools read
- * the registry via `engine.tryInject(ResourceRegistryKey)`.
+ * A resource created during an engine's install/connect is added to that
+ * engine's {@link ResourceRegistry}, an ambient value that
+ * `withResourceRegistry` sets. External tools read the registry through
+ * `engine.tryInject(ResourceRegistryKey)`.
  */
 
 import { isRef, unref, watch, type Ref } from 'vue';
@@ -50,59 +50,59 @@ export type { ResourceRegistryEntry } from './registries';
  */
 export interface Resource<T = DecimalSource> extends Ref<T> {
   /**
-   * Stable identifier for save-data and accessor lookups — the
-   * {@link ResourceOptions.id} as passed, not namespaced by module, and
-   * unique per engine. A wrapped ref created without an id takes its
-   * `displayName`. Use this (not `displayName`) as the key when forwarding
-   * to {@link GameStateAccessor} methods like `getAmount`/`getRate`.
+   * Stable id for save data and accessor lookups. It is the
+   * {@link ResourceOptions.id} as passed, with no persistent-context prefix,
+   * and unique per engine. A wrapped ref created without an id takes
+   * its `displayName`. Pass this id, not `displayName`, to
+   * {@link GameStateAccessor} methods such as `getAmount` and `getRate`.
    */
   id: string;
-  /** Human-readable name shown in UI and used for resource-registry lookups by name */
+  /** Text the player sees, also matched by the resource registry's `findByDisplayName` */
   displayName: string;
   /** Number of decimal places to show when formatting (0 = whole numbers only) */
   decimals: number;
-  /** If true, very small values are displayed as-is instead of rounding to 0 */
+  /** If true, `formatResource` shows very small values instead of rounding them to 0 */
   small?: boolean;
   /**
-   * Cumulative-gain accumulator — sums every strictly-increasing motion of
-   * the resource over its full life. Decreases don't subtract; refunds
-   * (a decrease followed by a re-increase) count as new gain. A linked
-   * `ResourceBag`'s cap clamps a gain before it counts, so overflow the bag
-   * destroys reaches neither this nor `best`. Starts at the resource's
-   * default, so a starting balance counts as earned. Present on a persistent
-   * resource created inside a persistent context (any engine
-   * module); absent outside one, and for derived/computed resources created
-   * via the {@link createResource} ref-wrapping overload.
+   * Total gain — the sum of every increase of the resource over its full
+   * life. Decreases don't subtract; refunds (a decrease followed by a
+   * re-increase) count as new gain. A linked `ResourceBag`'s capacity clamps a
+   * gain before it counts, so overflow the bag discards reaches neither this
+   * nor `best`. Starts at the resource's ref default, so a starting amount
+   * counts as gain. Present on a persistent resource created inside a
+   * persistent context (any engine module). Absent outside one, and for
+   * derived or computed resources created with the {@link createResource}
+   * ref-wrapping overload.
    *
-   * Persistent under a per-resource sub-context, so two resources in the
-   * same module don't collide on the tracker name. Tagged `lifetime: true`
-   * so module-scoped resets ignore it — `cumulative` survives every prestige,
-   * transcend, etc. by default, matching its "full life" semantic. Read by
-   * Gate's `cumulative-gte` kind via the ambient resource registry. To wipe
-   * cumulative on a hard reset, target it explicitly via
+   * Saved under a child persistent context per resource, so two resources in
+   * the same module don't collide on the tracker id. Tagged `lifetime: true`,
+   * so a reset that names the module's persistent context leaves it alone:
+   * `cumulative` survives every reset by default, as "full life" says. Gate's
+   * `cumulative-gte` kind reads it through the ambient resource registry. To
+   * clear it on a hard reset, name it:
    * `createReset({ thingsToReset: [resource.cumulative] })`.
    */
   cumulative?: Ref<DecimalSource> & Persistent<DecimalSource>;
   /**
    * High-water mark. Monotonically non-decreasing over the resource's full
    * life. Present and absent exactly as {@link Resource.cumulative} is.
-   * Persistent under a per-resource sub-context, tagged
-   * `lifetime: true` so module-scoped resets pass it over (same opt-out
-   * shape as {@link Resource.cumulative}).
+   * Saved under a child persistent context per resource and tagged
+   * `lifetime: true`. So a reset passes it over unless the reset names it, as
+   * with {@link Resource.cumulative}.
    */
   best?: Ref<DecimalSource> & Persistent<DecimalSource>;
 }
 
-/** Configuration for {@link createResource} */
+/** Options for {@link createResource} */
 export interface ResourceOptions {
-  /** Display name for the resource. Used in UI and registry lookups. Default: `"points"` */
+  /** Text the player sees, also matched by registry lookups. Default: `"points"` */
   displayName?: string;
   /** Number of decimal places to show when formatting. Default: `0` (whole numbers) */
   decimals?: number;
-  /** If true, display very small values as-is instead of rounding to 0. Off by default. */
+  /** If true, show very small values instead of rounding them to 0. Off by default. */
   small?: boolean;
   /**
-   * Save and registry identity — the key Gates and the resource registry
+   * Save and registry identity — the id Gates and the resource registry
    * look the resource up by. Required for a persistent resource, whose value
    * saves under it; a wrapped ref saves nothing and falls back to
    * `displayName`. Unique per engine: a repeat throws at creation, and so
@@ -111,15 +111,15 @@ export interface ResourceOptions {
   id?: string;
 }
 
-/** Configuration for a persistent {@link createResource}: `id` is required. */
+/** Options for a persistent {@link createResource}: `id` is required. */
 export type PersistentResourceOptions = ResourceOptions & { id: string };
 
 /**
- * Wrap an existing ref as a resource (non-persistent).
+ * Wrap an existing ref as a resource that saves nothing.
  *
  * Use this overload for derived or computed values that should look like a
- * resource (display name, formatting) but don't need their own persistence —
- * e.g., a "net income" display backed by a computed ref.
+ * resource (display name, formatting) but need no save of their own. An
+ * example is a net rate shown from a computed ref.
  *
  * Declared before the default-value overload so an existing `Ref<T>` argument
  * binds here: the default-value overload's bare `T` parameter would also
@@ -129,28 +129,28 @@ export type PersistentResourceOptions = ResourceOptions & { id: string };
  * never matches `Ref<T>`, so this ordering is safe for both call shapes.
  *
  * @param existingRef - An existing Vue ref to wrap with resource metadata
- * @param options - Display name, precision, and formatting controls
- * @returns A resource view over the existing ref (not persisted)
+ * @param options - Display name and formatting options
+ * @returns The existing ref with resource metadata attached; it saves nothing
  *
  * @example
  * ```ts
  * const netIncome = computed(() => Decimal.sub(income.value, expenses.value));
- * const netIncomeResource = createResource(netIncome, { displayName: 'net income', precision: 1 });
+ * const netIncomeResource = createResource(netIncome, { displayName: 'net income', decimals: 1 });
  * formatResource(netIncomeResource); // formatted string
  * ```
  */
 export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>;
 
 /**
- * Create a persistent resource — the standard way to define a game currency.
+ * Create a persistent resource — the standard way to define a game resource.
  *
  * The returned value is both a Vue ref (reactive, watchable) and a persistent
- * ref (auto-saved/loaded). When called inside an engine's install/connect
- * phase, it is also registered in that engine's resource registry for
- * discovery by balance workbenches, trace views, and other introspection tools.
+ * ref (saved and loaded). When called during an engine's install/connect, it
+ * is also registered in that engine's resource registry. Balance workbenches,
+ * trace views and other introspection tools find it there.
  *
  * @param defaultValue - Starting value for new saves. Use `0` or `new Decimal(...)`.
- * @param options - Display name, precision, and formatting controls
+ * @param options - The id, display name and formatting options
  * @returns A reactive, persistent resource with display metadata
  *
  * @example
@@ -159,7 +159,7 @@ export function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions
  * const points = createResource(0, { id: 'points', displayName: 'Points' });
  *
  * // Fractional currency — 2 decimal places, starts at 100
- * const gold = createResource(new Decimal(100), { id: 'gold', displayName: 'Gold', precision: 2 });
+ * const gold = createResource(new Decimal(100), { id: 'gold', displayName: 'Gold', decimals: 2 });
  *
  * // Use like any Vue ref
  * watch(points, (val) => console.log('Points changed:', val));
@@ -179,9 +179,10 @@ export function createResource<T>(
 }
 
 /**
- * A persistent resource that saves under its persistent id in the current context
- * but registers under `options.id`, for a system that builds same-named
- * resources in sibling contexts — two inventories holding the same item.
+ * A persistent resource that saves under `persistentId` in the enclosing
+ * persistent context but registers under `options.id`. It is for a system
+ * that builds same-id resources in sibling persistent contexts, such as two
+ * inventories that hold the same inventory item.
  *
  * @internal Used by createInventory.
  */
@@ -197,7 +198,7 @@ export function createPersistentContextScopedResource<T>(
 // but only from its own watcher, which subscribes at link time and so runs
 // after the cumulative/best trackers subscribed at creation. Both are
 // `flush: 'sync'`, so the trackers would see the raw over-cap write first and
-// count gain the bag then destroys. Rather than lean on subscription order,
+// count gain the bag then discards. Rather than depend on subscription order,
 // the trackers apply the bag's clamp themselves, looked up here.
 const resourceClamps = new WeakMap<
   Resource<DecimalSource>,
@@ -206,7 +207,7 @@ const resourceClamps = new WeakMap<
 
 /**
  * Register the clamp a linked bag applies to `resource`'s writes, so its
- * trackers count only what lands. Returns the deregistration. Throws when
+ * trackers count only the clamped amount. Returns the cleanup. Throws when
  * another clamp is already registered: one resource linked into two bags has
  * two caps fighting over its value.
  *
@@ -227,17 +228,16 @@ export function registerResourceClamp(
   };
 }
 
-/** Shared body of the resource factories; the persistent id defaults to the resolved id. */
+/** Shared body of the resource factories; `persistentId` defaults to `options.id`. */
 function buildResource<T>(
   defaultValue: T | Ref<T>,
   options: ResourceOptions,
   persistentId?: string,
 ): Resource<T> {
   const { displayName = 'points', decimals = 0, small = false, id } = options;
-  // Single ambient-context read shared by the tracker setup below and the
-  // registry registration at the end. The two sites both need to know
-  // whether we're inside an engine namespace; nothing between them changes
-  // the ambient context.
+  // One read of the enclosing persistent context, shared by the tracker setup
+  // below and the registration at the end. Both need to know whether a
+  // persistent context is open; nothing between them changes it.
   const parentContext = getCurrentPersistentContext();
 
   let resource: Partial<Resource<T>>;
@@ -257,9 +257,9 @@ function buildResource<T>(
         `Resource id "${name}" contains ".", which save paths split on. Use another separator, such as "-".`,
       );
     }
-    // Save under a stable name — the resource's id unless the caller scopes
-    // it — so round-trips survive field reorders inside a context. The
-    // non-persistent wrapper carries the same metadata.
+    // Save under a stable id — the resource's id unless the caller passes
+    // `persistentId` — so a save still loads after fields are reordered
+    // within a persistent context. The persistent alias gets the same metadata.
     const metadata = { id, displayName, decimals, small };
     // The public overload checked `T` against IfSerializable; a generic body can't
     // resolve that check, so the call goes through the unchecked shape.
@@ -270,26 +270,26 @@ function buildResource<T>(
     Object.assign(persistentResource[PersistentAlias], metadata);
     resource = Object.assign(persistentResource, metadata);
 
-    // Cumulative + best trackers are intrinsic to a persistent resource —
-    // their persistence path is identity-bound to the save name, so two
-    // resources in the same module each get their own sub-context for
-    // 'cumulative' and 'best' without colliding on the tracker name.
+    // The `cumulative` and `best` trackers belong to a persistent resource.
+    // Their save path includes the resource's id, so two resources in one
+    // module each get their own child persistent context, and the tracker
+    // ids don't collide.
     //
     // Skipped when the resource is created outside any persistent context
-    // (raw test fixtures, throwaway scripts) — same convention as the
-    // ResourceRegistry registration below.
+    // (bare tests, throwaway scripts), like the resource registry
+    // registration below.
     if (parentContext !== undefined) {
-      // Persistent contexts are flat under the engine namespace, so we
-      // qualify the tracker sub-context with the parent context id to
-      // keep the tracker's save path bound to the module that owns it.
+      // Persistent contexts are flat under the persistence namespace, so the
+      // child persistent context's id starts with the enclosing one's. That
+      // keeps the tracker's save path bound to the module that owns it.
       withPersistentContext(`${parentContext}::${name}`, () => {
         const initial = defaultValue as DecimalSource;
-        // `lifetime: true` so module-scoped resets pass over these trackers.
-        // Without the flag, a `createReset({ resetPersistentContexts: [contextId] })`
-        // would zero `cumulative` / `best` even when the underlying resource
-        // was kept via `keep:[resource]`, contradicting the "full life"
-        // semantic these refs advertise. To wipe lifetime stats on a hard
-        // reset, hand the tracker ref to `thingsToReset` directly.
+        // `lifetime: true`, so a reset that names the module's persistent
+        // context passes over these trackers. Without the flag,
+        // `createReset({ resetPersistentContexts: [contextId] })` would zero
+        // `cumulative` / `best` even when the resource itself was kept with
+        // `keep: [resource]`, against the "full life" these refs promise. To
+        // clear lifetime refs on a hard reset, pass them to `thingsToReset`.
         const cumulative = persistent<DecimalSource>(initial, {
           id: 'cumulative',
           lifetime: true,
@@ -299,15 +299,15 @@ function buildResource<T>(
           lifetime: true,
         });
 
-        // The last amount that landed after a linked bag's clamp. Cumulative
-        // diffs against it rather than the raw previous write, which may be
-        // an over-cap value the bag pulled back, so gain is always measured
-        // between two landed amounts.
+        // The last amount after a linked bag's clamp. `cumulative` diffs
+        // against it rather than the raw previous write, which may be an
+        // over-cap value the bag clamped back. So gain is always measured
+        // between two clamped amounts.
         let landed = initial;
 
-        // flush: 'sync' so sim harnesses driving engine.tickDriver.tickOnce()
-        // in a tight loop (no microtask boundary between ticks) still observe
-        // updates on the same tick the source resource changed.
+        // flush: 'sync' so balance-harness runners driving
+        // engine.tickDriver.tickOnce() in a tight loop (no microtask boundary
+        // between ticks) still observe updates on the tick the resource changed.
         watch(
           resource as Ref<DecimalSource>,
           (amount) => {
@@ -333,9 +333,9 @@ function buildResource<T>(
     }
   }
 
-  // Register in the ambient engine-scoped registry. Resources created
-  // outside an engine (top-level tests, throwaway scripts) silently skip
-  // registration — the primitive still works, just isn't discoverable.
+  // Register in the ambient resource registry. Resources created outside an
+  // engine (top-level tests, throwaway scripts) silently skip registration;
+  // the resource still works, but no tool can find it.
   getCurrentResourceRegistry()?.register({
     resource: resource as Resource,
     persistentContextId: parentContext,
@@ -345,16 +345,16 @@ function buildResource<T>(
 }
 
 /**
- * Format a resource value with its configured precision.
+ * Format a resource's amount with its `decimals` and `small` settings.
  *
- * @param resource - The resource to display
- * @param overrideAmount - Optional value to display instead of current value
+ * @param resource - The resource to format
+ * @param overrideAmount - An amount to format instead of the current one
  * @returns Formatted string representation
  *
  * @example
  * ```ts
- * const gold = createResource(1234.567, { id: 'gold', displayName: 'Gold', precision: 2 })
- * formatResource(gold) // "1.235 k" — notation takes over above 1000; precision no longer digits-after-decimal
+ * const gold = createResource(1234.567, { id: 'gold', displayName: 'Gold', decimals: 2 })
+ * formatResource(gold) // "1.235 k" — the active notation formats 1000 and above
  * formatResource(gold, 999) // "999.00"
  * ```
  */
@@ -385,7 +385,7 @@ export function unwrapResource(resource: Resource | Ref<Resource>): Resource {
  *
  * @param resource - The resource to increase
  * @param amount - The amount to add (Decimal or number)
- * @param chain - Optional modifier chain for trace attribution (see trace module)
+ * @param chain - Optional modifier chain for trace attribution (see `withTraceChain`)
  */
 export function addResource(
   resource: Resource<DecimalSource>,
@@ -405,7 +405,7 @@ export function addResource(
 export interface SubtractResourceOptions {
   /** If true, the resource can go below zero. Default: `false` (subtraction fails instead) */
   allowNegative?: boolean;
-  /** Modifier chain for trace attribution (see trace module) */
+  /** Modifier chain for trace attribution (see `withTraceChain`) */
   chain?: Modifier;
 }
 
@@ -419,7 +419,7 @@ export interface SubtractResourceOptions {
  * @param resource - The resource to decrease
  * @param amount - The amount to subtract (Decimal or number)
  * @param options - Subtraction behavior (allowNegative, chain attribution)
- * @returns `true` if subtraction was applied, `false` if blocked by insufficient funds
+ * @returns `true` if subtraction was applied, `false` if the amount held was too small
  */
 export function subtractResource(
   resource: Resource<DecimalSource>,
@@ -455,12 +455,12 @@ export function hasResource(resource: Resource<DecimalSource>, amount: DecimalSo
 }
 
 /**
- * Reset a resource to its default value (or zero).
+ * Reset a resource to its ref default (or zero).
  *
  * @param resource - The resource to reset
  */
 export function resetResource<T extends DecimalSource>(resource: Resource<T>): void {
-  // The aliasPersistent wrapper carries the default too, so this also covers it.
+  // The persistent alias holds the ref default too, so this also covers it.
   if (DefaultValue in resource) resetPersistent(resource as Resource<T> & Persistent<T>);
   else resource.value = 0 as T;
 }

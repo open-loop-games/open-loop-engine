@@ -4,21 +4,21 @@
 
 import type { TickDriver } from './tick-driver';
 
-/** Options for {@link processOfflineTime} — caps the catch-up window and the per-step chunk size. */
+/** Options for {@link processOfflineTime}: the catch-up window's cap and the chunk size of each `advanceTime` call. */
 export interface OfflineProgressOptions {
-  /** Maximum offline seconds to process (default: 259200 = 3 days) */
+  /** Most offline seconds to replay (default: 259200 = 3 days) */
   maxOfflineSeconds?: number;
   /** Seconds per advanceTime call (default: 1). A chunk above the driver's maxDeltaTime runs as several ticks. */
   chunkSize?: number;
 }
 
 /**
- * Process offline elapsed time by feeding it through the TickDriver in chunks.
+ * Replay offline time through the TickDriver in chunks.
  *
- * Each chunk is passed to `tickDriver.advanceTime()`, which passes the dt directly to
- * tick callbacks (no speedMultiplier applied — offline processing is wall-clock faithful).
+ * Each chunk goes to `tickDriver.advanceTime()`, which passes it to the tick handlers as dt.
+ * Game speed does not apply, so the replay matches wall-clock time.
  *
- * @returns Actual seconds processed: `elapsedSeconds` clamped to `[0, maxOfflineSeconds]`, with NaN read as 0.
+ * @returns Seconds replayed: `elapsedSeconds` clamped to `[0, maxOfflineSeconds]`, with NaN taken as 0.
  */
 export function processOfflineTime(
   tickDriver: TickDriver,

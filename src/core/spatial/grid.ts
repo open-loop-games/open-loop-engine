@@ -5,28 +5,29 @@
  *
  * Plain data: dense `T[]` cell storage plus three `Uint8Array` bitmaps
  * (passable / explored / visible). Adjacency, range, traversal, and an FOV
- * commit adapter that lets external libraries (rot.js shadowcasting) write
+ * commit handle that lets external libraries (rot.js shadowcasting) write
  * visibility back without the engine importing them.
  *
- * Rectangular *storage*, not rectangular *topology*: the `neighborhood`
- * option is the board's adjacency as a set of offsets, so 4-connected,
+ * Rectangular *storage*, not rectangular *adjacency*: the `neighborhood`
+ * option is the board's adjacency as a set of offsets. So 4-connected,
  * 8-connected, and hex-at-an-axial-offset are the same container with a
- * different delta set — and every traversal verb follows it.
+ * different neighborhood, and every traversal verb follows it.
  *
  * Two traversal queries, split by what the caller does with the answer:
  * `bfs()` for reachability and path reconstruction (parent links, hop order),
  * `distanceField()` for routing and gradient descent (least-cost distance per
  * cell, weighted, multi-source).
  *
- * Persistence is structure-level: `serialize()` returns a snapshot,
- * `restore(snapshot)` rebuilds. The consumer wraps the snapshot in a
- * single `persistent()` ref — the engine never spawns per-cell refs.
+ * Persistence is structure-level: `serialize()` returns the grid's
+ * serialized form, and `restore(serialized)` rebuilds from it. The consumer
+ * wraps the serialized form in a single `persistent()` ref; the engine
+ * never creates a ref per cell.
  *
  * Events:
  * - `cellChanged(x, y, prev, next)` — game-logic mutations via `set()`.
- * - `gridChanged()` — one coarse signal per `fill()` or `restore()`.
+ * - `gridChanged()` — one coarse event per `fill()` or `restore()`.
  * - `fovUpdated(deltaIn, deltaOut)` — one batched event per `commit()`.
- * - `maskChanged(mask)` — coarse signal that a whole bitmap may have
+ * - `maskChanged(mask)` — coarse event that a whole bitmap may have
  *   changed outside the FOV path: once per `markMaskChanged(mask)`, and once
  *   per bitmap on `restore()`.
  */
@@ -45,7 +46,7 @@ export interface SpatialGridOptions<T> {
   /**
    * The board's adjacency, as the set of offsets from a cell to its
    * neighbors. Drives `neighbors()` and every traversal query (`bfs`,
-   * `flood`, `distanceField`) — so a board's topology is stated once, at
+   * `flood`, `distanceField`). So a board's adjacency is stated once, at
    * construction, and the traversal verbs follow.
    *
    * Defaults to {@link ORTHOGONAL_DELTAS} (4-connected). Ships
@@ -81,14 +82,15 @@ export const DIAGONAL_DELTAS: readonly GridOffset[] = [
 
 /**
  * 6-connected hex adjacency, clockwise from east, for a hex board stored at
- * an axial offset — axial `(q, r)` at grid `(q + radius, r + radius)`, which
- * makes axial deltas equal grid deltas. That storage convention is what lets
- * a hex board keep the whole rectangular-grid surface (events, snapshots,
- * `createInfluenceLayer`) instead of dropping to `createGraph`.
+ * an axial offset. Axial `(q, r)` is stored at grid `(q + radius, r + radius)`,
+ * which makes axial offsets equal grid offsets. That storage convention is what
+ * lets a hex board keep the whole rectangular-grid API surface (events,
+ * serialized forms, `createInfluenceLayer`) instead of dropping to
+ * `createGraph`.
  *
  * The engine knows nothing else about hexes: no axial or cube coordinate
  * type, no hex distance, no pixel layout. Those stay consumer-side, where the
- * storage offset and the rendering convention already live.
+ * storage offset and the display convention already are.
  */
 export const HEX_AXIAL_DELTAS: readonly GridOffset[] = [
   { dx: 1, dy: 0 },
@@ -102,35 +104,35 @@ export const HEX_AXIAL_DELTAS: readonly GridOffset[] = [
 /** Events emitted by a {@link SpatialGrid}. Subscribe via `grid.on()`. */
 export interface SpatialGridEvents<T> {
   cellChanged: (x: number, y: number, prev: T, next: T) => void;
-  /** One coarse signal per bulk mutation (`fill()`, `restore()`). No per-cell payload. */
+  /** One coarse event per bulk mutation (`fill()`, `restore()`). No per-cell payload. */
   gridChanged: () => void;
   fovUpdated: (deltaIn: GridCoord[], deltaOut: GridCoord[]) => void;
   maskChanged: (mask: 'passable' | 'explored' | 'visible') => void;
 }
 
 /**
- * Plain-object snapshot of a grid's full state. Returned by `serialize()`
- * and accepted by `restore()`. Wrap in a single `persistent()` ref to
- * persist across saves; per-cell `persistent()` is explicitly rejected.
+ * Serialized form of a grid's full state. Returned by `serialize()` and
+ * accepted by `restore()`. Wrap it in a single `persistent()` ref to save
+ * it; do not give each cell its own `persistent()` ref.
  *
- * Bitmap fields are plain `number[]`, not `Uint8Array`: the snapshot is a
- * serialization boundary and must survive JSON (a `Uint8Array` stringifies to
- * `{"0":1,...}` and reloads as a lengthless object, which `restore()` rejects).
- * The live grid keeps `Uint8Array` for tick-rate performance; `serialize()`
+ * Bitmap fields are plain `number[]`, not `Uint8Array`, because the
+ * serialized form must round-trip through JSON. A `Uint8Array` stringifies to
+ * `{"0":1,...}` and reloads as a lengthless object, which `restore()` rejects.
+ * The live grid keeps `Uint8Array` for per-tick performance; `serialize()`
  * copies out to `number[]` and `restore()` bulk-loads via `.set()`, which
  * accepts a plain array.
  *
  * The bitmaps are fresh copies; `cells` is a shallow one. The array is new,
  * but its entries are the grid's own cell objects, and `restore()` stores the
- * snapshot's objects in turn. So with object cells, a mutation in place (a
- * tile's field, say) shows through in both directions, and a checkpoint taken
- * for an undo or a level retry has to copy its cells first. Primitive cells,
+ * serialized form's objects in turn. So with object cells, a mutation in place
+ * (a tile's field, say) shows through in both directions. A copy kept for an
+ * undo or a retry has to copy its cells first. Primitive cells,
  * and cells replaced through `set()`, never alias. `restore()` unwraps
  * reactive proxies, so restoring from a `persistent()` ref's `.value` keeps
  * the grid's cells raw.
  */
 export interface SerializedSpatialGrid<T> {
-  /** `serialize()` writes 1; `restore()` reads an absent version as 1. */
+  /** Format version. `serialize()` writes 1; `restore()` reads an absent one as 1. */
   version?: 1;
   width: number;
   height: number;
@@ -154,13 +156,13 @@ export interface SerializedSpatialGrid<T> {
 export interface FovUpdateHandle {
   /** Stage a cell as visible in the upcoming commit. Out-of-bounds is a no-op. */
   markVisible(x: number, y: number): void;
-  /** Apply staged visibility, OR into `explored`, and emit one delta event. */
+  /** Apply staged visibility, OR into `explored`, and emit one `fovUpdated` event. */
   commit(): void;
 }
 
 /**
  * Bounded 2D grid with configurable adjacency, BFS and weighted distance
- * fields, an FOV adapter, and snapshot persistence.
+ * fields, an FOV commit handle, and persistence through a serialized form.
  */
 export interface SpatialGrid<T> {
   readonly width: number;
@@ -169,14 +171,13 @@ export interface SpatialGrid<T> {
   /**
    * Number of cells whose `explored` bit is set. Maintained incrementally by
    * the FOV commit path and re-derived by `restore()` and
-   * `markMaskChanged('explored')`, so callers don't pay an
+   * `markMaskChanged('explored')`, so callers skip an
    * O(width × height) scan to check exploration progress.
    *
    * A hand write to the `explored` typed array is invisible to the engine:
-   * follow it with `markMaskChanged('explored')` or the count drifts.
-   * During a consumer port, reading this before every legacy write path
-   * goes through the FOV adapter or `markMaskChanged` is the classic
-   * counter-drift trap.
+   * follow it with `markMaskChanged('explored')` or the count drifts. Trust
+   * this count only once every write path goes through the FOV commit
+   * handle or `markMaskChanged`.
    *
    * A snapshot: typed-array hot-path state, so a computed over it never
    * recomputes. Re-read it after the write that changed it, or watch the
@@ -216,10 +217,10 @@ export interface SpatialGrid<T> {
    */
   set(x: number, y: number, value: T): void;
   /**
-   * Writes a value to (x, y) without emitting `cellChanged`. For tick-rate
-   * internal writers (influence-map accumulation and kin) where a per-cell
-   * event per write is pure overhead; pair with a coarser signal the
-   * consumer owns (a layer-level event, or `fill()`'s `gridChanged`).
+   * Writes a value to (x, y) without emitting `cellChanged`. For per-tick
+   * internal writers (influence-layer accumulation and similar) where an
+   * event per cell write is pure overhead. Pair it with a coarser event the
+   * consumer owns (an influence-layer event, or `fill()`'s `gridChanged`).
    * Bounds-checked like `set()`. Throws if out of bounds.
    */
   setSilent(x: number, y: number, value: T): void;
@@ -227,7 +228,7 @@ export interface SpatialGrid<T> {
    * Overwrites every cell in one row-major pass: each cell becomes
    * `mapper(x, y, current)`. Emits a single `gridChanged` event instead of
    * one `cellChanged` per cell — the batch counterpart to `set()` for
-   * full-grid mutations (zero-fill, decay passes, map generation).
+   * full-grid mutations (zero-fill, decay passes, board generation).
    */
   fill(mapper: (x: number, y: number, current: T) => T): void;
   /**
@@ -241,8 +242,8 @@ export interface SpatialGrid<T> {
    * In-bounds neighbors of (x, y) under the grid's configured
    * `neighborhood`, in that array's order.
    *
-   * @param neighborhood - Ad-hoc adjacency for this call only, overriding the
-   *   grid's own. For the query that wants a different topology than the
+   * @param neighborhood - Ad-hoc neighborhood for this call only, overriding
+   *   the grid's own. For the query that wants a different adjacency than the
    *   board — an 8-connected scan on a 4-connected board, say — without
    *   changing what traversal does.
    */
@@ -250,10 +251,10 @@ export interface SpatialGrid<T> {
   /** All cells within Chebyshev `radius` of (x, y), within bounds. */
   inRange(x: number, y: number, radius: number): Iterable<GridCoord>;
   /**
-   * Callback form of `inRange` for hot paths: visits the same cells without
-   * allocating a coordinate object (or generator result) per cell, and hands
-   * the callback the flat `y * width + x` index for direct `cells` access.
-   * Prefer `inRange` outside tick-rate loops — `for…of` reads better.
+   * Per-cell `fn` form of `inRange` for hot paths: visits the same cells
+   * without allocating a coordinate object (or generator result) per cell.
+   * It passes `fn` the flat `y * width + x` index for direct `cells` access.
+   * Prefer `inRange` outside per-tick loops, because `for…of` is clearer.
    */
   forEachInRange(
     x: number,
@@ -282,7 +283,7 @@ export interface SpatialGrid<T> {
   readonly passable: Uint8Array;
   /** Explored bitmap. 1 = ever-seen, 0 = unseen. Written by the FOV commit. */
   readonly explored: Uint8Array;
-  /** Currently-visible bitmap. 1 = visible right now, 0 = hidden. */
+  /** Currently-visible bitmap. 1 = visible right now, 0 = not visible. */
   readonly visible: Uint8Array;
 
   /**
@@ -302,8 +303,8 @@ export interface SpatialGrid<T> {
    * This is the query for routing and gradient-descent movement, where
    * `bfs()` is the query for reachability and path reconstruction. `bfs()`
    * returns parent links and no distances; this returns distances and no
-   * parent links — agents descend the field, and deriving the step direction
-   * consumer-side keeps routing and rendering from drifting on tie-breaks.
+   * parent links. Units descend the field, and deriving the step direction
+   * consumer-side keeps routing and display from disagreeing on tie-breaks.
    *
    * Expands the grid's configured `neighborhood`, matching `bfs()` and
    * `flood()` — so a hex board routes over hex adjacency without this query
@@ -311,14 +312,14 @@ export interface SpatialGrid<T> {
    * `cost` is `Infinity`, are dropped rather than seeded — a source standing
    * on impassable terrain is not a zero-distance origin.
    *
-   * Storage is `Float64Array` so accumulated cost stays exact to the width
-   * the caller's `cost` returns; quantize on the way out if you need a
-   * narrower field. Note this is a precision choice, not what makes the
-   * traversal sound — soundness comes from the queue carrying the *stored*
-   * distance rather than the computed one, so the staleness check compares
-   * like with like. Narrowing the store without that would round a distance
-   * below its queue key and drop nodes unexpanded, leaving whole regions at
-   * `Infinity`; integer costs hide it, any non-dyadic cost trips it.
+   * Storage is `Float64Array`, so accumulated cost keeps the full precision
+   * of the caller's `cost` values. Quantize on the way out if you need a
+   * narrower field. This is a precision choice, not what makes the traversal
+   * sound. Soundness comes from the queue holding the *stored* distance
+   * rather than the computed one, so the staleness check compares like with
+   * like. Narrowing the store without that would round a distance below its
+   * queue key and drop nodes unexpanded, leaving whole areas at
+   * `Infinity`. Integer costs hide the fault; any non-dyadic cost triggers it.
    *
    * @param sources - Seed cells, all at distance 0. A single-source query is
    *   a one-element set.
@@ -327,8 +328,8 @@ export interface SpatialGrid<T> {
    *   `distanceField` on this grid — the query reuses a per-grid scratch
    *   queue.
    * @param into - Optional destination array of length `width * height`,
-   *   filled in place and returned. For tick-rate callers that keep a
-   *   retained field buffer instead of allocating one per recompute.
+   *   filled in place and returned. For per-tick callers that keep one
+   *   field buffer instead of allocating one per recompute.
    *
    * @example
    * ```ts
@@ -362,7 +363,7 @@ export interface SpatialGrid<T> {
    * Declare that `mask` was written by hand, outside `beginFovUpdate()` and
    * `restore()`: re-derives the counts that bitmap feeds and emits
    * `maskChanged(mask)`. The write path for terrain that changes in play — a
-   * door opening, a wall going up — and for a generator populating
+   * door opening, a wall going up — and for board generation that fills
    * `passable` after construction. Costs one scan of the grid, so call it
    * once per batch of writes rather than once per cell.
    *
@@ -377,14 +378,15 @@ export interface SpatialGrid<T> {
   /** Subscribe to a grid event. Returns an unsubscribe function. */
   on<K extends keyof SpatialGridEvents<T>>(event: K, handler: SpatialGridEvents<T>[K]): Unsubscribe;
 
-  /** Capture the grid's current state as a plain-object snapshot. */
+  /** Return the grid's current state as its serialized form. */
   serialize(): SerializedSpatialGrid<T>;
   /**
-   * Replace the grid's state from a snapshot. Width/height must match
-   * construction; a version other than 1 throws. Once every cell, bitmap and
-   * count has landed, emits one `gridChanged` and then one `maskChanged` per
-   * bitmap (passable, explored, visible), so a renderer repaints a loaded
-   * board the same way it repaints a `fill()` — no per-cell `cellChanged`.
+   * Replace the grid's state from a serialized form. Width/height must
+   * match construction; a format version other than 1 throws. Once every
+   * cell, bitmap and count is written, emits one `gridChanged` and then one
+   * `maskChanged` per bitmap (passable, explored, visible). So UI code
+   * redraws a loaded board the same way it redraws after a `fill()`, with
+   * no per-cell `cellChanged`.
    */
   restore(serialized: SerializedSpatialGrid<T>): void;
 }
@@ -436,15 +438,15 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   let passableCountCache = -1;
 
   // Single FOV staging buffer reused across commits — a fresh
-  // Uint8Array per beginFovUpdate churns GC at high tick rates.
+  // Uint8Array per beginFovUpdate churns GC on every tick.
   // In-flight flag enforces the one-handle-at-a-time contract (same
   // shape as FovUpdateHandle's `committed` invariant).
   const fovStaging = new Uint8Array(size);
   let fovInFlight = false;
 
   const handle = createEmitHandle<SpatialGridEvents<T>>();
-  // Skip delta computation in commit() when no fovUpdated handler is
-  // attached — headless consumers (no renderer) would otherwise pay an
+  // Skip change-list computation in commit() when no fovUpdated handler is
+  // attached — headless consumers (no display) would otherwise run an
   // O(w × h) scan per FOV update for arrays that nothing reads.
   let fovSubscribers = 0;
 
@@ -506,7 +508,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   const posKey = (x: number, y: number): string => `${x},${y}`;
 
   // Binary min-heap over parallel key/payload arrays, retained across
-  // `distanceField` calls — a fresh heap per recompute churns GC at tick rate,
+  // `distanceField` calls — a fresh heap per recompute churns GC on every tick,
   // which is the whole reason `into` exists on the same query. Reuse is what
   // makes the query non-reentrant; the TSDoc states that contract.
   const heapKey: number[] = [];
@@ -683,7 +685,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         if (d > dist[u]) continue;
         const ux = u % width;
         const uy = (u - ux) / width;
-        // Delta walk inlined rather than routed through `neighbors()`: this is
+        // Offset walk inlined rather than routed through `neighbors()`: this is
         // the one traversal whose inner loop runs per relaxation, and the
         // generator would box a coordinate object per neighbor per pop.
         for (let k = 0; k < neighborhood.length; k++) {
@@ -833,7 +835,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       }
       if (serialized.width !== width || serialized.height !== height) {
         throw new Error(
-          `SpatialGrid.restore: snapshot dimensions (${serialized.width}×${serialized.height}) do not match grid (${width}×${height})`,
+          `SpatialGrid.restore: serialized dimensions (${serialized.width}×${serialized.height}) do not match grid (${width}×${height})`,
         );
       }
       if (
@@ -848,8 +850,8 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       explored.set(serialized.explored);
       visible.set(serialized.visible);
       for (let i = 0; i < size; i++) {
-        // A snapshot read back through a `persistent()` ref yields reactive
-        // proxies; the grid holds the raw objects so tick-rate reads skip traps.
+        // A serialized form read back through a `persistent()` ref yields reactive
+        // proxies; the grid holds the raw objects so per-tick reads skip proxy traps.
         cells[i] = toRaw(serialized.cells[i]);
       }
       recountMasks();

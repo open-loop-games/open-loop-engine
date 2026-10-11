@@ -1,9 +1,9 @@
 /**
  * Root finding — the numeric fallback for inversions with no closed form.
  *
- * One monotone-crossing search, shared by everything in the formula layer that
- * has to answer "smallest x where f(x) reaches target" without an algebraic
- * pre-image — an integral inverse whose shape has no closed form, an op
+ * One monotone search, shared by everything in the formula code that has to
+ * answer "smallest x where f(x) reaches target" without an algebraic
+ * pre-image — an antiderivative inverse whose shape has no closed form, an op
  * inverted in an argument that has none (`tetrate`'s base), or a first-passage
  * query, which asks the question of the forward function directly.
  *
@@ -15,7 +15,7 @@
  *   geometric ones. Once the bracket narrows past a factor of two the search
  *   switches to arithmetic, so it still converges exactly on small values.
  * - **No relative-tolerance early-out.** At tetration scale `f` has enormous
- *   slope, so a value-space "close enough" can fire while `x` is still far from
+ *   slope, so a value-space "close enough" can hold while `x` is still far from
  *   the root in input space. Termination is by bracket collapse — `x` values
  *   that no longer differ — which is a statement about the answer rather than
  *   about `f`.
@@ -47,7 +47,7 @@ const DEFAULT_EXPANSIONS = 32;
 /**
  * Default halving cap. A bracket spanning many magnitudes spends ~40 halvings
  * narrowing in log space before the search switches to arithmetic and another
- * ~35 converging there, so the cap sits well above both. Brackets that start
+ * ~35 converging there, so the cap is well above both. Brackets that start
  * tight — the common case, where the caller passes a closed-form `upper` — stop
  * far earlier on collapse.
  */
@@ -79,10 +79,10 @@ export function bracketMidpoint(lo: Decimal, hi: Decimal): Decimal {
  * report, because bisection cannot detect the violation. Callers own that
  * precondition (restricting to a monotone region, usually by choosing `lower`).
  *
- * @param f - The function to cross. Monotone non-decreasing on `[lower, ∞)`.
+ * @param f - The function to search. Monotone non-decreasing on `[lower, ∞)`.
  * @param target - The value to reach.
  * @param options - Bracket and iteration tuning. See {@link SolveMonotoneOptions}.
- * @returns The crossing point — always an `x` with `f(x) ≥ target`, so a stepped
+ * @returns The first passage — always an `x` with `f(x) ≥ target`, so a stepped
  *   curve answers on the far side of the step rather than the last input before
  *   it. `lower` when `target` is already reached there, or `null` when the target
  *   could not be bracketed — the one case where the returned number would be
@@ -109,13 +109,13 @@ export function solveMonotone(
   let lo = new Decimal(lower);
   let hi = new Decimal(upper);
 
-  // Already reached at the domain floor: `lower` *is* the first passage, and
+  // Already reached at the lower bound: `lower` *is* the first passage, and
   // bisecting below it would answer outside the domain the caller declared.
   if (Decimal.gte(f(lo), target)) return lo;
 
   // A non-finite guess is no guess: callers derive `upper` from a closed form
   // that can divide by a zero slope, and neither Infinity nor NaN is ever
-  // `lte` the floor, so it would otherwise be kept and never bracket.
+  // `lte` the lower bound, so it would otherwise be kept and never bracket.
   if (!Decimal.isFinite(hi) || Decimal.lte(hi, lo)) hi = new Decimal(Decimal.add(lo, 1));
   // Every `hi` is tested, including the last one the loop produces — and the
   // test is "did we reach it", not "are we still short". A non-comparable `f`
@@ -125,7 +125,7 @@ export function solveMonotone(
   for (let i = 0; !bracketed && i < expansions; i++) {
     // Expansion grows in log space too, for the same reason the bisection does:
     // doubling adds ~0.3 to the exponent per step, so bracketing a target whose
-    // answer sits at 1e10 takes 33 steps and one at 1e300 takes a thousand.
+    // answer is at 1e10 takes 33 steps and one at 1e300 takes a thousand.
     // Squaring reaches any representable magnitude in a few dozen, and
     // overshooting is free because the bisection is geometric.
     hi = new Decimal(

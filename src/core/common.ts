@@ -1,5 +1,5 @@
 /**
- * Common — shared generic type utilities, dev-mode helpers and effect-scope ownership
+ * Common — shared generic type utilities, dev-mode helpers and Vue effect scope ownership
  */
 
 import type { EffectScope } from 'vue';
@@ -12,7 +12,7 @@ export type RequiredKeys<T> = {
 /**
  * Type guard for checking if a value is a function
  */
-// `R` looks single-use but carries inference: it absorbs the non-function arm so
+// `R` looks single-use but drives inference: it absorbs the non-function arm so
 // `T` and `S` infer from the function arm. `| unknown` would collapse the union.
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function isFunction<T, S extends ReadonlyArray<unknown>, R>(
@@ -23,10 +23,10 @@ export function isFunction<T, S extends ReadonlyArray<unknown>, R>(
 
 /**
  * Detect dev mode. Vite sets `import.meta.env.DEV`; Node sets
- * `process.env.NODE_ENV`. Defaults to `true` when neither is available so
- * dev-only diagnostics surface in unconfigured environments (tests, scratch
- * runners) rather than going silent. Distinct from {@link isDevMode} in
- * `safeguards.ts`, which is an opt-in feature toggle.
+ * `process.env.NODE_ENV`. Defaults to `true` when neither is available, so
+ * dev-only checks still run in unconfigured environments (tests, scratch
+ * runners). Distinct from {@link isDevMode} in `safeguards.ts`, which is an
+ * opt-in feature toggle.
  */
 export function isDev(): boolean {
   try {
@@ -43,9 +43,9 @@ export function isDev(): boolean {
 }
 
 /**
- * Run `fn` inside `scope` while it is active, so the watchers and hooks it
- * builds stop with that scope; run it bare once the scope has stopped or when
- * there is none.
+ * Run `fn` inside the Vue effect scope `scope` while it is active, so the
+ * watchers, computeds and `onScopeDispose` handlers it builds stop with that
+ * scope. Run it bare once the scope has stopped, or when there is none.
  *
  * @internal
  */

@@ -1,40 +1,38 @@
 /**
- * Override Registry — generic typed registry with scoped push/pop, plus
+ * Override Registry — generic typed registry with scoped overrides, plus
  * the typed `TuningRegistry` narrow that opts a registry into the picker's
- * tuning-surface enumeration.
+ * tunable enumeration.
  *
- * Two purposes served by this module:
+ * This file serves two purposes:
  *
- * - `createOverrideRegistry<T>(name)` is the general-purpose function-
- *   substitution primitive. Use for mod overrides, challenge takeovers,
- *   sim swap, and debug overlays. The generic `T` admits variadic-arg
- *   signatures and any return type. Registries created this way are
- *   **not** enumerated by the picker.
+ * - `createOverrideRegistry<T>(id)` is the general-purpose override
+ *   primitive. Use it for mod overrides, challenge overrides, balance-harness
+ *   perturbations and debug overrides. The generic `T` admits variadic-arg
+ *   signatures and any return type. The picker does **not** enumerate
+ *   registries created this way.
  *
- * - `createTuningRegistry(name)` is a typed narrow over
- *   `OverrideRegistry<Record<string, () => DecimalSource>>` that auto-
- *   registers itself into the ambient `TuningRegistriesKey` set when
- *   called within `withTuningRegistries(...)`. The picker's `walkTunables`
- *   enumerates every registered tuning registry's base-map keys — so
+ * - `createTuningRegistry(id)` is a typed narrow over
+ *   `OverrideRegistry<Record<string, () => DecimalSource>>`. Inside
+ *   `withTuningRegistries(...)`, it adds itself to the ambient
+ *   `TuningRegistriesKey` set. The picker's `walkTunables` enumerates the
+ *   base-map keys of every tuning registry in that set. So
  *   `createTuningRegistry` is the boundary between "this registry holds
  *   designer-flagged tuning values" and "this registry holds general
  *   overrides."
  *
- * `tunable()` is the value-shaped construction primitive that sits on top.
- * Its registry argument should be a `TuningRegistry` (created via
- * `createTuningRegistry`) when you want the value to surface in the picker
- * / workbench / sensitivity analyzer; a plain `OverrideRegistry` works
- * for non-tuning function substitution.
+ * `tunable()` is the value-shaped construction primitive built on top.
+ * Give it a `TuningRegistry` (from `createTuningRegistry`) when the value
+ * should appear in the picker, a balance workbench or sensitivity-analysis
+ * tooling. A plain `OverrideRegistry` works for any other override.
  *
- * Resolution order: scope stack top-down → base map. Multiple scopes can
- * stack — each pushOverrides returns an independent cleanup function. Cleanup
- * is idempotent.
+ * Resolution order: the scoped overrides, newest first, then the base map.
+ * Several scoped overrides can be pushed at once. Each `pushOverrides`
+ * returns its own cleanup, and a cleanup is idempotent.
  *
- * `overrideVersion` is a reactive `Ref<number>` that bumps whenever a
- * resolution can change: every push and cleanup, every `override`, and a
- * `setDefault` that registers a new key. Read it from inside a Vue
- * `computed` to make the computed re-evaluate on those changes. Paired
- * with {@link tunable} for the sim-tunable-values pattern.
+ * `overrideVersion` is a version ref that bumps whenever a resolution can
+ * change. Those changes are every push and cleanup, every `override`, and a
+ * `setDefault` that registers a new key. Read it inside a Vue `computed` to make the
+ * computed re-evaluate on those changes. {@link tunable} reads it.
  *
  * @example
  * ```ts
@@ -54,10 +52,10 @@
  * cleanup();
  * combat.get('getSelfCombat')();  // 99 (back to mod override)
  *
- * // Tuning registry — enumerated by picker, surfaced in workbench.
+ * // Tuning registry — enumerated by picker, shown in a balance workbench.
  * const tuning = createTuningRegistry('producer-tuning');
  * const effect = tunable(tuning, 'upgrades/double-gold/effect', () =>
- *   Decimal.mul(baseEffect, purchasable.amount.value),
+ *   Decimal.mul(baseEffect, purchasable.count.value),
  * );
  * ```
  */
@@ -67,7 +65,7 @@ import type { DecimalSource } from '../primitives/decimal';
 import type { InjectionKey } from '../primitives/types';
 
 // === TYPES ===
-/** A scope pushed onto the override stack */
+/** One scoped override: a labelled set of overrides on the stack */
 interface ScopedOverrides<T> {
   readonly label: string;
   readonly overrides: Partial<T>;
@@ -79,77 +77,76 @@ interface ScopedOverrides<T> {
  * @typeParam T - Record of named functions (e.g., `{ getSelfCombat: () => number }`)
  */
 export interface OverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }> {
-  /** Human-readable registry name (passed to `createOverrideRegistry`). */
+  /** Registry id passed to `createOverrideRegistry`, shown in error messages. */
   readonly id: string;
 
   /**
-   * Register a default implementation. No-op if the key already has a base value.
-   * Called by vanilla modules during install.
+   * Register the registry default for a key. No-op if the key already has a base value.
+   * Called by shared modules during install.
    */
   setDefault<K extends keyof T & string>(key: K, fn: T[K]): void;
 
   /**
-   * Permanently override a value (sets regardless of existing base).
-   * Called by mod modules during install.
+   * Permanently override a key (sets regardless of an existing base value).
+   * Called by a mod's modules during install.
    */
   override<K extends keyof T & string>(key: K, fn: T[K]): void;
 
   /**
-   * Resolve a key: check scope stack top-down, then base map.
-   * @throws If the key is not found in any scope or the base map
+   * Resolve a key: check the scoped overrides, newest first, then the base map.
+   * @throws If no scoped override and no base-map entry holds the key
    */
   get<K extends keyof T & string>(key: K): T[K];
 
-  /** Check if a key exists in any scope or the base map */
+  /** Check if a key exists in any scoped override or the base map */
   has(key: keyof T & string): boolean;
 
   /**
-   * Snapshot of base-map keys — the design-time tuning surface declared
-   * via `setDefault` / `override`. Scope-only keys (transient challenge,
-   * prestige, or sim takeover overrides) are intentionally excluded:
-   * they are engine *state*, not author-declared intent, and surfacing
-   * them in pickers / introspection would produce transient entries
-   * that vanish on scope cleanup. Future-you should resist the urge
-   * to "fix" this to return base ∪ scopes.
+   * Snapshot of the base-map keys: the design-time keys declared
+   * through `setDefault` / `override`. Keys only a scoped override holds
+   * are excluded on purpose. Those are temporary challenge, prestige or
+   * perturbation overrides: engine *state*, not author-declared intent.
+   * Showing them in a picker or introspection would add entries that
+   * vanish on cleanup. Do not change this to return base ∪ scoped keys.
    */
   getBaseKeys(): readonly string[];
 
   /**
-   * Push a scoped set of overrides onto the stack.
-   * Returns an idempotent cleanup function that removes this exact scope.
+   * Push overrides: a scoped override onto the stack.
+   * Returns an idempotent cleanup function that removes exactly this scoped override.
    *
    * @param label - Human-readable label for debugging (e.g., "challenge:zombie")
-   * @param overrides - Partial map of keys to override while this scope is active
+   * @param overrides - Partial map of keys to override while this scoped override is pushed
    */
   pushOverrides(label: string, overrides: Partial<T>): () => void;
 
-  /** Number of active scopes on the stack */
+  /** Number of scoped overrides on the stack. Reactive. */
   readonly overrideDepth: number;
 
   /**
-   * Reactive version counter — bumps whenever a key's resolution can change:
-   * every push and scope cleanup, every `override`, and a `setDefault` that
-   * registers a new key (a no-op `setDefault` doesn't bump). Read from inside
-   * a `computed` to make it re-evaluate on those changes. Paired with
-   * {@link tunable} for the sim-tunable-values pattern.
+   * Version ref that bumps whenever a key's resolution can change. Those
+   * changes are every push and cleanup, every `override`, and a `setDefault`
+   * that registers a new key. A no-op `setDefault` doesn't bump it. Read it inside a
+   * `computed` to make it re-evaluate on those changes. {@link tunable}
+   * reads it.
    */
   readonly overrideVersion: Ref<number>;
 }
 
 /**
- * Typed narrow over {@link OverrideRegistry} for "values intentionally
- * declared as tuning surface." Every key resolves to a zero-arg reader
- * returning a `DecimalSource`. Picker enumeration walks instances of this
- * type via the ambient {@link TuningRegistriesKey}.
+ * Typed narrow over {@link OverrideRegistry} for values declared on purpose
+ * as tunables. Every key resolves to a zero-arg reader returning a
+ * `DecimalSource`. The picker's discovery walker reads every tuning registry
+ * through the ambient {@link TuningRegistriesKey} set.
  */
 export type TuningRegistry = OverrideRegistry<Record<string, () => DecimalSource>>;
 
 /**
  * Per-engine collection of tuning registries — the picker's
- * `walkTunables` reads this. Pre-provided as an empty `Set<TuningRegistry>`
- * by `createEngine`; populated by `createTuningRegistry` callsites that
- * run inside the engine's `withTuningRegistries(...)` ambient (the
- * install / connect phases).
+ * `walkTunables` reads this. `createEngine` provides it as an empty
+ * `Set<TuningRegistry>`. Each `createTuningRegistry` call adds to it while
+ * the engine's `withTuningRegistries(...)` sets it as the ambient value,
+ * during install/connect.
  *
  * Mirrors the {@link ChainRegistryKey} pattern: per-engine collection,
  * ambient auto-registration, picker enumerates without consumer-side
@@ -160,7 +157,7 @@ export const TuningRegistriesKey = Symbol('engine:tuning-registries') as Injecti
 >;
 
 // === FACTORY ===
-/** Whether a scope supplies its own, defined entry for `key`. */
+/** Whether a scoped override supplies its own, defined entry for `key`. */
 function overridesKey<T>(scope: ScopedOverrides<T>, key: keyof T & string): boolean {
   return Object.hasOwn(scope.overrides, key) && scope.overrides[key] !== undefined;
 }
@@ -168,7 +165,7 @@ function overridesKey<T>(scope: ScopedOverrides<T>, key: keyof T & string): bool
 /**
  * Create a new override registry.
  *
- * @param id - Human-readable name for error messages (e.g., "game-overrides")
+ * @param id - Registry id, shown in error messages (e.g., "game-overrides")
  */
 export function createOverrideRegistry<T extends { [K in keyof T]: (...args: never[]) => unknown }>(
   id: string,
@@ -193,7 +190,7 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
     },
 
     get<K extends keyof T & string>(key: K): T[K] {
-      // Walk scopes top-down
+      // Check scoped overrides, newest first
       for (let i = scopedOverrides.length - 1; i >= 0; i--) {
         const scope = scopedOverrides[i];
         if (overridesKey(scope, key)) return scope.overrides[key] as T[K];
@@ -240,34 +237,33 @@ export function createOverrideRegistry<T extends { [K in keyof T]: (...args: nev
 /**
  * Create a tuning registry — typed narrow over {@link OverrideRegistry} for
  * `Record<string, () => DecimalSource>`-shaped registries that opt into the
- * picker's tuning-surface enumeration.
+ * picker's tunable enumeration.
  *
- * The factory name is the boundary: calling `createTuningRegistry`
- * declares "this registry holds designer-flagged tuning values, surface
- * them in the workbench." Calling `createOverrideRegistry` directly opts
- * out — appropriate for challenge takeover, mod fn replacement, sim swap,
- * and other general substitution uses.
+ * The factory name is the boundary. Calling `createTuningRegistry`
+ * declares "this registry holds designer-flagged tuning values; show
+ * them in a balance workbench." Calling `createOverrideRegistry` directly
+ * opts out. That fits challenge overrides, a mod's replacements,
+ * balance-harness perturbations and other general overrides.
  *
- * Auto-registration only fires when called within
- * `withTuningRegistries(...)` — the ambient `createEngine` sets up
- * around `install()` / `connect()`. Registries constructed outside that
- * ambient (tests, throwaway scripts) silently skip registration; the
- * primitive still works, just isn't picker-discoverable.
+ * Auto-registration happens only inside `withTuningRegistries(...)`, the
+ * ambient value `createEngine` sets during install/connect. A registry
+ * built outside it (tests, throwaway scripts) skips registration silently.
+ * The registry still works; the picker just does not find it.
  *
- * @param id - Human-readable registry name. Used as the registry-name
- *   prefix in `TunablePickerEntry.label`.
+ * @param id - Registry id. It is the prefix of each
+ *   `TunablePickerEntry.label`.
  * @returns A {@link TuningRegistry} — same shape as `OverrideRegistry`
  *   with the value type narrowed to `() => DecimalSource`.
  *
  * @example
  * ```ts
- * // Typical archetype-install shape:
+ * // Typical install shape:
  * const tuning = createTuningRegistry('producer-tuning');
  * ctx.provide(ProducerTuningRegistryKey, tuning);
  *
  * // Consumer modules use tunable() to declare individual values:
  * const effect = tunable(tuning, 'upgrades/double-gold/effect', () =>
- *   Decimal.mul(baseEffect, purchasable.amount.value),
+ *   Decimal.mul(baseEffect, purchasable.count.value),
  * );
  * ```
  */
@@ -278,17 +274,17 @@ export function createTuningRegistry(id: string): TuningRegistry {
   return registry;
 }
 
-// === AMBIENT TUNING-REGISTRIES CONTEXT ===
+// === AMBIENT TUNING REGISTRIES ===
 let _currentTuningRegistries: Set<TuningRegistry> | undefined;
 
 /**
  * Run `fn` with `set` as the ambient tuning-registries collection. Any
  * `createTuningRegistry` called inside `fn` auto-registers into `set`.
  *
- * Used by {@link createEngine} to scope tuning-registry registration to
- * the current engine during its `install()` / `connect()` phases. Nested
- * calls save and restore the previous ambient so multiple engines
- * starting concurrently don't stomp each other.
+ * {@link createEngine} calls it to limit tuning-registry registration to
+ * its own engine during install/connect. Nested calls save and restore
+ * the previous ambient value. So engines built one inside another do not
+ * overwrite each other's set.
  *
  * @internal Consumer code should not call this directly.
  */
@@ -325,30 +321,30 @@ type Widen<R> = R extends number
       : R;
 
 /**
- * Bind a default implementation to `key` on `registry` and return a
- * reactive `ComputedRef` that re-evaluates when the scope stack changes
- * or the key is overridden.
+ * Register a registry default for `key` on `registry` and return a
+ * reactive `ComputedRef`. It re-evaluates when a scoped override is pushed
+ * or popped, or when the key is overridden.
  *
- * **`tunable()` is the opt-in declaration that a value belongs in the
- * externally-controlled tuning surface.** It is neither a primitive of
- * last resort ("only for places others can't reach") nor a universal
- * naming layer ("name every value through tunable"). Grep `tunable(` to
- * find the auditable surface of values declared as tuning targets — that
- * grep is load-bearing, and is only useful when `tunable` stays opt-in.
+ * **`tunable()` is the opt-in declaration that a value is tuned from
+ * outside the game.** It is neither a primitive of last resort ("only for
+ * places others can't reach") nor a universal naming convention ("name every
+ * value through tunable"). Grep `tunable(` to find every value declared
+ * as a tuning target. That grep is the audit, and it works only while
+ * `tunable` stays opt-in.
  *
- * Criteria for adding a `tunable()` wrap:
+ * Criteria for declaring a value through `tunable()`:
  *
- * 1. The value is **designer-meaningful** — a balance dial, not an
+ * 1. The value is **designer-meaningful** — a balance constant, not an
  *    implementation detail.
- * 2. The designer wants it surfaced to workbench / solver / sensitivity-
- *    analysis tooling.
+ * 2. The designer wants it shown in a balance workbench, a solver or
+ *    sensitivity-analysis tooling.
  * 3. The value doesn't already have a **better** identity. A `Modifier`
  *    in a `ModifierChain` has structural identity sufficient for external
- *    tools — wrapping in `tunable` would be redundant naming.
+ *    tools — declaring it through `tunable` would be redundant naming.
  *
  * Negative criteria — do **not** add `tunable()` for:
  *
- * - Implementation constants (loop tick interval, internal buffer sizes).
+ * - Implementation constants (the game-loop interval, internal buffer sizes).
  * - Values that are functions of other tunables (those are *derived* —
  *   tune the upstream).
  * - Anything in a hot evaluation path where the per-read indirection
@@ -356,47 +352,47 @@ type Widen<R> = R extends number
  * - Values that already have structural identity sufficient for the use
  *   case (chains, modifiers, resources).
  *
- * Pair with {@link createTuningRegistry} for the registry boundary that
- * opts the registry into picker enumeration. Using `tunable()` with a
- * plain `createOverrideRegistry` registry works for reactive read /
- * scope-override semantics but skips picker discoverability — appropriate
- * when the surface is internal to a subsystem and shouldn't appear in
- * the workbench.
+ * Pair it with {@link createTuningRegistry}, the registry boundary that
+ * opts the registry into picker enumeration. `tunable()` on a plain
+ * `createOverrideRegistry` registry still gives reactive reads and scoped
+ * overrides, but the picker does not find it. That fits values internal
+ * to one subsystem, which should not appear in a balance workbench.
  *
- * The default function is registered via `setDefault`, so it's a no-op if
- * another caller already claimed the key — that matches vanilla-vs-mod
- * resolution order and avoids silent clobber across installers.
+ * The default function is registered through `setDefault`. So it is a
+ * no-op if another caller already claimed the key. That matches the order
+ * in which a shared module's `setDefault` yields to a mod's `override`, and
+ * no install silently overwrites another.
  *
- * @param registry - The override registry to bind into. Use
- *   {@link TuningRegistry} (created via {@link createTuningRegistry}) when
- *   the value should surface in the picker.
- * @param key - Unique key within the registry (convention: namespaced
- *   path like `"upgrades/double-gold/effect"` so grep surfaces the
- *   category and the field together). A typed registry accepts only its
+ * @param registry - The override registry to register into. Use a
+ *   {@link TuningRegistry} (from {@link createTuningRegistry}) when the
+ *   value should appear in the picker.
+ * @param key - Unique key within the registry. By convention it is a
+ *   slash path like `"upgrades/double-gold/effect"`, so a grep finds the
+ *   category and the field together. A typed registry accepts only its
  *   zero-arg keys.
  * @param defaultFn - Default zero-arg reader. Typically a closure over
  *   the underlying persistent/computed state. Reads inside this function
  *   register their own reactive deps, so the returned computed also
  *   reacts to changes in the underlying state. Must fit the registry's
  *   type for `key`; its return type, with literals widened, types the result.
- * @returns A `ComputedRef` that reads through the registry's scope
- *   stack.
+ * @returns A `ComputedRef` that reads through the registry's scoped
+ *   overrides.
  *
  * @example
  * ```ts
  * const tuning = createTuningRegistry('producer-tuning');
  *
  * const effect = tunable(tuning, 'upgrades/double-gold/effect', () =>
- *   Decimal.mul(baseEffect, purchasable.amount.value),
+ *   Decimal.mul(baseEffect, purchasable.count.value),
  * );
  *
- * // Later, from a sim takeover UI:
- * const restore = tuning.pushOverrides('sim-takeover', {
+ * // Later, from a balance workbench:
+ * const restore = tuning.pushOverrides('workbench', {
  *   'upgrades/double-gold/effect': () => 9999,
  * });
  * // effect.value is now 9999; Vue re-renders dependents automatically.
  * restore();
- * // effect.value falls back to the closure over baseEffect + amount.
+ * // effect.value falls back to the closure over baseEffect + count.
  * ```
  */
 export function tunable<

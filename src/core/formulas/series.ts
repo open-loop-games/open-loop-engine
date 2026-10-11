@@ -1,21 +1,21 @@
 /**
  * Series contract — the discrete sum of a formula over integer steps.
  *
- * A cost curve indexed by level is a **series**, not an integral. Buying `n`
- * levels from level `a` costs `Σ f(a+i)` for `i` in `[0, n)`, and that is a
- * different number from `∫ₐᵃ⁺ⁿ f` — for the canonical exponential curve they
+ * A cost curve indexed by level is a **series**, not a cumulative. Purchasing `n`
+ * levels from level `a` costs `Σ f(a+i)` for `i` in `[0, n)`. That is a
+ * different number from `∫ₐᵃ⁺ⁿ f`. For the canonical exponential curve they
  * differ by the factor `(s−1)/ln s`, which is 7.3% at `s = 1.15` and 44% at
  * `s = 2`. Neither is a rounding error and neither approximates the other.
  *
- * The two live side by side on {@link Formula}: {@link Formula.cumulative} is
- * the continuous one (the rate-function lineage's *cumulative*, the thing
- * `firstPassage` inverts), {@link Formula.sum} is this one. Callers indexing by
+ * The two are side by side on {@link Formula}. {@link Formula.cumulative} is
+ * the continuous one (incremental-game math's *cumulative*, the thing
+ * `firstPassage` inverts), and {@link Formula.sum} is this one. Callers indexing by
  * level want `sum`; callers integrating a rate over time want `cumulative`.
  *
  * **Exact where a closed form exists, reported where it doesn't.** Unlike
- * integration, summation has no general compositional rule — `Σ f(g(x))` does
- * not decompose from `Σ g`, so a substitution-style shortcut would be a
- * silently-wrong answer of exactly the kind this module exists to stop
+ * integration, summation has no general compositional rule: `Σ f(g(x))` does
+ * not decompose from `Σ g`. So a substitution-style shortcut would be a
+ * silently-wrong answer, of exactly the kind this module exists to stop
  * returning. What does hold is linearity plus three base cases, and the op
  * table implements only those:
  *
@@ -27,8 +27,8 @@
  * Between them those cover `Formula.exponential`, `Formula.linear`, and
  * `Formula.polynomial` at an integer exponent up to twelve. Anything else has
  * no closed form here, and {@link Formula.sum} sums a bounded span term by term
- * and corrects a longer one by Euler–Maclaurin, reporting `not-summable` when
- * there is no integral to correct.
+ * and corrects a longer one by Euler–Maclaurin. It reports `not-summable` when
+ * the curve has no antiderivative to correct from.
  */
 
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
@@ -36,20 +36,20 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 // === CONTRACT ===
 
 /**
- * Diagnosed result of {@link Formula.sum}.
+ * Graded result of {@link Formula.sum}.
  *
  * - `exact` — a closed form applied, or the span was summed term by term.
  * - `approximate` — no closed form, and the span is too long to sum term by
- *   term; `value` is the continuous integral with Euler–Maclaurin boundary
+ *   term; `value` is the continuous cumulative with Euler–Maclaurin boundary
  *   corrections applied. `error` is the relative size of the last correction
- *   term, which bounds the truncation from above in the smooth monotone regime
- *   cost curves live in — read it as "accurate to about this much", not as a
+ *   term. It bounds the truncation from above in the smooth monotone regime
+ *   cost curves are in. Read it as "accurate to about this much", not as a
  *   proof.
  * - `not-summable` — no closed form, a span too long to sum term by term, and
- *   no integral to correct; or a term the curve leaves undefined.
+ *   no antiderivative to correct from; or a term the curve leaves undefined.
  *
  * Shape follows {@link Inversion} in `./inversion` — a value plus a `reason`
- * discriminator, `value: null` on the arm with no answer. Same contract
+ * discriminant, `value: null` on the arm with no answer. Same contract
  * question in a different operation, so it gets the same shape.
  */
 export type Series =
@@ -57,7 +57,7 @@ export type Series =
   | { value: DecimalSource; reason: 'approximate'; error: number }
   | { value: null; reason: 'not-summable' };
 
-/** The `not-summable` arm, which carries no payload and is returned from many places. */
+/** The `not-summable` arm, which has no payload and is returned from many places. */
 export const NOT_SUMMABLE: Series = { value: null, reason: 'not-summable' };
 
 /** Wrap an exact value. */
@@ -138,8 +138,8 @@ export function powerSeries(
 
 /**
  * Highest exponent {@link powerSeries} will expand. Faulhaber's coefficients
- * grow without bound and the recurrence below is O(p²); cost curves in the
- * corpus top out around cubic, so this is generous rather than restrictive.
+ * grow without bound and the recurrence below is O(p²). Typical cost curves are
+ * at most cubic, so this is generous rather than restrictive.
  */
 const MAX_POWER = 12;
 

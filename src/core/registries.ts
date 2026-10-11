@@ -1,6 +1,6 @@
 /**
  * Engine-internal registries — three per-engine enumerable collections that
- * external introspection tools (balance workbenches, sim pickers, devtools)
+ * external introspection tools (balance workbenches, the picker, devtools)
  * read to walk "every X this engine knows about":
  *
  * - **Chain registry** — every {@link ModifierChain} created via
@@ -11,14 +11,13 @@
  * - **Resource registry** — every {@link Resource} created via
  *   `createResource`.
  *
- * Each is auto-populated by its corresponding factory under an ambient
- * scope that {@link createEngine} sets up around `install()` / `connect()`.
- * Entities constructed outside an engine (tests, throwaway scripts)
- * silently skip registration — the primitive still works, just isn't
- * discoverable.
+ * Its factory fills each one while {@link createEngine} sets the registry as
+ * an ambient value, during install/connect. An object built outside an
+ * engine (tests, throwaway scripts) skips registration silently. The object
+ * still works; it is just not discoverable.
  *
- * Scratch-engine forks each build their own registries at `start()` time,
- * so two engines in the same runtime never cross-contaminate.
+ * Each engine, scratch engines included, builds its own registries at
+ * `start()`. So two engines in the same runtime never share one.
  *
  * Consumers read the registries via the typed injection keys — `ctx.inject`
  * inside a module, `engine.tryInject` from outside once the engine has
@@ -28,11 +27,12 @@
  * for (const chain of chains.all()) { ... }
  * ```
  *
- * Storage and the ambient triad are factored into {@link ./named-registry}.
- * Chain and effect-system are direct {@link NamedRegistry} aliases; the
- * resource registry wraps a NamedRegistry of entries because its public
- * lookup surface (`list` / `findByDisplayName` / `findById`) differs and each
- * entry carries the persistence context that created it.
+ * Storage and the ambient-value helper are in {@link ./named-registry}.
+ * The chain and effect-system registries are direct {@link NamedRegistry}
+ * aliases. The resource registry holds a NamedRegistry of entries instead,
+ * for two reasons. Its public lookup methods (`list` / `findByDisplayName` /
+ * `findById`) differ, and each entry records the persistent context it was
+ * created in.
  *
  * @cluster registries
  */
@@ -98,14 +98,14 @@ export const getCurrentChainRegistry = chainAmbient.getCurrent;
  * {@link ../systems/temporary-effect.TemporaryEffectSystem} and
  * {@link ../systems/conditional-effect.ConditionalEffectSystem} satisfy this.
  *
- * The picker's effect-system binding walker reads `id` for addressing and `allDefs()` for
- * enumeration; everything else is system-specific and stays behind the
+ * The picker's effect-system walker, which walks lowered grants, reads `id` for
+ * addressing and `allDefs()` for enumeration; everything else is system-specific and stays behind the
  * system's full interface.
  */
 export interface EnumerableEffectSystem {
-  /** System identifier, e.g. `'buffs'`, `'constructions-effects'`. */
+  /** System id, e.g. `'buffs'`, `'constructions-effects'`. */
   readonly id: string;
-  /** Kind tag so walkers can distinguish temporary from persistent defs. */
+  /** The variant, so walkers can tell temporary from conditional effect systems. */
   readonly kind: 'temporary' | 'conditional';
   /** Snapshot of every registered def — shape differs between kinds. */
   allDefs(): readonly EffectDefLike[];
@@ -113,8 +113,8 @@ export interface EnumerableEffectSystem {
 
 /**
  * Structural shape shared by `TemporaryEffectDef` and `ConditionalEffectDef`
- * that the picker needs. The full def types live in systems, which core
- * doesn't import.
+ * that the picker needs. The full def types are in the systems layer, which
+ * core doesn't import.
  */
 export interface EffectDefLike {
   readonly id: string;
@@ -167,14 +167,14 @@ export const getCurrentEffectSystemRegistry = effectSystemAmbient.getCurrent;
 
 // === RESOURCE REGISTRY ===
 /**
- * One entry in a {@link ResourceRegistry}. Carries the live resource and
- * the persistence-context id it was created under (namespace-stripped —
- * i.e. the raw module id the author passed).
+ * One entry in a {@link ResourceRegistry}. Records the live resource and
+ * the id of the enclosing persistent context it was created in, without
+ * the persistence namespace.
  */
 export interface ResourceRegistryEntry<T = DecimalSource> {
   /** The resource instance */
   resource: Resource<T>;
-  /** Persistence context ID the resource was created in, or undefined if created at top level */
+  /** Persistent context id the resource was created in, or undefined outside any persistent context */
   persistentContextId: string | undefined;
 }
 
@@ -185,15 +185,15 @@ export interface ResourceRegistryEntry<T = DecimalSource> {
  * register. Per-resource reactivity is handled by the underlying Vue ref.
  *
  * A resource id is unique per engine, as chain and effect-system ids are:
- * registering a repeat throws, naming both persistence contexts. Per-layer
+ * registering a repeat throws, naming both persistent contexts. Per-prestige-layer
  * resources (each prestige layer's `points`) take distinct ids.
  */
 export interface ResourceRegistry {
   /**
    * Add a resource entry to the registry. Throws if its id is already
    * registered.
-   * @internal Called by {@link createResource} under the ambient scope;
-   *   consumers should not call this directly.
+   * @internal Called by {@link createResource} while this registry is the
+   *   ambient value; consumers should not call this directly.
    */
   register(entry: ResourceRegistryEntry): void;
   /** Snapshot of all registered entries in insertion order. */

@@ -2,11 +2,11 @@
  * Type definitions for the formula system
  *
  * Most consumers only need {@link FormulaSource} (a formula or a raw value) and
- * {@link GenericFormula}. What a formula can do — invert, integrate, invert its
- * integral — depends on the ops in its chain and is answered at runtime by
- * `isInvertible()` / `isIntegrable()` / `isAntiderivativeInvertible()`. Every formula
- * carries every method, so a type naming a capability could not tell one
- * formula from another.
+ * {@link GenericFormula}. What a formula can do — invert, take its
+ * antiderivative, invert its antiderivative — depends on the ops in its chain.
+ * It is answered at runtime by `isInvertible()` / `isIntegrable()` /
+ * `isAntiderivativeInvertible()`. Every formula has every method, so a type
+ * naming a capability could not tell one formula from another.
  */
 
 import type { DecimalSource } from '@/primitives/decimal';
@@ -34,7 +34,7 @@ export type InvertFunction<T extends FormulaSource[]> = (
   ...inputs: T
 ) => DecimalSource;
 
-/** Integration function signature — used in {@link GeneralFormulaOptions} */
+/** Antiderivative function signature — used in {@link GeneralFormulaOptions} */
 export type IntegrateFunction<T extends FormulaSource[]> = (
   this: Formula<T>,
   stack: SubstitutionStack | undefined,

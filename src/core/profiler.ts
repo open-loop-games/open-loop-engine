@@ -1,21 +1,21 @@
 /**
- * Hot-path profiler — labeled wall-clock attribution for the tick loop.
+ * Hot-path profiler — labeled wall-clock timing for the game loop.
  *
- * Sibling to {@link trace} with an identical refcount gate: no subscriber,
+ * Sibling to {@link trace} with the same refcount switch: no subscriber,
  * no cost. When a consumer calls {@link enableProfiling}, the game loop's
- * `processTick` drives per-tick capture via {@link beginProfileTick} /
- * {@link endProfileTick}, and wrap points in hot code record labeled
- * sub-tick time through {@link profile} or {@link profileStart}/
+ * `processTick` drives per-tick capture through {@link beginProfileTick} /
+ * {@link endProfileTick}. Instrumented points in hot code record labeled
+ * time within a tick through {@link profile} or {@link profileStart}/
  * {@link profileEnd}.
  *
- * Per-label per-tick times are retained per tick so {@link getProfileReport}
- * yields p50/p95/p99 per label — profiling max times, not just averages,
- * which is what surfaces tail spikes over multi-thousand-tick runs.
+ * Each label's time is stored per tick, so {@link getProfileReport}
+ * yields p50/p95/p99 per label. Profiling max times, not just averages,
+ * is what shows tail spikes over thousands of ticks.
  *
  * Every time is inclusive wall clock: a label's time includes any labels
- * nested inside it (a category tick wraps the chain applies its entities
- * make, and a chain apply wraps its nested chains). Nested labels overlap,
- * so the `pct` column sums past 100%.
+ * nested inside it. A category's tick includes the chain applies its
+ * instances make, and a chain apply includes its nested chains. Nested
+ * labels overlap, so the `pct` column sums past 100%.
  */
 
 interface Timing {
@@ -23,24 +23,24 @@ interface Timing {
   calls: number;
   min: number;
   max: number;
-  /** Per-tick accumulated inclusive time for this label. One entry per tick the label fired. */
+  /** Per-tick summed inclusive time for this label. One entry per tick that recorded the label. */
   perTick: number[];
 }
 
 const timings: Map<string, Timing> = new Map();
 let refcount = 0;
 let tickStart = 0;
-/** Per-tick accumulator. Allocated in beginProfileTick, flushed in endProfileTick. */
+/** This tick's time per label. Allocated in beginProfileTick, flushed in endProfileTick. */
 let tickDeltas: Map<string, number> | null = null;
 
 /**
- * Subscribe to the profiler. Returns a disposer that decrements the refcount.
- * When the refcount hits zero, {@link profile}, {@link profileStart}, and the
- * tick-lifecycle hooks short-circuit — zero allocation, one branch.
+ * Subscribe to the profiler. Returns a cleanup that decrements the refcount.
+ * When the refcount reaches zero, {@link profile}, {@link profileStart}, and
+ * the per-tick capture functions short-circuit — zero allocation, one branch.
  *
- * Intended for benchmark runners and perf consumers: call once before the
- * measurement window, and read {@link getProfileReport} before disposing —
- * the last disposer clears every accumulated timing.
+ * Intended for benchmark runners and perf consumers. Call it once before the
+ * measurement window, and read {@link getProfileReport} before the cleanup,
+ * because the last cleanup clears every accumulated timing.
  */
 export function enableProfiling(): () => void {
   refcount++;
@@ -93,19 +93,19 @@ export function profileEnd(label: string, start: number): void {
   record(label, performance.now() - start);
 }
 
-function record(name: string, elapsed: number): void {
-  let t = timings.get(name);
+function record(label: string, elapsed: number): void {
+  let t = timings.get(label);
   if (!t) {
     t = { total: 0, calls: 0, min: Infinity, max: 0, perTick: [] };
-    timings.set(name, t);
+    timings.set(label, t);
   }
   t.total += elapsed;
   t.calls++;
   if (elapsed < t.min) t.min = elapsed;
   if (elapsed > t.max) t.max = elapsed;
   if (tickDeltas !== null) {
-    const prev = tickDeltas.get(name);
-    tickDeltas.set(name, (prev ?? 0) + elapsed);
+    const prev = tickDeltas.get(label);
+    tickDeltas.set(label, (prev ?? 0) + elapsed);
   }
 }
 
@@ -122,20 +122,20 @@ export function beginProfileTick(): void {
 }
 
 /**
- * End the current tick's capture window. Flushes per-label tick totals into
- * each label's `perTick` ring buffer, and records a synthetic `tick.total`
- * label carrying the whole-tick wall clock. Called by the game loop after
+ * End the current tick's capture window. Appends each label's tick total to
+ * that label's `perTick` list. Records a synthetic `tick.total` label with
+ * the whole tick's wall-clock time. Called by the game loop after
  * `processTick` finishes.
  * @internal
  */
 export function endProfileTick(): void {
   if (refcount === 0 || tickDeltas === null) return;
   const tickTotal = performance.now() - tickStart;
-  for (const [name, delta] of tickDeltas) {
-    const t = timings.get(name);
+  for (const [label, delta] of tickDeltas) {
+    const t = timings.get(label);
     if (t) t.perTick.push(delta);
   }
-  // Synthetic denominator label so %-of-total math lives in the same table.
+  // Synthetic denominator label, so %-of-total math is in the same table.
   record('tick.total', tickTotal);
   const t = timings.get('tick.total');
   if (t) t.perTick.push(tickTotal);
@@ -162,13 +162,13 @@ export interface ProfileEntry {
   minMs: number;
   /** Slowest single call, in milliseconds. */
   maxMs: number;
-  /** p50 per-tick inclusive time in microseconds (over ticks where the label fired). */
+  /** p50 per-tick inclusive time in microseconds (over ticks that recorded the label). */
   p50Us: number;
   /** p95 per-tick inclusive time in microseconds. */
   p95Us: number;
   /** p99 per-tick inclusive time in microseconds. */
   p99Us: number;
-  /** Number of ticks the label was touched. */
+  /** Number of ticks that recorded the label. */
   ticks: number;
 }
 
@@ -200,11 +200,11 @@ export function getProfileReport(): ProfileReport {
   const ticks = tickTotalEntry?.perTick.length ?? 0;
 
   const entries: ProfileEntry[] = [];
-  for (const [name, t] of timings) {
-    // perTick deltas are in ms; percentile output is in µs.
+  for (const [label, t] of timings) {
+    // perTick times are in ms; percentile output is in µs.
     const sortedPerTick = [...t.perTick].sort((a, b) => a - b);
     entries.push({
-      label: name,
+      label,
       pct: denominatorMs > 0 ? (t.total / denominatorMs) * 100 : 0,
       totalMs: t.total,
       calls: t.calls,
@@ -224,7 +224,7 @@ export function getProfileReport(): ProfileReport {
 
 /**
  * Format a {@link ProfileReport} as a console table.
- * Useful for headless runs; BenchmarkLayout renders the structured report directly.
+ * Useful for headless runs; a UI can show the structured report directly.
  */
 export function formatProfileReport(report: ProfileReport): string {
   const lines: string[] = [];

@@ -1,10 +1,10 @@
 /**
- * Persistence — auto-saved refs with context-scoped registration.
+ * Persistence — auto-saved refs, registered per persistent context.
  *
  * Key features:
  * - NaN detection to prevent corrupted saves
  * - Stack traces for debugging orphaned persistent refs
- * - PersistentAlias wrappers to avoid save duplication
+ * - Persistent aliases, so the save holds a value once
  * - Deleted flag for conditional persistence
  */
 
@@ -28,9 +28,9 @@ import { getNested, setNested } from './save-migrations';
 // === STATE TYPES ===
 
 /**
- * Serializable state types that can be saved/loaded safely.
- * Note: Decimals aren't directly allowed because we need to know to parse them back.
- * DecimalSources (string/number) are allowed because they're valid Decimal inputs.
+ * The serializable values a persistent ref may hold, which save and load safely.
+ * `DecimalSource` admits a `Decimal`: the save writes it as a string, and the
+ * load revives it against the ref default.
  */
 export type Serializable =
   | string
@@ -43,20 +43,20 @@ export type Serializable =
   | { [key: string]: Serializable }
   | { [key: number]: Serializable };
 
-/** Primitive subset of State for use in conditional type branches */
+/** The primitive subset of {@link Serializable}, for conditional type branches */
 export type SerializablePrimitive = string | number | boolean | null | undefined;
 
 /**
- * Compile-time constraint that validates T is serializable without requiring
- * explicit index signatures on interfaces. Use in generic bounds instead of
- * `T extends State` — accepts `{ name: string; count: number }` directly.
+ * Compile-time constraint that checks T is a serializable value without
+ * explicit index signatures on interfaces. Use it in generic bounds instead of
+ * `T extends Serializable`: it accepts `{ name: string; count: number }` directly.
  *
  * The object branch uses a mapped type (`{ [K in keyof T]: ... }`) which
  * checks each property structurally rather than demanding an index signature.
  * DecimalSource is checked before object so Decimal class instances pass
  * without mapped-type introspection of internal fields. A function, or an
  * object holding one (a Map, a class instance with methods), resolves to
- * `never`: it doesn't survive a save. A field declared `unknown` passes as
+ * `never`: a save cannot hold it. A field declared `unknown` passes as
  * opaque state the consumer vouches for; save validation still checks it at
  * load.
  */
@@ -76,49 +76,49 @@ export type SerializableConstraint<T> = unknown extends T
 
 // === SYMBOLS ===
 
-/** Symbol to access the underlying persistent state ref */
+/** Symbol for the backing ref of a persistent ref */
 export const PersistentState = Symbol('PersistentState');
 
-/** Symbol to access the default value for resets */
+/** Symbol for the ref default, which a reset restores */
 export const DefaultValue = Symbol('DefaultValue');
 
-/** Symbol for the stack trace of where this persistent was created */
+/** Symbol for the stack trace of where this persistent ref was created */
 export const StackTrace = Symbol('StackTrace');
 
-/** Symbol to mark a persistent as deleted (won't be saved) */
+/** Symbol that marks a persistent ref as deleted, so it is not saved */
 export const Deleted = Symbol('Deleted');
 
-/** Symbol for the non-persistent computed wrapper */
+/** Symbol for the persistent alias: a writable computed the save walk skips */
 export const PersistentAlias = Symbol('PersistentAlias');
 
-/** Symbol for the save data path */
+/** Symbol for the save path */
 export const SaveDataPath = Symbol('SaveDataPath');
 
 /** Symbol to check if NaN checking is enabled */
 export const CheckNaN = Symbol('CheckNaN');
 
 /**
- * Stable name of this persistent ref inside its context. When set, drives the
- * save-data key in {@link getAllPersistentRefs}. When unset, the key falls back
- * to iteration order — a dev-mode warning is emitted so the gap is observable.
+ * Stable id of this persistent ref inside its persistent context. When set, it
+ * decides the save key in {@link getAllPersistentRefs}. When unset, the key
+ * falls back to iteration order, and a dev-mode warning reports the gap.
  */
 export const PersistentId = Symbol('PersistentId');
 
 /**
  * Explicit Zod schema for this ref's runtime save validation. When unset, the
  * validator in `save-validation.ts` auto-derives from {@link DefaultValue}.
- * Carried as `unknown` so `persistence.ts` stays Zod-agnostic.
+ * Typed `unknown` so `persistence.ts` stays Zod-agnostic.
  */
 export const PersistentSchema = Symbol('PersistentSchema');
 
 /**
- * Marks a ref as Decimal-valued for schema derivation. Needed when the default
- * is a `number`/`string` DecimalSource rather than a Decimal instance, since
- * there's no runtime way to tell those apart from plain numeric refs.
+ * Marks a ref as Decimal-valued for schema derivation. It is needed when the
+ * default is a `number`/`string` DecimalSource rather than a Decimal instance.
+ * At runtime, nothing else tells those apart from plain numeric refs.
  */
 export const PersistentDecimal = Symbol('PersistentDecimal');
 
-/** Symbol to skip persistence checks on an object */
+/** Symbol that marks an object for the reset walk to skip */
 export const SkipPersistence = Symbol('SkipPersistence');
 
 /** Marks a persistent ref as lifetime — see {@link PersistentOptions.lifetime}. */
@@ -145,14 +145,14 @@ export type Persistent<T = Serializable> = Ref<T> & {
 };
 
 /**
- * A computed ref that reads/writes to a persistent ref.
- * Used to pass values without duplicating in save data.
+ * A writable computed over a persistent ref, which the save walk skips.
+ * Pass it to other features, so the save holds the value once.
  */
 export type PersistentAlias<T = Serializable> = WritableComputedRef<T> & {
   readonly [DefaultValue]: T;
 };
 
-// === MODULE STATE ===
+// === FILE STATE ===
 
 /**
  * True while a save load or a reset writes persistent refs. Watchers that
@@ -172,11 +172,11 @@ let hydrationPending = false;
 /**
  * Run `callback` each time a save load or a reset finishes writing persistent
  * refs, once the whole state is consistent. A reset runs it as its writes
- * settle. A save manager load runs it after `save:loaded`, so after the
- * engine's `onLoad` callbacks: a watcher that reacts to a reconciler's write
- * sees the state `onLoad` rebuilt. The flag is shared by every engine in the
- * process, so the callback also runs after another engine's load and must be
- * idempotent. Stops with the effect scope it was registered in.
+ * settle. A save manager load runs it after `save:loaded`, and so after the
+ * engine's `onLoad` handlers. A watcher that reacts to a hydration's write
+ * therefore sees the state `onLoad` rebuilt. Every engine in the runtime shares the
+ * handler set, so `callback` also runs after another engine's load and must
+ * be idempotent. It stops with the Vue effect scope it was registered in.
  *
  * @internal
  */
@@ -189,12 +189,13 @@ export function onHydrated(callback: () => void): () => void {
 
 /**
  * Call `fire` whenever `holds` is true outside a load or reset, and again as
- * each one settles if it holds then. Mid-load, a condition can hold before
+ * each one settles if it holds then. Mid-load, a predicate can hold before
  * the state `fire` writes is restored, so the settled state decides. The
- * watch is sync so `fire` lands on the tick `holds` turns true, even under a
- * sim driving `tickOnce()` in a tight loop. `fire` must be idempotent.
+ * watch is sync, so `fire` runs on the tick where `holds` flips to true. That
+ * holds even in a headless run that calls `tickOnce()` in a tight loop. `fire`
+ * must be idempotent.
  *
- * @returns A stop for both the watch and the hydration callback
+ * @returns A stop for both the watch and the hydration handler
  * @internal
  */
 export function latchWhenSettled(holds: Readonly<Ref<boolean>>, fire: () => void): () => void {
@@ -214,7 +215,7 @@ export function latchWhenSettled(holds: Readonly<Ref<boolean>>, fire: () => void
   };
 }
 
-/** Run every hydration callback, even past a throw; returns what they threw. */
+/** Run every hydration handler, even past a throw; returns what they threw. */
 function runHydrated(): unknown[] {
   const errors: unknown[] = [];
   for (const cb of [...hydratedCallbacks]) {
@@ -230,10 +231,10 @@ function runHydrated(): unknown[] {
 /**
  * Run `fn` as a save load or a reset writing persistent refs, with
  * {@link settling} held throughout. A nested call keeps the outer's hold,
- * so the state settles once, as the outermost call closes: the
- * {@link onHydrated} callbacks run then, or wait for an enclosing
- * {@link deferHydration}. Outside one, the first callback throw rethrows
- * from here once every callback has run.
+ * so the state settles once, as the outermost call closes. The
+ * {@link onHydrated} handlers run then, or wait for an enclosing
+ * {@link deferHydration}. Outside one, the first handler throw rethrows
+ * from here once every handler has run.
  *
  * @internal
  */
@@ -249,7 +250,7 @@ export function withSettling<T>(fn: () => T): T {
   }
 }
 
-/** Run the hydration callbacks for a settled load, or hold them for a deferral. */
+/** Run the hydration handlers for a settled load, or hold them for a deferral. */
 function settleHydration(): void {
   if (hydrationDeferrals > 0) {
     hydrationPending = true;
@@ -260,11 +261,11 @@ function settleHydration(): void {
 }
 
 /**
- * Run `fn` with {@link onHydrated} callbacks held until it returns or throws,
+ * Run `fn` with {@link onHydrated} handlers held until it returns or throws,
  * then run them once if a load or reset settled inside it. A throw from a
- * held callback goes to `onError` rather than out of this call: the writes
- * it reconciles have already landed. Nested calls hold until the outermost
- * closes, and report through its `onError`.
+ * held handler goes to `onError` rather than out of this call: the load or
+ * reset writes before it are already done. Nested calls hold until the
+ * outermost closes, and report through its `onError`.
  *
  * @internal
  */
@@ -280,47 +281,48 @@ export function deferHydration<T>(fn: () => T, onError: (err: unknown) => void):
   }
 }
 
-/** Track if we're currently in a context where persistent creation is expected */
+/** The stack of open persistent contexts; a new persistent ref registers under the top one */
 const addingContexts: string[] = [];
 
-/** Registry of persistent refs per context for validation */
+/** The persistent-ref registry: the refs of each persistent context */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const persistentRefs: Record<string, Set<Persistent<any>>> = {};
 
-/** Map from a persistent ref to the context it was created in */
+/** Map from a persistent ref to the persistent context it was created in */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const refContextId: WeakMap<Persistent<any>, string> = new WeakMap();
 
-/** Parent→child context relationships. When a context is pushed while another
- * is already on the stack, the new context becomes a child of the current top.
- * Used by {@link getPersistentContextRefs} to walk all refs owned by a module. */
+/** Parent→child persistent context links. A persistent context opened while
+ * another is open becomes a child of the enclosing one. {@link getPersistentContextRefs}
+ * walks the links to collect every ref under a persistent context. */
 const contextChildren: Record<string, Set<string>> = {};
 
 /**
- * Ambient namespace applied to `beginPersistentContext` calls. When set,
- * context ids are stored as `${namespace}${NAMESPACE_SEP}${id}` so forkable
- * engine instances sharing a runtime don't collide on module/category ids.
- * Null = default/unnamespaced (legacy behavior, bit-for-bit compatible).
+ * The persistence namespace applied to `beginPersistentContext` calls, an
+ * ambient value. When set, persistent context ids are stored as
+ * `${namespace}${NAMESPACE_SEP}${id}`, so engine instances sharing a runtime
+ * don't collide on module or category ids. Undefined means unnamespaced.
  *
- * Managed via {@link withPersistenceNamespace}. A stack is unnecessary —
- * nested namespaces aren't a supported use case.
+ * {@link withPersistenceNamespace} sets it. It needs no stack, because nested
+ * persistence namespaces are not supported.
  */
 let activeNamespace: string | undefined;
 
-/** Separator between namespace and raw context id. Colon avoids collision
- * with the `/` used by category-base for per-definition contexts. */
+/** Separator between the persistence namespace and the raw persistent context
+ * id. It avoids collision with the `/` that category-base puts in each def's
+ * persistent context id. */
 const NAMESPACE_SEP = '::';
 
-/** Map from full (namespaced) contextId → originating namespace. Keyed with
- * `''` for default/unnamespaced contexts. Drives `getAllPersistentRefs`
- * filtering so each engine only sees its own refs. */
+/** Map from a full persistent context id to its persistence namespace, `''`
+ * for an unnamespaced one. `getAllPersistentRefs` filters on it, so each
+ * engine sees only its own refs. */
 const contextNamespaces: Record<string, string> = {};
 
 // === HELPERS ===
 
 /**
- * Deep-clone a persistent ref's default so `DefaultValue` never aliases the
- * live state. Without this, in-place mutation of the ref's value (e.g. a
+ * Deep-clone a ref default so `DefaultValue` never aliases
+ * the live value. Without this, in-place mutation of the ref's value (e.g. a
  * `Decimal.fromNumber()` call or direct `.sign`/`.mag`/`.layer` writes, or
  * `.push()` on an array default) silently rewrites the default and turns
  * {@link resetPersistent} into a no-op.
@@ -341,7 +343,7 @@ export function cloneDefault<T>(value: T): T {
   return out as T;
 }
 
-/** A raw context id as registered under the active namespace. */
+/** A raw persistent context id as registered under the active persistence namespace. */
 function toFullContextId(contextId: string): string {
   return activeNamespace ? `${activeNamespace}${NAMESPACE_SEP}${contextId}` : contextId;
 }
@@ -360,7 +362,7 @@ function getStackTrace(): string {
 }
 
 /**
- * Check for NaN and write to persistent state, with error handling
+ * Check for NaN and write to the backing ref, with error handling
  */
 function checkNaNAndWrite<T>(persistentRef: Persistent<T>, value: T): void {
   // Only check NaN on numeric/Decimal values — strings, booleans, arrays, etc. are never NaN
@@ -376,22 +378,22 @@ function checkNaNAndWrite<T>(persistentRef: Persistent<T>, value: T): void {
   persistentRef[PersistentState].value = value;
 }
 
-// === CONTEXT API ===
+// === PERSISTENT CONTEXT API ===
 
 /**
- * Begin a context where persistent refs can be created.
- * All persistent refs created during this context will be tracked.
+ * Open a persistent context. Every persistent ref created while it is open
+ * registers under it.
  *
- * When an ambient namespace is active (see {@link withPersistenceNamespace}),
- * the stored context id is prefixed with `${namespace}${NAMESPACE_SEP}` so
- * two engines in the same runtime can share module ids without collision.
+ * When a persistence namespace is active (see {@link withPersistenceNamespace}),
+ * the stored persistent context id is prefixed with `${namespace}${NAMESPACE_SEP}`.
+ * So two engines in one runtime can share module ids without collision.
  *
- * @param id - Unique identifier for this context (e.g., node ID). Must not contain `.`,
- *   which save paths split on — it throws.
+ * @param id - Unique id for this persistent context, such as a node id. It must
+ *   not contain `.`, which save paths split on; such an id throws.
  */
 export function beginPersistentContext(id: string): void {
-  // Save keys are `${contextId}.${name}` and split on "." into the nested save
-  // object, so a dotted context id would save and validate at the wrong path.
+  // Save keys are `${contextId}.${refId}` and split on "." into nested save
+  // data, so a dotted persistent context id would save and validate at the wrong path.
   if (id.includes('.')) {
     throw new Error(`Persistent context id "${id}" contains ".", which save paths split on.`);
   }
@@ -408,18 +410,17 @@ export function beginPersistentContext(id: string): void {
 }
 
 /**
- * End the current persistent context.
+ * Close the enclosing persistent context.
  */
 export function endPersistentContext(): void {
   addingContexts.pop();
 }
 
 /**
- * Run a block inside a persistent context, guaranteeing the context is closed
- * even if the block throws. Preferred over manual begin/end pairs for simple
- * single-context scopes.
+ * Run a block inside a persistent context, and close it even if the block
+ * throws. Prefer it over a manual begin and end pair.
  *
- * @param id - Context identifier (same as {@link beginPersistentContext})
+ * @param id - Persistent context id (as for {@link beginPersistentContext})
  * @param fn - Block to execute inside the context
  * @returns The return value of `fn`
  */
@@ -433,11 +434,11 @@ export function withPersistentContext<T>(id: string, fn: () => T): T {
 }
 
 /**
- * Run a block with an ambient persistence namespace applied to any
- * `beginPersistentContext` calls underneath. Used by the engine to isolate
- * forkable instances that share module/category ids.
+ * Run a block with a persistence namespace applied to every
+ * `beginPersistentContext` call inside it. The engine uses it to isolate
+ * engine instances that share module or category ids.
  *
- * @param namespace - Namespace string, or undefined to run unnamespaced
+ * @param namespace - Persistence namespace, or undefined to run unnamespaced
  * @param fn - Block to execute
  * @internal Consumer code should not call this directly — set
  *   {@link EngineOptions.persistenceNamespace} instead.
@@ -453,9 +454,9 @@ export function withPersistenceNamespace<T>(namespace: string | undefined, fn: (
 }
 
 /**
- * Bind `fn` to the persistence namespace active now, so a call made after
- * install has closed it (a reset resolving its scope) still resolves context
- * ids in the engine that built the caller.
+ * Bind `fn` to the persistence namespace active now. Then a call after
+ * install, such as a reset resolving its reset scope, still resolves
+ * persistent context ids in the engine that built the caller.
  *
  * @internal
  */
@@ -467,16 +468,15 @@ export function bindPersistenceNamespace<A extends unknown[], R>(
 }
 
 /**
- * Strip the namespace prefix from a full context id, leaving the raw id the
- * caller passed to `beginPersistentContext`. Namespace-agnostic code that
- * needs to display or route on the context id (e.g. system fallback ids)
- * should read this, not the raw stack entry.
+ * Strip the persistence namespace prefix from a full persistent context id,
+ * leaving the raw id the caller passed to `beginPersistentContext`. Code that
+ * displays or routes on the id (such as system fallback ids) reads this, not
+ * the raw stack entry.
  *
  * The prefix is sliced by the *recorded* namespace length, not by indexOf
- * on the separator — so context ids that legitimately contain `::` for their
- * own scoping (e.g. resource lifetime trackers under `${parent}::${id}`)
- * round-trip with their structure intact instead of collapsing to whatever
- * follows the first `::`.
+ * on the separator. So an id that contains `::` for its own nesting keeps its
+ * structure, instead of collapsing to whatever follows the first `::`. A
+ * resource's lifetime trackers under `${parent}::${name}` are such ids.
  */
 function stripNamespace(fullId: string): string {
   const ns = contextNamespaces[fullId];
@@ -485,11 +485,11 @@ function stripNamespace(fullId: string): string {
 }
 
 /**
- * Get the current persistent context ID, if any.
+ * Get the enclosing persistent context's id, if any.
  *
- * Returns the raw id (namespace stripped) so consumer code that compares
- * against module/category ids stays stable regardless of which engine
- * instance the context was opened under.
+ * It returns the raw id, with the persistence namespace stripped. So consumer
+ * code that compares it with module or category ids works under any engine
+ * instance.
  */
 export function getCurrentPersistentContext(): string | undefined {
   const top = addingContexts[addingContexts.length - 1];
@@ -500,11 +500,13 @@ export function getCurrentPersistentContext(): string | undefined {
 const systemFallbackCounts = new Map<string, number>();
 
 /**
- * Context id for a system a module usually builds once: the explicit `id` as
- * given, else `${ambient}/${kind}`, else `${kind}_${n}` from a per-kind
- * counter (a build outside any module — tests). The kind keeps two systems in
- * one module from sharing a context and colliding on common ref names like
- * `unlocked`.
+ * Persistent context id for a system a module usually builds once:
+ * - the explicit `id` as given;
+ * - else `${ambient}/${kind}`, under the enclosing persistent context;
+ * - else `${kind}_${n}` from a per-kind counter, for a build outside any module (tests).
+ *
+ * The kind keeps two systems in one module from sharing a persistent context
+ * and colliding on common ref ids like `unlocked`.
  *
  * @internal
  */
@@ -518,11 +520,11 @@ export function resolveSystemPersistentContextId(id: string | undefined, kind: s
 }
 
 /**
- * Full (namespaced) context id used as the key in {@link persistentRefs}.
- * Ref creation and lookup-by-ref must use this so they land in the right
- * namespace bucket. Also used by attribution surfaces (e.g. chain bindings)
- * that want a globally-unique scope id rather than the namespace-stripped
- * {@link getCurrentPersistentContext} value.
+ * The enclosing persistent context's full id, persistence namespace included:
+ * the key in {@link persistentRefs}. Ref creation and lookup by ref use it, so
+ * a ref registers under the right persistence namespace. Attribution (such as
+ * a chain binding's) also uses it, for an id unique across engines, where
+ * {@link getCurrentPersistentContext} strips the persistence namespace.
  */
 export function getCurrentFullPersistentContext(): string | undefined {
   return addingContexts[addingContexts.length - 1];
@@ -534,45 +536,45 @@ export function getCurrentFullPersistentContext(): string | undefined {
  * Options for creating a persistent ref.
  */
 export interface PersistentOptions<T = unknown> {
-  /** Skip NaN detection on writes. Defaults to true. */
+  /** Check each write for NaN; a NaN write is logged and not written. Defaults to true. */
   checkNaN?: boolean;
   /**
-   * Stable name for this ref inside its persistent context, used as the
-   * save-data key. Required when you want rename-safe saves.
+   * Stable id for this ref inside its persistent context; it forms the save
+   * key. Set it so the save key does not depend on creation order.
    */
   id?: string;
   /**
    * Mark the ref as Decimal-valued for schema derivation. Set this when the
-   * default is a `number`/`string` DecimalSource rather than a Decimal instance
-   * and you want the save validator to accept only valid Decimal inputs.
+   * default is a `number`/`string` DecimalSource rather than a Decimal instance.
+   * Then the save validator accepts only valid Decimal inputs.
    * Without this, numeric refs get a lenient `number | string` schema that
    * still covers DecimalSource but doesn't construct-test the value.
    */
   decimal?: boolean;
   /**
    * Explicit runtime Zod schema override for save validation. When unset, the
-   * save validator auto-derives a schema from the default value's shape.
+   * save validator auto-derives a schema from the ref default's shape.
    * Typed as `unknown` here to keep persistence.ts Zod-agnostic — cast to
    * `z.ZodType<T>` at the call site.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema?: unknown extends T ? any : unknown;
   /**
-   * Mark the ref as lifetime: state that outlives a run, such as cumulative
-   * gain, a high-water mark or a lifetime counter. Only a reset that names
-   * the ref itself writes it. A `resetPersistentContexts` scope drops it, even with no
-   * `keep:` entry, and a `thingsToReset` walk passes over it inside any
-   * object or category it walks. Save, load and `engine.dispose()` ignore
-   * the flag.
+   * Mark the ref as lifetime: a value that survives a reset, such as a
+   * cumulative gain, a high-water mark or a lifetime counter. Only a reset that
+   * names the ref itself writes it. A `resetPersistentContexts` reset scope
+   * leaves it out, even with no `keep:` entry. A `thingsToReset` walk passes
+   * over it inside any object or category it walks. Save, load and
+   * `engine.dispose()` ignore the flag.
    *
-   * The rule for engine systems: system-owned cross-run state is lifetime
-   * (cycle stats, best-of records, run-pool aliveness, automation unlocks,
-   * total play time and the like). `Resource.cumulative` and `Resource.best`
-   * carry it too — see {@link createResource}.
+   * The rule for engine systems: system-owned state that must survive a reset
+   * is lifetime. Examples are cycle stats, best-of records, run pool aliveness,
+   * automation unlocks and total play time. `Resource.cumulative` and
+   * `Resource.best` are lifetime too; see {@link createResource}.
    *
-   * To wipe a lifetime ref, name it as a top-level entry,
+   * To reset a lifetime ref, name it as a top-level entry, as in
    * `createReset({ thingsToReset: [resource.cumulative] })`, or call the
-   * owning system's own reset verb.
+   * owning system's own reset method.
    *
    * Default: `false`.
    */
@@ -580,18 +582,18 @@ export interface PersistentOptions<T = unknown> {
 }
 
 /**
- * Resolves to `Ok` when `T` is serializable state and to `never` otherwise, so
- * a parameter typed through it rejects a non-state value at the call. Checking
+ * Resolves to `Ok` when `T` is a serializable value and to `never` otherwise.
+ * So a parameter typed through it rejects any other value at the call. Checking
  * here instead of intersecting the value parameter with {@link SerializableConstraint}
  * lets a literal default widen: `persistent(0)` is a `Persistent<number>`.
  */
 export type IfSerializable<T, Ok> = [T] extends [SerializableConstraint<T>] ? Ok : never;
 
 /**
- * Create a persistent ref that will be saved/loaded automatically.
+ * Create a persistent ref, which the save manager saves and loads.
  *
- * @param defaultValue - Initial value for new saves, or an existing ref to wrap
- * @param options - Configuration — see {@link PersistentOptions}
+ * @param defaultValue - The ref default, which a new save starts at, or an existing ref to wrap
+ * @param options - Options; see {@link PersistentOptions}
  */
 export function persistent<T>(
   defaultValue: T | Ref<T>,
@@ -606,7 +608,7 @@ export function persistent<T>(
   // corrupt it — see cloneDefault.
   const actualDefault: T = cloneDefault(isRef(defaultValue) ? defaultValue.value : defaultValue);
 
-  // Create non-persistent computed wrapper
+  // Create the persistent alias
   const alias = computed({
     get: () => persistentState.value,
     set: (value: T) => {
@@ -618,7 +620,7 @@ export function persistent<T>(
     },
   }) as PersistentAlias<T>;
 
-  // Attach default value to non-persistent wrapper
+  // Attach the ref default to the persistent alias
   (alias as { [DefaultValue]: T })[DefaultValue] = actualDefault;
 
   // Create the persistent ref object that mocks a Vue ref
@@ -657,7 +659,7 @@ export function persistent<T>(
     [Lifetime]: lifetime,
   } as unknown as Persistent<T>;
 
-  // Track in current context if there is one
+  // Register under the enclosing persistent context, if one is open
   const currentContext = getCurrentFullPersistentContext();
   if (currentContext) {
     persistentRefs[currentContext].add(persistent);
@@ -667,7 +669,7 @@ export function persistent<T>(
     }
   } else {
     console.warn(
-      'Creating a persistent ref outside of a context. This may cause save/load issues.',
+      'Creating a persistent ref outside a persistent context. It is not saved or loaded.',
       persistent,
       '\nCreated at:\n' + persistent[StackTrace],
     );
@@ -679,35 +681,35 @@ export function persistent<T>(
 // === REF UTILITIES ===
 
 /**
- * Assign a stable save-data name to a persistent ref inside its context.
+ * Assign a stable id to a persistent ref inside its persistent context; the
+ * id forms the ref's save key.
  *
- * Collisions within the same context throw — silent overwrite is exactly the
- * class of bug this guards against. Reassigning the same ref to
- * the same name is a no-op. Reassigning a ref from one name to another frees
- * the old name.
+ * A collision inside one persistent context throws, because a silent
+ * overwrite is the bug this guards against. Assigning a ref the id it already
+ * has is a no-op. Assigning a ref a new id frees the old one.
  *
- * Called directly with an explicit `name` on {@link persistent}'s options, or
- * by collector factories ({@link createDefStates}, category `mapState`)
- * that know the enclosing field name after the factory returns.
+ * {@link persistent} calls it for an explicit `id` option. Collector factories
+ * ({@link createDefStates}, a category's `mapState`) call it too, because they
+ * know the field name only after the factory returns.
  */
 export function setPersistentId(ref: Persistent, id: string): void {
   const contextId = refContextId.get(ref);
   if (!contextId || !(contextId in persistentRefs)) {
     throw new Error(
-      'setPersistentId: ref is not registered to a context. ' +
+      'setPersistentId: ref is not registered to a persistent context. ' +
         'Call setPersistentId only on refs created inside a persistent context.',
     );
   }
   const existing = ref[PersistentId];
   if (existing === id) return;
-  // Collision check: walk live refs in the context. Deriving on demand avoids
-  // drift between a cached name set and the live refs Set when callers clear
-  // the context (test teardown, etc.).
+  // Collision check: walk the live refs in the persistent context. Deriving on
+  // demand avoids drift between a cached id set and the live refs Set when
+  // callers clear the persistent context (test teardown, etc.).
   for (const other of persistentRefs[contextId]) {
     if (other === ref || other[Deleted]) continue;
     if (other[PersistentId] === id) {
       throw new Error(
-        `Persistent id collision in context "${contextId}": "${id}" is already in use.`,
+        `Persistent id collision in persistent context "${contextId}": "${id}" is already in use.`,
       );
     }
   }
@@ -722,10 +724,10 @@ export function isPersistent(value: unknown): value is Persistent {
 }
 
 /**
- * Get the non-persistent computed wrapper for a persistent ref.
- * Use this when passing to other features to avoid duplication in save data.
+ * Get the persistent alias of a persistent ref. Pass it to other features, so
+ * the save holds the value once.
  *
- * For objects, returns a proxy that hides persistence symbols.
+ * For any other object, it returns a proxy that hides the persistence symbols.
  */
 export function aliasPersistent<T extends Persistent<S>, S>(
   persistentRef: T,
@@ -742,7 +744,7 @@ export function aliasPersistent<T extends Persistent<S> | object, S>(
     return (value as Persistent<S>)[PersistentAlias];
   }
 
-  // For non-persistent objects, return a proxy that hides persistence symbols
+  // For an object that is not a persistent ref, return a proxy that hides persistence symbols
   return new Proxy(value, {
     get(target, p) {
       if (p === PersistentState) return undefined;
@@ -765,9 +767,9 @@ export function aliasPersistent<T extends Persistent<S> | object, S>(
  * Mark a persistent ref as deleted, so it won't be saved or loaded.
  * Use this for conditionally created persistent refs.
  *
- * Removes the ref from its originating context's registration set (looked up
- * via the WeakMap, not the active context stack — so calling this outside the
- * creating context still cleans up).
+ * Removes the ref from its originating persistent context's registration set,
+ * looked up through the WeakMap, not the persistent context stack. So a call
+ * outside the persistent context that created the ref still removes it.
  */
 export function deletePersistent(persistentRef: Persistent): void {
   const originContext = refContextId.get(persistentRef);
@@ -778,32 +780,32 @@ export function deletePersistent(persistentRef: Persistent): void {
 }
 
 /**
- * Reset a persistent ref to its default value
+ * Reset a persistent ref to its ref default
  */
 export function resetPersistent<T>(persistentRef: Persistent<T>): void {
   persistentRef.value = cloneDefault(persistentRef[DefaultValue]);
 }
 
 /**
- * True when a persistent ref's current value equals its default. Used by
- * {@link filterDefaultedRefs} to prune redundant entries from the save
- * envelope; deserialize restores absent keys to their default.
+ * True when a persistent ref's value equals its ref default.
+ * {@link filterDefaultedRefs} uses it to prune redundant leaves from the save
+ * data; a load restores an absent leaf to its ref default.
  *
- * That default is the loading build's, not the saving one's: an absent leaf
- * means "the writing build's default". A content update that changes a
- * default therefore moves every saved value that sat at the old one, and a
- * migration reading the leaf sees `undefined`. Changing a default is a save
- * migration.
+ * A load restores the loading build's default, but the leaf is absent because
+ * it held the writing build's default. So a content update that changes a
+ * default moves every saved value that held the old one. A save migration
+ * that reads the leaf sees `undefined`. Changing a default therefore needs a
+ * save migration.
  *
  * Equality rules, in order:
  * 1. NaN-vs-NaN (numeric primitives only) → equal.
  * 2. Strict `===` → covers all primitives (string, number, boolean, null, undefined).
  * 3. Decimal: when either side is a `Decimal` instance, or the ref is flagged
- *    via `{ decimal: true }`, comparison goes through `Decimal.eq` so different
- *    `Decimal` instances representing the same value still match.
+ *    via `{ decimal: true }`, comparison goes through `Decimal.eq`. So
+ *    different `Decimal` instances of the same value still match.
  * 4. Plain objects/arrays: bounded-depth structural equality (cap 6).
  * 5. Anything else (functions, refs, class instances other than `Decimal`,
- *    `Map`, `Set`, etc.) → never equal; the ref is kept.
+ *    `Map`, `Set`, etc.) → never equal; the ref stays in the save data.
  */
 export function isAtDefault<T>(persistentRef: Persistent<T>): boolean {
   const current = persistentRef[PersistentState].value;
@@ -865,11 +867,11 @@ function isPlainContainer(v: object): boolean {
 }
 
 /**
- * Return a new Map with refs whose value equals their default removed. Used
- * by the save manager between {@link getAllPersistentRefs} and
- * {@link serializePersistents} so the envelope omits redundant leaves —
- * ~5× size win on saves dominated by default-valued primitives. A pruned
- * leaf loads as the loading build's default — see {@link isAtDefault}.
+ * Return a new Map without the refs whose value equals their ref default. The
+ * save manager calls it between {@link getAllPersistentRefs} and
+ * {@link serializePersistents}, so the save data omits redundant leaves. That
+ * makes a save dominated by default-valued primitives about 5× smaller. A
+ * pruned leaf loads as the loading build's default; see {@link isAtDefault}.
  */
 export function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, Persistent> {
   const out = new Map<string, Persistent>();
@@ -882,25 +884,26 @@ export function filterDefaultedRefs(refs: Map<string, Persistent>): Map<string, 
 // === REGISTRY QUERIES ===
 
 /**
- * Get all persistent refs for a given context.
+ * Get every persistent ref of one persistent context.
  *
- * Accepts the raw context id and resolves it within the active namespace
- * only, so a forked engine never reads another engine's context.
+ * It takes the raw persistent context id and resolves it in the active
+ * persistence namespace only. So an engine never reads another engine's
+ * persistent context.
  */
 export function getPersistentRefs(contextId: string): Set<Persistent> | undefined {
   return persistentRefs[toFullContextId(contextId)];
 }
 
 /**
- * Get all persistent refs belonging to a module, including refs created in
- * nested child contexts (categories, per-definition states, etc.).
+ * Get every non-lifetime persistent ref under a persistent context, child
+ * persistent contexts included (categories, def states and the like).
  *
- * Unlike {@link getPersistentRefs} which returns only refs in one context,
- * this walks the parent→child context tree rooted at `contextId` and collects
- * every non-lifetime ref reachable from that root. Used by the reset system
- * to resolve `resetPersistentContexts` scope.
+ * {@link getPersistentRefs} returns the refs of one persistent context. This
+ * walks the tree of child persistent contexts rooted at `contextId`, and
+ * collects every non-lifetime ref in it. The reset system uses it to resolve
+ * a `resetPersistentContexts` reset scope.
  *
- * @param contextId - The raw context id (typically the module's `id` field)
+ * @param contextId - The raw persistent context id, often a module's `id`
  */
 export function getPersistentContextRefs(contextId: string): Set<Persistent> {
   const result = new Set<Persistent>();
@@ -911,18 +914,18 @@ export function getPersistentContextRefs(contextId: string): Set<Persistent> {
 }
 
 /**
- * Delete every ref in a context and in the contexts opened inside it,
- * lifetime refs included, so a build that failed partway leaves no refs to be
- * saved or to collide with a retry's names.
+ * Delete every ref in a persistent context and in its child persistent
+ * contexts, lifetime refs included. So a build that failed partway leaves no
+ * refs to be saved or to collide with a retry's ids.
  *
- * @param contextId - The raw context id, resolved in the active namespace
+ * @param contextId - The raw persistent context id, resolved in the active persistence namespace
  * @internal
  */
 export function deletePersistentContextRefs(contextId: string): void {
   for (const r of [...walkContextTree(contextId)]) deletePersistent(r);
 }
 
-/** Every ref reachable from a context through the parent→child context tree. */
+/** Every ref in a persistent context and its child persistent contexts. */
 function* walkContextTree(contextId: string): Generator<Persistent> {
   const stack = [toFullContextId(contextId)];
   while (stack.length > 0) {
@@ -939,9 +942,10 @@ function* walkContextTree(contextId: string): Generator<Persistent> {
 /**
  * Clear every registered persistent context and its refs.
  *
- * @internal Test-only reset used by suites that re-create the same contexts
- * across cases. Production code never needs this — contexts are created once
- * per engine lifetime. Using this in engine code is almost certainly a bug.
+ * @internal A test-only reset for suites that re-create the same persistent
+ * contexts across cases. Production code never needs it, because each engine
+ * creates its persistent contexts once. A call in engine code is almost
+ * certainly a bug.
  */
 export function resetAllPersistentContexts(): void {
   for (const key of Object.keys(persistentRefs)) {
@@ -957,23 +961,22 @@ export function resetAllPersistentContexts(): void {
 }
 
 /**
- * Drop every persistent context registered under the given namespace.
+ * Delete every persistent context registered under the given persistence
+ * namespace.
  *
- * Called by `engine.dispose()` when an engine instance is being torn down so
- * a subsequent engine using the same module ids can install without colliding
- * on persistent-ref names. Save storage is keyed independently (gameId, plus
- * namespace when set) and is not touched here.
+ * `engine.dispose()` calls it, so a later engine with the same module ids can
+ * install without colliding on persistent ref ids. Save storage is keyed
+ * separately (gameId, plus the persistence namespace when set), and this does
+ * not touch it.
  *
- * Pass `undefined` to clear unnamespaced contexts. With no namespace this
- * empties the entire default bucket — fine for single-engine pages (the
- * default case), but two unnamespaced engines coexisting in the same runtime
- * would interfere. Concurrent engines must use a `persistenceNamespace` for
- * isolation.
+ * Pass `undefined` to delete every unnamespaced persistent context. That suits
+ * a page with one engine. Two unnamespaced engines in one runtime would
+ * interfere, so concurrent engines must each set a `persistenceNamespace`.
  *
- * Refs registered under the cleared contexts are not mutated; their
- * `refContextId` WeakMap entries remain pointing at the now-deleted context
- * id. Callers (typically a disposed engine being garbage-collected) must drop
- * external references for the refs themselves to be reclaimed.
+ * The refs registered under the deleted persistent contexts are not changed.
+ * Their `refContextId` WeakMap entries still point at the deleted id. A caller,
+ * usually a disposed engine, must give up its references to the refs before
+ * garbage collection reclaims them.
  */
 export function deletePersistenceNamespace(persistenceNamespace?: string): void {
   const wantNs = persistenceNamespace ?? '';
@@ -987,33 +990,31 @@ export function deletePersistenceNamespace(persistenceNamespace?: string): void 
     delete contextChildren[fullId];
     unnamedWarnedContexts.delete(fullId);
   }
-  // Surviving contexts (different namespace) may still list cleared ids in
-  // their child set; drop those edges so getPersistentContextRefs doesn't
-  // walk into deleted entries.
+  // Persistent contexts in another persistence namespace may still list
+  // deleted ids as children; remove those edges so getPersistentContextRefs
+  // doesn't walk into deleted entries.
   for (const children of Object.values(contextChildren)) {
     for (const fullId of cleared) children.delete(fullId);
   }
 }
 
-// === DEFINITION STATE MAPS ===
+// === DEF STATE MAPS ===
 
 /**
- * Create a Map of per-definition persistent state, where each `stateFactory`
- * result must be an *object* of persistent refs (property keys become the
- * stable save names).
+ * Create a Map of def states. Each `stateFactory` result must be an *object*
+ * of persistent refs, whose property keys become their stable ids.
  *
- * Wraps `beginPersistentContext`/`endPersistentContext` and iterates
- * definitions, calling `stateFactory` for each to build the state object.
- * All `persistent()` calls inside the factory are tracked under `contextId`.
+ * It opens persistent context `contextId` and calls `stateFactory` once per
+ * def to build its def state. Every `persistent()` call inside the factory
+ * registers under `contextId`.
  *
- * @param contextId - Persistence context name (e.g. 'jobs', 'explorations')
- * @param definitions - Array of definition objects to create state for
- * @param stateFactory - Called once per definition. Must return an *object* whose
- *   properties are the persistent refs — property keys become the stable save
- *   names. Returning a bare `Persistent` loses stable naming (runtime console
- *   warning only).
- * @param keyAccessor - Function to extract the map key from a definition (default: `def.id`)
- * @returns Map from key to state object
+ * @param contextId - Persistent context id (e.g. 'jobs', 'explorations')
+ * @param definitions - The defs to create def states for
+ * @param stateFactory - Called once per def. It must return an *object* whose
+ *   properties are persistent refs; the property keys become their stable ids.
+ *   A bare `Persistent` gets no stable id, and only a console warning reports it.
+ * @param keyAccessor - Function to extract the map key from a def (default: `def.id`)
+ * @returns Map from key to def state
  *
  * @example
  * ```ts
@@ -1032,13 +1033,13 @@ export function createDefStates<D, K, S>(
 ): Map<K, S> {
   const map = new Map<K, S>();
   // withPersistentContext, not a bare begin/end pair: a throwing stateFactory
-  // must not leave the context stack pushed and mis-scope every later ref.
+  // must not leave the persistent context open and misplace every later ref.
   withPersistentContext(contextId, () => {
     for (const def of definitions) {
       const state = stateFactory(def);
       const defKey = keyAccessor(def);
-      // Auto-name every persistent field as `${defId}.${fieldName}` so save
-      // keys stay stable across field reorders and new-field additions.
+      // Give every persistent field the id `${defId}.${fieldName}`, so save
+      // keys stay stable when fields are reordered or added.
       if (state !== null && typeof state === 'object') {
         for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
           if (isPersistent(value) && value[PersistentId] === undefined) {
@@ -1055,7 +1056,7 @@ export function createDefStates<D, K, S>(
 // === SERIALIZATION ===
 
 /**
- * Serialize collected persistent refs to a save object
+ * Serialize the collected persistent refs to save data
  */
 export function serializePersistents(refs: Map<string, Persistent>): Record<string, unknown> {
   const save: Record<string, unknown> = {};
@@ -1077,33 +1078,31 @@ export function serializePersistents(refs: Map<string, Persistent>): Record<stri
   return save;
 }
 
-/** Tracks which contexts have already warned about unnamed refs this session */
+/** The persistent contexts that have already warned about refs with no id, in this runtime */
 const unnamedWarnedContexts: Set<string> = new Set();
 
 /**
- * Build a Map of all persistent refs across all contexts, keyed by a stable
- * name when one was assigned, or by iteration order as a legacy fallback.
+ * Build a Map of every persistent ref across every persistent context. A ref
+ * with an id is keyed by it; a ref with none falls back to its iteration order.
  *
- * Named keys have the shape `${contextId}.${name}` — for composite names set
- * by collector factories, the name may itself contain `.` (e.g.
- * `"jobs.warrior.progress"`), and the serializer splits the full key
- * accordingly to build nested save objects.
+ * A key with an id has the shape `${contextId}.${refId}`. A collector
+ * factory's composite id may itself contain `.` (e.g. `"jobs.warrior.progress"`),
+ * and the serializer splits the full key to build nested save data.
  *
- * Fallback keys for unnamed refs have the shape `${contextId}.${index}` and
- * emit a dev-mode warning once per context — this path exists so consumers
- * can adopt names incrementally without breaking save compatibility, and so
- * that legacy saves still round-trip.
+ * A fallback key has the shape `${contextId}.${index}`, and dev mode warns
+ * once per persistent context. The fallback lets a consumer add ids gradually
+ * without breaking saves, and keeps older saves round-tripping.
  *
- * Used by the save manager to serialize/deserialize all game state.
+ * The save manager uses it to save and load all live state.
  *
- * @param persistenceNamespace - When provided, only walks contexts that were opened
- *   under {@link withPersistenceNamespace} with the same namespace. When
- *   omitted, walks only unnamespaced (default) contexts. This lets two
- *   engines sharing a runtime each see only their own refs.
+ * @param persistenceNamespace - When provided, only walks persistent contexts
+ *   opened under {@link withPersistenceNamespace} with the same persistence
+ *   namespace. When omitted, walks only unnamespaced persistent contexts. So
+ *   two engines sharing a runtime each see only their own refs.
  *
- *   Context ids in the returned Map keys and in each ref's `SaveDataPath`
- *   have the namespace prefix stripped so envelope data is portable across
- *   engines with different namespaces.
+ *   Persistent context ids in the returned keys and in each ref's `SaveDataPath`
+ *   have the persistence namespace stripped. So save data moves between
+ *   engines with different persistence namespaces.
  */
 export function getAllPersistentRefs(persistenceNamespace?: string): Map<string, Persistent> {
   const result = new Map<string, Persistent>();
@@ -1126,44 +1125,45 @@ export function getAllPersistentRefs(persistenceNamespace?: string): Map<string,
         const key = `${contextId}.${i}`;
         ref[SaveDataPath] = [contextId, String(i)];
         result.set(key, ref);
-        // Only unnamed refs count, so naming a sibling never shifts this key.
+        // Only refs with no id count, so giving a sibling an id never shifts this key.
         i++;
       }
     }
     if (dev && hadUnnamed && !unnamedWarnedContexts.has(fullId)) {
       unnamedWarnedContexts.add(fullId);
       console.warn(
-        `[persistence] Context "${contextId}" has persistent refs without stable names. ` +
-          'Reordering persistent() calls inside this context will silently remap save values. ' +
-          'Assign names via persistent(default, { name: "..." }) or a collector factory.',
+        `[persistence] Persistent context "${contextId}" has persistent refs without stable ids. ` +
+          'Reordering persistent() calls inside it silently remaps saved values. ' +
+          'Assign ids with persistent(default, { id: "..." }) or a collector factory.',
       );
     }
   }
   return result;
 }
 
-/** Non-finite numbers serialize::string; this maps them back on load. */
+/** Non-finite numbers serialize as strings; this maps them back on load. */
 const NON_FINITE_NUMBERS: Record<string, number> = { Infinity, '-Infinity': -Infinity, NaN };
 
 /**
- * Rehydrate a loaded save leaf/tree against a persistent ref's default,
- * reviving the Decimals the serializer flattened to strings.
+ * Revive a loaded save leaf or tree against its persistent ref's default:
+ * decode the Decimals the serializer flattened to strings.
  *
  * break_eternity's `Decimal.toJSON` emits a string, so a `Decimal` nested
- * inside an object- or array-valued ref survives JSON serialization only as a
- * string — top-level revival alone would hand it back as `"99"` and break the
- * first `.add`/`.gte` call. The default value carries the declared shape and
- * drives revival: wherever the default holds a `Decimal`, the matching loaded
- * leaf is reconstructed via `new Decimal(...)`; wherever it holds a `number`,
- * non-finite strings (`"Infinity"`, `"NaN"`) are recovered and a Decimal's
- * rendering (a `DecimalSource` ref that held one) revives. Plain objects and
- * arrays recurse; arrays use `default[i]` (falling back to `default[0]`) as the
- * per-element type witness so homogeneous Decimal arrays revive.
+ * inside an object- or array-valued ref comes through JSON only as a string.
+ * Top-level revival alone would return it as `"99"` and break the first
+ * `.add`/`.gte` call. The ref default holds the declared shape and guides
+ * revival:
+ * - where the default holds a `Decimal`, the loaded leaf is rebuilt with `new Decimal(...)`;
+ * - where it holds a `number`, non-finite strings (`"Infinity"`, `"NaN"`) are
+ *   recovered, and a Decimal's rendering (from a `DecimalSource` ref that held one) revives;
+ * - plain objects and arrays recurse. An array uses `default[i]` (falling back
+ *   to `default[0]`) as the per-element type witness, so homogeneous Decimal arrays revive.
  *
  * Fields present in the loaded value but absent from the default pass through
- * unrevived — the default supplies no type witness for them. A dynamically
- * keyed Decimal map (default `{}`, keys added at runtime) therefore isn't
- * revived; store those as separate refs or via an explicit schema.
+ * unrevived, because the default supplies no type witness for them. So a
+ * dynamically keyed Decimal map (default `{}`, keys added while the game runs)
+ * is not revived; store its values as separate refs. An explicit `schema` does
+ * not help: validation never transforms a leaf.
  */
 function reviveValue(loaded: unknown, defaultNode: unknown): unknown {
   if (defaultNode instanceof Decimal) {
@@ -1211,12 +1211,12 @@ export function deserializePersistents(
       const current = getNested(save, path);
 
       if (current !== undefined) {
-        // Rehydrate Decimals the serializer flattened to strings — top level and
-        // nested alike, guided by the ref's declared default shape.
+        // Revive Decimals the serializer flattened to strings, top level and
+        // nested alike, guided by the ref default's shape.
         const revived = reviveValue(current, persistentRef[DefaultValue]);
         persistentRef[PersistentState].value = revived as Serializable;
       } else {
-        // Reset to default if not in save
+        // Reset to the ref default when the save data lacks the leaf
         resetPersistent(persistentRef);
       }
     }

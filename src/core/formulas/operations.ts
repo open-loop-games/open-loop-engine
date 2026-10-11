@@ -6,7 +6,7 @@
  *
  * Most operations follow structural patterns handled by factory functions
  * (`makeUnaryInvert`, `makeBinaryInvert`, `makeUnaryIntegrate`, `makeBinaryIntegrate`).
- * Operations with unique math (log integrals, tetration, etc.) are hand-written.
+ * Operations with unique math (log antiderivatives, tetration, etc.) are hand-written.
  */
 
 import { Decimal } from '@/primitives/decimal';
@@ -67,7 +67,7 @@ function makeUnaryIntegrate(formulaOp: (x: GenericFormula) => GenericFormula) {
  * `add`/`sub` by a constant, `mul`/`div` by a constant) and for nothing else.
  * Wiring a non-linear op through here yields the integrand reshaped rather than
  * an antiderivative, and the result is plausible enough to pass a smoke test:
- * `k/x` routed this way returned `k/(x²/2)`, making `∫2.5/x` over [1,10] come
+ * `k/x` routed this way returns `k/(x²/2)`, making `∫2.5/x` over [1,10] come
  * out as −4.95 against a true 5.756. `integrateDiv` is hand-written and guarded
  * to a bare-variable denominator because of it. An op that isn't linear here
  * needs its own hand-written integrate, as the log family and `root` have.
@@ -109,7 +109,7 @@ function makeBinarySubstitution(
 
 // === EXACT SQUARES ===
 
-// Decimal.pow and Decimal.root run a float pow even at exponent 2, landing an
+// Decimal.pow and Decimal.root run a float pow even at exponent 2, ending an
 // ulp off on integers: pow(41, 2) = 1680.9999999999998, root(1681, 2) =
 // 40.99999999999999 (91k of the first 100k perfect squares miss). A floored
 // curve then reads an exact threshold one step low, so exponent 2 takes the
@@ -171,7 +171,7 @@ export function sumSource(
  *
  * The weakest arm wins: `not-summable` anywhere makes the whole thing
  * unanswerable, and an approximate part makes the result approximate with the
- * errors added, since the identity carries both through unchanged.
+ * errors added, since the identity keeps both unchanged.
  *
  * @internal
  */
@@ -270,8 +270,7 @@ export function sumPowBase(
 ): Series {
   // Geometric only when the exponent is the bare variable. `base^g(x)` is
   // geometric for affine `g` too, but proving that means pattern-matching the
-  // chain, and an unproven claim here is exactly the silent wrongness the
-  // conformance work removed from this file.
+  // chain, and an unproven claim here would return a silently wrong sum.
   if (!isPlainVariable(lhs) || hasAnyVariable(rhs)) return NOT_SUMMABLE;
   return exactSeries(geometricSeries(unrefFormulaSource(rhs), from, count));
 }
@@ -319,10 +318,10 @@ function hasAnyVariable(f: unknown): boolean {
 /**
  * The coefficient *source* for a `K·x²/2` antiderivative — `lhs` is `var` or
  * `mul(var, k)`, so `F(x) + c·x = T` reduces to a quadratic with a closed-form
- * solve — or null when the shape needs bisection. Structural only — it never reads the value, because
- * the caller holds the result for the life of a memoized integral formula and
- * a coefficient is a `FormulaSource`, free to be a ref or a variable-free
- * sub-formula that moves afterwards.
+ * solve — or null when the shape needs bisection. Structural only: it never
+ * reads the value. The caller holds the result for the life of a memoized
+ * antiderivative formula, and a coefficient is a `FormulaSource`, free to be a
+ * ref or a variable-free sub-formula that moves afterwards.
  *
  * @internal
  */
@@ -344,11 +343,12 @@ function quadraticSlopeSource(lhs: FormulaSource): FormulaSource | null {
  * the closed form.
  *
  * Read per call rather than captured, because the caller holds this for the
- * life of a memoized integral formula and the coefficient can move under it.
+ * life of a memoized antiderivative formula, and the coefficient can move under
+ * it.
  *
  * K = 0 collapses the antiderivative to a line, and the closed form divides by
  * K; a non-finite K has no usable root. The *sign* of K is not a reason to
- * decline — the callers gate on the discriminant instead, which is the thing
+ * decline — the callers test the discriminant instead, which is the thing
  * that actually decides whether a real pre-image exists.
  *
  * @internal
@@ -417,7 +417,7 @@ function buildLinearIntegral(
             // A negative discriminant is a statement about the target, not the
             // shape: no real pre-image. Fall through and let the generic path
             // report it rather than rooting a negative and returning NaN. It
-            // fires on an ordinary positive slope in the (−,+) orientation.
+            // happens on an ordinary positive slope in the (−,+) orientation.
             if (Decimal.gte(disc, 0)) {
               return Decimal.div(Decimal.sub(Decimal.sqrt(disc), cs), k);
             }
@@ -427,7 +427,7 @@ function buildLinearIntegral(
           // bisection. F⁻¹(s_f·target) is the answer when c = 0, so it makes a
           // tight starting bracket for the general case. `c·x - F(x)` rises then
           // falls, so it is only monotone up to its turning point; `solveMonotone`
-          // cannot detect the violation and takes the first crossing it finds.
+          // cannot detect the violation and takes the first root it finds.
           const x = solveMonotone((v) => at(v, c), target, {
             upper: F.invert(signed(fSign, target)),
           });
@@ -658,7 +658,7 @@ export const invertPow = makeBinaryInvert(
  *
  * At `b = 1` that quotient is 0/0 and the antiderivative is its limit, `u`. The
  * base is read per evaluation rather than branched on at build, because the
- * integral is memoized and a ratio that is a ref can reach 1 afterwards.
+ * antiderivative is memoized and a ratio that is a ref can reach 1 afterwards.
  *
  * @internal
  */
@@ -788,7 +788,7 @@ export function invertIteratedExp(
   payload: FormulaSource,
 ) {
   if (hasVariable(lhs)) {
-    // The variable sits in the *base* position, so the inverse has to solve for
+    // The variable is in the *base* position, so the inverse has to solve for
     // the base. Upstream applied `iteratedlog(value, e, height)`, which solves
     // for the payload and hardcodes base e — the wrong argument, and right only
     // where the base happens to be e.
@@ -914,7 +914,7 @@ export const integrateAtan = makeUnaryIntegrate((x) =>
 
 // === HYPERBOLIC ===
 
-// Accuracy ceiling inherited from the dependency, not from this table: upstream
+// Accuracy limit inherited from the dependency, not from this table: upstream
 // `asinh`/`atanh` are the naive closed forms — `ln(x + √(x²+1))` and
 // `ln((1+x)/(1−x))/2` — which cancel catastrophically in the saturated tail. At
 // x = -10, `x + √(x²+1)` is 4.5e-5, so ~9 digits are gone: `asinh` returns

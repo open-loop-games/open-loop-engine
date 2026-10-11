@@ -5,13 +5,13 @@
  * - Current item tracking (what's actively running)
  * - Manual mutation (enqueue, remove, reorder)
  * - Pluggable fill strategy for automation (priority, round-robin, etc.)
- * - Events for lifecycle hooks
+ * - Lifecycle events
  *
  * Two modes:
- * - **queue** (default) — items are consumed on completion (pop from front)
- * - **list** — items persist, a cursor advances through them. Call
- *   `resetCursor()` to replay from the start (e.g., on loop restart). It moves
- *   only the cursor: per-run state kept in item metadata carries over unless
+ * - **queue** (default) — items are removed on completion (pop from front)
+ * - **list** — items stay, and a cursor advances through them. Call
+ *   `resetCursor()` to replay from the start (e.g., when a run ends). It moves
+ *   only the cursor: per-run state kept in item metadata stays as it is unless
  *   the consumer resets it first.
  *
  * Generic over metadata type M. When M = void the sequencer behaves like a
@@ -30,7 +30,7 @@ import { reportAdvanceCapTrip } from './safeguards';
 // === TYPES ===
 
 /**
- * A sequencer entry: string ID plus typed metadata. `metadata` is required
+ * A sequencer item: a string id plus typed metadata. `metadata` is required
  * even when `M` is `void` — pass `metadata: undefined`. Saves hold metadata as
  * JSON, so keep it JSON-plain: a `Decimal` in it loads back as its string.
  */
@@ -42,33 +42,34 @@ export interface SequencerItem<M = void> {
 /**
  * Tri-state precondition result from a {@link SequencerOptions.canStart} check.
  *
- * - `'now'` — dispatch the item
- * - `'never'` — permanently unrunnable, skip and advance
- * - `'notNow'` — temporarily blocked, **hold** the slot and retry next tick
+ * - `'now'` — start the item
+ * - `'never'` — it can never run: skip it and advance
+ * - `'notNow'` — blocked for now: **hold** the item in place and retry next tick
  *
  * The `'notNow'` case is the point of this shape: it lets a sequencer
  * express "can't start right now, but check again later" distinct from
  * "can't ever start." When `'notNow'` is returned without a
- * {@link SequencerOptions.registerTick} callback, it degrades to `'never'`.
+ * {@link SequencerOptions.registerTick} function, it degrades to `'never'`.
  */
 export type StartResult = 'now' | 'notNow' | 'never';
 
 /**
- * Tick registration — subscribes a per-tick callback and returns its
- * unsubscribe. Matches `EngineContext.onTick`; pass `ctx.onTick` directly.
+ * Tick registration — subscribes a tick handler and returns its unsubscribe.
+ * Matches `EngineContext.onTick`; pass `ctx.onTick` directly.
  *
- * It must accept any number of callbacks and run every one each tick, because
- * a factory may register several: `createActionCategory` registers its
- * sequencer's advance-cap reset and its own dispatcher. An adapter that keeps
- * only the latest callback type-checks, then silently drops the rest; for a
- * sequencer the cap latches and `advanceCapTrips` climbs while nothing runs.
+ * It must accept any number of handlers and run every one each tick. A
+ * factory may register several: `createActionCategory` registers its
+ * sequencer's advance-cap reset and its own tick handler. A wrapper that keeps
+ * only the latest handler type-checks, then silently ignores the rest. For a
+ * sequencer the cap then never resets, and `advanceCapTrips` climbs while
+ * nothing runs.
  */
 export type RegisterTick = (callback: (dt: number) => void) => () => void;
 
 /**
- * Strategy for automatically filling the sequencer when it runs dry.
- * The strategy closure captures whatever state it needs (candidates,
- * priorities, persistent index for round-robin, etc.).
+ * Fill strategy: the sequencer's next-item chooser when it has nothing to run.
+ * Its closure captures whatever state it needs (candidates, priorities, a
+ * persistent index for round-robin, etc.).
  */
 export interface FillStrategy<M = void> {
   /** Return the next item to run, or null if nothing should fill. */
@@ -81,22 +82,22 @@ export interface SequencerEvents<M = void> {
   started: (item: SequencerItem<M>) => void;
   completed: (item: SequencerItem<M>) => void;
   cancelled: (item: SequencerItem<M>) => void;
-  /** Emitted when the current item is re-dispatched via `repeat()` instead of `complete()`. */
+  /** Emitted when the current item starts again via `repeat()` instead of `complete()`. */
   repeated: (item: SequencerItem<M>) => void;
   /**
-   * Emitted when an item fails its `canStart` check with `'never'` — either from
-   * `dequeueNext` walking the sequence, or from the retry tick when a held
-   * item's gate turns permanent.
+   * Emitted when an item fails its `canStart` check with `'never'`. That comes
+   * from `dequeueNext` walking the sequence, or from the retry tick when a held
+   * item's check returns `'never'`.
    *
-   * The skip is already committed when this fires: the item has been popped in
-   * queue mode, and in list mode `cursor` has advanced past it. A listener that
+   * The skip is already done when this is emitted. In queue mode the item has
+   * been popped, and in list mode `cursor` has advanced past it. A handler that
    * wants the skipped item's index reads `cursor - 1`.
    */
   skipped: (item: SequencerItem<M>) => void;
   /**
    * Emitted when dequeueNext holds on `'notNow'` — the held item stays in
-   * `items` and is re-evaluated via the retry tick each subsequent tick,
-   * transitioning out when canStart returns `'now'` (dispatch) or `'never'` (skip).
+   * `items` and the retry tick re-checks it each later tick. The hold ends
+   * when canStart returns `'now'` (start) or `'never'` (skip).
    */
   held: (item: SequencerItem<M>) => void;
 }
@@ -105,18 +106,17 @@ export interface SequencerEvents<M = void> {
 export const DEFAULT_MAX_ADVANCES_PER_TICK = 1000;
 
 /**
- * Configuration for {@link createSequencer}. Mode picks queue (consume on
- * complete) vs list (cursor walks a persistent list); `canStart` + `registerTick`
- * wire the tri-state pre-run gate (`now` / `notNow` / `never`) plus its retry
- * tick.
+ * Options for {@link createSequencer}. `mode` picks queue (remove on complete)
+ * or list (a cursor walks a persistent list). `canStart` and `registerTick` wire
+ * the tri-state pre-start check (`now` / `notNow` / `never`) and its retry tick.
  */
 export interface SequencerOptions<M = void> {
-  /** Unique identifier — also used as persistent context name */
+  /** Unique id — also the persistent context id */
   id: string;
   /**
    * Sequencer behavior mode (default: 'queue').
-   * - `'queue'` — items are consumed (removed) on completion
-   * - `'list'` — items persist, a cursor advances through them
+   * - `'queue'` — items are removed on completion
+   * - `'list'` — items stay, and a cursor advances through them
    */
   mode?: 'queue' | 'list';
   /** Maximum number of items in the waiting sequence (default: unlimited) */
@@ -124,32 +124,33 @@ export interface SequencerOptions<M = void> {
   /**
    * Maximum number of complete→dequeueNext advances allowed per tick.
    * Prevents runaway loops when items complete instantly. This is the only cap
-   * a dispatch cascade hits — the chain is flattened rather than recursive, so
-   * emit depth stays constant however long the cascade runs. Once it trips,
-   * advancement pauses until the counter resets and resumes on the next tick;
-   * the running item is left dispatched and complete, never mid-dispatch.
+   * a cascade of starts hits. The chain is flattened rather than recursive, so
+   * emit depth stays constant however long the cascade runs. Once the cap is
+   * reached, advancement waits until the counter resets and continues on the
+   * next tick. The running item is left fully started, never half-started.
    *
    * When {@link registerTick} is supplied the counter resets automatically at
-   * each tick boundary, and a tick that follows a trip re-drives dispatch. A
-   * sequencer driven manually without `registerTick` must call
-   * {@link resetAdvanceCount} at the start of each tick, or the cap latches
-   * into a lifetime budget and dequeueNext stalls once cumulative advances pass
-   * it — and after a trip it must call `dequeueNext()` itself to resume.
+   * each tick boundary, and the tick after the cap is reached starts items again.
+   * A sequencer driven manually without `registerTick` must call
+   * {@link resetAdvanceCount} at the start of each tick. Otherwise the cap
+   * counts every advance since creation, and dequeueNext stalls once their
+   * total passes it. After the cap is reached, it must also call
+   * `dequeueNext()` itself to resume.
    * Default: {@link DEFAULT_MAX_ADVANCES_PER_TICK} (1000).
    */
   maxAdvancesPerTick?: number;
   /**
-   * Pre-run check called by dequeueNext before starting an item. Returns a
+   * Pre-start check called by dequeueNext before starting an item. Returns a
    * tri-state {@link StartResult}:
    *
-   * - `'now'` — dispatch the item
+   * - `'now'` — start the item
    * - `'never'` — skip the item (emits `skipped`) and try the next one
-   * - `'notNow'` — **hold the slot** (emits `held`); the item remains in
+   * - `'notNow'` — **hold the item** (emits `held`); the item remains in
    *   place and is re-checked by the retry tick next tick
    *
-   * Fill-strategy results are lightly gated: a fill item that returns
-   * anything other than `'now'` is dropped (fill never enters hold state,
-   * since fill strategies are expected to return runnable items).
+   * Fill-strategy results are checked lightly. A fill item that returns
+   * anything other than `'now'` is discarded. Fill never enters a hold,
+   * because fill strategies are expected to return runnable items.
    *
    * `'notNow'` requires {@link registerTick}. Without it, `'notNow'`
    * silently degrades to `'never'`.
@@ -158,11 +159,11 @@ export interface SequencerOptions<M = void> {
   /**
    * Tick registration, used twice: the per-tick advance-cap reset (see
    * {@link maxAdvancesPerTick}), and the `'notNow'` retry path. When a canStart
-   * call returns `'notNow'`, the sequencer installs a retry callback via this
-   * function and re-evaluates canStart each tick until the item transitions
-   * to `'now'` or `'never'`. Without this, `'notNow'` falls back to `'never'`.
+   * call returns `'notNow'`, the sequencer registers a retry handler through this
+   * function. It then calls canStart each tick until it returns `'now'` or
+   * `'never'`. Without this, `'notNow'` falls back to `'never'`.
    *
-   * Must run every callback it is given — see {@link RegisterTick}.
+   * Must run every handler it is given — see {@link RegisterTick}.
    */
   registerTick?: RegisterTick;
   /**
@@ -177,8 +178,8 @@ export interface SequencerOptions<M = void> {
 
 /**
  * Sequencer instance produced by {@link createSequencer}. Holds the current
- * item plus the waiting list, persists across save/load, and emits lifecycle
- * events (`started` / `completed` / `skipped` / `held`) consumers wire to game flow.
+ * item plus the waiting list, both saved and loaded. It emits lifecycle events
+ * (`started` / `completed` / `skipped` / `held`) that consumers wire to game flow.
  */
 export interface Sequencer<M = void> {
   readonly id: string;
@@ -193,10 +194,10 @@ export interface Sequencer<M = void> {
    * `items` is not a Ref: watch it through a getter, `() => seq.items.value`.
    *
    * Assigning `items.value = [...]` replaces the list wholesale and saves it.
-   * It is a raw escape hatch: it skips `maxSize`, emits no events, leaves the
-   * running item alone, doesn't move or clamp the list-mode cursor, and doesn't
-   * dispatch. During a hold, the retry tick re-checks whichever item now sits
-   * at the head (or the cursor). Use `enqueue` / `remove` / `reorder` / `clear`
+   * It is a raw escape hatch. It skips `maxSize` and emits no events. It leaves
+   * the running item alone, doesn't move or clamp the list-mode cursor, and
+   * doesn't start anything. During a hold, the retry tick re-checks whichever item is
+   * now at the head (or the cursor). Use `enqueue` / `remove` / `reorder` / `clear`
    * when those guarantees matter.
    */
   readonly items: { value: SequencerItem<M>[] };
@@ -227,25 +228,25 @@ export interface Sequencer<M = void> {
    */
   enqueue(item: SequencerItem<M>, options?: { at?: number }): boolean;
   /**
-   * Pop from items → set as current. Falls back to fill strategy if items empty.
+   * Pop from items → set as current. Falls back to the fill strategy if items is empty.
    *
-   * Returns the dispatched item, or `null` when nothing dispatched. Calling it
-   * from inside a sequencer event listener always returns `null`: the dispatch
+   * Returns the started item, or `null` when nothing started. Calling it
+   * from inside a sequencer event handler always returns `null`. The start
    * is deferred to the call already in progress, which runs it once the emit
-   * unwinds. A listener that needs the item should read {@link currentItem}
+   * unwinds. A handler that needs the item should read {@link currentItem}
    * afterwards rather than the return value.
    */
   dequeueNext(): SequencerItem<M> | null;
   /** Mark current as completed, emit 'completed', then dequeueNext. */
   complete(): void;
-  /** Re-dispatch the current item without advancing. Emits 'repeated', then dequeueNext. */
+  /** Start the current item again without advancing. Emits 'repeated', then dequeueNext. */
   repeat(): void;
   /**
-   * Patch the metadata of the current item with the result of `patch(currentMetadata)`.
-   * No-op when no current item. Both modes trigger reactive updates: in list mode
-   * the patched metadata is mirrored to the cursor-position in `items.value`; in
-   * queue mode (where the running item is no longer in `items.value`) the patched
-   * metadata is re-serialized into the underlying current persistent ref.
+   * Replace the metadata of the current item with the result of `patch(currentMetadata)`.
+   * No-op when no current item. Both modes trigger reactive updates. In list mode
+   * the updated metadata is copied to the cursor position in `items.value`. In
+   * queue mode the running item is no longer in `items.value`, so the updated
+   * metadata is serialized again into the underlying current persistent ref.
    *
    * @example
    * ```ts
@@ -254,9 +255,9 @@ export interface Sequencer<M = void> {
    */
   updateCurrentItem(patch: (metadata: M) => M): void;
   /**
-   * Patch the metadata of the item at the given `items.value` index. No-op when
-   * out of range. Triggers reactive updates on `items.value` via splat-replace
-   * at the targeted slot; other items keep their object identity. In queue mode
+   * Replace the metadata of the item at the given `items.value` index. No-op when
+   * out of range. Triggers reactive updates on `items.value` by replacing the item
+   * at that index; other items keep their object identity. In queue mode
    * the running item is no longer in `items.value` — use `updateCurrentItem` for
    * that case.
    *
@@ -267,10 +268,10 @@ export interface Sequencer<M = void> {
    */
   updateItem(index: number, patch: (metadata: M) => M): void;
   /**
-   * Abandon the current execution without completing it and emit `cancelled`.
-   * That is the running item or, while {@link holding}, the held one: queue
-   * mode drops it, list mode leaves the cursor on it so a later start re-runs
-   * it. Execution then stops — nothing dispatches until `start()`, `resume()`
+   * Cancel the current execution without completing it and emit `cancelled`.
+   * That is the running item or, while {@link holding}, the held one. Queue
+   * mode removes it. List mode leaves the cursor on it, so a later start re-runs
+   * it. Execution then stops — nothing starts until `start()`, `resume()`
    * or an auto-starting `enqueue()`.
    */
   cancel(): void;
@@ -281,13 +282,13 @@ export interface Sequencer<M = void> {
   /**
    * Clear all items from the waiting sequence. Cancels the current (or held)
    * item first, so a completion can't advance the list cursor past items
-   * enqueued afterwards; execution stops until `start()`, `resume()` or an
+   * enqueued afterwards. Execution stops until `start()`, `resume()` or an
    * auto-starting `enqueue()`.
    */
   clear(): void;
 
   // --- Direct current management ---
-  /** Set a specific item as current (bypassing the sequence). Used for interrupts. */
+  /** Set a specific item as current (outside the sequence). Used for interrupts. */
   setCurrent(item: SequencerItem<M>): void;
 
   // --- Control ---
@@ -304,15 +305,15 @@ export interface Sequencer<M = void> {
   start(): void;
 
   // --- Fill strategy ---
-  /** Pluggable automation strategy. Default: null (no auto-fill). */
+  /** Pluggable fill strategy for automation. Default: null (no auto-fill). */
   fillStrategy: FillStrategy<M> | null;
   /** Manually trigger the fill strategy. Returns the filled item or null. */
   fill(): SequencerItem<M> | null;
 
-  // --- Pre-run check ---
+  // --- Pre-start check ---
   /**
-   * Optional tri-state pre-run check. Can be set or cleared after creation:
-   * setting to `null` clears any active hold state. Setting to a new function
+   * Optional tri-state pre-start check. Can be set or cleared after creation:
+   * setting to `null` ends any hold. Setting to a new function
    * does not eagerly re-evaluate — the next retry tick (or dequeueNext call)
    * picks it up.
    */
@@ -321,7 +322,7 @@ export interface Sequencer<M = void> {
   /**
    * Whether the sequencer is currently holding on a `'notNow'` item. While
    * holding, `currentItem` is null, `items.value` is unchanged, and the
-   * retry tick is active. Live, but runtime-only: not saved.
+   * retry tick runs. Reactive, but ephemeral: not saved.
    */
   readonly holding: boolean;
 
@@ -329,7 +330,7 @@ export interface Sequencer<M = void> {
   /**
    * Index of the currently running item in the list (list mode only).
    * Points AT the running item during execution. Equals `items.value.length`
-   * when all items have been completed (done sentinel).
+   * when all items are complete (done sentinel).
    * In queue mode, always returns 0.
    */
   readonly cursor: number;
@@ -342,7 +343,7 @@ export interface Sequencer<M = void> {
    */
   // TODO(ergonomics): accept optional `toIndex: number` for arbitrary-position
   // cursor jumps (e.g. a repeat-from-marker jump). Deferred until
-  // an in-repo consumer surfaces.
+  // an in-repo consumer needs it.
   resetCursor(): void;
 
   // --- Safeguards ---
@@ -387,19 +388,19 @@ function deserializeItem<M>(raw: string): SequencerItem<M> {
  * Creates a persistent sequencer that manages ordered execution of items,
  * supporting both FIFO queue mode and repeating list mode with cursor.
  *
- * @param options - Sequencer configuration including mode, size limits, and optional
- *   pre-run gating via `canStart`
+ * @param options - Sequencer options: mode, size limits, and optional
+ *   pre-start checks via `canStart`
  * @returns A sequencer with enqueue/dequeue/reorder operations, pause/resume control,
- *   pluggable fill strategies, and persistent state that survives save/load
+ *   pluggable fill strategies, and persistent state
  *
  * @example
  * ```ts
- * const seq = createSequencer<{ type: string }>({
+ * const seq = createSequencer<{ kind: string }>({
  *   id: 'combat-queue',
  *   mode: 'queue',
  *   maxSize: 10,
  * });
- * seq.enqueue({ id: 'slash', metadata: { type: 'melee' } });
+ * seq.enqueue({ id: 'slash', metadata: { kind: 'melee' } });
  * seq.on('completed', (item) => console.log(`Finished ${item.id}`));
  * ```
  */
@@ -428,7 +429,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // JSON-serialized persistent-ref form used only for save/load. Dequeue pops
   // advance `_head` in O(1) instead of slicing a fresh array; mutations
   // batch-sync via `syncItems()` so bursts of pops or skips serialize once
-  // instead of per-step.
+  // instead of once per pop or skip.
 
   function deserializeItems(raw: string): SequencerItem<M>[] {
     if (raw === '') return [];
@@ -437,15 +438,15 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       if (!Array.isArray(parsed)) return [];
       return parsed.map((entry: unknown) => {
         if (typeof entry === 'string') {
-          // Legacy: plain string array
+          // Older save shape: plain string array
           return deserializeItem<M>(entry);
         }
-        // New format: { id, m } objects
+        // Current save shape: { id, m } objects
         const obj = entry as { id: string; m: M };
         return { id: obj.id, metadata: obj.m };
       });
     } catch {
-      // Legacy comma-delimited format
+      // Older save shape: comma-delimited
       return raw.split(',').map((s) => deserializeItem<M>(s));
     }
   }
@@ -471,7 +472,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   // `currentView()` call reads it once to establish tracking.
   const _liveVersion = shallowRef(0);
   // Last string we wrote to `rawItems` via syncItems — lets the load watcher
-  // below skip no-op re-hydrations when our own sync echoes back.
+  // below skip a no-op rebuild when our own sync echoes back.
   let _lastWritten = rawItems.value;
 
   function bumpLive(): void {
@@ -514,9 +515,9 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     return true;
   }
 
-  // Save-load re-hydration: when `rawItems` changes from outside our own
-  // `syncItems` writes (i.e. save manager restoring state), re-deserialize
-  // into the live array. Flush sync so the new state is visible immediately.
+  // Load rebuild: when `rawItems` changes from outside our own `syncItems`
+  // writes (i.e. the save manager loading a save), deserialize it again into
+  // the live array. Flush sync so the new state is visible immediately.
   watch(
     () => rawItems.value,
     (newRaw) => {
@@ -527,15 +528,16 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       bumpLive();
       _lastWritten = newRaw;
 
-      // Hold state is runtime-only (see § HOLD STATE), so a save taken while
-      // holding on a 'notNow' item reloads with current='' and the held item
-      // still queued — a silent permanent stall unless we re-drive. Re-dispatch
+      // Hold state is ephemeral (see § HOLD STATE), so a save taken while
+      // holding on a 'notNow' item loads with current='' and the held item
+      // still queued — a silent permanent stall unless we re-drive. Start it
       // on the next tick via a one-shot registerTick: deferred so `paused` and
       // `rawCursor` (which deserialize *after* rawItems) are read at their
       // loaded values rather than mid-load, and self-unregistering so it leaves
-      // no live watcher behind. Gated on startOnEnqueue so explicit-control
-      // sequencers stay put until the consumer calls start(); the hold path
-      // requires registerTick, so its absence means no hold stall can exist.
+      // no running watcher behind. Only when startOnEnqueue is set, so
+      // explicit-control sequencers stay put until the consumer calls start();
+      // the hold path requires registerTick, so its absence means no hold
+      // stall can exist.
       if (startOnEnqueue && registerTick && current.value === '' && _liveItems.length > 0) {
         const unsubRedrive = registerTick(() => {
           unsubRedrive();
@@ -567,9 +569,9 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
   let _advanceCapHit = false;
 
   // === HOLD STATE ===
-  // Runtime-only, not persisted. A save taken mid-hold reloads with the held
-  // item still queued and current=''; the rawItems rehydration watch above
-  // re-drives it on the next post-load tick.
+  // Ephemeral, not saved. A save taken mid-hold loads with the held item
+  // still queued and current=''; the rawItems load watch above re-drives it
+  // on the next tick after the load.
 
   const _holding = shallowRef(false);
   let _unsubRetryTick: (() => void) | null = null;
@@ -675,8 +677,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     if (!_fillStrategy) return null;
     const item = _fillStrategy.next();
     if (item == null) return null;
-    // Fill items are lightly gated: only 'now' dispatches. 'never' and
-    // 'notNow' both drop — fill never enters hold state because fill
+    // Fill items are checked lightly: only 'now' starts. 'never' and
+    // 'notNow' both discard the item — fill never enters a hold because fill
     // strategies are expected to return runnable items.
     if (_canStart) {
       const result = _canStart(item);
@@ -692,33 +694,33 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     }
   }
 
-  // Emits are synchronous, so a listener can dispatch underneath a walk that
-  // is already in progress, or ahead of a caller's trailing `dequeueNext()`
-  // (complete/repeat/resetCursor all emit, then call). Dispatching a second
-  // item over a live `current` overwrites it with no terminal event, orphaning
+  // Emits are synchronous, so a handler can start an item underneath a walk
+  // that is already in progress, or ahead of a caller's trailing `dequeueNext()`
+  // (complete/repeat/resetCursor all emit, then call). Starting a second
+  // item over a set `current` overwrites it with no terminal event, orphaning
   // the running item. Every other emitter in the engine iterates a snapshot
-  // taken before the first emit and is immune by construction; `dequeueNext`
+  // taken before the first emit and so is necessarily immune; `dequeueNext`
   // is a cursor over live state and cannot be, so the invariant — never
-  // dispatch over a live current — is enforced here rather than at each
-  // callsite. Checked at entry and again per iteration: the two re-entry
-  // topologies (a caller's trailing call, and a listener re-entering from
-  // inside the loop) need both.
+  // start over a set current — is enforced here rather than at each
+  // callsite. Checked at entry and again per pass of the loop: the two
+  // re-entry shapes (a caller's trailing call, and a handler re-entering
+  // from inside the loop) need both.
   const preempted = (): boolean => current.value !== '';
 
-  // An instant-complete listener drives dispatch by recursion: `emit('started')`
-  // → listener → `complete()` → `emit('completed')` → `dequeueNext()` →
+  // An instant-complete handler drives starts by recursion: `emit('started')`
+  // → handler → `complete()` → `emit('completed')` → `dequeueNext()` →
   // `emit('started')`. Left recursive, each item costs a real JS stack level and
   // a level on the emit handle's depth counter, so the emit-depth cap ends the
-  // cascade after ten items — mid-dispatch, with `current` already set and its
-  // `started` emit dropped, which is a permanent wedge rather than a pause.
+  // cascade after ten items — mid-start, with `current` already set and its
+  // `started` emit blocked, which is a permanent stall rather than a pause.
   // Trampolining the re-entrant call flattens the chain to constant depth: a
-  // listener's `dequeueNext()` records the intent and returns, and the loop
-  // below runs the dispatch after the emit unwinds. That keeps depth near 1 for
+  // handler's `dequeueNext()` records the intent and returns, and the loop
+  // below runs the start after the emit unwinds. That keeps depth near 1 for
   // any cascade length and leaves `maxAdvancesPerTick` as the only cap that
-  // fires, which is what its contract promises.
+  // is reached, which is what its contract promises.
   //
   // Any unbounded cascade must re-enter *some* sequencer's `dequeueNext`, so
-  // this also flattens chains routed through a second sequencer's listeners —
+  // this also flattens chains routed through a second sequencer's handlers —
   // per-instance emit-depth counters cannot see those at all.
   let _dispatching = false;
   let _redispatch = false;
@@ -730,7 +732,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     }
     _dispatching = true;
     try {
-      // Return the first dispatch, matching the recursive form: the outer
+      // Return the first start, matching the recursive form: the outer
       // caller receives the item it caused, not whatever the cascade ended on.
       const first = dequeueOnce();
       while (_redispatch) {
@@ -746,8 +748,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
   function dequeueOnce(): SequencerItem<M> | null {
     if (paused.value) return null;
-    // While holding, the retry tick owns the dispatch decision — anything
-    // enqueued meanwhile sits behind the held item.
+    // While holding, the retry tick owns the start decision — anything
+    // enqueued meanwhile waits behind the held item.
     if (_holding.value) return null;
     if (preempted()) return null;
 
@@ -792,13 +794,13 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         handle.emit('skipped', next);
       }
 
-      // Reached end of list — cursor sits at items.length (done sentinel)
+      // Reached end of list — cursor is at items.length (done sentinel)
       return preempted() ? null : fill();
     }
 
     // Queue mode: peek live head; pop in-place via _head++. We sync to
-    // rawItems at most once when the loop settles, so a burst of skips +
-    // a single dispatch pays O(n) serialization instead of O(n²).
+    // rawItems at most once when the loop ends, so a burst of skips +
+    // a single start costs O(n) serialization instead of O(n²).
     let dirty = false;
     try {
       while (_head < _liveItems.length) {
@@ -867,8 +869,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       }
       const isAppend = at === undefined || at >= viewLen;
 
-      // List-mode hold breaks only when the insert lands AT the cursor with
-      // no running item (the cursor's "next dispatch" slot now points at the
+      // List-mode hold breaks only when the insert goes AT the cursor with
+      // no running item (the cursor's "next start" position now points at the
       // new item rather than the held one). For at < cur the cursor shifts
       // and the held item stays tracked; for at > cur nothing changes.
       const heldBroken =
@@ -882,10 +884,10 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         _liveItems.splice(_head + at, 0, item);
         if (isList) {
           const cur = rawCursor!.value;
-          // Cursor follows when the insert lands behind it (cursor's
+          // Cursor follows when the insert goes behind it (cursor's
           // already-passed prefix grew by one). At-cursor only shifts when a
           // running item must stay tracked; when current is empty, the
-          // cursor is a "next dispatch" pointer and the inserted item
+          // cursor is a "next start" pointer and the inserted item
           // should become next.
           if (at < cur || (at === cur && current.value !== '')) {
             rawCursor!.value = cur + 1;
@@ -928,7 +930,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
       if (!captured) return;
       current.value = '';
       // Queue mode: the item was popped via _head++ when it became current,
-      // so restore it to the dispatch position. List mode: cursor already
+      // so restore it to the start position. List mode: cursor already
       // points AT this item; intentionally skip complete()'s `rawCursor++`.
       if (!isList) {
         _liveItems.splice(_head, 0, captured);
@@ -941,7 +943,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
     updateCurrentItem(patch: (metadata: M) => M): void {
       if (isList) {
-        // Running item also lives at _liveItems[head + cursor]; patch there
+        // Running item is also at _liveItems[head + cursor]; patch there
         // and mirror onto current.value so getCurrentItem()/currentMetadata
         // observers see the new metadata.
         const cur = rawCursor!.value;
@@ -950,8 +952,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         setCurrentRaw(_liveItems[_head + cur]);
         return;
       }
-      // Queue mode: dispatched item lives in current.value only (popped from
-      // _liveItems via _head++ on dispatch). Re-serialize with patched meta.
+      // Queue mode: the started item is in current.value only (popped from
+      // _liveItems via _head++ on start). Serialize again with the patched meta.
       const captured = getCurrentItem();
       if (!captured) return;
       setCurrentRaw({ id: captured.id, metadata: patch(captured.metadata) });
@@ -963,7 +965,7 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
     cancel(): void {
       // A held item is the execution in progress, so it is cancelled as a
-      // running one would be: dropped in queue mode, left under the cursor in
+      // running one would be: removed in queue mode, left under the cursor in
       // list mode. Nothing is running while holding.
       if (_holding.value) {
         const held = peekHeldItem();
@@ -993,13 +995,13 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
         if (index < cur) {
           rawCursor!.value--;
         } else if (index === cur && current.value !== '') {
-          // Active item removed; predecrement so complete()'s cursor++ lands
-          // on whatever shifted into the slot.
+          // Active item removed; predecrement so complete()'s cursor++ moves
+          // to whatever shifted into that position.
           rawCursor!.value--;
         }
       }
       // If the removal affected the held position (queue head in queue mode,
-      // or at-or-before cursor in list mode), drop the hold and re-drive.
+      // or at-or-before cursor in list mode), end the hold and re-drive.
       if (_holding.value) {
         const affectsHeld = isList ? index <= rawCursor!.value : index === 0;
         if (affectsHeld) {
@@ -1027,8 +1029,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
           rawCursor!.value++;
         }
       } else if (_holding.value && (from === 0 || to === 0)) {
-        // Queue-mode hold lives at index 0; disturbing that slot invalidates
-        // the held item identity. Drop the hold and re-drive.
+        // Queue-mode hold is at index 0; moving that item invalidates
+        // the held item identity. End the hold and re-drive.
         clearHold();
         dequeueNext();
       }
@@ -1053,15 +1055,15 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
     pause(): void {
       paused.value = true;
-      // The retry tick checks paused.value on each firing, so holding
-      // state is preserved across pause without needing to unregister.
+      // The retry tick checks paused.value each tick, so the hold
+      // stays across a pause without needing to unregister.
     },
 
     resume(): void {
       paused.value = false;
       if (_holding.value) {
-        // Snap out of hold by re-running the retry path immediately instead
-        // of waiting for the next tick, so the user gets responsive dispatch.
+        // End the hold by running the retry path immediately instead of
+        // waiting for the next tick, so the player sees the item start at once.
         retryHeldItem();
         return;
       }
@@ -1090,8 +1092,8 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
     set canStart(fn: ((item: SequencerItem<M>) => StartResult) | null) {
       _canStart = fn;
       if (_holding.value && fn === null) {
-        // Gate removed while holding — dispatch the held item on next
-        // dequeueNext call path.
+        // Check removed while holding — start the held item through
+        // dequeueNext.
         clearHold();
         dequeueNext();
       }
@@ -1127,14 +1129,14 @@ export function createSequencer<M = void>(options: SequencerOptions<M>): Sequenc
 
   // The advance cap guards against instant-complete runaway *within a single
   // tick*. When the consumer supplies registerTick, own the per-tick reset so
-  // the cap can't silently latch into a lifetime budget: without it the counter
-  // accumulates across every tick and dequeueNext returns null forever once
-  // cumulative advances pass the cap. Registered once, fired at the tick
-  // boundary (never mid-dispatch-cascade), so within-tick runaway still trips.
-  // Sequencers driven without registerTick keep the manual resetAdvanceCount()
-  // obligation. A tripped cap left the rest of the queue waiting with nothing
-  // running, so the reset also re-drives dispatch; dequeueNext itself declines
-  // when paused, holding or already running.
+  // the cap can't silently become a budget for the sequencer's whole life:
+  // without it the counter accumulates across every tick and dequeueNext
+  // returns null forever once the total passes the cap. Registered once, run
+  // at the tick boundary (never mid-cascade), so within-tick runaway still
+  // reaches the cap. Sequencers driven without registerTick keep the manual
+  // resetAdvanceCount() obligation. A reached cap left the rest of the queue
+  // waiting with nothing running, so the reset also starts items again;
+  // dequeueNext itself declines when paused, holding or already running.
   if (registerTick) {
     registerTick(() => {
       const capped = _advanceCapHit;

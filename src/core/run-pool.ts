@@ -1,29 +1,28 @@
 /**
  * RunPool — core primitive for managing a collection of opaque, addressable
- * "runs" with independent lifecycle state.
+ * pool runs with independent lifecycle state.
  *
- * A pool holds N runs, each with a stable `id`, a reactive `alive` flag, and
- * an opaque `step()` method. The pool does not drive ticks — consumers invoke
- * `handle.step()` on their own cadence (per-run interval, shared game loop,
- * batch catch-up, etc.). On step returning false, the pool applies its
- * `deathDisposition` (or the per-run `onDeath` override) and fires lifecycle
- * events:
+ * A run pool holds N pool runs, each with a stable `id`, a reactive `alive`
+ * flag, and an opaque `step()` method. The run pool does not drive ticks —
+ * consumers call `handle.step()` on their own cadence (per-run interval,
+ * shared game loop, batch catch-up, etc.). When a step returns false, the run
+ * pool applies its `deathDisposition` (or the pool run's `onDeath` override)
+ * and emits lifecycle events:
  *
- * - `'destroyed'` — handle leaves the pool (the `'destroy'` disposition).
- * - `'parked'` — handle stays with `alive=false` until explicit restart or
- *   `pool.reset()` (the `'park'` disposition).
- * - `{ restartedWith: step }` — swaps the step in-place; alive stays true
+ * - `'destroyed'` — the handle leaves the run pool (the `'destroy'` disposition).
+ * - `'parked'` — the handle stays with `alive=false` until `handle.restart()`
+ *   or `pool.reset()` (the `'park'` disposition).
+ * - `{ restartedWith: step }` — swaps the step in place; alive stays true
  *   (in-flight auto-restart).
  *
- * Pool persists its per-id aliveness map under context `${poolId}`, not
- * which ids exist: step closures can't be saved, so the game keeps its own
- * record of its runs and recreates them post-load via `addRun` — the
- * saved aliveness map is consulted so previously-dead
- * instances stay dead across save/load regardless of when they're
- * recreated, fixing the lazy-context gap an earlier per-instance layout
- * had with dynamically-spawned runs (spawned clones, loops).
- * The map is tagged `lifetime`: the in-memory handles are the authority,
- * so a module reset leaves them alone and `pool.reset()` stays the seam.
+ * The run pool saves its per-id aliveness map in the persistent context
+ * `${poolId}`, but not which ids exist. Step closures can't be saved, so the
+ * game keeps its own record of its pool runs and adds them again after a load
+ * with `addRun`. `addRun` reads the saved map, so a pool run that died stays
+ * dead across save and load, whenever it is added again.
+ * The map is tagged `lifetime`, so a reset leaves it alone unless the reset
+ * names it. The in-memory handles are the authority, and `pool.reset()` is
+ * the reset path.
  */
 
 import { computed, effectScope, ref, shallowRef, watch, type Ref } from 'vue';
@@ -34,119 +33,118 @@ import { attachPersistentContextReset } from './resettable';
 
 // === TYPES ===
 /**
- * One step of a run. Returns `true` if the run is still alive after the step,
- * `false` if it died. The pool interprets the return value — the step
- * function itself never needs to know the death policy.
+ * One step of a pool run. Returns `true` if the pool run is still alive after
+ * the step, `false` if it died. The run pool interprets the return value, so
+ * the step function never needs to know the death disposition.
  */
 export type RunStep = () => boolean;
 
 /**
- * Outcome of a run's death, returned synchronously from a per-instance
- * `onDeath` callback. When no callback is registered, the pool applies its
- * `deathDisposition` (`'destroy'` → `'destroyed'`; `'park'` → `'parked'`).
+ * Outcome of a pool run's death, returned synchronously from its `onDeath`
+ * option callback. Without one, the run pool applies its `deathDisposition`
+ * (`'destroy'` → `'destroyed'`; `'park'` → `'parked'`).
  */
 export type RunDeathOutcome = 'destroyed' | 'parked' | { readonly restartedWith: RunStep };
 
 /**
- * Opaque handle to one run inside the pool. Handles are identity-stable
- * across pool operations; consumers may store the reference.
+ * Opaque handle to one pool run. Handles keep their identity across run pool
+ * operations; consumers may store the reference.
  */
 export interface RunHandle<Id = string> {
   readonly id: Id;
   /**
-   * Reactive aliveness flag. Backed by the pool's persisted `aliveStates`
-   * map; reads and internal flips both route through that map so the value
-   * round-trips through save/load regardless of when this handle was
-   * created. Flipped to `false` on `'destroyed'` or `'parked'` outcomes;
-   * stays `true` through a `restartedWith` outcome.
+   * Reactive aliveness flag. A watcher mirrors it into the run pool's saved
+   * `aliveStates` map, and a load sets it again from that map. So the value
+   * round-trips through save and load, whenever this handle was created.
+   * Set to `false` on a `'destroyed'` or `'parked'` outcome; stays `true`
+   * through a `restartedWith` outcome.
    */
   readonly alive: Ref<boolean>;
   /**
-   * Invoke one step of this run. Routes through the pool's death pipeline —
-   * on a `false` return, the outcome is resolved and events fire before
-   * `step()` returns. Silent no-op returning `false` on a parked or
-   * destroyed handle.
+   * Call one step of this pool run. On a `false` return, the run pool
+   * resolves the death outcome and emits its events before `step()` returns.
+   * A silent no-op that returns `false` on a parked or destroyed handle.
    */
   step(): boolean;
   /**
    * Re-arm a parked handle with a new step function. No-op if the handle
-   * is alive or already destroyed. Fires `instance:restarted`.
+   * is alive or already destroyed. Emits `run:restarted`.
    */
   restart(nextStep: RunStep): void;
   /**
-   * Force-destroy this handle. Fires `instance:died` with outcome
-   * `'destroyed'`, then `instance:removed`. Idempotent.
+   * Force-destroy this handle. Emits `run:died` with outcome `'destroyed'`,
+   * then `run:removed`. Idempotent.
    */
   destroy(): void;
 }
 
 /**
- * Registration payload for {@link RunPool.addRun}: a stable id, the
- * per-tick `step` function, and an optional `onDeath` override that
- * supersedes the pool's `deathDisposition` for this specific instance.
+ * Registration payload for {@link RunPool.addRun}: a stable id, the `step`
+ * function, and an optional `onDeath` override of the run pool's
+ * `deathDisposition` for this pool run.
  */
 export interface RunRegistration<Id = string> {
   readonly id: Id;
   readonly step: RunStep;
   /**
-   * Optional per-instance death override. When present, its return value
-   * wins over the pool's `deathDisposition`.
+   * Optional death override for this pool run. When present, its return
+   * value wins over the run pool's `deathDisposition`.
    */
   readonly onDeath?: () => RunDeathOutcome;
 }
 
-/** Events emitted during pool lifecycle. Subscribe via `pool.on()`. */
+/** Events emitted during the run pool's lifecycle. Subscribe via `pool.on()`. */
 export interface RunPoolEvents<Id = string> {
   'run:added': (handle: RunHandle<Id>) => void;
   'run:removed': (handle: RunHandle<Id>) => void;
   /**
-   * Fired whenever a run's step returns false. The handle's `alive` has
-   * already been flipped to the post-death state (or left `true` for
-   * `restartedWith`). For `'destroyed'`, the handle is still present in
-   * `instances.value` during this event; `instance:removed` fires next.
+   * Emitted whenever a pool run's step returns false. The handle's `alive`
+   * already holds the post-death value (or stays `true` for `restartedWith`).
+   * For `'destroyed'`, the handle is still in `runs.value` during this
+   * event; `run:removed` follows.
    */
   'run:died': (handle: RunHandle<Id>, outcome: RunDeathOutcome) => void;
   /**
-   * Fired when a parked handle was re-armed via `handle.restart()` or a
+   * Emitted when a parked handle was re-armed via `handle.restart()`, or a
    * just-died handle was replaced via `{ restartedWith }`.
    */
   'run:restarted': (handle: RunHandle<Id>) => void;
   /**
-   * Fired on `pool.reset()`. Consumers observe and run game-side reset
-   * (re-arm parked handles, reset zones, etc.). The pool itself does not
-   * touch aliveness — the handler is responsible.
+   * Emitted on `pool.reset()`. Consumers handle it with the game-side reset
+   * (re-arm parked handles, reset zones, etc.). The run pool does not change
+   * aliveness itself; the handler does.
    */
   'pool:reset': () => void;
 }
 
 /**
- * Configuration for {@link createRunPool}. `deathDisposition` picks the
- * post-death disposition (`'destroy'` vs `'park'`); the
- * optional `maxRuns` caps concurrent runs.
+ * Options for {@link createRunPool}. `deathDisposition` picks the post-death
+ * disposition (`'destroy'` or `'park'`); the optional `maxRuns` sets the
+ * run pool's capacity.
  */
 export interface RunPoolOptions {
-  /** Unique identifier; used as the persistence context name. */
+  /** Unique id; the run pool's persistent context id. */
   readonly id: string;
   /**
-   * Pool-wide default applied when a run's `onDeath` is absent:
+   * Pool-wide default applied when a pool run has no `onDeath`:
    *
-   * - `'destroy'` — handle is removed from the pool (the run is gone).
-   * - `'park'` — handle stays with `alive=false` (the run can be restarted).
+   * - `'destroy'` — the handle is removed from the run pool (the pool run is gone).
+   * - `'park'` — the handle stays with `alive=false` (the pool run can be restarted).
    */
   readonly deathDisposition: 'destroy' | 'park';
   /**
-   * Optional hard cap on concurrent runs. `addRun` throws when
-   * exceeding. Default: unlimited. `0` is treated as valid-but-empty
-   * (always throws), not as "unlimited".
+   * Optional capacity: the most pool runs held at once. `addRun` throws past
+   * it. Default: unlimited. `0` is a valid empty capacity (always throws),
+   * not "unlimited".
    */
   readonly maxRuns?: number;
 }
 
 /**
- * A pool of concurrent run instances — spawned clones, loops, idle
- * factory loops — sharing one death policy but each carrying its own step
- * closure. Created by {@link createRunPool}; emit lifecycle events for
- * add/remove/death/restart/reset.
+ * A run pool: concurrent pool runs, such as spawned clones, that share one
+ * death disposition, each with its own step closure. Created by
+ * {@link createRunPool}; emits lifecycle events for add, remove, death,
+ * restart and reset.
  */
 export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
   readonly id: string;
@@ -159,37 +157,36 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
   /** Reactive count of handles with `alive.value === true`. */
   readonly liveCount: Readonly<Ref<number>>;
   /**
-   * Register a new run. Throws on ID collision or when exceeding
-   * `maxRuns`. Fires `instance:added`.
+   * Register a new pool run. Throws on an id collision or past `maxRuns`.
+   * Emits `run:added`.
    */
   addRun(registration: RunRegistration<Id>): RunHandle<Id>;
-  /** Look up by ID. Returns `undefined` for unknown IDs. */
+  /** Look up by id. Returns `undefined` for an unknown id. */
   getRun(id: Id): RunHandle<Id> | undefined;
-  /** Force-destroy by ID. No-op if unknown. Equivalent to `handle.destroy()`. */
+  /** Force-destroy by id. No-op if unknown. Equivalent to `handle.destroy()`. */
   removeRun(id: Id): void;
   /**
-   * Atomic pool-wide reset. Fires `pool:reset`; consumers re-arm handles
-   * in the handler. Seam, not a verb — the pool does not itself touch
-   * aliveness.
+   * Atomic pool-wide reset. Emits `pool:reset`; consumers re-arm handles
+   * in the handler. The run pool does not change aliveness itself.
    */
   reset(): void;
   /**
-   * Stop the pool's load re-seed and every handle's aliveness mirror. The
-   * saved map stays registered and keeps saving, so building a pool under the
-   * same id again takes a new engine. A pool built during `install()` stops
-   * with `engine.dispose()` without this call.
+   * Stop the run pool's load re-seed and every handle's aliveness mirror. The
+   * saved map stays registered and keeps saving, so building a run pool under
+   * the same id again takes a new engine. A run pool built during `install()`
+   * stops with `engine.dispose()` without this call.
    */
   dispose(): void;
 }
 
 // === FACTORY ===
 /**
- * Creates a persistent pool of opaque runs with lifecycle events.
+ * Creates a run pool: opaque pool runs with saved aliveness and lifecycle events.
  *
- * @param options - Pool configuration including `id`, `deathDisposition`, and
- *   optional `maxRuns` cap
- * @returns A pool with `addRun`/`getRun`/`removeRun`/`reset`
- *   operations, reactive `instances` and `liveCount`, and typed event
+ * @param options - Run pool options: `id`, `deathDisposition`, and the
+ *   optional `maxRuns` capacity
+ * @returns A run pool with `addRun`/`getRun`/`removeRun`/`reset`
+ *   operations, reactive `runs` and `liveCount`, and typed event
  *   subscription
  *
  * @example
@@ -211,19 +208,19 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
   const { id: poolId, deathDisposition, maxRuns = Infinity } = options;
 
-  // Pool-level persistence: the per-id aliveness map, in the pool's own
-  // context so it's in the registry at save-load time — `addRun` is
-  // consulted against the saved `aliveStates` regardless of when it runs, so
-  // dynamic instances created post-load pick up their saved alive state (no
-  // resurrection of dead clones).
+  // Pool-level persistence: the per-id aliveness map, in the run pool's own
+  // persistent context so it's in the persistent-ref registry when a save
+  // loads. `addRun` reads the saved `aliveStates` whenever it runs, so pool
+  // runs added after a load pick up their saved alive value (no resurrection
+  // of dead clones).
   const { aliveStates } = withPersistentContext(poolId, () => ({
     aliveStates: persistent<Record<string, boolean>>({}, { id: 'aliveStates', lifetime: true }),
   }));
 
   // In-memory collection state: `handleArray` holds insertion order, and
-  // `entries` everything else about a handle in the pool. A handle is in the
-  // pool while `entries` maps its id to its own entry; after it leaves, the
-  // id may be reused by a new handle.
+  // `entries` everything else about a handle in the run pool. A handle is in
+  // the run pool while `entries` maps its id to its own entry; after it
+  // leaves, a new handle may reuse the id.
   interface Entry {
     readonly handle: RunHandle<Id>;
     step: RunStep;
@@ -239,14 +236,14 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     return entry?.handle === h ? entry : undefined;
   }
 
-  // Owns the hydration hook and every handle's mirror watch, including those
-  // of handles added after install, so all of them stop with the pool.
+  // Owns the hydration handler and every handle's mirror watch, including
+  // those of handles added after install, so all of them stop with the run pool.
   const scope = effectScope();
 
   // A load replaces `aliveStates` wholesale: re-seed each handle still in the
-  // pool from it. A handle that has left the pool isn't walked, so a load
-  // naming its id can't revive it. A settle that left the map object in place
-  // (a reset, another engine's load) has nothing to re-seed.
+  // run pool from it. A handle that has left the run pool isn't walked, so a
+  // load naming its id can't bring it back. A settle that left the map object
+  // in place (a reset, another engine's load) has nothing to re-seed.
   let seededFrom = aliveStates.value;
   scope.run(() =>
     onHydrated(() => {
@@ -259,10 +256,10 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     }),
   );
 
-  // Versioned view-cache for referentially-stable `instances.value` reads.
-  // Pattern cribbed verbatim from sequencer.ts — reads return the same slice
-  // until a structural mutation bumps the version, then a fresh slice is
-  // handed out so Vue watchers and identity assertions trigger.
+  // Versioned view-cache for referentially-stable `runs.value` reads.
+  // The same pattern as sequencer.ts: reads return the same slice until a
+  // structural mutation bumps the version, then a fresh slice is handed out
+  // so Vue watchers and identity assertions trigger.
   const _liveVersion = shallowRef(0);
   let _viewCache: readonly RunHandle<Id>[] | null = null;
   let _viewVersion = 0;
@@ -314,7 +311,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
 
   function dispatchDeath(h: RunHandle<Id>, outcome: RunDeathOutcome): void {
     const entry = entryOf(h);
-    if (!entry) return; // handle was already torn down
+    if (!entry) return; // handle was already destroyed
 
     if (outcome === 'destroyed') return forceDestroy(h);
 
@@ -347,15 +344,15 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       throw new Error(`RunPool(${poolId}): maxRuns (${maxRuns}) exceeded`);
     }
 
-    // Resolve initial aliveness from the pool's persisted map. A fresh id
+    // Take the initial aliveness from the run pool's saved map. A fresh id
     // defaults to `true`; an id present in `aliveStates` (e.g. one whose
-    // entry was set by `deserializePersistents` at save-load time) keeps
-    // whatever value was loaded — including `false` for runs that died
-    // before the save was taken. `alive` is a local per-handle ref so a
-    // destroyed handle's `alive.value` stays at its last value after
-    // `removeFromCollection` cleans the map entry; a watcher mirrors flips
-    // into `aliveStates` for persistence, and the pool's `onHydrated`
-    // re-seeds it after a mid-session load replaces the entire map.
+    // entry `deserializePersistents` set when a save loaded) keeps whatever
+    // value was loaded — including `false` for pool runs that died before the
+    // save was taken. `alive` is a local per-handle ref so a destroyed
+    // handle's `alive.value` stays at its last value after
+    // `removeFromCollection` deletes the map entry. A watcher mirrors changes
+    // into `aliveStates` so they are saved, and the run pool's `onHydrated`
+    // re-seeds it after a load during play replaces the entire map.
     const idKey = String(reg.id);
     const initialAlive = aliveStates.value[idKey] ?? true;
     aliveStates.value[idKey] = initialAlive;
@@ -384,7 +381,7 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
       },
       restart(nextStep: RunStep): void {
         // Only parked handles re-arm. Live handles ignore; destroyed
-        // handles are out of the pool.
+        // handles are out of the run pool.
         const entry = entryOf(handle);
         if (!entry || alive.value) return;
         entry.step = nextStep;

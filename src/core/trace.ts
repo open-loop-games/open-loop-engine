@@ -6,7 +6,7 @@
  *
  * - Zero module code changes for basic tracing (setter intercept)
  * - Opt-in withTraceChain() for modifier chain attribution
- * - Per-tick grouping via beginTick()/endTick() called by game loop
+ * - Per-tick grouping via beginTraceTick()/endTraceTick(), which the game loop calls
  */
 
 import type { Modifier } from './modifier';
@@ -33,14 +33,14 @@ let tracing = false;
 let enableRefcount = 0;
 
 /**
- * Enable the trace system for the duration of a subscription. Returns a
- * disposer that decrements the refcount; tracing stays active as long as at
- * least one caller holds a subscription. When the refcount is zero,
- * `beginTraceTick` and `recordTrace` short-circuit so the hot path allocates
- * nothing — the common case where no observer is listening.
+ * Enable the trace system for the length of a subscription. Returns a
+ * cleanup that decrements the refcount; tracing stays on while at least one
+ * caller holds a subscription. When the refcount is zero, `beginTraceTick`
+ * and `recordTrace` short-circuit, so the hot path allocates nothing — the
+ * common case, where no observer is subscribed.
  *
- * Intended for observers like a graph view or balance-sim runner: call on
- * subscribe, invoke the returned disposer on unsubscribe.
+ * Intended for observers like a graph view or a balance-harness runner: call
+ * it on subscribe, and call the returned cleanup on unsubscribe.
  */
 export function enableTracing(): () => void {
   enableRefcount++;
@@ -66,9 +66,8 @@ export function isTracingEnabled(): boolean {
 let activeChain: Modifier | undefined;
 
 /**
- * Execute a callback with modifier chain attribution.
- * Any resource mutations inside the callback will have the chain
- * attached to their trace entry.
+ * Run `fn` with modifier chain attribution.
+ * Each resource mutation inside `fn` records the chain on its trace entry.
  *
  * @param chain - The modifier chain that computed the mutation amount
  * @param fn - The function that performs the mutation

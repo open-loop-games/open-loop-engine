@@ -1,19 +1,19 @@
 /**
- * Throttle — lightweight tick-callback rate limiter
+ * Throttle — lightweight rate limiter for tick handlers
  *
- * Gates a per-tick callback so it fires at most once per configured interval.
- * Useful for pacing automation checks (auto-buy, auto-prestige) that don't
+ * Limits work inside a tick handler to at most once per configured interval.
+ * Useful for pacing automation checks (auto-purchase, auto-prestige) that don't
  * need progress or cooldown tracking.
  *
  * - {@link createThrottle} — sole factory
  *
  * @example
  * ```ts
- * const buyThrottle = createThrottle({ interval: 0.5 }); // every 500ms
+ * const purchaseThrottle = createThrottle({ interval: 0.5 }); // every 500ms
  *
  * loop.onTick((dt) => {
- *   if (buyThrottle.ready(dt)) {
- *     attemptAutoBuy();
+ *   if (purchaseThrottle.ready(dt)) {
+ *     attemptAutoPurchase();
  *   }
  * });
  * ```
@@ -27,19 +27,19 @@ export interface ThrottleOptions {
 }
 
 /**
- * A gate that rate-limits execution within a tick callback.
+ * A rate limiter for work inside a tick handler.
  *
- * Call {@link ready} each tick with the elapsed dt. It returns `true` at most
- * once per configured interval, accumulating dt between allowed executions.
+ * Call {@link ready} each tick with its dt. It returns `true` at most once per
+ * configured interval, accumulating dt between allowed executions.
  */
 export interface Throttle {
   /**
    * Accumulate dt and return `true` if the interval has elapsed.
    * The internal accumulator subtracts (not resets) to preserve timing accuracy.
-   * Fires at most once per call, even with large dt values.
+   * Returns `true` at most once per call, even with large dt values.
    */
   ready(dt: number): boolean;
-  /** Reset the accumulator to zero (e.g., on loop restart). */
+  /** Reset the accumulator to zero (e.g., when a run ends). */
   reset(): void;
   /** The configured interval in seconds (read-only). */
   readonly interval: number;
@@ -47,17 +47,17 @@ export interface Throttle {
 
 // === FACTORY ===
 /**
- * Create a throttle gate for rate-limiting tick callbacks.
+ * Create a throttle that rate-limits work inside a tick handler.
  *
- * @param options - Configuration with the minimum interval between executions
- * @returns A {@link Throttle} with a `gate(dt)` method
+ * @param options - The minimum interval between executions
+ * @returns A {@link Throttle} with a `ready(dt)` method
  *
  * @example
  * ```ts
- * const prestiageCheck = createThrottle({ interval: 2 }); // every 2 seconds
+ * const prestigeCheck = createThrottle({ interval: 2 }); // every 2 seconds
  *
  * gameLoop.onTick((dt) => {
- *   if (prestiageCheck.ready(dt) && shouldAutoPrestige()) {
+ *   if (prestigeCheck.ready(dt) && shouldAutoPrestige()) {
  *     prestige();
  *   }
  * });
@@ -75,7 +75,7 @@ export function createThrottle(options: ThrottleOptions): Throttle {
       if (accumulated >= interval) {
         // Subtract to preserve remainder — prevents drift over many ticks
         accumulated -= interval;
-        // Clamp: if we've fallen far behind (large dt), don't bank multiple triggers
+        // Clamp: if we've fallen far behind (large dt), don't keep multiple triggers
         if (accumulated >= interval) {
           accumulated = accumulated % interval;
         }

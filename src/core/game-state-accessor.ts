@@ -1,25 +1,23 @@
 /**
- * Ambient game-state-accessor context — one of the cross-cutting ambient scopes
- * `createEngine` sets around `install()` / `connect()`, alongside the chain,
- * effect-system, resource and tuning registries, the engine categories, and
- * the persistence namespace.
+ * Ambient game-state accessor — one of the cross-cutting ambient values
+ * `createEngine` sets around `install()` / `connect()`. The others are the
+ * chain, effect-system, resource and tuning registries, the engine categories,
+ * and the persistence namespace.
  *
- * Problem it solves: `GameStateAccessor` (and its write-side partner
- * `GameStateMutator`) were previously threaded explicitly via options on
- * category factories (e.g., `createChallengeCategory`). Every new category
- * factory had to remember to wire the accessor through, and closure-timing
- * bugs were structurally possible when the accessor wasn't yet available
- * at category-creation time.
+ * Why it is ambient: threading `GameStateAccessor` (and its write-side partner
+ * `GameStateMutator`) through each category factory's options (e.g.
+ * `createChallengeCategory`) makes every factory wire it through. It also
+ * allows closure-timing bugs when the accessor isn't available yet at
+ * category creation.
  *
  * Mechanism: {@link createEngine} accepts a consumer-supplied accessor in its
- * config and wraps `install()` / `connect()` in {@link withGameStateAccessor}.
- * Category factories read the ambient via {@link getCurrentGameStateAccessor}
+ * options and wraps `install()` / `connect()` in {@link withGameStateAccessor}.
+ * Category factories read the ambient value via {@link getCurrentGameStateAccessor}
  * as a fallback when no per-category option is provided.
  *
  * The accessor is a stateless vtable of forwards: its methods close over
- * module-exported functions and call them lazily. Construction has zero side
- * effects and reads zero module state, so it can be constructed before any
- * module installs.
+ * exported functions and call them lazily. Construction has no side effects
+ * and reads no file-level state, so it can be built before any module installs.
  */
 
 import type { GameStateAccessor } from '@/primitives/types';
@@ -28,7 +26,7 @@ import type { GameStateMutator } from './effects';
 /** Combined accessor + mutator — every consumer unifies these into one object. */
 export type GameStateAccessorMutator = GameStateAccessor & GameStateMutator;
 
-// === AMBIENT CURRENT-ACCESSOR CONTEXT ===
+// === AMBIENT ACCESSOR ===
 let _current: GameStateAccessorMutator | undefined;
 
 /**
@@ -36,14 +34,13 @@ let _current: GameStateAccessorMutator | undefined;
  * factories called inside `fn` can read it via
  * {@link getCurrentGameStateAccessor}.
  *
- * Used by {@link createEngine} to scope accessor availability to the current
- * engine during its `install()` / `connect()` phases. Nested calls save and
- * restore the previous ambient so multiple engines starting concurrently
- * don't stomp each other.
+ * Used by {@link createEngine} to limit the accessor to that engine during its
+ * `install()` / `connect()` phases. Nested calls save and restore the previous
+ * ambient value, so engines starting concurrently don't overwrite each other's.
  *
  * Accepts `undefined` for engines that don't use an accessor (tests, engine-
  * only workbenches). In that case `getCurrentGameStateAccessor()` returns
- * `undefined` inside `fn`, and the previous ambient is restored on exit.
+ * `undefined` inside `fn`, and the previous ambient value is restored on exit.
  */
 export function withGameStateAccessor<T>(
   accessor: GameStateAccessorMutator | undefined,

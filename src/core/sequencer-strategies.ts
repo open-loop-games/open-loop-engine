@@ -9,7 +9,7 @@
  *
  * One of three sibling "choose one from a list" primitives. The axis is
  * shape, not lifecycle:
- * - `FillStrategy` (this file) — *stateful generator*. `next()` returns
+ * - `FillStrategy` (this file) — *stateful chooser*. `next()` returns
  *   `SequencerItem<M> | null`. Round-robin binds a persistent cursor.
  *   Verb form (`create*Strategy`) signals that construction allocates state;
  *   the convention extends across the family for symmetry.
@@ -18,8 +18,8 @@
  *   constructor-as-data carve-out — call sites read as configuration
  *   (`policy: selectionHybridPayback({ ... })`).
  * - `Recommender` ({@link ../systems/recommendation}) — *scored
- *   candidate*. The recommendation system filters defs via `canApply`,
- *   scores them, and runs `recommend()` on the winner each loop boundary.
+ *   candidate*. The recommendation system filters recommenders via `canApply`,
+ *   scores them, and runs `recommend()` on the winner at each run boundary.
  *
  * @cluster sequencer
  */
@@ -113,9 +113,9 @@ export function createPriorityStrategy<M = void>(
 
 /**
  * Cycle through candidates in round-robin order.
- * The rotation index is a persistent ref so it survives save/load.
+ * The rotation index is a persistent ref, so it is saved and loaded.
  *
- * @param id - Unique identifier for the persistent context
+ * @param id - Unique id for the persistent context
  * @param getCandidates - Returns available candidate items in desired order
  */
 export function createRoundRobinStrategy<M = void>(
@@ -145,7 +145,7 @@ export function createRoundRobinStrategy<M = void>(
  * Tries each strategy in order; returns the first non-null result.
  *
  * Common pattern: a higher-priority strategy first, then a round-robin
- * fallback — fill a free slot from its goals before walking a
+ * fallback — fill the sequencer from goals before walking a
  * hobbies list:
  * ```ts
  * createCompositeStrategy(

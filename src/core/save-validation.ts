@@ -1,5 +1,5 @@
 /**
- * Save validation — runtime Zod layer over the persistent-ref registry
+ * Save validation — runtime Zod checks over the persistent-ref registry
  *
  * Auto-derives a Zod schema for every persistent ref from its
  * {@link DefaultValue} and validates raw save data before deserialize. Catches
@@ -7,14 +7,14 @@
  * corruption without requiring consumers to hand-write schemas.
  *
  * Architecture: a hand-written save schema (often ~1000 lines) runs both
- * validation and migration. That is needed only when there is no persistent-ref
- * registry. Open Loop Engine has {@link getAllPersistentRefs} + stable named
- * keys, so the registry *is* the schema — derived at runtime from the
- * default values the engine already tracks.
- * Migrations stay in the existing `migrations` hook; validation runs once,
- * after the full migration chain.
+ * validation and save migration. That is needed only when there is no
+ * persistent-ref registry. The engine has {@link getAllPersistentRefs} and
+ * keys by id, so the registry *is* the schema. It derives at runtime from the
+ * ref defaults the engine already tracks.
+ * Save migrations stay in the `migrations` option; validation runs once,
+ * after all of them.
  *
- * Policy: field-level failures always emit `save:validation-failed`. In
+ * On failure: field-level failures always emit `save:validation-failed`. In
  * non-strict mode, the failing leaf is dropped from the raw data and
  * `deserializePersistents` falls back to the ref's default (self-heal). In
  * strict mode, validation failure aborts the load and bubbles up as
@@ -34,7 +34,7 @@ import {
 } from './persistence';
 
 /**
- * Zod adapter that accepts any value constructable as a `Decimal`, including
+ * Zod check that accepts any value constructable as a `Decimal`, including
  * `string`, `number`, and `Decimal` instances. Does not transform — the
  * engine's existing ref setter accepts `DecimalSource` and the serialize path
  * already encodes Decimals as strings.
@@ -50,10 +50,13 @@ const DECIMAL_NUMERIC = /^[-+]?e*[-+]?[\d.(]/;
 
 /**
  * Zod schema that accepts the three concrete {@link DecimalSource} shapes a
- * save can hold: a live `Decimal` instance, a finite `number`, or a numeric
- * string (including the `"Infinity"` / `"NaN"` literals
- * `serializePersistents` emits). Stricter than `z.unknown()` so `break_eternity`'s
- * silent garbage-to-zero coercion can't slip past validation.
+ * save can hold:
+ * - a live `Decimal` instance;
+ * - a `number`;
+ * - a numeric string, including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits.
+ *
+ * It is stricter than `z.unknown()`, so `break_eternity`'s silent
+ * garbage-to-zero coercion can't slip past validation.
  */
 export const decimalSchema: ZodType<DecimalSource> = z.custom<DecimalSource>((value) => {
   if (value instanceof Decimal) return true;
@@ -77,13 +80,13 @@ export interface ValidationIssue {
 }
 
 /**
- * Derive a Zod schema from a ref's default value and options. Recurses into
+ * Derive a Zod schema from a ref default and options. Recurses into
  * plain nested objects and arrays. Primitive defaults map to lenient schemas:
  * numeric defaults accept `number | string` so DecimalSource and
  * non-finite-encoded strings (`"Infinity"`, `"NaN"`) both pass.
  *
- * Every derived schema except the Decimal one accepts `null`: a default says
- * what kind a value has, not whether the ref's type admits null, and JSON only
+ * Every derived schema except the Decimal one accepts `null`. A default says
+ * what kind a value has, not whether the ref's type admits null. And JSON only
  * writes `null` where the game stored one. Rejecting it would reset a
  * legitimately-unset field on load. A Decimal ref holding `null` is not a
  * `DecimalSource`, so it stays rejected — pass an explicit `schema` for that.
@@ -145,7 +148,7 @@ export function getSchemaForRef(ref: Persistent): ZodType {
   return deriveSchema(ref[DefaultValue], ref[PersistentDecimal]);
 }
 
-/** Human-readable label for a Zod issue, for `save:validation-failed.expected`. */
+/** Human-readable text for a Zod issue, for `save:validation-failed.expected`. */
 function describeIssue(issue: ZodIssue): string {
   if (issue.code === 'invalid_type') {
     return String(issue.expected);
@@ -196,11 +199,11 @@ export interface ValidateSaveDataResult {
 /**
  * Validate raw save data against the live persistent-ref registry.
  *
- * Runs per-ref: navigates each ref's `SaveDataPath` into the data object,
- * runs `schema.safeParse` on the leaf, and in non-strict mode deletes the
- * leaf on failure (letting `deserializePersistents` fall back to the ref's
- * default). In strict mode, the first failure sets `ok: false` but the loop
- * continues so every issue is reported in one pass.
+ * Runs per ref: it navigates each ref's `SaveDataPath` into the data object
+ * and runs `schema.safeParse` on the leaf. In non-strict mode it deletes the
+ * leaf on failure, so `deserializePersistents` falls back to the ref default.
+ * In strict mode, the first failure sets `ok: false` but the loop continues,
+ * so every issue is reported in one pass.
  */
 export function validateSaveData(
   refs: Map<string, Persistent>,
@@ -214,8 +217,9 @@ export function validateSaveData(
   for (const [path, ref] of refs) {
     const parts = ref[SaveDataPath] ?? path.split('.');
     const leaf = navigateNested(data, parts);
-    // Missing leaves are not a validation error — deserialize will reset the
-    // ref to its default, which is exactly the "new persistent in v1.5" case.
+    // Missing leaves are not a validation error — deserialize resets the ref
+    // to its ref default, which is exactly the "new persistent ref in a later
+    // save version" case.
     if (leaf === undefined) continue;
 
     const schema = getSchemaForRef(ref);

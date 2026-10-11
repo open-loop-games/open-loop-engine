@@ -1,14 +1,14 @@
 /**
- * Save migrations — pure transforms for reshaping save data between versions.
+ * Save migrations — pure transforms for reshaping save data between save versions.
  *
- * Engine-supplied helpers consumers compose into their `migrations[v]` function
- * bodies. Each helper mutates the same data ref and returns it for chain
- * ergonomics; all helpers silently no-op when the target path doesn't exist,
- * so a migration tolerates already-absent fields (player opted out of a
- * feature, loaded a fresh save, etc.).
+ * Engine utilities that consumers compose into their `migrations[v]` function
+ * bodies. Each utility mutates the same data object and returns it, so calls
+ * chain. Every utility is a silent no-op when the target path doesn't exist.
+ * So a save migration tolerates fields already absent (the player opted out
+ * of a feature, loaded a fresh save, etc.).
  *
  * Path-key convention: `.` separates nested object keys, matching the
- * serialized shape produced by `serializePersistents`. Migration data is the
+ * serialized shape produced by `serializePersistents`. Save data is the
  * nested object tree, never a flat dot-keyed record — `getNested(data,
  * 'jobs.warrior.progress')` reaches into `data.jobs.warrior.progress`, not a
  * literal `data['jobs.warrior.progress']`.
@@ -18,13 +18,13 @@
  *   serialize/deserialize paths
  * - `renameField`, `retypeField`, `deleteField`, `addField` — single-path
  *   transforms
- * - `forEachDef` — iterate over a context's per-definition state
+ * - `forEachDef` — iterate over the def states in a persistent context's save data
  *
  * @cluster save
  */
 
-// Internal alias for the raw save-data shape every helper accepts. Not exported —
-// migrations always operate on a plain `Record<string, unknown>` from the engine.
+// Internal alias for the raw save-data shape every utility accepts. Not exported —
+// save migrations always operate on a plain `Record<string, unknown>` from the engine.
 type SaveData = Record<string, unknown>;
 
 // === FOUNDATION ===
@@ -32,7 +32,7 @@ type SaveData = Record<string, unknown>;
 /**
  * Read the value at a `.`-separated nested path in a save-data tree. Returns
  * `undefined` when any intermediate is missing or not a plain object — never
- * throws. Shared with `deserializePersistents` so migration code and the
+ * throws. Shared with `deserializePersistents`, so save migration code and the
  * deserialize path agree on what "missing" means.
  *
  * @example
@@ -53,8 +53,8 @@ export function getNested(data: SaveData, path: string): unknown {
 /**
  * Write `value` at a `.`-separated nested path, creating intermediate objects
  * as needed. A non-object intermediate is replaced with a fresh `{}` — the
- * path is the source of truth at write time, mirroring the engine's internal
- * legacy migration. Shared with `serializePersistents`.
+ * path is the source of truth at write time, matching the engine's v1 key
+ * remap. Shared with `serializePersistents`.
  *
  * @example
  * ```ts
@@ -78,7 +78,7 @@ export function setNested(data: SaveData, path: string, value: unknown): void {
   cur[parts[parts.length - 1]] = value;
 }
 
-// === MIGRATION HELPERS ===
+// === SAVE MIGRATION UTILITIES ===
 
 /**
  * Move a value from `oldPath` to `newPath`. No-op when `oldPath` is absent
@@ -104,10 +104,10 @@ export function renameField(data: SaveData, oldPath: string, newPath: string): S
 /**
  * Apply `transform` to the value at `path`. No-op when the path is absent.
  *
- * Useful for type migrations: a field that was a `number` and is now a
- * `Decimal` only needs `retypeField(data, path, (v) => String(v))` — the
- * engine's deserialize accepts string-encoded Decimals natively, so a plain
- * `String(v)` is the right shape.
+ * Useful when a field changes type. A field that held a `number` and now
+ * holds a `Decimal` only needs `retypeField(data, path, (v) => String(v))`.
+ * The engine's deserialize accepts string-encoded Decimals natively, so a
+ * plain `String(v)` is the right shape.
  *
  * @example
  * ```ts
@@ -179,10 +179,10 @@ export function addField(
 }
 
 /**
- * Iterate over each entry in a collection-shaped context (a top-level group
- * of per-definition state). `fn` receives the entry record and the definition
- * id; mutate the entry in place. No-op when the context is missing or not an
- * object; non-object entries within the context are skipped.
+ * Iterate over each entry in a collection-shaped persistent context: a
+ * top-level group of def states. `fn` receives the entry record and the def
+ * id; mutate the entry in place. No-op when the persistent context is missing
+ * or not an object; non-object entries in it are skipped.
  *
  * @example
  * ```ts

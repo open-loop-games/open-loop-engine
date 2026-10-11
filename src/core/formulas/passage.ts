@@ -7,7 +7,7 @@
  * isn't in the function's image — an interior `.floor()`, a `step` splice that
  * jumps at its breakpoint, a saturated `min`/`max`. There the algebra returns a
  * plausible number from inside a gap nothing evaluates into, and the search
- * returns the boundary a player actually crosses.
+ * returns the boundary a player actually reaches.
  *
  * The search never touches the op table — it only calls `evaluate` — which is
  * both why interior rounding cannot fool it and why it answers for chains that
@@ -18,13 +18,13 @@
  * over the search domain. Bisection cannot detect a violation, so instead of
  * pushing the whole burden to the caller this module probes the two places a
  * violation produces a *plausible* answer — see {@link findFirstPassage}. For a
- * curve that falls to its target (a drain, a decay) the question is a downward
- * crossing; negate the chain, or use `timeUntilGateFlip` over a `resource-gte`
- * gate when the quantity is a live resource rather than a formula.
+ * curve that falls to its target (a decay, an amount being spent), the question
+ * is a downward first passage. Negate the chain, or use `timeUntilGateFlip` over
+ * a `resource-gte` Gate when the quantity is a live resource, not a formula.
  *
- * Accuracy above layer 0 is floored by the representation, not the search: a
- * value is stored as its base-10 logarithm in a float64, so a passage computed
- * up there carries roughly `16 − log₁₀(log₁₀ x)` significant digits.
+ * Above break_eternity layer 0, the representation floor limits accuracy, not
+ * the search. A value is stored as its base-10 logarithm in a float64, so a
+ * passage computed up there has roughly `16 − log₁₀(log₁₀ x)` significant digits.
  *
  * @cluster formulas
  */
@@ -44,7 +44,7 @@ export interface FirstPassageOptions {
   /**
    * First guess for the top of the bracket, ideally a closed form for a
    * simplified version of the same problem. Purely an optimization: the search
-   * grows its own bracket when the target sits above this. Defaults to `lower + 1`.
+   * grows its own bracket when the target is above this. Defaults to `lower + 1`.
    */
   upper?: DecimalSource;
 }
@@ -52,17 +52,17 @@ export interface FirstPassageOptions {
 /**
  * Result of {@link Formula.firstPassage}.
  *
- * - `crossed` — the search found it. `value` is the smallest input reaching the target.
- * - `already-reached` — the target is already met at the domain floor, so no
- *   crossing was searched for. `value` is that floor. A legitimate answer ("you
- *   already have it"), distinguished from `crossed` because callers driving a
- *   countdown usually want to say so rather than render a zero.
- * - `no-crossing` — nothing in the searchable domain reaches the target.
- * - `not-monotone` — the search domain is not one on which a first passage is
- *   defined: the curve descends across it, or it isn't real-valued at the floor.
+ * - `reached` — the search found it. `value` is the smallest input reaching the target.
+ * - `already-reached` — the target is already met at the lower bound, so no
+ *   search ran. `value` is that lower bound. A legitimate answer ("you already
+ *   have it"), distinguished from `reached` because callers driving a countdown
+ *   usually want to say so rather than show a zero.
+ * - `not-reached` — nothing in the searchable domain reaches the target.
+ * - `not-monotone` — a first passage is not defined on the search domain. The
+ *   curve descends across it, or it isn't real-valued at the lower bound.
  *   Either way the remedy is the same — restrict the domain with `lower`, or
  *   negate a descending chain. Reported rather than returned, because this
- *   failure otherwise reads as a confident answer.
+ *   failure otherwise looks like a confident answer.
  */
 export type Passage =
   | { value: Decimal; reason: 'reached' | 'already-reached' }
@@ -71,7 +71,7 @@ export type Passage =
 // === MONOTONICITY PROBE ===
 
 /**
- * Offsets above the domain floor used to sniff for a descending curve. One step,
+ * Offsets above the lower bound used to test for a descending curve. One step,
  * one thousand, one billion — a level axis is exhausted by the first, a time
  * axis in seconds by the second, and the third catches a curve that stays flat
  * across both before turning over.
@@ -81,7 +81,7 @@ const DESCENT_PROBES = [1, 1e3, 1e9];
 /**
  * Whether `f` falls below `f(lower)` anywhere in {@link DESCENT_PROBES}.
  *
- * Cannot fire for a non-decreasing `f`, which is the property that makes it safe
+ * Cannot hold for a non-decreasing `f`, which is the property that makes it safe
  * to run unconditionally: a passing precondition is never reported as a failure.
  * A non-comparable `f` (NaN past some magnitude) fails the `lt` and is likewise
  * not reported.
@@ -99,17 +99,17 @@ function descends(f: (x: Decimal) => DecimalSource, lower: Decimal, atFloor: Dec
  * from a plausible one, each aimed at a specific way a non-monotone curve
  * produces a number instead of a report:
  *
- * - **At the floor.** `f(lower) ≥ target` normally means the target is already
- *   met. For a *descending* curve it means the opposite — the crossing is still
- *   ahead — and the unguarded answer is a confident `lower`. So the floor case
- *   probes forward before claiming it. A curve undefined at the floor (`recip`
- *   at 0) is refused outright, rather than left to whichever way an ordering
- *   comparison against `NaN` happens to answer.
- * - **Below the answer.** A crossing found at `x` is only the *first* one if
+ * - **At the lower bound.** `f(lower) ≥ target` normally means the target is
+ *   already met. For a *descending* curve it means the opposite: the first
+ *   passage is still ahead, and the unguarded answer is a confident `lower`. So
+ *   the lower-bound case probes forward before claiming it. A curve undefined at
+ *   the lower bound (`recip` at 0) is refused outright. It is not left to
+ *   whichever way an ordering comparison against `NaN` happens to answer.
+ * - **Below the answer.** An answer found at `x` is the *first* passage only if
  *   nothing below `x` already reached the target. One interior sample tests
- *   exactly the promise the name makes, and cannot fire on a monotone curve.
+ *   exactly the promise the name makes, and cannot hold on a monotone curve.
  *
- * @internal — the public surface is `Formula.firstPassage`.
+ * @internal — the public API surface is `Formula.firstPassage`.
  */
 export function findFirstPassage(
   f: (x: Decimal) => DecimalSource,

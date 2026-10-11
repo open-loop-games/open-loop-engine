@@ -3,41 +3,41 @@
  *
  * @cluster spatial-influence-layer
  *
- * Adds the per-frame propagation/decay lifecycle that turns a numeric grid
- * into a working "influence map" without introducing a new storage primitive.
- * The cell values live in the caller-supplied `SpatialGrid<number>`; the
- * layer owns only the source registry and the update loop. Persistence is
- * delegated to the grid; the source registry is session-lived and
- * re-registered at game start from the consumer's authoritative entity list.
+ * Adds the per-tick propagation/decay lifecycle that turns a numeric grid
+ * into a working influence layer without introducing a new storage primitive.
+ * The cell values are in the caller-supplied `SpatialGrid<number>`; the
+ * layer owns only the source registry and the update pass. Persistence is
+ * delegated to the grid. The source registry is ephemeral: the consumer
+ * re-registers its sources at game start from its own authoritative list.
  *
- * Field shape: BWAPI bots, 0 A.D., OpenRA, Spring AIs, CircuitAI's
- * `CThreatMap` 5-layer stratified threat. Cross-axis use (decision scoring
- * + spatial classification + opponent density) consumes a single layer's
- * `read()` reader so all three axes share one storage substrate.
+ * Field shape: the threat layers of RTS AI opponents, including threat
+ * stratified into several layers by unit class. Cross-axis use (decision
+ * scoring + spatial classification + opponent density) reads one layer's
+ * `read()` view, so all three axes share one storage.
  *
  * Distance metric: chosen by the falloff function. Accumulation iterates
- * the grid's Chebyshev `inRange` (square bounding box) and hands each cell's
- * `(dx, dy, radius)` to the falloff — the falloff decides how to collapse
- * the coordinate delta into a scalar. Built-in falloffs are Euclidean
+ * the grid's `forEachInRange`, the Chebyshev square of `radius`. It hands
+ * each cell's `(dx, dy, radius)` to the falloff, which decides how to
+ * collapse the coordinate offset into a scalar. Built-in falloffs are Euclidean
  * (`Math.hypot(dx, dy)`); custom falloffs are free to pick Chebyshev
  * (`Math.max(|dx|, |dy|)`), Manhattan (`|dx| + |dy|`), or hex-axial
  * (`(|dx| + |dy| + |dx + dy|) / 2`). Built-ins clamp or asymptote past
  * `radius`; custom falloffs are responsible for their own cutoff.
  *
- * Update order: evaporate → accumulate. `retentionFactor` is the fraction kept
- * per tick (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = full reset).
- * Full reset is the default — cheapest and fully reactive to source
- * movement, matching the most common field shape.
+ * Update order: decay → accumulate. `retentionFactor` is the fraction kept
+ * per tick (1.0 = no decay; 0.95 = lose 5% per tick; 0 / undefined = zero-fill).
+ * Zero-fill is the default: the cheapest, it follows source movement at
+ * once, and it matches the most common field shape.
  *
- * Events: the layer writes through the grid's silent/bulk paths — no
- * per-cell `cellChanged` storm at tick rate. Reactive wrappers subscribe
- * to the layer's own `updated` event, fired once per `update()`/`reset()`
- * after all cell writes land.
+ * Events: the layer writes through the grid's silent/bulk paths, so no
+ * per-cell `cellChanged` event is emitted on every tick. Reactive wrappers
+ * subscribe to the layer's own `updated` event, emitted once per
+ * `update()`/`reset()` after all cell writes are done.
  *
- * Diagnostics: `addSource` throws on illegal input (duplicate source id, NaN
- * strength, a position off the grid's integer cells) so misuse surfaces
- * synchronously. A source moved off the grid later is skipped by `update()`
- * rather than aborting the frame.
+ * Validation: `addSource` throws on illegal input (duplicate source id, NaN
+ * strength, a position off the grid's integer cells), so misuse throws at
+ * the call. A source moved off the grid later is skipped by `update()`
+ * rather than aborting the update.
  */
 
 import { createEmitHandle } from '../events';
@@ -45,16 +45,16 @@ import type { SpatialGrid } from './grid';
 import type { Unsubscribe } from './types';
 
 /**
- * A point source contributing influence to the layer.
+ * An influence source: a point that adds influence to the layer.
  *
  * Held by reference: callers may mutate `x`, `y`, `strength`, or `radius`
- * directly between frames and the next `update()` will use the current
+ * directly between updates, and the next `update()` uses the current
  * values. Source identity is the caller-assigned `id` — re-using an id
  * across `addSource` calls throws. A source whose position leaves the grid,
- * or lands between cells, contributes nothing until it is back on a cell.
+ * or is between cells, contributes nothing until it is back on a cell.
  */
 export interface InfluenceSource {
-  /** Stable identifier for source removal/lookup. */
+  /** Stable id for source removal/lookup. */
   id: string;
   /** Integer grid coordinate of the source. Mutable by reference. */
   x: number;
@@ -70,13 +70,13 @@ export interface InfluenceSource {
 }
 
 /**
- * Falloff curve applied per cell during accumulation.
+ * Falloff function applied per cell during accumulation.
  *
- * Receives the cell-to-source coordinate delta (`dx`, `dy`) and the source's
+ * Receives the cell-to-source coordinate offset (`dx`, `dy`) and the source's
  * effective radius (per-source override or `defaultRadius`). Returns a
  * scalar multiplier applied to the source's `strength`. The falloff owns
  * the choice of distance metric — collapse `(dx, dy)` to whatever scalar
- * fits the grid topology:
+ * fits the grid's neighborhood:
  *
  * - Euclidean: `Math.hypot(dx, dy)` (built-in default)
  * - Chebyshev: `Math.max(Math.abs(dx), Math.abs(dy))` (square / diagonal-equal grids)
@@ -88,7 +88,7 @@ export interface InfluenceSource {
  * (`linearFalloff` clamps; `gaussianFalloff` and `exponentialFalloff`
  * asymptote).
  *
- * @example Chebyshev lookup table for a roguelike danger map
+ * @example Chebyshev lookup table for a roguelike danger layer
  * ```ts
  * const DANGER = [2.0, 1.0, 0.6, 0.35, 0.2];
  * const dangerFalloff: FalloffFunction = (dx, dy, _r) => {
@@ -104,71 +104,71 @@ export interface InfluenceLayerOptions {
   /** Default radius for sources that do not specify one. */
   defaultRadius: number;
   /**
-   * Falloff curve. Built-ins: {@link linearFalloff}, {@link gaussianFalloff},
-   * {@link exponentialFalloff} (all Euclidean). Custom curves are plain
+   * Falloff function. Built-ins: {@link linearFalloff}, {@link gaussianFalloff},
+   * {@link exponentialFalloff} (all Euclidean). Custom falloffs are plain
    * `(dx, dy, radius) => number` functions and may use any distance metric —
    * see {@link FalloffFunction} for Chebyshev / Manhattan / hex examples.
    */
   falloff: FalloffFunction;
   /**
-   * Per-tick retention multiplier applied before accumulation.
+   * Retention factor: the fraction of each cell kept per tick, applied
+   * before accumulation.
    * - `1.0` — no decay; sources accumulate on top of prior-tick values.
-   * - `0.95` — lose 5% per tick (partial evaporation).
-   * - `0` or omitted — zero-fill each tick (full reset; cheapest, fully
-   *   reactive to source movement). This is the most common field shape.
+   * - `0.95` — lose 5% per tick (partial decay).
+   * - `0` or omitted — zero-fill each tick (cheapest, and follows source
+   *   movement at once). This is the most common field shape.
    */
   retentionFactor?: number;
   /**
    * When true, accumulation skips cells where `grid.passable[idx] === 0`.
-   * Default false — RTS threat maps typically allow walls to receive
+   * Default false — RTS threat layers typically allow walls to receive
    * threat values so units can score "inside the firing arc but behind
    * cover" positions.
    *
    * Caller must populate `grid.passable` before the first `update()`;
-   * otherwise this gate excludes every cell.
+   * otherwise this check excludes every cell.
    */
   respectPassability?: boolean;
   /**
-   * Fired once per `update()` with the count of cells touched during
-   * accumulation. Hook into a profiler to track influence-map cost on
-   * large maps. No per-cell overhead.
+   * Called once per `update()` with the count of cells touched during
+   * accumulation. Pass the count to a profiler to track influence-layer
+   * cost on large boards. No per-cell overhead.
    */
   onProfile?: (samples: number) => void;
 }
 
 /**
  * Read-only view over an influence layer's grid. Decision systems pass
- * the reader to consumers that should not mutate sources or trigger
- * updates. {@link composeInfluenceLayers} also returns a reader, so a
+ * the view to consumers that should not mutate sources or trigger
+ * updates. {@link composeInfluenceLayers} also returns a view, so a
  * composed multi-layer query is interchangeable with a single-layer one.
  */
 export interface InfluenceLayerView {
   /** Sample influence at a point. Returns 0 if out of bounds. */
   at(x: number, y: number): number;
   /**
-   * Sum influence over a Chebyshev region centered at `(x, y)` with the
-   * given radius. Only in-bounds cells contribute, and an out-of-bounds
-   * center sums to 0. Composed readers walk the same box under the first
-   * reader's `inBounds`.
+   * Sum influence over the range of `radius` around `(x, y)`. Only
+   * in-bounds cells contribute, and an out-of-bounds center sums to 0.
+   * Composed views walk the same range under the first view's `inBounds`.
    */
   sum(x: number, y: number, radius: number): number;
   /**
    * Find the cell within a Chebyshev `radius` of `(x, y)` with the highest
    * influence. Ties broken by iteration order. Returns `null` only if no
-   * cells fall in range (e.g. center far outside the grid).
+   * cell is in range, which is the case for an out-of-bounds center.
    */
   peak(x: number, y: number, radius: number): { x: number; y: number; value: number } | null;
   /**
-   * Whether `(x, y)` falls within the reader's domain. Composed readers defer
-   * to their first underlying reader (all are assumed to share a grid, as
+   * Whether `(x, y)` is within the view's domain. Composed views defer
+   * to their first underlying view (all are assumed to share a grid, as
    * `cells()` also relies on). Lets `sum()` and `peak()` honour their bounds
    * contract without every consumer re-deriving grid dimensions.
    */
   inBounds(x: number, y: number): boolean;
   /**
    * Iterate the underlying grid's cells as `[x, y, value]` triples in
-   * row-major order. Composed readers iterate the first underlying
-   * reader's cell set, applying the combine function per cell.
+   * row-major order. Composed views iterate the first underlying
+   * view's cell set, applying the combine function per cell.
    */
   cells(): Iterable<[number, number, number]>;
 }
@@ -176,9 +176,10 @@ export interface InfluenceLayerView {
 /** Events emitted by an {@link InfluenceLayer}. Subscribe via `layer.on()`. */
 export interface InfluenceLayerEvents {
   /**
-   * Fired once per `update()` / `reset()`, after all cell writes land.
-   * The layer's writes bypass per-cell `cellChanged` (tick-rate event-storm
-   * cost), so this is the signal reactive wrappers subscribe to.
+   * Emitted once per `update()` / `reset()`, after all cell writes are
+   * done. The layer's writes skip per-cell `cellChanged`, to avoid an event
+   * per cell on every tick. So this is the event reactive wrappers
+   * subscribe to.
    */
   updated: () => void;
 }
@@ -202,7 +203,7 @@ export interface InfluenceLayer {
   /**
    * Register a source. The returned reference is the same object the
    * caller passed in — mutating its `x`/`y`/`strength`/`radius` between
-   * frames is the supported update path. Throws on duplicate id, NaN
+   * updates is the supported update path. Throws on duplicate id, NaN
    * strength, or coords that aren't an in-bounds integer cell.
    */
   addSource(source: InfluenceSource): InfluenceSource;
@@ -214,14 +215,14 @@ export interface InfluenceLayer {
   // Lifecycle --------------------------------------------------------------
 
   /**
-   * One propagation pass: evaporate (multiply by `retentionFactor`, or zero-fill if
+   * One propagation pass: decay (multiply by `retentionFactor`, or zero-fill if
    * `retentionFactor` is 0/undefined) → accumulate from each registered source.
    * Caller drives the tick; the layer has no internal timer.
    */
   update(): void;
   /**
-   * Set every cell to zero without running accumulation. Useful on map
-   * load or round reset.
+   * Set every cell to zero without running accumulation. Useful on board
+   * load or at the start of a new round.
    */
   reset(): void;
 
@@ -255,12 +256,12 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
 
 // === CREATEINFLUENCELAYER ===
 /**
- * Wrap a `SpatialGrid<number>` with an influence-map lifecycle.
+ * Build an influence layer over a `SpatialGrid<number>`.
  *
  * @param grid Caller-owned numeric grid. The layer reads and writes via the
  *             grid's public API; persistence is the grid's concern.
- * @param options Layer-wide configuration (falloff, default radius, retention factor,
- *                passability gate, profile hook).
+ * @param options Layer-wide options (falloff, default radius, retention factor,
+ *                passability check, `onProfile`).
  * @returns A lifecycle handle exposing source registry, update/reset, and
  *          a stable {@link InfluenceLayerView}.
  *
@@ -274,7 +275,7 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
  * const threat = createInfluenceLayer(grid, {
  *   defaultRadius: 6,
  *   falloff: linearFalloff,
- *   // retentionFactor omitted → full reset each tick (default)
+ *   // retentionFactor omitted → zero-fill each tick (default)
  * });
  *
  * threat.addSource({ id: unit.id, x: unit.tileX, y: unit.tileY, strength: 10 });
@@ -293,7 +294,7 @@ export function createInfluenceLayer(
   const {
     defaultRadius,
     falloff,
-    retentionFactor,
+    retentionFactor = 0,
     respectPassability = false,
     onProfile,
   } = options;
@@ -331,16 +332,15 @@ export function createInfluenceLayer(
     }
   }
 
-  const retention = retentionFactor ?? 0;
   const zeroFill = (): number => 0;
-  const decayFill = (_x: number, _y: number, v: number): number => v * retention;
+  const decayFill = (_x: number, _y: number, v: number): number => v * retentionFactor;
 
   function evaporate(): void {
-    if (retention === 0) {
+    if (retentionFactor === 0) {
       grid.fill(zeroFill);
       return;
     }
-    if (retention === 1) return;
+    if (retentionFactor === 1) return;
     grid.fill(decayFill);
   }
 
@@ -456,21 +456,21 @@ export function createInfluenceLayer(
 
 // === COMPOSEINFLUENCELAYERS ===
 /**
- * Combine multiple influence-layer readers into a derived reader. The
- * `combine` function receives per-cell values (one per input reader, in
+ * Combine multiple influence-layer views into a derived view. The
+ * `combine` function receives per-cell values (one per input view, in
  * input order) and returns the composed value for that cell.
  *
  * No caching — each call to `at` / `sum` / `peak` re-reads from each
- * underlying reader. This is intentional: composition is cheap and
+ * underlying view. This is intentional: composition is cheap and
  * staleness is impossible.
  *
- * `cells()` iterates the *first* reader's cell set, applying `combine` per
+ * `cells()` iterates the *first* view's cell set, applying `combine` per
  * cell. Composed layers are expected to share a grid, making this safe.
  *
  * @example
  * ```ts
- * // CThreatMap-style: stratified per-unit-class threat layers, queried
- * // via a single composed "total threat" reader.
+ * // Stratified per-unit-class threat layers, queried
+ * // via a single composed "total threat" view.
  * const total = composeInfluenceLayers(
  *   [airThreat.read(), surfThreat.read(), amphThreat.read()],
  *   (values) => values.reduce((a, b) => a + b, 0),
@@ -483,7 +483,7 @@ export function composeInfluenceLayers(
   combine: (values: readonly number[], x: number, y: number) => number,
 ): InfluenceLayerView {
   if (views.length === 0) {
-    throw new Error('composeInfluenceLayers: readers array must not be empty');
+    throw new Error('composeInfluenceLayers: views array must not be empty');
   }
   const buf = new Array<number>(views.length);
 

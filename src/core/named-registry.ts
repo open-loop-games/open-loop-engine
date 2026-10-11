@@ -1,67 +1,66 @@
 /**
  * Named registry — engine-internal id-keyed collection helper shared by
- * the chain, effect-system, and resource registries.
+ * the chain registry, the effect-system registry and the resource registry.
  *
- * Each of those three registries is auto-populated by its corresponding
- * factory (`createModifierChain`, `createTemporaryEffectSystem` /
- * `createConditionalEffectSystem`, `createResource`) via an ambient
- * registry-target that {@link createEngine} sets up around `install()` /
- * `connect()`. The mechanism — module-private ambient slot, `with*` scope,
- * `getCurrent*` reader, id-keyed Map plus insertion-order array — is
- * identical across all three, and growing a fourth registry of the same
- * shape would duplicate the pattern again. This helper extracts it.
+ * Each of those three registries is filled by the factory of what it holds
+ * (`createModifierChain`, `createTemporaryEffectSystem` /
+ * `createConditionalEffectSystem`, `createResource`). The factory finds its
+ * registry through an ambient value that {@link createEngine} sets around
+ * `install()` / `connect()`. The mechanism — a file-private ambient value, a `with*` call,
+ * a `getCurrent*` reader, an id-keyed Map plus an insertion-order array — is
+ * identical across all three. A fourth registry of the same shape would
+ * duplicate it again, so this helper extracts it.
  *
- * `register(entity)` throws on a duplicate id — in every one of the three
+ * `register(entity)` throws on a duplicate id. In each of the three
  * registries a repeated id is an authoring mistake, and answering either
- * entity for it would silently hide the other.
+ * entry for it would silently hide the other.
  *
- * The ambient half is factored separately as {@link createAmbientValue}
- * because the resource registry pairs its NamedRegistry with a wrapper-
- * typed ambient (the public ResourceRegistry surface differs from the
- * underlying NamedRegistry), so the two halves don't always travel
- * together.
+ * The ambient half is a separate helper, {@link createAmbientValue}, because
+ * the resource registry pairs its NamedRegistry with an ambient value of a
+ * wrapper type. The public ResourceRegistry API differs from the underlying
+ * NamedRegistry, so the two halves are not always used together.
  *
  * @cluster registries
- * @internal Engine-internal — not part of the consumer surface.
+ * @internal Engine-internal — not part of the consumer API surface.
  */
 
 /**
- * Id-keyed registry with strict registration, id lookup, and insertion-order
+ * Id-keyed collection with strict registration, id lookup, and insertion-order
  * enumeration.
  *
- * @typeParam T - Entity type. Entities don't need an `id` field directly;
- *   the id is extracted via {@link CreateNamedRegistryOptions.idOf}.
+ * @typeParam T - Entry type. An entry needs no `id` field of its own;
+ *   {@link CreateNamedRegistryOptions.idOf} extracts the id.
  */
 export interface NamedRegistry<T> {
   /**
-   * Strict registration — throws if the entity's id is already registered.
+   * Strict registration — throws if the entry's id is already registered.
    *
-   * @internal Called by entity factories under an ambient scope; consumer
-   *   code reads via `get` / `has` / `all`.
+   * @internal Called by the entries' factories while the ambient value is
+   *   set; consumer code reads via `get` / `has` / `all`.
    */
   register(entity: T): void;
-  /** The entity registered under `id`, or `undefined` if none matches. */
+  /** The entry registered under `id`, or `undefined` if none matches. */
   get(id: string): T | undefined;
-  /** Whether an entity with the given id is registered. */
+  /** Whether an entry with the given id is registered. */
   has(id: string): boolean;
-  /** Snapshot of all registered entities in insertion order. */
+  /** Snapshot of all registered entries in insertion order. */
   all(): readonly T[];
-  /** Number of registered entities. */
+  /** Number of registered entries. */
   readonly size: number;
 }
 
 export interface CreateNamedRegistryOptions<T> {
-  /** Class-style label used as the duplicate-id error prefix (e.g. `'ChainRegistry'`). */
+  /** Class-style prefix for the duplicate-id error (e.g. `'ChainRegistry'`). */
   label: string;
   /** Lowercase noun used in the duplicate-id error message (e.g. `'chain'`, `'effect-system'`). */
   noun: string;
-  /** Extract the registry id from an entity. The resource registry projects through its entry wrapper; chain and effect-system entities expose `id` directly. */
+  /** Extract the registry id from an entry. The resource registry reads it through its entry wrapper; chains and effect systems expose `id` directly. */
   idOf: (entity: T) => string;
 }
 
 /**
  * Create a fresh, empty {@link NamedRegistry}. Each engine instance gets
- * its own — scratch-engine forks never cross-contaminate.
+ * its own, so scratch engines never share entries.
  */
 export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): NamedRegistry<T> {
   const { label, noun, idOf } = options;
@@ -97,17 +96,17 @@ export function createNamedRegistry<T>(options: CreateNamedRegistryOptions<T>): 
 }
 
 /**
- * Module-private ambient slot paired with `with` / `getCurrent` accessors.
- * Each call to {@link createAmbientValue} returns an isolated slot —
- * different scopes never share state, so chain / effect / resource ambients
- * stay independent even when minted from the same helper.
+ * A file-private ambient value with its `with` / `getCurrent` pair. Each
+ * call to {@link createAmbientValue} returns an isolated one. So the chain,
+ * effect-system and resource ambient values stay independent, though the
+ * same helper builds them.
  */
 export interface AmbientValue<T> {
   /**
-   * Run `fn` with `value` set as the ambient target. Nested calls save
-   * and restore the previous ambient so concurrent setups (e.g. multiple
-   * engines starting simultaneously) don't stomp each other. The previous
-   * ambient is also restored if `fn` throws.
+   * Run `fn` with `value` set as the ambient value. Nested calls save and
+   * restore the previous value, so nested setups (e.g. one engine built
+   * while another starts) don't overwrite each other. The previous value is
+   * also restored if `fn` throws.
    *
    * @internal Consumer code should not call this directly.
    */
@@ -116,16 +115,16 @@ export interface AmbientValue<T> {
    * Read the current ambient value, or `undefined` if outside a `with`
    * block (tests, throwaway scripts).
    *
-   * @internal Used by entity factories to auto-register into the current
-   *   engine's registries.
+   * @internal Used by the entries' factories to auto-register into the
+   *   current engine's registries.
    */
   getCurrent(): T | undefined;
 }
 
 /**
- * Create a fresh ambient-scope slot. The slot is closure-captured, so
- * each call returns an independent ambient — chain and effect-system
- * scopes can never alias even though they share this helper.
+ * Create a fresh ambient value. The closure holds it, so each call returns
+ * an independent one — the chain and effect-system ambient values never
+ * alias, though they share this helper.
  */
 export function createAmbientValue<T>(): AmbientValue<T> {
   let current: T | undefined;

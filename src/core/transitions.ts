@@ -1,25 +1,25 @@
 /**
- * Transition-distance primitives — "when does X happen?" math over current engine state.
+ * Transition-distance primitives — "when does X happen?" math over current game state.
  *
  * Pure synchronous functions that compose condition evaluation (`@/core/conditions`),
  * accessor-read state (`getAmount`, `getRate`), and Decimal arithmetic into
  * structured distances. Callers bind the result into reactive views with `computed()`
- * if they need reactivity; this module itself has no Vue dependency.
+ * if they need reactivity; this file itself has no Vue dependency.
  *
- * Three entry points:
+ * Three functions:
  *
  * - {@link timeUntilResource} — distance until a resource reaches an upward threshold.
- * - {@link timeUntilAffordable} — distance until a purchasable's next level is buyable.
+ * - {@link timeUntilAffordable} — distance until a purchasable's next purchase is affordable.
  * - {@link timeUntilConditionFlip} — distance until an {@link ICondition} changes truth value.
  *
- * Consumed by the transition-walker family — each walker leaf wraps one of these
- * per entity and emits `{ source, kind, currentValue, distance }` snapshots for
- * stasis analyzers, devtools panels, unlock hints, and tutorial-reachability tools.
+ * Consumed by the transition-walker family. Each walker leaf wraps one of these per
+ * category entry and emits `{ source, kind, currentValue, distance }` snapshots. Stasis
+ * analyzers, devtools panels, unlock hints and tutorial-reachability tools read them.
  *
  * Rate semantics are accessor-owned: games implement {@link GameStateAccessor.getRate}
- * in terms of their own economy (gross production, net of drains, tunable overrides).
- * This module never walks `CategoriesKey` or reads producer internals directly —
- * that aggregation is a harness-layer concern.
+ * in terms of their own economy (gross production, net rate, tunable overrides).
+ * This file never walks `CategoriesKey` or reads producer internals directly —
+ * that aggregation is a balance-harness concern.
  */
 
 import { Decimal, type DecimalSource, toNumber } from '@/primitives/decimal';
@@ -32,34 +32,34 @@ import type { Resource } from './resource';
  *
  * - `reason: 'computed'` — distance was determined from rates and current state. `seconds ≥ 0`.
  * - `reason: 'no-rate'` — transition requires motion but the rate is zero or wrong-signed.
- * - `reason: 'opaque-predicate'` — the predicate (unlock, state path, custom) has no
+ * - `reason: 'opaque-predicate'` — the predicate (flag, state path, custom) has no
  *   mechanical distance — it flips when something else writes to it.
- * - `reason: 'uncomputable'` — the transition may happen, but its distance can't be settled
- *   from current state and rates (e.g., point-crossing for an `eq` operator, no actionable
- *   children in a combinator, or a lifetime total the net rate can't bound).
+ * - `reason: 'uncomputable'` — the transition may happen, but its distance can't be computed
+ *   from current state and rates. Examples are point-crossing for an `eq` operator, no
+ *   actionable children in a combinator, and a lifetime total the net rate can't bound.
  */
 export type TransitionDistance =
   | { seconds: number; reason: 'computed' }
   | { seconds: null; reason: 'no-rate' | 'opaque-predicate' | 'uncomputable' };
 
 /**
- * Accessor slots a transition's distance arithmetic reads.
+ * The ids and paths a transition's distance arithmetic reads through the accessor.
  *
  * Produced by `collectGateDeps` (in `systems/gate.ts`, for Gate trees) and by the
  * transition walker's per-leaf dep emitters (for cost-resource transitions).
  * Used by incremental-snapshot caches: when any id in a dep set changes, the
  * consumer re-runs the distance calc for transitions that named it.
  *
- * Dep scope is deliberately narrow — only the slots the *distance* math reads,
- * not every reactive slot the walker touches for gating or current-value snapshots.
+ * The dep set is deliberately narrow. It holds only what the *distance* math reads,
+ * not every reactive value the walker reads for its predicates or current-value snapshots.
  * Those transitive reads invalidate through whatever upstream primitive writes
- * them (e.g. purchase-delta for count-derived gates), and including them here
- * would make the dep set over-broad without catching anything the narrow set misses.
+ * them, such as purchase-delta for count-derived Gates. Including them here would
+ * make the dep set over-broad without catching anything the narrow set misses.
  */
 export interface TransitionDeps {
   /**
-   * Resource ids whose amount the distance reads: the balance via
-   * `accessor.getAmount(id)`, or the lifetime total a `cumulative-gte` gate reads.
+   * Resource ids whose amount the distance reads: the amount via
+   * `accessor.getAmount(id)`, or the lifetime total a `cumulative-gte` Gate reads.
    */
   resources: ReadonlySet<string>;
   /**
@@ -75,12 +75,12 @@ export interface TransitionDeps {
 
 /**
  * Minimal shape satisfied by {@link Purchasable}. Declared structurally in core so
- * this module doesn't reach into the systems layer.
+ * this file doesn't import from the systems source layer.
  */
 export interface AffordableLike {
-  /** The resource that pays for this purchasable */
+  /** The resource this purchasable's cost is paid in */
   resource: Resource;
-  /** Cost to buy the next `amount` levels (defaults to 1) */
+  /** Cost of the next `count` purchases (defaults to 1) */
   getCost: (count?: DecimalSource) => DecimalSource;
 }
 
@@ -92,7 +92,7 @@ export interface AffordableLike {
  * - Otherwise returns `{ seconds: (target - current) / rate, reason: 'computed' }`.
  *
  * Unidirectional (upward only). For downward crossings use {@link timeUntilConditionFlip}
- * with a `lte` / `lt` resource condition.
+ * with a `lte` / `lt` resource `ICondition`.
  *
  * @param resourceId - The resource's id (as keyed in the accessor).
  * @param target - The threshold value. Reached when `current ≥ target`.
@@ -116,10 +116,10 @@ export function timeUntilResource(
 }
 
 /**
- * Distance until the next level of a purchasable becomes affordable — delegates to
+ * Distance until a purchasable's next purchase becomes affordable — delegates to
  * {@link timeUntilResource} using `purchasable.resource` and `purchasable.getCost(1)`.
  *
- * Single-unit cost only. Bulk-aware affordability distance would be a separate primitive.
+ * One purchase only. A bulk-purchase affordability distance would be a separate primitive.
  */
 export function timeUntilAffordable(
   purchasable: AffordableLike,
@@ -131,21 +131,21 @@ export function timeUntilAffordable(
 /**
  * Distance until `condition` changes truth value, assuming current rates hold.
  *
- * Dispatches on `condition.type`:
+ * Dispatches on `condition.kind`:
  *
  * - `resource` — six-way truth table over `operator × sign(rate)`; returns `'uncomputable'`
  *   for `eq` (point-crossing); returns `'no-rate'` when rate is zero or wrong-signed.
- * - `and` / `or` — combinator semantics keyed on current truth:
- *   - AND currently-true → min over children's flip-to-false distances.
- *   - AND currently-false → max over currently-false children's flip-to-true distances.
+ * - `all` / `any` — combinator semantics keyed on current truth:
+ *   - ALL currently-true → min over children's flip-to-false distances.
+ *   - ALL currently-false → max over currently-false children's flip-to-true distances.
  *     (Currently-true children assumed stable over the horizon — monotonicity).
- *   - OR currently-true → max over currently-true children's flip-to-false distances.
- *   - OR currently-false → min over children's flip-to-true distances.
+ *   - ANY currently-true → max over currently-true children's flip-to-false distances.
+ *   - ANY currently-false → min over children's flip-to-true distances.
  *   - Null children follow {@link combineFlipDistances}: `'no-rate'` drops out of a min,
- *     and any other null propagates with its reason. A lower-bound variant (use computable
- *     children as a floor) is a separate candidate primitive.
- * - `not` — recurse on the inner condition (NOT flips iff inner flips).
- * - `unlock`, `state` — always `'opaque-predicate'` (no mechanical distance).
+ *     and any other null propagates with its reason. A lower-bound form (computable
+ *     children as a lower bound) is a separate candidate primitive.
+ * - `not` — recurse on the inner condition IR (NOT flips iff the inner one flips).
+ * - `flag`, `state` — always `'opaque-predicate'` (no mechanical distance).
  *
  * @internal Consumers ask `timeUntilGateFlip`, which answers the same question over a Gate.
  */
@@ -215,7 +215,7 @@ export function secondsToCover(gap: DecimalSource, rate: DecimalSource): Transit
 }
 
 /**
- * One child's contribution to a combinator flip-distance calculation: its
+ * One child's input to a combinator flip-distance calculation: its
  * current truth value plus its individual flip distance. Callers build these
  * tuples per child and hand them to {@link combineFlipDistances}.
  *
@@ -227,17 +227,17 @@ export interface ChildFlipResult {
 }
 
 /**
- * Truth-table dispatch over `{ currentlyTrue, distance }` tuples for `and` / `or`
- * combinators. Pure — no accessor reads, no condition recursion. Used by
+ * Truth-table dispatch over `{ currentlyTrue, distance }` tuples for `all` / `any`
+ * combinators. Pure — no accessor reads, no condition IR recursion. Used by
  * {@link timeUntilConditionFlip} for `ICondition` combinators and by
  * `timeUntilGateFlip` (in `systems/gate.ts`) for `Gate` combinators, so both
- * surfaces share the same flip-distance semantics.
+ * share the same flip-distance semantics.
  *
  * Semantics:
- * - AND currently-true → min over children's flip-to-false distances.
- * - AND currently-false → max over currently-false children's flip-to-true distances.
- * - OR  currently-true → max over currently-true children's flip-to-false distances.
- * - OR  currently-false → min over children's flip-to-true distances.
+ * - ALL currently-true → min over children's flip-to-false distances.
+ * - ALL currently-false → max over currently-false children's flip-to-true distances.
+ * - ANY currently-true → max over currently-true children's flip-to-false distances.
+ * - ANY currently-false → min over children's flip-to-true distances.
  * - Under `min`, a `'no-rate'` child never flips, so it can't be the first
  *   to: it drops out, and the result is `'no-rate'` only when every child is.
  * - Otherwise strict-null: any child returning `null` propagates null with its
@@ -258,8 +258,8 @@ export function combineFlipDistances(
   const combinatorTrue =
     kind === 'all' ? children.every((s) => s.currentlyTrue) : children.some((s) => s.currentlyTrue);
 
-  // AND true → any child flips false (min). AND false → all false-children flip true (max).
-  // OR  true → all true-children flip false (max). OR  false → any child flips true (min).
+  // ALL true → any child flips false (min). ALL false → all false-children flip true (max).
+  // ANY true → all true-children flip false (max). ANY false → any child flips true (min).
   const [mode, actionable] =
     kind === 'all'
       ? combinatorTrue

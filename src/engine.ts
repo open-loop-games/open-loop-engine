@@ -3,10 +3,11 @@
  * a runnable game: {@link createEngine}, {@link EngineContext},
  * {@link EngineModule}, {@link EngineOptions}, and the built-in injection keys.
  *
- * Lives in its own module rather than the root barrel so the harness can import
- * the engine builder without a back-edge through `@/index` — which re-exports
- * `./harness` and would otherwise close a runtime cycle. Imports only downward
- * (primitives, core, systems); never from harness.
+ * It is its own file, not part of the root barrel, so the balance harness can
+ * import `createEngine` without an import back through `@/index`. That barrel
+ * re-exports `./harness`, so such an import would close an import cycle at
+ * runtime. This file imports only from lower source layers (primitives, core,
+ * systems), never from the harness.
  *
  * @cluster engine
  */
@@ -59,26 +60,26 @@ import type {
 
 export type { TickHandler } from './core/tick-driver';
 /**
- * Callback invoked before live state is serialized — by `engine.save()`, the
- * autosave, and the save manager's `save` / `saveToSlot` / `exportSave` —
- * so it can flush derived state into persistent refs.
+ * A handler called before live state is serialized, so it can write derived
+ * state into persistent refs. `engine.save()`, the autosave, and the save
+ * manager's `save`, `saveToSlot` and `exportSave` call it.
  */
 export type SaveHandler = () => void;
 /**
- * Callback invoked after a save loads successfully through any entry point:
- * `engine.load()`, the save manager's `load` / `importSave`, or a harness
- * engine hydrated from a save. Receives the `SaveLoadResult` (always
- * `success: true`, with the save's timestamp) — not the decoded payload.
+ * A handler called after a save loads successfully, by any entry point. The
+ * entry points are `engine.load()`, the save manager's `load` or `importSave`,
+ * and a balance-harness engine loaded from a save. It receives the `SaveLoadResult`
+ * (always `success: true`, with the save's timestamp), not the decoded save data.
  *
- * Every `onLoad` runs before the engine's own post-load reconciles (a
- * challenge's scopes, a latching achievement or automation tier, a slot's
- * resync), so a watcher reacting to their writes sees the state `onLoad`
- * rebuilt. A reset runs those reconciles and no `onLoad`.
+ * Every `onLoad` runs before the engine's own hydration: a challenge's scoped
+ * overrides, a latched achievement or automation tier, a loadout's selection.
+ * So a watcher of hydration's writes sees the state `onLoad` rebuilt. A reset
+ * runs hydration and no `onLoad`.
  */
 export type LoadHandler = (result: SaveLoadResult) => void;
 
-// `InjectionKey<T>` lives in `./primitives/types` so the systems and harness
-// entry points can reach it without a back-edge to the root module.
+// `InjectionKey<T>` is in `./primitives/types` so the systems and harness
+// subpaths can import it without an import back through the root file.
 import type { InjectionKey } from './primitives/types';
 
 /**
@@ -108,30 +109,30 @@ export const TickDriverKey: InjectionKey<TickDriver> = Symbol('engine:tick-drive
 /** Inject the save manager. Available when `persistence` is not `false`. */
 export const SaveManagerKey: InjectionKey<SaveManager> = Symbol('engine:save');
 
-// `EngineCategories` and `CategoriesKey` live alongside the category
-// factories in `./systems/engine-categories` and reach the public surface
-// through the systems barrel. Imported at the top of this file for the
-// `createEngine` self-publish wiring.
+// `EngineCategories` and `CategoriesKey` are beside the category factories
+// in `./systems/engine-categories` and reach the API surface through the
+// systems barrel. Imported at the top of this file for the `createEngine`
+// self-publish wiring.
 
 /**
- * Per-module collaboration surface, handed to each {@link EngineModule}'s
- * `install` and `connect` callbacks. Exposes lifecycle hooks (tick / save /
- * load), engine-wide event pub/sub, and the
- * {@link provide} / {@link inject} channel modules use to share APIs.
+ * The engine context: the object each {@link EngineModule}'s `install` and
+ * `connect` receive. It registers tick, save and load handlers, and it
+ * subscribes to and emits engine-wide events. Its {@link provide} /
+ * {@link inject} pair lets modules share APIs.
  */
 export interface EngineContext {
-  /** Register a callback invoked every game tick with delta time in seconds */
+  /** Register a handler called every tick with its dt in seconds. */
   onTick(handler: TickHandler): () => void;
-  /** Register a callback invoked before live state is serialized; see {@link SaveHandler}. */
+  /** Register a handler called before live state is serialized; see {@link SaveHandler}. */
   onSave(callback: SaveHandler): void;
-  /** Register a callback invoked after a save loads, by any entry point; see {@link LoadHandler}. */
+  /** Register a handler called after a save loads, by any entry point; see {@link LoadHandler}. */
   onLoad(callback: LoadHandler): void;
 
   /**
    * Subscribe to an engine-wide event. Returns an unsubscribe function.
    *
-   * Subscriptions made during `install()` / `connect()` are released by
-   * `engine.dispose()`.
+   * `engine.dispose()` unsubscribes every subscription made during
+   * `install()` / `connect()`.
    *
    * @example
    * ```ts
@@ -141,7 +142,7 @@ export interface EngineContext {
   on<K extends keyof EngineEvents>(event: K, handler: EngineEvents[K]): () => void;
 
   /**
-   * Emit an engine-wide event, invoking all subscribers.
+   * Emit an engine-wide event, calling every handler subscribed to it.
    *
    * @example
    * ```ts
@@ -190,64 +191,67 @@ export interface EngineModule {
   install(engine: EngineContext): void;
   /**
    * Cross-module wiring phase, called after ALL modules have installed.
-   * Use for wiring that needs every module's APIs to exist — cycle-breaking
-   * callbacks, runner initialization, cross-cutting subscriptions.
-   * Called in the same topological order as install(). Full EngineContext available.
+   * Use it for wiring that needs every module's APIs. Examples are handlers
+   * that break a dependency cycle, set-up that reads another module, and
+   * subscriptions across modules. Called in the same topological order as install(), with the full
+   * EngineContext.
    */
   connect?(engine: EngineContext): void;
 }
 
 /**
- * A selectable game mod — metadata plus the module to install when active.
+ * A mod: a whole-game ruleset the player selects when a new game starts, with
+ * its metadata and its modules.
  *
- * Mods are game variants, each an alternate rule set selected at new-game creation.
- * Only one mod is active per save. `selectMod()` pushes the mod's full
- * module list into the engine's registration list; `start()` then installs
- * them alongside any modules the consumer added via `use()`.
+ * A save has at most one active mod. `selectMod()` adds the mod's full module
+ * list to the modules `start()` installs, beside the modules `use()` added.
  */
 export interface ModDef {
-  /** Unique identifier stored in the save */
+  /** The id stored in the save */
   id: string;
-  /** Display name for the mod picker UI */
+  /** Display name in the UI that selects a mod */
   displayName: string;
-  /** Optional description shown in the mod picker */
+  /** Optional description shown in the UI that selects a mod */
   description?: string;
-  /** Highlight this mod in the picker (e.g., "Recommended") */
+  /** Highlight this mod in that UI (e.g., "Recommended") */
   recommended?: boolean;
   /**
-   * The full module set installed when this mod is active. Includes every
-   * module the game needs under this variant — shared base, game content,
-   * and any mod-specific tail. Not a delta layered over an implicit base.
+   * The full module set installed while this mod is active. It holds every
+   * module the game needs under this mod: shared modules, game content and the
+   * mod's own modules. It is never an add-on delta over an implicit base game.
    */
   modules: EngineModule[];
 }
 
 /**
- * Configuration passed to {@link createEngine}. `gameId` is required; every
- * other field tunes tick cadence, save behavior, mod support, or persistence
- * namespacing.
+ * Options for {@link createEngine}. `gameId` is required. The other options
+ * set the interval rate and tick mode, saving, mods and the persistence namespace.
  */
 export interface EngineOptions {
   gameId: string;
   intervalRate?: number;
   maxDeltaTime?: number;
-  /** Initial speed multiplier (default 1). Scales dt during live play. */
+  /** Initial game speed (default 1). It scales dt in live play. */
   speedMultiplier?: number;
   /**
-   * dt handling mode. `'variable'` (default) passes real elapsed dt to callbacks.
-   * `'fixed'` accumulates and drains at `fixedDt` per sub-tick — for source-faithful
-   * ports with clamp-on-overshoot tick math. See `createTickDriver` for details.
+   * Tick mode. `'variable'` (default) runs one tick per interval, with the raw dt
+   * capped and scaled by game speed. `'fixed'` accumulates that dt and runs ticks
+   * of `fixedDt` from it, for faithful ports of tick math that clamps on overshoot.
+   * See `createTickDriver` for details.
    */
   tickMode?: 'variable' | 'fixed';
-  /** Seconds per sub-tick in fixed mode. Defaults to `1 / intervalRate`. */
+  /** The dt of every fixed-mode tick. Defaults to `1 / intervalRate`. */
   fixedDt?: number;
-  /** Cap on sub-ticks per `intervalTick` in fixed mode (default 100). Live-play overspill protection. */
+  /**
+   * Cap on the fixed-mode ticks one interval runs (default 100). It protects
+   * live play from overflow.
+   */
   maxTicksPerInterval?: number;
-  /** Diagnostic callback when a fixed-mode interval drops ticks. */
+  /** Called when a fixed-mode interval discards ticks. */
   onTicksOverflow?: (droppedTicks: number) => void;
   /**
-   * Diagnostic callback when a variable-mode tick's raw dt exceeds
-   * `maxDeltaTime`; receives the dropped seconds, for banking them.
+   * Called when a variable-mode interval's raw dt exceeds `maxDeltaTime`. It
+   * receives the discarded seconds, so they can be deposited in a time bank.
    */
   onDeltaOverflow?: (droppedSeconds: number) => void;
   /**
@@ -265,9 +269,9 @@ export interface EngineOptions {
   autoSaveInterval?: number;
   /** Set to false to skip save manager creation. Default true. */
   persistence?: boolean;
-  /** Save format version number. Passed to the save manager. */
+  /** The save version: the consumer's save-format number. Passed to the save manager. */
   saveVersion?: number;
-  /** Migration functions keyed by source version. Passed to the save manager. */
+  /** Save migrations keyed by the save version they migrate from. Passed to the save manager. */
   saveMigrations?: Record<number, SaveMigration>;
   /** Custom storage backend. Defaults to localStorage. */
   storageAdapter?: StorageAdapter;
@@ -275,47 +279,46 @@ export interface EngineOptions {
   maxSaveSlots?: number;
   /**
    * When true, any save validation failure aborts the load with
-   * `save:load-failed { reason: 'validation' }`. When false, failing leaves
-   * are self-healed to their persistent ref's default value and the load
-   * proceeds. `save:validation-failed` is emitted per field in both modes.
+   * `save:load-failed { reason: 'validation' }`. When false, each failing leaf
+   * takes its ref default and the load proceeds. `save:validation-failed` is
+   * emitted per field in both modes.
    *
-   * Defaults to dev-mode detection in the underlying save manager: fail-loud
-   * in development (so bugs surface early), self-heal in production (so
-   * player saves stay protected).
+   * Defaults to dev-mode detection in the underlying save manager: fail loudly
+   * in development (so bugs appear early), self-heal in production (so player
+   * saves stay protected).
    */
   strictValidation?: boolean;
   /** Available game mods. One may be selected before start(). */
   mods?: ModDef[];
   /**
-   * Isolate this engine instance's persistent state from any other engine
-   * sharing the same runtime. When set, all module/category persistence
-   * contexts are prefixed with the namespace, the save manager filters its
-   * context walk to this namespace only, and storage keys carry the
-   * namespace so two engines with the same `gameId` don't alias each other.
+   * Keep this engine instance's persistent refs apart from any other engine in
+   * the same runtime. When set, the persistence namespace prefixes every module
+   * and category persistent context. The save manager then walks only this
+   * persistence namespace. Storage keys contain it too, so two engines with the
+   * same `gameId` never share a save.
    *
-   * Leave undefined for single-engine apps — behavior is bit-for-bit
-   * identical to pre-namespacing saves.
+   * Leave it undefined for a single-engine app; its saves then have no
+   * persistence namespace prefix.
    *
-   * Primary use case: forkable "scratch" engine instances for sim/balance
-   * workbenches, takeover compare, A/B predictive displays.
+   * The main use is scratch engines: for balance workbenches, override
+   * comparisons and A/B predictive displays.
    */
   persistenceNamespace?: string;
   /**
-   * Consumer-supplied game-state accessor + mutator. When provided, category
-   * factories (`createChallengeCategory`, etc.) read it from the ambient
-   * context as a fallback when no per-category `accessor` option is given.
-   * The accessor is a stateless vtable constructed before any module
-   * installs — its methods are only called at gameplay time, not during
-   * install/connect.
+   * Consumer-supplied game-state accessor and mutator. When provided, category
+   * factories (`createChallengeCategory`, etc.) read it as an ambient value
+   * when a category has no `accessor` option. The accessor is a stateless
+   * vtable, built before any module installs. Its methods are called only
+   * during play, not during install/connect.
    */
   accessor?: GameStateAccessor & GameStateMutator;
 }
 
 /**
  * The assembled engine instance returned by {@link createEngine}. Modules are
- * registered via `use()`, the game runs between `start()` and `stop()`, and
- * `dispose()` releases this engine's persistent contexts when a fresh
- * instance will reuse the same module ids in the same page lifetime.
+ * registered via `use()`, and the game runs between `start()` and `stop()`.
+ * `dispose()` deletes this engine's persistent contexts, so a new engine
+ * instance can reuse the same module ids in the same page lifetime.
  */
 export interface Engine {
   /**
@@ -325,8 +328,8 @@ export interface Engine {
   use(module: EngineModule): Engine;
   /**
    * Install registered modules and begin ticking. Does not load a save —
-   * call `load()` explicitly after `start()` (modules must install first so
-   * their persistent refs exist to hydrate).
+   * call `load()` explicitly after `start()` (modules must install first, so
+   * their persistent refs exist for the load to write).
    * @throws On a disposed engine, a circular or missing dependency, or two
    *   different module objects registered under one id. A module's
    *   `install()` or `connect()` throwing disposes the engine, then rethrows.
@@ -334,24 +337,24 @@ export interface Engine {
   start(): void;
   stop(): void;
   /**
-   * Tear down the engine: stop the TickDriver, stop every watcher and computed
-   * modules created during `install()` / `connect()`, drop their tick
-   * handlers, event subscriptions and save/load hooks, and release every
-   * persistent context this engine registered under its
-   * `persistenceNamespace`. Safe to pass detached, as in
-   * `onUnmounted(engine.dispose)`. Required when a fresh engine sharing the same module ids will be constructed in the same
-   * page-lifetime — e.g. the gallery sandbox remounting an archetype. Save
-   * storage (keyed by `gameId`, plus `persistenceNamespace` when set) is
-   * untouched, so a subsequent engine loads the same on-disk save.
+   * Dispose of the engine. Stop the TickDriver and every watcher and computed
+   * that modules created during `install()` / `connect()`. Remove their tick
+   * handlers, event subscriptions, and save and load handlers. Delete every
+   * persistent context this engine registered under its `persistenceNamespace`.
+   * It is safe to pass unbound, as in `onUnmounted(engine.dispose)`. Call it
+   * before a new engine with the same module ids is built in the same page
+   * lifetime. One case is a UI that remounts a game. Save storage (keyed by
+   * `gameId`, plus `persistenceNamespace` when set) stays as it is, so a later
+   * engine loads the same stored save.
    *
-   * After dispose, calling `start()` throws. The engine instance must be
-   * dropped; callers create a new engine via `createEngine()` to resume.
+   * After dispose, `start()` throws. Discard the instance, and call
+   * `createEngine()` for a new one.
    */
   dispose(): void;
-  /** Save game state to the active slot, firing all onSave callbacks first. */
+  /** Save live state to the active slot. Every onSave handler runs first. */
   save(): void;
   /**
-   * Load the active slot, firing all onLoad callbacks after.
+   * Load the active slot. Every onLoad handler runs after the load.
    * @throws Before `start()` (no module has created its refs yet) or after `dispose()`.
    */
   load(): SaveLoadResult;
@@ -359,9 +362,9 @@ export interface Engine {
   readonly saveManager: SaveManager | undefined;
   /**
    * The module set registered via `use()` plus any mod modules appended by
-   * `selectMod()`. Exposed so forkable-instance helpers (scratch engines, sim
-   * workbenches) can spin up a second engine with the same module shape
-   * without the caller tracking the list externally.
+   * `selectMod()`. A helper that builds a scratch engine, for a balance
+   * workbench say, reads it. So it can build a second engine with the same
+   * modules without tracking the list itself.
    */
   readonly registeredModules: readonly EngineModule[];
   /**
@@ -369,24 +372,24 @@ export interface Engine {
    * during its `install()` / `connect()` phase. Returns `undefined` when
    * the key has not been provided or when called before `start()`.
    *
-   * External introspection tools (sim pickers, devtools, balance
-   * workbenches) use this to read opt-in discovery keys like
+   * Introspection tools outside the engine (the picker, devtools, balance
+   * workbenches) read opt-in injection keys with it, such as
    * {@link CategoriesKey}, {@link ChainRegistryKey}, and
-   * {@link EffectSystemRegistryKey} without having to install a probe
-   * module purely to capture them.
+   * {@link EffectSystemRegistryKey}. They need no module installed only to
+   * capture them.
    */
   tryInject<T>(key: InjectionKey<T>): T | undefined;
 
   // === MOD SUPPORT ===
-  /** Registered mod definitions (from config) */
+  /** The registered mods (from the `mods` option) */
   readonly mods: readonly ModDef[];
-  /** Currently selected mod ID, or null if no mod selected */
+  /** The selected mod's id, or null if no mod is selected */
   readonly activeModId: string | null;
   /**
-   * Select a mod before calling start(). Pushes every module in the mod's
-   * `modules` list into the engine's registration list (as if the consumer
-   * had called `use()` on each) and tags the active save with the mod id.
-   * Must be called before `start()`, and only once per engine instance.
+   * Select a mod before calling start(). It adds every module in the mod's
+   * `modules` list to the modules `start()` installs, as if `use()` had been
+   * called on each. It also tags the active save with the mod id. Call it
+   * before `start()`, and at most once per engine instance.
    * @throws If the mod id is unknown, a mod is already selected, or the
    *   engine has already started.
    */
@@ -400,9 +403,9 @@ export interface Engine {
 
   /**
    * Live interval in milliseconds between autosaves. Mirrors
-   * {@link EngineOptions.autoSaveInterval} but is mutable at runtime —
-   * setting it re-arms the autosave timer with the new period (or stops
-   * it when set to 0). No effect when `persistence: false` was passed to
+   * {@link EngineOptions.autoSaveInterval}, but can be set while the game
+   * runs. Setting it re-arms the autosave timer with the new period, or
+   * stops it when set to 0. No effect when `persistence: false` was passed to
    * {@link createEngine}. Symmetric to `engine.tickDriver.intervalRate`.
    */
   autoSaveInterval: number;
@@ -415,8 +418,8 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
  *
- * @param options - Engine configuration including game ID, TickDriver settings, persistence
- *   options, and available mods
+ * @param options - Engine options: the game id, TickDriver options, persistence options,
+ *   and the available mods
  * @returns An engine instance that accepts modules via `use()`, then `start()` to begin
  *   ticking. Exposes the TickDriver, save manager, and mod selection. With persistence
  *   on (the default) the game autosaves every 30 s once a `load()` has run.
@@ -427,7 +430,7 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  * engine.use(resourceModule);
  * engine.use(combatModule);
  * engine.start(); // installs modules, so their persistent refs exist
- * engine.load(); // hydrates them; a first run reports `not-found`
+ * engine.load(); // loads the save into them; a first launch reports `not-found`
  * ```
  */
 export function createEngine(options: EngineOptions): Engine {
@@ -442,11 +445,12 @@ export function createEngine(options: EngineOptions): Engine {
     clearInterval: globalThis.clearInterval.bind(globalThis),
   };
 
-  // Created inside the engine's namespace under a stable context id so the
-  // fixed-mode accumulator joins this engine's namespaced save, restores
-  // deterministically across sessions, and is evicted by `dispose()`'s
-  // `deletePersistenceNamespace`. Outside the namespace it would strand in the
-  // default bucket — excluded from its own save (open-loop-engine#9).
+  // Created inside the engine's persistence namespace under a stable
+  // persistent context id, so the fixed-mode accumulator is part of this
+  // engine's save, restores deterministically across play sessions, and is
+  // deleted by `dispose()`'s `deletePersistenceNamespace`. Outside the
+  // persistence namespace it would be in the default one, which this engine's
+  // save excludes.
   const tickDriver = withPersistenceNamespace(options.persistenceNamespace, () =>
     createTickDriver({
       intervalRate: options.intervalRate,
@@ -496,7 +500,7 @@ export function createEngine(options: EngineOptions): Engine {
       }, autoSaveInterval);
     }
   }
-  // Every subscription and effect made on the engine's behalf, released by dispose().
+  // The unsubscribe of every subscription made on the engine's behalf; dispose() runs them.
   const cleanups = new Set<() => void>();
   const moduleScope = effectScope(true);
   // Populated at start() with the per-engine injection map built from
@@ -504,9 +508,9 @@ export function createEngine(options: EngineOptions): Engine {
   // for external introspection tools.
   let publicInjections: Map<symbol, unknown> | undefined;
 
-  // The hooks ride the save manager's own events so every entry point runs
-  // them — consumers wire the manager's import/export/save/load to their UI.
-  // The manager emits them inside the engine's namespace.
+  // The save and load handlers run on the save manager's own events, so every
+  // entry point runs them — consumers wire the manager's import/export/save/load
+  // to their UI. The manager emits them inside the engine's persistence namespace.
   if (saveManager) {
     track(
       saveManager.on('save:before-serialize', () => {
@@ -530,14 +534,14 @@ export function createEngine(options: EngineOptions): Engine {
         if (!loadRan && autoSaveInterval > 0 && isDev()) {
           console.warn(
             `[engine] "${options.gameId}" ticked before load(): call engine.load() after start() ` +
-              '(a first run reports not-found). Autosave holds until a load has run.',
+              '(a first launch reports not-found). Autosave holds until a load has run.',
           );
         }
       }),
     );
   }
 
-  /** Hold `unsub` for dispose(), returning an unsubscribe that also lets it go. */
+  /** Keep `unsub` for dispose(); the returned unsubscribe also removes it from that set. */
   function track(unsub: () => void): () => void {
     const off = () => {
       cleanups.delete(off);
@@ -584,8 +588,8 @@ export function createEngine(options: EngineOptions): Engine {
       saveManager?.save();
     },
     load() {
-      // Before start() no persistent ref exists to hydrate, so the load would
-      // report success, change nothing, and let the next save overwrite it.
+      // Before start() no persistent ref exists for the load to write, so it
+      // would report success, change nothing, and let the next save overwrite it.
       if (disposed) throw new Error('Cannot load into a disposed engine');
       if (!installed) throw new Error('Call start() before load(): modules must install first');
       return saveManager?.load() ?? { success: false };
@@ -611,20 +615,18 @@ export function createEngine(options: EngineOptions): Engine {
         // via the ambient set below. Parallel to chainRegistry.
         const effectSystemRegistry = createEffectSystemRegistry();
         // Per-engine resource registry — auto-populated by createResource
-        // calls via the ambient set below. Replaces the former process-wide
-        // global registry so per-run / scratch engines never cross-
-        // contaminate each other's resource discovery.
+        // calls via the ambient set below. Per-engine, so scratch engines never
+        // see each other's resources.
         const resourceRegistry = createResourceRegistry();
-        // Per-engine categories accumulator — auto-populated by the
+        // Per-engine categories collection — auto-populated by the
         // category factories (createProducerCategory etc.) via the ambient
-        // set below. Pre-provided under CategoriesKey so harness tooling
-        // and external consumers get the inventory without any
-        // archetype-side publication step.
+        // set below. Pre-provided under CategoriesKey so balance-harness tooling
+        // and external consumers get the full category list without a publish
+        // step in any module.
         const engineCategories: EngineCategories = {};
         // Per-engine tuning-registries set — auto-populated by
-        // createTuningRegistry calls via the ambient below. Picker's
-        // walkTunables reads this set to enumerate the designer-flagged
-        // tuning surface.
+        // createTuningRegistry calls via the ambient set below. The picker's
+        // walkTunables reads this set to list every tunable.
         const tuningRegistries = new Set<TuningRegistry>();
 
         // Engine services, pre-provided before any module installs. The engine
@@ -670,12 +672,12 @@ export function createEngine(options: EngineOptions): Engine {
           },
         };
 
-        // All install/connect work runs under the configured namespace so
-        // module ids don't collide across engines sharing a runtime, and
-        // under the engine's chain / effect-system / resource / categories
-        // ambient targets so every primitive call auto-registers into this
-        // engine's registries specifically.
-        // The effect scope owns every watcher and computed a module creates,
+        // All install/connect work runs under the configured persistence
+        // namespace, so module ids don't collide across engines sharing a
+        // runtime. It also runs under the engine's chain / effect-system /
+        // resource / categories ambient values, so every primitive call
+        // registers into this engine's registries.
+        // The Vue effect scope owns every watcher and computed a module creates,
         // so dispose() can stop them even when they watch state outliving
         // the engine.
         try {
@@ -706,8 +708,8 @@ export function createEngine(options: EngineOptions): Engine {
           );
         } catch (err) {
           // A half-installed engine can neither start again nor be reached by
-          // a caller whose reference the throw unwound, so release its
-          // persistent names here — else the next engine collides on them.
+          // a caller whose reference the throw unwound, so delete its
+          // persistent contexts here — else the next engine collides on them.
           engine.dispose();
           throw err;
         }
@@ -727,8 +729,8 @@ export function createEngine(options: EngineOptions): Engine {
       engine.stop();
       moduleScope.stop();
       for (const unsub of [...cleanups]) unsub();
-      // Drop the in-memory persistent-context registry for this engine's
-      // namespace so a fresh engine can install the same module set without
+      // Delete this engine's persistence namespace from the persistent-ref
+      // registry, so a new engine can install the same module set without
       // colliding on persistent-ref names. Save storage is untouched.
       deletePersistenceNamespace(options.persistenceNamespace);
       disposed = true;

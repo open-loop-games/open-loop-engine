@@ -1,20 +1,20 @@
 /**
- * Save Manager — persistent game state with multi-slot support
+ * Save Manager — saves of live state, with multi-slot support
  *
- * Manages save/load, import/export, and multiple save slots.
- * Each slot stores a versioned {@link SaveEnvelope} with automatic migration.
+ * Manages save and load, import and export, and multiple save slots.
+ * Each slot stores a versioned {@link SaveEnvelope}, with automatic save migration.
  *
  * Key features:
- * - Multiple named save slots with auto-increment IDs
- * - Active slot selection (save/load operate on active slot)
+ * - Multiple named save slots with auto-increment ids
+ * - Active slot selection (save and load operate on the active slot)
  * - Peek any slot's metadata without full deserialization
- * - Export/import for save sharing
- * - Backwards-compatible migration from single-slot format
+ * - Export and import for save sharing
+ * - An older single-slot save moves into slot 0
  *
  * @example
  * ```ts
  * const mgr = createSaveManager({ gameId: 'my-game' });
- * mgr.createLoadout('Manual Save');  // slot 1
+ * mgr.createSlot('Manual Save');  // slot 1
  * mgr.selectSlot(1);
  * mgr.save();       // save, and the engine's autosave, now write slot 1
  * mgr.peekSlot(0);  // peek slot 0 without switching
@@ -45,20 +45,20 @@ import LZString from 'lz-string';
 const { compressToBase64, decompressFromBase64 } = LZString;
 
 /**
- * Engine-internal save-format version, stored in the envelope under `_engine.version`.
+ * The engine save version, stored in the envelope under `_engine.version`.
  *
- * Bumped when the engine changes how it writes save data in a way that isn't
- * driven by consumer content. Decoupled from `SaveManagerOptions.version` so
- * consumers don't have to bump their game version every time the engine
- * upgrades its envelope format. A save carrying a higher version than this
- * one is refused with `future-version`.
+ * Bumped when the engine changes how it writes save data in a way consumer
+ * content does not drive. It is separate from `SaveManagerOptions.saveVersion`,
+ * so consumers don't bump their save version each time the engine changes its
+ * envelope format. A save with a higher engine save version than this one is
+ * refused with `future-version`.
  *
- * Version history:
- * - `1` (implicit, absent `_engine`): original iteration-order keys (`contextId.0`, `contextId.1`, …)
- * - `2`: stable named keys (`contextId.name` or `contextId.defId.field`) plus legacy migration from v1
+ * Engine save versions:
+ * - `1` (implicit, absent `_engine`): iteration-order keys (`contextId.0`, `contextId.1`, …)
+ * - `2`: keys by id (`contextId.refId` or `contextId.defId.field`), plus the key remap from v1
  * - `3`: `data` is an lz-string base64-compressed JSON string when `_engine.compression === 'lz'`.
- *   Pruning of defaulted leaves is also active. Auto-detect on read via the
- *   `_engine.compression` discriminator; `compressSave: false` opts out at write time.
+ *   Pruning of defaulted leaves is also active. A read detects it by the
+ *   `_engine.compression` field; `compressSave: false` opts out at write time.
  */
 export const ENGINE_SAVE_VERSION = 3;
 
@@ -75,7 +75,7 @@ export interface StorageAdapter {
  * Canonical in-memory {@link StorageAdapter} backed by a `Map`. Each call
  * returns a fresh, independent store — two invocations do not share state.
  *
- * Use for scratch engines, Vitest fixtures, headless runs, and any consumer
+ * Use for scratch engines, Vitest tests, headless runs, and any consumer
  * that wants save-manager semantics without touching `localStorage`. Matches
  * the localStorage contract: `getItem` returns `null` for missing keys,
  * `setItem` overwrites, `removeItem` is idempotent.
@@ -102,42 +102,40 @@ export function createMemoryStorage(): StorageAdapter {
 }
 
 /**
- * One step of a consumer save migration: receives the save data written by
- * version N and returns it reshaped for version N + 1. Mutating in place is
- * fine, but the step must still return the object — the migration helpers
- * (`renameField` and friends) return it for the arrow shorthand.
+ * One consumer save migration: it receives the save data written at save
+ * version N and returns it reshaped for save version N + 1. Mutating in place
+ * is fine, but the step must still return the object. The save migration
+ * utilities (`renameField` and friends) return it for the arrow shorthand.
  */
 export type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>;
 
-/** Configuration for creating a save manager. */
+/** Options for creating a save manager. */
 export interface SaveManagerOptions {
   /** Unique game identifier — prefixes all storage keys to avoid conflicts. */
   gameId: string;
   /**
-   * Forkable-instance namespace. When set, storage keys carry the namespace
-   * (`${gameId}:${namespace}-slot-${id}`) and `getAllPersistentRefs` is
-   * walked filtered to contexts opened under the same namespace. Save-event
-   * handlers and post-load reconcilers run inside it. Undefined = legacy
-   * single-engine path, bit-for-bit compatible.
+   * The persistence namespace. When set, storage keys contain it
+   * (`${gameId}:${namespace}-slot-${id}`), and the save walks only the
+   * persistent contexts opened under it. Save event handlers and hydration
+   * run inside it. Undefined means one engine with no persistence namespace.
    *
-   * Normally passed through from `EngineOptions.persistenceNamespace`; the
-   * engine is the expected caller. Direct `createSaveManager` consumers
-   * only need this when manually wiring a scratch engine.
+   * The engine passes it from `EngineOptions.persistenceNamespace`. A direct
+   * `createSaveManager` consumer needs it only to wire a scratch engine by hand.
    */
   persistenceNamespace?: string;
-  /** Current save format version. Used to drive migration on load. Default: 1. */
+  /** The consumer's save version. A load runs the save migrations up to it. Default: 1. */
   saveVersion?: number;
   /** Pluggable storage backend. Defaults to localStorage when available. */
   storageAdapter?: StorageAdapter;
   /**
-   * Migration functions keyed by the version they migrate FROM.
-   * Migrations run sequentially up to the current version on every load. A
-   * step that returns anything but an object fails the load with `unknown`.
+   * Save migrations keyed by the save version they migrate from. Every load
+   * runs them in order up to `saveVersion`. A step that returns anything but
+   * an object fails the load with `unknown`.
    */
   migrations?: Record<number, SaveMigration>;
   /**
-   * Display name for the default slot (id 0). Default: 'Autosave'. Only a
-   * label: the engine's autosave writes the active slot, not slot 0.
+   * Display name for the default slot (id 0). Default: 'Autosave'. It is
+   * only display text: the engine's autosave writes the active slot, not slot 0.
    */
   defaultSlotDisplayName?: string;
   /** Maximum number of save slots. Default: 10 */
@@ -145,10 +143,10 @@ export interface SaveManagerOptions {
   /**
    * When true, any save validation failure aborts the load with
    * `save:load-failed { reason: 'validation' }`. When false, failing leaves
-   * are self-healed to their persistent ref's default value and the load
+   * are self-healed to their ref default and the load
    * proceeds. `save:validation-failed` is emitted per field in both modes.
    *
-   * Defaults to dev-mode detection: fail-loud in development (so bugs surface
+   * Defaults to dev-mode detection: fail-loud in development (so bugs show
    * early), self-heal in production (so player saves stay protected).
    */
   strictValidation?: boolean;
@@ -158,9 +156,8 @@ export interface SaveManagerOptions {
    * saves. Default `true` — the size win is large (3-5×) and consumer code
    * is unaffected.
    *
-   * Set `false` for dev-mode tooling that wants to inspect raw envelope JSON
-   * without decompressing. Test fixtures asserting on-disk shape also use
-   * this opt-out.
+   * Set `false` for dev-mode tooling that inspects the envelope without
+   * decompressing. Tests that assert on the stored shape also use this opt-out.
    */
   compressSave?: boolean;
 }
@@ -175,9 +172,9 @@ export interface SaveLoadResult {
 export interface SavePeek {
   timestamp: number;
   version: number;
-  /** Active mod ID at time of save, if any */
+  /** Id of the active mod when the save was written, if any */
   modId?: string;
-  /** Game-provided metadata for display (e.g. playtime, loop count) */
+  /** Game-provided metadata for display (e.g. play time, run count) */
   metadata?: Record<string, unknown>;
 }
 
@@ -188,16 +185,16 @@ export interface SaveSlot {
 }
 
 /**
- * Reason a load or import operation failed. Surfaces the failure mode that
+ * Reason a load or import operation failed. It reports the failure mode that
  * the catch-all `{success: false}` return cannot express.
  *
  * - `not-found`: no envelope exists at the target storage key
  * - `parse-error`: raw data was not valid JSON
  * - `wrong-game-id`: envelope parsed but its `gameId` doesn't match this manager
- * - `future-version`: the save was written by a newer build — its game version
- *   exceeds this manager's, or its engine save version exceeds this engine's
+ * - `future-version`: a newer game build or engine wrote the save: its save
+ *   version exceeds this manager's, or its engine save version exceeds this engine's
  * - `validation`: runtime Zod validation failed in strict mode
- * - `unknown`: any other thrown error during load/migration/deserialize
+ * - `unknown`: any other thrown error during a load, save migration or deserialize
  */
 export type SaveLoadFailureReason =
   | 'not-found'
@@ -211,25 +208,25 @@ export type SaveLoadFailureReason =
  * Events emitted by a SaveManager. Subscribe via `mgr.on(event, handler)`.
  *
  * `slotId` is the slot the operation targeted — the active slot at the time of
- * the call. `importSave` applies to the live state under the active slot (it
- * does not itself write storage until the next `save()`), so it carries that id.
+ * the call. `importSave` applies to the live state under the active slot, so
+ * its events contain that id. It does not itself write storage until the next `save()`.
  */
 export interface SaveEvents {
   /**
-   * A save was successfully loaded or imported. Engine systems reconcile
-   * their runtime state to it after every handler has run.
+   * A save was successfully loaded or imported. Engine systems hydrate
+   * their live state from it after every handler has run.
    */
   'save:loaded': (meta: { slotId: number; timestamp: number; version: number }) => void;
-  /** A load or import failed. `detail` carries the underlying error when available. */
+  /** A load or import failed. `detail` contains the underlying error when available. */
   'save:load-failed': (err: {
     slotId: number;
     reason: SaveLoadFailureReason;
     detail?: unknown;
   }) => void;
   /**
-   * A save was written by a newer build. `kind: 'game'` compares the envelope's
-   * `version` with `SaveManagerOptions.version`; `kind: 'engine'` compares its
-   * engine save version with this engine's, and a game can't migrate that.
+   * A newer game build or engine wrote the save. `kind: 'game'` compares the
+   * envelope's `version` with `SaveManagerOptions.saveVersion`. `kind: 'engine'`
+   * compares its engine save version with this engine's, and a game can't migrate that.
    */
   'save:future-version-refused': (err: {
     slotId: number;
@@ -238,9 +235,9 @@ export interface SaveEvents {
     supportedVersion: number;
   }) => void;
   /**
-   * A persistent ref's leaf value failed Zod validation. `action` reflects
-   * the policy applied: `self-heal` means the leaf was dropped and the ref
-   * will fall back to its default; `fail` means strict mode aborted the load.
+   * A persistent ref's leaf value failed Zod validation. `action` names what
+   * was done: `self-heal` means the leaf was deleted and the ref loads its ref
+   * default; `fail` means strict mode aborted the load.
    */
   'save:validation-failed': (err: {
     path: string;
@@ -249,25 +246,25 @@ export interface SaveEvents {
     action: 'self-heal' | 'fail';
   }) => void;
   /**
-   * An engine system's reconcile threw after a load or import succeeded, or a
-   * watcher reacting to one of its writes did. Reconcilers run after
-   * `save:loaded` and every `onLoad` callback; by then the refs hold the save,
+   * An engine system's hydration threw after a load or import succeeded, or a
+   * watcher reacting to one of its writes did. Hydration runs after
+   * `save:loaded` and every `onLoad` handler. By then the refs hold the save,
    * so the load stands, the slot stays unprotected, and the remaining
-   * reconcilers still run. `detail` is the thrown error, also logged via
-   * `console.error`.
+   * hydration handlers still run. `detail` is the thrown error, also logged
+   * with `console.error`.
    */
   'save:hydration-failed': (err: { slotId: number; detail: unknown }) => void;
-  /** A consumer-provided migration step ran during load. */
+  /** A consumer save migration ran during a load. */
   'save:migration-applied': (info: { from: number; to: number }) => void;
   /**
    * Live state is about to be serialized, by `save`, `saveToSlot` or
    * `exportSave`. Handlers run synchronously first, so one that flushes
-   * derived state into persistent refs lands in the written save.
+   * derived state into persistent refs is in the written save.
    */
   'save:before-serialize': () => void;
   /**
-   * A save landed in storage: `save`, `saveToSlot` or the engine's autosave
-   * wrote `slotId`. The signal for "Saved" feedback. Unlike
+   * A save was written to storage: `save`, `saveToSlot` or the engine's
+   * autosave wrote `slotId`. The event for "Saved" feedback. Unlike
    * `save:before-serialize`, it never fires for `exportSave`, for a protected
    * slot that refused the write, or when the storage write threw.
    */
@@ -277,13 +274,13 @@ export interface SaveEvents {
    * still holds a save the live state doesn't reflect. `save()` and
    * `saveToSlot()` skip it until {@link SaveManager.releaseSlot}, `deleteSave`,
    * a raw write (`importSlot` / `replaceSlot`) or a successful `load` /
-   * `importSave` on it — otherwise the next autosave would overwrite the save
+   * `importSave` on it. Otherwise the next autosave would overwrite the save
    * the load just refused.
    */
   'save:slot-protected': (info: { slotId: number; reason: SaveLoadFailureReason }) => void;
 }
 
-/** Multi-slot save manager: persists, loads, imports, and exports versioned game state. */
+/** Multi-slot save manager: saves, loads, imports and exports live state, versioned. */
 export interface SaveManager extends Emittable<SaveEvents> {
   // --- Active slot operations ---
   /** Write live state to the active slot. Skipped while the slot is protected. */
@@ -300,17 +297,17 @@ export interface SaveManager extends Emittable<SaveEvents> {
   deleteSave(): void;
   /** Peek the active slot's metadata */
   peek(): SavePeek | null;
-  /** Mod ID to include in the next save envelope. Set by the engine. */
+  /** Id of the mod to include in the next save envelope. Set by the engine. */
   modId: string | undefined;
 
   // --- Slot management ---
-  /** ID of the currently active slot */
+  /** Id of the active slot */
   readonly activeSlotId: number;
-  /** All save slots (id + name) */
+  /** All save slots (id and display name) */
   readonly slots: readonly SaveSlot[];
-  /** Create a new slot. Returns the new slot's ID. */
-  createLoadout(displayName?: string): number;
-  /** Delete a slot by ID. Throws if it's the active slot. */
+  /** Create a new slot. Returns the new slot's id. */
+  createSlot(displayName?: string): number;
+  /** Delete a slot by id. Throws if it's the active slot. */
   deleteSlot(slotId: number): void;
   /** Rename a slot */
   renameSlot(slotId: number, displayName: string): void;
@@ -319,7 +316,7 @@ export interface SaveManager extends Emittable<SaveEvents> {
   /** Peek any slot's metadata without switching or deserializing */
   peekSlot(slotId: number): SavePeek | null;
   /**
-   * Save current state to a specific slot without changing the active slot.
+   * Save live state to a specific slot without changing the active slot.
    * Skipped while that slot is protected.
    */
   saveToSlot(slotId: number): void;
@@ -334,16 +331,16 @@ export interface SaveManager extends Emittable<SaveEvents> {
    * chosen to discard that save.
    */
   releaseSlot(slotId: number): void;
-  /** Find a slot by name. Returns the slot or undefined if not found. */
+  /** Find a slot by display name. Returns the slot or undefined if not found. */
   findSlotByDisplayName(name: string): SaveSlot | undefined;
-  /** Set a callback that provides metadata to include in save envelopes. */
+  /** Set a function that provides metadata to include in save envelopes. */
   setMetadataProvider(fn: () => Record<string, unknown>): void;
 
   // --- Slot-to-slot copy (run-branching, accept-branch, portable snapshots) ---
   /**
    * Allocate a new slot and copy `srcId`'s on-disk envelope into it byte-for-byte.
    * Source slot must exist; if it has no saved data, the new slot is created
-   * empty (mirroring `createLoadout()` alone). Does not touch the active slot.
+   * empty (mirroring `createSlot()` alone). Does not touch the active slot.
    * Returns the new slot's id.
    */
   duplicateSlot(srcId: number, name?: string): number;
@@ -355,15 +352,15 @@ export interface SaveManager extends Emittable<SaveEvents> {
    */
   replaceSlot(srcId: number, destId: number): void;
   /**
-   * Return the raw on-disk envelope JSON for `slotId`, or `null` if the slot
-   * has no saved data. Slot must exist. Unlike `exportSave()`, this does not
-   * serialize live state — it reads what's currently persisted for that slot,
-   * regardless of whether it is the active slot.
+   * Return the save text stored for `slotId`, or `null` if the slot has no
+   * saved data. Slot must exist. Unlike `exportSave()`, this does not
+   * serialize live state: it reads what the slot stores now, whether or not
+   * it is the active slot.
    */
   exportSlot(slotId: number): string | null;
   /**
-   * Write a raw envelope into a slot's storage entry without deserializing it
-   * into the live engine. Validates that the envelope parses and that its
+   * Write save text into a slot's storage entry without loading it into the
+   * live engine. Validates that the envelope parses and that its
    * `gameId` matches; emits `save:load-failed` and returns failure otherwise.
    * When `slotId` is omitted, allocates a new slot and writes into it. Use
    * `selectSlot(id)` + `load()` to activate the imported slot afterwards.
@@ -378,17 +375,17 @@ interface SaveEnvelope {
   gameId: string;
   timestamp: number;
   /**
-   * Persistent state. Object when uncompressed (engine v1, v2, or v3 with
+   * The save data. Object when uncompressed (engine v1, v2, or v3 with
    * `compressSave: false`); lz-string base64 string when v3 with
    * `_engine.compression === 'lz'`. `applyEnvelope` normalizes to object
-   * before the migration / validate / deserialize chain runs.
+   * before the save migration / validate / deserialize chain runs.
    */
   data: Record<string, unknown> | string;
   modId?: string;
   metadata?: Record<string, unknown>;
   /**
-   * Engine-side envelope metadata. Added in ENGINE_SAVE_VERSION 2 for stable
-   * named persistent keys. Absence means pre-2, triggers legacy migration.
+   * Engine-side envelope metadata, present from engine save version 2. Its
+   * absence means engine save version 1, which triggers the key remap.
    */
   _engine?: {
     version: number;
@@ -398,25 +395,24 @@ interface SaveEnvelope {
 }
 
 /**
- * Migrate a v1 envelope (iteration-order keys) into v2 (named keys).
+ * Remap a v1 envelope (iteration-order keys) to v2 (keys by id).
  *
- * v1 save data for a context looks like `{ jobs: { "0": …, "1": … } }`.
- * v2 expects `{ jobs: { progress: …, timesCompleted: … } }`. The registry's
- * iteration order is authoritative: the Nth ref in the current context's
- * Set owns the Nth slot in the old save. A ref that is still unnamed moves to
- * the key the current build reads for it, its index among the context's
- * unnamed refs.
+ * v1 save data for a persistent context looks like `{ jobs: { "0": …, "1": … } }`.
+ * v2 expects `{ jobs: { progress: …, timesCompleted: … } }`. The persistent-ref
+ * registry's iteration order is authoritative: the Nth ref in the persistent
+ * context's Set owns the Nth index in the old save. A ref that still has no
+ * id moves to the key the loading build reads for it. That key is its index
+ * among the persistent context's refs with no id.
  *
- * Best-effort: when the current ref's default value has an incompatible
- * runtime type with the old value, the old value is dropped and the ref will
- * fall back to its default on deserialize. A warning is logged per suspect
- * remap so the fragility is observable.
+ * Best-effort: the ref's default may have a runtime type incompatible with the
+ * old value. Then the old value is removed and the ref loads its ref default.
+ * A warning is logged per suspect remap, so the fragility is observable.
  */
 function migrateIndexToNamed(
   data: Record<string, unknown>,
   refs: Map<string, Persistent>,
 ): Record<string, unknown> {
-  // Bucket the live refs by contextId, preserving registry iteration order.
+  // Group the live refs by contextId, in registry iteration order.
   // getAllPersistentRefs has already populated SaveDataPath[0] = contextId.
   const byContext = new Map<string, Persistent[]>();
   for (const ref of refs.values()) {
@@ -444,7 +440,7 @@ function migrateIndexToNamed(
       const newKey = ref[PersistentId] ?? ref[SaveDataPath]![1];
       if (!looseTypeMatch(ref[DefaultValue], oldVal)) {
         console.warn(
-          `[save] Legacy key migration type mismatch at "${contextId}.${i}" → "${contextId}.${newKey}": ` +
+          `[save] Version 1 key remap type mismatch at "${contextId}.${i}" → "${contextId}.${newKey}": ` +
             `expected ${describeType(ref[DefaultValue])}, got ${describeType(oldVal)}. Falling back to default.`,
         );
         continue;
@@ -477,7 +473,7 @@ function describeType(v: unknown): string {
 
 // === FACTORY ===
 
-/** Sentinel thrown by the load path to carry a typed failure to the one place that reports it. */
+/** Sentinel thrown by the load path to pass a typed failure to the one place that reports it. */
 class LoadFailure extends Error {
   constructor(
     public readonly reason: SaveLoadFailureReason,
@@ -508,26 +504,26 @@ function parseEnvelope(raw: string): SaveEnvelope {
 }
 
 /**
- * Create a save manager — orchestrates serialization, slot management,
- * migrations, and validation around the persistent-ref tree. Wired into the
- * engine automatically unless {@link EngineOptions.persistence} is `false`;
- * call directly only when assembling a save layer outside `createEngine`.
+ * Create a save manager: serialization, slot management, save migrations and
+ * validation over the persistent-ref registry. The engine builds one unless
+ * {@link EngineOptions.persistence} is `false`. Call it directly only to
+ * assemble saving outside `createEngine`.
  *
  * Storage keys are prefixed with `gameId` (and `persistenceNamespace`, if
  * given), so two engines sharing a runtime never collide. The returned manager
  * emits the {@link SaveEvents} (`save:loaded`, `save:load-failed`,
  * `save:validation-failed` and the rest) for instrumentation.
  *
- * @param options - {@link SaveManagerOptions} carrying `gameId`, version,
- *   migrations, the optional storage adapter, and slot/compression knobs.
- * @returns A {@link SaveManager} exposing `save` / `load` / `peek`, slot
- *   operations, and the `on(...)` subscription handle.
+ * @param options - {@link SaveManagerOptions} with `gameId`, `saveVersion`,
+ *   `migrations`, the optional storage adapter, and the slot and compression options.
+ * @returns A {@link SaveManager} with `save` / `load` / `peek`, slot
+ *   operations, and `on(...)` for its events.
  *
  * @example
  * ```ts
  * const saves = createSaveManager({
  *   gameId: 'my-game',
- *   version: 3,
+ *   saveVersion: 3,
  *   migrations: {
  *     1: (data) => migrateV1toV2(data),
  *     2: (data) => migrateV2toV3(data),
@@ -548,9 +544,9 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
     compressSave = true,
   } = options;
 
-  // Storage key prefix carries the namespace so two engines with the same
-  // gameId don't alias each other in localStorage. Undefined namespace
-  // preserves the legacy `${gameId}-…` shape exactly.
+  // The storage key prefix contains the persistence namespace, so two engines
+  // with the same gameId don't alias each other in localStorage. With no
+  // persistence namespace, the key keeps the plain `${gameId}-…` shape.
   const storagePrefix = persistenceNamespace ? `${gameId}:${persistenceNamespace}` : gameId;
 
   const slotsKey = `${storagePrefix}-slots`;
@@ -578,7 +574,7 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
     slotsVersion.value++;
   }
   let _metadataProvider: (() => Record<string, unknown>) | null = null;
-  // Slots whose load failed on a save that still sits in storage.
+  // Slots whose load failed on a save that storage still holds.
   const _protectedSlots = new Set<number>();
 
   // === SLOT INDEX PERSISTENCE ===
@@ -605,8 +601,8 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
     return `${storagePrefix}-slot-${slotId}`;
   }
 
-  // === LEGACY MIGRATION ===
-  // If old single-slot save exists but no slot index, migrate to slot 0
+  // === SINGLE-SLOT LAYOUT ===
+  // If an older single-slot save exists but no slot index, move it to slot 0
   function migrateLegacy(): void {
     const legacyKey = `${storagePrefix}-save`;
     const legacyData = storage.getItem(legacyKey);
@@ -635,9 +631,9 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
   }
 
   /**
-   * Run `fn` inside this manager's persistence namespace, so the save-event
-   * handlers and the post-load reconcilers it triggers see the same namespace
-   * whichever entry point a consumer called.
+   * Run `fn` inside this manager's persistence namespace. So the save event
+   * handlers and the hydration it triggers see it, whichever method a
+   * consumer called.
    */
   function inNamespace<T>(fn: () => T): T {
     return withPersistenceNamespace(persistenceNamespace, fn);
@@ -754,7 +750,7 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
           throw new LoadFailure(
             'unknown',
             new Error(
-              `save migration from version ${v} returned ${describeType(next)}, not an object`,
+              `save migration from save version ${v} returned ${describeType(next)}, not an object`,
             ),
           );
         }
@@ -763,19 +759,19 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
       }
       v++;
     }
-    // Engine-internal legacy migration: iteration-order keys → stable named keys.
-    // Runs after the user migration chain (which reshapes per game version)
-    // but before deserialize, since only here do we have the registry context.
+    // Engine key remap: iteration-order keys → keys by id. It runs after the
+    // consumer's save migrations (which reshape per save version) and before
+    // deserialize, because only here is the persistent-ref registry at hand.
     const refs = getAllPersistentRefs(persistenceNamespace);
-    // v2 already wrote named keys, so only a v1 envelope is remapped.
+    // v2 already wrote keys by id, so only a v1 envelope is remapped.
     if (engineVersion < 2) {
       data = migrateIndexToNamed(data, refs);
     }
 
-    // Runtime validation: single pass after migrations, before deserialize.
+    // Runtime validation: single pass after save migrations, before deserialize.
     // Field-level failures emit save:validation-failed; in strict mode the
     // first failure aborts via LoadFailure, otherwise the failing leaves
-    // are dropped from `data` and deserialize falls back to defaults.
+    // are deleted from `data` and deserialize falls back to ref defaults.
     const validation = validateSaveData(refs, data, {
       strict: strictValidation,
       onIssue: (issue: ValidationIssue) => {
@@ -830,7 +826,7 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
     );
   }
 
-  /** Report a post-load reconcile's throw without failing the load it followed. */
+  /** Report a hydration throw without failing the load before it. */
   function reportHydrationError(slotId: number): (err: unknown) => void {
     return (err) => {
       console.error('A hydration after a successful save load threw; the load stands.', err);
@@ -920,8 +916,8 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
       return (_slotsView ??= _slots.map((s) => ({ ...s })));
     },
 
-    createLoadout(name?: string): number {
-      return allocSlot(name);
+    createSlot(displayName?: string): number {
+      return allocSlot(displayName);
     },
 
     deleteSlot(slotId: number): void {

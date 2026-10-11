@@ -1,25 +1,25 @@
 /**
- * Engine safeguards — iteration caps, depth limits, and dev diagnostics.
+ * Engine safeguards — iteration caps, depth limits, and safeguard diagnostics.
  *
  * Provides runtime protection against infinite recursion and runaway loops
  * in event emission, sequencer advancement, and other engine internals.
  *
  * - Guards are always active (cheap enough for production)
- * - Diagnostic counters always run; dev mode adds a console warning per trip
+ * - Safeguard diagnostics always count; dev mode adds a console warning each time a cap is hit
  */
 
 // === DEV MODE ===
 let _devMode = false;
 
 /**
- * Enable dev-mode diagnostics: a console warning on every safeguard trip.
- * The counters {@link getSafeguardDiagnostics} reads run whether or not dev mode is on.
+ * Enable dev mode: a console warning each time a safeguard cap is hit.
+ * The safeguard diagnostics {@link getSafeguardDiagnostics} reads count whether or not dev mode is on.
  */
 export function enableDevMode(): void {
   _devMode = true;
 }
 
-/** Disable dev-mode diagnostics. */
+/** Disable dev mode. */
 export function disableDevMode(): void {
   _devMode = false;
 }
@@ -29,20 +29,20 @@ export function isDevMode(): boolean {
   return _devMode;
 }
 
-// === DIAGNOSTICS COUNTERS ===
+// === SAFEGUARD DIAGNOSTICS ===
 /**
- * Diagnostic counters captured by the runtime safeguards — how often the
- * emit-depth cap and sequencer advance cap have tripped, plus the last
- * offender of each. Read via {@link getSafeguardDiagnostics}.
+ * Safeguard diagnostics — how often the emit-depth cap and the sequencer
+ * advance cap were hit, plus the last offender of each. Read through
+ * {@link getSafeguardDiagnostics}.
  */
 export interface SafeguardDiagnostics {
   /** Number of times an emit depth limit was hit */
   emitDepthTrips: number;
   /** Number of times a sequencer advance cap was hit */
   advanceCapTrips: number;
-  /** Last event name that tripped the emit depth limit */
+  /** Last event name that hit the emit depth limit */
   lastEmitDepthEvent: string | null;
-  /** Last sequencer ID that tripped the advance cap */
+  /** Last sequencer id that hit the advance cap */
   lastAdvanceCapSequencer: string | null;
 }
 
@@ -53,12 +53,12 @@ const _diagnostics: SafeguardDiagnostics = {
   lastAdvanceCapSequencer: null,
 };
 
-/** Read-only snapshot of safeguard diagnostics counters. */
+/** Read-only snapshot of the safeguard diagnostics. */
 export function getSafeguardDiagnostics(): Readonly<SafeguardDiagnostics> {
   return { ..._diagnostics };
 }
 
-/** Reset all diagnostics counters to zero. */
+/** Reset every safeguard diagnostic to zero. */
 export function resetSafeguardDiagnostics(): void {
   _diagnostics.emitDepthTrips = 0;
   _diagnostics.advanceCapTrips = 0;
@@ -66,7 +66,7 @@ export function resetSafeguardDiagnostics(): void {
   _diagnostics.lastAdvanceCapSequencer = null;
 }
 
-// === INTERNAL REPORTING (CALLED BY GUARDS IN EVENTS.TS, SEQUENCER.TS, ETC.) ===
+// === INTERNAL RECORDING (CALLED BY GUARDS IN EVENTS.TS, SEQUENCER.TS, ETC.) ===
 /** @internal Called when emit depth limit is exceeded. */
 export function reportEmitDepthTrip(eventName: string, depth: number): void {
   _diagnostics.emitDepthTrips++;
@@ -74,7 +74,7 @@ export function reportEmitDepthTrip(eventName: string, depth: number): void {
   if (_devMode) {
     console.warn(
       `[safeguard] Emit depth limit hit: event "${eventName}" at depth ${depth}. ` +
-        `Recursive emit chain blocked.`,
+        `Recursive emit blocked.`,
     );
   }
 }
@@ -86,7 +86,7 @@ export function reportAdvanceCapTrip(sequencerId: string, count: number): void {
   if (_devMode) {
     console.warn(
       `[safeguard] Advance cap hit: sequencer "${sequencerId}" after ${count} advances. ` +
-        `Further advancement paused until next tick.`,
+        `Further advances wait for the next tick.`,
     );
   }
 }

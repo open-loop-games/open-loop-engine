@@ -1,5 +1,5 @@
 /**
- * Conditions — declarative predicate evaluation over `GameStateAccessor`
+ * Conditions — condition IR evaluation over `GameStateAccessor`
  */
 
 import { Decimal } from '@/primitives/decimal';
@@ -37,13 +37,13 @@ function compareDecimal(
 }
 
 /**
- * Compare an arbitrary state value against an expected value with a state-condition
- * operator. `eq` / `neq` use strict equality; ordering operators coerce both sides
- * to `number` (matches the inline dispatch this helper replaced — relies on the
- * caller to author state paths that hold numeric values when using ordering ops).
+ * Compare a value at a state path against an expected value with a
+ * `StateCondition` operator. `eq` / `neq` use strict equality. The ordering
+ * operators coerce both sides to `number`, so the caller must point them at
+ * state paths that hold numbers.
  *
- * Shared by {@link evaluateCondition}'s `state` branch and Gate's `state` kind so
- * the operator semantics stay canonical in one place.
+ * {@link evaluateCondition}'s `state` branch and the Gate `state` kind share
+ * it, so the operator meaning is defined in one place.
  *
  * @internal
  */
@@ -71,9 +71,9 @@ export function compareState(
 }
 
 /**
- * Evaluate a declarative {@link ICondition} against the given game-state
- * accessor. Recurses through `and` / `or` / `not` nodes; leaves resolve via
- * the accessor's `getAmount` / `getFlag` / `getStateAt` lookups.
+ * Evaluate an {@link ICondition}, the condition IR, against the given game-state
+ * accessor. Recurses through `all` / `any` / `not` nodes; leaves read the
+ * accessor's `getAmount` / `getFlag` / `getStateAt`.
  *
  * @internal
  */
@@ -120,10 +120,10 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
 }
 
 /**
- * Collect the dotted-path dependencies referenced by a condition tree —
- * `resources.<id>.amount`, `unlocks.<id>`, and any state targets — deduped
- * and returned as a flat array. Used by reactivity-aware consumers to wire
- * `computed` subscriptions over arbitrary {@link ICondition} graphs.
+ * Collect the dotted-path dependencies a condition IR tree reads —
+ * `resources.<id>.amount`, `flags.<id>` and any state paths — deduped, as a
+ * flat array. Reactivity-aware consumers use it to wire `computed`
+ * subscriptions over any {@link ICondition} tree.
  *
  * @internal
  */
@@ -135,11 +135,11 @@ export function extractDependencies(condition: ICondition): string[] {
 
 // === CONDITION BUILDERS ===
 /**
- * Ergonomic factories for constructing {@link ICondition} values — the
- * internal IR. Consumers author {@link Gate} literals on content fields
- * instead; engine-internal code reaches `C` via the `@/core/conditions`
- * import path when it needs to construct ICondition values directly (tests,
- * walker projection round-trips, internal-effect machinery).
+ * Ergonomic factories for constructing {@link ICondition} values, the
+ * condition IR. Consumers author {@link Gate} literals on predicate fields
+ * instead. Engine-internal code imports `C` from `@/core/conditions` when it
+ * builds condition IR directly: tests, walker projection round-trips and
+ * internal effect code.
  *
  * @internal
  */
