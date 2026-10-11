@@ -323,7 +323,7 @@ describe('applyPerturbation — chain-registry source', () => {
   });
 });
 
-describe('applyPerturbation — content source', () => {
+describe('applyPerturbation — effect-system walker', () => {
   it('resolves the live modifier through the effect-system registry', () => {
     let speedChain: ReturnType<typeof createModifierChain>;
     const mod: EngineModule = {

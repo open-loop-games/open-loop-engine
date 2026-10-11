@@ -13,7 +13,7 @@ import { walkTunables } from './walk-tunables';
 /**
  * Priority order for deduplication of modifier entries: when the same
  * `Modifier` instance is reachable via multiple walkers, the entry with
- * the higher-priority source wins. `content` is most specific
+ * the higher-priority source wins. `effect-system` is most specific
  * (user-intuitive), `chain-registry` is the derived auto-registration
  * path. Tunable entries don't compete with modifier identity and skip
  * this dedup.
@@ -29,7 +29,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  * grouping the result by discovery layer.
  *
  * Modifier dedup: a `Map<Modifier, ModifierPickerEntry>` collects one
- * canonical entry per modifier. Walkers run in content → chain-registry
+ * canonical entry per modifier. Walkers run in effect-system → chain-registry
  * order; ties are broken by priority (see {@link MODIFIER_SOURCE_PRIORITY}).
  * Because the map keys on object identity, this is snapshot-scoped — a
  * later `createPickerSnapshot` call rebuilds the map from scratch and a
@@ -42,11 +42,11 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  * layers stay independent.
  *
  * @param engine - The engine to enumerate. Walkers read auto-registered
- *   content from `ChainRegistryKey`, `EffectSystemRegistryKey`, and
+ *   entries from `ChainRegistryKey`, `EffectSystemRegistryKey`, and
  *   `TuningRegistriesKey` via `engine.tryInject` — engines without those
  *   keys produce empty groups rather than crashing.
  * @returns {@link PickerSnapshot} with entries grouped by discovery layer
- *   (`content`, `chains`, `tunables`) plus a flat `all` list.
+ *   (`effectSystem`, `chains`, `tunables`) plus a flat `all` list.
  *
  * @example
  * ```ts
@@ -61,7 +61,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  * ```
  */
 export function createPickerSnapshot(engine: Engine): PickerSnapshot {
-  const contentEntries = walkEffectSystemBindings(engine);
+  const effectSystemEntries = walkEffectSystemBindings(engine);
   const chainEntries = walkChainRegistry(engine);
   const tunableEntries: TunablePickerEntry[] = walkTunables(engine);
 
@@ -82,20 +82,20 @@ export function createPickerSnapshot(engine: Engine): PickerSnapshot {
   }
 
   // Offer in priority order so the first write already matches the tie-breaker.
-  for (const e of contentEntries) offer(e);
+  for (const e of effectSystemEntries) offer(e);
   for (const e of chainEntries) offer(e);
 
   const all: PickerEntry[] = [];
-  const content: ModifierPickerEntry[] = [];
+  const effectSystem: ModifierPickerEntry[] = [];
   const chains: ModifierPickerEntry[] = [];
 
   for (const entry of canonical.values()) {
     all.push(entry);
-    if (entry.address.walker === 'effect-system') content.push(entry);
+    if (entry.address.walker === 'effect-system') effectSystem.push(entry);
     else chains.push(entry);
   }
 
   for (const entry of tunableEntries) all.push(entry);
 
-  return { all, content, chains, tunables: tunableEntries };
+  return { all, effectSystem, chains, tunables: tunableEntries };
 }

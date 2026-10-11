@@ -18,7 +18,7 @@ describe('createPickerSnapshot', () => {
     const mod: EngineModule = {
       id: 'all',
       install(ctx) {
-        // Source 1: content — temporary effect with a binding on a fresh chain.
+        // Source 1: effect system — temporary effect with a binding on a fresh chain.
         const damage = createModifierChain('damage');
         const temp = createTemporaryEffectSystem({
           id: 'buffs',
@@ -31,7 +31,7 @@ describe('createPickerSnapshot', () => {
         });
 
         // Source 2: chain registry — a standalone chain with 2 modifiers that
-        // NO content entry touches. These are reachable only through the
+        // NO effect-system entry touches. These are reachable only through the
         // chain-registry walker.
         const standalone = createModifierChain('spellPotency');
         standalone.add(createMultiplicativeModifier({ multiplier: 1.1 }));
@@ -49,14 +49,14 @@ describe('createPickerSnapshot', () => {
     const snap = createPickerSnapshot(engine);
 
     // Layers:
-    //   content:     buffs.crit[0]                            (1 entry)
+    //   effectSystem: buffs.crit[0]                            (1 entry)
     //   chain:       damage[*], spellPotency[*],
     //                spellPotency[0], spellPotency[1]         (4 entries)
     expect(snap.all).toHaveLength(5);
-    expect(snap.content).toHaveLength(1);
+    expect(snap.effectSystem).toHaveLength(1);
     expect(snap.chains).toHaveLength(4);
 
-    expect(snap.content[0].label).toBe('buffs.crit[0]');
+    expect(snap.effectSystem[0].label).toBe('buffs.crit[0]');
     expect(snap.chains.map((e) => e.label)).toEqual([
       'damage[*]',
       'spellPotency[*]',
@@ -67,13 +67,13 @@ describe('createPickerSnapshot', () => {
     engine.stop();
   });
 
-  it('dedups when the same Modifier is reachable via content + chain registry', () => {
-    // A content binding's chain is auto-registered in the chain registry
+  it('dedups when the same Modifier is reachable via an effect system and the chain registry', () => {
+    // An effect-system binding's chain is auto-registered in the chain registry
     // (createModifierChain during install auto-registers). So the modifier
     // added by the binding is walkable via both:
-    //   content walker: buffs.rageBinding[0]
+    //   effect-system walker: buffs.rageBinding[0]
     //   chain walker:   damage[0]
-    // The merger must keep only the content entry.
+    // The merger must keep only the effect-system entry.
     let sharedModifier: Modifier | null = null;
     const mod: EngineModule = {
       id: 'dedup',
@@ -107,22 +107,22 @@ describe('createPickerSnapshot', () => {
 
     // damage chain has exactly 1 modifier (sharedModifier, added once).
     // That one modifier is reachable via:
-    //   - content walker (via the binding on `rage`)
+    //   - effect-system walker (via the binding on `rage`)
     //   - chain-registry walker (via damage[0])
-    // After dedup, the sharedModifier appears once, canonical source = content.
+    // After dedup, the sharedModifier appears once, canonical walker = effect-system.
     // The chain-registry walker also emits a chain-apply entry (damage[*])
-    // which is a fresh marker with no content equivalent, so it stays.
+    // which is a fresh marker with no effect-system equivalent, so it stays.
     expect(snap.all).toHaveLength(2);
-    expect(snap.content).toHaveLength(1);
-    expect(snap.content[0].modifier).toBe(sharedModifier);
-    expect(snap.content[0].address.walker).toBe('effect-system');
+    expect(snap.effectSystem).toHaveLength(1);
+    expect(snap.effectSystem[0].modifier).toBe(sharedModifier);
+    expect(snap.effectSystem[0].address.walker).toBe('effect-system');
     expect(snap.chains).toHaveLength(1);
     expect(snap.chains[0].label).toBe('damage[*]');
 
     engine.stop();
   });
 
-  it('offers a live effect binding only as its content entry, factory-built or overlaid', () => {
+  it('offers a live effect binding only as its effect-system entry, factory-built or overlaid', () => {
     let damage!: ReturnType<typeof createModifierChain>;
     let temp!: ReturnType<typeof createTemporaryEffectSystem>;
     const mod: EngineModule = {
@@ -133,7 +133,7 @@ describe('createPickerSnapshot', () => {
         temp.register({
           id: 'rage',
           duration: 5,
-          // A factory builds a fresh modifier per activation, so the content
+          // A factory builds a fresh modifier per activation, so the effect-system
           // walker's object never matches the one standing in the chain.
           grants: [
             { chain: damage, modifier: () => createMultiplicativeModifier({ multiplier: 2 }) },
@@ -154,8 +154,10 @@ describe('createPickerSnapshot', () => {
     expect(damage.modifiers).toHaveLength(2);
     expect(labels()).toEqual(['buffs.rage[0]', 'buffs.focus[0]', 'damage[*]']);
 
-    // A content perturbation seats a wrapper in the slot; that is effect-owned too.
-    const focus = createPickerSnapshot(engine).content.find((e) => e.label === 'buffs.focus[0]')!;
+    // An effect-system perturbation seats a wrapper in the slot; that is effect-owned too.
+    const focus = createPickerSnapshot(engine).effectSystem.find(
+      (e) => e.label === 'buffs.focus[0]',
+    )!;
     const cleanup = applyPerturbation(engine, focus, { kind: 'scalar-multiply', factor: 2 });
     expect(labels()).toEqual(['buffs.rage[0]', 'buffs.focus[0]', 'damage[*]']);
     cleanup();
@@ -174,7 +176,7 @@ describe('createPickerSnapshot', () => {
 
     const snap = createPickerSnapshot(engine);
     expect(snap.all).toEqual([]);
-    expect(snap.content).toEqual([]);
+    expect(snap.effectSystem).toEqual([]);
     expect(snap.chains).toEqual([]);
     expect(snap.tunables).toEqual([]);
 

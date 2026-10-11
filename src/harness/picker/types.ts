@@ -5,10 +5,10 @@
  * Picker walks two layers of intent:
  *
  * - **Structural identity** — `Modifier`s in auto-registered chains and
- *   effect-system content. Discoverable by enumeration of the engine's
+ *   effect-system bindings. Discoverable by enumeration of the engine's
  *   ambient registries (`ChainRegistryKey`, `EffectSystemRegistryKey`).
  *   Perturbation wraps the modifier in its chain position, or, for
- *   content, the binding in every activation.
+ *   an effect-system binding, the binding in every activation.
  *
  * - **Addressability identity** — `tunable()` values registered into a
  *   `TuningRegistry`. The designer's opt-in declaration that a value
@@ -28,7 +28,7 @@ import type { Modifier, ModifierChain } from '@/core/modifier';
  * Which discovery walker produced a given {@link PickerEntry}. Also used by
  * the merger as the priority order for deduplication of modifier entries:
  * when the same `Modifier` instance is reachable via multiple walks, the
- * canonical address wins in this order — `content` > `chain-registry`.
+ * canonical address wins in this order — `effect-system` > `chain-registry`.
  * Tunable entries don't compete with modifier entries for identity and
  * skip dedup entirely.
  */
@@ -103,7 +103,7 @@ export type PickerAddress = ModifierPickerAddress | TunablePickerAddress;
 
 /**
  * A perturbable modifier surface discovered by the picker. Covers both
- * `content` (effect-system bindings, active or not) and `chain-registry`
+ * `effect-system` (effect-system bindings, active or not) and `chain-registry`
  * (auto-registered `ModifierChain` modifiers) discovery sources.
  */
 export interface ModifierPickerEntry {
@@ -115,7 +115,7 @@ export interface ModifierPickerEntry {
   /**
    * Position of `modifier` within `chain.modifiers` at snapshot time, for
    * display and diagnostics; perturbation doesn't read it. `-1` when the
-   * snapshot's object isn't in the chain: a content binding whose effect
+   * snapshot's object isn't in the chain: an effect-system binding whose effect
    * is inactive, one bound through a factory (each call makes a fresh
    * modifier), or a `chain-apply` entry.
    */
@@ -159,15 +159,15 @@ export type PickerEntry = ModifierPickerEntry | TunablePickerEntry;
  * for tree rendering, and also exposes a flat `all` list for linear access.
  *
  * Modifier entries are deduplicated by `Modifier` object identity across
- * `content` and `chain-registry` walkers — a single `Modifier` instance
- * appears in exactly one of `content` / `chains`. Tunable entries are
+ * `effect-system` and `chain-registry` walkers — a single `Modifier` instance
+ * appears in exactly one of `effectSystem` / `chains`. Tunable entries are
  * unique by `(registryId, key)` and never collide with modifier entries.
  */
 export interface PickerSnapshot {
   /** All entries after deduplication, in walker order. */
   all: readonly PickerEntry[];
   /** Modifier entries whose canonical address walker is `effect-system`. */
-  content: readonly ModifierPickerEntry[];
+  effectSystem: readonly ModifierPickerEntry[];
   /** Modifier entries whose canonical address walker is `chain-registry`. */
   chains: readonly ModifierPickerEntry[];
   /** Tunable entries — one per key per registered tuning registry. */
