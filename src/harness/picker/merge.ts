@@ -7,7 +7,7 @@
 import type { Engine } from '@/engine';
 import type { ModifierPickerEntry, PickerEntry, PickerSnapshot, TunablePickerEntry } from './types';
 import { walkChainRegistry } from './walk-chain-registry';
-import { walkEffectSystemBindings } from './walk-effect-system-bindings';
+import { walkEffectSystemGrants } from './walk-effect-system-grants';
 import { walkTunables } from './walk-tunables';
 
 /**
@@ -59,7 +59,7 @@ const MODIFIER_SOURCE_PRIORITY: Record<'effect-system' | 'chain-registry', numbe
  * ```
  */
 export function createPickerSnapshot(engine: Engine): PickerSnapshot {
-  const effectSystemEntries = walkEffectSystemBindings(engine);
+  const effectSystemEntries = walkEffectSystemGrants(engine);
   const chainEntries = walkChainRegistry(engine);
   const tunableEntries: TunablePickerEntry[] = walkTunables(engine);
 

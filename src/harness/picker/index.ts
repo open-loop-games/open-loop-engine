@@ -16,6 +16,6 @@ export type {
   PickerSnapshot,
 } from './types';
 export { walkChainRegistry } from './walk-chain-registry';
-export { walkEffectSystemBindings } from './walk-effect-system-bindings';
+export { walkEffectSystemGrants } from './walk-effect-system-grants';
 export { walkTunables } from './walk-tunables';
 export { createPickerSnapshot } from './merge';

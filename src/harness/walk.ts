@@ -127,7 +127,7 @@ export function forEachEffectDef(
  * A def's lowered grants in `grantIndex` order — each grant paired with each
  * chain it targets, calling a factory-form `grants` once.
  */
-export function effectDefBindings(def: EffectDefLike): { grant: Grant; chain: ModifierChain }[] {
+export function effectDefGrants(def: EffectDefLike): { grant: Grant; chain: ModifierChain }[] {
   const raw = def.grants;
   if (raw == null) return [];
   return flattenGrants(typeof raw === 'function' ? raw() : raw);

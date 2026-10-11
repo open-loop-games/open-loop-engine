@@ -55,7 +55,7 @@ import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { ChainRegistryKey, EffectSystemRegistryKey } from '@/core/registries';
 import { TuningRegistriesKey } from '@/core/override-registry';
 import type { PickerEntry } from './picker';
-import { effectDefBindings } from './walk';
+import { effectDefGrants } from './walk';
 
 /** Scalar transform applied on top of an existing modifier or tunable value. */
 export type Perturbation =
@@ -176,7 +176,7 @@ function applyModifierPerturbation(
           `effect def "${address.defId}" not found in system "${address.effectSystemId}"`,
         );
       }
-      if (address.grantIndex >= effectDefBindings(def).length) {
+      if (address.grantIndex >= effectDefGrants(def).length) {
         throw new Error(`def "${address.defId}" has no grant at index ${address.grantIndex}`);
       }
       return wrapBinding(system, address.defId, address.grantIndex, (m) =>

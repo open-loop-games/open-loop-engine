@@ -17,7 +17,7 @@ import {
 import {
   createPickerSnapshot,
   walkChainRegistry,
-  walkEffectSystemBindings,
+  walkEffectSystemGrants,
   walkTunables,
 } from '@/harness/picker';
 import { applyPerturbation } from '@/harness/perturbation';
@@ -48,7 +48,7 @@ function persistentDamage(gameId: string) {
       ]);
     },
   });
-  const entry = (label: string) => walkEffectSystemBindings(engine).find((e) => e.label === label)!;
+  const entry = (label: string) => walkEffectSystemGrants(engine).find((e) => e.label === label)!;
   return { engine, on, flat, dmg: () => dmg, entry };
 }
 
@@ -355,7 +355,7 @@ describe('applyPerturbation — effect-system walker', () => {
     engine.use(mod);
     engine.start();
 
-    const entry = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.haste[0]')!;
+    const entry = walkEffectSystemGrants(engine).find((e) => e.label === 'buffs.haste[0]')!;
     expect(entry).toBeDefined();
     expect(entry.indexInChain).toBeGreaterThanOrEqual(0);
     expect(num(speedChain!.apply(10))).toBe(20);
@@ -476,7 +476,7 @@ describe('applyPerturbation — effect-system walker', () => {
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
-    const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    const rage = walkEffectSystemGrants(engine).find((e) => e.label === 'buffs.rage[0]')!;
     buffs.activate('rage');
     expect(num(dmg.apply(1))).toBe(12);
 
@@ -520,7 +520,7 @@ describe('applyPerturbation — effect-system walker', () => {
         dmg.add(createMultiplicativeModifier({ multiplier: 2 }));
       },
     });
-    const rage = walkEffectSystemBindings(engine).find((e) => e.label === 'buffs.rage[0]')!;
+    const rage = walkEffectSystemGrants(engine).find((e) => e.label === 'buffs.rage[0]')!;
     buffs.activate('rage');
     tick(1);
     buffs.activate('rage');
@@ -596,7 +596,7 @@ describe('applyPerturbation — effect-system walker', () => {
   it('names the missing piece when an entry no longer resolves', () => {
     const { engine, entry } = persistentDamage('pert-content-missing');
     const flatEntry = entry('gear.flat[0]');
-    // walkEffectSystemBindings always produces 'effect-system'-walker addresses; narrow away the
+    // walkEffectSystemGrants always produces 'effect-system'-walker addresses; narrow away the
     // wider ModifierPickerAddress union so the override merges cleanly.
     const contentAddress = flatEntry.address as Extract<
       typeof flatEntry.address,
