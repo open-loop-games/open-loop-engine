@@ -1,7 +1,7 @@
 /**
- * RNG — seedable pseudo-random number generator and weighted-item picker
+ * RNG — seedable pseudo-random number generator and weighted random choice
  *
- * The module-global stream starts from an entropy seed, so every session draws
+ * The global stream starts from an entropy seed, so every play session draws
  * differently until {@link seedRNG} makes it replayable.
  */
 
@@ -14,7 +14,7 @@ interface AleaState {
   c: number;
 }
 
-// Alea's mash is a stateful accumulator: `n` MUST persist across calls so the
+// Alea's mash keeps state between calls: `n` MUST persist across calls so the
 // three `mash(' ')` seed lines below diverge. A stateless mash (resetting `n`
 // per call) collapses s0 == s1 == s2 at init and makes draws 2 and 3 of every
 // seeded stream bit-identical — see the non-degeneracy regression test.
@@ -59,11 +59,11 @@ function nextAlea(state: AleaState): number {
   return state.s2;
 }
 
-// Module-global RNG state. Held as a mutable object (not a closure) so
+// Global RNG state. Held as a mutable object (not a closure) so
 // `getRNGState`/`setRNGState` can snapshot and restore it — required for
 // deterministic bisect in event-driven probes, where fire-time
 // resolution replays a sub-advance from a checkpoint. Seeded from entropy so an
-// unseeded game doesn't replay one fixed sequence every session; determinism
+// unseeded game doesn't replay one fixed sequence every play session; determinism
 // is opt-in through seedRNG.
 let currentSeed = Math.floor(Math.random() * 2 ** 32);
 const globalAlea: AleaState = initAleaState(currentSeed);
@@ -76,11 +76,11 @@ function assignState(target: AleaState, source: AleaState): void {
 }
 
 /**
- * Reseed the module-global RNG. Resets the Alea state so subsequent
+ * Reseed the global RNG. Resets the Alea state so subsequent
  * `random()` / `randomInt()` / etc. calls produce a deterministic stream
  * for the given seed. Without a call, the stream starts from an entropy seed.
- * A game that wants its draws to continue across reloads persists
- * {@link getRNGState} and restores it with {@link setRNGState}. Does not
+ * A game that wants its draws to continue across reloads saves the
+ * {@link getRNGState} result and restores it with {@link setRNGState}. Does not
  * affect closures returned by {@link createSeededRNG}.
  */
 export function seedRNG(seed: number): void {
@@ -89,7 +89,7 @@ export function seedRNG(seed: number): void {
 }
 
 /**
- * Opaque snapshot of the module-global RNG's internal state. Produced by
+ * Opaque snapshot of the global RNG's internal state. Produced by
  * {@link getRNGState} and consumed by {@link setRNGState}. Treat as a black
  * box — the field shapes are internal to the Alea implementation.
  */
@@ -102,7 +102,7 @@ export interface RNGState {
 }
 
 /**
- * Capture the module-global RNG state. Pairs with {@link setRNGState} to
+ * Capture the global RNG state. Pairs with {@link setRNGState} to
  * snapshot/restore an in-progress stream without re-seeding from scratch.
  * Used by bisect-style probes that need to replay a sub-advance from a
  * checkpoint while preserving RNG-sensitive determinism.
@@ -118,7 +118,7 @@ export function getRNGState(): RNGState {
 }
 
 /**
- * Restore the module-global RNG to a previously captured state. After this
+ * Restore the global RNG to a previously captured state. After this
  * call, subsequent `random()` values match the sequence from the original
  * point. Does not reset `createSeededRNG` streams — those are independent.
  */
@@ -133,7 +133,7 @@ export function setRNGState(state: RNGState): void {
 /**
  * Returns an independent seeded RNG closure. Use when a consumer needs a
  * self-contained stream that must not contaminate — or be contaminated by —
- * the module-level `seedRNG`/`random` shared state.
+ * the global `seedRNG`/`random` shared state.
  */
 export function createSeededRNG(seed: number): () => number {
   const state = initAleaState(seed);
@@ -149,7 +149,7 @@ export function getSeed(): number {
 }
 
 /**
- * Draw the next value in [0, 1) from the module-global RNG, which is
+ * Draw the next value in [0, 1) from the global RNG, which is
  * entropy-seeded until {@link seedRNG} is called.
  */
 export function random(): number {
@@ -158,7 +158,7 @@ export function random(): number {
 
 /**
  * Draw an integer in `[min, max]` inclusive.
- * @param rng draw source; defaults to the module-global stream. Pass a
+ * @param rng draw source; defaults to the global stream. Pass a
  * {@link createSeededRNG} closure for an independent deterministic stream.
  */
 export function randomInt(min: number, max: number, rng: () => number = random): number {
@@ -167,7 +167,7 @@ export function randomInt(min: number, max: number, rng: () => number = random):
 
 /**
  * Pick one element uniformly at random from `array`, or `undefined` if empty.
- * @param rng draw source; defaults to the module-global stream.
+ * @param rng draw source; defaults to the global stream.
  */
 export function randomItem<T>(array: readonly T[], rng: () => number = random): T | undefined {
   if (array.length === 0) return undefined;
@@ -176,7 +176,7 @@ export function randomItem<T>(array: readonly T[], rng: () => number = random): 
 
 /**
  * Return a new array with `array`'s elements in random order (Fisher–Yates).
- * @param rng draw source; defaults to the module-global stream.
+ * @param rng draw source; defaults to the global stream.
  */
 export function shuffle<T>(array: readonly T[], rng: () => number = random): T[] {
   const result = [...array];
@@ -190,7 +190,7 @@ export function shuffle<T>(array: readonly T[], rng: () => number = random): T[]
 /**
  * Pick one item from a weighted list. Returns `undefined` when the list is
  * empty or every weight is non-positive.
- * @param rng draw source; defaults to the module-global stream. Pass a
+ * @param rng draw source; defaults to the global stream. Pass a
  * {@link createSeededRNG} closure for an independent deterministic stream.
  */
 export function weightedPick<T>(
@@ -210,7 +210,7 @@ export function weightedPick<T>(
 
 /**
  * Return `true` with the given probability (clamped 0..1 by RNG output).
- * @param rng draw source; defaults to the module-global stream.
+ * @param rng draw source; defaults to the global stream.
  */
 export function chance(probability: number, rng: () => number = random): boolean {
   return rng() < probability;

@@ -1,6 +1,6 @@
 import type { Decimal, DecimalSource } from './decimal';
 
-/** Modifies a numeric resource by adding, subtracting, multiplying, or setting its value. */
+/** Changes a resource's amount by adding, subtracting, multiplying, or setting it. */
 export interface ResourceEffect {
   kind: 'resource';
   target: string;
@@ -10,18 +10,18 @@ export interface ResourceEffect {
   value: DecimalSource | { evaluate(): DecimalSource };
 }
 
-/** Sets an unlock flag to true or false, controlling feature/content visibility. */
+/** Sets a flag to true or false, for example to control whether content is available. */
 export interface FlagEffect {
   kind: 'flag';
   target: string;
-  /** Whether the target should become unlocked (`true`) or locked (`false`). */
+  /** The value the flag is set to. */
   value: boolean;
 }
 
-/** Writes an arbitrary value to a dot-path in game state (e.g. `"player.phase"`). */
+/** Writes any value at a state path in game state (e.g. `"player.phase"`). */
 export interface StateEffect {
   kind: 'state';
-  /** Dot-separated path into game state (e.g. `"player.phase"`). */
+  /** State path, dot-separated (e.g. `"player.phase"`). */
   path: string;
   value: unknown;
 }
@@ -33,7 +33,7 @@ export interface CompositeEffect {
 }
 
 /**
- * Applies one of two effects depending on whether a condition holds at evaluation time.
+ * Applies one of two effects, chosen by whether its condition IR holds when the effect is resolved.
  *
  * Engine-internal IR: consumers construct via `E.branch(gate, then, otherwise?)`
  * which returns the public {@link IEffect} opaquely, so the embedded
@@ -44,15 +44,15 @@ export interface CompositeEffect {
 export interface BranchEffect {
   kind: 'branch';
   condition: ICondition;
-  /** Effect applied when the condition is true. */
+  /** Effect applied when `condition` holds. */
   then: IEffect;
-  /** Effect applied when the condition is false. Omit to do nothing on false. */
+  /** Effect applied when `condition` does not hold. Omit to do nothing then. */
   else?: IEffect;
 }
 
 /**
- * Tagged-union root for declarative effects — the data shape content
- * authors hand to category factories. Resolved via {@link resolveEffect} and
+ * Tagged-union root for declarative effects — the data shape consumers hand
+ * to category factories. Resolved via {@link resolveEffect} and
  * applied through a {@link GameStateMutator}.
  *
  * Branch effects (built via `E.branch`) are part of the internal IR
@@ -65,7 +65,7 @@ export type IEffect = ResourceEffect | FlagEffect | StateEffect | CompositeEffec
 /**
  * Engine-internal effect IR — the full union including {@link BranchEffect}.
  * Used by `resolveEffect` / `applyEffect` / walker machinery that needs to
- * narrow on `type: 'branch'`. Not part of the public surface.
+ * narrow on `kind: 'branch'`. Not part of the public API surface.
  *
  * @internal
  */
@@ -85,7 +85,7 @@ export interface ResourceCondition {
 }
 
 /**
- * True when the named unlock flag is set. Used to gate content behind prior progression.
+ * True when the named flag is set. Used to block content until prior progress.
  * @internal
  */
 export interface FlagCondition {
@@ -94,20 +94,20 @@ export interface FlagCondition {
 }
 
 /**
- * Compares an arbitrary game state value at a dot-path against an expected value.
+ * Compares the game-state value at a state path against an expected value.
  * @internal
  */
 export interface StateCondition {
   kind: 'state';
-  /** Dot-separated path into game state (e.g. `"player.phase"`). */
+  /** State path, dot-separated (e.g. `"player.phase"`). */
   path: string;
-  /** Comparison operator applied as `state[target] <operator> value`. */
+  /** Comparison operator applied as `getStateAt(path) <operator> value`. */
   operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
   value: unknown;
 }
 
 /**
- * True only when every child condition holds (short-circuits on first false).
+ * True only when every child holds (short-circuits on first false).
  * @internal
  */
 export interface AllCondition {
@@ -116,7 +116,7 @@ export interface AllCondition {
 }
 
 /**
- * True when at least one child condition holds (short-circuits on first true).
+ * True when at least one child holds (short-circuits on first true).
  * @internal
  */
 export interface AnyCondition {
@@ -125,7 +125,7 @@ export interface AnyCondition {
 }
 
 /**
- * Inverts a condition: true when the wrapped condition is false, and vice versa.
+ * Inverts its child: true when the child does not hold, and vice versa.
  * @internal
  */
 export interface NotCondition {
@@ -134,15 +134,15 @@ export interface NotCondition {
 }
 
 /**
- * Engine-internal IR for declarative predicates. Consumers author {@link Gate}
- * literals on content-def fields; the engine projects accessor-backed Gate
- * leaves to ICondition via `gateToCondition`. Embedded by the internal
- * {@link BranchEffect} as the conditional-effect IR (unreachable from
- * the public {@link IEffect} union).
+ * Condition IR — the engine-internal form of a declarative predicate.
+ * Consumers author {@link Gate} literals on predicate fields; the engine
+ * projects accessor-backed Gate leaves to ICondition via `gateToCondition`.
+ * The internal {@link BranchEffect} embeds it as its condition (unreachable
+ * from the public {@link IEffect} union).
  *
- * Not part of the public surface — kept as a typed interchange shape between
- * the Gate projection and the IEffect / walker machinery that already speaks
- * it. Import from `@/primitives/types` for cross-module internal use.
+ * Not part of the public API surface. It is kept as a typed interchange shape
+ * between the Gate projection and the IEffect / walker machinery that already
+ * reads it. Import from `@/primitives/types` for cross-file internal use.
  *
  * @internal
  */
@@ -157,26 +157,30 @@ export type ICondition =
 /** Structured output produced by an {@link Analyzer} after a headless run completes. */
 export interface AnalyzerSummary {
   id: string;
-  /** Scalar measurements collected during the run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
+  /** Scalar analyzer metrics collected during the headless run (e.g. `{ "peakGold": 4200, "cycles": 12 }`). */
   metrics: Record<string, number | string | boolean>;
 }
 
-/** Observer attached to a headless run that collects metrics per tick and optionally per finalized cycle. */
+/**
+ * Observer of one headless run that collects metrics per tick, and optionally
+ * per finalized cycle-log entry.
+ */
 export interface Analyzer {
   id: string;
-  /** Called once before the first tick. Use to initialize accumulators. */
+  /** Called once before the first tick. Use it to initialize running totals. */
   onStart?(): void;
   /** Called after each tick. `tick` is the zero-based tick index. */
   onTick?(tick: number): void;
-  /** Called once after the last tick. Use to finalize aggregated metrics. */
+  /** Called once after the last tick. Use it to compute final metrics. */
   onEnd?(): void;
   /**
-   * Called once per finalized cycle when the analyzer is attached to a cell
-   * whose engine publishes a CycleLog — `createSensitivityCell` discovers the
-   * log via `engine.tryInject(CycleLogKey)` and auto-subscribes. The entry
-   * shape is structurally compatible with `CycleLogEntry` from the cycle-log
-   * system, so analyzers wired directly to `log.on('finalized', ...)` outside
-   * a harness cell also satisfy this hook.
+   * Called once per finalized cycle-log entry when the analyzer is attached
+   * to a cell whose engine publishes a CycleLog. `createSensitivityCell` finds
+   * the log via `engine.tryInject(CycleLogKey)` and subscribes to it. The
+   * entry shape is structurally compatible with `CycleLogEntry` from the
+   * cycle-log system. So an analyzer wired directly to
+   * `log.on('finalized', ...)` outside a balance-harness cell also fits this
+   * method.
    */
   onRunFinalize?(entry: {
     runNumber: number;
@@ -190,7 +194,7 @@ export interface Analyzer {
     }>;
     annotations: Record<string, unknown>;
   }): void;
-  /** Produces the final {@link AnalyzerSummary} after the run ends. */
+  /** Produces the final {@link AnalyzerSummary} after the headless run ends. */
   summarize(): AnalyzerSummary;
 }
 
@@ -201,33 +205,34 @@ export interface WeightedItem<T> {
   weight: number;
 }
 
-/** Read-only view of game state used when evaluating conditions and resolving effects. */
+/** Read-only view of game state used when evaluating predicates and resolving effects. */
 export interface GameStateAccessor {
   /** Returns the current amount of the named resource. */
   getAmount(id: string): Decimal;
-  /** Returns whether the named unlock flag is currently set. */
+  /** Returns whether the named flag is currently set. */
   getFlag(id: string): boolean;
   /** Returns the value at a dot-separated state path (e.g. `"player.phase"`). */
   getStateAt(path: string): unknown;
   /**
-   * Returns the current net flow rate for the named resource, in resource-units per second.
+   * Returns the current net rate for the named resource, in resource units per second.
    *
-   * Games implement this in terms of their own economy — gross production, net of drains,
-   * tunable overrides, or any mix. The transition-distance primitives
+   * Games implement this in terms of their own economy — gross production minus what is
+   * subtracted, tunable overrides, or any mix. The transition-distance primitives
    * (`timeUntilResource`, `timeUntilAffordable`, `timeUntilGateFlip`) call this to
    * compute "when does X happen" without owning rate semantics themselves.
    *
-   * Accessors without a rate concept should return `Decimal.dZero` — transition helpers
-   * interpret a zero rate as "no-rate, uncomputable distance."
+   * Accessors without a rate concept should return `Decimal.dZero`. The transition-distance
+   * utilities read a zero rate as "no rate, transition distance not computable."
    */
   getRate(id: string): Decimal;
   /**
    * Returns the gross inflow rate for the named resource: what it gains per second before
-   * any drain, so never less than {@link GameStateAccessor.getRate} and never negative.
+   * anything is subtracted. So it is never less than {@link GameStateAccessor.getRate}, and
+   * never negative.
    *
-   * Optional. `timeUntilGateFlip` reads it to predict a `cumulative-gte` gate, since the
+   * Optional. `timeUntilGateFlip` reads it to predict a `cumulative-gte` Gate, since the
    * lifetime total grows by inflow alone. Without it the net rate stands in, which
-   * overstates the time whenever something drains the resource.
+   * overstates the time whenever something subtracts from the resource.
    */
   getInflowRate?(id: string): Decimal;
 }

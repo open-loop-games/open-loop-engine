@@ -1,19 +1,18 @@
 /**
- * Big number utilities using break_eternity.js
- * Provides Decimal type and formatting functions for large/small numbers.
+ * Decimal — big-number arithmetic and formatting on break_eternity.js
  *
- * Large number formatting delegates to the active notation via notationManager
- * (powered by eternal_notations). Small numbers use regular decimal display.
+ * Provides the Decimal type and formatting functions for large and small
+ * numbers. Large numbers are formatted by the active notation through
+ * notationManager (from eternal_notations). Small numbers use the regular format.
  *
  * Arithmetic statics (add/sub/mul/div/min/max) are patched onto the imported
- * break_eternity class with typeof-dispatched fast paths: when both operands
+ * break_eternity class with typeof-dispatched fast paths. When both operands
  * are raw `number` and the result fits within IEEE 754 double precision, the
- * math runs in number-space and the result is promoted to a fresh `Decimal`
+ * math runs in number-space. The result is then promoted to a fresh `Decimal`
  * via `new OrigDecimal(r)` before return. Otherwise the call falls through to
- * the original static. Promotion preserves the `Decimal` return contract —
- * consumers can chain-call (`.clamp().toNumber()`, etc.) without needing to
- * know the fast path exists. Promotion to a fresh `Decimal` before return
- * preserves the chain contract regardless of whether the fast path fires.
+ * the original static. Promotion preserves the `Decimal` return contract, so
+ * consumers can chain-call (`.clamp().toNumber()`, etc.) whether or not the
+ * fast path is taken.
  *
  * Predicates (eq/gt/gte/lt/lte) stay boolean-returning — no promotion needed,
  * no chain form to preserve.
@@ -41,7 +40,7 @@ export type Decimal = InstanceType<DecimalClass>;
 export type DecimalSource = Decimal | number | string;
 
 // OVERFLOW_ABS caps below IEEE 754 double precision (2^53 ≈ 9e15). The static
-// fast paths compute in number-space only when the result lands under this
+// fast paths compute in number-space only when the result falls under this
 // magnitude; larger magnitudes fall through to the original static.
 const OVERFLOW_ABS = 1e15;
 
@@ -50,13 +49,13 @@ const OVERFLOW_ABS = 1e15;
 const MIN_NORMAL = 2.2250738585072014e-308;
 
 /**
- * Coerce a layer-0, small-magnitude Decimal back to native `number`. For
- * accumulator chains (`acc = Decimal.add(acc, x)` in a loop), the
- * wrap-as-Decimal return preserves single-call chain form but promotes the
- * accumulator out of number-space after iter 0 — every subsequent iteration
- * then misses the typeof fast path. Calling this at each reduce boundary (and
- * between chained Decimal ops in multi-step accumulator bodies) keeps the
- * accumulator renormalized so the fast path fires on every iteration.
+ * Coerce a small-magnitude Decimal at break_eternity layer 0 back to native
+ * `number`. Take a running sum (`acc = Decimal.add(acc, x)` in a loop). The
+ * wrap-as-Decimal return preserves single-call chain form. But it promotes the
+ * sum out of number-space after iter 0, so every later iteration misses the
+ * typeof fast path. Call this at each reduce boundary, and between chained
+ * Decimal ops in multi-step loop bodies. The running sum then stays
+ * renormalized, and the fast path is taken on every iteration.
  *
  * Contract mirrors the fast-path promotion threshold — values the fast path
  * would have kept in number-space get coerced back here. Anything with
@@ -78,8 +77,8 @@ export function renormIfLayer0(x: DecimalSource): DecimalSource {
 /**
  * Wrap a DecimalSource into a Decimal instance at a reduce or chain boundary,
  * skipping the clone when it's already a Decimal. Pair with
- * {@link renormIfLayer0} at reduce sites: renorm between steps for fast-path
- * firing, `toFinalDecimal` once at the return so callers can chain instance
+ * {@link renormIfLayer0} at reduce sites: renorm between steps so the fast path
+ * is taken, `toFinalDecimal` once at the return so callers can chain instance
  * methods on the result. Honors the single-call Decimal return contract
  * at aggregation boundaries.
  *
@@ -101,7 +100,7 @@ export function toFinalDecimal(x: DecimalSource): Decimal {
 //   min(v) { return this.gt(v) ? v : this; }    5.min(NaN) -> 5
 //
 // The consequence is a guard that reads "have we already arrived?" as `true`
-// against an undefined value, and answers with the domain floor — silent,
+// against an undefined value, and answers with the domain's lower bound — silent,
 // plausible, and wrong. `recip(0)` is NaN rather than Infinity in this library,
 // so an ordinary chain reaches it without doing anything exotic.
 //
@@ -123,7 +122,7 @@ export function toFinalDecimal(x: DecimalSource): Decimal {
 // where the value is defined rather than to evaluate into a domain edge and
 // inspect the result afterward.
 //
-// Patched on the prototype, not just the statics: 25 of the engine's 64 ordering
+// Patched on the prototype, not just the statics: many of the engine's ordering
 // callsites use the instance form, and the statics delegate down here anyway.
 // break_eternity's own internals (tetrate/slog/lambertw) route through these too
 // and are covered by the suite.
@@ -166,7 +165,7 @@ const origLte = OrigDecimal.lte;
 // promoted via `new OrigDecimal(r)` before return. No widened type, no cast:
 // the signature matches the original static exactly. Function names mirror
 // the originals — formula DSL stringification reads `.name`, so the patched
-// statics must keep their original identifiers to avoid surfacing `fastAdd`
+// statics must keep their original identifiers to avoid showing `fastAdd`
 // in user-facing output.
 
 OrigDecimal.add = function add(a: DecimalSource, b: DecimalSource): Decimal {
@@ -262,15 +261,15 @@ export function bn(x: DecimalSource): Decimal {
 /**
  * Coerce a DecimalSource to a native number. Fast path for `number` inputs
  * (identity); slow path routes through a Decimal for strings and instances.
- * Use at the JS-iteration / native-math boundary, where a value typed
- * `DecimalSource` (a resource's value, a config field) has no `.toNumber()`
+ * Use it at the JS-iteration / native-math boundary. There a value typed
+ * `DecimalSource` (a resource's value, an options field) has no `.toNumber()`
  * to call until it is known to be a Decimal.
  */
 export function toNumber(x: DecimalSource): number {
   return typeof x === 'number' ? x : new OrigDecimal(x).toNumber();
 }
 
-/** float64 machine epsilon — the ulp of a mantissa, and of a stored exponent above layer 0. */
+/** float64 machine epsilon — the ulp of a mantissa, and of a stored exponent above break_eternity layer 0. */
 const EPSILON = 2.220446049250313e-16;
 
 /**
@@ -289,23 +288,23 @@ const ROOT_ERROR_HEADROOM = 2;
  *
  * This is the perfect-power snap, and it decides only which of two off-by-one
  * errors to risk — never the grade, which is `ambiguous` on both sides of it.
- * A root landing this close to an integer is either a perfect power the log/exp
+ * A root this close to an integer is either a perfect power the log/exp
  * path fell a few ulps short of, or a coincidence with about a 1-in-500 chance;
  * below the ceiling the perfect power is overwhelmingly likelier and rounding
  * to it wins, above it the bar is wide enough that flooring wins.
  *
  * The measured reason for reporting rather than trusting either way: over 3234
  * oracle-checked radicands, snapping produced three answers off by one — all of
- * them radicands built as `base^degree` at layer 1, where the construction's
+ * them radicands built as `base^degree` at break_eternity layer 1, where the construction's
  * own rounding puts the stored value a hair *below* the perfect power it was
- * meant to be. Nothing available at this layer distinguishes that from the
- * perfect power itself.
+ * meant to be. Nothing available at that break_eternity layer distinguishes
+ * that from the perfect power itself.
  */
 const SNAP_CEILING = 1e-3;
 
 /**
  * The ceiling past which break_eternity cannot tell an integer from its
- * successor: `9e15`, its layer-0 boundary. At or above it a Decimal stores its
+ * successor: `9e15`, its break_eternity layer-0 boundary. At or above it a Decimal stores its
  * base-10 logarithm and `m.add(1).eq(m)`, so "the largest integer `m` with
  * `m^degree ≤ x`" has no representable answer. `8999999999999999` is the last
  * integer that still works.
@@ -319,18 +318,18 @@ const MAX_DISTINGUISHABLE_INTEGER = 9e15;
  * How far, in integers, `value.root(degree)` can sit from the true root.
  *
  * The root is the coordinate to work in, and by a factor of `degree`. Both
- * `root` and `pow` route through log/exp, so both carry the ulp of a stored
+ * `root` and `pow` route through log/exp, so both have the ulp error of a stored
  * logarithm — but `pow` *multiplies* the exponent by `degree` while `root`
  * divides it, so at 1e27 the raw square root is accurate to ±0.2 integers while
  * a `m² ≤ x` comparison is only good to ±0.44. Comparing powers is the less
  * precise instrument at every magnitude, which is why the floor is settled here
  * and never by raising a candidate back.
  *
- * The `max(…, 1)` floor covers layer 0, where the radicand is stored directly
+ * The `max(…, 1)` floor covers break_eternity layer 0, where the radicand is stored directly
  * and the error is the ordinary ulp of the root's own mantissa.
  *
  * Deliberately *not* `inversionTolerance` from `core/formulas`, and not only
- * because `primitives/` sits below `core/`: that function floors at 1e-10
+ * because `primitives/` is below `core/`: that function floors at 1e-10
  * relative, which at 1e28 is 1e18 absolute against a one-integer step of 2e14 —
  * four orders too loose to floor anything. The shape transfers (a floor plus a
  * magnitude term); the constant does not.
@@ -343,7 +342,7 @@ function rootUncertainty(value: Decimal, root: Decimal, degree: number): Decimal
 }
 
 /**
- * The floored root of a layer-0 radicand, settled in exact integer arithmetic.
+ * The floored root of a radicand at break_eternity layer 0, settled in exact integer arithmetic.
  *
  * Below {@link MAX_DISTINGUISHABLE_INTEGER} a Decimal *is* an exact integer, so
  * the question has an exact answer and no float reasoning is needed to reach
@@ -364,25 +363,25 @@ function exactIntegerRoot(value: Decimal, root: Decimal, degree: number): Decima
 }
 
 /**
- * Diagnosed result of {@link tryIntegerRoot}.
+ * Graded result of {@link tryIntegerRoot}.
  *
  * - `exact` — `value` is the true `⌊x^(1/degree)⌋`: `value^degree ≤ x <
  *   (value+1)^degree` holds in exact arithmetic.
  * - `ambiguous` — the representation cannot resolve an integer here, so `value`
  *   is the best estimate available rather than a verified floor. `value` is
- *   within `max(1, width)` of the true root — measured across 573 ambiguous
- *   results with no violation — which lets a caller judge whether the
- *   imprecision matters at its scale: a width below 1 means "possibly off by
- *   one", while 1e6 means the integer part carries no information at all.
+ *   within `max(1, width)` of the true root, measured across 573 ambiguous
+ *   results with no violation. So a caller can judge whether the imprecision
+ *   matters at its scale. A width below 1 means "possibly off by one", while
+ *   1e6 means the integer part contains no information at all.
  *
  * A radicand that is an exact perfect power still reports `ambiguous` once it
- * passes layer 0, because at that point nothing distinguishes it from a value
- * a hair below it. The answer is usually right there; it just isn't provable,
- * and `exact` is reserved for what is.
+ * passes break_eternity layer 0. Past that point nothing distinguishes it from
+ * a value a hair below it. The answer is usually right there; it just isn't
+ * provable, and `exact` is reserved for what is.
  *
- * Shape follows `Inversion` in `@/core/formulas` — a value plus a `reason`
- * discriminator — rather than inventing a second vocabulary for "the answer is
- * there but you should know something about it".
+ * Shape follows `Inversion` in `@/core/formulas`: a value plus a `reason`
+ * discriminant. It does not invent a second vocabulary for "the answer is
+ * there, but you should know something about it".
  */
 export type IntegerRoot =
   | { value: Decimal; reason: 'exact' }
@@ -399,18 +398,18 @@ export type IntegerRoot =
  *   {@link MAX_DISTINGUISHABLE_INTEGER} a Decimal stores its logarithm, `m` and
  *   `m + 1` are the same number, and no implementation can distinguish them.
  * - **The root's own error bar reaches an integer boundary.** See
- *   {@link rootUncertainty}: the raw root carries the ulp of a stored logarithm,
+ *   {@link rootUncertainty}: the raw root has the ulp error of a stored logarithm,
  *   which grows with magnitude and shrinks with `degree`. Once the bar spans a
  *   boundary, which integer the root falls between is not determined by the
  *   representation. The bar reaches one integer wide once the root passes about
- *   1e11 — a square root at 1e22, a cube root at 1e33, a fifth root only at
- *   1e55 — and whether it actually *straddles* depends on where the root sits
- *   between integers, so a radicand well clear of a perfect power stays exact
- *   past that and one sitting on top of one does not.
+ *   1e11: a square root at 1e22, a cube root at 1e33, a fifth root only at
+ *   1e55. Whether it actually *straddles* a boundary depends on where the root
+ *   is between integers. So a radicand well clear of a perfect power stays
+ *   exact past that point, and one sitting on top of one does not.
  *
- * Use this over {@link integerRoot} where being silently off by one matters —
- * balance tooling, tests, and dev-mode asserts on a game whose accumulators run
- * long. Gameplay payout paths generally want the plain form.
+ * Use this over {@link integerRoot} where being silently off by one matters:
+ * the balance harness, tests, and dev-mode asserts on a game whose
+ * accumulators run long. Gameplay payout paths generally want the plain form.
  *
  * @param x - the radicand; sources accepted, coerced once
  * @param degree - the root degree (a positive integer: 2, 3, …)
@@ -452,7 +451,7 @@ export function tryIntegerRoot(x: DecimalSource, degree: number): IntegerRoot {
   const high = root.add(uncertainty).floor();
   if (low.eq(high)) return { value: low, reason: 'exact' };
 
-  // An integer sits inside the error bar, so the floor is not provable and the
+  // An integer is inside the error bar, so the floor is not provable and the
   // grade says so. Which value to hand back is a separate question from the
   // grade: below SNAP_CEILING a perfect power is the likelier explanation and
   // rounding to it beats flooring away from it, above it the reverse.
@@ -469,23 +468,24 @@ export function tryIntegerRoot(x: DecimalSource, degree: number): IntegerRoot {
  * square root; `integerRoot(x, 3)` the integer cube root.
  *
  * Use this instead of `Decimal.floor(Decimal.root(x, n))`. break_eternity
- * computes both `root` and `pow` through log/exp, so each carries float error
+ * computes both `root` and `pow` through log/exp, so each has float error
  * in both directions (`root(8, 3)` = 1.999…, `pow(3, 3)` = 27.000…4). A plain
- * floor of the root under-counts at perfect powers (∛8 → 1), and a plain
+ * floor of the root under-counts at perfect powers (∛8 → 1). A plain
  * `mⁿ ≤ x` comparison mis-floors *worse*, since `pow` amplifies the same error
  * by `degree` where `root` divides it. This works in the root's own coordinate
  * instead, floored against break_eternity's measured error at that magnitude.
  *
- * **Exact up to a degree-dependent ceiling** — roughly 1e22 for degree 2 and
- * 1e33 for degree 3, where the root passes 1e11 — above which the
- * representation stops resolving consecutive integers and the result is the
- * best estimate rather than a verified floor.
+ * **Exact up to a degree-dependent ceiling**: roughly 1e22 for degree 2 and
+ * 1e33 for degree 3, where the root passes 1e11. Above it the representation
+ * stops resolving consecutive integers, and the result is the best estimate
+ * rather than a verified floor.
  * {@link tryIntegerRoot} returns the same value plus which of the two you got;
- * reach for it when being silently off by one would matter. `x ≤ 0` returns 0.
+ * use it when being silently off by one would matter. `x ≤ 0` returns 0.
  *
- * Canonical use is sublinear per-source prestige payouts — `Σ integerRoot(
- * total / scale, 3)` — where pooling before the root would let one dominant
- * source mask the others (see consumer-guide § Sublinear per-source payouts).
+ * Canonical use is sublinear per-source prestige payouts,
+ * `Σ integerRoot(total / scale, 3)`. Pooling before the root would let one
+ * dominant source mask the others. See consumer-guide-recipes § Sublinear
+ * per-source prestige payouts.
  *
  * @param x - the radicand; sources accepted, coerced once
  * @param degree - the root degree (a positive integer: 2, 3, …)
@@ -511,8 +511,9 @@ export const DEFAULT_DECIMALS = 2;
 export const DEFAULT_SHOW_SMALL = true;
 
 /**
- * Threshold above which numbers are formatted by the active notation.
- * Below this, regularFormat/commaFormat are used for clean display.
+ * The value at and above which `format` uses the active notation.
+ * Below it, `format` uses `regularFormat`, except for the small-value cases
+ * `format` describes.
  */
 const NOTATION_THRESHOLD = new OrigDecimal(1000);
 
@@ -572,8 +573,9 @@ export function regularFormat(num: DecimalSource, decimals: number): string {
 /**
  * Smart format that chooses the best representation based on magnitude.
  *
- * Small numbers (< 1000) use regular decimal notation.
- * Large numbers delegate to the active eternal notation via notationManager.
+ * Numbers below 1000 use the regular format. Larger numbers use the active
+ * notation through notationManager, as do non-zero numbers below 0.001 when
+ * `small` is set.
  */
 export function format(
   num: DecimalSource,

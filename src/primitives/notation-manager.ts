@@ -23,8 +23,8 @@ function sigFigRounding(sigFigs: number): (value: Decimal) => Decimal {
 }
 
 /**
- * Singleton-style registry that controls which {@link Notation} `format()`
- * uses for `Decimal` rendering. Ships with `standard`, `scientific`, and
+ * Singleton that holds the named notations and controls which
+ * {@link Notation} `format()` uses for a `Decimal`. Ships with `standard`, `scientific`, and
  * `engineering` from `eternal_notations` pre-registered; consumers add more
  * via `register(name, notation)`.
  */
@@ -57,7 +57,7 @@ export class NotationManager {
     return this.active;
   }
 
-  /** Get the current precision (significant figures). */
+  /** Get the number of sig figs the notations round to. */
   getSigFigs(): number {
     return this.sigFigs;
   }
