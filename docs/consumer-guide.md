@@ -1,32 +1,37 @@
 # Consumer Guide
 
-How to express a game with `@open-loop/engine`. Read this after forking `open-loop-starter` and before writing your first module.
+How to express a game with `@open-loop/engine`. Read this after you fork `open-loop-starter` and before you write your first module.
 
-This guide explains **how to compose** the engine — levels of abstraction, when to reach for which surface, the recurring shapes of consumer modules. It deliberately does not enumerate symbols; for that, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs: [consumer-guide-choosing.md](./consumer-guide-choosing.md) when two primitives overlap and you need the boundary; [consumer-guide-recipes.md](./consumer-guide-recipes.md) for the worked-pattern cookbook; [consumer-guide-balance.md](./consumer-guide-balance.md) for how numbers get chosen and verified; `CHANGELOG.md` for breaking-change migration blocks.
+This guide explains **how to compose** the engine: the abstraction levels, which API to choose when, and the recurring shapes of modules. It does not list symbols. For those, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs:
+
+- [consumer-guide-choosing.md](./consumer-guide-choosing.md) — the boundary between two primitives that overlap;
+- [consumer-guide-recipes.md](./consumer-guide-recipes.md) — worked engine compositions;
+- [consumer-guide-balance.md](./consumer-guide-balance.md) — how balance constants are chosen and verified;
+- `CHANGELOG.md` — the API migrations of breaking changes.
 
 ## The expression spectrum
 
-The engine offers several levels of abstraction for the same problem. Knowing which level to reach for — and when to move between them — is the core skill.
+The engine offers several abstraction levels for the same problem. The core skill is to know which level to choose, and when to move between them.
 
-### Level 1: Resource helpers (reach for first)
+### Level 1: Resource utilities (use first)
 
-The engine ships utility functions that handle the Decimal arithmetic, bounds checking, and modifier application that every game needs. Use these before writing raw `Decimal.add(resource.value, ...)`:
+The engine ships utilities for the Decimal arithmetic, bounds checks and modifier application that every game needs. Use them before you write raw `Decimal.add(resource.value, ...)`:
 
 | Function | What it does | Replaces |
 |---|---|---|
 | `addResource` | Add to a resource, optionally tagging the gain with a modifier chain for trace attribution | `resource.value = Decimal.add(resource.value, amount)` |
-| `subtractResource` | Subtract with insufficient-funds check; returns `false` if short | `if (Decimal.gte(r.value, cost)) { r.value = Decimal.sub(...) }` |
-| `hasResource` | Check if a resource meets a threshold | `Decimal.gte(resource.value, amount)` |
+| `subtractResource` | Subtract after an affordability check; returns `false` if the amount is short | `if (Decimal.gte(r.value, cost)) { r.value = Decimal.sub(...) }` |
+| `hasResource` | Check whether a resource's amount reaches a threshold | `Decimal.gte(resource.value, amount)` |
 | `formatResource` | Format a resource for display | `format(resource.value)` |
-| `resetResource` | Reset to default value | `resource.value = Decimal.dZero` |
-| `resource.best` | Persistent high-water mark on persistent resources | Manual `if (gt(current, best)) best = current` |
-| `resource.cumulative` | Persistent lifetime gain on persistent resources, seeded with the default, so a starting balance counts as earned (as `cumulative-gte` reads it) | Manual accumulator in onTick |
+| `resetResource` | Reset to the ref default | `resource.value = Decimal.dZero` |
+| `resource.best` | Saved high-water mark on persistent resources | Manual `if (gt(current, best)) best = current` |
+| `resource.cumulative` | Saved lifetime gain on persistent resources. It starts at the ref default, so a starting amount counts toward it, as `cumulative-gte` reads it | Manual accumulator in a tick handler |
 
-These aren't sugar — they're the correct API. `subtractResource` returns a boolean so "check and spend" is one call, not two. `addResource` accepts an optional modifier chain that tags the gain for trace attribution (it does *not* apply the chain as a yield multiplier — pre-multiply the amount if you need that).
+These are the correct API, not sugar. `subtractResource` returns a boolean, so "check and spend" is one call. `addResource`'s chain does *not* multiply the gain, so pre-multiply the amount if you need that.
 
-### Level 2: Category systems (the default for content)
+### Level 2: Categories (the default for content)
 
-Categories are the engine's standard shape for registering content: each factory exposes a typed registration contract and produces live engine objects per definition. Define a definition type, provide a mapper, register in bulk. The full factory list is in `api/content-systems.md` and `api/content-narrative.md` — read each's **Canonical entrypoints** block before reaching for raw primitives.
+Categories are the engine's standard shape for registering content. Each category factory has a typed registration contract and builds live engine objects per def. Define a def type, provide a `map*` callback, and register in bulk. The full factory list is in `api/content-systems.md` and `api/content-narrative.md`. Read each one's **Canonical entrypoints** block before you drop to raw primitives.
 
 ```ts
 const skills = createSkillCategory<MySkillDef>({
@@ -39,20 +44,20 @@ const skills = createSkillCategory<MySkillDef>({
 skills.register([{ id: 'woodcutting', xpDivisor: 10 }, { id: 'mining', xpDivisor: 12 }]);
 ```
 
-The `map*` function is where your game's definition shape meets the engine's options shape. For simple cases this is mostly pass-through; for complex cases (skills with custom curves, actions with type-specific behavior) the mapper does real work.
+The `map*` function is where your game's def shape meets the engine's options shape.
 
-What a category gives you: per-definition persistent context, typed accessors (`getDef` / `getAll`), and per-def lifecycle. A mod adds definitions through the category's own `register`, which builds each def's instance and state — the category's `registry` is a read-and-patch `ContentRegistryView` with no `register` of its own — and changes one with `registry.patch()` without touching the original module. A patch rewrites the def, not what was built from it: a live instance sees it only where its mapping reads the def back through `getDef(id)` inside a getter, since value fields and closures over `def` are copied or frozen at register.
+A category gives you a persistent context per def, typed reads (`getDef` / `getAll`) and a per-def lifecycle. A mod adds defs through the category's own `register`, which builds each def's instance and def state. The category's `registry` is a read-and-patch `ContentRegistryView` with no `register`. A mod changes a def with `registry.patch()`, without touching the original module. A patch rewrites the def, not what was built from it. Value fields and closures over `def` are copied or frozen at register. So a live instance sees a patch only where its mapping reads the def back through `getDef(id)` inside a getter.
 
-**Categories self-register.** Creating a category enrolls it into a global engine registry, so any consumer — UI surfaces, balance panels, debug overlays, the headless harness, mods — can walk your content by category type without importing the module that declared it. No publishing step; reading is opt-in. This is about who can *read* your content, not about where it may be constructed: the registry, like every other ambient handle, is only wired during `install()` / `connect()`. Bypass categories (raw primitives, no wrapper) and the content still works but falls outside the registry — tooling and mods won't see it.
+**Categories self-register.** A new category enrolls itself in `EngineCategories`. So UIs, balance workbenches, the balance harness and mods can walk your content without importing its module. Like every other ambient value, `EngineCategories` is wired only during `install()` / `connect()`. Content built from raw primitives still works, but tooling and mods do not see it.
 
-**Predicate-gated purchasables.** A purchasable's shape is its requirements, not its name. Swap `createCostRequirement` for a predicate requirement and the same primitive becomes an unlock — no cost charged, and the `active` ref flips once it is purchased. Nothing purchases it on its own: `setupSweepAutoPurchase` does, on the first tick the requirement holds. Progression gates, tier ladders, era unlocks, and visibility flags all read through the one accessor — `category.getPurchasable(id)?.active.value` — with no parallel visibility store to keep in sync.
+**Purchasables as unlocks.** A purchasable's shape is its requirements, not its name. Replace `createCostRequirement` with a predicate requirement, and the same primitive becomes an unlock. It costs nothing, and its `active` ref becomes true once it is purchased. Nothing purchases it on its own: `setupSweepAutoPurchase` does, on the first tick the requirement is met. Progression unlocks, ladders, era unlocks and visibility all read one value, `category.getPurchasable(id)?.active.value`. No parallel visibility store needs to stay in sync.
 
 Two predicate-requirement forms, in preference order:
 
-- `createGateRequirement({ gate })` — the Gate-authored path. Express the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`) and the adapter lifts it into the Requirement contract. The Gate is the only form that's serializable for save/mod/sim and supports `timeUntilGateFlip` for predictor UIs. Use this whenever the predicate can be expressed as a Gate.
-- `createBooleanRequirement({ requirement })` — the closure escape hatch. Use when the predicate doesn't fit a Gate kind (arbitrary cross-system computation, opaque consumer state). Same runtime shape as the Gate adapter, but the predicate isn't introspectable.
+- `createGateRequirement({ gate })` — the Gate form. Write the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`). The factory wraps it in the `Requirement` contract. Only a Gate is serializable for saves, mods and the balance harness. Only a Gate supports `timeUntilGateFlip` for predictor UIs. Use this form whenever a Gate can express the predicate.
+- `createBooleanRequirement({ met })` — the closure form. Use it when no Gate kind fits the predicate: arbitrary computation across systems, or opaque consumer state. It returns the same requirement shape as the Gate form, but the predicate is not introspectable.
 
-**What a Gate needs wired.** A Gate reads only the handles its kinds use, and the engine resolves them from the ambient scope — so construct gates inside `install()` / `connect()`, and hold the result rather than re-resolving from a player-driven path. `count-gte` and `unlock` resolve entirely through the category registry and need **no accessor at all**; `cumulative-gte` evaluates through the resource registry and needs one only when you predict it with `timeUntilGateFlip`; the accessor-backed kinds (`resource-gte`, `flag`, `state`) need one, and it's yours to supply:
+**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. The accessor-backed kinds need a `GameStateAccessor`, and you supply it. [§ Data and live state separation](#data-and-live-state-separation) lists which kinds need it:
 
 ```ts
 const engine = createEngine({
@@ -69,7 +74,7 @@ const engine = createEngine({
 });
 ```
 
-A gate that reaches for a handle you didn't wire throws naming both the handle and the kind that wanted it, where you authored it: at construction for `createGateRequirement`, and when the definition registers for a system's predicate field. Every systems-layer predicate field — challenge `visible` / `canEnter` / `goal`, achievement `goal` / `visible` / `hidden`, purchasable and producer `visible`, automation tiers, cycle `endCondition`, reset `canReset`, persistent-effect `active`, a grant's `when` — takes a `Predicate`: a boolean, ref, getter or Gate. Code that reads one back off a definition evaluates it with `evaluatePredicate(def.goal, runtime)`, or reads the instance's reactive field instead.
+A Gate that needs a Gate service you did not wire throws, and names the service and the Gate kinds in play. It throws where you wrote it: at construction for `createGateRequirement`, and at register for a system's predicate field. Every predicate field of the systems layer takes a `Predicate`: a boolean, a ref, a getter or a Gate. `api/INDEX.md#predicate-forms` lists the fields. To read one back off a def, evaluate it with `evaluatePredicate(def.goal, services)`, or read the instance's reactive field.
 
 ```ts
 const unlocks = createPurchasableCategory<UnlockDef>({
@@ -88,66 +93,71 @@ setupSweepAutoPurchase(unlocks, { enabled: true }, ctx.onTick);
 
 ### Level 3: Raw primitives (when categories don't fit)
 
-If a category's `map*` is fighting you — the shape is too different, the timing is wrong, you need control the category doesn't expose — drop down to the raw `create*` function directly:
+If a category's `map*` works against you, drop down to the raw `create*` function. The signs are a shape that is too different, the wrong timing, or a need for control the category does not expose:
 
 - `createScalingPurchasable` instead of `createPurchasableCategory`
 - `createCycle`, `createReset`, `createModifierChain` directly
-- `createCategoryBase` for category-shaped registries that don't fit any built-in shape. Pass `Instance = void` and omit `buildInstance` when entries are pure per-def state (no behavior object alongside the def). The base wires per-def persistent context (`{categoryId}/{def.id}`), auto-names persistent fields, and exposes `Resettable` so a category in `createReset` / `createCycle.thingsToReset` resets every entry's per-def context. This is the same primitive `createSkillCategory`, `createPurchasableCategory`, etc. compose internally — drop here when no system-level wrapper fits but the per-def-state-with-mod-aware-registration shape still does.
+- `createCategoryBase` for a category of your own shape. Every built-in category is built on it. Pass `Instance = void` and omit `buildInstance` when a def needs only def state.
 
-This is the normal path for one-off constructs, not a failure. The engine's systems layer composes from these same primitives — dropping down gives you the same building blocks with full control. For the purchasable family specifically, [consumer-guide-choosing.md §Choosing among purchasable primitives](./consumer-guide-choosing.md#choosing-among-purchasable-primitives) resolves most "category or raw?" questions; reach here for the rest.
+This is the normal path for one-off constructs, not a failure. The systems layer is built from these same primitives. For purchasables, [consumer-guide-choosing.md §Choosing among purchasable primitives](./consumer-guide-choosing.md#choosing-among-purchasable-primitives) answers most "category or raw?" questions.
 
-### Level 4: Declarative gates and effects (the data-driven escape hatch)
+### Level 4: Declarative Gates and effects
 
-`Gate` is the typed predicate-spec data shape; `IEffect` / `E` builder / `GameStateMutator` are the matching write side — plain data objects evaluated through pure functions against the engine's ambient runtime. Reach for this level when typed refs aren't available: save-file replay, mod configs loaded from JSON/YAML, balance-sim tools, content-registry patches that override behavior via data. The full treatment — Gate kind flavors, when to use vs. avoid, `StateGate` for indexed runtime collections, the closure escape hatch — lives in [§Data and runtime separation](#data-and-runtime-separation). For symbol-level detail see `api/mechanics.md#gate` and `api/mechanics.md#effects`; for the form-choice table (Gate vs Requirement vs `Computable<boolean>`) see `api/INDEX.md#predicate-forms`.
+`Gate` is the typed, serializable predicate. `IEffect`, the `E` builder and `GameStateMutator` are the write side. Both are plain data, evaluated by pure functions: a Gate against the ambient Gate services, an effect through the `GameStateMutator`. Choose this level when typed refs are not available. Examples are save-file replay, mod files, balance tools and content-registry patches. The section [§ Data and live state separation](#data-and-live-state-separation) covers it in full. The form-choice table (Gate vs Requirement vs `Computable<boolean>`) is in `api/INDEX.md#predicate-forms`.
 
-## Data and runtime separation
+## Data and live state separation
 
-Content modules keep `data/*.ts` engine-runtime-free: data files describe what content exists, never instantiate engine refs. This isn't dogma — it's what makes content swappable (a mod replaces the data module, the runtime stays the same), serializable (data is plain values), and analyzable (a balance tool can read data without booting the engine).
+Content modules keep `data/*.ts` free of engine objects. A data file describes what content exists, and never builds engine refs. That makes content swappable, because a mod replaces the data module and the module code stays the same. It makes content serializable, because data is plain values. It makes content analyzable, because a balance tool can read data without booting the engine.
 
-The trick is when data needs to express predicates over live game state. An achievement's `requirement` has to look at a resource value; an unlock's gate has to check a threshold against a lifetime accumulator; a dialog node's condition has to read relationship state. Those are runtime questions, but the *shape* of the question is part of the content definition.
+The difficulty is a predicate over live state. An achievement's `goal` must look at a resource amount. An unlock must compare a lifetime total with a threshold. A dialog node's condition must read relationship state. The engine answers those questions while the game runs, but the *shape* of each question is part of the def.
 
-`Gate` is the answer. Predicate shape lives in the content definition as a typed AST keyed by string IDs; the engine's ambient runtime resolves those IDs to live refs at evaluation time. The data side never touches an engine ref; the runtime side never owns predicate shape.
+`Gate` is the answer. The predicate's shape is in the def, as a typed AST keyed by string ids. The ambient Gate services resolve those ids to live refs at evaluation time. The data side never touches an engine ref, and the module side never owns a predicate's shape.
 
-Gate kinds split by what they read, and the split decides what you have to wire. **Accessor-backed leaves** (`resource-gte`, `state`, `flag`) are declarative against the accessor, with predictor-friendly distance via `timeUntilGateFlip` where the kind admits it — these are the kinds that oblige you to supply a `GameStateAccessor`. `cumulative-gte` reads the resource's lifetime total from the resource registry, so it evaluates without an accessor; predicting it takes one, and divides by the resource's inflow rate — `getInflowRate` where your accessor serves it, else the net rate, which overstates the time while anything drains the resource. **Category-aware leaves** (`count-gte`, `unlock`) read through `CategoryEntrySignals` and need no accessor — use when the unlock or count *is* a registered category entry. Combinators (`all`, `any`, `not`) compose either flavor; children go in an `of` field — `of: Gate[]` for `all`/`any`, `of: Gate` for `not`.
+Gate kinds split by what they read, and the split decides what you wire:
 
-**When NOT to reach for Gate.** When you have direct typed refs in scope, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is about *content definitions* (where the closure can't live anyway) — typed callsites inside engine module code stay typed.
+- **Accessor-backed leaves** (`resource-gte`, `state`, `flag`) are declarative over the accessor. Where the kind permits it, `timeUntilGateFlip` predicts their transition distance. These are the kinds that require a `GameStateAccessor`.
+- **`cumulative-gte`** reads the resource's lifetime total from the resource registry, so it evaluates without an accessor. A prediction needs one, and divides by the resource's inflow rate. That rate is `getInflowRate` where your accessor serves it, else the net rate. The net rate overstates the time while anything subtracts from the resource.
+- **Category-aware leaves** (`count-gte`, `active`) read through `CategoryEntrySignals`, and need no accessor. Use them when the unlock or the count *is* a category entry.
+- **Combinators** (`all`, `any`, `not`) combine either kind. Children go in an `of` field: `of: Gate[]` for `all` / `any`, `of: Gate` for `not`.
+
+**When NOT to use a Gate.** With typed refs at hand, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is for *defs*, where a closure cannot be anyway. Typed call sites inside module code stay typed.
 
 ```ts
 // data/achievements.ts — pure data, no engine imports
 import type { Gate } from '@open-loop/engine';
 
-export interface AchievementDef { id: string; description: string; requirement: Gate }
+export interface AchievementDef { id: string; description: string; goal: Gate }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first-handful', description: 'Ten saved.',
-    requirement: { kind: 'cumulative-gte', resource: 'eggs', value: 10 } },
+    goal: { kind: 'cumulative-gte', resource: 'eggs', value: 10 } },
   { id: 'coop-built', description: 'Hens settle in.',
-    requirement: { kind: 'count-gte', category: 'producers', entry: 'coop', value: 1 } },
+    goal: { kind: 'count-gte', category: 'producers', entry: 'coop', value: 1 } },
   { id: 'flock-master', description: 'A big coop and a full larder.',
-    requirement: { kind: 'all', of: [
+    goal: { kind: 'all', of: [
       { kind: 'count-gte', category: 'producers', entry: 'coop', value: 5 },
       { kind: 'cumulative-gte', resource: 'eggs', value: 1000 },
     ] } },
 ];
 ```
 
-No per-game predicate interface, no module-side implementation table, no closures handed into registration. The Gate union grows engine-side when a validated kind shows up across consumers; consumer code stays a tree of typed data. The would-be side-table for "what's currently visible?" never materializes because `unlock` reads `unlocks.getPurchasable(id)?.active.value` through the category-signals layer.
+No per-game predicate interface, no module-side implementation table, no closures passed into registration. The Gate union grows in the engine when a validated kind appears across consumers.
 
-**Runtime collection queries — use `StateGate`, not a new Gate kind.** Predicates over indexed runtime state (bestiary kill counts, achievement tallies, per-tag aggregates, multi-run stats) fit `StateGate` once the collection is projected into a dot-path shape and resolved by `GameStateAccessor.getStateAt`. A "killed ≥5 goblins" check becomes `{ kind: 'state', key: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. Compound queries that need iteration ("killed any monster with tag X") are expressed by precomputing a derived counter game-side (`computed(() => ...)` over the collection, exposed at e.g. `derived.killsByTag.<tag>`) and gating on *that* path — the engine does not ship an iteration primitive because the collection shape (tags, types, filters) is inherently game-specific.
+**Queries over a collection: use `StateGate`, not a new Gate kind.** A predicate over indexed state fits `StateGate` once the collection is projected into dot-paths that `GameStateAccessor.getStateAt` resolves. Examples are bestiary kill counts, achievement counts, per-tag totals and stats across runs. A "killed ≥5 goblins" check becomes `{ kind: 'state', path: 'bestiary.goblin.kills', operator: 'gte', value: 5 }`. A query that needs iteration, such as "killed any monster with tag X", needs a derived counter on the game side. Compute it over the collection (`computed(() => ...)`), expose it at a path such as `derived.killsByTag.<tag>`, and test *that* path. The engine ships no iteration primitive, because the collection's shape (tags, types, filters) is specific to each game.
 
-A custom-predicate Gate kind carrying a closure is deliberately *not* part of the union: it would break Gate's serializability and predictor introspection. When neither `StateGate` nor a derived-counter path fits, the signal is that the gate isn't declarative — express it as a typed getter game-side on a `Predicate` field (or `createBooleanRequirement` on requirement-shaped fields) and keep it out of `Gate` entirely. That's the right place for it: an unserializable predicate doesn't belong in `data/*.ts` either way.
+A Gate kind that holds a closure is not part of the union, on purpose. It would break the Gate's serializability and predictor introspection. When neither `StateGate` nor a derived counter fits, the predicate is not declarative. Write it as a typed getter on a `Predicate` field, or as `createBooleanRequirement` on a requirement field. Keep it out of `Gate`. An unserializable predicate does not belong in `data/*.ts` either.
 
 ## Persistence
 
-The game bootstrap is `use(...)` → `start()` → `load()`. `start()` installs the modules, so their persistent refs exist, and does not load the save. `load()` hydrates them; a first run reports `not-found`. `load()` before `start()` (or after `dispose()`) throws.
+The game start-up is `use(...)` → `start()` → `load()`. `start()` installs the modules, so their persistent refs exist, but does not load the save. `load()` applies the save to them, and on first launch it reports `not-found`. `load()` before `start()`, or after `dispose()`, throws.
 
-With persistence on, the engine autosaves every 30 s. `autoSaveInterval` sets the period, and 0 turns autosave off. `engine.autoSaveInterval` retunes it at runtime, so a player's autosave setting writes there. Autosave holds until a load has run, so a late `load()` never finds defaults written over its save. In dev, a first tick before any load warns while autosave is on. Call `engine.save()` at checkpoints such as a run's end, on top of the interval.
+With persistence on, the engine autosaves every 30 s. `autoSaveInterval` sets the period, and 0 turns autosave off. `engine.autoSaveInterval` changes it while the game runs, so a player's autosave setting writes there. Autosave waits until a load has run, so a late `load()` never finds its save overwritten with defaults. In dev, a first tick before any load warns while autosave is on. Call `engine.save()` at moments such as a run's end, in addition to the interval.
 
-A load that fails for any reason but `not-found` protects its slot: autosave and `save()` skip it until `saveManager.releaseSlot(id)` or `deleteSave()`, and `save:slot-protected` fires for a UI that offers "discard the unreadable save". `ctx.onLoad` fires after every successful load path (`engine.load()`, the save manager's `load` / `importSave`, harness `createEngineFromSave`), and `ctx.onSave` before every serialization, autosave and `exportSave` included. "Saved" UI keys off `save:written`, not `onSave`: it fires only once `save`, `saveToSlot` or autosave has written the slot.
+A load that fails for any reason except `not-found` protects its slot from writes until `saveManager.releaseSlot(id)` or `deleteSave()`. It emits `save:slot-protected` for a UI that offers to discard the unreadable save. `ctx.onLoad` runs after every successful load path, and `ctx.onSave` before every serialization. A "Saved" UI listens to `save:written`, not `onSave`, which is emitted only once a slot is written.
 
 ### Persistent context
 
-All engine state that survives save/load must be created inside a persistent context. `withPersistentContext` runs a block inside the context and guarantees the context closes even if the block throws — return whatever refs the caller needs and destructure on the outside:
+All persistent engine state must be created inside a persistent context. `withPersistentContext` runs a block inside one, and closes it even if the block throws. Return the refs the caller needs, and destructure them outside:
 
 ```ts
 const { wood, stone } = withPersistentContext('my-resources', () => ({
@@ -156,11 +166,11 @@ const { wood, stone } = withPersistentContext('my-resources', () => ({
 }));
 ```
 
-The context ID and each ref's `id` make up the save key. Changing either breaks existing saves.
+The persistent context id and each ref's `id` make up the save key. A change to either breaks existing saves.
 
 ### Resetting persistent refs in bulk
 
-Use `createReset`'s `resetPersistentContexts` for module-scoped resets instead of manually enumerating refs. The reset resolves each module ID to that module's persistent refs, nested category and per-definition contexts included, each time it runs — so refs made in `connect()` or by a module installed later are in scope, and an ID naming no module logs a warning:
+To reset whole modules, use `createReset`'s `resetPersistentContexts` instead of listing refs by hand. Each time the reset runs, it resolves each module id to that module's persistent refs, its category and per-def persistent contexts included. So refs made in `connect()`, or by a module installed later, are in its reset scope. An id that names no module logs a warning:
 
 ```ts
 const prestigeReset = createReset({
@@ -168,15 +178,22 @@ const prestigeReset = createReset({
 });
 ```
 
-So adding a resource, upgrade, producer, or category entry inside a module scope automatically joins resets that reference that module — no cross-file coordination.
+So a resource, purchasable, producer or category entry you add inside a module joins every reset that names that module.
 
-**System-owned cross-run state is lifetime.** Resource `cumulative` / `best`, accumulator-skill `lifetimeBonus`, cycle `count` / `bestTime`, time `totalPlayTime`, BestOf records, run-pool aliveness, automation unlocks, recommendation settings, dialog state, achievement `earned` / `earnedAt` and challenge `active` / `completions` are tagged `lifetime`: neither `resetPersistentContexts` nor a `thingsToReset` walk over an object or category touches them. Wipe one by naming the ref itself in `thingsToReset`, or through the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state — skill `xp`, cycle `elapsed`, TimeBank `banked` (carry it with `keep`) — so a looper's between-run reset over a skill-category module wipes xp and keeps the permanent bonus, which is the intended cycle shape. A module reset also sweeps an `ActionCategory`'s queue or list, current item, cursor and pause flag, and fires no `cancelled`; `thingsToReset: [category]` reaches only its per-def state.
+**The systems' lifetime refs.** These system refs are tagged `lifetime`:
 
-A system or category in `thingsToReset` resets what it owns — its own persistent context, or each entry's per-definition context — and nothing it merely names: a purchasable's cost resource, a producer's output, a ref passed as `limit` or `visibility`. List those explicitly when the reset should clear them.
+- resource `cumulative` / `best`, accumulator skill `lifetimeBonus`;
+- cycle `count` / `bestTime`, time `totalPlayTime`;
+- BestOf records, run pool aliveness, automation unlocks, recommendation settings, dialog state;
+- achievement `earned` / `earnedAt`, challenge `active` / `completions`.
 
-Resource writes inside `onReset`, `afterReset` listeners and a cycle's `onEnd` run under the load guard and never reach `cumulative` / `best` — including a reset run from inside another's hooks, since the guard holds until the outermost reset ends. Grant prestige currency after `reset()` returns, or in `afterEnd`.
+Neither `resetPersistentContexts` nor a `thingsToReset` walk over an object or a category writes them. To clear one, name the ref itself in `thingsToReset`, or use the system's own verb (`resetUnlocks`, `clearAll`). The rest is run state: skill `xp`, cycle `elapsed`, TimeBank `banked` (hold it with `keep`). So a reset between runs over a skill category's module clears xp and keeps the lifetime bonus, which is the intended cycle. A module reset also clears an `ActionCategory`'s queue or list, current item, cursor and pause flag, and emits no `cancelled`. `thingsToReset: [category]` reaches only its def state.
 
-Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved scope, evaluated at reset time. Refs in `keep` survive verbatim; refs in `retain` are snapshot before the wipe, run through the supplied transform, and written back after:
+A system or category in `thingsToReset` resets what it owns: its own persistent context, or each entry's per-def persistent context. It does not reset what it only names: a purchasable's cost resource, a producer's output, a ref passed as `limit` or `visibility`. List those explicitly when the reset should clear them.
+
+Resource writes inside `onReset`, `afterReset` handlers and a cycle's `onEnd` run under the settle guard, and never reach `cumulative` / `best`. That includes a reset run from another reset's handlers, because the guard holds until the outermost reset ends. Add the prestige gain after `reset()` returns, or in `afterEnd`.
+
+Inline `keep` and `retain` on the same `createReset` act as a denylist over the resolved reset scope, evaluated at reset time. Refs in `keep` keep their value verbatim. Refs in `retain` are captured before the clear, passed through the given transform, and written back after:
 
 ```ts
 const prestigeReset = createReset({
@@ -186,21 +203,29 @@ const prestigeReset = createReset({
 });
 ```
 
-A `Resource` returned by `createResource` is itself the `Persistent` handle (`Resource<T> & Persistent<T>`), so pass it directly to `keep` / `retain` — no `.amount` indirection. Inline `keep`/`retain` is shorthand for `createRetention`; drop to the standalone factory only when the same policy spans more than one reset.
+A `Resource` from `createResource` is itself the `Persistent` handle (`Resource<T> & Persistent<T>`). So pass it to `keep` / `retain` directly, with no `.amount`. Inline `keep` / `retain` is shorthand for `createRetention`. Use the standalone factory only when one retention spans more than one reset.
 
-### Category systems scope their own persistence
+### Categories own their persistent contexts
 
-Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory`, etc.) wrap each registered definition in its own persistent context, `{categoryId}/{def.id}`. That id is the **save key** as given — it isn't prefixed with the ambient module, so keep category ids unique across the game. **Reset scope** is a different axis: the per-definition context is still recorded as a child of the module the category was built in, so a reset naming that module reaches every entry's run state. Only `lifetime` refs escape it (§ Resetting persistent refs in bulk). Keep a category whose run state must outlive a prestige in a module no reset names.
+Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory` and the others) wrap each def in its own persistent context, `{categoryId}/{def.id}`. That id starts the **save key** as given. The enclosing module does not prefix it, so keep category ids unique across the game. The **reset scope** is a separate question. The per-def persistent context is still recorded as a child of the module that built the category. So a reset that names that module reaches every entry's run state. Only `lifetime` refs are outside it (§ Resetting persistent refs in bulk). Put a category whose run state must survive a reset in a module that no reset names.
 
-For challenges that means `active` and `completions` survive every prestige tier (the genre convention), and a challenge stays entered through the prestiges played inside it. Naming `'my-challenges/ic1'` in `resetPersistentContexts` doesn't reset them; to wipe completions, name the refs — `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
+For challenges, `active` and `completions` survive every prestige layer, which is the genre convention. A challenge also stays entered through every reset played inside it. Naming `'my-challenges/no-upgrades'` in `resetPersistentContexts` does not reset them. To clear completions, name the refs: `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
 
-Rebuilding runtime state from persisted refs is hydration, and the engine does it itself after every load and reset — a challenge category re-applies an active challenge's overrides and patches, so there is nothing to call from `onLoad`. A public `restore(x)` is a different operation: it writes back what the same object's `snapshot()` or `serialize()` produced, such as a slot loadout or a resource-bag record, and brings the object's hooks in line as a load would. These engine reconciles (challenge scopes, achievement and automation latching, slot hook resync, temporary-effect rebuild) run after every `ctx.onLoad`: a watcher on what they write sees state `onLoad` rebuilt, while `onLoad` itself sees them unreconciled. A reconcile that throws after a successful load leaves the load standing and fires `save:reconcile-failed`. A load restores `earned` without firing `onComplete`, so `onComplete` may grant a reward; and an achievement whose requirement holds once a load settles (one added in a content update, or one a reset wiped by name) latches then. Challenge `onEnter` / `onExit` run only on a player entry or exit, so they may write game state; runtime-only setup that must come back after a load derives from `challenge.active`. A temporary-effect system rebuilds its live instances from the save, calling each def's `onHydrate` (else `onActivate`) and never `onExpire` on the instances it replaces, so a def whose `onActivate` grants game state needs an `onHydrate`; a reset that clears the system drops its instances without `onExpire` too.
+Rebuilding live state from persistent refs is hydration, and the engine does it after every load and reset. For example, a challenge category re-applies an entered challenge's overrides and patches, so `onLoad` has nothing to call. A public `restore(x)` is a different operation. It writes back what the same object's `snapshot()` or `serialize()` produced, such as a loadout or a resource bag record. Then it brings the object's handlers in line, as a load would.
 
-### Bindings re-hydrate from install, not from save
+Hydration runs after every `ctx.onLoad`. It covers challenge overrides, achievement and automation latching, loadout handlers and the temporary-effect rebuild. A watcher on what hydration writes already sees the state `onLoad` rebuilt, but `onLoad` itself sees the state before hydration. A hydration that throws after a successful load leaves the load standing, and emits `save:hydration-failed`.
 
-Modifier bindings (`chain.bind`, `Grant` lowerings, `ConditionalEffectSystem.register`) aren't serialized — closures can't round-trip. They live in module install code, which runs once at `start()`, before `load()` hydrates anything, so install sees default values. Bind unconditionally with `active` / `multiplier` closing over persistent refs: those are reactive, so the chain follows the refs through every load, import and reset the same tick.
+These option callbacks differ between play and a load:
 
-The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads the default once at install and never re-fires. Bind unconditionally and let `active` gate. `active` is a `Computable<boolean>` (`T | Readonly<Ref<T>> | () => T`), so all three of these are valid:
+- A load restores `earned` without `onComplete`, so `onComplete` may grant a reward. An achievement whose goal holds once a load settles latches then, and its `onComplete` runs.
+- Challenge `onEnter` / `onExit` run only when a player enters or exits, so they may write game state. Derive ephemeral setup that must come back after a load from `challenge.active`.
+- A temporary-effect system calls `onHydrate`, else `onActivate`, and never `onExpire`. So a def whose `onActivate` writes game state needs an `onHydrate`. A reset that clears the system also drops its instances without `onExpire`.
+
+### Bindings are rebuilt at install, not loaded
+
+Modifier bindings (`chain.bind`, grants, `ConditionalEffectSystem.register`) are not serialized, because closures cannot round-trip. They are in module install code, which runs once at `start()`, before `load()` writes anything. So install sees ref defaults. Bind unconditionally, with `active` / `multiplier` reading persistent refs. Those are reactive, so the chain follows the refs through every load, import and reset in the same tick.
+
+The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads the default once at install and never runs again. `active` is a `Computable<boolean>` (`T | Readonly<Ref<T>> | () => T`), so all three forms are valid:
 
 ```ts
 // Ref in hand — preferred, no closure
@@ -211,17 +236,17 @@ chain.bind({ active: () => hasResource(ref.action, 1) && upgrade.active.value, m
 chain.bind({ modifier })  // omit `active` entirely
 ```
 
-Reach for the getter only when the predicate is derived from more than one source; if you already have a `Ref<boolean>`, pass it as-is.
+Use the getter only when the predicate derives from more than one source.
 
-### Writing migrations
+### Writing save migrations
 
-When you bump `EngineOptions.saveVersion`, supply a `saveMigrations` entry for each version that transforms data from `v → v+1`. Migrations run sequentially over the raw decoded save object before validation and deserialize. A step must return the object: one that returns nothing doesn't compile, and fails the load at runtime. Changing a default is a migration too — a leaf at the old default was pruned from the save, so it loads as the new default, and a migration sees `undefined` for it, meaning "the writing build's default". The engine ships a small kit of pure transforms — compose them in the migration body rather than hand-rolling traversal each time.
+When you bump `EngineOptions.saveVersion`, supply a `saveMigrations` entry per version, which transforms the save data from `v` to `v+1`. Save migrations run in order over the raw decoded save data, before validation and deserialization. A step must return the data. One that returns nothing does not compile, and fails the load at runtime. A changed ref default needs a save migration too. A leaf at the old default was pruned from the save, so it loads as the new default. A save migration sees `undefined` for it, which means "the writing build's default". The engine ships a small kit of pure transforms. Compose them in the step instead of writing a traversal each time.
 
 ```ts
-import { renameField, retypeField, forEachDef, type SaveMigration } from '@open-loop/engine';
+import { renameField, forEachDef, type SaveMigration } from '@open-loop/engine';
 
 const saveMigrations: Record<number, SaveMigration> = {
-  // v1 → v2: definitions gained derived fields — iterate each entry, seed with `??=`.
+  // v1 → v2: defs gained derived fields — iterate each def, seed with `??=`.
   1: (data) => {
     for (const group of ['jobs', 'constructions', 'exploration']) {
       forEachDef(data, group, (entry) => {
@@ -232,28 +257,32 @@ const saveMigrations: Record<number, SaveMigration> = {
   },
   // v2 → v3: rename a top-level group via a named helper.
   2: (data) => renameField(data, 'oldModule', 'newModule'),
-  // v3 → v4: number → Decimal — engine deserialize accepts string-encoded Decimals.
-  3: (data) => retypeField(data, 'inventory.gold', (v) => String(v)),
 };
 ```
 
-The helpers share their `.`-split nested-path convention, silent no-op on missing paths, and mutate-and-return semantics with the engine's serialize/deserialize paths — read their tsdoc for the per-helper detail. `getNested` / `setNested` are the raw escape hatch for one-off shapes that don't fit a named helper.
+Every helper mutates the data and returns it, and a missing path is a silent no-op. Each helper's TSDoc has its detail. `getNested` / `setNested` are the raw form for one-off shapes that no named helper fits.
 
-Drop to a hand-rolled callback only when a migration needs cross-field invariants (compute one field from two others), structural reshaping (collapse two contexts into one), or persistent-ref-registry interaction (legacy ID-to-name remaps — already handled internally). The engine emits `save:migration-applied { from, to }` per migration, so per-step logging belongs in an event listener, not the migration body.
+Write the step by hand only when it needs one of these:
+
+- a cross-field invariant, such as one field computed from two others;
+- a structural change, such as two persistent contexts merged into one;
+- work against the persistent-ref registry. The engine already handles old id-to-name remaps there.
+
+The engine emits `save:migration-applied { from, to }` per step, so per-step logging belongs in an event handler, not the step.
 
 ## Conversions
 
-`createConversion` is an atomic multi-resource transformation: spend inputs through `Requirement`s, produce outputs against a snapshot of what those inputs charged. Crafting recipes (`{wood: 100, mineral: 50} → {beam: 1}`), market trades (`{gold: 5} → {wood: 1}`), and exchange actions (`{gold: 'all'} → {mana: ({gold}) => gold * 50}`) are what the machinery is for — multi-input atomicity plus a snapshot taken before any mutation, so same-resource compounding (an output producing more of an input type) is well-defined.
+`createConversion` is an atomic transformation over several resources, for crafting, market trades and exchange actions. It spends inputs through `Requirement`s, and produces outputs against a snapshot taken before any write. So an output that adds to an input's resource is well-defined.
 
-**Inputs are Requirements, not necessarily costs.** A `createBooleanRequirement`, or a `createCostRequirement` with `requiresPay: false`, gates `canConvert` and charges nothing. That is the second shape shipping games use: a *gated trigger* whose real spend is a reset fired from `afterConvert`.
+**Inputs are Requirements, not necessarily costs.** A `createBooleanRequirement`, or a `createCostRequirement` with `requiresPay: false`, decides `canConvert` and costs nothing. That is the second shape shipping games use: a *conditional trigger* whose real spend is a reset run from `afterConvert`.
 
-Conversion and reset are composed externally — the factory holds no `Reset` reference:
+Conversion and reset are combined outside the factory, which holds no `Reset` reference:
 
 ```ts
 const prestige = createConversion({
   inputs: {
     ready: createBooleanRequirement({
-      requirement: () => Decimal.gte(runScore.value, threshold),
+      met: () => Decimal.gte(runScore.value, threshold),
       description: 'Run score reached',
     }),
   },
@@ -266,15 +295,15 @@ const prestige = createConversion({
 // At the call site: if (prestige.canConvert.value) prestige.convert();
 ```
 
-**Prestige does not require a Conversion.** `createReset` plus a gain function is the entire pattern, and several shipping games compose it that way rather than routing through this factory. Reach for a Conversion when you want gate + gain + reset bundled behind one `convert()` with `canConvert` / `currentGain` for the UI to read; drop to `createReset` when you don't. Neither is the blessed path.
+**Prestige does not require a Conversion.** `createReset` plus a gain function is the whole composition, and several shipping games build it that way without this factory. Use a Conversion to put the test, the gain and the reset behind one `convert()`. It gives the UI `canConvert` / `currentGain`. Use `createReset` alone when you do not. Neither path is preferred.
 
-For the gain curve itself, compose the arithmetic you need rather than looking for a prestige-formula helper — the engine ships none. A fixed-exponent floored root is `integerRoot`; a curve whose exponent moves at runtime is a `Formula` chain, which also inverts for a "next at" display. For the per-source sublinear payout shape built on the former, see [consumer-guide-recipes.md §Sublinear per-source prestige payouts](./consumer-guide-recipes.md#sublinear-per-source-prestige-payouts).
+For the gain curve itself, compose the arithmetic you need. The engine ships no prestige-formula helper. A floored root with a fixed exponent is `integerRoot`. A curve whose exponent changes during play is a `Formula`, which also inverts for a "next at" display. The recipe [consumer-guide-recipes.md §Sublinear per-source prestige payouts](./consumer-guide-recipes.md#sublinear-per-source-prestige-payouts) builds a per-source sublinear payout on `integerRoot`.
 
 ## Modifier chains and effects
 
-The word "effect" wears two hats in this section. `IEffect` / the `E` builder / `GameStateMutator` are the **state-mutation AST** — declarative writes evaluated against the ambient runtime. `createConditionalEffectSystem` / `createTemporaryEffectSystem` are **binding-lifecycle managers** — they hold live modifier registrations and activate/deactivate them as predicates flip. "Persistent" in the system name refers to the binding's durability across reloads, not to save serialization — the modifier bindings themselves are rebuilt from the defs, never read from the save (see § Bindings re-hydrate from install). A temporary effect does save which instances are active and how long each has left, and rebuilds their bindings from that after every load and reset. The modifier chain is the surface that bindings (from either source) push onto.
+"Effect" has two senses in this section. `IEffect`, the `E` builder and `GameStateMutator` are the **effect**: a declarative state write, evaluated against game state. `createConditionalEffectSystem` and `createTemporaryEffectSystem` are the **effect systems**. They hold live modifier bindings, and activate or deactivate them as predicates flip. The engine rebuilds those bindings from the defs, and never reads them from the save (§ Bindings are rebuilt at install, not loaded). A temporary-effect system does save which instances are active and how long each has left. After every load and reset, it rebuilds their bindings from that. Bindings from either source go onto a modifier chain.
 
-`createModifierChain` is a named, composable modifier multiple modules can push onto — a shared surface for production bonuses, yield multipliers, or any value many systems contribute to:
+`createModifierChain` is a named, composable modifier that several modules can add to. It is a shared chain for production multipliers, or for any value that many systems change:
 
 ```ts
 // Module A creates the chain
@@ -287,50 +316,55 @@ productionChain.add(createMultiplicativeModifier({
 }));
 ```
 
-A chain evaluates in insertion order, so `+10` then `×2` differs from `×2` then `+10`. A binding's `active` gates it where it sits, `chain.reserve()` holds a position for modifiers added later, and `chain.replace(old, next)` swaps in place; a raw `remove` + `add` moves the contribution to the end. Both effect systems place each binding by registration order — a static `modifiers` array claims its positions at `register`, a factory array on first activation — so a chain's value depends on which effects are active, not on the order they activated.
+A chain evaluates in insertion order, so `+10` then `×2` differs from `×2` then `+10`. `chain.replace(old, next)` keeps a modifier's position, but `remove` + `add` moves it to the end. Both effect systems place each binding by registration order. So a chain's value depends on which effects are active, not on the order they activated.
 
-Nothing reads a shared chain until something binds it. A producer's output runs through its own `rateChain`, so bind the shared chain into each one; `mapState` runs per producer, including those a mod registers later:
+Nothing reads a shared chain until something binds it. A producer's output runs through its own `rateChain`, so bind the shared chain into each one. `mapState` runs for each producer, including those a mod registers later:
 
 ```ts
 createProducerCategory<BuildingDef>({
   id: 'buildings',
   registerTick: ctx.onTick,
-  mapProducer: (def) => ({ resource: cookies, baseRate: def.baseRate, trigger: 'continuous' }),
-  mapState: (_def, producer) => { producer.rateChain.bind({ modifier: productionChain, description: 'Production' }); },
+  mapProducer: (def) => ({ resource: eggs, baseRate: def.baseRate, trigger: 'continuous' }),
+  mapState: (_def, producer) => { producer.rateChain.bind({ modifier: productionChain, text: 'Production' }); },
 });
 ```
 
-Pass the `description` (or an `id`): bind derives the binding's attribution id from the modifier's description, and a shared chain has none while it is empty or holds an undescribed modifier, so a bare bind throws "cannot auto-derive binding id" whenever `mapState` runs before the chain fills.
+Pass the `text`, or an `id`. Without them, bind derives the binding's attribution id from the modifier's description. A shared chain has no description while it is empty or holds a modifier without one. So a bare bind throws "cannot auto-derive binding id" whenever `mapState` runs before the chain fills.
 
-For conditional modifiers (active only when a condition is met), there are three levels; pick the most-specific one that fits:
+For a modifier in force only while a condition holds, there are three forms. Choose the most specific one that fits:
 
-- **Declarative category fields (`grants` / `restricts` / `rewards`)** — preferred when the modifier's lifecycle matches a category signal. Purchasable and achievement categories expose `grants?: Grant[]` (active while the purchasable's `active` ref is true / the achievement is earned); challenge categories expose `restricts?: Grant[]` (active during the challenge) and `rewards?: Grant[]` (active after at least one completion). Each `Grant` lowers to a `chain.bind` call with scope-derived attribution — zero per-binding ceremony, balance-sim sees the contribution with an id like `ad-ip-upgrades/totalTimeMult/Time Dilation`.
+- **Declarative category fields (`grants` / `restricts` / `rewards`)** — preferred when the modifier's lifecycle matches a category signal. Purchasable and achievement categories have `grants?: Grant[]`, in force while the purchasable's `active` ref is true or the achievement is earned. Challenge categories have `restricts?: Grant[]`, in force while the challenge is entered, and `rewards?: Grant[]`, in force after at least one completion. Each grant becomes a `chain.bind` call, with attribution from the persistent context. So a grant needs no per-binding setup, and the balance harness sees its modifier with an id like `research/overclock/Overclock`.
 
   ```ts
-  createPurchasableCategory<IPUpgradeDef>({
-    id: 'ad-ip-upgrades',
+  createPurchasableCategory<ResearchDef>({
+    id: 'research',
     mapPurchasable: (def) => ({
       display: { title: def.title, description: def.description },
-      requirements: createCostRequirement({ resource: infinityPoints, cost: def.cost }),
+      requirements: createCostRequirement({ resource: researchPoints, cost: def.cost }),
       limit: 1,
       grants: [
-        { chain: productionChain, mult: () => computeMult(), description: 'Time Dilation' },
+        { chain: productionChain, mult: () => computeMult(), description: 'Overclock' },
       ],
     }),
   });
   ```
 
-- **`chain.bind({ active, modifier })`** — the primitive the declarative fields lower to. Use directly when you have a one-off 1:1 binding that doesn't fit a category signal (ad-hoc module-level buffs, unlock-gated conditional modifiers). Auto-derives an attribution id from the ambient `withPersistentContext` scope and the modifier's description; duplicate ids within one chain throw. Binding is **synchronous** — purchase an upgrade and `chain.apply(...)` reflects the contribution the same tick, no `nextTick()` needed. Bindings aren't persisted — the install-time binding follows its refs reactively across loads (see § Bindings re-hydrate from install, not from save).
+- **`chain.bind({ active, modifier })`** — the primitive under the declarative fields. Use it directly for a one-off binding that fits no category signal. Examples are a module-level modifier and one behind an unlock. It derives an attribution id from the enclosing persistent context and the attribution text, and a duplicate id in one chain throws. Binding is **synchronous**. Purchase an upgrade, and `chain.apply(...)` includes the modifier in the same tick, with no `nextTick()`.
 
-- **`createConditionalEffectSystem`** — keep this for cases that `chain.bind` can't cover cleanly: multi-chain atomic bindings where all chains must activate/deactivate together, bindings with `onActivate` / `onDeactivate` side-effect hooks, or explicit registration outside any category-driven lifecycle. Its `modifiers` take the same `Grant[]` as the category fields, and so do a temporary effect's, where each shorthand builds a fresh modifier per stack. An `onActivate` that falsifies its own predicate settles deactivated, and a predicate that reads a value its own bindings change throws — don't gate a bonus on the chain it boosts. `getActive()` / `getByTag()` are reactive.
+- **`createConditionalEffectSystem`** — for what `chain.bind` cannot cover cleanly:
+  - a binding over several chains that must activate and deactivate together;
+  - a binding with `onActivate` / `onDeactivate` option callbacks;
+  - a registration outside any category lifecycle.
 
-When a challenge or prestige layer replaces one multiplier with another while active (a challenge that rewires tickspeed to a different source is the canonical example), use `replacementGrants` to generate the cancel + replacement pair as one call. It returns two separately-described grants so attribution stays intact — do not use `OverrideRegistry` for this, which bypasses the chain and defeats introspection.
+  Its `modifiers` take the same `Grant[]` as the category fields, and so do a temporary-effect system's. A predicate that reads a value its own bindings change throws. So do not make a modifier depend on the chain it raises.
 
-The most common shape this ladder gets used for — one definition's yield scaled by another definition's state — is worked in [consumer-guide-recipes.md §Cross-action bonuses](./consumer-guide-recipes.md#cross-action-bonuses).
+A challenge or prestige layer may replace one multiplier with another while it is in force. An example is a challenge that takes a production multiplier from a different source. For this, use `replacementGrants`, which builds the cancel grant and the replacement grant in one call. The two grants have separate descriptions, so attribution stays intact. Do not use `OverrideRegistry` for this, because it bypasses the chain and defeats introspection.
 
-## Tunable knobs
+[consumer-guide-recipes.md §Cross-action bonuses](./consumer-guide-recipes.md#cross-action-modifiers) works the most common use of these forms: one def's yield scaled by another def's state.
 
-Balance constants — base rates, cost growth, multipliers — declare at their reader sites through `tunable()`, which exposes them via a tuning registry any external surface can read: a balance probe sweeping a knob, a live dev-panel slider, a mod config, an A/B harness. Declare them there from the first pass rather than collecting them in a parallel constants file; two homes for one number has no rule for which wins. Where the values come from in the first place is [consumer-guide-balance.md](./consumer-guide-balance.md).
+## Tunables
+
+Balance constants are declared where they are read, through `tunable()`. That puts them in a tuning registry that balance probes, dev panels and mods can read. Declare them there from the first pass, not in a separate constants file. Two homes for one number have no rule for which wins. [consumer-guide-balance.md](./consumer-guide-balance.md) covers where the values come from.
 
 ```ts
 // modules/tuning.ts — the registry, shared by every reader site
@@ -340,41 +374,50 @@ export const tuning = createTuningRegistry('my-game');
 const baseRate = tunable(tuning, 'producers/tier1/baseRate', () => 0.5);
 const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
 
-// data/producers.ts — structural, not a knob: left unwrapped
+// data/producers.ts — structural, not a tunable: left unwrapped
 export const prestigeEligibleThreshold = 1_000_000;
 ```
 
-The wrap returns a `ComputedRef` that reads registry-then-default; `pushOverrides` and the cleanup it returns install and pop override layers reactively (see `tunable()` tsdoc for the scoped-stack mechanics). The design payoff is two-fold. First, the wrap surface doubles as documentation of *what's a knob*: wrap values external surfaces should touch, leave structural constants (architectural thresholds, fixed step counts, level boundaries) unwrapped, and a reviewer scanning the registry sees exactly what's safe to perturb. Second, transient takeovers — sim runs, what-if probes, balance bisections — push a scope, run, restore: base values come back with no manual cleanup.
+`tunable()` returns a `ComputedRef` that reads the tuning registry's scoped overrides, else its default. `tuning.pushOverrides(label, …)` pushes overrides, and the cleanup it returns pops them. The design gives two things:
 
-Key naming convention: namespace with `category/entity/field` slashes (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Greppable, sortable, and clear about what each key controls when the registry is enumerated.
+- **The wraps document *what is a tunable*.** Wrap the values that external tools should change. Leave structural constants unwrapped: architectural thresholds, fixed step counts, level boundaries. A reviewer who scans the tuning registry then sees exactly what is safe to perturb.
+- **Temporary overrides need no manual cleanup.** Headless runs, what-if probes and balance bisections push overrides, run and pop them.
 
-For the cross-engine layer that walks these registries (balance workbench, sim picker, dev panels) see `api/introspection.md#override-registry` — `createTuningRegistry` auto-enrolls into `TuningRegistriesKey` (the picker's enumeration surface) when constructed inside the engine's install/connect ambient. `createOverrideRegistry` is the broader primitive underneath — reach for it directly when the override target is a non-numeric function the picker shouldn't surface (challenge takeover, mod fn replacement, sim swap). For modifier-chain replacement specifically, prefer `replacementGrants` (§Modifier chains) over a raw `OverrideRegistry` swap — it keeps chain attribution intact.
+Name a key by slash-separated segments for category, def and field (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Such keys are greppable, sortable, and clear about what each one controls when the tuning registry is listed.
+
+Built inside install/connect, `createTuningRegistry` enrolls itself in `TuningRegistriesKey`, which the picker enumerates. `createOverrideRegistry` is the broader primitive beneath it. Use it directly when the override target is a non-numeric function that the picker should not show. To replace a modifier, prefer `replacementGrants` over a raw `OverrideRegistry` override, because it keeps chain attribution intact.
 
 ## Introspection
 
-External tools (devtools panels, balance probes, UI hints, mods) walk the live engine surface through opt-in injection keys — `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. No install-time coupling: anything with an engine handle can enumerate without being wired into its module graph.
+External tools, such as devtools panels, balance probes, UI hints and mods, walk the live engine through opt-in injection keys: `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. Nothing couples them at install. Anything with an engine instance can enumerate them without being wired into its module graph.
 
-The "game code never imports harness" rule applies to runtime gameplay modules (per-tick logic, content registrations, effect bindings). Tooling consumers — devtools panels, balance probes, "upcoming unlock" hints, content-introspecting mods — are a separate class and may import the harness walkers and picker freely. Keep tooling imports in their own module so the gameplay/tooling boundary stays legible.
+The rule that game code never imports the balance harness is for gameplay modules: per-tick logic, content registration, effect bindings. Tooling may import the balance harness's walkers and picker freely. Keep tooling imports in their own module, so the line between gameplay and tooling stays clear.
 
 Two query shapes recur:
 
-- **"What can modify this value, and where does it come from?"** — `createPickerSnapshot` walks content + chains + tunables and deduplicates by `Modifier` identity. Content entries are declared effect bindings, active or not; chain entries are what the chains hold now. See `api/harness.md#picker`.
-- **"What changes next?"** — the transition-walker family returns pending state transitions across challenges/purchasables/producers with `TransitionDistance` per emission. Two adoption shapes, picked by recomputation cadence: `createTransitionSnapshot` rebuilds from scratch on each call (one-shot probes, coarse-cadence UIs), `createIncrementalSnapshot` caches with per-label dependency tracking and `invalidate*` axes (event-stepping probes that rebuild per simulated event). See `api/harness.md#transition-walker`.
+- **"What can change this value, and where does it come from?"** — `createPickerSnapshot` walks content, chains and tunables, and deduplicates by `Modifier` identity. Its content entries are declared effect-system bindings, active or not. Its chain entries are what the chains hold now. See `api/harness.md#picker`.
+- **"What changes next?"** — the transition walkers return pending transitions, each with a `TransitionDistance`. `createTransitionSnapshot` rebuilds on each call. `createIncrementalSnapshot` caches, for probes that rebuild after each simulated event. See `api/harness.md#transition-walker`.
 
-Null `distance.seconds` is intentional and consumer-interpreted: a stasis analyzer treats it as "cannot rule out this transition"; a countdown UI hides null rows entirely. The walker never makes that policy call.
+A null `distance.seconds` is intentional, and the consumer interprets it. A stasis analyzer treats it as "cannot rule out this transition", and a countdown UI hides null rows.
 
-Neither snapshot subscribes to reactive changes — consumers drive recomputation cadence themselves. Broader "can this predicate still fire?" coverage would need a budget-bounded layer composing the walker with rate and input checks; that's deliberately absent, not overlooked.
+Neither snapshot subscribes to reactive changes, so consumers decide when to recompute. Broader "can this predicate still hold?" coverage would need a search with a budget that combines the walker with rate and input checks. It is absent on purpose, not by oversight.
 
 ## Composition recipes
 
-Recurring shapes consumers assemble from engine primitives — worked patterns from the consumer corpus, not engine symbols — live in [consumer-guide-recipes.md](./consumer-guide-recipes.md): action execution, worker pools, persona rosters, priority-weighted fill, dialog and subjects, spatial boards, cross-action bonuses, prestige payouts, and the shared pure state-function. Reach for it when you're building one of those.
+[consumer-guide-recipes.md](./consumer-guide-recipes.md) has the recurring shapes that consumers build from engine primitives. They are worked examples from consumer code, not engine symbols:
+
+- action execution, worker pools, persona rosters, priority-weighted fill;
+- dialog and subjects, spatial grids, cross-action bonuses, prestige payouts;
+- the shared pure state function.
+
+Read it when you build one of those.
 
 ## When the engine should grow
 
-The engine evolves as consumers use it. Two signals:
+The engine grows as consumers use it. Two signals:
 
-**`TODO(ergonomics)`** — a working but verbose path. When two independent consumers build the same wrapper around the same ceremony, that's the signal to promote it to engine sugar. One consumer's wrapper is a game-side helper; two is a missing engine primitive.
+**`TODO(ergonomics)`** — a path that works but is verbose. When two independent consumers build the same wrapper around the same setup, promote it to engine sugar. One consumer's wrapper is a game-side helper. Two are a missing engine primitive.
 
-**The 10% threshold** — the data-driven escape hatch (level 4) is designed for the ~10% of game logic that a generic engine can't express in typed systems. If your game is spending more than 10% of its module code in `Gate` / `GameStateAccessor` territory, that's a signal: either the engine needs a new typed system for the pattern you're expressing, or the existing system needs a higher-level entry point. File a research ticket, not a workaround.
+**The 10% threshold** — abstraction level 4 is designed for the ~10% of game logic that typed systems cannot express. Suppose more than 10% of your module code is `Gate` / `GameStateAccessor` code. Then either the engine needs a new typed system for that pattern, or an existing system needs a higher-level API. File a research ticket, not a workaround.
 
-The test from [AGENTS.md](../AGENTS.md) § Layering Principle: if you'd copy-paste the same wiring between two different games, it belongs in the engine. If it only makes sense for one game's design, it stays game-side. If it has no opinion about game design at all, it's core.
+The test from [AGENTS.md](../AGENTS.md) § Layering Principle: if you would copy-paste the same wiring between two different games, it belongs in the engine. If it only makes sense for one game's design, it stays in the game. If it has no opinion about game design at all, it is core.

@@ -1,54 +1,88 @@
-# Choosing between engine surfaces
+# Choosing between engine primitives
 
-Which primitive is mine, when two of them overlap. Companion to [consumer-guide.md](./consumer-guide.md) — read the guide for *how to think* about composing the engine; come here holding two candidate names and needing the boundary between them.
+Which primitive is mine, when two of them overlap. Companion to [consumer-guide.md](./consumer-guide.md). Read the guide for *how to think* about composing the engine. Come here holding two candidate names, when you need the boundary between them.
 
-The split against [api/INDEX.md](api/INDEX.md) is by kind, not depth. INDEX answers **"which symbol does X?"** — one hop, no tension, and it stops there. This file answers **"these two overlap and picking wrong doesn't error"** — the cases where the routing answer alone isn't enough, because both candidates compile and only one is right.
+The split against [api/INDEX.md](api/INDEX.md) is by kind, not depth. INDEX answers **"which symbol does X?"**: one hop, no tension, and it stops there. This file answers **"these two overlap and picking wrong doesn't error"**. Those are the cases where the routing answer alone is not enough, because both candidates compile and only one is right.
 
 ## Common disambiguators
 
-**Purchasable vs achievement.** Player-initiated through requirements (and may spend resources) → purchasable. Observed by the game, auto-earns when true → achievement.
+**Purchasable vs achievement.** The player starts it through requirements, and it may spend resources → purchasable. The game observes it, and it is earned once its goal holds → achievement.
 
-**Producer vs predicate-gated purchasable.** Ownership contributes to a rate → producer. Ownership flips a boolean / grants an effect → purchasable (with `createBooleanRequirement` or a Gate-backed requirement). A predicate-gated purchasable doesn't become a producer just because it's gated.
+**Producer vs purchasable behind a predicate.** Ownership adds to a rate → producer. Ownership sets a boolean or applies an effect → purchasable, with `createBooleanRequirement` or a Gate-backed requirement. A purchasable that a predicate blocks is still not a producer.
 
-**TickDriver vs Cycle vs RunPool.** "How does time advance?" → `TickDriver`. "End this gameplay run, reset a scope, replay" → `Cycle`. "Track many independent concurrent run instances" → `RunPool`. The three primitives don't substitute for each other — a game can use all three. `Cycle` is named for that lifecycle rather than for the loop-incremental genre it came from: a prestige layer's reincarnation and a new-game-plus are the same shape and ship on it too.
+**TickDriver vs Cycle vs RunPool.** "How does time advance?" → `TickDriver`. "End this run, reset a reset scope, start the next run" → `Cycle`. "Track many independent concurrent runs" → `RunPool`, whose members are pool runs. The three primitives do not substitute for each other, and a game can use all three. `Cycle` is named for that lifecycle, not for one genre. A prestige layer's reincarnation and a new-game-plus have the same shape, and both are built on it.
 
-**Offline progress strategy.** Four families recur across the corpus — *extrapolation* (closed-form reward for time away), *tick-sim* (replay elapsed time through the loop), *cap-and-trickle* (release banked time at a bounded rate), and *banking* (idle becomes spendable fast-forward inside a later active session). The engine ships **mechanism, not policy**: `processOfflineTime` (blocking chunked replay through the TickDriver — covers extrapolation and tick-sim), `TickDriver.speedMultiplier` (the live tick scaler), the `onTicksOverflow` / `onDeltaOverflow` hooks (the seam for re-routing dropped live-path time instead of discarding it), and the time bank for the *banking* family. Which family you pick, whether catch-up runs blocking or drains gradually over frames, whether live-path overflow is re-routed losslessly, and how screen/menu gating works are all **consumer-side policy** composed on top. Shipping consumers diverge on every one of those axes off the same mechanism — by design; don't reach for an engine primitive to unify them. *Banking* is the one family converging across consumers, so it has a surface: `createTimeBank` is the reservoir (deposit and withdraw; earn policy stays yours), `createBankedAcceleration` spends it as a live speed boost and can bank dropped live time itself (`depositLiveOverflow`), and `burstDischarge` dumps it through `processOfflineTime` in one fast-forward. All of these are in `api/lifecycle.md`.
+**Offline progress.** Four families recur across games:
 
-**Sequencer vs advisor.** If the system has to remember what is currently scheduled, it's a sequencer. If it only needs to choose or recommend from candidates each time it's asked, it's an advisor / selection policy.
+- *extrapolation*: a closed-form reward for the time away;
+- *tick replay*: replay the elapsed time through the game loop;
+- *cap-and-trickle*: release banked time at a bounded rate;
+- *banking*: offline time becomes seconds the player spends later, to accelerate a play session.
 
-**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same conceptual job but different shapes. `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful generator**: the sequencer calls `next()` when its queue runs dry, and the strategy returns the next `SequencerItem<M>` or `null`. Round-robin binds a persistent cursor. `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**: the caller pre-filters candidates and asks `pick(candidates) → T | undefined`. `Recommender` (via `createRecommendationSystem`) is a **scored candidate**: every registered def runs `canApply` / `score` between cycles, and the highest-scoring winner runs `recommend()`. The naming asymmetry (`create*Strategy` verb form vs `selection*` noun form) is deliberate: fill strategies bind closure state, selection policies are stateless dispatchers consumed declaratively (`policy: selectionHybridPayback({ ... })`).
+The engine ships **the mechanism, not the choices**:
 
-Two adjacent primitives sit in the wider advisor family but don't fit the immediate-choice shape above. `createGoalPicker` maintains a **weighted active-goal pool** (between-tick goal arbitration, persistent only when composed with a Loadout; not a one-shot pick). `createRuleAdvisor` aggregates **observation history** into ranked suggestions surfaced to the player (derived from what happened, not selected from candidates). Both live in `api/advisors.md`; read its Canonical entrypoints block for the one-liner role of each.
+- `processOfflineTime`: a blocking replay in chunks through the TickDriver, for extrapolation and tick replay;
+- `TickDriver.speedMultiplier`: the game speed of live play;
+- the `onTicksOverflow` and `onDeltaOverflow` option callbacks: where dropped live time can be re-routed instead of discarded;
+- the time bank, for the *banking* family.
 
-**Formula operations that answer near-identical questions.** Two clusters sit close enough to pick wrong without getting an error for it. *Which input?* — `invert` (algebraic pre-image, unchecked, because the op table composes with it recursively), `tryInvert` (that same answer graded, naming the cases where the target falls in a gap the curve never evaluates into), `firstPassage` (the smallest input at which the curve *reaches* a target — no inverse needed, and usually what a time axis meant). *Which total?* — `evaluateAntiderivative` (bare antiderivative), `cumulative(a, b)` (continuous area across a span), `sum(a, n)` (discrete series).
+The consumer composes the choices on top:
 
-The compressor for both clusters: ask whether your axis is **levels** or **time**. A cost curve is indexed by level, so it wants `sum` — and `calculateCost` / `calculateMaxAffordable` both use it, so a bulk buy prices at exactly what those purchases cost bought singly. A rate integrated over elapsed seconds is `cumulative`, which is what `firstPassage` inverts. The two totals differ by a boundary term, not a rounding error — worth 7.3% on a `1.15ⁿ` curve — so the wrong one is wrong at any tolerance. Per-method failure reasons, gap sizes, and monotonicity and precision constraints live in each method's tsdoc, which cross-links its siblings; read them at the callsite.
+- which family to use;
+- whether catch-up blocks, or runs gradually across intervals;
+- whether dropped live time is re-routed without loss;
+- how screens and menus are blocked during catch-up.
 
-**Introspection vs harness.** "Discover what's live in this engine right now" → introspection. "Run a simulation against this engine state" → harness. A dev panel usually starts with introspection; a balance experiment starts with harness.
+Shipping consumers diverge on each of those axes over the same mechanism, by design. Do not look for an engine primitive to unify them. *Banking* is the one family converging across consumers, so it has engine primitives:
 
-**Unlock taxonomy.** Several primitives flip availability; pick by *who* trips the flip and *what* it gates.
+- `createTimeBank` is the time bank, with deposit and withdraw. The rule for what to deposit stays yours.
+- `createBankedAcceleration` spends it as extra game speed. It can also deposit dropped live time itself (`depositLiveOverflow`).
+- `burstDischarge` replays it through `processOfflineTime` in one burst.
 
-| Shape | Use | Flips |
+All of these are in `api/lifecycle.md`.
+
+**Sequencer vs advisor.** If the system must remember what is scheduled now, it is a sequencer. If it only chooses or recommends from candidates each time it is asked, it is an advisor or a selection policy.
+
+**Three sibling axes for "choose one from a list."** The engine ships three primitives with the same job and different shapes:
+
+- `FillStrategy` (`createConditionalStrategy`, `createPriorityStrategy`, `createRoundRobinStrategy`, `createCompositeStrategy`) is a **stateful chooser**. The sequencer calls `next()` when its queue is empty, and the fill strategy returns the next `SequencerItem<M>` or `null`. Round-robin keeps a persistent cursor.
+- `SelectionPolicy` (`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite`) is a **stateless selector**. The caller pre-filters candidates and asks `pick(candidates) → T | undefined`.
+- `Recommender` (via `createRecommendationSystem`) is a **scored candidate**. After each run ends, every registered recommender runs `canApply`, and each applicable one runs `score`. The highest-scoring winner runs `recommend()`.
+
+The naming asymmetry is deliberate: `create*Strategy` is a verb form, and `selection*` is a noun form. Fill strategies keep closure state. Selection policies are stateless objects with a `pick` method. The `selection*` helpers build them, and they are consumed declaratively (`policy: selectionHybridPayback({ ... })`).
+
+Two adjacent primitives are in the wider advisor family, but do not fit the immediate-choice shape above. `createGoalPicker` keeps a **weighted selection of goals from a candidate pool**. It selects on each `pick()` call, which the consumer makes, often from a tick handler. Its selection is persistent only when composed with a Loadout; it is not a one-shot pick. `createRuleAdvisor` reduces **observation history** to a digest, and ranks suggestions shown to the player. Its suggestions derive from what happened, not from a choice among candidates. Both are in `api/advisors.md`; read its Canonical entrypoints block for the role of each.
+
+**Formula operations that answer near-identical questions.** Two groups are close enough to pick wrong without an error. *Which input?* `invert` is the algebraic pre-image, unchecked, because the op table composes with it recursively. `tryInvert` is that same answer as a graded result. It names the cases where the target falls in a gap the curve never evaluates into. `firstPassage` is the smallest input at which the curve *reaches* a target. It needs no inverse, and it is usually what a time axis meant. *Which total?* `evaluateAntiderivative` is the antiderivative alone. `cumulative(a, b)` is the continuous definite integral over a span. `sum(a, n)` is the discrete series of levels.
+
+The test for both groups: ask whether your axis is **levels** or **time**. A cost curve is a discrete series of levels, one per purchase, so it wants `sum`. `calculateCost` and `calculateMaxAffordable` both use it. So a bulk purchase costs exactly what the same purchases cost one at a time. A rate integrated over elapsed seconds is `cumulative`, which is what `firstPassage` inverts. The two totals differ by a boundary term, not a rounding error: 7.3% on a `1.15ⁿ` curve. So the wrong one is wrong at any tolerance. Per-method failure reasons, gap sizes, and monotonicity and precision constraints are in each method's TSDoc, which links its siblings. Read them at the call site.
+
+**Introspection vs balance harness.** "Discover what is live in this engine now" → introspection. "Run a simulation against this engine state" → balance harness. A dev panel usually starts with introspection; a balance experiment starts with the balance harness.
+
+**Unlock taxonomy.** Several primitives change availability. Choose by *who* causes the change and *what* it blocks.
+
+| Shape | Use | Changes |
 |---|---|---|
-| Player action that charges a cost | `createPurchasableCategory` with `createCostRequirement` | per-instance `active` / `amount` |
-| Predicate flips, no cost | `createPurchasableCategory` with `createGateRequirement` (`+ setupSweepAutoPurchase`) | per-instance `active` |
-| Observed milestone, auto-earns when true | `createAchievementCategory` | per-instance `earned` |
+| Player action that pays a cost | `createPurchasableCategory` with `createCostRequirement` | per-instance `active` / `count` |
+| A predicate holds, no cost | `createPurchasableCategory` with `createGateRequirement` (`+ setupSweepAutoPurchase`) | per-instance `active` |
+| Achievement, earned once its goal holds | `createAchievementCategory` | per-instance `earned` |
 | Named region grouping content | `createZoneSystem` | which entries are *addressable* |
-| Ordered ladder of feature availability | `createAutomationTiers` | which features are exposed |
-| Entity rank / relationship state | `createSubjectCategory` tier field | per-subject tier value |
+| Ordered unlock of automation features | `createAutomationTiers` | which features are exposed |
+| Subject rank or relationship status | `createSubjectCategory` ladder field | per-subject rung |
 
-The first three flip per-instance bits the rest of the game reads directly (`active.value`, `earned.value`). The last three flip *what's even surfaced* — they restructure the addressable set, not a single boolean.
+The first three set per-instance values that the rest of the game reads directly (`active.value`, `earned.value`). The last three change *what is shown at all*. They restructure the addressable set, not a single boolean.
+
 ## Choosing among purchasable primitives
 
-Three paths land in the consumer corpus, each fitting a different shape of need. "Purchase-shaped" here covers anything spent on with a cost requirement — buildings, upgrades, gates, perks, leveled instances:
+Consumers use three paths, and each fits a different shape of need. "Purchase-shaped" here covers anything purchased with a cost requirement: buildings, upgrades, unlocks, perks, repeatable purchases.
 
 | Need | Use |
 |---|---|
-| Building with continuous rate (clicker buildings, ambient auto-producers) | `createProducerCategory` |
-| Upgrades / gates / capped repeatables in batch (perks, milestones, sequential tiers, visibility unlocks) | `createPurchasableCategory` |
-| Per-instance customized leveled purchases (heterogeneous `effect` / `onPurchase` per instance, post-creation per-instance wiring) | raw `createScalingPurchasable` |
+| Building with a continuous rate (clicker buildings, passive producers) | `createProducerCategory` |
+| Upgrades, unlocks and repeatables with a limit, in batch (perks, sequential upgrade rungs, visibility unlocks) | `createPurchasableCategory` |
+| Repeatable purchases customized per instance (a different `effect` / `onPurchase` per instance, wiring after creation) | raw `createScalingPurchasable` |
 
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, `createProducerCategory` bundles cost, count, rate aggregation, autobuy, and payback metric in one definition shape:
+**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `setupPolicyAutoPurchase` accepts it for auto-purchase:
 
 ```ts
 const buildings = createProducerCategory<ProducerDef>({
@@ -64,48 +98,48 @@ const buildings = createProducerCategory<ProducerDef>({
 });
 ```
 
-**No rate, batch shape → purchasable category.** When many instances share an effect mapping — capped repeatables, sequential upgrade tiers, predicate-gated unlocks — `createPurchasableCategory` fits. The mapped `limit` selects the sub-shape: `1` for upgrades and gates, a finite cap for repeatable perks, omitted for unbounded:
+**No rate, batch shape → purchasable category.** When many instances share an effect mapping, `createPurchasableCategory` fits. Examples are repeatables with a limit, sequential upgrade rungs, and unlocks behind a predicate. The mapped `limit` selects the sub-shape: `1` for upgrades and unlocks, a finite limit for repeatable perks, omitted for no limit:
 
 ```ts
 const perks = createPurchasableCategory<PerkDef>({
   id: 'ngplus-perks',
   mapPurchasable: (def) => ({
     display: { title: def.name, description: def.description },
-    requirements: (level) =>
+    requirements: (count) =>
       createCostRequirement({
         resource: dna,
-        cost: Formula.exponential(level, def.baseCost, def.costRatio),
+        cost: Formula.exponential(count, def.baseCost, def.costRatio),
         maxBulkCount: Decimal.dInf,
       }),
     limit: def.maxLevel,
-    effect: (amount) => def.effect(new Decimal(amount).toNumber()),
+    effect: (count) => def.effect(new Decimal(count).toNumber()),
   }),
 });
 ```
 
-**Leveled costs take the factory form of `requirements`.** The callback receives the purchasable's own `amount` ref, which `def` alone can't supply — the ref doesn't exist until `createPurchasable` runs, and `mapState` is too late. Return an array over the same `level` for multi-resource ladders; `maxRequirementsMet` min-folds across them.
+**A cost that scales with count takes the factory form of `requirements`.** The callback receives the purchasable's own `count` ref, which `def` alone cannot supply. The ref does not exist until `createPurchasable` runs, and `mapState` runs too late. For a cost in several resources, return an array over the same `count`; `maxRequirementsMet` takes the minimum across them.
 
-The shape to avoid is a cost getter that reads the level back out of the category (`getPurchasable(def.id)?.amount.value`). It evaluates correctly one purchase at a time, so nothing looks wrong — but a non-Formula cost prices bulk as a linear extrapolation of the current rung, so buy-max undercharges any ladder and over-reports affordability by the same factor. A static cost has no such gap: linear is exact when the price doesn't move.
+The shape to avoid is a cost getter that reads the count back out of the category (`getPurchasable(def.id)?.count.value`). It evaluates correctly one purchase at a time, so nothing looks wrong. But a cost that is not a `Formula` costs a bulk purchase as a linear extrapolation of its current value. So purchase max undercharges any rising cost, and over-reports affordability by the same factor. A static cost has no such gap, because linear is exact when the cost does not move.
 
-**Per-instance closures → raw scaling purchasable.** When you're already iterating per definition and each instance needs its own post-creation wiring — a side-channel modifier closing over the produced purchasable's refs, custom retention listing, mapping into a per-instance lookup — drop to `createScalingPurchasable` directly inside the loop. This is a drop to [Level 3](./consumer-guide.md#level-3-raw-primitives-when-categories-dont-fit); the entry is here because future authors looking for "leveled purchasables" otherwise reach for the category and fight its shape:
+**Per-instance closures → raw scaling purchasable.** Sometimes you already iterate per def, and each instance needs its own wiring after creation. Examples are a side-channel modifier closing over the new purchasable's refs, a custom retention list, or an entry in a per-instance lookup. Then call `createScalingPurchasable` directly inside the loop. This is a drop to [Level 3](./consumer-guide.md#level-3-raw-primitives-when-categories-dont-fit). The entry is here because authors who look for "leveled purchasables" otherwise choose the category, and work against its shape:
 
 ```ts
 for (const def of spellDefs) {
   const purchasable = createScalingPurchasable({
     id: `level-${def.id}`, description: `${def.name} level`,
     resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
-    effect: (amount: DecimalSource) => Decimal.mul(amount, Decimal.mul(def.baseDamage, 0.05)),
-    onPurchase: (amount) => schoolSkills.get(def.school)?.addXp(Decimal.mul(amount, 5)),
+    effect: (count: DecimalSource) => Decimal.mul(count, Decimal.mul(def.baseDamage, 0.05)),
+    onPurchase: (count) => schoolSkills.get(def.school)?.addXp(Decimal.mul(count, 5)),
   });
 
   // post-creation wiring closing over per-instance refs
   spellPotency.add(createAdditiveModifier({
     addend: () => purchasable.effect.value,
-    enabled: () => Decimal.gt(purchasable.amount.value, 0),
+    enabled: () => Decimal.gt(purchasable.count.value, 0),
     description: `${def.name} levels`,
   }));
   spellLevels.set(def.id, purchasable);
 }
 ```
 
-Path C trades self-registration for direct control — like any raw-primitive bypass, the purchasables fall outside the category registry (see [*Categories self-register*](./consumer-guide.md#level-2-category-systems-the-default-for-content) in the guide), so track them at the consumer (`Map<id, Purchasable>`) if anything needs batch access.
+The raw path trades self-registration for direct control. Like any raw-primitive bypass, these purchasables are outside `EngineCategories`, so tooling that walks categories does not see them (see [*Categories self-register*](./consumer-guide.md#level-2-categories-the-default-for-content) in the guide). So track them in consumer code (`Map<id, Purchasable>`) if anything needs batch access.
