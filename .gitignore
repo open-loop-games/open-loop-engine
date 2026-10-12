@@ -10,8 +10,9 @@ docs/notes/
 # Bytecode from scripts/formula-oracle.py's dev-only oracle runs
 __pycache__/
 
-# Claude: commit .claude/CLAUDE.md and rules/, keep the rest private
+# Claude: commit .claude/CLAUDE.md, rules/ and skills/, keep the rest private
 .claude/*
 !.claude/CLAUDE.md
 !.claude/rules/
+!.claude/skills/
 .claude/CLAUDE.local.md
