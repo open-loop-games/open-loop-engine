@@ -8,9 +8,10 @@ Rename manifests, one per breaking release, and the API migration codemod that a
 | `manifests.mjs` | version order, and the manifests a range crosses |
 | `codemod.mjs` | applies manifests to a consumer through the old engine's `.d.ts` |
 | `run.mjs` | the consumer runner: every manifest from the installed engine to the target |
+| `rename.mjs` | the engine side: applies one family of a manifest to `src/` and `tests/` |
 | `residue.mjs` | old names still present after a rename, in a consumer or in the engine |
 | `migration.mjs` | prints a Migration list for a breaking commit's body |
-| `codemod.test.mjs` | fixture pairs, one per entry kind, plus a range; part of `pnpm test` |
+| `api-migrations.test.mjs` | fixture pairs for the codemod and the engine rename; part of `pnpm test` |
 
 Only a breaking release has a folder. A patch renames nothing. No deprecation window exists, because `AGENTS.md` bans `@deprecated` before 1.0.
 
@@ -88,7 +89,7 @@ The codemod's own output can be wrong in three ways. Diff the saved files for th
 ## A breaking release's checklist
 
 1. **Manifest:** add each rename to `<version>/manifest.json` as its commit is made on `next`. `pnpm test` checks every entry's shape.
-2. **Engine:** rename in the engine, one family per commit. `node api-migrations/residue.mjs --engine <version> <family>` lists what the rename left.
+2. **Engine:** `node api-migrations/rename.mjs <version> <family>`, then typecheck and the report's by-hand list. `node api-migrations/residue.mjs --engine <version> <family>` lists what the rename left in comments and docs.
 3. **Migration blocks:** `node api-migrations/migration.mjs <version> <family>` prints the list for that commit's body.
 4. **Starter:** before the cut, run steps 1–2 of § Upgrade a consumer on starter, with `next`'s `migrations/`. It tests the manifest; the bump waits for the release.
 5. **Consumers:** after the release, each consumer runs § Upgrade a consumer on its own bump.

@@ -1,10 +1,11 @@
-// Fixture pairs for the migration codemod: an old engine .d.ts, a consumer file before,
-// and the file the codemod must leave. One pair per manifest kind, plus a range.
+// Fixture pairs for the API migration scripts: an old engine .d.ts or source, a file
+// before, and the file the script must leave. One pair per manifest kind, plus a range.
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyManifests } from './codemod.mjs';
+import { renameFamily } from './rename.mjs';
 import {
   KINDS,
   compareVersions,
@@ -129,6 +130,50 @@ describe('API migration codemod', () => {
     );
     expect(r.after).toBe(
       `import { createLoadout } from '@open-loop/engine'\nexport const m = createLoadout().multiplier\n`,
+    );
+  });
+});
+
+describe('engine rename', () => {
+  it('applies families in manifest order; a later family names an owner by its old name', async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'ol-api-migration-')));
+    dirs.push(root);
+    mkdirSync(join(root, 'src'));
+    mkdirSync(join(root, 'tests'));
+    writeFileSync(
+      join(root, 'src/grant.ts'),
+      `export interface Bonus {\n  mult: number;\n  kind: 'flat' | 'scaled';\n}\nexport function makeBonus(b: Bonus): Bonus {\n  return b;\n}\n`,
+    );
+    writeFileSync(
+      join(root, 'tests/grant.test.ts'),
+      `import { makeBonus } from '../src/grant';\nexport const b = makeBonus({ mult: 2, kind: 'flat' });\n`,
+    );
+    writeFileSync(
+      join(root, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          strict: true,
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          target: 'es2022',
+          noEmit: true,
+        },
+        include: ['src', 'tests'],
+      }),
+    );
+    const entries = [
+      entry('type', 'Bonus', 'Grant', { family: 'A', files: ['src/grant.ts'] }),
+      entry('property', 'mult', 'multiplier', { family: 'B', owners: ['Bonus'] }),
+      entry('literal', 'flat', 'additive', { family: 'B', owners: ['Bonus'] }),
+    ];
+    await renameFamily({ root, entries, family: 'A', tsconfig: 'tsconfig.json' });
+    const r = await renameFamily({ root, entries, family: 'B', tsconfig: 'tsconfig.json' });
+    expect(r.todo).toEqual([]);
+    expect(readFileSync(join(root, 'src/grant.ts'), 'utf8')).toBe(
+      `export interface Grant {\n  multiplier: number;\n  kind: 'additive' | 'scaled';\n}\nexport function makeBonus(b: Grant): Grant {\n  return b;\n}\n`,
+    );
+    expect(readFileSync(join(root, 'tests/grant.test.ts'), 'utf8')).toBe(
+      `import { makeBonus } from '../src/grant';\nexport const b = makeBonus({ multiplier: 2, kind: 'additive' });\n`,
     );
   });
 });
