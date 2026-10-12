@@ -50,8 +50,11 @@ jobs:
         run: pnpm check:nodenext
 
       # Version-keyed drift audits diff docs/api between tags, so what is
-      # committed has to be what a clean build generates.
+      # committed has to be what a clean build generates. `next` never commits
+      # docs/api (the hook skips it in a worktree); the release commit
+      # regenerates it after the cut, and the tag run checks it.
       - name: docs/api matches a clean build
+        if: github.ref != 'refs/heads/next'
         run: |
           if [ -n "$(git status --porcelain -- docs/api)" ]; then
             git status --short -- docs/api
