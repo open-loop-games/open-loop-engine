@@ -41,7 +41,7 @@ Rebase after a release, and before you commit on `next`. Another push to `main` 
 
 1. In the worktree: `git rebase main`.
 2. Run `pnpm typecheck` and `pnpm test`, because a rebase runs no hook.
-3. `git push --force-with-lease origin next`, then confirm its CI run passes.
+3. `git push --force-with-lease origin next`, then confirm its CI run passes. Match the run to the pushed SHA, because a poll can report before the new run is queued.
 
 ## Cut the minor
 

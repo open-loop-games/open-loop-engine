@@ -89,7 +89,7 @@ The codemod's own output can be wrong in three ways. Diff the saved files for th
 ## A breaking release's checklist
 
 1. **Manifest:** add each rename to `<version>/manifest.json` as its commit is made on `next`. `pnpm test` checks every entry's shape.
-2. **Engine:** `node api-migrations/rename.mjs <version> <family>`, then typecheck and the report's by-hand list. `node api-migrations/residue.mjs --engine <version> <family>` lists what the rename left in comments and docs.
+2. **Engine:** `node api-migrations/rename.mjs <version> <family>`, then typecheck and the report's by-hand list. The rename keeps local names through aliases (`iterations: ticks`); rename the locals. `node api-migrations/residue.mjs --engine <version> <family>` lists what the rename left in comments and docs.
 3. **Migration blocks:** `node api-migrations/migration.mjs <version> <family>` prints the list for that commit's body.
 4. **Starter:** before the cut, run steps 1–2 of § Upgrade a consumer on starter, with `next`'s `migrations/`. It tests the manifest; the bump waits for the release.
 5. **Consumers:** after the release, each consumer runs § Upgrade a consumer on its own bump.
