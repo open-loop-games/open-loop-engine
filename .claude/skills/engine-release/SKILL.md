@@ -1,9 +1,9 @@
 ---
 name: engine-release
-description: WIP (0/2). Release open-loop-engine — a patch from main, or the next minor, collected on the `next` branch and cut by a fast-forward. Use to cut an engine release, to commit a breaking change, or to rebase `next`. Only for the open-loop-engine repo.
+description: WIP (1/2). Release open-loop-engine — a patch from main, or the next minor, collected on the `next` branch and cut by a fast-forward. Use to cut an engine release, to commit a breaking change, or to rebase `next`. Only for the open-loop-engine repo.
 ---
 
-# Engine release — WIP (0/2)
+# Engine release — WIP (1/2)
 
 **This skill is WIP.** After each use, add what the run taught to this file. Then increment the counter in the title and the description. At (2/2), remove "WIP" from both. Keep the skill thin. Where another file owns a step, point to that file; do not copy it.
 
@@ -23,7 +23,7 @@ Owners of the details:
 1. `pnpm release --dry-run`, and read the section.
 2. `pnpm release`. CI publishes the pushed tag.
 3. Confirm the publish:
-   - the Actions tasks endpoint, with the `agent-gitea-read` fnox profile;
+   - the Actions tasks endpoint, with the `agent-gitea-read` fnox profile: `$GITEA_URL/api/v1/repos/studio/open-loop-engine/actions/tasks`. The runs are in `workflow_runs`, and the publish run is named `publish`;
    - `pnpm view @open-loop/engine dist-tags`, run from a consumer repo. The engine repo has no studio registry config, so there it asks npmjs.
 4. If `next` has commits, rebase it (§ Rebase next).
 
@@ -35,9 +35,11 @@ Owners of the details:
 
 ## Rebase next
 
+Rebase after a release, and before you commit on `next`. Another push to `main` needs no rebase, because the cut rebases anyway.
+
 1. In the worktree: `git rebase main`.
 2. Run `pnpm typecheck` and `pnpm test`, because a rebase runs no hook.
-3. `git push --force-with-lease origin next`.
+3. `git push --force-with-lease origin next`, then confirm its CI run passes.
 
 ## Cut the minor
 
