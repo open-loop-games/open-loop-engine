@@ -354,7 +354,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | ST10 | **ref**, **version ref**, **backing ref** | a Vue ref (external); a counter every mutation bumps; the inner ref behind a persistent ref | state ref |
 | ST11 | **reactive** | tracked by Vue: a `computed` over it recomputes when it changes | live, dynamic (for this sense) |
 | ST12 | **live** | everyday: running now, in live play | live, for reactive |
-| ST13 | **Computable**, **getter**, **property getter** | a value, a ref or a getter; a zero-argument function; a TypeScript `get` property | — |
+| ST13 | **Computable**, **getter**, **property getter** | a value, a ref or a getter; a zero-argument function; a TypeScript `get` property | `MaybeGetter`, a hand-written `T \| (() => T)`, for a Computable |
 | ST14 | **stale**, **invalidate** | marked out of date; mark it so | — |
 
 ### DS — display and formatting

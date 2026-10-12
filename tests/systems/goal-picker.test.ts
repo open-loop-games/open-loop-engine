@@ -162,6 +162,23 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
     expect(second.active).toEqual(['a', 'b']);
   });
 
+  it('unwraps a weights ref on each pick, and setWeights takes a ref too', () => {
+    const weights = ref<Record<string, number>>({ a: 10, b: 1 });
+    const picker = createGoalPicker<string, void, Record<string, number>>({
+      pool: () => ['a', 'b'],
+      weights,
+      scorer: (id, w) => w[id] ?? 0,
+      capacity: 1,
+      mode: 'fresh-each-pick',
+    });
+    expect(picker.pick().active).toEqual(['a']);
+    weights.value = { a: 1, b: 10 };
+    expect(picker.pick().active).toEqual(['b']);
+
+    picker.setWeights(ref({ a: 10, b: 1 }));
+    expect(picker.pick().active).toEqual(['a']);
+  });
+
   it('reflects shifting weights when capacity is full (vs. persistent mode which would stick)', () => {
     let weights: Record<string, number> = { a: 10, b: 1 };
     const picker = createGoalPicker<string, void, Record<string, number>>({

@@ -49,7 +49,7 @@ import {
   type ContentRegistryView,
   tunable,
 } from '@/index';
-import type { Computable, MaybeGetter } from '@/core/computed';
+import type { Computable } from '@/core/computed';
 import type { FormulaSource } from '@/core/formulas/types';
 import type {
   CreateEngineFromSaveOptions,
@@ -1402,13 +1402,13 @@ describe('ModifierChain.replace / reserve and slot surface (B5)', () => {
 });
 
 describe('Modifier.description carries multi-line breakdowns (B5)', () => {
-  it('is a MaybeGetter over one or many ModifierDescriptions, not a single line', () => {
-    // A regression that narrowed this back to `MaybeGetter<ModifierDescription>`
+  it('is a Computable over one or many ModifierDescriptions, not a single line', () => {
+    // A regression that narrowed this back to `Computable<ModifierDescription>`
     // would compile at every existing call site (a single description is
     // still assignable) and only break at the composite-effect flattening
     // this type exists to support.
     expectTypeOf<Modifier['description']>().toEqualTypeOf<
-      MaybeGetter<ModifierDescription | ModifierDescription[]> | undefined
+      Computable<ModifierDescription | ModifierDescription[]> | undefined
     >();
   });
 });

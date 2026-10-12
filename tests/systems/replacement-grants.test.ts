@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { Decimal } from '@/primitives/decimal';
 import { createModifierChain, createMultiplicativeModifier } from '@/core/modifier';
+import { resolveComputable } from '@/core/computed';
 import { createConditionalEffectSystem } from '@/systems/conditional-effect';
 import { replacementGrants } from '@/systems/replacement-grants';
 
@@ -74,7 +75,7 @@ describe('replacementGrants', () => {
     expect(chain.modifiers.length).toBe(2);
 
     const descs = chain.modifiers.map((m) => {
-      const d = typeof m.description === 'function' ? m.description() : m.description;
+      const d = m.description == null ? undefined : resolveComputable(m.description);
       return Array.isArray(d) ? undefined : d?.text;
     });
     expect(descs).toEqual(['Rewire (cancel)', 'Rewire (replacement)']);

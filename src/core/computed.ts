@@ -20,11 +20,6 @@ import { isFunction } from './common';
 export type Computable<T> = T | Readonly<Ref<T>> | (() => T);
 
 /**
- * A value that may be a direct value or a getter function (no refs).
- */
-export type MaybeGetter<T> = T | (() => T);
-
-/**
  * Unwrap a {@link Computable} to its current value in a single step.
  *
  * Unlike {@link toMaybeRef} (which wraps getters in `computed()`), this

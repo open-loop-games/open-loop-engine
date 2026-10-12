@@ -181,6 +181,17 @@ describe('createModifierChain', () => {
     expect(descs[1].text).toBe('Upgrade');
   });
 
+  it('resolves a hand-built modifier whose description is a ref', () => {
+    const rows = ref({ text: 'Aura', formattedValue: '×2' });
+    const chain = createModifierChain('desc-ref-raw');
+    chain.add({ apply: (gain) => Decimal.times(gain, 2), description: rows });
+
+    const describe = chain.description as () => { text: string }[];
+    expect(describe().map((d) => d.text)).toEqual(['Aura']);
+    rows.value = { text: 'Greater aura', formattedValue: '×2' };
+    expect(describe().map((d) => d.text)).toEqual(['Greater aura']);
+  });
+
   it('reads a ref description text on each describe, for every operation kind', () => {
     const text = ref('Rank 1');
     const chain = createModifierChain('desc-ref');

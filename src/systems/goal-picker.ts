@@ -77,11 +77,11 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
   pool: () => readonly TCandidate[];
 
   /**
-   * Current weights vector (persona, policy, difficulty). Passed verbatim
-   * to the scorer. The function form is read on each pick, so weights can
-   * change (e.g. a persona that shifts with progress); a plain value is fixed.
+   * Current weights vector (persona, policy, difficulty), passed to the
+   * scorer. A ref or getter is read on each pick, so weights can change
+   * (e.g. a persona that shifts with progress); a plain value is fixed.
    */
-  weights: TWeights | (() => TWeights);
+  weights: Computable<TWeights>;
 
   /** The score function. See {@link GoalScorerFn}. */
   scorer: GoalScorerFn<TCandidate, TContext, TWeights>;
@@ -161,14 +161,14 @@ export interface GoalPicker<TCandidate, TContext, TWeights> {
    */
   readonly active: readonly TCandidate[];
 
-  /** Replace the weights value or getter for the next `pick()` call. */
-  setWeights(weights: TWeights | (() => TWeights)): void;
+  /** Replace the weights value, ref or getter for the next `pick()` call. */
+  setWeights(weights: Computable<TWeights>): void;
 }
 
 // === PRIVATE BUILDERS ===
 
-function normalizeWeights<T>(w: T | (() => T)): () => T {
-  return typeof w === 'function' ? (w as () => T) : () => w;
+function normalizeWeights<T>(w: Computable<T>): () => T {
+  return () => resolveComputable(w);
 }
 
 function normalizeCapacity(c: Computable<number> | undefined): () => number {
@@ -309,7 +309,7 @@ export function createGoalPicker<TCandidate, TContext, TWeights>(
     return result;
   }
 
-  function setWeights(weights: TWeights | (() => TWeights)): void {
+  function setWeights(weights: Computable<TWeights>): void {
     getWeights = normalizeWeights(weights);
   }
 

@@ -301,7 +301,6 @@ export type {
   SubstitutionStack,
   Emittable,
   Computable,
-  MaybeGetter,
   Serializable,
   Persistent,
   PersistentAlias,

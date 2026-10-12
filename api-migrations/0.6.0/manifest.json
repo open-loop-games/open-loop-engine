@@ -1,0 +1,14 @@
+[
+  {
+    "family": "computable",
+    "old": "MaybeGetter",
+    "new": "Computable",
+    "kind": "merge",
+    "owners": [],
+    "files": ["src/core/computed.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "MaybeGetter merges into Computable, which also admits a ref",
+    "note": "a consumer that reads a former MaybeGetter field calls resolveComputable, because the value can now be a ref"
+  }
+]

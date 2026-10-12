@@ -220,6 +220,24 @@ describe('createRuleAdvisor — analyzer context', () => {
     expect(advisor.reevaluate().map((s) => s.id)).toEqual(['over']);
   });
 
+  it('unwraps a ref context on every reevaluate', () => {
+    const ctx = ref({ threshold: 100 });
+    const advisor = createRuleAdvisor({
+      historySource: () => [10],
+      digest: (h) => h[0] ?? 0,
+      context: ctx,
+      analyzers: [
+        (sum, c) =>
+          sum > c.threshold
+            ? [{ id: 'over', severity: 'warning' as const, summary: 'over', payload: undefined }]
+            : [],
+      ],
+    });
+    expect(advisor.reevaluate()).toEqual([]);
+    ctx.value = { threshold: 5 };
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['over']);
+  });
+
   it('re-reads a getter context on every reevaluate', () => {
     let threshold = 100;
     const advisor = createRuleAdvisor({

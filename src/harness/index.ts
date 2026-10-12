@@ -94,7 +94,6 @@ export type {
   BindOptions,
   BindingRecord,
   Grant,
-  MaybeGetter,
   Emittable,
   TickDriver,
   PhaseHandlers,

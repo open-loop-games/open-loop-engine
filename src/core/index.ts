@@ -320,7 +320,7 @@ export {
 // === DEV TOOLS & ADVANCED CONSUMER UTILITIES ===
 
 // === COMPUTED / REACTIVITY UTILITIES ===
-export type { MaybeGetter, Computable } from './computed';
+export type { Computable } from './computed';
 export { toMaybeRef, resolveComputable } from './computed';
 
 // === PERSISTENT CONTEXTS ===

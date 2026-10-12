@@ -17,7 +17,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
-import { resolveComputable, toMaybeRef, type Computable, type MaybeGetter } from './computed';
+import { resolveComputable, toMaybeRef, type Computable } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
@@ -42,8 +42,9 @@ export interface Modifier {
    * Human-readable description for UI breakdown panels. A single modifier
    * describes itself with one line; a composite ({@link createSequentialModifier},
    * a {@link ModifierChain}) returns one line per enabled, described child.
+   * Can be a ref or getter; read it with `resolveComputable`.
    */
-  description?: MaybeGetter<ModifierDescription | ModifierDescription[]>;
+  description?: Computable<ModifierDescription | ModifierDescription[]>;
 }
 
 /** A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel */
@@ -330,10 +331,7 @@ export function createSequentialModifier<T extends Modifier>(
   const describeAll = (): ModifierDescription[] =>
     modifiers
       .filter((m) => unref(m.enabled) !== false && m.description != null)
-      .flatMap((m) => {
-        const desc = m.description!;
-        return typeof desc === 'function' ? desc() : desc;
-      });
+      .flatMap((m) => resolveComputable(m.description!));
 
   // Reduce body keeps the accumulator renormalized so each modifier's
   // typeof fast path can fire; the final return wraps once to Decimal so
@@ -706,7 +704,7 @@ export function createModifierChain(id: string): ModifierChain {
       if (items.length === 0 || items.every((m) => m.enabled == null)) return true;
       return items.some((m) => unref(m.enabled) !== false);
     }),
-    get description(): MaybeGetter<ModifierDescription | ModifierDescription[]> | undefined {
+    get description(): Computable<ModifierDescription | ModifierDescription[]> | undefined {
       void itemsVersion.value;
       return composed.description;
     },

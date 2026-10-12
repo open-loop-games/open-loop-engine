@@ -123,7 +123,7 @@ export type SuggestionRankFn<TPayload> = (
  * advisor analyzers; `TPayload` reaches the returned advisor. `TContext` defaults to `undefined`
  * so context-free callers can omit it entirely. With inference-first design,
  * call sites spell none of these out in practice. The function form of
- * `historySource`, the value/getter form of `context`, and the advisor analyzer
+ * `historySource`, the `context` value, ref or getter, and the advisor analyzer
  * return types give TypeScript enough to infer them all.
  */
 export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefined> {
@@ -155,12 +155,12 @@ export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefi
    * Parallel context passed to the digest function and every advisor
    * analyzer. Use for state that *isn't* a function of history — e.g. the current rule
    * set, the current encounter id. A plain value for a fixed context, a
-   * getter for a changing one (re-read each `reevaluate()`).
+   * ref or getter for a changing one (re-read each `reevaluate()`).
    *
    * Omit when the advisor analyzers don't need context; they receive
    * `undefined`, and `TContext` infers to `undefined`.
    */
-  context?: TContext | (() => TContext);
+  context?: Computable<TContext>;
 
   /**
    * Ranking comparator. Defaults to severity (warnings first), then array
@@ -277,11 +277,8 @@ function resolveHistory<TEntry>(source: HistorySource<TEntry>): readonly TEntry[
   return source.history.value as unknown as readonly TEntry[];
 }
 
-function resolveContext<TContext>(context: TContext | (() => TContext) | undefined): TContext {
-  if (typeof context === 'function') {
-    return (context as () => TContext)();
-  }
-  return context as TContext;
+function resolveContext<TContext>(context: Computable<TContext> | undefined): TContext {
+  return (context === undefined ? undefined : resolveComputable(context)) as TContext;
 }
 
 // === FACTORIES ===
