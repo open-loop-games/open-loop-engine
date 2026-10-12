@@ -269,19 +269,18 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(layer.read().at(5, 3)).toBeCloseTo(4);
   });
 
-  it('onProfile fires once per update with cells-touched count', () => {
+  it('updated carries the count of cells an update touched', () => {
     const grid = numericGrid(5, 5);
-    const onProfile = vi.fn();
-    const layer = createInfluenceLayer(grid, {
-      defaultRadius: 1,
-      falloff: linearFalloff,
-      onProfile,
-    });
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    const updated = vi.fn();
+    layer.on('updated', updated);
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 1 });
     layer.update();
-    expect(onProfile).toHaveBeenCalledTimes(1);
-    // 3x3 Chebyshev box centered at (2,2) → 9 samples.
-    expect(onProfile).toHaveBeenCalledWith(9);
+    expect(updated).toHaveBeenCalledTimes(1);
+    // 3x3 Chebyshev box centered at (2,2) → 9 cells.
+    expect(updated).toHaveBeenCalledWith({ cellsTouched: 9 });
+    layer.reset();
+    expect(updated).toHaveBeenLastCalledWith({ cellsTouched: 0 });
   });
 
   it('supports custom Chebyshev falloff via lookup table (roguelike danger pattern)', () => {
@@ -313,17 +312,14 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(layer.read().at(10, 5)).toBe(0);
   });
 
-  it('zero-strength source contributes no samples', () => {
+  it('zero-strength source touches no cells', () => {
     const grid = numericGrid(5, 5);
-    const onProfile = vi.fn();
-    const layer = createInfluenceLayer(grid, {
-      defaultRadius: 1,
-      falloff: linearFalloff,
-      onProfile,
-    });
+    const layer = createInfluenceLayer(grid, { defaultRadius: 1, falloff: linearFalloff });
+    const updated = vi.fn();
+    layer.on('updated', updated);
     layer.addSource({ id: 'a', x: 2, y: 2, strength: 0 });
     layer.update();
-    expect(onProfile).toHaveBeenCalledWith(0);
+    expect(updated).toHaveBeenCalledWith({ cellsTouched: 0 });
     expect(layer.read().at(2, 2)).toBe(0);
   });
 });

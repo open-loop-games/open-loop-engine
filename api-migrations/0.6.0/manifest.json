@@ -242,5 +242,17 @@
     "optional": false,
     "public": true,
     "clause": "display text is a description (ID11); summary is an analyzer's end-of-run output (ME4)"
+  },
+  {
+    "family": "influence-updated",
+    "old": "onProfile",
+    "new": null,
+    "kind": "removal",
+    "owners": ["InfluenceLayerOptions"],
+    "files": ["src/core/spatial/influence-layer.ts"],
+    "optional": true,
+    "public": true,
+    "clause": "the influence layer's updated event carries { cellsTouched }",
+    "note": "replacement: layer.on('updated', ({ cellsTouched }) => …)"
   }
 ]

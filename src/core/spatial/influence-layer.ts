@@ -128,12 +128,6 @@ export interface InfluenceLayerOptions {
    * otherwise this check excludes every cell.
    */
   respectPassability?: boolean;
-  /**
-   * Called once per `update()` with the count of cells touched during
-   * accumulation. Pass the count to a profiler to track influence-layer
-   * cost on large boards. No per-cell overhead.
-   */
-  onProfile?: (samples: number) => void;
 }
 
 /**
@@ -178,9 +172,10 @@ export interface InfluenceLayerEvents {
    * Emitted once per `update()` / `reset()`, after all cell writes are
    * done. The layer's writes skip per-cell `cellChanged`, to avoid an event
    * per cell on every tick. So this is the event reactive wrappers
-   * subscribe to.
+   * subscribe to. `cellsTouched` counts the cells the update accumulated
+   * into (0 after `reset()`): the layer's cost on a large board.
    */
-  updated: () => void;
+  updated: (info: { cellsTouched: number }) => void;
 }
 
 /** Lifecycle handle for an influence layer. */
@@ -262,7 +257,7 @@ export const exponentialFalloff: FalloffFunction = (dx, dy, r) => {
  * @param grid Caller-owned numeric grid. The layer reads and writes via the
  *             grid's public API; persistence is the grid's concern.
  * @param options Layer-wide options (falloff, default radius, retention factor,
- *                passability check, `onProfile`).
+ *                passability check).
  * @returns A lifecycle handle exposing source registry, update/reset, and
  *          a stable {@link InfluenceLayerView}.
  *
@@ -292,13 +287,7 @@ export function createInfluenceLayer(
   grid: SpatialGrid<number>,
   options: InfluenceLayerOptions,
 ): InfluenceLayer {
-  const {
-    defaultRadius,
-    falloff,
-    retentionFactor = 0,
-    respectPassability = false,
-    onProfile,
-  } = options;
+  const { defaultRadius, falloff, retentionFactor = 0, respectPassability = false } = options;
 
   if (!Number.isFinite(defaultRadius) || defaultRadius <= 0) {
     throw new Error(
@@ -346,7 +335,7 @@ export function createInfluenceLayer(
   }
 
   function accumulate(): number {
-    let samples = 0;
+    let cellsTouched = 0;
     for (const source of sources.values()) {
       const r = source.radius ?? defaultRadius;
       if (r <= 0 || source.strength === 0) continue;
@@ -361,12 +350,12 @@ export function createInfluenceLayer(
         const dx = cx - source.x;
         const dy = cy - source.y;
         const contribution = source.strength * falloff(dx, dy, r);
-        samples++;
+        cellsTouched++;
         if (contribution === 0) return;
         grid.setSilent(cx, cy, grid.cells[idx] + contribution);
       });
     }
-    return samples;
+    return cellsTouched;
   }
 
   function makeView(): InfluenceLayerView {
@@ -439,14 +428,13 @@ export function createInfluenceLayer(
 
     update() {
       evaporate();
-      const samples = accumulate();
-      onProfile?.(samples);
-      handle.emit('updated');
+      const cellsTouched = accumulate();
+      handle.emit('updated', { cellsTouched });
     },
 
     reset() {
       grid.fill(zeroFill);
-      handle.emit('updated');
+      handle.emit('updated', { cellsTouched: 0 });
     },
 
     on(event, handler) {
