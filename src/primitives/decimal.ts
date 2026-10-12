@@ -21,9 +21,13 @@
  * `gte`, `lte`, `max`, `min` — because break_eternity derives each from a strict
  * comparison in a way that only holds under trichotomy, and NaN breaks it. See
  * the ORDERING CORRECTIONS section below.
+ *
+ * The `"number"` conversion hint answers `toNumber()`, so a relational operator
+ * between two Decimals compares magnitudes, not strings. See NUMBER CONVERSION.
  */
 
 import OrigDecimal from 'break_eternity.js';
+import { isDev } from './dev';
 import { notationManager } from './notation-manager';
 
 // Re-export under the engine's canonical names. The runtime value `Decimal`
@@ -148,6 +152,44 @@ OrigDecimal.prototype.min = function min(this: Decimal, value: DecimalSource): D
   if (this.isNan() || decimal.isNan()) return new OrigDecimal(OrigDecimal.dNaN);
   return this.gt(decimal) ? new OrigDecimal(decimal) : new OrigDecimal(this);
 };
+
+// === NUMBER CONVERSION ===
+
+// break_eternity's `valueOf()` returns `toString()`, so a relational operator
+// between two Decimals compares strings: `D(9) < D(10)` is false. TypeScript
+// admits that form, unlike Decimal-vs-number or arithmetic. The `"number"` hint
+// (relational operators, unary `+`, `Number()`) answers `toNumber()` instead,
+// which is also what `Number(d)` callsites expect. Other hints keep the string,
+// so interpolation and `String(d)` are unchanged.
+//
+// Two Decimals past float64 range still compare wrong: both convert to Infinity
+// (or both underflow to 0). The hint cannot tell `<` from `Number()`, so dev
+// builds warn once on the first conversion that loses magnitude.
+let warnedLossyConversion = false;
+
+Object.defineProperty(OrigDecimal.prototype, Symbol.toPrimitive, {
+  configurable: true,
+  writable: true,
+  value: function toPrimitive(this: Decimal, hint: string): number | string {
+    if (hint !== 'number') return this.toString();
+    const n = this.toNumber();
+    if (!warnedLossyConversion && losesMagnitude(this, n) && isDev()) {
+      warnedLossyConversion = true;
+      console.warn(
+        `Decimal ${this.toString()} converted to the number ${n}, which loses its magnitude. ` +
+          `A relational operator between two such Decimals gives a wrong answer. ` +
+          `Compare with .lt()/.gt(), or call .toNumber() to accept the loss.`,
+      );
+    }
+    return n;
+  },
+});
+
+/** Whether `n`, the float64 conversion of `d`, has lost `d`'s magnitude. */
+function losesMagnitude(d: Decimal, n: number): boolean {
+  if (n === Infinity || n === -Infinity) return d.isFinite();
+  return n === 0 && !d.eq(0);
+}
 
 const origAdd = OrigDecimal.add;
 const origSub = OrigDecimal.sub;

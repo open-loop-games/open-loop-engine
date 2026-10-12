@@ -38,7 +38,7 @@ import {
 import { setNested } from './save-migrations';
 import { createEmitHandle, type Emittable } from './events';
 import { validateSaveData, type ValidationIssue } from './save-validation';
-import { isDev } from './common';
+import { isDev } from '@/primitives/dev';
 import { Decimal } from '@/primitives/decimal';
 import { shallowRef } from 'vue';
 import LZString from 'lz-string';

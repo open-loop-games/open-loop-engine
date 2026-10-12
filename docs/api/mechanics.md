@@ -12,7 +12,7 @@ The composable evaluation primitives: modifier chains, requirements, formulas, c
 
 ## Common
 
-shared generic type utilities, dev-mode helpers and Vue effect scope ownership
+shared generic type utilities and Vue effect scope ownership
 
 - `type RequiredKeys<T>` — Extract keys that are required (non-optional) from a type. `src/core/common.ts:8`
 

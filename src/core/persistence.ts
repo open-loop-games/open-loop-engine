@@ -22,7 +22,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { isTracing, recordTrace } from './trace';
 import type { Resource } from './resource';
-import { isDev } from './common';
+import { isDev } from '@/primitives/dev';
 import { getNested, setNested } from './save-migrations';
 
 // === STATE TYPES ===

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   Decimal,
   bn,
@@ -199,6 +199,44 @@ describe('ordering against NaN', () => {
     expect(undefinedValue.isNan()).toBe(true);
     expect(Decimal.gte(bn(1000), undefinedValue)).toBe(false);
     expect(Decimal.gte(undefinedValue, bn(1000))).toBe(false);
+  });
+});
+
+describe('number conversion', () => {
+  it('a relational operator between two Decimals compares magnitudes', () => {
+    expect(bn(9) < bn(10)).toBe(true);
+    expect(bn(10) > bn(9)).toBe(true);
+    expect(bn(-2) <= bn(-10)).toBe(false);
+  });
+
+  it('string uses keep the string', () => {
+    expect(`${bn(5)}`).toBe('5');
+    expect(String(bn(5))).toBe('5');
+    expect('x' + bn(5)).toBe('x5');
+  });
+
+  // The warning fires once per process, so no earlier test in this file may
+  // convert a Decimal outside float64 range.
+  it('warns once in dev when a conversion loses magnitude', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(bn(9) < bn(10)).toBe(true);
+      expect(Number(bn(Infinity))).toBe(Infinity);
+      expect(Number(bn(0).recip())).toBeNaN();
+      expect(warn).not.toHaveBeenCalled();
+
+      // Still wrong: both sides convert to Infinity. The warning names it.
+      expect(bn('1e400') < bn('1e500')).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toContain('1e400');
+
+      expect(bn('1e-400') > bn(0)).toBe(false);
+      const tower = bn('ee20');
+      expect(Number(tower)).toBe(tower.toNumber());
+      expect(warn).toHaveBeenCalledOnce();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

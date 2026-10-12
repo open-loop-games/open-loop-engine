@@ -22,7 +22,7 @@ import {
   withPersistenceNamespace,
   deletePersistenceNamespace,
 } from './core/persistence';
-import { isDev } from './core/common';
+import { isDev } from './primitives/dev';
 import { createEmitHandle } from './core/events';
 import {
   ChainRegistryKey,
