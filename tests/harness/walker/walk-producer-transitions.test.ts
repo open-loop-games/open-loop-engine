@@ -58,7 +58,7 @@ function buildEngineWithProducers(
           purchase: {
             costResource: resource,
             baseCost: def.baseCost,
-            costScaling: 1.15,
+            costRatio: 1.15,
             limit: def.limit,
           },
         }),

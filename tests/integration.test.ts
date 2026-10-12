@@ -12,8 +12,8 @@ import type { GameStateAccessor, ICondition, IEffect, Analyzer } from '@/primiti
 
 describe('Integration: simple idle game loop', () => {
   it('runs a basic resource accumulation game headlessly', () => {
-    const result = runHeadless({ setup: () => [], tick: () => {}, ticks: 100, seed: 42 });
-    expect(result.totalTicks).toBe(100);
+    const result = runHeadless({ setup: () => [], tick: () => {}, iterations: 100, seed: 42 });
+    expect(result.iterations).toBe(100);
   });
 
   it('resources + modifiers + conditions + effects work together', () => {
@@ -51,7 +51,7 @@ describe('Integration: simple idle game loop', () => {
     let tickGold = 0;
     const tracker: Analyzer = {
       id: 'gold-tracker',
-      onTick: () => {},
+      onIteration: () => {},
       onEnd: () => {},
       summarize: () => ({ id: 'gold-tracker', metrics: { maxGold: tickGold } }),
     };
@@ -60,7 +60,7 @@ describe('Integration: simple idle game loop', () => {
       tick: () => {
         tickGold += 1;
       },
-      ticks: 50,
+      iterations: 50,
     });
     expect(tickGold).toBe(50);
   });
@@ -73,7 +73,7 @@ describe('Integration: simple idle game loop', () => {
       tick: () => {
         total1 += random();
       },
-      ticks: 100,
+      iterations: 100,
       seed: 123,
     });
     runHeadless({
@@ -81,7 +81,7 @@ describe('Integration: simple idle game loop', () => {
       tick: () => {
         total2 += random();
       },
-      ticks: 100,
+      iterations: 100,
       seed: 123,
     });
     expect(total1).toBe(total2);

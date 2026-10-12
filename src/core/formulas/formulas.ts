@@ -940,7 +940,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   // === COST SCALING CONSTRUCTORS ===
 
   /**
-   * Exponential cost curve: `base * mult^x`. The canonical incremental cost scaling.
+   * Exponential cost curve: `base * costRatio^x`. The canonical incremental cost curve.
    *
    * Fully invertible and integrable, with a closed-form series. So
    * {@link calculateMaxAffordable} gives "purchase max" and {@link calculateCost}
@@ -949,7 +949,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * @param variable - Level input — typically a reactive ref (e.g., `purchasable.count`),
    *   or a raw `DecimalSource` for ad-hoc evaluation via `.evaluate(level)`.
    * @param base - Cost at level 0
-   * @param mult - Cost ratio per level (e.g., `1.15` = +15% per level)
+   * @param costRatio - Cost ratio per level (e.g., `1.15` = +15% per level)
    *
    * Every parameter after `variable` can be a ref or a variable-free Formula,
    * for a value a modifier or a tunable changes at runtime.
@@ -965,9 +965,9 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
   public static exponential(
     variable: MaybeRef<DecimalSource>,
     base: FormulaSource,
-    mult: FormulaSource,
+    costRatio: FormulaSource,
   ): GenericFormula {
-    return Formula.variable(variable).pow_base(mult).mul(base);
+    return Formula.variable(variable).pow_base(costRatio).mul(base);
   }
 
   /**

@@ -165,7 +165,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | VC5 | **modifier** | one apply/invert step on a value; a modifier's part of a value | contribution, link, registration, boost, buff. "Bonus" only in player-facing text |
 | VC6 | **modifier chain**, **sequential modifier**, **op chain** | a `ModifierChain`; the composite `createSequentialModifier` returns; a formula's ops from its variable to its root | pipeline, calculation chain, stack |
 | VC7 | **binding** | a modifier added by `chain.bind`, with its attribution record | binding, for an effect-system entry |
-| VC8 | **grant**, **lowered grant** | an authored entry `{ chain, mult / add / exp, when }`, sign-neutral; one grant an effect system places in a reserved chain slot | binding entry, declarative binding |
+| VC8 | **grant**, **lowered grant** | an authored entry `{ chain, multiplier / add / exponent, when }`, sign-neutral; one grant an effect system places in a reserved chain slot | binding entry, declarative binding |
 | VC9 | **multiplier**, **cost ratio** | a multiplicative factor; the factor each purchase multiplies the next cost by | multiplier, for a cost ratio |
 | VC10 | **apply** | with its object: apply a modifier, an effect, a recommendation | apply, for starting an effect |
 | VC11 | **activate**, **deactivate**, **expire**, **dispel** | an effect starts or ends; a temporary effect runs out, or is removed early | applied, onActivate |

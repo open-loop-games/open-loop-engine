@@ -26,7 +26,7 @@
  * effects.register({
  *   id: 'belt-maxhealth',
  *   active: computed(() => constructionsCategory.getState(sid(47))?.isFinished.value ?? false),
- *   grants: [{ chain: maxHealthChain, mult: 4, description: 'Belt' }],
+ *   grants: [{ chain: maxHealthChain, multiplier: 4, description: 'Belt' }],
  * });
  * ```
  *
@@ -149,7 +149,7 @@ const MAX_SETTLE_FLIPS = 8;
  * effects.register({
  *   id: 'library-bonus',
  *   active: computed(() => library.isBuilt.value),
- *   grants: [{ chain: xpChain, mult: 2, description: 'Library' }],
+ *   grants: [{ chain: xpChain, multiplier: 2, description: 'Library' }],
  * });
  * ```
  *
@@ -163,7 +163,7 @@ const MAX_SETTLE_FLIPS = 8;
  *   id: 'affected-by:mine:pickaxe',
  *   active: computed(() => equipment.has('pickaxe')),
  *   // engine-wide chain from createModifierChain
- *   grants: [{ chain: progressChain, mult: 1.5, description: 'Pickaxe' }],
+ *   grants: [{ chain: progressChain, multiplier: 1.5, description: 'Pickaxe' }],
  * });
  *
  * // The balance harness walks the effect-system registry for full attribution:

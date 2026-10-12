@@ -372,7 +372,7 @@ For a modifier in force only while a condition holds, there are three forms. Cho
       requirements: createCostRequirement({ resource: researchPoints, cost: def.cost }),
       limit: 1,
       grants: [
-        { chain: productionChain, mult: () => computeMult(), description: 'Overclock' },
+        { chain: productionChain, multiplier: () => computeMult(), description: 'Overclock' },
       ],
     }),
   });
@@ -406,7 +406,7 @@ export const tuningModule: EngineModule = {
 // modules/producers.ts — declared where it's read, and passed straight into options
 install(ctx) {
   const tuning = ctx.inject(TuningKey);
-  const costGrowth = tunable(tuning, 'producers/costGrowth', () => 1.08);
+  const costRatio = tunable(tuning, 'producers/costRatio', () => 1.08);
   createProducerCategory<BuildingDef>({
     id: 'buildings',
     registerTick: ctx.onTick,
@@ -417,7 +417,7 @@ install(ctx) {
       purchase: {
         costResource: eggs,
         baseCost: tunable(tuning, `producers/${def.id}/baseCost`, () => def.baseCost),
-        costScaling: costGrowth, // the cost ratio
+        costRatio,
       },
     }),
   });
@@ -427,7 +427,7 @@ install(ctx) {
 export const prestigeEligibleThreshold = 1_000_000;
 ```
 
-`tunable()` returns a `ComputedRef` that reads the tuning registry's scoped overrides, else its default. `tuning.pushOverrides(label, { 'producers/costGrowth': () => 1.2 })` pushes overrides: a map from tuning key to a function that returns the value. The cleanup it returns pops them. The design gives two things:
+`tunable()` returns a `ComputedRef` that reads the tuning registry's scoped overrides, else its default. `tuning.pushOverrides(label, { 'producers/costRatio': () => 1.2 })` pushes overrides: a map from tuning key to a function that returns the value. The cleanup it returns pops them. The design gives two things:
 
 - **The wraps document *what is a tunable*.** Wrap the values that external tools should change. Leave structural constants unwrapped: architectural thresholds, fixed step counts, level boundaries. A reviewer who scans the tuning registry then sees exactly what is safe to perturb.
 - **Temporary overrides need no manual cleanup.** Headless runs, what-if probes and balance bisections push overrides, run and pop them.

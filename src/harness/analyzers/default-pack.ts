@@ -35,7 +35,7 @@ import { createResourcePeakAnalyzer } from './resource-peak';
  *   modules: () => [createGoldModule()],
  *   buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
  *   tick: (engine) => engine.tickDriver.tickOnce(),
- *   ticks: 1000,
+ *   iterations: 1000,
  * });
  * ```
  */

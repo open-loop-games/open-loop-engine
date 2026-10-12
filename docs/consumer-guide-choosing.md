@@ -84,7 +84,7 @@ Consumers use three paths, and each fits a different shape of need. "Purchase-sh
 | Repeatable purchases customized per instance (a different `effect` / `onPurchase` per instance, wiring after creation) | raw `createScalingPurchasable` |
 | A purchase that owns nothing afterwards (a unit sent to a queue, a consumable) | `createPurchasableCategory` with no `limit` and a static cost, whose `onPurchase` does the work |
 
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `costScaling` is the cost ratio: each purchase multiplies the next cost by it. A producer category with a purchase:
+**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `costRatio` is the cost ratio: each purchase multiplies the next cost by it. A producer category with a purchase:
 
 ```ts
 const buildings = createProducerCategory<ProducerDef>({
@@ -95,7 +95,7 @@ const buildings = createProducerCategory<ProducerDef>({
     baseRate: def.baseRate,
     trigger: 'continuous',
     display: def.name,
-    purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+    purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: def.costRatio },
   }),
 });
 ```
@@ -131,7 +131,7 @@ The shape to avoid is a cost getter that reads the count back out of the categor
 for (const def of spellDefs) {
   const purchasable = createScalingPurchasable({
     id: `level-${def.id}`, description: `${def.name} level`,
-    resource: knowledge, baseCost: 10, costScaling: 1.15, limit: 50,
+    resource: knowledge, baseCost: 10, costRatio: 1.15, limit: 50,
     effect: (count: DecimalSource) => Decimal.mul(count, Decimal.mul(def.baseDamage, 0.05)),
     // onPurchase receives the purchase's bulk count, not the new count
     onPurchase: (bulkCount) => schoolSkills.get(def.school)?.addXp(Decimal.mul(bulkCount, 5)),

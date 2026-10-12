@@ -38,7 +38,7 @@ interface BuildingDef {
   name: string;
   baseRate: number;
   baseCost: number;
-  costScaling: number;
+  costRatio: number;
 }
 
 // ============================================================================
@@ -149,7 +149,7 @@ describe('setupSweepAutoPurchase', () => {
       description: 'Leveled upgrade',
       resource: cookies,
       baseCost: 100,
-      costScaling: 2,
+      costRatio: 2,
     });
 
     setupSweepAutoPurchase([levels], { enabled: true, reserve: 400 }, registerTick);
@@ -352,7 +352,7 @@ describe('setupPolicyAutoPurchase', () => {
         purchase: {
           costResource,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -365,9 +365,9 @@ describe('setupPolicyAutoPurchase', () => {
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
-      { id: 'grandma', name: 'Grandma', baseRate: 10, baseCost: 100, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 100, baseCost: 1100, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1.15 },
+      { id: 'grandma', name: 'Grandma', baseRate: 10, baseCost: 100, costRatio: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 100, baseCost: 1100, costRatio: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(category, { enabled: true, policy: cheapestPolicy() }, registerTick);
@@ -388,13 +388,13 @@ describe('setupPolicyAutoPurchase', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: def.id === 'click' ? 'manual' : 'continuous',
-        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+        purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: def.costRatio },
       }),
       registerTick,
     });
     category.register([
-      { id: 'click', name: 'Click', baseRate: 1, baseCost: 1, costScaling: 1.15 },
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
+      { id: 'click', name: 'Click', baseRate: 1, baseCost: 1, costRatio: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(category, { enabled: true, policy: cheapestPolicy() }, registerTick);
@@ -412,9 +412,9 @@ describe('setupPolicyAutoPurchase', () => {
     // farm:   cost 110, rate 10    → beat 11   ← winner
     // tower:  cost 120, rate 1     → beat 120
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 100, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costScaling: 1.15 },
-      { id: 'tower', name: 'Tower', baseRate: 1, baseCost: 120, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 100, costRatio: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costRatio: 1.15 },
+      { id: 'tower', name: 'Tower', baseRate: 1, baseCost: 120, costRatio: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(
@@ -438,7 +438,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const enabled = ref(false);
@@ -461,7 +461,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     setupPolicyAutoPurchase(category, { enabled: true, interval: 2 }, registerTick);
@@ -486,8 +486,8 @@ describe('setupPolicyAutoPurchase', () => {
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
-      { id: 'cheap', name: 'Cheap', baseRate: 1, baseCost: 3, costScaling: 1.15 },
-      { id: 'expensive', name: 'Expensive', baseRate: 100, baseCost: 1000, costScaling: 1.15 },
+      { id: 'cheap', name: 'Cheap', baseRate: 1, baseCost: 3, costRatio: 1.15 },
+      { id: 'expensive', name: 'Expensive', baseRate: 100, baseCost: 1000, costRatio: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(
@@ -513,7 +513,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const cleanup = setupPolicyAutoPurchase(category, { enabled: true }, registerTick);
@@ -533,8 +533,8 @@ describe('setupPolicyAutoPurchase', () => {
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 20, baseCost: 110, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 20, baseCost: 110, costRatio: 1.15 },
     ]);
 
     setupPolicyAutoPurchase(
@@ -553,8 +553,8 @@ describe('setupPolicyAutoPurchase', () => {
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costRatio: 1.15 },
     ]);
 
     const cursor = category.getProducer('cursor')!.repeatable!;
@@ -579,7 +579,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     setupPolicyAutoPurchase(category, { enabled: true, interval: 1 }, registerTick);
@@ -588,10 +588,10 @@ describe('setupPolicyAutoPurchase', () => {
     expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(3);
   });
 
-  it('bails on the iteration cap and reports dropped iterations via onIterationsOverflow', () => {
+  it('bails on the attempt cap and reports dropped attempts via onAttemptsOverflow', () => {
     // Pathological config: tiny interval + a tick whose dt would drain 1M
     // slots. Without the cap the loop would synchronously freeze; with the
-    // cap, the loop bails at `maxIterationsPerTick`, drops the accumulator,
+    // cap, the loop bails at `maxAttemptsPerTick`, drops the accumulator,
     // and fires the diagnostic callback with the floor of the dropped count.
     const cookies = createTestResource('cookies', new Decimal('1e100'));
     const { category, registerTick, tick } = makeCategory(cookies);
@@ -601,7 +601,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 1,
-      costScaling: 1.0001,
+      costRatio: 1.0001,
     });
 
     let droppedReported: number | undefined;
@@ -610,8 +610,8 @@ describe('setupPolicyAutoPurchase', () => {
       {
         enabled: true,
         interval: 1e-6,
-        maxIterationsPerTick: 100,
-        onIterationsOverflow: (n) => {
+        maxAttemptsPerTick: 100,
+        onAttemptsOverflow: (n) => {
           droppedReported = n;
         },
       },
@@ -636,8 +636,8 @@ describe('setupPolicyAutoPurchase', () => {
       const cookies = createTestResource('cookies', 200);
       const { category, registerTick, tick } = makeCategory(cookies);
       category.register([
-        { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1 },
-        { id: 'farm', name: 'Farm', baseRate: 200, baseCost: 200, costScaling: 1 },
+        { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1 },
+        { id: 'farm', name: 'Farm', baseRate: 200, baseCost: 200, costRatio: 1 },
       ]);
       const cursor = category.getProducer('cursor')!.repeatable!;
       const farm = category.getProducer('farm')!.repeatable!;
@@ -829,7 +829,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     // Reserve 70, cost starts at 10. Effective budget = resource − 70.
@@ -860,7 +860,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     // Reserve 70 leaves a 30 budget. `bulkCount: 10` would cost far more than
@@ -894,7 +894,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 50,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     // A unit costs 50 chips against a 90-chip floor on a 100 bank, so nothing
@@ -920,8 +920,8 @@ describe('setupPolicyAutoPurchase', () => {
     // far more expensive than `steady`. Pick-once-repeat would buy `burst`
     // 3×; recompute picks burst then steady then steady.
     category.register([
-      { id: 'burst', name: 'Burst', baseRate: 100, baseCost: 100, costScaling: 100 },
-      { id: 'steady', name: 'Steady', baseRate: 1, baseCost: 50, costScaling: 1.01 },
+      { id: 'burst', name: 'Burst', baseRate: 100, baseCost: 100, costRatio: 100 },
+      { id: 'steady', name: 'Steady', baseRate: 1, baseCost: 50, costRatio: 1.01 },
     ]);
 
     const steadySeed = category.getProducer('steady')!.repeatable!;
@@ -959,7 +959,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     // Reserve 95: resource 100, cost 10 → effective 5, short of cost. Skip.
@@ -997,7 +997,7 @@ describe('setupPolicyAutoPurchase', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -1007,7 +1007,7 @@ describe('setupPolicyAutoPurchase', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
     setupPolicyAutoPurchase(
       category,
@@ -1049,7 +1049,7 @@ describe('setupPolicyAutoPurchase', () => {
             purchase: {
               costResource: cookies,
               baseCost: def.baseCost,
-              costScaling: def.costScaling,
+              costRatio: def.costRatio,
             },
           }),
           registerTick,
@@ -1059,14 +1059,14 @@ describe('setupPolicyAutoPurchase', () => {
           name: 'Cursor',
           baseRate: 1,
           baseCost: 10,
-          costScaling: 1.15,
+          costRatio: 1.15,
         });
         const upgrade = createScalingPurchasable({
           id: 'sale',
           description: 'Sale',
           resource: cookies,
           baseCost: 1,
-          costScaling: 2,
+          costRatio: 2,
         });
         setupPolicyAutoPurchase(category, { enabled: true, interval: 2 }, registerTick);
         setupSweepAutoPurchase([upgrade], { enabled: true, interval: 2 }, registerTick);
@@ -1090,9 +1090,9 @@ describe('setupPolicyAutoPurchase', () => {
     const { category, registerTick, tick } = makeCategory(cookies);
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costScaling: 1.15 },
-      { id: 'farm', name: 'Farm', baseRate: 50, baseCost: 50, costScaling: 1.15 },
-      { id: 'tower', name: 'Tower', baseRate: 5, baseCost: 30, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1.15 },
+      { id: 'farm', name: 'Farm', baseRate: 50, baseCost: 50, costRatio: 1.15 },
+      { id: 'tower', name: 'Tower', baseRate: 5, baseCost: 30, costRatio: 1.15 },
     ]);
 
     const highestRate: SelectionPolicy<Producer> = {

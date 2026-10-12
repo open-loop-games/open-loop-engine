@@ -314,7 +314,7 @@ Two rules follow.
 
 ### `Formula` where a constant is wired
 
-The spine stays plain arithmetic. A spine-derived constant wired into a live purchasable's cost or a skill's XP curve is different. There, **express the curve as a `Formula`, not a hand-rolled closure**: `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costScaling` shorthands, which build a `Formula`.
+The spine stays plain arithmetic. A spine-derived constant wired into a live purchasable's cost or a skill's XP curve is different. There, **express the curve as a `Formula`, not a hand-rolled closure**: `Formula.variable(n).pow(exponent).mul(base)`, or the `baseCost`/`costRatio` shorthands, which build a `Formula`.
 
 A hand-rolled `Math.pow` cost works on the day you write it, but gives up the engine's bulk-purchase math. `calculateMaxAffordable` counts purchases over a cost `Formula`, and seeds the count from its inverse where it has one. At the default `maxBulkCount`, a non-Formula cost is single-purchase only. Raise it, and bulk cost is linear from the current cost, which undercharges any growing cost (`CostRequirementOptions.cost`). Either way, you lose the "next at N" inversion a UI wants, and you find out from a feature request, not an error.
 

@@ -89,14 +89,14 @@ describe('Purchasable (one-shot, limit: 1)', () => {
     expect(unref(p.display.title)).toBeUndefined();
   });
 
-  it('defaults showAmount to false when limit is 1', () => {
+  it('defaults showCount to false when limit is 1', () => {
     const p = createPurchasable({
       id: 'p6',
       display: { description: 'one-shot' },
       requirements: [],
       limit: 1,
     });
-    expect(p.display.showAmount).toBe(false);
+    expect(p.display.showCount).toBe(false);
   });
 
   it('exposes static effect as computed', () => {
@@ -156,13 +156,13 @@ describe('Purchasable (leveled, limit > 1)', () => {
     expect(p.purchaseMaxByDefault).toBe(true);
   });
 
-  it('defaults showAmount to true when limit > 1', () => {
+  it('defaults showCount to true when limit > 1', () => {
     const p = createPurchasable({
       id: 'p12',
       display: { description: 'leveled' },
       requirements: [],
     });
-    expect(p.display.showAmount).toBe(true);
+    expect(p.display.showCount).toBe(true);
   });
 
   it('computes effect from amount function', () => {
@@ -201,7 +201,7 @@ describe('createScalingPurchasable — effectDescription', () => {
       description: 'Multiplier',
       resource: points,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       effect: 2,
     });
 
@@ -216,7 +216,7 @@ describe('createScalingPurchasable — effectDescription', () => {
       description: 'Spell damage',
       resource: points,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       effect: (level: DecimalSource) => Decimal.mul(level, 0.25),
       effectDescription: '+0.25 damage per level',
     });
@@ -234,7 +234,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
       description: 'Shorthand effect',
       resource: points,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       effect: 2, // interpreted as 2^amount
     });
 
@@ -253,7 +253,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
       description: 'Factory effect',
       resource: points,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       // Linear effect: 1 + 0.5 * amount
       effectFormula: (amount) => Formula.variable(amount).mul(0.5).add(1),
     });
@@ -276,7 +276,7 @@ describe('createScalingPurchasable — effect as Formula', () => {
       description: 'Opaque effect',
       resource: points,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       // Non-Formula function that might do anything
       effect: (amount) => Decimal.add(Decimal.mul(amount, 3), 7),
     });
@@ -297,7 +297,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
       description: 'cost escalation',
       resource: r,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     expect(new Decimal(p.getCost(1)).toNumber()).toBeCloseTo(10, 5);
@@ -316,7 +316,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
       description: 'multi',
       resource: r,
       baseCost: 100,
-      costScaling: 1.2,
+      costRatio: 1.2,
     });
 
     // Buy 5 via repeated single purchases so the test is independent of bulk math.
@@ -337,7 +337,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
       description: 'afford',
       resource: r,
       baseCost: 100,
-      costScaling: 1.2,
+      costRatio: 1.2,
     });
 
     p.purchase(1);
@@ -353,7 +353,7 @@ describe('createScalingPurchasable — cost escalation regression', () => {
 });
 
 describe('createScalingPurchasable — reactive geometric cost', () => {
-  it('reads a ref costScaling into the next cost and the bulk cost', () => {
+  it('reads a ref costRatio into the next cost and the bulk cost', () => {
     const r = createResource(1e9, { id: 'r', displayName: 'r' });
     const scaling = ref<DecimalSource>(2);
     const p = createScalingPurchasable({
@@ -361,7 +361,7 @@ describe('createScalingPurchasable — reactive geometric cost', () => {
       description: 'reactive scaling',
       resource: r,
       baseCost: 10,
-      costScaling: scaling,
+      costRatio: scaling,
     });
 
     p.purchase(1);
@@ -382,7 +382,7 @@ describe('createScalingPurchasable — purchaseMax at finite limit regression', 
       description: 'limit 3',
       resource: r,
       baseCost: 100,
-      costScaling: 10,
+      costRatio: 10,
       limit: 3,
       effectFormula: (amount) => Formula.variable(amount).mul(1).add(1),
     });
@@ -538,7 +538,7 @@ describe('createScalingPurchasable — closure cost (cost / costFormula)', () =>
       description: 'geometric',
       resource: r,
       baseCost: 100,
-      costScaling: 2,
+      costRatio: 2,
     });
 
     expect(Decimal.eq(p.getCost(1), 100)).toBe(true);

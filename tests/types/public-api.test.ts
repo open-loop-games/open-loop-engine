@@ -746,7 +746,7 @@ describe('runSensitivity', () => {
     const { runSensitivity } = await import('@/harness');
     type Fn = typeof runSensitivity;
     // Calling with no type argument infers from the baseline. Both shapes type-check.
-    const cellBaseline = { id: 'b', setup: () => [], tick: () => {}, ticks: 1 };
+    const cellBaseline = { id: 'b', setup: () => [], tick: () => {}, iterations: 1 };
     const untilBaseline = { id: 'b', buildEngine: () => ({}) as Engine };
 
     expectTypeOf<Fn>().toBeFunction();
@@ -1008,12 +1008,12 @@ describe('Purchasable factories — id and options shape', () => {
       description: 'test',
       resource,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
     expectTypeOf(p).toEqualTypeOf<Purchasable>();
   });
 
-  it('the geometric arm and ProducerPurchaseOptions take costScaling as a ref or getter', async () => {
+  it('the geometric arm and ProducerPurchaseOptions take costRatio as a ref or getter', async () => {
     const { createScalingPurchasable } = await import('@/index');
     const resource = createResource(0, { id: 'reactive-gold', displayName: 'gold' });
     const scaling = ref<DecimalSource>(1.15);
@@ -1022,17 +1022,17 @@ describe('Purchasable factories — id and options shape', () => {
       description: 'test',
       resource,
       baseCost: 10,
-      costScaling: scaling,
+      costRatio: scaling,
     });
     createScalingPurchasable({
       id: 'getter-scaling',
       description: 'test',
       resource,
       baseCost: 10,
-      costScaling: () => scaling.value,
+      costRatio: () => scaling.value,
     });
     type Config = import('@/systems/producer-category').ProducerPurchaseOptions;
-    expectTypeOf<Config['costScaling']>().toEqualTypeOf<Computable<DecimalSource>>();
+    expectTypeOf<Config['costRatio']>().toEqualTypeOf<Computable<DecimalSource>>();
   });
 
   it('each cost and effect shape takes its own key', async () => {
@@ -1068,7 +1068,7 @@ describe('Purchasable factories — id and options shape', () => {
       description: 'test',
       resource,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       costFormula: (amount: MaybeRef<DecimalSource>) => F.variable(amount),
     });
     createScalingPurchasable({
@@ -1076,7 +1076,7 @@ describe('Purchasable factories — id and options shape', () => {
       description: 'test',
       resource,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
       // @ts-expect-error — a Formula factory goes under `effectFormula`.
       effect: (amount) => F.variable(amount),
     });

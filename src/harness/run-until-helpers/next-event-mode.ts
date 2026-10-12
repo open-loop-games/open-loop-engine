@@ -116,7 +116,7 @@ export interface NextEventModeOptions {
 
 /** @internal */
 export interface NextEventModeResult {
-  totalTicks: number;
+  iterations: number;
   elapsedSimulated: number;
   terminated: 'predicate' | 'maxSimTime' | 'unreachable';
 }
@@ -220,7 +220,7 @@ export function runNextEventLoop(
         ),
       );
       simTime = outcome.simTime;
-      steps += outcome.ticks;
+      steps += outcome.iterations;
       inc.invalidateAll();
       before = sample();
       if (outcome.exit === 'predicate') {
@@ -251,7 +251,7 @@ export function runNextEventLoop(
   }
 
   return {
-    totalTicks: steps,
+    iterations: steps,
     elapsedSimulated: Math.min(simTime, maxSimTime),
     terminated,
   };
@@ -359,7 +359,7 @@ function commitDeps(
 
 interface FastTickOutcome {
   simTime: number;
-  ticks: number;
+  iterations: number;
   exit: 'predicate' | 'maxSimTime' | 'resume';
 }
 
@@ -374,7 +374,7 @@ function fastTickDuringStasis(
   stasisCheckInterval: number,
 ): FastTickOutcome {
   let simTime = startSimTime;
-  let ticks = 0;
+  let iterations = 0;
 
   while (simTime < maxSimTime) {
     const remaining = maxSimTime - simTime;
@@ -382,23 +382,23 @@ function fastTickDuringStasis(
     if (dt <= 0) break;
     engine.tickDriver.advanceTime(dt);
     simTime += dt;
-    ticks++;
+    iterations++;
 
-    // `startSteps + ticks` keeps ctx.iteration absolute over the headless run,
+    // `startSteps + iterations` keeps ctx.iteration absolute over the headless run,
     // consistent with the main loop's `steps`, not a per-entry local counter
     // restarting at 1.
-    if (predicate({ iteration: startSteps + ticks, simTime })) {
-      return { simTime, ticks, exit: 'predicate' };
+    if (predicate({ iteration: startSteps + iterations, simTime })) {
+      return { simTime, iterations, exit: 'predicate' };
     }
-    if (ticks % stasisCheckInterval === 0) {
+    if (iterations % stasisCheckInterval === 0) {
       const snapshot = createTransitionSnapshot(engine, accessor);
       if (!isStasis(snapshot)) {
-        return { simTime, ticks, exit: 'resume' };
+        return { simTime, iterations, exit: 'resume' };
       }
     }
   }
 
-  return { simTime, ticks, exit: 'maxSimTime' };
+  return { simTime, iterations, exit: 'maxSimTime' };
 }
 
 function bisectTerminationTime(

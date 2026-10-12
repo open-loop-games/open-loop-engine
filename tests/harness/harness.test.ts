@@ -21,7 +21,7 @@ function createCounterAnalyzer(): Analyzer {
   let summarized = 0;
   return {
     id: 'counter',
-    onTick: () => {
+    onIteration: () => {
       ticks += 1;
     },
     summarize: (): AnalyzerSummary => ({
@@ -31,7 +31,7 @@ function createCounterAnalyzer(): Analyzer {
   };
 }
 
-/** Cell that records a metric equal to its own `ticks` setting — simple,
+/** Cell that records a metric equal to its own `iterations` setting — simple,
  *  lets us assert aggregation arithmetic without floating-point fuzz.
  *  Optional `analyzers` factory produces fresh instances per run. */
 function fixedMetricCell(
@@ -43,7 +43,7 @@ function fixedMetricCell(
     id: name,
     setup: () => analyzers(),
     tick: () => {},
-    ticks: metric,
+    iterations: metric,
   };
 }
 
@@ -79,7 +79,7 @@ function runWithMetric(
   metrics: Record<string, number | string | boolean>,
 ): HeadlessResult {
   return {
-    totalTicks: 0,
+    iterations: 0,
     elapsedSimulated: 0,
     analyzerSummaries: [{ id: name, metrics }],
   };
@@ -153,7 +153,7 @@ describe('aggregateCell', () => {
   it('prevents cross-analyzer collisions via namespacing', () => {
     const runs: HeadlessResult[] = [
       {
-        totalTicks: 0,
+        iterations: 0,
         elapsedSimulated: 0,
         analyzerSummaries: [
           { id: 'a', metrics: { x: 10 } },
@@ -281,7 +281,7 @@ describe('runMatrix', () => {
             return [analyzer];
           },
           tick: () => {},
-          ticks: 1,
+          iterations: 1,
         },
       ],
       seeds: [100, 200],
@@ -315,8 +315,8 @@ describe('runSensitivity', () => {
     const result = runSensitivity({
       baseline,
       variants: [
-        { id: 'double', patch: (b) => ({ ...b, ticks: b.ticks * 2 }) },
-        { id: 'half', patch: (b) => ({ ...b, ticks: b.ticks / 2 }) },
+        { id: 'double', patch: (b) => ({ ...b, iterations: b.iterations * 2 }) },
+        { id: 'half', patch: (b) => ({ ...b, iterations: b.iterations / 2 }) },
       ],
       seeds: [1, 2, 3],
     });
@@ -349,7 +349,7 @@ describe('runSensitivity', () => {
         {
           id: 'ticks',
           values: [5, 20],
-          patch: (b, v) => ({ ...b, ticks: v as number }),
+          patch: (b, v) => ({ ...b, iterations: v as number }),
         },
       ],
       seeds: [1],

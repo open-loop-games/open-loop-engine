@@ -43,7 +43,7 @@ import type {
  * @example Fixed-tick
  * ```ts
  * const result = runSensitivity({
- *   baseline: { id: 'baseline', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
+ *   baseline: { id: 'baseline', setup: () => [createGoldAnalyzer()], tick, iterations: 1000 },
  *   variants: [
  *     { id: 'fast-gold', patch: (b) => ({ ...b, setup: () => [createFastGoldAnalyzer()] }) },
  *   ],

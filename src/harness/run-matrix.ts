@@ -34,8 +34,8 @@ import type { CellResult, MatrixOptions, MatrixResult } from './types';
  * ```ts
  * const result = runMatrix({
  *   cells: [
- *     { id: 'fast', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
- *     { id: 'slow', setup: () => [createGoldAnalyzer()], tick, ticks: 1000 },
+ *     { id: 'fast', setup: () => [createGoldAnalyzer()], tick, iterations: 1000 },
+ *     { id: 'slow', setup: () => [createGoldAnalyzer()], tick, iterations: 1000 },
  *   ],
  *   seeds: [1, 2, 3],
  * });
@@ -52,7 +52,7 @@ export function runMatrix(options: MatrixOptions): MatrixResult {
     const result = runHeadless({
       setup: () => cell.setup({ seed }),
       tick: cell.tick,
-      ticks: cell.ticks,
+      iterations: cell.iterations,
       tickDelta: cell.tickDelta,
       seed,
       teardown: cell.teardown,

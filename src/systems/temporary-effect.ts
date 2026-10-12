@@ -28,7 +28,7 @@
  *   id: 'burn',
  *   duration: 4,
  *   tags: ['echo', 'flame'],
- *   grants: [{ chain: damageChain, mult: 1.5, description: 'Burn' }],
+ *   grants: [{ chain: damageChain, multiplier: 1.5, description: 'Burn' }],
  *   onTick: (inst, dt) => dealDamage(10 * dt),
  *   onExpire: () => clearBurnVisuals(),
  * });
@@ -234,7 +234,7 @@ function toFiniteDuration(defId: string, duration: DecimalSource): number {
  * effects.register({
  *   id: 'haste',
  *   duration: 10,
- *   grants: [{ chain: speedChain, mult: 1.5, description: 'Haste' }],
+ *   grants: [{ chain: speedChain, multiplier: 1.5, description: 'Haste' }],
  * });
  *
  * effects.activate('haste'); // +50% speed for 10 seconds

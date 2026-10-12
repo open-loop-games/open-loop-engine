@@ -66,7 +66,7 @@ function createGoldEngine(maxDeltaTime?: number): Engine & { readonly gold: numb
 /** Analyzer factory that records lifecycle calls as metrics. */
 function createLifecycleAnalyzer(): Analyzer {
   let starts = 0;
-  let ticks = 0;
+  let iterations = 0;
   let ends = 0;
   const tickIndices: number[] = [];
   return {
@@ -74,8 +74,8 @@ function createLifecycleAnalyzer(): Analyzer {
     onStart: () => {
       starts += 1;
     },
-    onTick: (i) => {
-      ticks += 1;
+    onIteration: (i) => {
+      iterations += 1;
       tickIndices.push(i);
     },
     onEnd: () => {
@@ -85,7 +85,7 @@ function createLifecycleAnalyzer(): Analyzer {
       id: 'lifecycle',
       metrics: {
         starts,
-        ticks,
+        iterations,
         ends,
         firstTickIndex: tickIndices[0] ?? -1,
         lastTickIndex: tickIndices[tickIndices.length - 1] ?? -1,
@@ -103,7 +103,7 @@ describe('runUntil', () => {
       maxSimTime: 10,
     });
     expect(result.terminated).toBe('predicate');
-    expect(result.totalTicks).toBe(0);
+    expect(result.iterations).toBe(0);
     expect(result.elapsedSimulated).toBe(0);
     expect(engine.tickCount).toBe(0);
   });
@@ -117,7 +117,7 @@ describe('runUntil', () => {
       tickDelta: 0.1,
     });
     expect(result.terminated).toBe('predicate');
-    expect(result.totalTicks).toBe(5);
+    expect(result.iterations).toBe(5);
     expect(result.elapsedSimulated).toBeCloseTo(0.5, 10);
     expect(engine.tickCount).toBe(5);
   });
@@ -132,7 +132,7 @@ describe('runUntil', () => {
     });
     expect(result.terminated).toBe('maxSimTime');
     // Math.floor(1 / 0.1) === 10 ticks, stepped 10 times with sim-time 1.0.
-    expect(result.totalTicks).toBe(10);
+    expect(result.iterations).toBe(10);
     expect(result.elapsedSimulated).toBeCloseTo(1.0, 10);
   });
 
@@ -141,7 +141,7 @@ describe('runUntil', () => {
     // 0.7 / 0.1 is 6.999999999999999 in binary floating point.
     const result = runUntil({ engine, until: () => false, maxSimTime: 0.7, tickDelta: 0.1 });
     expect(result.terminated).toBe('maxSimTime');
-    expect(result.totalTicks).toBe(7);
+    expect(result.iterations).toBe(7);
     expect(result.elapsedSimulated).toBeCloseTo(0.7, 10);
   });
 
@@ -155,7 +155,7 @@ describe('runUntil', () => {
     expect(result.elapsedSimulated).toBeCloseTo(0.15, 10);
   });
 
-  it('fires analyzer lifecycle onStart/onTick/onEnd in order', () => {
+  it('fires analyzer lifecycle onStart/onIteration/onEnd in order', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
@@ -166,14 +166,14 @@ describe('runUntil', () => {
     });
     const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.starts).toBe(1);
-    expect(metrics.ticks).toBe(3);
+    expect(metrics.iterations).toBe(3);
     expect(metrics.ends).toBe(1);
-    // onTick receives the index of the tick just stepped (0..totalTicks-1).
+    // onIteration receives the index of the iteration just run (0..iterations-1).
     expect(metrics.firstTickIndex).toBe(0);
     expect(metrics.lastTickIndex).toBe(2);
   });
 
-  it('does not fire analyzer onTick when the predicate fires at tick 0', () => {
+  it('does not fire analyzer onIteration when the predicate fires at iteration 0', () => {
     const engine = createTestEngine();
     const result = runUntil({
       engine,
@@ -183,7 +183,7 @@ describe('runUntil', () => {
     });
     const metrics = result.analyzerSummaries[0]!.metrics;
     expect(metrics.starts).toBe(1);
-    expect(metrics.ticks).toBe(0);
+    expect(metrics.iterations).toBe(0);
     expect(metrics.ends).toBe(1);
   });
 
@@ -239,7 +239,7 @@ describe('runUntil', () => {
         tickDelta: 5,
       });
       expect(result.terminated).toBe('predicate');
-      expect(result.totalTicks).toBe(20);
+      expect(result.iterations).toBe(20);
       expect(result.elapsedSimulated).toBeCloseTo(100, 9);
       expect(engine.gold).toBeCloseTo(result.elapsedSimulated, 9);
     } finally {

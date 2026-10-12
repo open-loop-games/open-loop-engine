@@ -40,7 +40,7 @@ interface PerkDef {
   id: string;
   name: string;
   baseCost: number;
-  costScaling: number;
+  costRatio: number;
   maxLevel: number;
   effectPerLevel: number;
 }
@@ -430,8 +430,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'Alpha', baseCost: 10, costScaling: 1.5, maxLevel: 5, effectPerLevel: 1.1 },
-      { id: 'b', name: 'Beta', baseCost: 20, costScaling: 2, maxLevel: 3, effectPerLevel: 1.2 },
+      { id: 'a', name: 'Alpha', baseCost: 10, costRatio: 1.5, maxLevel: 5, effectPerLevel: 1.1 },
+      { id: 'b', name: 'Beta', baseCost: 20, costRatio: 2, maxLevel: 3, effectPerLevel: 1.2 },
     ]);
 
     expect(category.size).toBe(2);
@@ -456,7 +456,7 @@ describe('createPurchasableCategory (leveled)', () => {
       id: 'a',
       name: 'A',
       baseCost: 10,
-      costScaling: 1.5,
+      costRatio: 1.5,
       maxLevel: 5,
       effectPerLevel: 1.1,
     });
@@ -482,7 +482,7 @@ describe('createPurchasableCategory (leveled)', () => {
       id: 'cheap',
       name: 'Cheap',
       baseCost: 10,
-      costScaling: 1,
+      costRatio: 1,
       maxLevel: 5,
       effectPerLevel: 2,
     });
@@ -512,7 +512,7 @@ describe('createPurchasableCategory (leveled)', () => {
       id: 'expensive',
       name: 'Expensive',
       baseCost: 100,
-      costScaling: 2,
+      costRatio: 2,
       maxLevel: 10,
       effectPerLevel: 1.1,
     });
@@ -540,7 +540,7 @@ describe('createPurchasableCategory (leveled)', () => {
       id: 'capped',
       name: 'Capped',
       baseCost: 1,
-      costScaling: 1,
+      costRatio: 1,
       maxLevel: 2,
       effectPerLevel: 1.1,
     });
@@ -566,8 +566,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'A', baseCost: 1, costScaling: 1, maxLevel: 10, effectPerLevel: 1.1 },
-      { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 10, effectPerLevel: 1.1 },
+      { id: 'a', name: 'A', baseCost: 1, costRatio: 1, maxLevel: 10, effectPerLevel: 1.1 },
+      { id: 'b', name: 'B', baseCost: 1, costRatio: 1, maxLevel: 10, effectPerLevel: 1.1 },
     ]);
 
     expect(Decimal.eq(category.totalCount.value, 0)).toBe(true);
@@ -593,8 +593,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'A', baseCost: 1, costScaling: 1, maxLevel: 10, effectPerLevel: 2 },
-      { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 10, effectPerLevel: 3 },
+      { id: 'a', name: 'A', baseCost: 1, costRatio: 1, maxLevel: 10, effectPerLevel: 2 },
+      { id: 'b', name: 'B', baseCost: 1, costRatio: 1, maxLevel: 10, effectPerLevel: 3 },
     ]);
 
     // Both at 0: effect = 2^0 * 3^0 = 1
@@ -621,8 +621,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'A', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 2 },
-      { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 3 },
+      { id: 'a', name: 'A', baseCost: 1, costRatio: 1, maxLevel: 1, effectPerLevel: 2 },
+      { id: 'b', name: 'B', baseCost: 1, costRatio: 1, maxLevel: 1, effectPerLevel: 3 },
     ]);
 
     expect(Decimal.eq(category.totalEffect.value, 1)).toBe(true);
@@ -646,8 +646,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'A', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 1.1 },
-      { id: 'b', name: 'B', baseCost: 1, costScaling: 1, maxLevel: 1, effectPerLevel: 1.1 },
+      { id: 'a', name: 'A', baseCost: 1, costRatio: 1, maxLevel: 1, effectPerLevel: 1.1 },
+      { id: 'b', name: 'B', baseCost: 1, costRatio: 1, maxLevel: 1, effectPerLevel: 1.1 },
     ]);
 
     expect(category.allMaxed.value).toBe(false);
@@ -673,8 +673,8 @@ describe('createPurchasableCategory (leveled)', () => {
     });
 
     category.register([
-      { id: 'a', name: 'A', baseCost: 10, costScaling: 1, maxLevel: 10, effectPerLevel: 1.1 },
-      { id: 'b', name: 'B', baseCost: 10, costScaling: 1, maxLevel: 10, effectPerLevel: 1.1 },
+      { id: 'a', name: 'A', baseCost: 10, costRatio: 1, maxLevel: 10, effectPerLevel: 1.1 },
+      { id: 'b', name: 'B', baseCost: 10, costRatio: 1, maxLevel: 10, effectPerLevel: 1.1 },
     ]);
 
     const bought = category.purchaseAffordable();
@@ -701,7 +701,7 @@ describe('createPurchasableCategory grants', () => {
         grants: [
           {
             chain: productionChain,
-            mult: def.bonus,
+            multiplier: def.bonus,
             description: `from:${def.id}`,
           },
         ],
@@ -792,7 +792,7 @@ describe('createPurchasableCategory grants', () => {
         grants: [
           {
             chain,
-            mult: def.bonus,
+            multiplier: def.bonus,
             description: `gated:${def.id}`,
             when: () => secondGate.value,
           },
@@ -968,7 +968,7 @@ describe('createPurchasableCategory — registry patches', () => {
       id: 'p',
       name: 'P',
       baseCost: 1,
-      costScaling: 1,
+      costRatio: 1,
       maxLevel: 1,
       effectPerLevel: 1,
     });

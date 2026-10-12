@@ -12,7 +12,7 @@ describe('Headless Runner', () => {
       tick: () => {
         count++;
       },
-      ticks: 100,
+      iterations: 100,
     });
     expect(count).toBe(100);
   });
@@ -23,7 +23,7 @@ describe('Headless Runner', () => {
       tick: (dt) => {
         deltas.push(dt);
       },
-      ticks: 5,
+      iterations: 5,
       tickDelta: 0.1,
     });
     expect(deltas.every((d) => d === 0.1)).toBe(true);
@@ -35,7 +35,7 @@ describe('Headless Runner', () => {
       tick: (dt) => {
         deltas.push(dt);
       },
-      ticks: 1,
+      iterations: 1,
     });
     expect(deltas[0]).toBe(0.05);
   });
@@ -47,7 +47,7 @@ describe('Headless Runner', () => {
       tick: () => {
         v1.push(random());
       },
-      ticks: 5,
+      iterations: 5,
       seed: 42,
     });
     runHeadless({
@@ -55,7 +55,7 @@ describe('Headless Runner', () => {
       tick: () => {
         v2.push(random());
       },
-      ticks: 5,
+      iterations: 5,
       seed: 42,
     });
     expect(v1).toEqual(v2);
@@ -65,11 +65,11 @@ describe('Headless Runner', () => {
     const analyzer: Analyzer = {
       id: 'test',
       onStart: () => events.push('start'),
-      onTick: (t) => events.push(`tick-${t}`),
+      onIteration: (t) => events.push(`tick-${t}`),
       onEnd: () => events.push('end'),
       summarize: () => ({ id: 'test', metrics: {} }),
     };
-    const result = runHeadless({ setup: () => [analyzer], tick: () => {}, ticks: 3 });
+    const result = runHeadless({ setup: () => [analyzer], tick: () => {}, iterations: 3 });
     expect(events).toEqual(['start', 'tick-0', 'tick-1', 'tick-2', 'end']);
     expect(result.analyzerSummaries).toHaveLength(1);
   });
@@ -81,7 +81,7 @@ describe('Headless Runner', () => {
         return [];
       },
       tick: () => order.push('tick'),
-      ticks: 1,
+      iterations: 1,
     });
     expect(order).toEqual(['setup', 'tick']);
   });
@@ -90,7 +90,7 @@ describe('Headless Runner', () => {
     const analyzer: Analyzer = {
       id: 'test',
       onStart: () => order.push('onStart'),
-      onTick: () => order.push('tick'),
+      onIteration: () => order.push('tick'),
       onEnd: () => order.push('onEnd'),
       summarize: () => ({ id: 'test', metrics: {} }),
     };
@@ -100,13 +100,13 @@ describe('Headless Runner', () => {
         return [analyzer];
       },
       tick: () => {},
-      ticks: 1,
+      iterations: 1,
     });
     expect(order).toEqual(['setup', 'onStart', 'tick', 'onEnd']);
   });
   it('returns elapsed time', () => {
-    const r = runHeadless({ setup: () => [], tick: () => {}, ticks: 100, tickDelta: 0.05 });
-    expect(r.totalTicks).toBe(100);
+    const r = runHeadless({ setup: () => [], tick: () => {}, iterations: 100, tickDelta: 0.05 });
+    expect(r.iterations).toBe(100);
     expect(r.elapsedSimulated).toBeCloseTo(5, 5);
   });
   it('runs teardown once the analyzers have summarized', () => {
@@ -116,7 +116,7 @@ describe('Headless Runner', () => {
         { id: 'a', summarize: () => (calls.push('summarize'), { id: 'a', metrics: {} }) },
       ],
       tick: () => {},
-      ticks: 1,
+      iterations: 1,
       teardown: () => calls.push('teardown'),
     });
     expect(calls).toEqual(['summarize', 'teardown']);
@@ -131,7 +131,7 @@ describe('Headless Runner', () => {
           tick: () => {
             throw new Error('tick blew up');
           },
-          ticks: 1,
+          iterations: 1,
           teardown: () => teardowns++,
         }),
       ).toThrow('tick blew up');
@@ -147,7 +147,7 @@ describe('Headless Runner', () => {
             },
           ],
           tick: () => {},
-          ticks: 1,
+          iterations: 1,
           teardown: () => teardowns++,
         }),
       ).toThrow('analyzer blew up');
@@ -164,7 +164,7 @@ describe('Headless Runner', () => {
           throw new Error('setup blew up');
         },
         tick: () => {},
-        ticks: 1,
+        iterations: 1,
         teardown: () => teardowns++,
       }),
     ).toThrow('setup blew up');

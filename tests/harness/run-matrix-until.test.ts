@@ -198,7 +198,7 @@ describe('runMatrixUntil', () => {
     expect(result.cells[0]!.runs).toHaveLength(3);
     for (const run of result.cells[0]!.runs) {
       expect(run.terminated).toBe('predicate');
-      expect(run.totalTicks).toBe(5);
+      expect(run.iterations).toBe(5);
       expect(run.elapsedSimulated).toBeCloseTo(0.5, 10);
     }
     // Three independent state objects — no bleed.
@@ -402,7 +402,7 @@ describe('runMatrixUntil', () => {
 
   it('runMatrix output still omits termination fields (no regression)', () => {
     const result = runMatrix({
-      cells: [{ id: 'a', setup: () => [], tick: () => {}, ticks: 3 }],
+      cells: [{ id: 'a', setup: () => [], tick: () => {}, iterations: 3 }],
       seeds: [1, 2],
     });
     const agg = result.cells[0]!.aggregate;

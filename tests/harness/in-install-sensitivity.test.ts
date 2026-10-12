@@ -87,7 +87,7 @@ describe('in-install sensitivity integration', () => {
       modules: () => [createToyModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 20,
+      iterations: 20,
     });
 
     const variant = createSensitivityCell({
@@ -102,7 +102,7 @@ describe('in-install sensitivity integration', () => {
       },
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 20,
+      iterations: 20,
     });
 
     const result = runSensitivity({
@@ -177,7 +177,7 @@ describe('in-install sensitivity integration', () => {
       modules: () => [makeEmptyChainModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 20,
+      iterations: 20,
     });
 
     const variant = createSensitivityCell({
@@ -189,7 +189,7 @@ describe('in-install sensitivity integration', () => {
       },
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 20,
+      iterations: 20,
     });
 
     const result = runSensitivity({
@@ -268,7 +268,7 @@ describe('in-install sensitivity integration', () => {
       modules: () => [createLoopGoldModule()],
       buildAnalyzers: (engine) => defaultAnalyzerPack(engine),
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: TOTAL_TICKS,
+      iterations: TOTAL_TICKS,
     });
 
     const result = runMatrix({ cells: [cell], seeds: [1] });

@@ -167,7 +167,7 @@ describe('walkEffectSystemGrants — grant chain arrays', () => {
         pers.register({
           id: 'rage',
           active: true,
-          grants: [{ chain: [speed, power], mult: 2, description: 'Rage' }],
+          grants: [{ chain: [speed, power], multiplier: 2, description: 'Rage' }],
         });
       },
     };

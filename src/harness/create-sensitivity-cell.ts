@@ -9,7 +9,7 @@
  *
  * Order inside `setup`: build the engine from the save → apply `perturb` →
  * build analyzers → subscribe `onRunFinalize` to any published
- * CycleLog. The cell then runs for `ticks × tickDelta` sim-seconds.
+ * CycleLog. The cell then runs for `iterations × tickDelta` sim-seconds.
  *
  * @cluster runners
  */
@@ -65,7 +65,7 @@ export interface CreateSensitivityCellOptions {
    * `(engine) => engine.tickDriver.tickOnce()` or a consumer-specific handler.
    */
   tick: (engine: Engine, dt: number) => void;
-  ticks: number;
+  iterations: number;
   tickDelta?: number;
   /**
    * Base persistence namespace for the scratch engine of each headless run. The balance
@@ -109,7 +109,7 @@ let runCounter = 0;
  *   saveText,
  *   modules: () => [createGoldModule()],
  *   tick: (engine) => engine.tickDriver.tickOnce(),
- *   ticks: 1000,
+ *   iterations: 1000,
  * });
  * ```
  */
@@ -121,7 +121,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     perturb,
     buildAnalyzers,
     tick,
-    ticks,
+    iterations,
     tickDelta,
     persistenceNamespace: namespace = `workbench-${name}`,
     engineOptions: config,
@@ -172,7 +172,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     setup,
     tick: tickAdapter,
     teardown,
-    ticks,
+    iterations,
     ...(tickDelta !== undefined && { tickDelta }),
   };
 }

@@ -110,12 +110,12 @@ export function replacementGrants(options: ReplacementGrantsOptions): Grant[] {
   return [
     {
       chain,
-      mult: () => Decimal.recip(unref(cancelSrc)),
+      multiplier: () => Decimal.recip(unref(cancelSrc)),
       description: `${description} (cancel)`,
     },
     {
       chain,
-      mult: () => unref(replacementSrc),
+      multiplier: () => unref(replacementSrc),
       description: `${description} (replacement)`,
     },
   ];
@@ -125,19 +125,22 @@ export function replacementGrants(options: ReplacementGrantsOptions): Grant[] {
 
 /**
  * Build the Modifier a {@link Grant} describes: a fresh one for the
- * `mult` / `add` / `exp` shorthands, the resolved hand-built one otherwise.
+ * `multiplier` / `add` / `exponent` keys, the resolved hand-built one otherwise.
  *
  * @internal
  */
 export function buildGrantModifier(grant: Grant): Modifier {
-  if ('mult' in grant) {
-    return createMultiplicativeModifier({ multiplier: grant.mult, description: grant.description });
+  if ('multiplier' in grant) {
+    return createMultiplicativeModifier({
+      multiplier: grant.multiplier,
+      description: grant.description,
+    });
   }
   if ('add' in grant) {
     return createAdditiveModifier({ addend: grant.add, description: grant.description });
   }
-  if ('exp' in grant) {
-    return createExponentialModifier({ exponent: grant.exp, description: grant.description });
+  if ('exponent' in grant) {
+    return createExponentialModifier({ exponent: grant.exponent, description: grant.description });
   }
   const resolved = typeof grant.modifier === 'function' ? grant.modifier() : grant.modifier;
   // Add an inline description to a modifier that has none — keeps

@@ -531,7 +531,7 @@ describe('Integration: Prestige Tree layer chain', () => {
 
       const tracker: Analyzer = {
         id: 'prestige-tracker',
-        onTick: () => {},
+        onIteration: () => {},
         onEnd: () => {},
         summarize: () => ({
           id: 'prestige-tracker',
@@ -570,11 +570,11 @@ describe('Integration: Prestige Tree layer chain', () => {
             superPrestigeCount++;
           }
         },
-        ticks: 20000,
+        iterations: 20000,
         seed: 42,
       });
 
-      expect(result.totalTicks).toBe(20000);
+      expect(result.iterations).toBe(20000);
 
       // Should have prestiged multiple times
       expect(prestigeCount).toBeGreaterThan(0);
@@ -619,7 +619,7 @@ describe('Integration: Prestige Tree layer chain', () => {
             }
           }
         },
-        ticks: 5000,
+        iterations: 5000,
         seed: 99,
       });
 

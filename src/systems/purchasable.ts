@@ -66,7 +66,7 @@ export interface PurchasableDisplay {
    * Whether to show the current count (e.g., "5 owned").
    * Default: `false` when limit is 1, `true` otherwise.
    */
-  showAmount?: boolean;
+  showCount?: boolean;
 }
 
 // TODO(expansion): staged purchasables — a purchasable that transforms between
@@ -149,7 +149,7 @@ type CountCurve = (count: MaybeRef<DecimalSource>) => FormulaSource;
  * Cost options for {@link ScalingPurchasableOptions}. A discriminated
  * union: provide exactly one shape.
  *
- * - **Geometric** (`baseCost + costScaling`) — closed-form `baseCost × costScaling^count`.
+ * - **Geometric** (`baseCost + costRatio`) — closed-form `baseCost × costRatio^count`.
  * - **Formula** (`costFormula`) — any curve the Formula vocabulary expresses.
  *   Invertible, so bulk purchasing walks the real curve.
  * - **Function** (`cost`) — any cost shape the Formula vocabulary can't
@@ -163,7 +163,7 @@ export type ScalingPurchasableCost =
        * The cost ratio (e.g., `1.15` for a 15% rise per purchase).
        * Can be a ref or getter, for a tunable or a scoped override.
        */
-      costScaling: Computable<DecimalSource>;
+      costRatio: Computable<DecimalSource>;
       costFormula?: never;
       cost?: never;
     }
@@ -176,7 +176,7 @@ export type ScalingPurchasableCost =
        */
       costFormula: CountCurve;
       baseCost?: never;
-      costScaling?: never;
+      costRatio?: never;
       cost?: never;
     }
   | {
@@ -187,7 +187,7 @@ export type ScalingPurchasableCost =
        */
       cost: (count: DecimalSource) => DecimalSource;
       baseCost?: never;
-      costScaling?: never;
+      costRatio?: never;
       costFormula?: never;
     };
 
@@ -244,7 +244,7 @@ export type ScalingPurchasableOptions = {
    */
   effectDescription?: Computable<string>;
   /** Whether to show the current count. Default: `false` when limit is 1, `true` otherwise. */
-  showAmount?: boolean;
+  showCount?: boolean;
   /** The limit: the most purchases. Default: `Infinity` */
   limit?: Computable<DecimalSource>;
   /** Starting count. Default: `0` */
@@ -292,7 +292,7 @@ export interface Purchasable {
     title: MaybeRef<string | undefined>;
     description: MaybeRef<string>;
     effectDescription: MaybeRef<string | undefined>;
-    showAmount: boolean;
+    showCount: boolean;
   };
   /** Current effect value — computed from the count for a function effect, or the static value */
   effect: ComputedRef<DecimalSource>;
@@ -355,14 +355,14 @@ function buildPurchasableDisplay(
   title: MaybeRef<string | undefined>;
   description: MaybeRef<string>;
   effectDescription: MaybeRef<string | undefined>;
-  showAmount: boolean;
+  showCount: boolean;
 } {
   const disp = toPurchasableDisplay(display);
   return {
     title: toMaybeRef(disp.title),
     description: toMaybeRef(disp.description ?? ''),
     effectDescription: toMaybeRef(disp.effectDescription),
-    showAmount: disp.showAmount ?? !isOneShot,
+    showCount: disp.showCount ?? !isOneShot,
   };
 }
 
@@ -481,15 +481,15 @@ function buildScalingCostRequirement(
     });
   }
 
-  // Geometric path. toMaybeRef so a tunable()/ref baseCost or costScaling
+  // Geometric path. toMaybeRef so a tunable()/ref baseCost or costRatio
   // flows reactively into the Formula. Formula sources accept
   // MaybeRef<DecimalSource>, so the exponential re-evaluates when either
   // underlying ref changes (e.g., a scoped override pushed on a tunable).
   const processedBaseCost = toMaybeRef(options.baseCost);
-  const processedCostScaling = toMaybeRef(options.costScaling);
+  const processedCostRatio = toMaybeRef(options.costRatio);
   return createCostRequirement({
     resource: options.resource,
-    cost: Formula.exponential(count, processedBaseCost, processedCostScaling),
+    cost: Formula.exponential(count, processedBaseCost, processedCostRatio),
     maxBulkCount: limit ?? Decimal.dInf,
   });
 }
@@ -684,7 +684,7 @@ export function createPurchasable(
  * one customized repeatable purchase.
  *
  * The cost options are a discriminated union (see {@link ScalingPurchasableCost}):
- * - **Geometric**: `baseCost + costScaling` produces `baseCost * costScaling ^ count`.
+ * - **Geometric**: `baseCost + costRatio` produces `baseCost * costRatio ^ count`.
  * - **Formula**: `costFormula` takes a curve factory (invertible, bulk-aware).
  * - **Function**: `cost` takes a plain `(count) => Decimal` function
  *   (one unit per purchase) for cost shapes no Formula expresses.
@@ -707,7 +707,7 @@ export function createPurchasable(
  *   description: 'Point Generator',
  *   resource: points,
  *   baseCost: 10,
- *   costScaling: 1.15,
+ *   costRatio: 1.15,
  *   effect: 2,            // ×2 per purchase (static base → 2^count)
  * });
  * ```
@@ -745,7 +745,7 @@ export function createScalingPurchasable(
     title,
     description,
     effectDescription,
-    showAmount,
+    showCount,
     limit,
     initialCount,
     onPurchase,
@@ -766,7 +766,7 @@ export function createScalingPurchasable(
         effectDescription:
           effectDescription ??
           (effectFn ? computed(() => `×${formatSmall(effectFn(count.value), 2)}`) : undefined),
-        showAmount,
+        showCount,
       },
       requirements: costRequirement,
       limit,

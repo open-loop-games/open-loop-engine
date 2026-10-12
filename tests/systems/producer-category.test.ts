@@ -30,7 +30,7 @@ interface BuildingDef {
   name: string;
   baseRate: number;
   baseCost: number;
-  costScaling: number;
+  costRatio: number;
 }
 
 interface ClickDef {
@@ -69,8 +69,8 @@ describe('createProducerCategory', () => {
     });
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costScaling: 1.15 },
-      { id: 'grandma', name: 'Grandma', baseRate: 1, baseCost: 100, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costRatio: 1.15 },
+      { id: 'grandma', name: 'Grandma', baseRate: 1, baseCost: 100, costRatio: 1.15 },
     ]);
 
     expect(category.size).toBe(2);
@@ -99,7 +99,7 @@ describe('createProducerCategory', () => {
       name: 'Grandma',
       baseRate: 5,
       baseCost: 100,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const producer = category.getProducer('grandma')!;
@@ -120,7 +120,7 @@ describe('createProducerCategory', () => {
       registerTick,
     });
 
-    const def = { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costScaling: 1.15 };
+    const def = { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costRatio: 1.15 };
     category.register(def);
 
     expect(category.getDef('cursor')).toBe(def);
@@ -176,9 +176,9 @@ describe('createProducerCategory', () => {
     });
 
     category.register([
-      { id: 'b', name: 'B', baseRate: 2, baseCost: 1, costScaling: 1 },
-      { id: 'a', name: 'A', baseRate: 1, baseCost: 1, costScaling: 1 },
-      { id: 'c', name: 'C', baseRate: 3, baseCost: 1, costScaling: 1 },
+      { id: 'b', name: 'B', baseRate: 2, baseCost: 1, costRatio: 1 },
+      { id: 'a', name: 'A', baseRate: 1, baseCost: 1, costRatio: 1 },
+      { id: 'c', name: 'C', baseRate: 3, baseCost: 1, costRatio: 1 },
     ]);
 
     const ids = category.getAll().map((e) => e.def.id);
@@ -230,13 +230,13 @@ describe('createProducerCategory', () => {
 
     // Base game
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costScaling: 1.15 },
+      { id: 'cursor', name: 'Cursor', baseRate: 0.1, baseCost: 15, costRatio: 1.15 },
     ]);
     expect(category.size).toBe(1);
 
     // Mod adds more
     category.register([
-      { id: 'portal', name: 'Portal', baseRate: 100, baseCost: 1e12, costScaling: 1.15 },
+      { id: 'portal', name: 'Portal', baseRate: 100, baseCost: 1e12, costRatio: 1.15 },
     ]);
     expect(category.size).toBe(2);
     expect(category.getProducer('portal')).toBeDefined();
@@ -261,7 +261,7 @@ describe('createProducerCategory', () => {
       name: 'Cursor',
       baseRate: 0.1,
       baseCost: 15,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     expect(() => {
@@ -270,7 +270,7 @@ describe('createProducerCategory', () => {
         name: 'Cursor 2',
         baseRate: 0.2,
         baseCost: 20,
-        costScaling: 1.2,
+        costRatio: 1.2,
       });
     }).toThrow(/Duplicate/);
   });
@@ -294,7 +294,7 @@ describe('createProducerCategory', () => {
       name: 'Cursor',
       baseRate: 0.1,
       baseCost: 15,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     category.registry.patch('cursor', { baseRate: 0.5 });
@@ -320,7 +320,7 @@ describe('createProducerCategory', () => {
     });
 
     // No purchase config — count defaults to 1
-    category.register({ id: 'gen', name: 'Generator', baseRate: 10, baseCost: 0, costScaling: 1 });
+    category.register({ id: 'gen', name: 'Generator', baseRate: 10, baseCost: 0, costRatio: 1 });
 
     tick(1.0);
     // 10 rate * 1 count * 1.0 dt = 10
@@ -341,13 +341,13 @@ describe('createProducerCategory', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
     });
 
-    category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costRatio: 1.15 });
 
     const producer = category.getProducer('mine')!;
     // Purchase 3 units
@@ -370,18 +370,18 @@ describe('createProducerCategory', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: 'continuous',
-        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
-        display: { title: def.name, effectDescription: '+5/s each', showAmount: false },
+        purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: def.costRatio },
+        display: { title: def.name, effectDescription: '+5/s each', showCount: false },
       }),
       registerTick,
     });
-    category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costRatio: 1.15 });
 
     const { display } = category.getProducer('mine')!.repeatable!;
     expect(unref(display.title)).toBe('Mine');
     expect(unref(display.description)).toBe('');
     expect(unref(display.effectDescription)).toBe('+5/s each');
-    expect(display.showAmount).toBe(false);
+    expect(display.showCount).toBe(false);
   });
 
   it("reads a string display as the repeatable's description, defaulting to the def id", () => {
@@ -394,14 +394,14 @@ describe('createProducerCategory', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: 'continuous',
-        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+        purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: def.costRatio },
         display: def.id === 'mine' ? def.name : undefined,
       }),
       registerTick,
     });
     category.register([
-      { id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 },
-      { id: 'well', name: 'Well', baseRate: 1, baseCost: 10, costScaling: 1.15 },
+      { id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costRatio: 1.15 },
+      { id: 'well', name: 'Well', baseRate: 1, baseCost: 10, costRatio: 1.15 },
     ]);
 
     expect(unref(category.getProducer('mine')!.repeatable!.display.description)).toBe('Mine');
@@ -475,7 +475,7 @@ describe('createProducerCategory', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: 'manual',
-        purchase: { costResource: cookies, baseCost: 10, costScaling: 1.15 },
+        purchase: { costResource: cookies, baseCost: 10, costRatio: 1.15 },
         extraCount: cursors,
       }),
       registerTick,
@@ -501,7 +501,7 @@ describe('createProducerCategory', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: 'manual',
-        purchase: { costResource: cookies, baseCost: 10, costScaling: 1.15 },
+        purchase: { costResource: cookies, baseCost: 10, costRatio: 1.15 },
       }),
       registerTick,
     });
@@ -606,7 +606,7 @@ describe('createProducerCategory', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -616,8 +616,8 @@ describe('createProducerCategory', () => {
     cookies.value = 1e9;
 
     category.register([
-      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 1, costScaling: 1.01 },
-      { id: 'grandma', name: 'Grandma', baseRate: 5, baseCost: 1, costScaling: 1.01 },
+      { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 1, costRatio: 1.01 },
+      { id: 'grandma', name: 'Grandma', baseRate: 5, baseCost: 1, costRatio: 1.01 },
     ]);
 
     // Buy 2 cursors, 3 grandmas
@@ -691,7 +691,7 @@ describe('createProducerCategory', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -702,7 +702,7 @@ describe('createProducerCategory', () => {
       name: 'Cursor',
       baseRate: 0.1,
       baseCost: 15,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const producer = category.getProducer('cursor')!;
@@ -732,14 +732,14 @@ describe('createProducerCategory', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
         extraCount: () => generated.value,
       }),
       registerTick,
     });
 
-    category.register({ id: 'mine', name: 'Mine', baseRate: 2, baseCost: 10, costScaling: 1.15 });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 2, baseCost: 10, costRatio: 1.15 });
 
     const producer = category.getProducer('mine')!;
     producer.repeatable!.purchase(3); // owned = 3, extra = 4 → count = 7
@@ -822,7 +822,7 @@ describe('createProducerCategory', () => {
             purchase: {
               costResource: cookies,
               baseCost: def.baseCost,
-              costScaling: def.costScaling,
+              costRatio: def.costRatio,
             },
             extraCount: () => generated1.value,
           };
@@ -835,7 +835,7 @@ describe('createProducerCategory', () => {
           purchase: {
             costResource: cookies,
             baseCost: def.baseCost,
-            costScaling: def.costScaling,
+            costRatio: def.costRatio,
           },
         };
       },
@@ -843,8 +843,8 @@ describe('createProducerCategory', () => {
     });
 
     category.register([
-      { id: 't1', name: 'T1', baseRate: 1, baseCost: 100, costScaling: 1.15 },
-      { id: 't2', name: 'T2', baseRate: 1, baseCost: 1000, costScaling: 1.15 },
+      { id: 't1', name: 'T1', baseRate: 1, baseCost: 100, costRatio: 1.15 },
+      { id: 't2', name: 'T2', baseRate: 1, baseCost: 1000, costRatio: 1.15 },
     ]);
 
     const t1 = category.getProducer('t1')!;
@@ -889,7 +889,7 @@ describe('createProducerCategory', () => {
     expect(producer.repeatable).toBeUndefined();
   });
 
-  it('reads a reactive costScaling into the next purchase cost', () => {
+  it('reads a reactive costRatio into the next purchase cost', () => {
     const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies', 1e9);
     const scaling = ref(2);
@@ -900,11 +900,11 @@ describe('createProducerCategory', () => {
         resource: cookies,
         baseRate: def.baseRate,
         trigger: 'continuous',
-        purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: scaling },
+        purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: scaling },
       }),
       registerTick,
     });
-    category.register({ id: 'mine', name: 'Mine', baseRate: 1, baseCost: 10, costScaling: 0 });
+    category.register({ id: 'mine', name: 'Mine', baseRate: 1, baseCost: 10, costRatio: 0 });
 
     const repeatable = category.getProducer('mine')!.repeatable!;
     repeatable.purchase(1);
@@ -960,7 +960,7 @@ describe('Producer.purchaseBeatSeconds', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -971,7 +971,7 @@ describe('Producer.purchaseBeatSeconds', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const producer = category.getProducer('cursor')!;
@@ -1014,7 +1014,7 @@ describe('Producer.purchaseBeatSeconds', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -1025,7 +1025,7 @@ describe('Producer.purchaseBeatSeconds', () => {
       name: 'Broken',
       baseRate: 0,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     expect(category.getProducer('broken')!.purchaseBeatSeconds.value).toBe(Infinity);
@@ -1044,7 +1044,7 @@ describe('Producer.purchaseBeatSeconds', () => {
         purchase: {
           costResource: cookies,
           baseCost: def.baseCost,
-          costScaling: def.costScaling,
+          costRatio: def.costRatio,
         },
       }),
       registerTick,
@@ -1059,7 +1059,7 @@ describe('Producer.purchaseBeatSeconds', () => {
       name: 'Cursor',
       baseRate: 1,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const producer = category.getProducer('cursor')!;
@@ -1095,7 +1095,7 @@ describe('Producer signed-rate integration', () => {
       name: 'Field',
       baseRate: 5,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     const producer = category.getProducer('field')!;
@@ -1129,7 +1129,7 @@ describe('Producer signed-rate integration', () => {
       name: 'Field',
       baseRate: -5,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     // Demand is 5, balance is 2 — the shortfall drains the remainder rather
@@ -1159,7 +1159,7 @@ describe('Producer signed-rate integration', () => {
       name: 'Field',
       baseRate: -5,
       baseCost: 10,
-      costScaling: 1.15,
+      costRatio: 1.15,
     });
 
     tick(1);
@@ -1181,7 +1181,7 @@ describe('producer save keys', () => {
           description: 'Sale',
           resource: cookies,
           baseCost: 1,
-          costScaling: 2,
+          costRatio: 2,
         });
       }
       const category = createProducerCategory<BuildingDef>({
@@ -1190,11 +1190,11 @@ describe('producer save keys', () => {
           resource: cookies,
           baseRate: def.baseRate,
           trigger: 'continuous',
-          purchase: { costResource: cookies, baseCost: def.baseCost, costScaling: def.costScaling },
+          purchase: { costResource: cookies, baseCost: def.baseCost, costRatio: def.costRatio },
         }),
         registerTick,
       });
-      category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costScaling: 1.15 });
+      category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costRatio: 1.15 });
       return category;
     });
   }

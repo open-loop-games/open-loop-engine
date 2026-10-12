@@ -165,16 +165,16 @@ export interface AnalyzerSummary {
 }
 
 /**
- * Observer of one headless run that collects metrics per tick, and optionally
+ * Observer of one headless run that collects metrics per iteration, and optionally
  * per finalized cycle-log entry.
  */
 export interface Analyzer {
   id: string;
-  /** Called once before the first tick. Use it to initialize running totals. */
+  /** Called once before the first iteration. Use it to initialize running totals. */
   onStart?(): void;
-  /** Called after each tick. `tick` is the zero-based tick index. */
-  onTick?(tick: number): void;
-  /** Called once after the last tick. Use it to compute final metrics. */
+  /** Called after each iteration. `iteration` is its zero-based index. */
+  onIteration?(iteration: number): void;
+  /** Called once after the last iteration. Use it to compute final metrics. */
   onEnd?(): void;
   /**
    * Called once per finalized cycle-log entry when the analyzer is attached

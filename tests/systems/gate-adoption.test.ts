@@ -806,7 +806,7 @@ describe('Predicate fields — every arm reaches the system', () => {
           purchase: {
             costResource: api.points,
             baseCost: 0,
-            costScaling: 1,
+            costRatio: 1,
             visible: pointsGte(2),
           },
         }),
@@ -854,7 +854,7 @@ describe('Predicate fields — every arm reaches the system', () => {
           requirements: [],
           limit: 1,
           initialCount: 1,
-          grants: [{ chain, mult: 2, description: 'Doubler', when: pointsGte(4) }],
+          grants: [{ chain, multiplier: 2, description: 'Doubler', when: pointsGte(4) }],
         }),
       });
       upgrades.register({ id: 'doubler' });
@@ -930,7 +930,7 @@ describe('Predicate fields — a Gate missing a handle throws at register, label
       mapPurchasable: () => ({
         display: { description: '' },
         requirements: [],
-        grants: [{ chain, mult: 2, description: 'Doubler', when: unwiredFlag }],
+        grants: [{ chain, multiplier: 2, description: 'Doubler', when: unwiredFlag }],
       }),
     });
     expect(() => granted.register({ id: 'u' })).toThrow(/purchasable 'u' grant 'Doubler' when: /);

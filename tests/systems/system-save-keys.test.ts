@@ -110,7 +110,7 @@ describe('system save keys', () => {
           resource: cookies,
           baseRate: 1,
           trigger: 'continuous',
-          purchase: { costResource: cookies, baseCost: 10, costScaling: 1.15 },
+          purchase: { costResource: cookies, baseCost: 10, costRatio: 1.15 },
         }),
         registerTick,
       });

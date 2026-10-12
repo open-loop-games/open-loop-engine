@@ -353,7 +353,7 @@ describe('createAchievementCategory grants', () => {
       id: 'ach-grants1',
       mapAchievement: (def) => ({
         display: { title: def.name },
-        grants: [{ chain, mult: 1.5, description: `from:${def.id}` }],
+        grants: [{ chain, multiplier: 1.5, description: `from:${def.id}` }],
       }),
     });
 

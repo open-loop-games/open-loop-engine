@@ -49,9 +49,9 @@ export interface Cell {
   id: string;
   setup: (ctx: RunContext) => Analyzer[];
   tick: (dt: number) => void;
-  /** Total number of ticks to simulate for this cell. */
-  ticks: number;
-  /** Sim-seconds per tick. Defaults to `0.05`. */
+  /** Number of iterations to run for this cell. */
+  iterations: number;
+  /** Sim-seconds per iteration. Defaults to `0.05`. */
   tickDelta?: number;
   /**
    * Called after the analyzers of each headless run have summarized, before
@@ -419,8 +419,8 @@ export interface RunUntilOptions {
   tickDelta?: number;
   /**
    * Builds the analyzers. Called once before the loop. In the fixed-tick modes
-   * the analyzer lifecycle (`onStart`/`onTick`/`onEnd`) mirrors
-   * {@link runHeadless}, and `onTick` receives the zero-based index of the
+   * the analyzer lifecycle (`onStart`/`onIteration`/`onEnd`) mirrors
+   * {@link runHeadless}, and `onIteration` receives the zero-based index of the
    * iteration just completed. `'next-event'` mode throws if it returns any analyzers.
    */
   setup?: () => Analyzer[];
@@ -470,9 +470,9 @@ export interface RunUntilResult {
    * ticks. In `'next-event'` mode, the count of advances and fast-ticks, which
    * vary in length.
    */
-  totalTicks: number;
+  iterations: number;
   /**
-   * The sim-time of the headless run at termination. Equals `totalTicks * tickDelta` in the
+   * The sim-time of the headless run at termination. Equals `iterations * tickDelta` in the
    * fixed-tick modes. In `'next-event'` mode (advances of varying length, plus
    * fast-ticks) it is the accumulated advanced sim-time, not that product.
    */

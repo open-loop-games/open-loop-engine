@@ -460,7 +460,7 @@ export interface BindingRecord {
  * predicate (e.g. `item.active` for purchasables), so consumer code doesn't
  * repeat it.
  *
- * Use the `mult` / `add` / `exp` short-hands for the common modifier kinds;
+ * Use the `multiplier` / `add` / `exponent` keys for the common modifier kinds;
  * the `modifier` variant is the escape hatch for hand-built modifiers
  * (invertible chains, sequential composites, replacement grants).
  */
@@ -469,7 +469,7 @@ export type Grant =
       /** One or more chains to bind onto. Array binds the same modifier to each chain with a shared predicate. */
       chain: ModifierChain | ModifierChain[];
       /** Multiplier value (or reactive source). */
-      mult: Computable<DecimalSource>;
+      multiplier: Computable<DecimalSource>;
       /** Stable display text for UI breakdowns, also used as the attribution text. */
       description: string;
       /**
@@ -488,7 +488,7 @@ export type Grant =
   | {
       chain: ModifierChain | ModifierChain[];
       /** Exponent value (or reactive source). */
-      exp: Computable<DecimalSource>;
+      exponent: Computable<DecimalSource>;
       description: string;
       when?: Predicate;
     }

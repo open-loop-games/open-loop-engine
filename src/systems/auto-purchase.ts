@@ -435,17 +435,17 @@ export interface SetupPolicyAutoPurchaseOptions {
    * `dt` (24h offline catch-up + 1e-6s interval = millions of purchase
    * attempts that would block the thread). When the cap is hit, the loop stops and
    * the remaining `accumulator` is set to zero; consumers observe it through
-   * {@link onIterationsOverflow}.
+   * {@link onAttemptsOverflow}.
    */
-  maxIterationsPerTick?: number;
+  maxAttemptsPerTick?: number;
   /**
    * Diagnostic option callback called when the drain loop stops at the
-   * {@link maxIterationsPerTick} cap. Receives the floor of the discarded
+   * {@link maxAttemptsPerTick} cap. Receives the floor of the discarded
    * purchase-attempt count (`accumulator / interval` at the stop). The loop never
    * throws on overflow; the default does nothing. Use it to report
    * misconfiguration in dev mode, or to track overflow in telemetry.
    */
-  onIterationsOverflow?: (droppedIterations: number) => void;
+  onAttemptsOverflow?: (droppedAttempts: number) => void;
 }
 
 /**
@@ -513,8 +513,8 @@ export function setupPolicyAutoPurchase(
   const processedBulk = toMaybeRef<DecimalSource>(options.bulkCount ?? 1);
   const processedReserve = toMaybeRef<DecimalSource>(options.reserve ?? 0);
   const processedWaitForCost = toMaybeRef(options.waitForCost ?? false);
-  const maxIterationsPerTick = options.maxIterationsPerTick ?? 10000;
-  const onIterationsOverflow = options.onIterationsOverflow;
+  const maxAttemptsPerTick = options.maxAttemptsPerTick ?? 10000;
+  const onAttemptsOverflow = options.onAttemptsOverflow;
 
   let getList: () => Producer[];
   let aggregateRate: (resource: Resource) => DecimalSource;
@@ -591,12 +591,12 @@ export function setupPolicyAutoPurchase(
     // drains regardless. `interval <= 0` collapses to one purchase attempt per
     // tick with the accumulator cleared.
     //
-    // `iterations < maxIterationsPerTick` mirrors createTickDriver's
+    // `attempts < maxAttemptsPerTick` mirrors createTickDriver's
     // maxTicksPerInterval safety cap — pathological combos (tiny interval +
     // long offline catch-up dt) would otherwise drain millions of times
     // synchronously and block the thread.
-    let iterations = 0;
-    while (accumulator.value >= interval && iterations < maxIterationsPerTick) {
+    let attempts = 0;
+    while (accumulator.value >= interval && attempts < maxAttemptsPerTick) {
       totalRateByResource.clear();
 
       const scanStart = profileStart();
@@ -655,13 +655,13 @@ export function setupPolicyAutoPurchase(
         break;
       }
       accumulator.value -= interval;
-      iterations++;
+      attempts++;
     }
 
-    if (iterations >= maxIterationsPerTick && interval > 0 && accumulator.value >= interval) {
+    if (attempts >= maxAttemptsPerTick && interval > 0 && accumulator.value >= interval) {
       const dropped = Math.floor(accumulator.value / interval);
       accumulator.value = 0;
-      onIterationsOverflow?.(dropped);
+      onAttemptsOverflow?.(dropped);
     }
   });
 }

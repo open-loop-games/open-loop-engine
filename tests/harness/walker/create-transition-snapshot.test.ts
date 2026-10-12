@@ -117,7 +117,7 @@ function buildMergeEngine(gameId: string, accessor: GameStateAccessor) {
           purchase: {
             costResource: gold,
             baseCost: def.baseCost,
-            costScaling: 1.15,
+            costRatio: 1.15,
           },
         }),
         registerTick: ctx.onTick,

@@ -36,7 +36,7 @@ describe('createRunFinalizeAnalyzer', () => {
         addResource(gold, loopCount * 10);
         loopTickHandler?.(dt);
       },
-      ticks: 3,
+      iterations: 3,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;
@@ -51,7 +51,7 @@ describe('createRunFinalizeAnalyzer', () => {
     const result = runHeadless({
       setup: () => [tracker],
       tick: () => {},
-      ticks: 5,
+      iterations: 5,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;

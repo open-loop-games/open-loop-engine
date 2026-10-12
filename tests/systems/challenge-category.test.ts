@@ -66,7 +66,7 @@ describe('ChallengeDef declarative bindings', () => {
       id: 'halved',
       displayName: 'Halved',
       goal: () => false,
-      restricts: [{ chain, mult: 0.5, description: 'rate-halve' }],
+      restricts: [{ chain, multiplier: 0.5, description: 'rate-halve' }],
     });
 
     const ch = challenges.getChallenge('halved')!;
@@ -90,8 +90,8 @@ describe('ChallengeDef declarative bindings', () => {
       id: 'trade',
       displayName: 'Trade',
       goal: () => true,
-      restricts: [{ chain, mult: 0.5, description: 'rate' }],
-      rewards: [{ chain, mult: 3, description: 'rate' }],
+      restricts: [{ chain, multiplier: 0.5, description: 'rate' }],
+      rewards: [{ chain, multiplier: 3, description: 'rate' }],
     });
 
     const ch = challenges.getChallenge('trade')!;
@@ -115,7 +115,7 @@ describe('ChallengeDef declarative bindings', () => {
       id: 'beat',
       displayName: 'Beat',
       goal: () => true,
-      rewards: [{ chain, mult: 2, description: 'perk' }],
+      rewards: [{ chain, multiplier: 2, description: 'perk' }],
     });
 
     const ch = challenges.getChallenge('beat')!;
@@ -276,7 +276,7 @@ describe('ChallengeCategory — scopes follow `active` through every load and re
       id: 'halved',
       displayName: 'Halved',
       goal: () => false,
-      restricts: [{ chain, mult: 0.5, description: 'halve' }],
+      restricts: [{ chain, multiplier: 0.5, description: 'halve' }],
     };
     const first = createChallengeCategory({ id: 'ch-rebind' });
     first.register(def);

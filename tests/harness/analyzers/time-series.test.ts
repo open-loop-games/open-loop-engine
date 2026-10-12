@@ -21,7 +21,7 @@ describe('createTimeSeriesAnalyzer', () => {
         gold.value = trajectory[tick]!;
         tick += 1;
       },
-      ticks: 5,
+      iterations: 5,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;
@@ -45,7 +45,7 @@ describe('createTimeSeriesAnalyzer', () => {
     const result = runHeadless({
       setup: () => [tracker],
       tick: () => {},
-      ticks: 0,
+      iterations: 0,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;
@@ -63,7 +63,7 @@ describe('createTimeSeriesAnalyzer', () => {
         return [tracker];
       },
       tick: () => {},
-      ticks: 3,
+      iterations: 3,
     });
     const result = runHeadless({
       setup: () => {
@@ -71,7 +71,7 @@ describe('createTimeSeriesAnalyzer', () => {
         return [tracker];
       },
       tick: () => {},
-      ticks: 1,
+      iterations: 1,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;

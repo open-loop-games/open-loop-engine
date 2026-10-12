@@ -868,7 +868,7 @@ describe('modifiers take Grants', () => {
       id: 'haste',
       duration: 10,
       maxStacks: 2,
-      grants: [{ chain, mult: 1.5, description: 'Haste' }],
+      grants: [{ chain, multiplier: 1.5, description: 'Haste' }],
     });
 
     system.activate('haste');
@@ -897,7 +897,7 @@ describe('modifiers take Grants', () => {
     system.register({
       id: 'owl',
       duration: 10,
-      grants: [{ chain, mult: 2, description: 'Owl', when: night }],
+      grants: [{ chain, multiplier: 2, description: 'Owl', when: night }],
     });
 
     system.activate('owl');
@@ -913,7 +913,7 @@ describe('modifiers take Grants', () => {
       system.register({
         id: 'owl',
         duration: 10,
-        grants: [{ chain, mult: 2, description: 'Owl', when: { kind: 'flag', id: 'night' } }],
+        grants: [{ chain, multiplier: 2, description: 'Owl', when: { kind: 'flag', id: 'night' } }],
       }),
     ).toThrow(/temporary effect 'owl' grant 'Owl' when: /);
   });

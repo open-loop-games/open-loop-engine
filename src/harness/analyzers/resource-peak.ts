@@ -20,7 +20,7 @@
  * The analyzer accepts this: an astronomical resource is the consumer's
  * problem until the harness aggregator has Decimal-aware metric types.
  *
- * Sampling lifecycle: sampling happens in `onTick`, so each observation shows
+ * Sampling lifecycle: sampling happens in `onIteration`, so each observation shows
  * post-tick state. Zero-tick headless runs fall back to a single read inside
  * `summarize`, so the analyzer still reports a meaningful `peak/final/avg` trio.
  */
@@ -37,7 +37,7 @@ import { Decimal } from '@/primitives/decimal';
  * importing this type.
  */
 export interface ResourcePeakMetrics {
-  /** Highest value observed across all ticks (including the initial sample). */
+  /** Highest value observed across all iterations (including the initial sample). */
   peak: number;
   /** Value at the final tick. */
   final: number;
@@ -82,7 +82,7 @@ export function createResourcePeakAnalyzer(resource: Resource): Analyzer {
       samples.length = 0;
       peak = -Infinity;
     },
-    onTick() {
+    onIteration() {
       sample();
     },
     summarize(): AnalyzerSummary {

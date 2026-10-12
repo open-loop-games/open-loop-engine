@@ -164,35 +164,35 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
   // See studio/open-loop-engine#22.
 
   const CURVES = [
-    { baseCost: 10, costScaling: 1.05 },
-    { baseCost: 10, costScaling: 1.15 },
-    { baseCost: 10, costScaling: 1.5 },
-    { baseCost: 10, costScaling: 2 },
-    { baseCost: 10, costScaling: 3 },
-    { baseCost: 1e6, costScaling: 1.15 },
+    { baseCost: 10, costRatio: 1.05 },
+    { baseCost: 10, costRatio: 1.15 },
+    { baseCost: 10, costRatio: 1.5 },
+    { baseCost: 10, costRatio: 2 },
+    { baseCost: 10, costRatio: 3 },
+    { baseCost: 1e6, costRatio: 1.15 },
   ];
 
-  for (const { baseCost, costScaling } of CURVES) {
+  for (const { baseCost, costRatio } of CURVES) {
     for (const funds of [1e3, 1e6, 1e12]) {
-      test(`base=${baseCost} s=${costScaling} funds=${funds}`, () => {
+      test(`base=${baseCost} s=${costRatio} funds=${funds}`, () => {
         const bulkWallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const bulk = createScalingPurchasable({
-          id: `bulk-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
+          id: `bulk-${baseCost}-${costRatio}-${funds}`.replaceAll('.', '_'),
           description: 'bulk-buy curve',
           resource: bulkWallet,
           baseCost,
-          costScaling,
+          costRatio,
           purchaseMaxByDefault: true,
         });
         const boughtInBulk = bulk.purchaseMax();
 
         const oneWallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const one = createScalingPurchasable({
-          id: `one-${baseCost}-${costScaling}-${funds}`.replaceAll('.', '_'),
+          id: `one-${baseCost}-${costRatio}-${funds}`.replaceAll('.', '_'),
           description: 'one-at-a-time curve',
           resource: oneWallet,
           baseCost,
-          costScaling,
+          costRatio,
         });
         let boughtSingly = 0;
         while (one.canPurchase.value && boughtSingly < 5000) {
@@ -215,26 +215,26 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
   test('a bulk buy never spends more than the player has', () => {
     // The overcharge used to exceed the balance outright on steep curves, and
     // `pay`'s clamp to zero hid it by draining the wallet instead of failing.
-    for (const costScaling of [1.5, 2, 3, 5]) {
+    for (const costRatio of [1.5, 2, 3, 5]) {
       const wallet = createResource(ref<DecimalSource>(1e6), { displayName: 'coins' });
       const p = createScalingPurchasable({
-        id: `clamp-${costScaling}`.replaceAll('.', '_'),
+        id: `clamp-${costRatio}`.replaceAll('.', '_'),
         description: 'clamp curve',
         resource: wallet,
         baseCost: 10,
-        costScaling,
+        costRatio,
         purchaseMaxByDefault: true,
       });
       const bought = p.purchaseMax();
       const spent = Decimal.sub(1e6, wallet.value);
       const truth = bruteForce(
-        (x) => Decimal.mul(10, Decimal.pow(costScaling, x)),
+        (x) => Decimal.mul(10, Decimal.pow(costRatio, x)),
         0,
         Number(bought.toString()),
       );
       expect(
         Decimal.lte(relativeError(spent, truth), EXACT),
-        `s=${costScaling}: spent ${spent.toString()} for ${String(bought)} levels worth ${truth.toString()}`,
+        `s=${costRatio}: spent ${spent.toString()} for ${String(bought)} levels worth ${truth.toString()}`,
       ).toBe(true);
       expect(Decimal.gt(wallet.value, 0)).toBe(true);
     }
@@ -310,7 +310,7 @@ describe('a bulk purchase charges what the same purchases charge one at a time',
 });
 
 describe('a flat price is an ordinary authored value', () => {
-  test('costScaling 1 buys in bulk, singly, and under a cap', () => {
+  test('costRatio 1 buys in bulk, singly, and under a cap', () => {
     // A ratio of 1 has no continuous inverse to seed buy-max from — `1ˣ/ln 1`
     // is 0/0 — and the count still has to come out of the price.
     const capped = createScalingPurchasable({
@@ -318,7 +318,7 @@ describe('a flat price is an ordinary authored value', () => {
       description: 'flat capped curve',
       resource: createResource(ref<DecimalSource>(100), { displayName: 'coins' }),
       baseCost: 10,
-      costScaling: 1,
+      costRatio: 1,
       limit: 5,
       purchaseMaxByDefault: true,
     });
@@ -331,7 +331,7 @@ describe('a flat price is an ordinary authored value', () => {
       description: 'flat bulk curve',
       resource: wallet,
       baseCost: 10,
-      costScaling: 1,
+      costRatio: 1,
       purchaseMaxByDefault: true,
     });
     expect(String(bulk.purchaseMax())).toBe('10');
@@ -342,7 +342,7 @@ describe('a flat price is an ordinary authored value', () => {
       description: 'flat single curve',
       resource: createResource(ref<DecimalSource>(100), { displayName: 'coins' }),
       baseCost: 10,
-      costScaling: 1,
+      costRatio: 1,
       purchaseMaxByDefault: false,
     });
     expect(single.canPurchase.value).toBe(true);
@@ -361,8 +361,8 @@ describe('a single-payment purchase charges the level it counted to', () => {
     // current level's price, which is the value the fast path was reading and
     // is strictly below the next level's on every increasing curve.
     for (const startLevel of [0, 7]) {
-      for (const costScaling of [1.05, 1.15, 1.5, 2, 3]) {
-        const funds = Decimal.mul(10, Decimal.pow(costScaling, startLevel));
+      for (const costRatio of [1.05, 1.15, 1.5, 2, 3]) {
+        const funds = Decimal.mul(10, Decimal.pow(costRatio, startLevel));
         const level = ref<DecimalSource>(startLevel);
         const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const shape = {
@@ -371,12 +371,12 @@ describe('a single-payment purchase charges the level it counted to', () => {
         };
         const capped = createCostRequirement({
           ...shape,
-          cost: Formula.exponential(level, 10, costScaling),
+          cost: Formula.exponential(level, 10, costRatio),
           maxBulkCount: 1,
         });
         const uncapped = createCostRequirement({
           ...shape,
-          cost: Formula.exponential(level, 10, costScaling),
+          cost: Formula.exponential(level, 10, costRatio),
           maxBulkCount: Decimal.dInf,
         });
 
@@ -384,7 +384,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
         const truth = Decimal.min(maxRequirementsMet(uncapped), 1);
         expect(
           Decimal.eq(capAnswer, truth),
-          `level=${startLevel} s=${costScaling}: cap of 1 said ${String(capAnswer)}, uncapped clamped says ${String(truth)}`,
+          `level=${startLevel} s=${costRatio}: cap of 1 said ${String(capAnswer)}, uncapped clamped says ${String(truth)}`,
         ).toBe(true);
 
         // And the wallet is what notices if it doesn't: `pay` subtracts the
@@ -393,7 +393,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
         payRequirements(capped, capAnswer);
         expect(
           Decimal.gte(wallet.value, 0) && Decimal.lte(capped.getCost(capAnswer), funds),
-          `level=${startLevel} s=${costScaling}: charged ${String(capped.getCost(capAnswer))} out of ${String(funds)}`,
+          `level=${startLevel} s=${costRatio}: charged ${String(capped.getCost(capAnswer))} out of ${String(funds)}`,
         ).toBe(true);
       }
     }
@@ -408,14 +408,14 @@ describe('a single-payment purchase charges the level it counted to', () => {
   // and `calculateMaxAffordable`'s `priceOf` — and nothing pinned that.
 
   for (const startLevel of [0, 7]) {
-    for (const costScaling of [1.05, 1.15, 1.5, 2, 3]) {
-      test(`level=${startLevel} s=${costScaling}`, () => {
+    for (const costRatio of [1.05, 1.15, 1.5, 2, 3]) {
+      test(`level=${startLevel} s=${costRatio}`, () => {
         const funds = 1e3;
         const level = ref<DecimalSource>(startLevel);
         const wallet = createResource(ref<DecimalSource>(funds), { displayName: 'coins' });
         const req = createCostRequirement({
           resource: wallet,
-          cost: Formula.exponential(level, 10, costScaling),
+          cost: Formula.exponential(level, 10, costRatio),
           sumLevels: false,
           maxBulkCount: Decimal.dInf,
         });
@@ -428,7 +428,7 @@ describe('a single-payment purchase charges the level it counted to', () => {
         // at level 7 a 2× or 3× curve already prices the next level above the
         // whole balance, which is a real state and not a degenerate skip.
         const expected = Decimal.gt(n, 0)
-          ? Decimal.mul(10, Decimal.pow(costScaling, Decimal.add(startLevel, n)))
+          ? Decimal.mul(10, Decimal.pow(costRatio, Decimal.add(startLevel, n)))
           : Decimal.dZero;
         expect(
           Decimal.lte(relativeError(price, expected), EXACT),

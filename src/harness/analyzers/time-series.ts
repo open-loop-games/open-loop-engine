@@ -1,16 +1,16 @@
 /**
- * Time-series analyzer — samples a single resource every tick and reports
- * one scalar metric per tick (`time-series:{id}.t{i}`) instead of a reduced
+ * Time-series analyzer — samples a single resource every iteration and reports
+ * one scalar metric per iteration (`time-series:{id}.t{i}`) instead of a reduced
  * peak/final/avg trio. Keys use {@link Resource.id}, unique per engine, so
  * two resources sharing a display name never merge.
  *
  * The design depends on the harness aggregator rather than adding a new
  * Decimal-array metric type. {@link AnalyzerSummary.metrics} is scalar-only,
- * so a trajectory cannot pass through as one value. But each tick has its own
+ * so a trajectory cannot pass through as one value. But each iteration has its own
  * key, so the `${analyzerId}.${metricKey}` aggregation scheme computes
- * min/mean/max/percentiles *per tick across seeds* automatically. That
- * per-tick distribution is exactly the variance range a balance UI charts,
- * with no bespoke aggregation. The cost is `ticks` metric keys per sampled
+ * min/mean/max/percentiles *per iteration across seeds* automatically. That
+ * per-iteration distribution is exactly the variance range a balance UI charts,
+ * with no bespoke aggregation. The cost is `iterations` metric keys per sampled
  * resource. Balance work in development is the only caller, so that cost is
  * acceptable; the default analyzer pack stays scalar-only.
  *
@@ -41,7 +41,7 @@ import { Decimal } from '@/primitives/decimal';
  * ```ts
  * const gold = createResource(0, { id: 'gold', displayName: 'Gold' });
  * const analyzer = createTimeSeriesAnalyzer(gold);
- * runHeadless({ setup: () => [analyzer], ticks: 200, ... });
+ * runHeadless({ setup: () => [analyzer], iterations: 200, ... });
  * // analyzer.summarize().metrics → { 't0': …, 't1': …, …, 't199': … }
  * ```
  */
@@ -58,7 +58,7 @@ export function createTimeSeriesAnalyzer(resource: Resource): Analyzer {
     onStart() {
       samples.length = 0;
     },
-    onTick() {
+    onIteration() {
       sample();
     },
     summarize(): AnalyzerSummary {

@@ -615,7 +615,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
         resource: flour,
         baseRate: 1,
         trigger: 'continuous',
-        purchase: { costResource: cookies, baseCost: 10, costScaling: 1 },
+        purchase: { costResource: cookies, baseCost: 10, costRatio: 1 },
       }),
       registerTick: () => () => {},
     });

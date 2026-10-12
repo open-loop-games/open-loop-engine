@@ -21,7 +21,7 @@ describe('createResourcePeakAnalyzer', () => {
         gold.value = trajectory[tick]!;
         tick += 1;
       },
-      ticks: 10,
+      iterations: 10,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;
@@ -44,7 +44,7 @@ describe('createResourcePeakAnalyzer', () => {
     const result = runHeadless({
       setup: () => [tracker],
       tick: () => {},
-      ticks: 0,
+      iterations: 0,
     });
 
     const metrics = result.analyzerSummaries[0]!.metrics;
@@ -63,7 +63,7 @@ describe('createResourcePeakAnalyzer', () => {
         return [tracker];
       },
       tick: () => {},
-      ticks: 1,
+      iterations: 1,
     });
     const result = runHeadless({
       setup: () => {
@@ -71,7 +71,7 @@ describe('createResourcePeakAnalyzer', () => {
         return [tracker];
       },
       tick: () => {},
-      ticks: 1,
+      iterations: 1,
     });
 
     expect(result.analyzerSummaries[0]!.metrics.peak).toBe(5);

@@ -46,7 +46,8 @@ describe('self-referential grants (#18)', () => {
           {
             chain,
             // Self-referential: reads back through the category's own accessor.
-            mult: () => Decimal.pow(def.factor, category.getPurchasable(def.id)?.count.value ?? 0),
+            multiplier: () =>
+              Decimal.pow(def.factor, category.getPurchasable(def.id)?.count.value ?? 0),
             description: def.name,
           },
         ],
@@ -91,7 +92,7 @@ describe('self-referential grants (#18)', () => {
         display: { description: def.name },
         requirements: createCostRequirement({ resource: gold, cost: def.cost }),
         limit: 5,
-        grants: [{ chain, mult: 2, description: def.name }],
+        grants: [{ chain, multiplier: 2, description: def.name }],
       }),
     });
     category.register([{ id: 'perk', name: 'Perk', cost: 10, factor: 2 }]);

@@ -120,7 +120,7 @@ export function buildMixedEngine(gameId: string, accessor: GameStateAccessor) {
           purchase: {
             costResource: gold,
             baseCost: def.baseCost,
-            costScaling: 1.15,
+            costRatio: 1.15,
             limit: def.limit,
           },
         }),

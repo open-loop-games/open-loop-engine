@@ -438,7 +438,7 @@ describe('modifiers take Grants, active takes a Predicate', () => {
     system.register({
       id: 'library',
       active: built,
-      grants: [{ chain, mult: 2, description: 'Library' }],
+      grants: [{ chain, multiplier: 2, description: 'Library' }],
     });
 
     expect(value(chain)).toBe(1);

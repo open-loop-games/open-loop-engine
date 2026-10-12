@@ -50,7 +50,7 @@ function createGoldPeakAnalyzer(getGold: () => number): Analyzer {
   let peak = 0;
   return {
     id: 'gold-peak',
-    onTick: () => {
+    onIteration: () => {
       const v = getGold();
       if (v > peak) peak = v;
     },
@@ -141,7 +141,7 @@ describe('createSensitivityCell', () => {
       perturb,
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 20,
+      iterations: 20,
     });
   }
 
@@ -198,7 +198,7 @@ describe('createSensitivityCell', () => {
       },
       buildAnalyzers: () => [createGoldPeakAnalyzer(() => currentGold())],
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 1,
+      iterations: 1,
     });
 
     runSensitivity({
@@ -265,7 +265,7 @@ describe('createSensitivityCell', () => {
         },
       ],
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 1,
+      iterations: 1,
     });
     for (const seed of [1, 2, 3]) cell.setup({ seed });
 
@@ -292,7 +292,7 @@ describe('createSensitivityCell', () => {
         },
       ],
       tick: (engine) => engine.tickDriver.tickOnce(),
-      ticks: 1,
+      iterations: 1,
     });
     runMatrix({ cells: [cell], seeds: [1, 2] });
 

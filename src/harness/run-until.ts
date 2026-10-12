@@ -23,7 +23,7 @@
  * `simTime`) and reads game state via closure over the caller's engine.
  * The predicate is evaluated *before* each iteration, including iteration 0.
  * So a headless run that starts already in the target state terminates at once
- * with `totalTicks: 0`.
+ * with `iterations: 0`.
  *
  * Run mode (`options.mode`):
  *
@@ -101,7 +101,7 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
       stasisCheckInterval: options.stasisCheckInterval,
     });
     return {
-      totalTicks: out.totalTicks,
+      iterations: out.iterations,
       elapsedSimulated: out.elapsedSimulated,
       terminated: out.terminated,
       analyzerSummaries: [],
@@ -129,12 +129,12 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
     if (tick === maxTicks) break;
     engine.tickDriver.advanceTime(tickDelta);
     tick++;
-    for (const a of analyzers) a.onTick?.(tick - 1);
+    for (const a of analyzers) a.onIteration?.(tick - 1);
   }
   for (const a of analyzers) a.onEnd?.();
 
   return {
-    totalTicks: tick,
+    iterations: tick,
     elapsedSimulated: tick * tickDelta,
     terminated,
     analyzerSummaries: analyzers.map((a) => a.summarize()),

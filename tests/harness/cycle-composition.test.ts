@@ -51,7 +51,7 @@ describe('runMatrix composition with direct CycleLog finalize subscription', () 
             return analyzers;
           },
           tick: (dt) => loopTickHandler?.(dt),
-          ticks: 100,
+          iterations: 100,
           tickDelta: 0.05,
         },
       ],

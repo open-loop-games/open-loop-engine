@@ -685,7 +685,7 @@ describe("runUntil({mode: 'next-event'}) — cumulative-gte under a drain", () =
     expect(result.elapsedSimulated).toBeCloseTo(12, 6);
     // One event step to each reveal, rather than fast-ticking a stasis the
     // inflow already broke.
-    expect(result.totalTicks).toBe(2);
+    expect(result.iterations).toBe(2);
   });
 });
 

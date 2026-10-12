@@ -52,7 +52,7 @@ export interface ProducerPurchaseOptions {
   /** Cost of the first purchase. Can be a ref or getter, for a tunable or a scoped override. */
   baseCost: Computable<DecimalSource>;
   /** The cost ratio each purchase multiplies the next cost by. Can be a ref or getter, for a tunable or a scoped override. */
-  costScaling: Computable<DecimalSource>;
+  costRatio: Computable<DecimalSource>;
   /** The limit: the most purchases */
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */
@@ -315,7 +315,7 @@ function buildProducer<Def extends { id: string }>(
   let repeatable: Purchasable | undefined;
   if (mapping.purchase) {
     const pc = mapping.purchase;
-    const { title, description, effectDescription, showAmount } = toPurchasableDisplay(
+    const { title, description, effectDescription, showCount } = toPurchasableDisplay(
       mapping.display ?? def.id,
     );
     repeatable = createScalingPurchasable(
@@ -324,10 +324,10 @@ function buildProducer<Def extends { id: string }>(
         title,
         description,
         effectDescription,
-        showAmount,
+        showCount,
         resource: pc.costResource,
         baseCost: pc.baseCost,
-        costScaling: pc.costScaling,
+        costRatio: pc.costRatio,
         limit: pc.limit,
         initialCount: pc.initialCount,
         onPurchase: pc.onPurchase,
@@ -431,7 +431,7 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
  *     purchase: {
  *       costResource: gold,
  *       baseCost: def.baseCost,
- *       costScaling: 1.15,
+ *       costRatio: 1.15,
  *     },
  *   }),
  *   registerTick: ctx.onTick,

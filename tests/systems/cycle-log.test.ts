@@ -426,7 +426,7 @@ describe('createCycleLog', () => {
     let tickCount = 0;
     const tickAnalyzer: Analyzer = {
       id: 'ticker',
-      onTick: () => {
+      onIteration: () => {
         tickCount++;
       },
       summarize: () => ({ id: 'ticker', metrics: { ticks: tickCount } }),
@@ -448,7 +448,7 @@ describe('createCycleLog', () => {
         addResource(gold, 10);
         if (tickCount % 2 === 1) cycle.end();
       },
-      ticks: 6,
+      iterations: 6,
     });
 
     expect(entries).toHaveLength(3);
