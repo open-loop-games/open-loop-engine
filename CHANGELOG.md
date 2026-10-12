@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.5.2 (2026-10-12)
+
+### Features
+
+* an option the engine reads reactively takes Computable, so a tunable can move it (1f437cc)
+
 ## 0.5.1 (2026-10-11)
 
 ### Features
