@@ -1,11 +1,11 @@
 ---
 name: engine-release
-description: WIP (1/2). Release open-loop-engine — a patch from main, or the next minor, collected on the `next` branch and cut by a fast-forward. Use to cut an engine release, to commit a breaking change, or to rebase `next`. Only for the open-loop-engine repo.
+description: Release open-loop-engine — a patch from main, or the next minor, collected on the `next` branch and cut by a fast-forward. Use to cut an engine release, to commit a breaking change, or to rebase `next`. Only for the open-loop-engine repo.
 ---
 
-# Engine release — WIP (1/2)
+# Engine release
 
-**This skill is WIP.** After each use, add what the run taught to this file. Then increment the counter in the title and the description. At (2/2), remove "WIP" from both. Keep the skill thin. Where another file owns a step, point to that file; do not copy it.
+Keep the skill thin. Where another file owns a step, point to that file; do not copy it.
 
 Owners of the details:
 - `AGENTS.md` § Commits: the bump policy and `pnpm release`; its § Publish surface: what ships;
@@ -45,10 +45,14 @@ Rebase after a release, and before you commit on `next`. Another push to `main` 
 
 ## Cut the minor
 
-1. Adapt and check the consumers first, by the playbook's § Consumers.
-2. Rebase `next` (§ Rebase next).
-3. In the main checkout: `git merge --ff-only next`.
-4. `pnpm build`. The release commit's hook writes `docs/api/` from `dist/`, and `dist/` is still main's build. Without this step the tag's CI check fails, and nothing publishes.
-5. `pnpm release --dry-run`, and read every Breaking changes entry.
-6. `pnpm release`, then confirm the publish (§ Release a patch, step 3).
-7. Close the umbrella, and file the next one when the first breaking item appears.
+Every consumer pins a `^0.x` range, so the release breaks none of them. Starter moves at the cut; every other consumer moves at its own drift audit.
+
+1. In the worktree, `pnpm release --dry-run`, and read every Breaking changes entry. Fix an entry by rewording its commit on `next`, not by editing `CHANGELOG.md` afterwards.
+2. Check starter against `next`, by `api-migrations/README.md` § A breaking release's checklist. A break found there is fixed on `next` before the cut.
+3. Rebase `next` (§ Rebase next).
+4. In the main checkout: `git merge --ff-only next`.
+5. `pnpm build`, then `git checkout -- docs/api`. `pnpm release` refuses a dirty tree, and the release commit's hook regenerates `docs/api/` from the fresh `dist/`. Without the build, `dist/` is still main's, so the tag's CI check fails, and nothing publishes.
+6. `pnpm release --dry-run`, then `pnpm release`. Confirm the publish (§ Release a patch, step 3).
+7. Rebase `next` again; it fast-forwards to the release commit.
+8. Move starter to the minor with `/audit` from starter. Its bump commit contains the `Engine-audited:` trailer.
+9. Close the umbrella, and file the next one when the first breaking item appears.
