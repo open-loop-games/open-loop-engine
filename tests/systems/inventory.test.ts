@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 import { createInventory } from '@/systems/inventory';
 import { createAdditiveModifier, createMultiplicativeModifier } from '@/core/modifier';
 import type { Modifier } from '@/core/modifier';
@@ -182,6 +182,23 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 100 });
       inv.add('wood', 50);
       expect(inv.isFull()).toBe(false);
+    });
+
+    it('reads a ref baseCapacity and totalCapacity, so raising either lets more in', () => {
+      const perItem = ref(10);
+      const total = ref(12);
+      const inv = createInventory({ id: 'inv', baseCapacity: perItem, totalCapacity: total });
+
+      expect(inv.capacity.value.eq(10)).toBe(true);
+      expect(inv.add('wood', 12).eq(0)).toBe(true);
+
+      perItem.value = 20;
+      expect(inv.capacity.value.eq(20)).toBe(true);
+      expect(inv.add('wood', 12).eq(12)).toBe(true);
+      expect(inv.add('iron', 5).eq(0)).toBe(true);
+
+      total.value = 20;
+      expect(inv.add('iron', 5).eq(5)).toBe(true);
     });
   });
 

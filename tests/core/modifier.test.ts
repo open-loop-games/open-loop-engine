@@ -181,6 +181,19 @@ describe('createModifierChain', () => {
     expect(descs[1].text).toBe('Upgrade');
   });
 
+  it('reads a ref description text on each describe, for every operation kind', () => {
+    const text = ref('Rank 1');
+    const chain = createModifierChain('desc-ref');
+    chain.add(createAdditiveModifier({ addend: 10, description: text }));
+    chain.add(createMultiplicativeModifier({ multiplier: 2, description: text }));
+    chain.add(createExponentialModifier({ exponent: 0.9, description: text }));
+
+    const describe = chain.description as () => { text: string }[];
+    expect(describe().map((d) => d.text)).toEqual(['Rank 1', 'Rank 1', 'Rank 1']);
+    text.value = 'Rank 2';
+    expect(describe().map((d) => d.text)).toEqual(['Rank 2', 'Rank 2', 'Rank 2']);
+  });
+
   it('has correct id', () => {
     const chain = createModifierChain('my-chain');
     expect(chain.id).toBe('my-chain');

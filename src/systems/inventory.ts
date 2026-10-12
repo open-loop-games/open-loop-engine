@@ -5,7 +5,8 @@
  * vocabulary (add/subtract/canFit/isFull) instead of raw bag operations.
  */
 
-import { computed, type ComputedRef } from 'vue';
+import { computed, unref, type ComputedRef } from 'vue';
+import { toMaybeRef, type Computable } from '@/core/computed';
 import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createResourceBag, type ResourceBag } from '@/core/resource-bag';
@@ -19,12 +20,12 @@ import { createModifierChain, type Modifier } from '@/core/modifier';
 /** Options for {@link createInventory} — capacity, overflow behavior, and the initial item list. */
 export interface InventoryOptions {
   id: string;
-  /** Starting per-item capacity */
-  baseCapacity: DecimalSource;
+  /** Per-item capacity before the capacity chain. Can be a ref or getter, for a tunable or an upgradeable capacity. */
+  baseCapacity: Computable<DecimalSource>;
   /** What happens when adding beyond capacity (default: 'block') */
   overflow?: 'block' | 'discard';
-  /** Optional total capacity across all items, like a weight limit */
-  totalCapacity?: DecimalSource;
+  /** Optional total capacity across all items, like a weight limit. Can be a ref or getter. */
+  totalCapacity?: Computable<DecimalSource>;
   /** Display name for UI */
   displayName?: string;
   /** Initial item amounts */
@@ -125,8 +126,9 @@ export function createInventory(options: InventoryOptions): Inventory {
   // a cleanup on add. Matches Producer/Skill chain wiring.
   const capacityChain = createModifierChain(`${id}/capacity`);
 
+  const processedBaseCapacity = toMaybeRef(baseCapacity);
   const capacity: ComputedRef<Decimal> = computed(() =>
-    Decimal.fromValue(capacityChain.apply(baseCapacity)),
+    Decimal.fromValue(capacityChain.apply(unref(processedBaseCapacity))),
   );
 
   // --- Underlying bag with reactive per-item cap ---

@@ -14,11 +14,11 @@ Decision-support systems that observe the engine and rank actions: rule advisor,
 weighted-goal selection over a candidate pool
 
 - `function createGoalPicker<TCandidate, TContext, TWeights>(options: GoalPickerOptions<TCandidate, TContext, TWeights>): GoalPicker<TCandidate, TContext, TWeights>` — Creates a weighted-goal picker over a candidate pool. `src/systems/goal-picker.ts:215`
-- `type GoalCompletionFn<TCandidate, TContext> = (candidateId: TCandidate, context: TContext) => boolean` — Completion predicate. `src/systems/goal-picker.ts:50`
-- `interface GoalPicker<TCandidate, TContext, TWeights>` — A goal picker instance, returned by createGoalPicker. `src/systems/goal-picker.ts:140`
-- `interface GoalPickerOptions<TCandidate, TContext, TWeights>` `src/systems/goal-picker.ts:69`
-- `interface GoalPickResult<TCandidate>` — Result of one GoalPicker.pick — a diff over the active selections. `src/systems/goal-picker.ts:56`
-- `type GoalScorerFn<TCandidate, TContext, TWeights> = (candidateId: TCandidate, weights: TWeights, context: TContext) => number` — Score function. `src/systems/goal-picker.ts:40`
+- `type GoalCompletionFn<TCandidate, TContext> = (candidateId: TCandidate, context: TContext) => boolean` — Completion predicate. `src/systems/goal-picker.ts:51`
+- `interface GoalPicker<TCandidate, TContext, TWeights>` — A goal picker instance, returned by createGoalPicker. `src/systems/goal-picker.ts:141`
+- `interface GoalPickerOptions<TCandidate, TContext, TWeights>` `src/systems/goal-picker.ts:70`
+- `interface GoalPickResult<TCandidate>` — Result of one GoalPicker.pick — a diff over the active selections. `src/systems/goal-picker.ts:57`
+- `type GoalScorerFn<TCandidate, TContext, TWeights> = (candidateId: TCandidate, weights: TWeights, context: TContext) => number` — Score function. `src/systems/goal-picker.ts:41`
 
 ## Selection policies
 
@@ -53,13 +53,13 @@ between-run arbitration across registered recommenders
 
 reduces history to a digest and ranks advisor analyzer suggestions
 
-- `type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (digest: TDigest, context: TContext) => readonly Suggestion<TPayload>[]` — Advisor analyzer function — a domain-specific heuristic that reads the digest and the parallel `context` value, and returns zero or more suggestions. `src/systems/rule-advisor.ts:104`
-- `type AdvisorDigestFn<TEntry, TDigest, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TDigest` — Digest function — reduces history to the digest the advisor analyzers read. `src/systems/rule-advisor.ts:90`
+- `type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (digest: TDigest, context: TContext) => readonly Suggestion<TPayload>[]` — Advisor analyzer function — a domain-specific heuristic that reads the digest and the parallel `context` value, and returns zero or more suggestions. `src/systems/rule-advisor.ts:105`
+- `type AdvisorDigestFn<TEntry, TDigest, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TDigest` — Digest function — reduces history to the digest the advisor analyzers read. `src/systems/rule-advisor.ts:91`
 - `function createRuleAdvisor<TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create a rule advisor. `src/systems/rule-advisor.ts:334`
 - `function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:339`
-- `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (the usual case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:74`
-- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:208`
-- `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:190`
-- `interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefined>` `src/systems/rule-advisor.ts:128`
-- `interface Suggestion<TPayload = unknown>` — One entry of the advisor's ranked list. `src/systems/rule-advisor.ts:47`
-- `type SuggestionRankFn<TPayload> = (a: Suggestion<TPayload>, b: Suggestion<TPayload>) => number` — Comparator for ranking the merged suggestion list. `src/systems/rule-advisor.ts:113`
+- `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (the usual case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:75`
+- `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:209`
+- `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:191`
+- `interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefined>` `src/systems/rule-advisor.ts:129`
+- `interface Suggestion<TPayload = unknown>` — One entry of the advisor's ranked list. `src/systems/rule-advisor.ts:48`
+- `type SuggestionRankFn<TPayload> = (a: Suggestion<TPayload>, b: Suggestion<TPayload>) => number` — Comparator for ranking the merged suggestion list. `src/systems/rule-advisor.ts:114`

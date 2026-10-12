@@ -59,7 +59,7 @@ seedable pseudo-random number generator and weighted random choice
 the reactive, saved quantities an incremental game is built on
 
 - `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:390`
-- `type CapacitySource = DecimalSource | (() => DecimalSource)` — A capacity value that can be static or a reactive getter. `src/core/resource-bag.ts:18`
+- `type CapacitySource = Computable<DecimalSource>` — A capacity: a value, or a ref or getter for a reactive capacity. `src/core/resource-bag.ts:19`
 - `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource that saves nothing. `src/core/resource.ts:142`
 - `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game resource. `src/core/resource.ts:169`
 - `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Create a container of amounts by item type, with an optional total capacity and optional per-type capacities. `src/core/resource-bag.ts:151`

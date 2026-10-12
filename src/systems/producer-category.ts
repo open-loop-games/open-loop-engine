@@ -75,8 +75,11 @@ export interface ProducerPurchaseOptions {
 export interface ProducerMapping {
   /** The resource this producer produces */
   resource: Resource;
-  /** Base production: per unit per second (continuous) or per activation (manual) */
-  baseRate: DecimalSource;
+  /**
+   * Base production: per unit per second (continuous) or per activation
+   * (manual). Can be a ref or getter, for a tunable or a scoped override.
+   */
+  baseRate: Computable<DecimalSource>;
   /**
    * `'continuous'` runs every tick; `'manual'` exposes `.activate()`, which
    * credits `computedRate × count` once per call.
@@ -306,7 +309,8 @@ function buildProducer<Def extends { id: string }>(
   const mapping = mapProducer(def, ctx);
 
   const rateChain = createModifierChain(`${categoryId}/${def.id}/rate`);
-  const computedRate = computed(() => Decimal.fromValue(rateChain.apply(mapping.baseRate)));
+  const baseRate = toMaybeRef(mapping.baseRate);
+  const computedRate = computed(() => Decimal.fromValue(rateChain.apply(unref(baseRate))));
 
   let repeatable: Purchasable | undefined;
   if (mapping.purchase) {

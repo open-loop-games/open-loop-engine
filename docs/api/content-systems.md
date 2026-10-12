@@ -108,20 +108,20 @@ per-run metric delta recording
 
 game-dev-friendly wrapper over ResourceBag
 
-- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional automatic persistence. `src/systems/inventory.ts:110`
-- `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:48`
-- `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:20`
+- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional automatic persistence. `src/systems/inventory.ts:111`
+- `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:49`
+- `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:21`
 
 ## Producer Category
 
 batch-create Producers from defs
 
-- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:448`
-- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:159`
-- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:246`
+- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:452`
+- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:162`
+- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:249`
 - `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:40`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:233`
-- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:129`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:236`
+- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:132`
 - `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:75`
 - `interface ProducerPurchaseOptions` — Purchase options for a producer purchased more than once. `src/systems/producer-category.ts:49`
 

@@ -11,11 +11,12 @@
 import { reactive, shallowRef, toRaw, watch } from 'vue';
 import { Decimal, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
+import { resolveComputable, type Computable } from './computed';
 import { settling } from './persistence';
 import { registerResourceClamp, type Resource } from './resource';
 
-/** A capacity value that can be static or a reactive getter */
-export type CapacitySource = DecimalSource | (() => DecimalSource);
+/** A capacity: a value, or a ref or getter for a reactive capacity */
+export type CapacitySource = Computable<DecimalSource>;
 
 /**
  * Sum a set of amounts into a single Decimal. Renormalizes the running sum
@@ -33,17 +34,16 @@ export function sumAmountsAsDecimal(amounts: Iterable<DecimalSource>): Decimal {
 
 function resolveCapacity(cap: CapacitySource | undefined): Decimal | undefined {
   if (cap == null) return undefined;
-  const raw = typeof cap === 'function' ? cap() : cap;
-  return toFinalDecimal(raw);
+  return toFinalDecimal(resolveComputable(cap));
 }
 
 /** Options for configuring a resource bag at creation time. */
 export interface ResourceBagOptions {
   /** Starting amounts per item type. An item type not listed starts at zero. */
   initial?: Record<string, DecimalSource>;
-  /** Combined capacity across all item types. Can be a getter for a reactive capacity. */
+  /** Combined capacity across all item types. Can be a ref or getter, for a reactive capacity. */
   capacity?: CapacitySource;
-  /** Capacity per item type. Each can be a getter for a reactive capacity. */
+  /** Capacity per item type. Each can be a ref or getter, for a reactive capacity. */
   capacityPerType?: Record<string, CapacitySource>;
   /**
    * Behavior when an add operation would exceed capacity.

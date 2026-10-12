@@ -34,6 +34,7 @@
  */
 
 import { shallowRef } from 'vue';
+import { resolveComputable, type Computable } from '@/core/computed';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import type { CycleLog, CycleLogEntry } from './cycle-log';
 
@@ -170,10 +171,10 @@ export interface RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext = undefi
 
   /**
    * Cap on suggestions per `reevaluate()`. A plain number for a fixed cap, a
-   * getter for a changing cap (e.g. a UI density toggle). Default:
+   * ref or getter for a changing cap (e.g. a UI density toggle). Default:
    * `Infinity` (no cap).
    */
-  maxSuggestions?: number | (() => number);
+  maxSuggestions?: Computable<number>;
 
   /**
    * Observe-only option callback. Called once per `reevaluate()`, AFTER
@@ -262,10 +263,9 @@ function defaultRank<TPayload>(a: Suggestion<TPayload>, b: Suggestion<TPayload>)
   return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
 }
 
-function normalizeMaxSuggestions(c: number | (() => number) | undefined): () => number {
+function normalizeMaxSuggestions(c: Computable<number> | undefined): () => number {
   if (c == null) return () => Infinity;
-  if (typeof c === 'function') return c;
-  return () => c;
+  return () => resolveComputable(c);
 }
 
 function capList<T>(list: T[], cap: number): T[] {

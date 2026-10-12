@@ -26,6 +26,7 @@
  * @see {@link createLoadout} — the loadout that saves a selection
  */
 
+import { resolveComputable, type Computable } from '@/core/computed';
 import type { Loadout } from './loadout';
 
 // === TYPES ===
@@ -94,10 +95,10 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
   isCompleted?: GoalCompletionFn<TCandidate, TContext>;
 
   /**
-   * Most selections held at once. The function form is read on each pick,
-   * so capacity can grow (e.g. through purchases). Default: `1`.
+   * Most selections held at once. Can be a ref or getter, read on each
+   * pick, so capacity can grow (e.g. through purchases). Default: `1`.
    */
-  capacity?: number | (() => number);
+  capacity?: Computable<number>;
 
   /**
    * A Loadout, owned by the caller, that the picker writes selections into.
@@ -170,10 +171,9 @@ function normalizeWeights<T>(w: T | (() => T)): () => T {
   return typeof w === 'function' ? (w as () => T) : () => w;
 }
 
-function normalizeCapacity(c: number | (() => number) | undefined): () => number {
+function normalizeCapacity(c: Computable<number> | undefined): () => number {
   if (c == null) return () => 1;
-  if (typeof c === 'function') return c;
-  return () => c;
+  return () => resolveComputable(c);
 }
 
 // === FACTORIES ===

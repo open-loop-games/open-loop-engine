@@ -71,6 +71,19 @@ describe('createGoalPicker — internal array (no slot)', () => {
     expect(second.active).toEqual(['a', 'b']);
   });
 
+  it('reads a capacity ref on each pick, so raising it opens a slot', () => {
+    const capacity = ref(1);
+    const picker = createGoalPicker<string, void, void>({
+      pool: () => ['a', 'b', 'c'],
+      weights: undefined,
+      scorer: (id) => (id === 'a' ? 3 : id === 'b' ? 2 : 1),
+      capacity,
+    });
+    expect(picker.pick().selected).toEqual(['a']);
+    capacity.value = 2;
+    expect(picker.pick().selected).toEqual(['b']);
+  });
+
   it('is a no-op when pool is empty', () => {
     const picker = createGoalPicker<string, void, void>({
       pool: () => [],

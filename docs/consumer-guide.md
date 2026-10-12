@@ -411,8 +411,9 @@ install(ctx) {
     id: 'buildings',
     registerTick: ctx.onTick,
     mapProducer: (def) => ({
-      resource: eggs, baseRate: def.baseRate, trigger: 'continuous',
+      resource: eggs, trigger: 'continuous',
       // an option typed Computable takes a tunable as is
+      baseRate: tunable(tuning, `producers/${def.id}/baseRate`, () => def.baseRate),
       purchase: {
         costResource: eggs,
         baseCost: tunable(tuning, `producers/${def.id}/baseCost`, () => def.baseCost),

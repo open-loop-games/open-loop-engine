@@ -177,6 +177,24 @@ describe('createRuleAdvisor — rank + maxSuggestions', () => {
     cap.value = 2;
     expect(advisor.reevaluate().map((s) => s.id)).toEqual(['a', 'b']);
   });
+
+  it('reads a maxSuggestions ref on each reevaluate', () => {
+    const cap = ref(1);
+    const advisor = createRuleAdvisor({
+      historySource: () => [],
+      digest: () => undefined,
+      analyzers: [
+        () => [
+          { id: 'a', severity: 'info' as const, summary: '', payload: undefined },
+          { id: 'b', severity: 'info' as const, summary: '', payload: undefined },
+        ],
+      ],
+      maxSuggestions: cap,
+    });
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['a']);
+    cap.value = 2;
+    expect(advisor.reevaluate().map((s) => s.id)).toEqual(['a', 'b']);
+  });
 });
 
 // ============================================================================

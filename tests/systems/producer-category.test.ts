@@ -16,6 +16,7 @@ import { createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
+import { createTuningRegistry, tunable } from '@/core/override-registry';
 import { ref, unref } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
 import { createTestResource } from '../helpers/test-resource';
@@ -910,6 +911,34 @@ describe('createProducerCategory', () => {
     expect(new Decimal(repeatable.getCost(1)).toNumber()).toBeCloseTo(20, 5);
     scaling.value = 3;
     expect(new Decimal(repeatable.getCost(1)).toNumber()).toBeCloseTo(30, 5);
+  });
+
+  it('reads a tunable baseRate, so a scoped override moves the rate and the tick output', () => {
+    const { registerTick, tick } = createManualTicks();
+    const cookies = createTestResource('cookies', 0);
+    const tuning = createTuningRegistry('reactive-rate-tuning');
+
+    const category = createProducerCategory<ClickDef>({
+      id: 'reactive-rate',
+      mapProducer: (def) => ({
+        resource: cookies,
+        baseRate: tunable(tuning, `producers/${def.id}/baseRate`, () => def.baseRate),
+        trigger: 'continuous',
+      }),
+      registerTick,
+    });
+    category.register({ id: 'well', name: 'Well', baseRate: 2 });
+
+    const producer = category.getProducer('well')!;
+    expect(new Decimal(producer.computedRate.value).toNumber()).toBe(2);
+
+    const pop = tuning.pushOverrides('probe', { 'producers/well/baseRate': () => 5 });
+    expect(new Decimal(producer.computedRate.value).toNumber()).toBe(5);
+    tick(1);
+    expect(new Decimal(cookies.value).toNumber()).toBe(5);
+
+    pop();
+    expect(new Decimal(producer.computedRate.value).toNumber()).toBe(2);
   });
 });
 

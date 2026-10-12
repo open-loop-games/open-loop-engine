@@ -17,7 +17,7 @@ import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
-import { toMaybeRef, type Computable, type MaybeGetter } from './computed';
+import { resolveComputable, toMaybeRef, type Computable, type MaybeGetter } from './computed';
 import { createEmitHandle, type Emittable } from './events';
 import type { Predicate } from './gate';
 import { getCurrentChainRegistry } from './registries';
@@ -71,11 +71,11 @@ export interface AdditiveModifierOptions {
   /** The value to add. Can be a ref/getter for dynamic values (e.g., scaling with upgrades). */
   addend: Computable<DecimalSource>;
   /**
-   * Text for the UI breakdown (e.g., "Upgrade bonus"). Can be a getter for
-   * dynamic text. A plain string — the factory wraps it into the
+   * Text for the UI breakdown (e.g., "Upgrade bonus"). Can be a ref or
+   * getter, for reactive text. The factory wraps it into the
    * `ModifierDescription` shape that `Modifier.description` exposes.
    */
-  description?: MaybeGetter<string>;
+  description?: Computable<string>;
   /** Reactive toggle. When `false`, this modifier is skipped entirely. Default: always enabled. */
   enabled?: Computable<boolean>;
   /** Flip the "bad" indicator: positive addends show as bad. Use for costs or penalties. */
@@ -116,7 +116,7 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
             const value = unref(processedAddend);
             const isPositive = Decimal.gte(value, 0);
             return {
-              text: typeof description === 'function' ? description() : description,
+              text: resolveComputable(description),
               formattedValue: (isPositive ? '+' : '') + formatSmall(value),
               isBad: smallerIsBetter ? isPositive : Decimal.lt(value, 0),
             };
@@ -131,11 +131,11 @@ export interface MultiplicativeModifierOptions {
   /** The factor to multiply by. Can be a ref/getter for dynamic values. */
   multiplier: Computable<DecimalSource>;
   /**
-   * Text for the UI breakdown. Can be a getter for dynamic text. A plain
-   * string — the factory wraps it into the `ModifierDescription` shape that
+   * Text for the UI breakdown. Can be a ref or getter, for reactive text.
+   * The factory wraps it into the `ModifierDescription` shape that
    * `Modifier.description` exposes.
    */
-  description?: MaybeGetter<string>;
+  description?: Computable<string>;
   /** Reactive toggle. When `false`, this modifier is skipped. Default: always enabled. */
   enabled?: Computable<boolean>;
   /** Flip the "bad" indicator: multipliers > 1 show as bad. Use for cost multipliers. */
@@ -187,7 +187,7 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
         : (): ModifierDescription => {
             const value = unref(processedMultiplier);
             return {
-              text: typeof description === 'function' ? description() : description,
+              text: resolveComputable(description),
               formattedValue: '×' + formatSmall(value),
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
@@ -202,11 +202,11 @@ export interface ExponentialModifierOptions {
   /** The power to raise the input to. Can be a ref/getter for dynamic values. */
   exponent: Computable<DecimalSource>;
   /**
-   * Text for the UI breakdown. Can be a getter for dynamic text. A plain
-   * string — the factory wraps it into the `ModifierDescription` shape that
+   * Text for the UI breakdown. Can be a ref or getter, for reactive text.
+   * The factory wraps it into the `ModifierDescription` shape that
    * `Modifier.description` exposes.
    */
-  description?: MaybeGetter<string>;
+  description?: Computable<string>;
   /** Reactive toggle. When `false`, this modifier is skipped. Default: always enabled. */
   enabled?: Computable<boolean>;
   /**
@@ -276,7 +276,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
         ? undefined
         : (): ModifierDescription => {
             const value = unref(processedExponent);
-            const text = typeof description === 'function' ? description() : description;
+            const text = resolveComputable(description);
             return {
               text: supportLowNumbers ? text + ' (+1 effective)' : text,
               formattedValue: '^' + formatSmall(value),
