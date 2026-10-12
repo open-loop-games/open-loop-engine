@@ -64,7 +64,8 @@ const entry = (kind, old, next, more = {}) => ({
   ...more,
 });
 
-describe('API migration codemod', () => {
+// Each case builds a ts-morph project and type-checks it, which a CI runner takes seconds over.
+describe('API migration codemod', { timeout: 30_000 }, () => {
   it('renames a member on its owner, and leaves the same name on another type', () => {
     const engine = `export interface Purchasable { amount: number }\nexport interface Other { amount: number }\n`;
     const before = `import type { Purchasable, Other } from '@open-loop/engine'\nexport const a = (p: Purchasable, o: Other) => p.amount + o.amount\n`;
@@ -134,7 +135,7 @@ describe('API migration codemod', () => {
   });
 });
 
-describe('engine rename', () => {
+describe('engine rename', { timeout: 30_000 }, () => {
   it('applies families in manifest order; a later family names an owner by its old name', async () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'ol-api-migration-')));
     dirs.push(root);
