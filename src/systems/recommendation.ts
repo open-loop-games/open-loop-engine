@@ -78,7 +78,7 @@ export interface RecommendationRationale {
   /** Per-metric comparison: current performance vs projected with the recommended configuration */
   metrics: Record<string, RecommendationMetricComparison>;
   /** Display text for the UI, written by the recommender */
-  summary: string;
+  description: string;
 }
 
 /** The output of a recommender's `recommend()` method */
@@ -145,6 +145,7 @@ interface SerializedRecommendation {
   rationale: {
     recommenderId: string;
     metrics: Record<string, { current: string; projected: string; delta: string }>;
+    /** The rationale's `description`, under the key players' saves hold. */
     summary: string;
   };
   timestamp: number;
@@ -298,7 +299,7 @@ function serialize(rec: Recommendation): SerializedRecommendation {
     rationale: {
       recommenderId: rec.rationale.recommenderId,
       metrics: serializedMetrics,
-      summary: rec.rationale.summary,
+      summary: rec.rationale.description,
     },
     timestamp: rec.timestamp,
     applied: rec.applied,
@@ -320,7 +321,7 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
     rationale: {
       recommenderId: raw.rationale.recommenderId,
       metrics,
-      summary: raw.rationale.summary,
+      description: raw.rationale.summary,
     },
     timestamp: raw.timestamp,
     applied: raw.applied,
@@ -362,7 +363,7 @@ function deserialize(raw: SerializedRecommendation): Recommendation {
  *
  * // Advisory mode: present the recommendation in the UI
  * recs.on('recommended', (rec) => {
- *   showAdvisorPanel(rec.rationale.summary, rec.rationale.metrics);
+ *   showAdvisorPanel(rec.rationale.description, rec.rationale.metrics);
  * });
  *
  * // Auto-apply mode: apply the best configuration after each run

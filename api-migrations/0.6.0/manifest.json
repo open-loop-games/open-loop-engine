@@ -220,5 +220,27 @@
     "public": true,
     "clause": "how many of an entry the player owns is its count (QT2)",
     "note": "nested in Purchasable.display"
+  },
+  {
+    "family": "display-text",
+    "old": "summary",
+    "new": "description",
+    "kind": "property",
+    "owners": ["Suggestion"],
+    "files": ["src/systems/rule-advisor.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "display text is a description (ID11); summary is an analyzer's end-of-run output (ME4)"
+  },
+  {
+    "family": "display-text",
+    "old": "summary",
+    "new": "description",
+    "kind": "property",
+    "owners": ["RecommendationRationale"],
+    "files": ["src/systems/recommendation.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "display text is a description (ID11); summary is an analyzer's end-of-run output (ME4)"
   }
 ]

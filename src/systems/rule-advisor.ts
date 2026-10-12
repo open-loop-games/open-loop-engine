@@ -51,7 +51,7 @@ export interface Suggestion<TPayload = unknown> {
   /** Sort rank in the default rank function (warnings before infos). */
   severity: 'info' | 'warning';
   /** Display text, formatted by the caller. */
-  summary: string;
+  description: string;
   /** Domain-specific payload. The engine never inspects this. */
   payload: TPayload;
   /**

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { bn } from '@/primitives/decimal';
 import { createResource, addResource } from '@/core/resource';
-import { beginPersistentContext, endPersistentContext } from '@/core/persistence';
+import {
+  beginPersistentContext,
+  endPersistentContext,
+  deserializePersistents,
+  getAllPersistentRefs,
+} from '@/core/persistence';
 import { createCycle } from '@/systems/cycle';
 import { createCycleLog } from '@/systems/cycle-log';
 import { createBestOf } from '@/systems/best-of';
@@ -48,7 +53,7 @@ function makeStrategy(overrides: Partial<Recommender> & { id: string }): Recomme
       rationale: {
         recommenderId: overrides.id,
         metrics: {},
-        summary: `Apply ${overrides.id}`,
+        description: `Apply ${overrides.id}`,
       },
     }),
     ...overrides,
@@ -668,7 +673,7 @@ describe('createRecommendationSystem', () => {
               metrics: {
                 gold: { current: '10', projected: '20', delta: '10' },
               },
-              summary: 'Use fire loadout',
+              description: 'Use fire loadout',
             },
           }),
         }),
@@ -680,12 +685,39 @@ describe('createRecommendationSystem', () => {
     expect(rec).not.toBeNull();
     expect(rec!.recommenderId).toBe('persisted');
     expect(rec!.snapshot).toEqual({ loadout: 'fire' });
-    expect(rec!.rationale.summary).toBe('Use fire loadout');
+    expect(rec!.rationale.description).toBe('Use fire loadout');
     expect(rec!.rationale.metrics.gold).toEqual({
       current: '10',
       projected: '20',
       delta: '10',
     });
+  });
+
+  it('loads the rationale description from the saved summary key', () => {
+    const { cycle, cycleLog, bestOf } = createTestStack('legacy-summary');
+    const recs = createRecommendationSystem({
+      id: 'rec-legacy-summary',
+      cycle,
+      cycleLog,
+      bestOf,
+      getCurrentSnapshot: () => ({}),
+      applySnapshot: () => {},
+      recommenders: [],
+    });
+
+    deserializePersistents(getAllPersistentRefs(), {
+      'rec-legacy-summary': {
+        storedRecommendation: {
+          recommenderId: 'old',
+          snapshot: {},
+          rationale: { recommenderId: 'old', metrics: {}, summary: 'Use fire loadout' },
+          timestamp: 1,
+          applied: false,
+        },
+      },
+    });
+
+    expect(recs.lastRecommendation.value!.rationale.description).toBe('Use fire loadout');
   });
 
   // ==========================================================================
@@ -730,7 +762,7 @@ describe('createRecommendationSystem', () => {
               rationale: {
                 recommenderId: 'counter',
                 metrics: {},
-                summary: `Call ${callCount}`,
+                description: `Call ${callCount}`,
               },
             };
           },

@@ -152,7 +152,7 @@ export function createBestReplayRecommender(
               delta,
             },
           },
-          summary: `Replay best ${metricKey} configuration (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, run #${entry.runNumber})`,
+          description: `Replay best ${metricKey} configuration (${entry.value.toString()} in ${entry.elapsed.toFixed(1)}s, run #${entry.runNumber})`,
         },
       };
     },
