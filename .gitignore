@@ -7,6 +7,9 @@ temp
 # public engine surface.
 docs/notes/
 
+# Reports the API migration scripts write in the directory they run from
+.api-migration-*.md
+
 # Bytecode from scripts/formula-oracle.py's dev-only oracle runs
 __pycache__/
 
