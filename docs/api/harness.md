@@ -35,7 +35,7 @@ synchronous tick loop for deterministic simulation and tests
 
 - `interface HeadlessOptions` — Options for one synchronous headless run. `src/core/headless.ts:11`
 - `interface HeadlessResult` — What a completed headless run returns. `src/core/headless.ts:37`
-- `function runHeadless(options: HeadlessOptions): HeadlessResult` — Simulate a fixed number of ticks headless. `src/core/headless.ts:53`
+- `function runHeadless(options: HeadlessOptions): HeadlessResult` — Run a fixed number of iterations headless. `src/core/headless.ts:53`
 
 ## Perturbation applier
 
@@ -130,7 +130,7 @@ the cartesian `cells × seeds` plan over `runHeadless`. It keeps the raw result 
 - `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each iteration of a runUntil loop. `src/harness/types.ts:390`
 - `interface Variant<C extends Cell | UntilCell = Cell>` — A named change to the baseline cell: the generic form of a domain-specific axis such as excluding upgrades. `src/harness/types.ts:235`
 - `interface WorkItem<C = Cell>` — One unit of work in a flat cell×seed plan. `src/harness/types.ts:71`
-- `interface Analyzer` — Observer of one headless run that collects metrics per tick, and optionally per finalized cycle-log entry. `src/primitives/types.ts:171`
+- `interface Analyzer` — Observer of one headless run that collects metrics per iteration, and optionally per finalized cycle-log entry. `src/primitives/types.ts:171`
 - `interface AnalyzerSummary` — What an Analyzer reports after one headless run; cell aggregation keeps only its number metrics. `src/primitives/types.ts:161`
 - `interface CompositeEffect` — Groups multiple effects into one, applied in order as a single unit. `src/primitives/types.ts:30`
 - `interface FlagEffect` — Sets a flag to true or false, for example to control whether content is available. `src/primitives/types.ts:14`

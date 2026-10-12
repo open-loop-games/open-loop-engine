@@ -55,13 +55,13 @@ Stack navigator over a recursive `Graph` — tracks the graph scope it has enter
 
 An influence layer over `SpatialGrid<number>` — the propagation and decay steps that turn a numeric grid into per-cell influence.
 
-- `function composeInfluenceLayers(views: readonly InfluenceLayerView[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerView` — Combine multiple influence-layer views into a derived view. `src/core/spatial/influence-layer.ts:482`
-- `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Build an influence layer over a `SpatialGrid<number>`. `src/core/spatial/influence-layer.ts:291`
-- `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)` up to `d = r`, then 0; Euclidean `d`. `src/core/spatial/influence-layer.ts:252`
+- `function composeInfluenceLayers(views: readonly InfluenceLayerView[], combine: (values: readonly number[], x: number, y: number) => number): InfluenceLayerView` — Combine multiple influence-layer views into a derived view. `src/core/spatial/influence-layer.ts:470`
+- `function createInfluenceLayer(grid: SpatialGrid<number>, options: InfluenceLayerOptions): InfluenceLayer` — Build an influence layer over a `SpatialGrid<number>`. `src/core/spatial/influence-layer.ts:286`
+- `const exponentialFalloff: FalloffFunction` — Exponential falloff `exp(-d/r)` up to `d = r`, then 0; Euclidean `d`. `src/core/spatial/influence-layer.ts:247`
 - `type FalloffFunction = (dx: number, dy: number, radius: number) => number` — Falloff function applied per cell during accumulation. `src/core/spatial/influence-layer.ts:99`
-- `const gaussianFalloff: FalloffFunction` — Gaussian falloff `exp(-(d/r)^2 * 2)` up to `d = r`, then 0; Euclidean `d`. `src/core/spatial/influence-layer.ts:245`
-- `interface InfluenceLayer` — Lifecycle handle for an influence layer. `src/core/spatial/influence-layer.ts:187`
+- `const gaussianFalloff: FalloffFunction` — Gaussian falloff `exp(-(d/r)^2 * 2)` up to `d = r`, then 0; Euclidean `d`. `src/core/spatial/influence-layer.ts:240`
+- `interface InfluenceLayer` — Lifecycle handle for an influence layer. `src/core/spatial/influence-layer.ts:182`
 - `interface InfluenceLayerOptions` — Options accepted by createInfluenceLayer. `src/core/spatial/influence-layer.ts:102`
-- `interface InfluenceLayerView` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:145`
+- `interface InfluenceLayerView` — Read-only view over an influence layer's grid. `src/core/spatial/influence-layer.ts:139`
 - `interface InfluenceSource` — An influence source: a point that adds influence to the layer. `src/core/spatial/influence-layer.ts:56`
-- `const linearFalloff: FalloffFunction` — Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. `src/core/spatial/influence-layer.ts:238`
+- `const linearFalloff: FalloffFunction` — Linear falloff `(1 - d/r)`, clamped to `[0, 1]`, Euclidean `d`. `src/core/spatial/influence-layer.ts:233`

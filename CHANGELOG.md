@@ -2,6 +2,84 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.6.0 (2026-10-12)
+
+### ⚠ Breaking changes
+
+* Computable is the one type for a value, a ref or a getter (8ef7d18)
+
+  `MaybeGetter` is removed. `Modifier.description` and a
+  chain's `description` are `Computable<ModifierDescription | ModifierDescription[]>`,
+  so a reader must also handle a ref. `GoalPickerOptions.weights`,
+  `GoalPicker.setWeights` and `RuleAdvisorOptions.context` take
+  `Computable<T>`: a ref passed there is now unwrapped before the scorer or
+  analyzer sees it.
+
+  Migration:
+    // before
+    const d = typeof desc === 'function' ? desc() : desc;
+    // after
+    import { resolveComputable } from '@open-loop/engine';
+    const d = resolveComputable(desc);
+    // a MaybeGetter<T> annotation becomes Computable<T>
+
+  Why: one sense, one type. A hand-written `T | (() => T)` rejects a ref, so
+  a tunable (a ComputedRef) could not reach the field, and a reader that
+  checked only for a function returned a ref object as if it were a value.
+  The engine's input rule is in AGENTS.md § Reactive reads.
+
+* names follow the term list: iterations, attempts, cost ratio, grant keys, count (1676b76)
+
+  Public names change to the engine's terms. Run the
+  API migration codemod (api-migrations/run.mjs in the engine repo) before
+  the bump; it renames these across a consumer's .ts files.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    ticks → iterations (HeadlessOptions, Cell, CreateSensitivityCellOptions)
+    totalTicks → iterations (HeadlessResult, RunUntilResult)
+    onTick → onIteration (Analyzer) *
+    maxIterationsPerTick → maxAttemptsPerTick (SetupPolicyAutoPurchaseOptions) *
+    onIterationsOverflow → onAttemptsOverflow (SetupPolicyAutoPurchaseOptions) *
+    costScaling → costRatio (ProducerPurchaseOptions, ScalingPurchasableCost)
+    mult → multiplier (Grant)
+    exp → exponent (Grant); `add` stays
+    showAmount → showCount (PurchasableDisplay, ScalingPurchasableOptions) *
+    showAmount → showCount (Purchasable.display)
+
+  An analyzer built outside an `Analyzer`-typed literal keeps a stale
+  `onTick` without a type error, and it never fires. Search for `onTick`
+  in analyzer code after the bump.
+
+  Why: one balance-harness loop pass is an iteration, and one pass can run
+  several engine ticks, so a count of passes named "ticks" misreports it.
+  The auto-purchase cap counts attempts, because a pass under waitForCost
+  can buy nothing. A cold reader took `Grant.mult` and a modifier's
+  `multiplier` for two things, and `exp` is also Formula's natural
+  exponential; `add` has neither problem.
+
+* a suggestion's and a recommendation's display text is its description (e8c7aa8)
+
+  `Suggestion.summary` and `RecommendationRationale.summary`
+  are renamed to `description`. A rule advisor's analyzers and a custom
+  recommender write `description`; a UI reads it.
+
+  Migration:
+    summary → description (Suggestion, RecommendationRationale)
+
+* **core:** an influence layer reports cells touched on its updated event (a20986a)
+
+  `InfluenceLayerOptions.onProfile` is removed. Read the
+  count from the layer's `updated` event instead. A listener that takes no
+  argument still works.
+
+  Migration:
+    // before
+    createInfluenceLayer(grid, { ..., onProfile: (n) => record(n) })
+    // after
+    const layer = createInfluenceLayer(grid, { ... })
+    layer.on('updated', ({ cellsTouched }) => record(cellsTouched))
+
 ## 0.5.2 (2026-10-12)
 
 ### Features

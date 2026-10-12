@@ -38,15 +38,15 @@ between-run arbitration across registered recommenders
 
 - `interface BestReplayRecommenderOptions` `src/systems/recommenders.ts:28`
 - `function createBestReplayRecommender(metricKey: string, options?: BestReplayRecommenderOptions): Recommender` — Create a recommender that replays the configuration that produced the best value for a given metric. `src/systems/recommenders.ts:94`
-- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered recommenders after each run ends, and presents or auto-applies the winning configuration. `src/systems/recommendation.ts:372`
+- `function createRecommendationSystem(options: RecommendationSystemOptions): RecommendationSystem` — Create a recommendation system that evaluates registered recommenders after each run ends, and presents or auto-applies the winning configuration. `src/systems/recommendation.ts:373`
 - `interface Recommendation` — A produced recommendation stored by the system. `src/systems/recommendation.ts:128`
 - `interface RecommendationContext` — The evaluation context passed to every recommender's `canApply`, `score`, and `recommend` methods. `src/systems/recommendation.ts:54`
 - `interface RecommendationMetricComparison` — Per-metric comparison data in a recommendation's rationale. `src/systems/recommendation.ts:68`
 - `interface RecommendationRationale` — Structured explanation of why a recommendation was made. `src/systems/recommendation.ts:75`
 - `interface RecommendationResult` — The output of a recommender's `recommend()` method. `src/systems/recommendation.ts:85`
-- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:220`
-- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:155`
-- `interface RecommendationSystemOptions` `src/systems/recommendation.ts:165`
+- `interface RecommendationSystem` — A recommendation system instance — the returned object from createRecommendationSystem. `src/systems/recommendation.ts:221`
+- `interface RecommendationSystemEvents` — Events emitted by a RecommendationSystem instance. `src/systems/recommendation.ts:156`
+- `interface RecommendationSystemOptions` `src/systems/recommendation.ts:166`
 - `interface Recommender` — A recommender. `src/systems/recommendation.ts:98`
 
 ## Rule advisor
@@ -55,8 +55,8 @@ reduces history to a digest and ranks advisor analyzer suggestions
 
 - `type AdvisorAnalyzerFn<TDigest, TPayload, TContext = undefined> = (digest: TDigest, context: TContext) => readonly Suggestion<TPayload>[]` — Advisor analyzer function — a domain-specific heuristic that reads the digest and the parallel `context` value, and returns zero or more suggestions. `src/systems/rule-advisor.ts:105`
 - `type AdvisorDigestFn<TEntry, TDigest, TContext = undefined> = (history: readonly TEntry[], context: TContext) => TDigest` — Digest function — reduces history to the digest the advisor analyzers read. `src/systems/rule-advisor.ts:91`
-- `function createRuleAdvisor<TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create a rule advisor. `src/systems/rule-advisor.ts:334`
-- `function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:339`
+- `function createRuleAdvisor<TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<CycleLogEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: CycleLog; }): RuleAdvisor<TPayload>` — Create a rule advisor. `src/systems/rule-advisor.ts:331`
+- `function createRuleAdvisor<TEntry, TDigest, TPayload, TContext = undefined>(options: Omit<RuleAdvisorOptions<TEntry, TDigest, TPayload, TContext>, 'historySource'> & { historySource: () => readonly TEntry[]; }): RuleAdvisor<TPayload>` `src/systems/rule-advisor.ts:336`
 - `type HistorySource<TEntry> = CycleLog | (() => readonly TEntry[])` — History source — either a CycleLog (the usual case, equivalent to `() => cycleLog.history.value`) or a caller-supplied function returning the entry list. `src/systems/rule-advisor.ts:75`
 - `interface RuleAdvisor<TPayload>` — A rule advisor instance, returned by createRuleAdvisor. `src/systems/rule-advisor.ts:209`
 - `interface RuleAdvisorEvents<TPayload>` — Events emitted by a RuleAdvisor instance. `src/systems/rule-advisor.ts:191`
