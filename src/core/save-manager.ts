@@ -191,6 +191,8 @@ export interface SaveSlot {
  * - `not-found`: no envelope exists at the target storage key
  * - `parse-error`: raw data was not valid JSON
  * - `wrong-game-id`: envelope parsed but its `gameId` doesn't match this manager
+ * - `wrong-mod`: the save names a mod other than the active one. A save that
+ *   names no mod loads under any.
  * - `future-version`: a newer game build or engine wrote the save: its save
  *   version exceeds this manager's, or its engine save version exceeds this engine's
  * - `validation`: runtime Zod validation failed in strict mode
@@ -200,6 +202,7 @@ export type SaveLoadFailureReason =
   | 'not-found'
   | 'parse-error'
   | 'wrong-game-id'
+  | 'wrong-mod'
   | 'future-version'
   | 'validation'
   | 'unknown';
@@ -815,6 +818,8 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
         let e: SaveEnvelope;
         try {
           e = readEnvelope(raw);
+          // Another mod's save would load only the refs both mods share.
+          if (e.modId !== undefined && e.modId !== _modId.value) throw new LoadFailure('wrong-mod');
           applyEnvelope(e, slotId);
         } catch (err) {
           return failLoad(slotId, err, protectOnFail);

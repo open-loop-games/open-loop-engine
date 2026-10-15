@@ -15,9 +15,9 @@
  */
 
 import type { Analyzer } from '@/primitives/types';
-import type { Engine, EngineOptions, EngineModule } from '@/engine';
+import type { Engine, EngineModule, ModDef } from '@/engine';
 import { CycleLogKey } from '@/systems/cycle-log';
-import { createEngineFromSave } from './create-engine';
+import { createEngineFromSave, type CreateEngineFromSaveOptions } from './create-engine';
 import type { Cell, RunContext } from './types';
 
 /**
@@ -38,6 +38,11 @@ export interface CreateSensitivityCellOptions {
    * re-entered.
    */
   modules: () => EngineModule[];
+  /**
+   * Factory returning the game's mods per headless run, fresh for the same
+   * reason as `modules`. When the save names a mod, its engine selects it.
+   */
+  mods?: () => ModDef[];
   /**
    * Optional mutation applied to the engine after build, before analyzer
    * construction and the first tick. Receives the harness `RunContext`, so
@@ -74,10 +79,7 @@ export interface CreateSensitivityCellOptions {
    */
   persistenceNamespace?: string;
   /** Forwarded to `createEngineFromSave` — same restrictions apply. */
-  engineOptions?: Omit<
-    EngineOptions,
-    'gameId' | 'persistence' | 'persistenceNamespace' | 'storageAdapter' | 'autoSaveInterval'
-  >;
+  engineOptions?: CreateEngineFromSaveOptions['engineOptions'];
 }
 
 let runCounter = 0;
@@ -118,6 +120,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     id: name,
     saveText,
     modules,
+    mods,
     perturb,
     buildAnalyzers,
     tick,
@@ -142,6 +145,7 @@ export function createSensitivityCell(options: CreateSensitivityCellOptions): Ce
     const engine = createEngineFromSave({
       saveText,
       modules: modules(),
+      mods: mods?.(),
       persistenceNamespace: `${namespace}-${runCounter++}`,
       engineOptions: config,
     });

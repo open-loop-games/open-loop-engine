@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { createEngine } from '@/index';
-import type { EngineModule, EngineContext } from '@/index';
+import { createEngine, persistent } from '@/index';
+import type { EngineModule, EngineContext, ModDef } from '@/index';
+import { createEngineFromSave } from '@/harness/create-engine';
 
 beforeAll(() => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -250,5 +251,94 @@ describe('engine mod support', () => {
   it('peekSave returns null when persistence is disabled', () => {
     const engine = createEngine({ gameId: 'test', persistence: false });
     expect(engine.peekSave()).toBeNull();
+  });
+});
+
+describe("a save's mod", () => {
+  // Each mod keeps a counter; a fresh set per engine, so refs don't alias.
+  const counters = new Map<string, { value: number }>();
+  const modsFor = (): ModDef[] =>
+    ['lloyd', 'omsi'].map((id) => ({
+      id,
+      displayName: id,
+      modules: [
+        {
+          id: `${id}-mod`,
+          install() {
+            counters.set(id, persistent(0, { id: 'counter' }));
+          },
+        },
+      ],
+    }));
+  const build = (modId: string | undefined, storage = createMapStorage()) => {
+    const engine = createEngine({ gameId: 'test', storageAdapter: storage, mods: modsFor() });
+    if (modId) engine.selectMod(modId);
+    else engine.use({ id: 'base', install() {} });
+    engine.start();
+    return engine;
+  };
+  const exportFrom = (modId: string | undefined, value: number) => {
+    const engine = build(modId);
+    if (modId) counters.get(modId)!.value = value;
+    const text = engine.saveManager!.exportSave();
+    engine.dispose();
+    return text;
+  };
+
+  it('refuses an import from another mod, and leaves the state as it was', () => {
+    const text = exportFrom('lloyd', 7);
+    const engine = build('omsi');
+    counters.get('omsi')!.value = 3;
+    const failed = vi.fn();
+    engine.saveManager!.on('save:load-failed', failed);
+
+    expect(engine.saveManager!.importSave(text).success).toBe(false);
+    expect(failed).toHaveBeenCalledWith(expect.objectContaining({ reason: 'wrong-mod' }));
+    expect(counters.get('omsi')!.value).toBe(3);
+    engine.dispose();
+  });
+
+  it('refuses a modded save in an engine with no mod selected', () => {
+    const text = exportFrom('lloyd', 7);
+    const engine = build(undefined);
+    expect(engine.saveManager!.importSave(text).success).toBe(false);
+    engine.dispose();
+  });
+
+  it('loads a save that names no mod under any mod', () => {
+    const text = exportFrom(undefined, 0);
+    const engine = build('omsi');
+    expect(engine.saveManager!.importSave(text).success).toBe(true);
+    engine.dispose();
+  });
+
+  it("protects a slot another mod wrote, so this mod's autosave can't overwrite it", () => {
+    const storage = createMapStorage();
+    const first = build('lloyd', storage);
+    counters.get('lloyd')!.value = 7;
+    first.save();
+    const slot = first.saveManager!.activeSlotId;
+    const before = first.saveManager!.exportSlot(slot);
+    first.dispose();
+
+    const second = build('omsi', storage);
+    expect(second.saveManager!.load().success).toBe(false);
+    second.save();
+
+    expect(second.saveManager!.exportSlot(slot)).toBe(before);
+    second.dispose();
+  });
+
+  it('createEngineFromSave selects the mod the save names', () => {
+    const text = exportFrom('lloyd', 7);
+    const engine = createEngineFromSave({ saveText: text, mods: modsFor() });
+    expect(engine.activeModId).toBe('lloyd');
+    expect(counters.get('lloyd')!.value).toBe(7);
+    engine.dispose();
+  });
+
+  it("createEngineFromSave throws when mods doesn't hold the save's mod", () => {
+    const text = exportFrom('lloyd', 7);
+    expect(() => createEngineFromSave({ saveText: text, modules: [] })).toThrow(/mod "lloyd"/);
   });
 });
