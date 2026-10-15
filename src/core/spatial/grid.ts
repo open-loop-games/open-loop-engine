@@ -30,9 +30,12 @@
  * - `maskChanged(mask)` — coarse event that a whole bitmap may have
  *   changed outside the FOV path: once per `markMaskChanged(mask)`, and once
  *   per bitmap on `restore()`.
+ *
+ * `revision` is the reactive form of the same writes: a computed that reads
+ * it recomputes after each, with no subscription to dispose.
  */
 
-import { toRaw } from 'vue';
+import { shallowRef, toRaw, type Ref } from 'vue';
 import { createEmitHandle } from '../events';
 import { randomItem } from '@/primitives/rng';
 import type { GridCoord, GridOffset, PassabilityFn, TraversalCostFn, Unsubscribe } from './types';
@@ -169,6 +172,16 @@ export interface SpatialGrid<T> {
   readonly height: number;
 
   /**
+   * Advances on every write that emits, or would emit, an event: `set`,
+   * `fill`, an FOV `commit`, `markMaskChanged` and `restore`. Read it at the
+   * head of a computed over cells, bitmaps or counts, so the computed
+   * recomputes after those writes. `setSilent` and hand writes to `cells` or
+   * a bitmap do not advance it; follow them with `markMaskChanged` or a
+   * `fill()`.
+   */
+  readonly revision: Readonly<Ref<number>>;
+
+  /**
    * Number of cells whose `explored` bit is set. Maintained incrementally by
    * the FOV commit path and re-derived by `restore()` and
    * `markMaskChanged('explored')`, so callers skip an
@@ -179,9 +192,10 @@ export interface SpatialGrid<T> {
    * this count only once every write path goes through the FOV commit
    * handle or `markMaskChanged`.
    *
-   * A snapshot: typed-array hot-path state, so a computed over it never
-   * recomputes. Re-read it after the write that changed it, or watch the
-   * mask writes you own. Same for `passableCount` and `exploredPassableCount`.
+   * A snapshot: typed-array hot-path state, so a computed over it alone never
+   * recomputes. Read `revision` at the head of the computed, or re-read the
+   * count after the write that changed it. Same for `passableCount` and
+   * `exploredPassableCount`.
    */
   readonly exploredCount: number;
 
@@ -445,6 +459,8 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   let fovInFlight = false;
 
   const handle = createEmitHandle<SpatialGridEvents<T>>();
+  // Advanced before each emit, so a handler that reads it sees the new value.
+  const revision = shallowRef(0);
   // Skip change-list computation in commit() when no fovUpdated handler is
   // attached — headless consumers (no display) would otherwise run an
   // O(w × h) scan per FOV update for arrays that nothing reads.
@@ -553,6 +569,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   const grid: SpatialGrid<T> = {
     width,
     height,
+    revision,
     cells,
     passable,
     explored,
@@ -586,6 +603,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       const i = idx(x, y);
       const prev = cells[i];
       cells[i] = value;
+      revision.value++;
       handle.emit('cellChanged', x, y, prev, value);
     },
 
@@ -602,6 +620,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
           cells[i] = mapper(x, y, cells[i]);
         }
       }
+      revision.value++;
       handle.emit('gridChanged');
     },
 
@@ -781,6 +800,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
                 }
               }
             }
+            revision.value++;
             handle.emit('fovUpdated', deltaIn, deltaOut);
           } else {
             visible.set(fovStaging);
@@ -791,6 +811,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
                 if (passable[i] === 1) exploredPassableCount++;
               }
             }
+            revision.value++;
           }
           fovInFlight = false;
         },
@@ -812,6 +833,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
     markMaskChanged(mask) {
       if (mask !== 'visible') recountMasks();
+      revision.value++;
       handle.emit('maskChanged', mask);
     },
 
@@ -855,6 +877,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         cells[i] = toRaw(serialized.cells[i]);
       }
       recountMasks();
+      revision.value++;
       handle.emit('gridChanged');
       handle.emit('maskChanged', 'passable');
       handle.emit('maskChanged', 'explored');

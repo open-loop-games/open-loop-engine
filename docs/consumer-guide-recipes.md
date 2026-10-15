@@ -348,15 +348,23 @@ A per-entity stat that the balance harness must perturb reads through `tunable()
 
 ### Grid change events — and the replacement gotcha
 
-`grid.on('cellChanged', fn)` fires on every `set()`. But the grid may be **replaced**, for board growth or for a challenge that swaps in a masked shape. A direct subscription then stays on the old grid. Own a wrapper that subscribes again inside your build path, and let consumers subscribe to *that*:
+SpatialGrid cells are **not** reactive per cell. For a reactive read, read `grid.revision` at the head of the computed. It advances on every write that emits an event, so the computed recomputes after each. The grid may also be **replaced**, for board growth or for a challenge that swaps in a masked shape. Hold it in a `shallowRef`; a computed that reads `revision` through that ref then tracks the swap too:
+
+```ts
+const grid = shallowRef(createSpatialGrid({ /* … */ }));
+const walls = computed(() => {
+  void grid.value.revision.value;
+  return countWalls(grid.value);
+});
+```
+
+`grid.on(…)` is for side effects, and for derived state too costly to rebuild on every read. A direct subscription stays on the old grid after a replacement. Own a wrapper that subscribes again inside your build path, and let consumers subscribe to *that*:
 
 ```ts
 const handlers: Array<() => void> = [];
 function buildGrid() { grid = createSpatialGrid({ /* … */ }); grid.on('cellChanged', () => handlers.forEach((h) => h())); }
 export function onGridChanged(h: () => void) { handlers.push(h); }
 ```
-
-SpatialGrid cells are **not** reactive per cell. Reactivity comes from the event, not from reading a cell. To derive reactive board state, subscribe to `cellChanged` or `onGridChanged` and write into a `shallowRef` (next section).
 
 ### Adjacency → stat bonus
 

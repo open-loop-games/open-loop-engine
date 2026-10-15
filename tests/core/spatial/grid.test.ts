@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isReactive } from 'vue';
+import { computed, isReactive } from 'vue';
 import { beginPersistentContext, endPersistentContext, persistent } from '@/core/persistence';
 import { seedRNG } from '@/primitives/rng';
 import {
@@ -84,6 +84,52 @@ describe('createSpatialGrid — construction & access', () => {
     expect(events).toHaveLength(2);
     expect(events[1][2]).toBe(a);
     expect(events[1][3]).toBe(a);
+  });
+});
+
+describe('createSpatialGrid — revision', () => {
+  it('set() advances it, so a computed that reads it recomputes; setSilent() does not', () => {
+    const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
+    const walls = computed(() => {
+      void grid.revision.value;
+      return [grid.at(0, 0), grid.at(1, 0)].filter((t) => t.kind === 'wall').length;
+    });
+    expect(walls.value).toBe(0);
+    grid.set(0, 0, { kind: 'wall' });
+    expect(walls.value).toBe(1);
+    grid.setSilent(1, 0, { kind: 'wall' });
+    expect(walls.value).toBe(1);
+  });
+
+  it('every other emitting write advances it, and an FOV commit does with no subscriber', () => {
+    const grid = createSpatialGrid<number>({ width: 2, height: 2, initializer: () => 0 });
+    const seen = computed(() => grid.revision.value);
+    const advances = (write: () => void): boolean => {
+      const before = seen.value;
+      write();
+      return seen.value > before;
+    };
+    const saved = grid.serialize();
+
+    expect(advances(() => grid.fill(() => 1))).toBe(true);
+    expect(
+      advances(() => {
+        const fov = grid.beginFovUpdate();
+        fov.markVisible(0, 0);
+        fov.commit();
+      }),
+    ).toBe(true);
+    expect(advances(() => grid.markMaskChanged('passable'))).toBe(true);
+    expect(advances(() => grid.restore(saved))).toBe(true);
+  });
+
+  it('a handler sees the advanced revision', () => {
+    const grid = createSpatialGrid<number>({ width: 1, height: 1, initializer: () => 0 });
+    let read = -1;
+    grid.on('cellChanged', () => (read = grid.revision.value));
+    grid.set(0, 0, 1);
+    expect(read).toBe(grid.revision.value);
+    expect(read).toBeGreaterThan(0);
   });
 });
 
