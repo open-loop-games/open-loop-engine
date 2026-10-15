@@ -326,8 +326,10 @@ export function createTickDriver(options: TickDriverOptions = {}): TickDriver {
     }
     // The phases entered when the tick began: one entered mid-tick first runs next
     // tick, so its clock starts at 0, and one exited mid-tick stops at once.
-    for (const name of [...activePhases]) {
-      if (activePhases.has(name)) phases.get(name)?.onTick?.(dt);
+    if (activePhases.size > 0) {
+      for (const name of [...activePhases]) {
+        if (activePhases.has(name)) phases.get(name)?.onTick?.(dt);
+      }
     }
     endProfileTick();
     endTraceTick();

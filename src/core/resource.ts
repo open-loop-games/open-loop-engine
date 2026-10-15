@@ -345,7 +345,7 @@ function buildResource<T>(
               landed = amount;
               return;
             }
-            const clamp = resourceClamps.get(resource as Resource<DecimalSource>);
+            const clamp = getResourceClamp(resource as Resource<DecimalSource>);
             const next = clamp ? clamp(amount) : amount;
             if (Decimal.gt(next, landed)) {
               const gain = Decimal.sub(next, landed);

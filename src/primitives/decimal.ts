@@ -173,13 +173,15 @@ Object.defineProperty(OrigDecimal.prototype, Symbol.toPrimitive, {
   value: function toPrimitive(this: Decimal, hint: string): number | string {
     if (hint !== 'number') return this.toString();
     const n = this.toNumber();
-    if (!warnedLossyConversion && losesMagnitude(this, n) && isDev()) {
+    if (!warnedLossyConversion && losesMagnitude(this, n)) {
       warnedLossyConversion = true;
-      console.warn(
-        `Decimal ${this.toString()} converted to the number ${n}, which loses its magnitude. ` +
-          `A relational operator between two such Decimals gives a wrong answer. ` +
-          `Compare with .lt()/.gt(), or call .toNumber() to accept the loss.`,
-      );
+      if (isDev()) {
+        console.warn(
+          `Decimal ${this.toString()} converted to the number ${n}, which loses its magnitude. ` +
+            `A relational operator between two such Decimals gives a wrong answer. ` +
+            `Compare with .lt()/.gt(), or call .toNumber() to accept the loss.`,
+        );
+      }
     }
     return n;
   },
@@ -188,7 +190,7 @@ Object.defineProperty(OrigDecimal.prototype, Symbol.toPrimitive, {
 /** Whether `n`, the float64 conversion of `d`, has lost `d`'s magnitude. */
 function losesMagnitude(d: Decimal, n: number): boolean {
   if (n === Infinity || n === -Infinity) return d.isFinite();
-  return n === 0 && !d.eq(0);
+  return n === 0 && d.sign !== 0;
 }
 
 const origAdd = OrigDecimal.add;
