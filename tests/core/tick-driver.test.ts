@@ -135,6 +135,38 @@ describe('TickDriver', () => {
     tickDriver.exitPhase('combat');
     expect(active).toBe(false);
   });
+  it('a phase entered during a tick first runs on the next tick', () => {
+    const tickDriver = createTickDriver({ intervalRate: 20 });
+    const ran: string[] = [];
+    tickDriver.registerPhase('dusk', {
+      onTick: () => {
+        ran.push('dusk');
+        tickDriver.exitPhase('dusk');
+        tickDriver.enterPhase('night');
+      },
+    });
+    tickDriver.registerPhase('night', { onTick: () => ran.push('night') });
+    tickDriver.enterPhase('dusk');
+    tickDriver.tickOnce();
+    expect(ran).toEqual(['dusk']);
+    tickDriver.tickOnce();
+    expect(ran).toEqual(['dusk', 'night']);
+  });
+  it('a phase exited during a tick does not run later in that tick', () => {
+    const tickDriver = createTickDriver({ intervalRate: 20 });
+    const ran: string[] = [];
+    tickDriver.registerPhase('a', {
+      onTick: () => {
+        ran.push('a');
+        tickDriver.exitPhase('b');
+      },
+    });
+    tickDriver.registerPhase('b', { onTick: () => ran.push('b') });
+    tickDriver.enterPhase('a');
+    tickDriver.enterPhase('b');
+    tickDriver.tickOnce();
+    expect(ran).toEqual(['a']);
+  });
   it('timerProvider is used for scheduling', () => {
     const mockSetInterval = vi.fn().mockReturnValue(42);
     const mockClearInterval = vi.fn();

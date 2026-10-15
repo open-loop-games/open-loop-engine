@@ -188,8 +188,9 @@ export interface TickDriver {
   registerPhase(name: string, handlers: PhaseHandlers): void;
   /**
    * Enter a tick phase, and call its `onEnter`; entering an entered phase does
-   * nothing. Several phases can be entered at once. The entered set is not
-   * saved, so a game enters its phases again after a load.
+   * nothing. Several phases can be entered at once. A phase entered during a
+   * tick first runs on the next tick. The entered set is not saved, so a game
+   * enters its phases again after a load.
    */
   enterPhase(name: string): void;
   /** Exit a tick phase, and call its `onExit`; exiting a phase not entered does nothing. */
@@ -323,7 +324,11 @@ export function createTickDriver(options: TickDriverOptions = {}): TickDriver {
     } finally {
       tickIndex = -1;
     }
-    for (const name of activePhases) phases.get(name)?.onTick?.(dt);
+    // The phases entered when the tick began: one entered mid-tick first runs next
+    // tick, so its clock starts at 0, and one exited mid-tick stops at once.
+    for (const name of [...activePhases]) {
+      if (activePhases.has(name)) phases.get(name)?.onTick?.(dt);
+    }
     endProfileTick();
     endTraceTick();
   }
