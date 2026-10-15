@@ -66,6 +66,8 @@ A game that ships player-facing automation writes each policy as a pure function
 
 The exception is deliberate. Behavior that exists *only* to perturb the game, such as full-auto play drivers or optimal-play enumeration, is balance-harness tooling. It stays on the probe side. The test: is the behavior also a real mechanic? If so, it is game code.
 
+**A watcher the probe depends on needs `flush: 'sync'`.** A probe drives `tickDriver.tickOnce()` in a tight loop, with no microtask boundary between ticks. So a watcher on Vue's default flush never runs during the headless run, and state it maintains goes stale with no error. A resource's own `cumulative` and `best` trackers flush sync for this reason. A watch that must also hold through a reset, such as one that records what a reset is about to clear, needs sync in the browser too.
+
 A probe worth keeping is worth committing. Wire it into your scripts (`"sim": "vite-node scripts/…"`), not a scratch directory. A balance script outside the repo is rebuilt from memory whenever the economy moves. Fold one-off diagnostic scans into it once they have served.
 
 A useful probe has three passes:
