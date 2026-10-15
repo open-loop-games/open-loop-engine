@@ -316,7 +316,12 @@ export interface Purchasable {
   purchase: (count?: DecimalSource) => DecimalSource;
   /** Purchase max, or one unit when `purchaseMaxByDefault` is off. Returns the count purchased. */
   purchaseMax: () => DecimalSource;
-  /** Estimate the total cost of the next `count` purchases. Default count: `1` */
+  /**
+   * Estimate the total cost of the next `count` purchases. Default count: `1`.
+   * Sums every cost requirement, whatever resource each charges. So for a
+   * cost in two or more resources, read each cost requirement's `getCost`
+   * from `requirements` instead.
+   */
   getCost: (count?: DecimalSource) => DecimalSource;
   /** The `onPurchase` option callback, if set */
   onPurchase?: (bulkCount: DecimalSource) => void;
