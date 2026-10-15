@@ -136,13 +136,14 @@ export interface ProducerMapping {
    * inputs by what it made. Keyed by consumer-chosen key. Continuous producers
    * only, and not with `allowNegative`.
    *
-   * Converters that share an input claim it in tick order, which is
-   * registration order: an earlier one takes its full draw first.
+   * A converter claims its inputs after the tick's gains and losses are
+   * written. Converters that share an input claim it in registration order:
+   * an earlier one takes its full draw first.
    */
   inputs?: Record<string, ProducerInput>;
   /**
-   * Option callback run after each continuous tick that produced, with the
-   * amount it added. For a side credit beside the output, such as a count of
+   * Option callback run after each continuous tick that produced, once the
+   * amount is written, with the amount it added. For a side credit beside the output, such as a count of
    * the input a converter drew.
    */
   onProduce?: (amount: DecimalSource) => void;
@@ -345,6 +346,30 @@ export interface ProducerCategory<
   readonly size: number;
 }
 
+/** A converter's tick-side state: its inputs, and the refs it reports through. */
+interface ConverterState {
+  readonly inputs: readonly {
+    readonly key: string;
+    readonly resource: Resource;
+    readonly per: ComputedRef<DecimalSource>;
+  }[];
+  readonly realizedRate: ShallowRef<DecimalSource>;
+  readonly limit: ShallowRef<ProducerLimit>;
+}
+
+/** One tick's writes, collected by the walk and applied after it. */
+interface ProducerTickBatch {
+  dt: number;
+  /** Summed gain per resource */
+  readonly gains: Map<Resource, DecimalSource>;
+  /** Gaining producers with an `onProduce`, and what each made */
+  readonly produced: [Producer, Decimal][];
+  readonly losses: [Producer, Decimal][];
+  readonly converters: [Producer, ConverterState, Decimal][];
+}
+
+const converterStates = new WeakMap<Producer, ConverterState>();
+
 // === PRIVATE BUILDERS ===
 
 /**
@@ -410,14 +435,14 @@ function buildProducer<Def extends { id: string }>(
     return Decimal.add(ownedCount.value, extraCount.value);
   });
 
-  const inputs = mapping.inputs
-    ? Object.fromEntries(
-        Object.entries(mapping.inputs).map(([key, input]) => {
-          const per = toMaybeRef(input.per);
-          return [key, { resource: input.resource, per: computed(() => unref(per)) }];
-        }),
-      )
-    : undefined;
+  const converter: ConverterState | undefined = mapping.inputs && {
+    inputs: Object.entries(mapping.inputs).map(([key, input]) => {
+      const per = toMaybeRef(input.per);
+      return { key, resource: input.resource, per: computed(() => unref(per)) };
+    }),
+    realizedRate: shallowRef<DecimalSource>(Decimal.dZero),
+    limit: shallowRef<ProducerLimit>('rate'),
+  };
 
   let activate: (() => void) | undefined;
   if (mapping.trigger === 'manual') {
@@ -439,18 +464,19 @@ function buildProducer<Def extends { id: string }>(
     return cost.div(rate.mul(effCount)).toNumber();
   });
 
-  return {
+  const producer: Producer = {
     id: def.id,
     rateChain,
     computedRate,
     resource: mapping.resource,
     allowNegative: mapping.allowNegative ?? false,
-    inputs,
+    inputs:
+      converter &&
+      Object.fromEntries(
+        converter.inputs.map(({ key, resource, per }) => [key, { resource, per }]),
+      ),
     onProduce: mapping.onProduce,
-    ...(inputs && {
-      realizedRate: shallowRef<DecimalSource>(Decimal.dZero),
-      limit: shallowRef<ProducerLimit>('rate'),
-    }),
+    ...(converter && { realizedRate: converter.realizedRate, limit: converter.limit }),
     trigger: mapping.trigger,
     repeatable,
     activate,
@@ -459,11 +485,45 @@ function buildProducer<Def extends { id: string }>(
     count,
     purchaseBeatSeconds,
   };
+  if (converter) converterStates.set(producer, converter);
+  return producer;
+}
+
+// === PRIVATE TICK ===
+
+/**
+ * Collect one continuous producer's tick into `batch`. Skips manual producers
+ * so mixed-trigger categories don't double-credit on `activate()`. The walk
+ * only reads, so every producer's rate reads the state from before the tick.
+ */
+function collectContinuousProducer(
+  entry: { instance: Producer },
+  dt: number,
+  batch: ProducerTickBatch,
+): void {
+  const producer = entry.instance;
+  if (producer.trigger !== 'continuous') return;
+  const amount = Decimal.mul(Decimal.mul(producer.computedRate.value, producer.count.value), dt);
+  batch.dt = dt;
+  const converter = converterStates.get(producer);
+  if (converter) {
+    batch.converters.push([producer, converter, amount]);
+    return;
+  }
+  if (amount.gt(Decimal.dZero)) {
+    const held = batch.gains.get(producer.resource);
+    batch.gains.set(producer.resource, held === undefined ? amount : Decimal.add(held, amount));
+    if (producer.onProduce) batch.produced.push([producer, amount]);
+    return;
+  }
+  if (amount.gte(Decimal.dZero)) return;
+  batch.losses.push([producer, amount]);
 }
 
 /**
- * Per-tick body for a continuous producer entry. Skips manual producers so
- * mixed-trigger categories don't double-credit on `activate()`.
+ * Apply a tick's writes: each resource's summed gain in one write, then the
+ * losses, then the converters, each in registration order. One write per
+ * resource matters because every write runs the resource's sync watchers.
  *
  * A rate chain with consumption modifiers can compose net-negative, so the
  * integration is signed: the same `rate × count × dt` that credits a positive
@@ -471,36 +531,38 @@ function buildProducer<Def extends { id: string }>(
  * opts into `allowNegative`. It takes what remains rather than refusing the
  * whole shortfall, because a continuous rate has no atomic purchase to reject.
  */
-function tickContinuousProducer(entry: { instance: Producer }, dt: number): void {
-  const producer = entry.instance;
-  if (producer.trigger !== 'continuous') return;
-  const amount = Decimal.mul(Decimal.mul(producer.computedRate.value, producer.count.value), dt);
-  if (producer.inputs) {
-    tickConverter(producer, producer.inputs, amount, dt);
-    return;
+function applyProducerTick(batch: ProducerTickBatch): void {
+  try {
+    for (const [resource, gain] of batch.gains) addResource(resource, gain);
+    for (const [producer, amount] of batch.produced) producer.onProduce!(amount);
+    for (const [producer, amount] of batch.losses) {
+      const next = Decimal.add(producer.resource.value, amount);
+      producer.resource.value =
+        producer.allowNegative || Decimal.gte(next, 0) ? next : Decimal.dZero;
+    }
+    for (const [producer, converter, want] of batch.converters) {
+      tickConverter(producer, converter, want, batch.dt);
+    }
+  } finally {
+    batch.gains.clear();
+    batch.produced.length = 0;
+    batch.losses.length = 0;
+    batch.converters.length = 0;
   }
-  if (Decimal.gt(amount, 0)) {
-    addResource(producer.resource, amount);
-    producer.onProduce?.(amount);
-    return;
-  }
-  if (Decimal.gte(amount, 0)) return;
-  const next = Decimal.add(producer.resource.value, amount);
-  producer.resource.value = producer.allowNegative || Decimal.gte(next, 0) ? next : Decimal.dZero;
 }
 
-/** Per-tick body for a converter: make what the rate wants, bounded by the inputs. */
+/** One converter's tick: make what the rate wants, bounded by the inputs. */
 function tickConverter(
   producer: Producer,
-  inputs: Readonly<Record<string, ResolvedProducerInput>>,
+  converter: ConverterState,
   want: Decimal,
   dt: number,
 ): void {
-  let made = Decimal.max(want, 0);
+  let made = Decimal.max(want, Decimal.dZero);
   let limit: ProducerLimit = 'rate';
-  for (const [key, { resource, per }] of Object.entries(inputs)) {
-    const draw = Decimal.fromValue(per.value);
-    if (!draw.gt(0)) continue;
+  for (const { key, resource, per } of converter.inputs) {
+    const draw = Decimal.fromValue_noAlloc(per.value);
+    if (!draw.gt(Decimal.dZero)) continue;
     const feeds = Decimal.div(resource.value, draw);
     if (feeds.lt(made)) {
       made = feeds;
@@ -509,23 +571,25 @@ function tickConverter(
   }
   // A full bin throttles the converter, so no input is burned into the overflow.
   const clamp = getResourceClamp(producer.resource);
-  if (clamp && made.gt(0)) {
+  if (clamp && made.gt(Decimal.dZero)) {
     // Compare targets, not (held + made) − held, which float error can put an ulp short.
     const held = producer.resource.value;
     const target = Decimal.add(held, made);
     const landed = clamp(target);
     if (Decimal.lt(landed, target)) {
-      made = Decimal.max(Decimal.sub(landed, held), 0);
+      made = Decimal.max(Decimal.sub(landed, held), Decimal.dZero);
       limit = 'room';
     }
   }
-  (producer.limit as ShallowRef<ProducerLimit>).value = limit;
-  (producer.realizedRate as ShallowRef<DecimalSource>).value =
-    made.gt(0) && dt > 0 ? Decimal.div(made, dt) : Decimal.dZero;
-  if (!made.gt(0)) return;
-  for (const { resource, per } of Object.values(inputs)) {
+  converter.limit.value = limit;
+  if (!made.gt(Decimal.dZero)) {
+    converter.realizedRate.value = Decimal.dZero;
+    return;
+  }
+  converter.realizedRate.value = Decimal.div(made, dt);
+  for (const { resource, per } of converter.inputs) {
     const next = Decimal.sub(resource.value, Decimal.mul(made, per.value));
-    resource.value = Decimal.max(next, 0);
+    resource.value = Decimal.max(next, Decimal.dZero);
   }
   addResource(producer.resource, made);
   producer.onProduce?.(made);
@@ -535,6 +599,11 @@ function tickConverter(
 
 /**
  * Create a producer category — batch registration of Producers from defs.
+ *
+ * Each tick, every continuous producer's rate reads the state from before
+ * the tick, and each resource takes its producers' summed gain in one write.
+ * So the tick's result does not depend on registration order, except where
+ * converters share an input: they claim it in registration order.
  *
  * @param options - Category id, `mapProducer`, and tick registration
  * @returns A {@link ProducerCategory} with registry, lookup, and registration
@@ -586,9 +655,22 @@ export function createProducerCategory<Def extends { id: string }, DefState = vo
     }),
   });
 
-  setupCategoryTick(base, registerTick, tickContinuousProducer, {
-    profileLabel: 'producer.continuous.tick',
-  });
+  const batch: ProducerTickBatch = {
+    dt: 0,
+    gains: new Map(),
+    produced: [],
+    losses: [],
+    converters: [],
+  };
+  setupCategoryTick(
+    base,
+    registerTick,
+    (entry, dt) => collectContinuousProducer(entry, dt, batch),
+    {
+      profileLabel: 'producer.continuous.tick',
+      afterWalk: () => applyProducerTick(batch),
+    },
+  );
 
   const category: ProducerCategory<Def, DefState> = {
     id: base.id,

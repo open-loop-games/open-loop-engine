@@ -18,7 +18,7 @@ import { createResourceBag } from '@/core/resource-bag';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createTuningRegistry, tunable } from '@/core/override-registry';
-import { ref, unref } from 'vue';
+import { ref, unref, watch } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
 import { createTestResource } from '../helpers/test-resource';
 
@@ -940,6 +940,117 @@ describe('createProducerCategory', () => {
 
     pop();
     expect(new Decimal(producer.computedRate.value).toNumber()).toBe(2);
+  });
+});
+
+// ============================================================================
+// The tick walk
+// ============================================================================
+
+describe('producer category tick', () => {
+  it('writes each resource once per tick, however many producers feed it', () => {
+    const { registerTick, tick } = createManualTicks();
+    const cookies = createTestResource('cookies');
+    const category = createProducerCategory<BuildingDef>({
+      id: 'walk-writes',
+      mapProducer: (def) => ({ resource: cookies, baseRate: def.baseRate, trigger: 'continuous' }),
+      registerTick,
+    });
+    category.register([
+      { id: 'a', name: 'A', baseRate: 1, baseCost: 0, costRatio: 1 },
+      { id: 'b', name: 'B', baseRate: 2, baseCost: 0, costRatio: 1 },
+      { id: 'c', name: 'C', baseRate: 3, baseCost: 0, costRatio: 1 },
+    ]);
+    let writes = 0;
+    watch(cookies, () => writes++, { flush: 'sync' });
+
+    tick(1);
+
+    expect(writes).toBe(1);
+    expect(new Decimal(cookies.value).eq(6)).toBe(true);
+  });
+
+  it("reads every producer's rate from the state before the tick, whatever the walk order", () => {
+    const { registerTick, tick } = createManualTicks();
+    const cookies = createTestResource('cookies');
+    const category = createProducerCategory<BuildingDef>({
+      id: 'walk-order',
+      mapProducer: (def) => ({
+        resource: cookies,
+        // `b` produces at the amount held, so it would see `a`'s gain mid-walk.
+        baseRate: def.id === 'b' ? () => cookies.value : def.baseRate,
+        trigger: 'continuous',
+      }),
+      registerTick,
+    });
+    category.register([
+      { id: 'a', name: 'A', baseRate: 10, baseCost: 0, costRatio: 1 },
+      { id: 'b', name: 'B', baseRate: 0, baseCost: 0, costRatio: 1 },
+    ]);
+
+    tick(1);
+
+    expect(new Decimal(cookies.value).eq(10)).toBe(true);
+  });
+
+  for (const [order, ids] of [
+    ['gain first', ['gain', 'loss']],
+    ['loss first', ['loss', 'gain']],
+  ] as const) {
+    it(`clamps a loss against the tick's gains (${order})`, () => {
+      const { registerTick, tick } = createManualTicks();
+      const cookies = createTestResource('cookies');
+      const category = createProducerCategory<BuildingDef>({
+        id: `walk-loss-${ids[0]}`,
+        mapProducer: (def) => ({
+          resource: cookies,
+          baseRate: def.baseRate,
+          trigger: 'continuous',
+        }),
+        registerTick,
+      });
+      category.register(
+        ids.map((id) => ({
+          id,
+          name: id,
+          baseRate: id === 'gain' ? 5 : -3,
+          baseCost: 0,
+          costRatio: 1,
+        })),
+      );
+
+      tick(1);
+
+      expect(new Decimal(cookies.value).eq(2)).toBe(true);
+    });
+  }
+
+  it("lets a converter draw the tick's gains", () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore');
+    const ingots = createTestResource('ingots');
+    const category = createProducerCategory<BuildingDef>({
+      id: 'walk-converter',
+      mapProducer: (def) =>
+        def.id === 'mine'
+          ? { resource: ore, baseRate: 4, trigger: 'continuous' }
+          : {
+              resource: ingots,
+              baseRate: 10,
+              trigger: 'continuous',
+              inputs: { ore: { resource: ore, per: 2 } },
+            },
+      registerTick,
+    });
+    category.register([
+      { id: 'mine', name: 'Mine', baseRate: 0, baseCost: 0, costRatio: 1 },
+      { id: 'smelter', name: 'Smelter', baseRate: 0, baseCost: 0, costRatio: 1 },
+    ]);
+
+    tick(1);
+
+    expect(new Decimal(ingots.value).eq(2)).toBe(true);
+    expect(new Decimal(ore.value).eq(0)).toBe(true);
   });
 });
 

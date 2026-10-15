@@ -363,6 +363,8 @@ export interface SetupCategoryTickOptions {
    * its own labels.
    */
   profileLabel?: string;
+  /** Runs once after every entry's tick, as part of the same walk. */
+  afterWalk?: () => void;
 }
 
 /**
@@ -401,12 +403,13 @@ export function setupCategoryTick<Def extends { id: string }, Instance, DefState
   perEntry: (entry: CategoryEntry<Def, Instance, DefState>, dt: number) => void,
   options: SetupCategoryTickOptions = {},
 ): () => void {
-  const { profileLabel } = options;
+  const { profileLabel, afterWalk } = options;
 
   const getEntries = cachedCategoryList(base, (e) => e);
 
   const walk = (dt: number) => {
     for (const entry of getEntries()) perEntry(entry, dt);
+    afterWalk?.();
   };
   if (!profileLabel) return registerTick(walk);
   return registerTick((dt: number) => {

@@ -116,17 +116,17 @@ game-dev-friendly wrapper over ResourceBag
 
 batch-create Producers from defs
 
-- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:572`
-- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:188`
-- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:300`
+- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:641`
+- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:189`
+- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:301`
 - `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:40`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:287`
-- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:158`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:288`
+- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:159`
 - `interface ProducerInput` — A stock a converting producer draws for each unit of output. `src/systems/producer-category.ts:72`
-- `type ProducerLimit` — What bound a converter's last tick: `'rate'` when it made what its rate wants, `'input:<key>'` when that input ran short, `'room'` when the output's resource bag was full. `src/systems/producer-category.ts:278`
+- `type ProducerLimit` — What bound a converter's last tick: `'rate'` when it made what its rate wants, `'input:<key>'` when that input ran short, `'room'` when the output's resource bag was full. `src/systems/producer-category.ts:279`
 - `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:82`
 - `interface ProducerPurchaseOptions` — Purchase options for a producer purchased more than once. `src/systems/producer-category.ts:49`
-- `interface ResolvedProducerInput` — A ProducerInput with its per-unit draw resolved to a ref. `src/systems/producer-category.ts:281`
+- `interface ResolvedProducerInput` — A ProducerInput with its per-unit draw resolved to a ref. `src/systems/producer-category.ts:282`
 
 ## Purchasable
 
