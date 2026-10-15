@@ -56,6 +56,8 @@ A closed form can be worth executing. It predicts a run length, sizes a paramete
 
 **A solved quantity has one home, and the code that grows reads it.** The spine may *solve* for a rate: the per-purchase gain that holds time-to-kill flat, or the ladder that puts beats on schedule. Then the implementation must read that solved value, not re-author the growth beside it. Two authored copies drift silently. The failure looks like a permanent deficit and a game that is too hard, not like arithmetic. It gets tuned with the wrong constants. The second face of the rule: **every term that multiplies a solved curve belongs inside the solve.** A term left out is not a small error, because the rest of the model assumes the solve is delivered. The divergence compounds, and nothing reports it.
 
+**Solve a threshold from the walk at its scheduled time.** A threshold the player must reach, such as an unlock price or an ending, is what the spine's walk holds at its scheduled moment. Solve it in the same pass that walks the arc. A threshold chosen first and timed afterwards drifts with every retune, and its timing becomes a measurement nobody re-runs. When reaching it changes later income, walk the arc with that change applied at its time. Past the walk's horizon there is no walk to solve from. Extrapolate by the walk's last ratio, and say so at the value.
+
 **Keep the retired shape where it was retired.** A headless run can show that the spine was the wrong *family*, not the wrong constant. Then write down what the old shape assumed and what contradicted it, at the value that replaced it. Three lines are the cheapest guard against re-deriving a refuted shape a year later. By then the conclusion is remembered and the refutation is not.
 
 ### The probe — real engine, real policies
@@ -121,6 +123,7 @@ That subject has its own file, [consumer-guide-balance-automated-player.md](./co
 - joining every optimized quantity to a realized counterpart;
 - proof that a scoring term has spread before you tune its weight;
 - what a converging policy cannot measure;
+- a driver that plays the policy the spine assumes, and search parameters measured rather than tuned;
 - personas as a coverage axis;
 - three checks on the probe: one brain, restore parity, pipeline liveness.
 
@@ -148,7 +151,7 @@ Where the game is deterministic, repeating a cell measures nothing, and averagin
 
 **Name your verification suites, and say which one you ran.** Write down your game's suites in order, with what each covers and costs. For example: a seconds-long unit and calibration suite, a minutes-long fixture suite, the full arc, the grid across personas. Then pick the shallowest that covers what the change could move. The shared vocabulary matters most: "fixture suite green, grid pending" is a handoff, and "I ran some probes" is not.
 
-**Write the prediction down before the headless run.** The spine is the prediction. Write it *before* the instrument runs, with what would refute it, and never edit it afterward. A prediction adjusted after the numbers is no evidence, and one commit later the adjustment is invisible. When a result refuses the change, that is the finding. Keep a refused change re-derivable, with the cell it lost on, so a later basis shift can bring it back.
+**Write the prediction down before the headless run.** The spine is the prediction. Write it *before* the instrument runs, with what would refute it, and never edit it afterward. A prediction adjusted after the numbers is no evidence, and one commit later the adjustment is invisible. When a result refuses the change, that is the finding. Keep a refused change re-derivable, with the cell it lost on and the condition that would revive it, so a later basis shift re-checks it. This binds a pass that grades a candidate change. A read that answers what the code does owes no prediction. It owes receipts by path and symbol, and it runs before the prediction it informs.
 
 ## Reading a game's balance shape
 

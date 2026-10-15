@@ -44,6 +44,23 @@ So pair an automated player's reading with a **policy-free** one whenever the cl
 
 The remaining option is to point a **second automated player at the first**. Its objective is to beat your policy rather than to play well. It goes where a converging automated player structurally cannot, because it optimizes for exactly what the first one passed by. Read the result by asking whether a player could reach the same exploit. If yes, it is a design finding. If no, it is a finding about the automated player, and it costs you nothing beyond the knowledge. It is listed last, because only it requires building and maintaining another automated player.
 
+## Drive the probe with the policy the spine assumes
+
+A spine predicts the arc for one policy: a build order, a plan, a route and its stops. A probe driven by any other policy measures that policy. Its diff from the prediction then reads as a miss in the economy. Where shipping automation drives the probe, the spine predicts for that policy. Where a game ships none, write the driver from the spine's assumptions.
+
+- **State the assumptions at the driver.** Its header lists what the spine assumes: the purchase order, the reserves kept, the risks taken. A change to them is a change to the spine.
+- **Share one source where you can.** A plan that the spine integrates and the driver plays, from one function, cannot drift apart.
+- **Split a measured time into the spine's terms before you retune.** Report each stretch in the spine's own terms: travel, waiting, the hit rate. A wait or a purchase the spine never assumed then shows as the driver's, not the economy's.
+
+A driver that plays better than the spine's policy is no improvement here. It can make a purchase cost time that the spine counted as a saving.
+
+## Measure a driver's search parameters; never tune them
+
+A driver that searches has authored parameters that look free: a lookahead depth, the horizon a candidate is scored over, the split of one purse between two uses. A tuned value holds on the board it was tuned on, and fails on the next. So derive each one from the boards, or per decision.
+
+- **A depth is the smallest that no board improves past.** Run the search unbudgeted on every board, at rising depth. A board added later reopens the measurement, not the argument. A scoring horizon whose best value is interior, not a plateau, is measured the same way. Record the values tried beside the one chosen.
+- **Split a purse between two uses by price, never by a share.** Price both uses in one currency. Read the price of the second use from a dry run of its own search over the whole purse. Spend past what that search cannot convert must beat its last marginal purchase. A saving that the search holds back is priced at what it buys per unit spent, never kept as a reserve.
+
 ## Personas are a coverage axis, not a parameter to tune
 
 Vary the automated player's *objective*, not its policy. Use one shared decision procedure, with several utility functions that express playstyles the design claims to support. Authoring them top-down is the point. They state what the design intends to support, rather than fitting observed players. The check that they are real is that they produce measurably different *outcomes* on the same content. Utility functions that look different are never that check. An objective and the behaviour it produces come apart routinely. That is § Never let the model read the authored parameter, one level up.
