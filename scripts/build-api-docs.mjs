@@ -330,6 +330,7 @@ function renderIndex(byCluster) {
     '| inventory with item capacities | content-systems.md#inventory |',
     '| zone unlocks / named content regions | content-systems.md#zone |',
     '| constrained loadout / saved selection | content-systems.md#loadout |',
+    '| saved queues / layout templates / named saves of a state slice | ../consumer-guide-recipes.md#named-saves-of-a-state-slice |',
     '| automation unlock ladder | content-systems.md#automation-tiers |',
     '| stack modifiers on a chain | mechanics.md#modifier |',
     '| timed buff / temporary multiplier / an effect with a duration | `createTemporaryEffectSystem` → mechanics.md#effects |',

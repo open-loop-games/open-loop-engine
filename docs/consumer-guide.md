@@ -457,10 +457,12 @@ Two companions contain the recurring shapes consumers build from engine primitiv
 
 ## When the engine should grow
 
-The engine grows as consumers use it. Two signals:
+The engine grows as consumers use it. Three signals:
 
-**`TODO(ergonomics)`** — a path that works but is verbose. When two independent consumers build the same wrapper around the same setup, promote it to engine sugar. One consumer's wrapper is a game-side helper. Two are a missing engine primitive.
+**`TODO(ergonomics)`** — a path that works but is verbose. Two independent consumers with the same wrapper make it engine sugar; one consumer's wrapper is a game-side helper.
 
-**The 10% threshold** — abstraction level 4 is designed for the ~10% of game logic that typed systems cannot express. Suppose more than 10% of your module code is `Gate` / `GameStateAccessor` code. Then either the engine needs a new typed system for that pattern, or an existing system needs a higher-level API. File a research ticket, not a workaround.
+**A recipe whose copies diverge on engine invariants** — a system is a typed registration contract over core. It re-wires API that exists, so it starts as a recipe. Three independent copies that diverge on save keys, reset coverage, tick order or per-def state make it a system. Copies that differ only by design keep it a recipe.
 
-The test from [AGENTS.md](../AGENTS.md) § Layering Principle: if you would copy-paste the same wiring between two different games, it belongs in the engine. If it only makes sense for one game's design, it stays in the game. If it has no opinion about game design at all, it is core.
+**The 10% threshold** — level 4 serves the ~10% of game logic that typed systems cannot express. A module past 10% `Gate` / `GameStateAccessor` code needs a new typed system or a higher-level API: file a research ticket, not a workaround.
+
+The test from [AGENTS.md](../AGENTS.md) § Layering Principle: wiring you would copy between two games belongs in the engine. Wiring that only one game's design needs stays in that game. Code with no opinion about game design is core.

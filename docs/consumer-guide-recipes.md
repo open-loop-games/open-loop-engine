@@ -525,3 +525,36 @@ The parameterization seam: policy parameters are an argument, and game state is 
 Why no engine helper: there is nothing to extract. Each policy or step is domain logic (target picking, drift integration, seat rotation). The shared part is already one line: export the function, and call it from both sides. The engine's only job is to make the balance-harness side cheap. `runUntil`, `createMemoryStorage`, `AutomationTiers.unlock` and `pushOverrides` are the balance-harness kernel that assembles the second caller.
 
 This is the general form of one rule: a player-facing automation policy is game code. It is a pure function that `AutomationTiers` blocks until its automation tier unlocks. The balance harness drives the shipping tick with the automation tier forced, and does not re-implement the policy ([consumer-guide-balance.md](./consumer-guide-balance.md) § The probe). The integration-step flavor is an always-on economy step with no automation tier. It is the same discipline, used outside automation. The switch a player sets over such a policy is in [consumer-guide-recipes-tick.md § A player switch over a tier-gated policy](./consumer-guide-recipes-tick.md#a-player-switch-over-a-tier-gated-policy).
+
+## Named saves of a state slice
+
+The player saves one slice of live state under a name and loads it back later: a saved action queue, a set of automation priorities, a seating layout. `createLoadout` is pick-N-from-M selection, and `SaveManager` slots hold whole games, so neither is this. Each game composes it from `persistent()`, because the design choices differ from game to game.
+
+Four rules hold for any shape:
+
+- **One persistent value holds every entry**, in the owning module's persistent context: a list, fixed slots or a keyed record. Do not open a persistent context per entry. A context must exist before `engine.load()` runs, and an entry the player creates later does not.
+- **Keep the value out of every reset.** The saved entries outlive the run, so leave the module out of each reset's `thingsToReset` and contexts. Retaining it with `keep` works, but it couples the saves to every reset that is added later.
+- **Store plain data that names content:** ids, counts, coordinates, types. Never store live objects or instance references.
+- **Load checks the payload against live state.** Content may have locked, changed or gone since the save. Skip what no longer applies, and decide whether a partial load stands or rolls back.
+
+```ts
+withPersistentContext('templates', () => {
+  saved = persistent<Record<string, { name: string; slots: Slot[] }>>({}, { id: 'saved' });
+});
+
+function save(name: string): void {
+  saved.value = { ...saved.value, [nextId()]: { name, slots: readSlots() } };
+}
+
+function load(id: string): void {
+  for (const slot of saved.value[id]?.slots ?? []) {
+    if (isAvailable(slot)) place(slot); // skip a slot that no longer applies
+  }
+}
+```
+
+The rest is the game's design, and the engine takes no position on it:
+- the shape of the saves (fixed slots or an open list);
+- how many the player may keep;
+- whether a save overwrites or adds;
+- what a load does with an entry that no longer fits.
