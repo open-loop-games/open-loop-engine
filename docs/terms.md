@@ -285,7 +285,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 |---|---|---|---|
 | QT1 | **amount** | a quantity of a resource, held or moved (`getAmount`) | balance, holdings, stock, funds, wallet, bank |
 | QT2 | **count**, **purchase count**, **bulk count**, **effective count** | how many; how many of an entry the player owns; how many units one purchase takes; a producer's owned count plus its extra count | amount, level, number of purchases (for these) |
-| QT3 | **cost** | what a purchase or action spends, noun and verb | price, priced, charge |
+| QT3 | **cost**, **costlier** | what a purchase or action spends, noun and verb; costing more | price, priced, charge; dear, dearer, dearest |
 | QT4 | **traversal cost** | the cost to enter a grid cell (external, pathfinding) | bare "cost" outside spatial text |
 | QT5 | **affordable** | a cost the resource's amount covers | payable |
 | QT6 | **reserve** | an amount an auto-purchase leaves unspent | floor, spending floor |
