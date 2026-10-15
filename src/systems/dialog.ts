@@ -99,7 +99,7 @@ export interface DialogPresentation {
  *
  * TODO(expansion): when an external adapter needs to persist adapter-private
  * payload across save/load, add an `adapter?` field constrained to
- * SerializableConstraint-compatible shapes (not `unknown` — must be serializable).
+ * SerializableConstraint-compatible shapes.
  */
 export interface SerializedDialogAdapter {
   activeGraphId?: string;

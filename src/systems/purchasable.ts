@@ -69,10 +69,6 @@ export interface PurchasableDisplay {
   showCount?: boolean;
 }
 
-// TODO(expansion): staged purchasables — a purchasable that transforms between
-// N phases (a stages[] list, charged overlays). Add optional `stages`
-// array to options, expose `stage` ref on instance. Deferred: no consumer need yet.
-
 /**
  * Full options for {@link createPurchasable} — the engine-internal raw
  * factory. Consumers build this shape through `mapPurchasable` on

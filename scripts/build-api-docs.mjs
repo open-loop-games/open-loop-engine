@@ -332,6 +332,8 @@ function renderIndex(byCluster) {
     '| constrained loadout / saved selection | content-systems.md#loadout |',
     '| automation unlock ladder | content-systems.md#automation-tiers |',
     '| stack modifiers on a chain | mechanics.md#modifier |',
+    '| timed buff / temporary multiplier / an effect with a duration | `createTemporaryEffectSystem` → mechanics.md#effects |',
+    '| speed up one action / a rate chain per action | `rateChain: true` on the action mapping → content-systems.md#action-category |',
     '| "purchase max" count / bulk purchase cost preview | mechanics.md#formulas |',
     '| softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |',
     '| declarative Gate (data-driven predicate) | mechanics.md#gate |',
