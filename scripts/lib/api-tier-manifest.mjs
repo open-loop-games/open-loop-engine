@@ -20,7 +20,7 @@ export const TIER_MANIFEST = [
     entrypoints: [
       '`createResource` — define a named game quantity with persistence and display text.',
       '`addResource` / `subtractResource` / `hasResource` / `formatResource` — change, check and present resources through the standard utilities.',
-      '`Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource.',
+      '`Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource. `Resource.sinceReset` (opt in with `trackSinceReset`) is the gain since the last reset.',
       '`createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.',
       '`randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.',
       '`createConversion` — model atomic recipes, trades, and prestige-style exchanges.',

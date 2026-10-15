@@ -6,8 +6,9 @@
  * converting prestige currency. This file provides:
  *
  * - {@link createResource} — create a named value with auto-persistence,
- *   engine-scoped registration, and the lifetime `cumulative` / `best`
- *   trackers (built when the resource is created inside a persistent context)
+ *   engine-scoped registration, the lifetime `cumulative` / `best` trackers
+ *   and the opt-in `sinceReset` (built when the resource is created inside a
+ *   persistent context)
  * - {@link addResource} / {@link subtractResource} / {@link hasResource} — arithmetic utilities
  * - {@link formatResource} — formatted string using the resource's `decimals` and `small` settings
  * - {@link unwrapResource} — dereference a `Resource | Ref<Resource>` to the underlying Resource
@@ -91,6 +92,14 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
    * with {@link Resource.cumulative}.
    */
   best?: Ref<DecimalSource> & Persistent<DecimalSource>;
+  /**
+   * Gain since the last reset whose scope contains this resource, through its
+   * persistent context or by name in `thingsToReset`. A `keep` that retains
+   * the amount still zeroes this. Counts rises as {@link Resource.cumulative}
+   * does, but starts at 0, so a starting amount is not gain. Present when
+   * {@link ResourceOptions.trackSinceReset} is set and `cumulative` is.
+   */
+  sinceReset?: Ref<DecimalSource> & Persistent<DecimalSource>;
 }
 
 /** Options for {@link createResource} */
@@ -109,6 +118,11 @@ export interface ResourceOptions {
    * does a `.` in a persistent resource's id, since save paths split on it.
    */
   id?: string;
+  /**
+   * Also track {@link Resource.sinceReset}, the gain in the current run. Off
+   * by default, since it adds one saved value per resource.
+   */
+  trackSinceReset?: boolean;
 }
 
 /** Options for a persistent {@link createResource}: `id` is required. */
@@ -234,7 +248,7 @@ function buildResource<T>(
   options: ResourceOptions,
   persistentId?: string,
 ): Resource<T> {
-  const { displayName = 'points', decimals = 0, small = false, id } = options;
+  const { displayName = 'points', decimals = 0, small = false, id, trackSinceReset } = options;
   // One read of the enclosing persistent context, shared by the tracker setup
   // below and the registration at the end. Both need to know whether a
   // persistent context is open; nothing between them changes it.
@@ -298,6 +312,10 @@ function buildResource<T>(
           id: 'best',
           lifetime: true,
         });
+        // Not lifetime, so a reset of the module's persistent context zeroes it.
+        const sinceReset = trackSinceReset
+          ? persistent<DecimalSource>(0, { id: 'sinceReset' })
+          : undefined;
 
         // The last amount after a linked bag's clamp. `cumulative` diffs
         // against it rather than the raw previous write, which may be an
@@ -319,7 +337,9 @@ function buildResource<T>(
             const clamp = resourceClamps.get(resource as Resource<DecimalSource>);
             const next = clamp ? clamp(amount) : amount;
             if (Decimal.gt(next, landed)) {
-              cumulative.value = Decimal.add(cumulative.value, Decimal.sub(next, landed));
+              const gain = Decimal.sub(next, landed);
+              cumulative.value = Decimal.add(cumulative.value, gain);
+              if (sinceReset) sinceReset.value = Decimal.add(sinceReset.value, gain);
             }
             if (Decimal.gt(next, best.value)) best.value = next;
             landed = next;
@@ -329,6 +349,7 @@ function buildResource<T>(
 
         resource.cumulative = cumulative;
         resource.best = best;
+        if (sinceReset) resource.sinceReset = sinceReset;
       });
     }
   }

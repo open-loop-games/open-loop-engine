@@ -34,6 +34,7 @@ import {
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
 import { Resettable } from '@/core/resettable';
+import type { Resource } from '@/core/resource';
 import { createRetention } from './retention';
 import { createPredicateResolver, type Predicate } from './gate';
 
@@ -347,7 +348,7 @@ export function createReset(options: ResetOptions): Reset {
           if (processedThingsToReset) {
             const things = unref(processedThingsToReset);
             for (const thing of things) {
-              if (isPersistent(thing)) resetPersistent(thing);
+              if (isPersistent(thing)) resetNamedPersistent(thing);
               else resetObject(thing);
             }
           }
@@ -402,7 +403,7 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
 
   // If it's a persistent ref, reset it
   if (isPersistent(obj)) {
-    if (!obj[Lifetime]) resetPersistent(obj);
+    if (!obj[Lifetime]) resetNamedPersistent(obj);
     return;
   }
 
@@ -434,6 +435,16 @@ function resetObject(obj: unknown, visited?: WeakSet<object>): void {
   for (const value of Object.values(obj)) {
     resetObject(value, visited);
   }
+}
+
+/**
+ * Reset a persistent ref a reset names. A resource's `sinceReset` is in a
+ * child persistent context, so naming the resource reaches it only here.
+ */
+function resetNamedPersistent(ref: Persistent): void {
+  resetPersistent(ref);
+  const sinceReset = (ref as Partial<Resource>).sinceReset;
+  if (sinceReset) resetPersistent(sinceReset);
 }
 
 // === RESET TIME TRACKING ===

@@ -6,7 +6,7 @@ Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatt
 
 - `createResource` — define a named game quantity with persistence and display text.
 - `addResource` / `subtractResource` / `hasResource` / `formatResource` — change, check and present resources through the standard utilities.
-- `Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource.
+- `Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource. `Resource.sinceReset` (opt in with `trackSinceReset`) is the gain since the last reset.
 - `createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.
 - `randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.
 - `createConversion` — model atomic recipes, trades, and prestige-style exchanges.
@@ -58,24 +58,24 @@ seedable pseudo-random number generator and weighted random choice
 
 the reactive, saved quantities an incremental game is built on
 
-- `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:390`
+- `function addResource(resource: Resource<DecimalSource>, amount: DecimalSource, chain?: Modifier): void` — Add an amount to a resource. `src/core/resource.ts:411`
 - `type CapacitySource = Computable<DecimalSource>` — A capacity: a value, or a ref or getter for a reactive capacity. `src/core/resource-bag.ts:19`
-- `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource that saves nothing. `src/core/resource.ts:142`
-- `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game resource. `src/core/resource.ts:169`
+- `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource that saves nothing. `src/core/resource.ts:156`
+- `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game resource. `src/core/resource.ts:183`
 - `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Create a container of amounts by item type, with an optional total capacity and optional per-type capacities. `src/core/resource-bag.ts:151`
-- `function formatResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource's amount with its `decimals` and `small` settings. `src/core/resource.ts:361`
-- `function hasResource(resource: Resource<DecimalSource>, amount: DecimalSource): boolean` — Check if a resource has at least a certain amount. `src/core/resource.ts:453`
-- `type PersistentResourceOptions` — Options for a persistent createResource: `id` is required. `src/core/resource.ts:115`
-- `function resetResource<T extends DecimalSource>(resource: Resource<T>): void` — Reset a resource to its ref default (or zero). `src/core/resource.ts:462`
-- `interface Resource<T = DecimalSource> extends Ref<T>` — A named, quantifiable game value backed by a Vue ref. `src/core/resource.ts:51`
+- `function formatResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource's amount with its `decimals` and `small` settings. `src/core/resource.ts:382`
+- `function hasResource(resource: Resource<DecimalSource>, amount: DecimalSource): boolean` — Check if a resource has at least a certain amount. `src/core/resource.ts:474`
+- `type PersistentResourceOptions` — Options for a persistent createResource: `id` is required. `src/core/resource.ts:129`
+- `function resetResource<T extends DecimalSource>(resource: Resource<T>): void` — Reset a resource to its ref default (or zero). `src/core/resource.ts:483`
+- `interface Resource<T = DecimalSource> extends Ref<T>` — A named, quantifiable game value backed by a Vue ref. `src/core/resource.ts:52`
 - `interface ResourceBag` — Amounts by item type, with optional capacities and reactive links to Resources. `src/core/resource-bag.ts:60`
 - `interface ResourceBagOptions` — Options for configuring a resource bag at creation time. `src/core/resource-bag.ts:41`
-- `interface ResourceOptions` `src/core/resource.ts:97`
-- `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:424`
-- `interface SubtractResourceOptions` `src/core/resource.ts:405`
+- `interface ResourceOptions` `src/core/resource.ts:106`
+- `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:445`
+- `interface SubtractResourceOptions` `src/core/resource.ts:426`
 - `function transferAmountsBetweenBags(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal>` — Transfer several item types between bags in one call. `src/core/resource-bag.ts:457`
 - `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's amount and the destination's remaining capacity. `src/core/resource-bag.ts:432`
-- `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:376`
+- `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:397`
 
 ## Conversion
 

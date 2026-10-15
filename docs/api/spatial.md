@@ -4,7 +4,7 @@ Coordinate primitives for adjacency-driven games: grid, graph, scope stack and i
 
 ## Canonical entrypoints
 
-- `createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form.
+- `createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.revision` to recompute after each write.
 - `createGraph` — arbitrary node/edge topology with nested child graphs.
 - `createScopeStack` — track the graph scope entered in a nested graph.
 - `createInfluenceLayer` — propagation and decay over a numeric grid.
@@ -13,18 +13,18 @@ Coordinate primitives for adjacency-driven games: grid, graph, scope stack and i
 
 Bounded 2D grid with FOV updates and a serialized form. Rectangular storage, configurable neighborhood: the `neighborhood` offset set makes 4-connected, 8-connected and hex-at-axial-offset the same container. Every traversal verb follows it. Two traversal queries split by use: `bfs()` for reachability and parent links, `distanceField()` for weighted multi-source routing distance. The shared coordinate types (`GridCoord`, `GridOffset`, `PassabilityFn`, `TraversalCostFn`, `Unsubscribe`) are here.
 
-- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:414`
-- `const DIAGONAL_OFFSETS: readonly GridOffset[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:72`
-- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:156`
+- `function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGrid<T>` — Create a bounded 2D grid sized `width × height`, populated by calling `initializer(x, y)` for every cell. `src/core/spatial/grid.ts:428`
+- `const DIAGONAL_OFFSETS: readonly GridOffset[]` — 8-connected adjacency: the four orthogonals plus the four diagonals. `src/core/spatial/grid.ts:75`
+- `interface FovUpdateHandle` — Handle returned by SpatialGrid.beginFovUpdate. `src/core/spatial/grid.ts:159`
 - `interface GridCoord` — A 2D integer coordinate. `src/core/spatial/types.ts:12`
 - `interface GridOffset` — A 2D integer offset from a cell to one of its neighbors. `src/core/spatial/types.ts:23`
-- `const HEX_AXIAL_OFFSETS: readonly GridOffset[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset. `src/core/spatial/grid.ts:95`
-- `const ORTHOGONAL_OFFSETS: readonly GridOffset[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:64`
+- `const HEX_AXIAL_OFFSETS: readonly GridOffset[]` — 6-connected hex adjacency, clockwise from east, for a hex board stored at an axial offset. `src/core/spatial/grid.ts:98`
+- `const ORTHOGONAL_OFFSETS: readonly GridOffset[]` — 4-connected orthogonal adjacency: E, W, N, S. `src/core/spatial/grid.ts:67`
 - `type PassabilityFn<T> = (cell: T, x: number, y: number) => boolean` — Caller-supplied passability test for grid traversal queries (BFS, flood). `src/core/spatial/types.ts:36`
-- `interface SerializedSpatialGrid<T>` — Serialized form of a grid's full state. `src/core/spatial/grid.ts:134`
-- `interface SpatialGrid<T>` — Bounded 2D grid with configurable adjacency, BFS and weighted distance fields, an FOV commit handle, and persistence through a serialized form. `src/core/spatial/grid.ts:167`
-- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:105`
-- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:41`
+- `interface SerializedSpatialGrid<T>` — Serialized form of a grid's full state. `src/core/spatial/grid.ts:137`
+- `interface SpatialGrid<T>` — Bounded 2D grid with configurable adjacency, BFS and weighted distance fields, an FOV commit handle, and persistence through a serialized form. `src/core/spatial/grid.ts:170`
+- `interface SpatialGridEvents<T>` — Events emitted by a SpatialGrid. `src/core/spatial/grid.ts:108`
+- `interface SpatialGridOptions<T>` — Options accepted by createSpatialGrid. `src/core/spatial/grid.ts:44`
 - `type TraversalCostFn<T> = (cell: T, x: number, y: number) => number` — Caller-supplied cost to *enter* a cell, for weighted traversal queries (`distanceField`). `src/core/spatial/types.ts:52`
 - `type Unsubscribe = () => void` — Function returned by event subscriptions; call it to unsubscribe the handler. `src/core/spatial/types.ts:29`
 

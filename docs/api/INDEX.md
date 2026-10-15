@@ -12,7 +12,7 @@ Start at the highest abstraction level that fits. Drop down only when it does no
 
 | Abstraction level | Use | Start at |
 | --- | --- | --- |
-| **L1: Resource utilities** | `addResource` / `hasResource` / `formatResource`, `Resource.best` / `.cumulative` — direct resource changes, formatting, lifetime refs | resources.md#resource |
+| **L1: Resource utilities** | `addResource` / `hasResource` / `formatResource`, `Resource.best` / `.cumulative` / `.sinceReset` — direct resource changes, formatting, lifetime and per-run gain | resources.md#resource |
 | **L2: Categories** | `createProducerCategory`, `createPurchasableCategory`, `createSkillCategory`, `createDialogCategory`, … — repeatable authored content, and the default for it | content-systems.md, content-narrative.md |
 | **L3: Raw primitives** | `createScalingPurchasable`, `createCycle`, `createModifierChain`, `createCategoryBase` — one-off mechanics, or registration shapes a category's mapping constrains | composition.md, mechanics.md, lifecycle.md |
 | **L4: Declarative data** | `Gate`, `E` / `IEffect` — Gates and effects as data, for JSON, mods, saves and the balance harness | mechanics.md#gate, mechanics.md#effects |

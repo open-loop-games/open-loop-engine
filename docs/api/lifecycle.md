@@ -53,13 +53,13 @@ auto-saved refs, registered per persistent context
 
 the reset mechanic behind prestige layers
 
-- `function createReset(options: ResetOptions): Reset` — Create a reset mechanic. `src/systems/reset.ts:273`
-- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:455`
-- `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:155`
-- `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:183`
-- `interface ResetOptions` — Options for a reset mechanic. `src/systems/reset.ts:61`
-- `type ResetScope = string | ScopedReset` — A reset scope entry, one of: - a persistent context id (string), which the persistent-ref registry resolves; - another Reset or Cycle, whose resolved scope is unioned in. `src/systems/reset.ts:56`
-- `interface ScopedReset` — Any object exposing a resolved set of persistent refs for a composable reset scope. `src/systems/reset.ts:47`
+- `function createReset(options: ResetOptions): Reset` — Create a reset mechanic. `src/systems/reset.ts:274`
+- `function createResetTimer(reset: Reset): Ref<number>` — Create a reset-zeroed elapsed-time ref. `src/systems/reset.ts:466`
+- `interface Reset extends ScopedReset` — A reset mechanic that can reset game progress. `src/systems/reset.ts:156`
+- `interface ResetEvents` — Events emitted by a Reset instance. `src/systems/reset.ts:184`
+- `interface ResetOptions` — Options for a reset mechanic. `src/systems/reset.ts:62`
+- `type ResetScope = string | ScopedReset` — A reset scope entry, one of: - a persistent context id (string), which the persistent-ref registry resolves; - another Reset or Cycle, whose resolved scope is unioned in. `src/systems/reset.ts:57`
+- `interface ScopedReset` — Any object exposing a resolved set of persistent refs for a composable reset scope. `src/systems/reset.ts:48`
 
 ## Resettable protocol
 

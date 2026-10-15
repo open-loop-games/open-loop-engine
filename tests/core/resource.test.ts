@@ -115,6 +115,37 @@ describe('Resource', () => {
     expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
     expect(new Decimal(gold.best!.value).toNumber()).toBe(50);
   });
+  it('sinceReset counts gain from 0, and a reset of its persistent context zeroes it', () => {
+    beginPersistentContext('since-reset-context');
+    const gold = createResource(bn(5), { id: 'gold', trackSinceReset: true });
+    endPersistentContext();
+    addResource(gold, 50);
+    subtractResource(gold, 20);
+    addResource(gold, 10);
+    expect(new Decimal(gold.sinceReset!.value).toNumber()).toBe(60);
+
+    createReset({ resetPersistentContexts: ['since-reset-context'], keep: [gold] }).reset();
+
+    expect(gold.value.toNumber()).toBe(45);
+    expect(new Decimal(gold.sinceReset!.value).toNumber()).toBe(0);
+    expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(65);
+    addResource(gold, 3);
+    expect(new Decimal(gold.sinceReset!.value).toNumber()).toBe(3);
+  });
+  it('sinceReset zeroes when a reset names its resource, directly or inside an object', () => {
+    beginPersistentContext('since-reset-named');
+    const gold = createResource(bn(0), { id: 'gold', trackSinceReset: true });
+    const ore = createResource(bn(0), { id: 'ore', trackSinceReset: true });
+    endPersistentContext();
+    addResource(gold, 50);
+    addResource(ore, 7);
+
+    createReset({ thingsToReset: [gold, { stock: { ore } }] }).reset();
+
+    expect(new Decimal(gold.sinceReset!.value).toNumber()).toBe(0);
+    expect(new Decimal(ore.sinceReset!.value).toNumber()).toBe(0);
+    expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
+  });
   it('a resource that takes over an unowned amount counts no gain for it', () => {
     const build = () =>
       withPersistentContext('tracker-take-over', () => createResource(bn(0), { id: 'gold' }));
@@ -143,6 +174,22 @@ describe('Resource', () => {
     expect(gold.value.toNumber()).toBe(50);
     expect(new Decimal(gold.cumulative!.value).toNumber()).toBe(50);
     expect(new Decimal(gold.best!.value).toNumber()).toBe(50);
+  });
+  it('sinceReset round-trips through a save, and the load itself is no gain', () => {
+    const mgr = createSaveManager({
+      gameId: 'since-reset-save',
+      storageAdapter: createMemoryStorage(),
+    });
+    beginPersistentContext('since-reset-save');
+    const gold = createResource(bn(0), { id: 'gold', trackSinceReset: true });
+    endPersistentContext();
+    addResource(gold, 50);
+    const snapshot = mgr.exportSave();
+    subtractResource(gold, 50);
+    addResource(gold, 10);
+
+    expect(mgr.importSave(snapshot).success).toBe(true);
+    expect(new Decimal(gold.sinceReset!.value).toNumber()).toBe(50);
   });
   it('resetResource restores default', () => {
     beginPersistentContext('test-resource-reset');
