@@ -9,7 +9,7 @@ Keep the skill thin. Where another file owns a step, point to that file; do not 
 
 Owners of the details:
 - `AGENTS.md` § Commits: the bump policy and `pnpm release`; its § Publish surface: what ships;
-- `AGENTS.md` § Breaking-change entries: the body of a breaking commit;
+- `AGENTS.md` § Breaking-change entries: the body of a breaking commit; its § API migrations: the codemod's place in a release;
 - `docs/notes/review-backlog-releases.md` (local): classifying an item, consumers and the changelog check;
 - `api-migrations/README.md`: rename manifests, the consumer codemod, and a breaking release's checklist.
 
@@ -33,7 +33,7 @@ Owners of the details:
 - Work in the worktree `.claude/worktrees/next`. If it is missing: `git worktree add .claude/worktrees/next next`, then `pnpm install --frozen-lockfile`.
 - Never commit `docs/api/` on `next`. The pre-commit hook skips it in a worktree, and CI skips the `docs/api` check on `next`.
 - Inside a minor, a mechanical rename batch goes first, in its own commit.
-- A rename adds its entry to `api-migrations/<version>/manifest.json` in the same commit.
+- A rename's manifest entry and Migration list: `AGENTS.md` § API migrations.
 
 ## Rebase next
 

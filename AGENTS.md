@@ -87,7 +87,18 @@ around a different part of it. Don't reintroduce a generic Action —
 the composition is the primitive.
 ```
 
-Keep the Migration block short enough to paste into a consumer PR. Keep the Why block specific enough that future-you does not re-derive the primitive. When a breaking change is obvious, such as a rename, skip both blocks. The blocks are worth writing only for a non-obvious change.
+Keep the Migration block short enough to paste into a consumer PR. Keep the Why block specific enough that future-you does not re-derive the primitive. A rename's Migration block is the list `migration.mjs` prints (§ API migrations), and it needs no Why block. For another obvious break, skip both blocks. The blocks are worth writing only for a non-obvious change.
+
+### API migrations
+
+A rename is the one break a tool can apply for a consumer. `api-migrations/` holds a rename manifest per breaking release, and the codemod that applies the manifests a consumer's upgrade crosses. The folder is not in `files`. So a consumer runs the codemod from an engine checkout, never from an installed copy.
+
+- A commit that renames public API adds its entries to `api-migrations/<version>/manifest.json` in that same commit. `pnpm test` checks each entry's shape.
+- A consumer whose bump crosses a breaking release runs the codemod first, while the old engine is still installed.
+- A breaking release older than the first manifest has none. Migrate its renames by hand, from the changelog.
+- Every other break is migrated by hand, from its Migration block.
+
+`api-migrations/README.md` has the manifest format, the consumer's upgrade steps, what typecheck misses after a codemod, and a breaking release's checklist.
 
 ### Type-surface pins
 
