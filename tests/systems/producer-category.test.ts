@@ -14,6 +14,7 @@ import {
 import type { DecimalSource } from '@/primitives/decimal';
 import { createScalingPurchasable } from '@/systems/purchasable';
 import { createResource } from '@/core/resource';
+import { createResourceBag } from '@/core/resource-bag';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
 import { createTuningRegistry, tunable } from '@/core/override-registry';
@@ -1166,6 +1167,190 @@ describe('Producer signed-rate integration', () => {
 
     // -3 is readable by a starvation detector; the clamped variant loses it.
     expect(new Decimal(catnip.value).eq(-3)).toBe(true);
+  });
+});
+
+describe('producer inputs (a continuous converter)', () => {
+  interface RecipeDef {
+    id: string;
+    rate: number;
+  }
+  const amount = (r: { value: DecimalSource }) => new Decimal(r.value).toNumber();
+
+  it('debits each input per unit made, and makes only what the scarcest input feeds', () => {
+    const { registerTick, tick } = createManualTicks();
+    const meat = createTestResource('meat', 3);
+    const wood = createTestResource('wood', 100);
+    const jerky = createTestResource('jerky', 0);
+    const racks = createProducerCategory<RecipeDef>({
+      id: 'racks',
+      mapProducer: (def) => ({
+        resource: jerky,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { meat: { resource: meat, per: 0.5 }, wood: { resource: wood, per: 2 } },
+      }),
+      registerTick,
+    });
+    racks.register({ id: 'rack', rate: 10 });
+
+    tick(1);
+
+    // Meat feeds 3 / 0.5 = 6 of the 10 the rate wants.
+    expect(amount(jerky)).toBeCloseTo(6);
+    expect(amount(meat)).toBeCloseTo(0);
+    expect(amount(wood)).toBeCloseTo(88);
+  });
+
+  it('reports the realized rate and what bound the last tick', () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore', 100);
+    const bars = createTestResource('bars', 0);
+    const smelters = createProducerCategory<RecipeDef>({
+      id: 'smelters',
+      mapProducer: (def) => ({
+        resource: bars,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { ore: { resource: ore, per: 10 } },
+      }),
+      registerTick,
+    });
+    smelters.register({ id: 'smelter', rate: 4 });
+    const smelter = smelters.getProducer('smelter')!;
+
+    tick(2);
+    expect(amount(smelter.realizedRate!)).toBeCloseTo(4);
+    expect(smelter.limit!.value).toBe('rate');
+
+    // 20 ore left feeds 2 bars, against the 8 that 2 s at rate 4 wants.
+    tick(2);
+    expect(amount(smelter.realizedRate!)).toBeCloseTo(1);
+    expect(smelter.limit!.value).toBe('input:ore');
+
+    tick(2);
+    expect(amount(smelter.realizedRate!)).toBe(0);
+  });
+
+  it("throttles at a linked bag's cap instead of burning inputs into the overflow", () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore', 100);
+    const bars = createTestResource('bars', 7);
+    createResourceBag({ capacityPerType: { bars: 10 } }).link('bars', bars);
+    const smelters = createProducerCategory<RecipeDef>({
+      id: 'smelters-capped',
+      mapProducer: (def) => ({
+        resource: bars,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { ore: { resource: ore, per: 2 } },
+      }),
+      registerTick,
+    });
+    smelters.register({ id: 'smelter', rate: 5 });
+
+    tick(1);
+
+    expect(amount(bars)).toBeCloseTo(10);
+    expect(amount(ore)).toBeCloseTo(94);
+    expect(smelters.getProducer('smelter')!.limit!.value).toBe('room');
+  });
+
+  it('is not room-bound when the bag has room, whatever the float error of held + made − held', () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore', 100);
+    // (held + made) − held lands an ulp below made for this pair.
+    const bars = createTestResource('bars', 12.593465862187864);
+    createResourceBag({ capacityPerType: { bars: 100 } }).link('bars', bars);
+    const smelters = createProducerCategory<RecipeDef>({
+      id: 'smelters-roomy',
+      mapProducer: (def) => ({
+        resource: bars,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { ore: { resource: ore, per: 1 } },
+      }),
+      registerTick,
+    });
+    smelters.register({ id: 'smelter', rate: 0.36059794958967123 });
+
+    tick(1);
+
+    expect(smelters.getProducer('smelter')!.limit!.value).toBe('rate');
+    expect(amount(ore)).toBe(new Decimal(100).sub(0.36059794958967123).toNumber());
+  });
+
+  it('calls onProduce with what each tick made, and not on a tick that made nothing', () => {
+    const { registerTick, tick } = createManualTicks();
+    const pages = createTestResource('pages', 3);
+    const notes = createTestResource('notes', 0);
+    const made: number[] = [];
+    const clerks = createProducerCategory<RecipeDef>({
+      id: 'clerks',
+      mapProducer: (def) => ({
+        resource: notes,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { pages: { resource: pages, per: 1 } },
+        onProduce: (amount) => made.push(new Decimal(amount).toNumber()),
+      }),
+      registerTick,
+    });
+    clerks.register({ id: 'clerk', rate: 2 });
+
+    tick(1);
+    tick(1);
+    tick(1);
+
+    expect(made).toEqual([2, 1]);
+  });
+
+  it('claims a shared input in registration order', () => {
+    const { registerTick, tick } = createManualTicks();
+    const coal = createTestResource('coal', 6);
+    const steel = createTestResource('steel', 0);
+    const coke = createTestResource('coke', 0);
+    const works = createProducerCategory<RecipeDef & { out: 'steel' | 'coke' }>({
+      id: 'works',
+      mapProducer: (def) => ({
+        resource: def.out === 'steel' ? steel : coke,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { coal: { resource: coal, per: 1 } },
+      }),
+      registerTick,
+    });
+    works.register([
+      { id: 'foundry', rate: 4, out: 'steel' },
+      { id: 'oven', rate: 4, out: 'coke' },
+    ]);
+
+    tick(1);
+
+    expect(amount(steel)).toBeCloseTo(4);
+    expect(amount(coke)).toBeCloseTo(2);
+    expect(works.getProducer('oven')!.limit!.value).toBe('input:coal');
+  });
+
+  it('refuses inputs on a manual producer or beside allowNegative', () => {
+    const { registerTick } = createManualTicks();
+    const ore = createTestResource('ore', 1);
+    const bars = createTestResource('bars', 0);
+    const build = (extra: { trigger?: 'manual'; allowNegative?: boolean }) =>
+      createProducerCategory<RecipeDef>({
+        id: `refuse-${extra.trigger ?? 'negative'}`,
+        mapProducer: (def) => ({
+          resource: bars,
+          baseRate: def.rate,
+          trigger: extra.trigger ?? 'continuous',
+          allowNegative: extra.allowNegative,
+          inputs: { ore: { resource: ore, per: 1 } },
+        }),
+        registerTick,
+      }).register({ id: 'smelter', rate: 1 });
+
+    expect(() => build({ trigger: 'manual' })).toThrow(/smelter.*inputs/);
+    expect(() => build({ allowNegative: true })).toThrow(/smelter.*inputs/);
   });
 });
 

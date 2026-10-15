@@ -44,6 +44,7 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | add a new resource | resources.md#resource |
 | show a resource reactively | resources.md#resource |
 | convert resources / crafting recipe / market trade | resources.md#conversion |
+| turn stock into output each tick / a smelter or workshop that draws inputs | `ProducerMapping.inputs` → content-systems.md#producer-category |
 | cap a resource / storage capacity / overflow | `createResourceBag` (capacity + `link`) → resources.md#resource |
 | random pick / draw k items / shuffle / weighted roll | `randomItem` / `shuffle` / `weightedPick` → resources.md#rng |
 | building / producer (a "generator" elsewhere) / passive production | content-systems.md#producer-category |

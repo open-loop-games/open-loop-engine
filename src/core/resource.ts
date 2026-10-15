@@ -242,6 +242,17 @@ export function registerResourceClamp(
   };
 }
 
+/**
+ * The clamp a linked bag applies to `resource`'s writes, if one is linked.
+ *
+ * @internal Used by a converting producer to size its output to the bag's room.
+ */
+export function getResourceClamp(
+  resource: Resource<DecimalSource>,
+): ((amount: DecimalSource) => DecimalSource) | undefined {
+  return resourceClamps.get(resource);
+}
+
 /** Shared body of the resource factories; `persistentId` defaults to `options.id`. */
 function buildResource<T>(
   defaultValue: T | Ref<T>,

@@ -10,6 +10,8 @@ The split against [api/INDEX.md](api/INDEX.md) is by kind, not depth. INDEX answ
 
 **Producer vs purchasable behind a predicate.** Ownership adds to a rate → producer. Ownership sets a boolean or applies an effect → purchasable, with `createBooleanRequirement` or a Gate-backed requirement. A purchasable that a predicate blocks is still not a producer.
 
+**Conversion vs a producer with inputs.** The player or a rule converts once, all or nothing → `createConversion`. A building turns stock into output every tick, slowing to what the stock feeds → a continuous producer with `inputs`. It makes what its scarcest input feeds, stops at a linked bag's cap, and reports `realizedRate` and `limit`. A verb that draws one unit beside such a producer is still a Conversion, because a manual producer credits `rate × count`.
+
 **TickDriver vs Cycle vs RunPool.** "How does time advance?" → `TickDriver`. "End this run, reset a reset scope, start the next run" → `Cycle`. "Track many independent concurrent runs" → `RunPool`, whose members are pool runs. The three primitives do not substitute for each other, and a game can use all three. `Cycle` is named for that lifecycle, not for one genre. A prestige layer's reincarnation and a new-game-plus have the same shape, and both are built on it.
 
 **Offline progress.** Four families recur across games:

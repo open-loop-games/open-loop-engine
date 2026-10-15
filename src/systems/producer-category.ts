@@ -9,11 +9,11 @@
  * See {@link createProducerCategory} for a worked example.
  */
 
-import { computed, unref, type ComputedRef } from 'vue';
+import { computed, shallowRef, unref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
 import { toMaybeRef, type Computable } from '@/core/computed';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
-import { addResource, type Resource } from '@/core/resource';
+import { addResource, getResourceClamp, type Resource } from '@/core/resource';
 import {
   createCategoryBase,
   setupCategoryTick,
@@ -68,6 +68,13 @@ export interface ProducerPurchaseOptions {
   purchaseMaxByDefault?: Computable<boolean>;
 }
 
+/** A stock a converting producer draws for each unit of output. */
+export interface ProducerInput {
+  resource: Resource;
+  /** Amount drawn per unit of output. Can be a ref or getter, for a tunable. */
+  per: Computable<DecimalSource>;
+}
+
 /**
  * Return type of the {@link ProducerCategoryOptions.mapProducer} callback.
  * Describes how a def maps to a producer.
@@ -120,6 +127,25 @@ export interface ProducerMapping {
    * starvation detectors that read a negative amount).
    */
   allowNegative?: boolean;
+  // TODO(expansion): a declared claim priority, once a game needs an order other
+  // than registration order for converters that share an input.
+  /**
+   * Turn the producer into a converter: each unit of output draws `per` of
+   * each input. A tick makes `computedRate × count × dt`, or less when an
+   * input holds too little or the output's linked bag is full, and debits the
+   * inputs by what it made. Keyed by consumer-chosen key. Continuous producers
+   * only, and not with `allowNegative`.
+   *
+   * Converters that share an input claim it in tick order, which is
+   * registration order: an earlier one takes its full draw first.
+   */
+  inputs?: Record<string, ProducerInput>;
+  /**
+   * Option callback run after each continuous tick that produced, with the
+   * amount it added. For a side credit beside the output, such as a count of
+   * the input a converter drew.
+   */
+  onProduce?: (amount: DecimalSource) => void;
 }
 
 /**
@@ -182,6 +208,18 @@ export interface Producer {
   readonly resource: Resource;
   /** Whether a net-negative rate may take the resource below zero */
   readonly allowNegative: boolean;
+  /** The stocks a converter draws per unit of output; undefined for a plain producer */
+  readonly inputs: Readonly<Record<string, ResolvedProducerInput>> | undefined;
+  /**
+   * A converter's output per second on its last tick, after its inputs bound
+   * it. `computedRate × count` is what it would make unbounded. Present only
+   * when `inputs` is set.
+   */
+  readonly realizedRate?: Readonly<Ref<DecimalSource>>;
+  /** What bound a converter's last tick. Present only when `inputs` is set. */
+  readonly limit?: Readonly<Ref<ProducerLimit>>;
+  /** The `onProduce` option callback, if set */
+  readonly onProduce?: (amount: DecimalSource) => void;
   /** Trigger mode */
   readonly trigger: 'continuous' | 'manual';
   /** The Purchasable, when `purchase` was set */
@@ -230,6 +268,19 @@ export interface Producer {
    * contains the cascade's `(owned + generated)`.
    */
   readonly purchaseBeatSeconds: ComputedRef<number>;
+}
+
+/**
+ * What bound a converter's last tick: `'rate'` when it made what its rate
+ * wants, `'input:<key>'` when that input ran short, `'room'` when the output's
+ * resource bag was full.
+ */
+export type ProducerLimit = 'rate' | `input:${string}` | 'room';
+
+/** A {@link ProducerInput} with its per-unit draw resolved to a ref. */
+export interface ResolvedProducerInput {
+  readonly resource: Resource;
+  readonly per: ComputedRef<DecimalSource>;
 }
 
 /** A category entry: def, Producer instance, def state and signals */
@@ -284,7 +335,9 @@ export interface ProducerCategory<
   /**
    * The total rate of all continuous producers of a resource.
    * Returns `sum(computedRate * count)` for matching producers, where `count`
-   * is each producer's effective count, `owned + extraCount`.
+   * is each producer's effective count, `owned + extraCount`. A converter
+   * counts at that nominal rate, even when its inputs starve it; its
+   * `realizedRate` is what it made. Its draws do not count against its inputs.
    */
   getTotalRate(resource: Resource): DecimalSource;
 
@@ -307,6 +360,11 @@ function buildProducer<Def extends { id: string }>(
   predicates: PredicateResolver,
 ): Producer {
   const mapping = mapProducer(def, ctx);
+  if (mapping.inputs && (mapping.trigger !== 'continuous' || mapping.allowNegative)) {
+    throw new Error(
+      `Producer "${def.id}" sets inputs, which need trigger 'continuous' and no allowNegative: a converter draws stock per tick and never debits below zero.`,
+    );
+  }
 
   const rateChain = createModifierChain(`${categoryId}/${def.id}/rate`);
   const baseRate = toMaybeRef(mapping.baseRate);
@@ -352,6 +410,15 @@ function buildProducer<Def extends { id: string }>(
     return Decimal.add(ownedCount.value, extraCount.value);
   });
 
+  const inputs = mapping.inputs
+    ? Object.fromEntries(
+        Object.entries(mapping.inputs).map(([key, input]) => {
+          const per = toMaybeRef(input.per);
+          return [key, { resource: input.resource, per: computed(() => unref(per)) }];
+        }),
+      )
+    : undefined;
+
   let activate: (() => void) | undefined;
   if (mapping.trigger === 'manual') {
     activate = () => {
@@ -378,6 +445,12 @@ function buildProducer<Def extends { id: string }>(
     computedRate,
     resource: mapping.resource,
     allowNegative: mapping.allowNegative ?? false,
+    inputs,
+    onProduce: mapping.onProduce,
+    ...(inputs && {
+      realizedRate: shallowRef<DecimalSource>(Decimal.dZero),
+      limit: shallowRef<ProducerLimit>('rate'),
+    }),
     trigger: mapping.trigger,
     repeatable,
     activate,
@@ -402,13 +475,60 @@ function tickContinuousProducer(entry: { instance: Producer }, dt: number): void
   const producer = entry.instance;
   if (producer.trigger !== 'continuous') return;
   const amount = Decimal.mul(Decimal.mul(producer.computedRate.value, producer.count.value), dt);
+  if (producer.inputs) {
+    tickConverter(producer, producer.inputs, amount, dt);
+    return;
+  }
   if (Decimal.gt(amount, 0)) {
     addResource(producer.resource, amount);
+    producer.onProduce?.(amount);
     return;
   }
   if (Decimal.gte(amount, 0)) return;
   const next = Decimal.add(producer.resource.value, amount);
   producer.resource.value = producer.allowNegative || Decimal.gte(next, 0) ? next : Decimal.dZero;
+}
+
+/** Per-tick body for a converter: make what the rate wants, bounded by the inputs. */
+function tickConverter(
+  producer: Producer,
+  inputs: Readonly<Record<string, ResolvedProducerInput>>,
+  want: Decimal,
+  dt: number,
+): void {
+  let made = Decimal.max(want, 0);
+  let limit: ProducerLimit = 'rate';
+  for (const [key, { resource, per }] of Object.entries(inputs)) {
+    const draw = Decimal.fromValue(per.value);
+    if (!draw.gt(0)) continue;
+    const feeds = Decimal.div(resource.value, draw);
+    if (feeds.lt(made)) {
+      made = feeds;
+      limit = `input:${key}`;
+    }
+  }
+  // A full bin throttles the converter, so no input is burned into the overflow.
+  const clamp = getResourceClamp(producer.resource);
+  if (clamp && made.gt(0)) {
+    // Compare targets, not (held + made) − held, which float error can put an ulp short.
+    const held = producer.resource.value;
+    const target = Decimal.add(held, made);
+    const landed = clamp(target);
+    if (Decimal.lt(landed, target)) {
+      made = Decimal.max(Decimal.sub(landed, held), 0);
+      limit = 'room';
+    }
+  }
+  (producer.limit as ShallowRef<ProducerLimit>).value = limit;
+  (producer.realizedRate as ShallowRef<DecimalSource>).value =
+    made.gt(0) && dt > 0 ? Decimal.div(made, dt) : Decimal.dZero;
+  if (!made.gt(0)) return;
+  for (const { resource, per } of Object.values(inputs)) {
+    const next = Decimal.sub(resource.value, Decimal.mul(made, per.value));
+    resource.value = Decimal.max(next, 0);
+  }
+  addResource(producer.resource, made);
+  producer.onProduce?.(made);
 }
 
 // === FACTORIES ===
