@@ -573,6 +573,55 @@ describe('chain.bind', () => {
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toBe('mix-ctx/Bound');
   });
+
+  it('unbind removes a binding by id, as its cleanup would', () => {
+    const chain = createModifierChain('bind-unbind');
+    chain.bind({ id: 'double', modifier: createMultiplicativeModifier({ multiplier: 2 }) });
+
+    expect(chain.unbind('double')).toBe(true);
+    expect(chain.unbind('double')).toBe(false);
+    expect(Decimal.eq(chain.apply(100), 100)).toBe(true);
+    expect(chain.bindings()).toHaveLength(0);
+  });
+
+  it("a binding's cleanup leaves a later binding that reuses its id", () => {
+    const chain = createModifierChain('bind-reuse');
+    const removeFirst = chain.bind({
+      id: 'rule',
+      modifier: createMultiplicativeModifier({ multiplier: 2 }),
+    });
+    chain.unbind('rule');
+    chain.bind({ id: 'rule', modifier: createMultiplicativeModifier({ multiplier: 3 }) });
+
+    removeFirst();
+
+    expect(Decimal.eq(chain.apply(100), 300)).toBe(true);
+    expect(chain.bindings().map((b) => b.id)).toEqual(['rule']);
+  });
+
+  it('rebind swaps the modifier in place, under the same active predicate', () => {
+    const chain = createModifierChain('bind-rebind');
+    const on = ref(true);
+    const remove = chain.bind({
+      id: 'warp',
+      active: on,
+      modifier: createMultiplicativeModifier({ multiplier: 2 }),
+    });
+    chain.add(createAdditiveModifier({ addend: 10 }));
+
+    expect(chain.rebind('warp', createMultiplicativeModifier({ multiplier: 3 }))).toBe(true);
+
+    // ×3 still runs before the +10.
+    expect(Decimal.eq(chain.apply(100), 310)).toBe(true);
+    on.value = false;
+    expect(Decimal.eq(chain.apply(100), 110)).toBe(true);
+    expect(chain.bindings()[0].modifier).toBe(chain.modifiers[0]);
+
+    remove();
+    expect(chain.bindings()).toHaveLength(0);
+    expect(chain.modifiers).toHaveLength(1);
+    expect(chain.rebind('warp', createMultiplicativeModifier({ multiplier: 4 }))).toBe(false);
+  });
 });
 
 describe('createModifierChain live reads', () => {

@@ -544,11 +544,29 @@ export interface ModifierChain extends Modifier {
    * @returns A function that removes the binding (modifier + attribution record) from the chain.
    */
   bind(opts: BindOptions): () => void;
+  /**
+   * Remove the binding with this id, as its `bind` cleanup would. A module
+   * uses it to undo a binding another module made.
+   *
+   * @returns `false`, changing nothing, when no binding has the id.
+   */
+  unbind(id: string): boolean;
+  /**
+   * Put a new modifier in the binding with this id, at its position in the
+   * chain. The binding keeps its id, `active` predicate and tags, and its
+   * record shows the new modifier. A module uses it to replace a modifier
+   * another module bound, such as a mod's version of a base-game rule.
+   *
+   * @returns `false`, changing nothing, when no binding has the id.
+   */
+  rebind(id: string, modifier: Modifier | (() => Modifier)): boolean;
   /** Remove a previously added modifier (its first occurrence, slots included) */
   remove(modifier: Modifier): void;
   /**
    * Put `next` at `current`'s position, recomposing once.
-   * Use it to replace a modifier without moving it to the end.
+   * Use it to replace a modifier without moving it to the end. A binding's
+   * record keeps the modifier it was bound with; use {@link rebind} to
+   * replace a bound one.
    *
    * @returns `false`, changing nothing, when `current` isn't in the chain.
    */
@@ -644,7 +662,16 @@ export function createModifierChain(id: string): ModifierChain {
   // `items` is its flattening, rebuilt on every recompose.
   const layout: (Modifier | ChainSlot)[] = [];
   let items: Modifier[] = [];
-  const bindingsById = new Map<string, BindingRecord>();
+  // An entry, not the record itself, so `rebind` can swap the record while the
+  // binding's cleanup still recognises its own binding.
+  const bindingsById = new Map<string, { record: BindingRecord }>();
+
+  function removeBinding(entry: { record: BindingRecord }): void {
+    // Delete first: removal bumps `itemsVersion`, and a reader it wakes must
+    // not still see the record.
+    bindingsById.delete(entry.record.id);
+    chain.remove(entry.record.modifier);
+  }
   const handle = createEmitHandle<ModifierChainEvents>();
 
   // `enabled`, `apply`, `invert`, and `description` are all composition-reactive:
@@ -755,15 +782,34 @@ export function createModifierChain(id: string): ModifierChain {
         tags: opts.tags ?? [],
         persistentContextId,
       };
-      bindingsById.set(bindingId, record);
-
-      const removeFromChain = chain.add(modifier);
+      const entry = { record };
+      bindingsById.set(bindingId, entry);
+      chain.add(modifier);
+      // A later binding may reuse the id once this one is gone, so the cleanup
+      // removes only its own.
       return () => {
-        // Delete first: removal bumps `itemsVersion`, and a reader it wakes
-        // must not still see the record.
-        bindingsById.delete(bindingId);
-        removeFromChain();
+        if (bindingsById.get(bindingId) === entry) removeBinding(entry);
       };
+    },
+
+    unbind(id: string): boolean {
+      const entry = bindingsById.get(id);
+      if (!entry) return false;
+      removeBinding(entry);
+      return true;
+    },
+
+    rebind(id: string, next: Modifier | (() => Modifier)): boolean {
+      const entry = bindingsById.get(id);
+      if (!entry) return false;
+      const raw = typeof next === 'function' ? next() : next;
+      const { active } = entry.record;
+      const modifier = active == null ? raw : delegateModifier(raw, { when: active });
+      const previous = entry.record.modifier;
+      // The record changes first, so a reader the recompose wakes sees it.
+      entry.record = { ...entry.record, modifier };
+      chain.replace(previous, modifier);
+      return true;
     },
 
     remove(modifier: Modifier): void {
@@ -812,7 +858,7 @@ export function createModifierChain(id: string): ModifierChain {
 
     bindings(): readonly BindingRecord[] {
       void itemsVersion.value;
-      return Array.from(bindingsById.values());
+      return Array.from(bindingsById.values(), (entry) => entry.record);
     },
 
     on: handle.on,

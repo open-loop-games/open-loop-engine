@@ -76,9 +76,9 @@ Seed-sweep runners. `runBeatProbe` collects termination-time distributions per b
 reduces the raw results of headless runs into per-metric stats, optional histograms, and termination-time distributions for predicate-bounded headless runs. Also exports `diffAggregates`, the baseline-vs-variant delta primitive that custom-sweep callers use directly when the canned `runSensitivity` shape does not fit
 
 - `function computeMetricStats(values: number[]): MetricStats` — Descriptive stats (min/max/avg/stddev/median/p5/p50/p95/count) over a numeric array. `src/harness/aggregate.ts:46`
-- `function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine` — Load a save into a fresh, isolated engine running the given modules. `src/harness/create-engine.ts:82`
+- `function createEngineFromSave(options: CreateEngineFromSaveOptions): Engine` — Load a save into a fresh, isolated engine running the given modules. `src/harness/create-engine.ts:93`
 - `interface CreateEngineFromSaveOptions` `src/harness/create-engine.ts:24`
-- `function createSensitivityCell(options: CreateSensitivityCellOptions): Cell` — Build a harness `Cell` backed by an engine per headless run, constructed from save text. `src/harness/create-sensitivity-cell.ts:116`
+- `function createSensitivityCell(options: CreateSensitivityCellOptions): Cell` — Build a harness `Cell` backed by an engine per headless run, constructed from save text. `src/harness/create-sensitivity-cell.ts:118`
 - `interface CreateSensitivityCellOptions` — Options for createSensitivityCell: the immutable baseline save text. `src/harness/create-sensitivity-cell.ts:29`
 - `function createTickCounter(driver: TickDriver): TickCounter` — Count `onTick` fires on `driver`, one per tick. `src/harness/replay.ts:93`
 - `function createWorkPlan<C>(options: { cells: C[]; seeds: number[]; }): WorkItem<C>[]` — Build the flat `(cellIdx, seedIdx, seed, cell)` array that runMatrix and runMatrixUntil iterate. `src/harness/work-plan.ts:38`

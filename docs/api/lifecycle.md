@@ -84,7 +84,7 @@ saves of live state, with multi-slot support
 - `function addField(data: SaveData, path: string, defaultValue: unknown, opts?: AddFieldOptions): SaveData` — Write `defaultValue` at `path`. `src/core/save-migrations.ts:167`
 - `interface AddFieldOptions` `src/core/save-migrations.ts:148`
 - `function createMemoryStorage(): StorageAdapter` — Canonical in-memory StorageAdapter backed by a `Map`. `src/core/save-manager.ts:91`
-- `function createSaveManager(options: SaveManagerOptions): SaveManager` — Create a save manager: serialization, slot management, save migrations and validation over the persistent-ref registry. `src/core/save-manager.ts:535`
+- `function createSaveManager(options: SaveManagerOptions): SaveManager` — Create a save manager: serialization, slot management, save migrations and validation over the persistent-ref registry. `src/core/save-manager.ts:538`
 - `const decimalSchema: ZodType<DecimalSource>` — Zod schema that accepts the three concrete DecimalSource shapes a save can hold: - a live `Decimal` instance; - a `number`; - a numeric string, including the `"Infinity"` / `"NaN"` literals `serializePersistents` emits. `src/core/save-validation.ts:61`
 - `function deleteField(data: SaveData, path: string): SaveData` — Remove the value at `path`. `src/core/save-migrations.ts:139`
 - `function deriveSchema(defaultValue: unknown, decimal?: boolean): ZodType` — Derive a Zod schema from a ref default and options. `src/core/save-validation.ts:94`
@@ -94,10 +94,10 @@ saves of live state, with multi-slot support
 - `function getSchemaForRef(ref: Persistent): ZodType` — Get the effective schema for a persistent ref — explicit override wins, else auto-derive. `src/core/save-validation.ts:143`
 - `function renameField(data: SaveData, oldPath: string, newPath: string): SaveData` — Move a value from `oldPath` to `newPath`. `src/core/save-migrations.ts:93`
 - `function retypeField(data: SaveData, path: string, transform: (oldValue: unknown) => unknown): SaveData` — Apply `transform` to the value at `path`. `src/core/save-migrations.ts:117`
-- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:214`
-- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:199`
+- `interface SaveEvents` — Events emitted by a SaveManager. `src/core/save-manager.ts:217`
+- `type SaveLoadFailureReason = 'not-found' | 'parse-error' | 'wrong-game-id' | 'wrong-mod' | 'future-version' | 'validation' | 'unknown'` — Reason a load or import operation failed. `src/core/save-manager.ts:201`
 - `interface SaveLoadResult` — Result of a save load or import operation. `src/core/save-manager.ts:166`
-- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: saves, loads, imports and exports live state, versioned. `src/core/save-manager.ts:284`
+- `interface SaveManager extends Emittable<SaveEvents>` — Multi-slot save manager: saves, loads, imports and exports live state, versioned. `src/core/save-manager.ts:287`
 - `interface SaveManagerOptions` `src/core/save-manager.ts:113`
 - `type SaveMigration = (data: Record<string, unknown>) => Record<string, unknown>` — One consumer save migration: it receives the save data written at save version N and returns it reshaped for save version N + 1. `src/core/save-manager.ts:110`
 - `interface SavePeek` — Lightweight save metadata returned without full deserialization. `src/core/save-manager.ts:172`
