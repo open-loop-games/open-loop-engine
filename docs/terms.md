@@ -122,6 +122,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | RN17 | **game loop**, **loop** | the TickDriver's per-tick loop; a code loop | loop, for a run |
 | RN18 | **balance loop** | the spine, build, run, diff, decide process | the loop, the workbench cycle |
 | RN19 | **dependency cycle**, **import cycle** | a cycle in a graph | bare "cycle" for it |
+| RN20 | **phase** | a stretch of a run that a game's own value names, such as build or wave | tick phase, for it; stage |
 
 ### SV — saving and loading
 
@@ -237,6 +238,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | TM10 | **game speed** | `TickDriver.speedMultiplier`, which scales dt in live play | boost, acceleration (as the setting's noun) |
 | TM11 | **duration**, **needed** | seconds a thing lasts; the progress a timed progress needs to complete | duration, for progress |
 | TM12 | **accumulator**, **accumulator skill** | a value ticks add to and a threshold drains; a skill whose lifetime bonus accumulates across runs | accumulator, for the category set (say collection) |
+| TM13 | **animation frame** | one browser repaint, in which a drawing reads game state (`requestAnimationFrame`) | frame, tick (for it) |
 
 ### BH — the balance harness
 
