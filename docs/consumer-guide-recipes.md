@@ -2,7 +2,7 @@
 
 Recurring shapes that consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol. Each is a hand-roll in one consumer, where an engine helper would over-fit. A second consumer that independently writes the same wrapper is the signal to move it out of this file.
 
-This is the companion cookbook to [consumer-guide.md](./consumer-guide.md). Read the guide for *how to think* about composing the engine. Read this file for the full worked pattern when you build one. These bulky examples are here so that the guide stays a continuous read.
+This is the companion cookbook to [consumer-guide.md](./consumer-guide.md). Read the guide for *how to think* about composing the engine. Read this file for the full worked pattern when you build one. These bulky examples are here so that the guide stays a continuous read. Shapes a tick handler runs, or that read what ticks wrote, are in [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md). They cover phases inside a run, drawing ticking game state, and a player switch over a tier-gated policy.
 
 ## Action execution: ActionCategory, worker bundle, or Loadout
 
@@ -358,7 +358,7 @@ const walls = computed(() => {
 });
 ```
 
-`grid.on(…)` is for side effects, and for derived state too costly to rebuild on every read. A direct subscription stays on the old grid after a replacement. Own a wrapper that subscribes again inside your build path, and let consumers subscribe to *that*:
+`grid.on(…)` is for side effects, and for derived state updated per cell from the event's coordinates. A direct subscription stays on the old grid after a replacement. Own a wrapper that subscribes again inside your build path, and let consumers subscribe to *that*:
 
 ```ts
 const handlers: Array<() => void> = [];
@@ -376,18 +376,29 @@ interface OccupancyView { width: number; height: number; occupantAt(x: number, y
 // Pure: (view) → bonuses keyed by entity id. No module state, no reactivity.
 function evaluate(view: OccupancyView): Map<string, Bonus> { /* walk cells, read neighbors, sum */ }
 
-// Live wrapper: recompute into a shallowRef on any board change.
-const synergy = shallowRef<Map<string, Bonus>>(new Map());
-onGridChanged(() => { synergy.value = evaluate(liveView()); });   // + watch() any non-spatial inputs
+// Live wrapper: a computed over the grid's revision. It also tracks any other reactive input.
+const synergy = computed(() => { void grid.value.revision.value; return evaluate(liveView()); });
 export const getBonus = (id: string) => synergy.value.get(id) ?? NONE;
 
-// Preview: same evaluator, overlay the hypothetical placement.
-function preview(id: string, x: number, y: number) {
-  return evaluate({ ...liveView(), occupantAt: (cx, cy) => (cx === x && cy === y ? id : liveView().occupantAt(cx, cy)) });
+// Preview: the same evaluator, over a list of cell changes laid on the live view.
+type Change = { x: number; y: number; occupant: string | null };
+const overlay = (v: OccupancyView, c: Change): OccupancyView =>
+  ({ ...v, occupantAt: (cx, cy) => (cx === c.x && cy === c.y ? c.occupant : v.occupantAt(cx, cy)) });
+function preview(changes: Change[]) {
+  const live = liveView();
+  return { live: evaluate(live), hypothetical: evaluate(changes.reduce(overlay, live)) };
 }
 ```
 
-Two disciplines keep this stable. First, **recompute on placement events, not per tick**. Structural bonuses change only when the board changes. So apply time-varying factors (freshness, decay) at read time, not inside the recomputed result. Second, the grid ships no connection shapes such as a full row, a full column or radial arcs. For those, hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coordinates. It stays pure and testable beside the evaluator. A fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood`, or an ad-hoc `neighbors(x, y, neighborhood)` call, not a hand-roll.
+The view is a seam in your code, not engine API. Each evaluator reads its own set of methods, so a generic view would fit none of them.
+
+- **Declare on the view exactly what the evaluator reads.** Bounds plus `occupantAt` is the minimum. A board with a mask, or a directed reach such as a ray that stops at a void, puts `reach(x, y, relation)` on the view. The preview and the live board then resolve reach the same way.
+- **Preview a list of changes.** One verb then covers place, remove, move (vacate, then occupy) and swap. The overlay patches every occupancy read the view has: `occupantAt`, and any iterator over occupied cells. Present the difference between the two results, so the player sees what the change moves.
+- **Attribute each term to its source,** as `{ fromId, kind, value }`. A preview, a "what feeds this" highlight and a marginal value all read it. The marginal value is the result evaluated again without the piece.
+- **Choose the live wrapper by what changes.** A `computed` that reads `grid.revision` covers a grid replacement and every other reactive input. When the authoritative list is one reactive ref instead of the grid, a `computed` over that ref is enough. Subscribe to `cellChanged` only to update the result per cell.
+- **A search may re-express the evaluator.** A search that scores many boards can resolve reach to cell indices once, and evaluate over those. Lock the two equal by test.
+
+Two disciplines keep this stable. First, **recompute on placement events, not per tick**. Structural bonuses change only when the board changes. So apply time-varying factors (freshness, decay) at read time, not inside the recomputed result. Second, the grid ships no connection shapes such as a full row, a full column, a ray or radial arcs. For those, hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coordinates. It stays pure and testable beside the evaluator. A fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood`, or an ad-hoc `neighbors(x, y, neighborhood)` call, not a hand-roll.
 
 ### Routing: fields by default, A\* only for the opposite shape
 
@@ -513,4 +524,4 @@ The parameterization seam: policy parameters are an argument, and game state is 
 
 Why no engine helper: there is nothing to extract. Each policy or step is domain logic (target picking, drift integration, seat rotation). The shared part is already one line: export the function, and call it from both sides. The engine's only job is to make the balance-harness side cheap. `runUntil`, `createMemoryStorage`, `AutomationTiers.unlock` and `pushOverrides` are the balance-harness kernel that assembles the second caller.
 
-This is the general form of one rule: a player-facing automation policy is game code. It is a pure function that `AutomationTiers` blocks until its automation tier unlocks. The balance harness drives the shipping tick with the automation tier forced, and does not re-implement the policy ([consumer-guide-balance.md](./consumer-guide-balance.md) § The probe). The integration-step flavor is an always-on economy step with no automation tier. It is the same discipline, used outside automation.
+This is the general form of one rule: a player-facing automation policy is game code. It is a pure function that `AutomationTiers` blocks until its automation tier unlocks. The balance harness drives the shipping tick with the automation tier forced, and does not re-implement the policy ([consumer-guide-balance.md](./consumer-guide-balance.md) § The probe). The integration-step flavor is an always-on economy step with no automation tier. It is the same discipline, used outside automation. The switch a player sets over such a policy is in [consumer-guide-recipes-tick.md § A player switch over a tier-gated policy](./consumer-guide-recipes-tick.md#a-player-switch-over-a-tier-gated-policy).

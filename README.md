@@ -62,6 +62,7 @@ The engine contains its own docs, in the repo and in the installed package under
 - **`docs/consumer-guide.md`** — how to think about composing the engine. Abstraction levels (resource utilities → categories → raw primitives → declarative data), persistence, modifier chains.
 - **`docs/consumer-guide-choosing.md`** — which primitive is mine, when two of them overlap. The boundaries INDEX's routing table is too short to draw: producer vs gated purchasable, Cycle vs RunPool, category vs raw purchasable.
 - **`docs/consumer-guide-recipes.md`** — the worked-pattern cookbook the guide routes into: worker pools, persona rosters, spatial grids, dialog and subjects.
+- **`docs/consumer-guide-recipes-tick.md`** — its companion for shapes a tick handler runs: phases inside a run, drawing ticking game state, a player switch over automation.
 - **`docs/consumer-guide-balance.md`** — how numbers get chosen and verified: the closed-form spine, the probe that contradicts it, and the balance loop between them.
 - **`docs/consumer-guide-balance-automated-player.md`** — balance when an automated player plays the game your probe measures. It covers calibrating the automated player, what it can't measure, and the balance harness checks that keep its readings honest.
 

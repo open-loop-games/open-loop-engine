@@ -5,7 +5,7 @@ How to express a game with `@open-loop/engine`. Read this after you fork `open-l
 This guide explains **how to compose** the engine: the abstraction levels, which API to choose when, and the recurring shapes of modules. It does not list symbols. For those, route through [api/INDEX.md](api/INDEX.md) into the relevant `api/<tier>.md` file. Adjacent docs:
 
 - [consumer-guide-choosing.md](./consumer-guide-choosing.md) — the boundary between two primitives that overlap;
-- [consumer-guide-recipes.md](./consumer-guide-recipes.md) — worked engine compositions;
+- [consumer-guide-recipes.md](./consumer-guide-recipes.md) and [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md) — worked engine compositions;
 - [consumer-guide-balance.md](./consumer-guide-balance.md) — how balance constants are chosen and verified;
 - `CHANGELOG.md` — the API migrations of breaking changes.
 
@@ -453,13 +453,7 @@ Neither snapshot subscribes to reactive changes, so consumers decide when to rec
 
 ## Composition recipes
 
-[consumer-guide-recipes.md](./consumer-guide-recipes.md) has the recurring shapes that consumers build from engine primitives. They are worked examples from consumer code, not engine symbols:
-
-- action execution, worker pools, persona rosters, priority-weighted fill;
-- dialog and subjects, spatial grids, cross-action bonuses, prestige payouts;
-- the shared pure state function.
-
-Read it when you build one of those.
+Two companions contain the recurring shapes consumers build from engine primitives. [consumer-guide-recipes.md](./consumer-guide-recipes.md) covers content, queues, grids and payouts. [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md) covers what a tick handler runs, and drawing what ticks change. Read one when you build one.
 
 ## When the engine should grow
 
