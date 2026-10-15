@@ -74,6 +74,8 @@ export interface GoalPickerOptions<TCandidate, TContext, TWeights> {
    * caller controls eligibility filtering. The picker does not enforce
    * uniqueness, visibility, or exclusion across pickers.
    */
+  // TODO(ergonomics): pass the pick context to pool. A candidate set built per pick now
+  // needs a picker per pick or a side channel into the closure.
   pool: () => readonly TCandidate[];
 
   /**
