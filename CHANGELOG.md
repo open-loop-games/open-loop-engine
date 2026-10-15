@@ -2,6 +2,68 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.0 (2026-10-15)
+
+### ⚠ Breaking changes
+
+* **systems:** a producer category's tick no longer depends on walk order (7903eac)
+
+  within one tick, every continuous producer in a
+  category reads its rate from the state before the tick, and each
+  resource takes its producers' gains in one write. A loss then clamps
+  against the amount after every gain of the tick, and a converter claims
+  its inputs after the tick's gains and losses. A plain producer's
+  onProduce runs after its gain is written.
+
+  Migration: no API changes. Re-measure balance receipts in a game whose
+  producer rates read anything a producer's own gain changes in the same
+  tick — the amount held, a lifetime total, or an achievement earned on
+  one — and in a game where a loss or a converter shares a resource with
+  a gain. Such a game's result depended on registration order before, by
+  an amount that grew with tickDelta. A sync watcher on a produced
+  resource now fires once per tick.
+
+  Why: the old result depended on registration order and tick size, which
+  no design intends, and the per-producer writes multiplied every sync
+  watcher on the resource by the producer count. Converters still claim a
+  shared input in registration order, which their contract states.
+
+* **core:** a save that names a mod loads only under that mod (8b1e27c)
+
+  load and importSave refuse a save whose modId names a
+  mod other than the engine's active one (selectMod), with the new
+  SaveLoadFailureReason 'wrong-mod'. A save with no modId loads under any
+  mod. createEngineFromSave throws on a save that names a mod its new
+  `mods` option doesn't hold, and its `engineOptions` no longer takes
+  `mods`. `modules` is optional.
+
+  Migration:
+    // a scratch engine for a modded save
+    createEngineFromSave({ saveText, mods: gameMods })
+    // in place of reading the save's modId and installing that mod's modules
+    createEngineFromSave({ saveText, modules: modulesFor(modIdOf(saveText)) })
+
+    A switch over SaveLoadFailureReason gains a 'wrong-mod' case.
+
+  Why: a partial load of another mod's save leaves a game in a state no
+  mod defines, and the envelope already carried the answer.
+
+### Features
+
+* **core:** Resource.sinceReset counts gain since the last reset (e567ab6)
+* **spatial:** SpatialGrid.revision makes a computed over the grid recompute (58a005e)
+* **systems:** a continuous producer with inputs is a converter (4a06f7f)
+* **core:** a module removes or replaces another module's binding by its id (3a5f73f)
+
+### Fixes
+
+* **primitives:** a relational operator between two Decimals compares magnitudes (afbae1c)
+* **tick-driver:** a phase entered during a tick first runs on the next tick (22610cb)
+
+### Performance
+
+* skip the phase snapshot on a tick with no phase; one dev check per lossy conversion (3c7d2c3)
+
 ## 0.6.0 (2026-10-12)
 
 ### ⚠ Breaking changes
