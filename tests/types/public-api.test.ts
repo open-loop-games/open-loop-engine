@@ -326,6 +326,20 @@ describe('purchase result type surface', () => {
   });
 });
 
+describe('bag result type surface', () => {
+  it('returns the amount moved, or a literal 0 when none was', async () => {
+    type Bag = import('@/core/resource-bag').ResourceBag;
+    type Inv = import('@/systems/inventory').Inventory;
+    const { transferBetweenBags, transferAmountsBetweenBags } = await import('@/index');
+    expectTypeOf<ReturnType<Bag['add']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf<ReturnType<Bag['subtract']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf<ReturnType<Inv['add']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf<ReturnType<Inv['subtract']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf(transferBetweenBags).returns.toEqualTypeOf<Decimal | 0>();
+    expectTypeOf(transferAmountsBetweenBags).returns.toEqualTypeOf<Record<string, Decimal | 0>>();
+  });
+});
+
 describe('auto-purchase helper type surface', () => {
   it('both helpers take an optional id and a category or a fixed list', async () => {
     const { setupSweepAutoPurchase, setupPolicyAutoPurchase } = await import('@/index');

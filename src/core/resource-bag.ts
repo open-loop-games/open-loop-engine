@@ -63,17 +63,18 @@ export interface ResourceBag {
   /** Set the amount for an item type, clamped to capacity. */
   set(typeId: string, amount: DecimalSource): void;
   /**
-   * Add to an item type. Returns the amount actually added.
-   * Returns zero when overflow is 'block' and the add would exceed capacity,
-   * and for a non-positive amount, which is a no-op.
+   * Add to an item type. Returns the amount actually added, or `0` when none
+   * was: when overflow is 'block' and the add would exceed capacity, and for a
+   * non-positive amount, which is a no-op. So `if (bag.add(...))` reads as
+   * "something went in".
    */
-  add(typeId: string, amount: DecimalSource): Decimal;
+  add(typeId: string, amount: DecimalSource): Decimal | 0;
   /**
-   * Subtract from an item type. Returns the amount actually subtracted.
-   * Pass `allowNegative: true` to allow the amount to go below zero.
-   * A non-positive amount is a no-op and returns zero.
+   * Subtract from an item type. Returns the amount actually subtracted, or `0`
+   * when none was. Pass `allowNegative: true` to allow the amount to go below
+   * zero. A non-positive amount is a no-op.
    */
-  subtract(typeId: string, amount: DecimalSource, allowNegative?: boolean): Decimal;
+  subtract(typeId: string, amount: DecimalSource, allowNegative?: boolean): Decimal | 0;
   /** Return true if the bag holds at least `amount` of the given item type. */
   has(typeId: string, amount: DecimalSource): boolean;
   /** Return true if the bag holds at least every listed amount at once. */
@@ -258,14 +259,14 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 
     set: setAmount,
 
-    add(typeId: string, amount: DecimalSource): Decimal {
+    add(typeId: string, amount: DecimalSource): Decimal | 0 {
       const toAdd = toFinalDecimal(amount);
       // `!gt(0)` also turns NaN away.
-      if (!toAdd.gt(0)) return Decimal.dZero;
+      if (!toAdd.gt(0)) return 0;
       const remaining = computeRemainingForType(typeId);
 
       if (overflow === 'block') {
-        if (toAdd.gt(remaining)) return Decimal.dZero;
+        if (toAdd.gt(remaining)) return 0;
         writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), toAdd)));
         return toAdd;
       } else {
@@ -273,15 +274,15 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
         const actualAdd = toFinalDecimal(Decimal.min(toAdd, remaining));
         // `!gt(0)` rather than `lte(0)`: a NaN written here would poison the
         // entry and every total read after it. `lte` admits NaN, `gt` rejects it.
-        if (!actualAdd.gt(0)) return Decimal.dZero;
+        if (!actualAdd.gt(0)) return 0;
         writeAmount(typeId, toFinalDecimal(Decimal.add(getAmount(typeId), actualAdd)));
         return actualAdd;
       }
     },
 
-    subtract(typeId: string, amount: DecimalSource, allowNegative = false): Decimal {
+    subtract(typeId: string, amount: DecimalSource, allowNegative = false): Decimal | 0 {
       const toSub = toFinalDecimal(amount);
-      if (!toSub.gt(0)) return Decimal.dZero;
+      if (!toSub.gt(0)) return 0;
       const current = getAmount(typeId);
 
       if (allowNegative) {
@@ -291,6 +292,7 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
       }
 
       const actual = toFinalDecimal(Decimal.min(toSub, current));
+      if (!actual.gt(0)) return 0;
       writeAmount(typeId, toFinalDecimal(Decimal.sub(current, actual)));
       return actual;
     },
@@ -427,24 +429,22 @@ export function createResourceBag(options: ResourceBagOptions = {}): ResourceBag
 /**
  * Move up to `amount` of `typeId` from one {@link ResourceBag} to another,
  * clamped by both the source's amount and the destination's remaining
- * capacity. Returns the amount actually transferred.
+ * capacity. Returns the amount actually transferred, or `0` when none was.
  */
 export function transferBetweenBags(
   from: ResourceBag,
   to: ResourceBag,
   typeId: string,
   amount: DecimalSource,
-): Decimal {
+): Decimal | 0 {
   const toTransfer = toFinalDecimal(amount);
   const available = from.get(typeId);
   const canTake = toFinalDecimal(Decimal.min(toTransfer, available));
 
-  if (!canTake.gt(0)) return Decimal.dZero;
+  if (!canTake.gt(0)) return 0;
 
   const added = to.add(typeId, canTake);
-  if (added.gt(0)) {
-    from.subtract(typeId, added);
-  }
+  if (added) from.subtract(typeId, added);
   return added;
 }
 
@@ -452,14 +452,15 @@ export function transferBetweenBags(
  * Transfer several item types between bags in one call. With `allOrNothing`,
  * the transfer is atomic: if any item type can't move fully, or the total
  * exceeds the destination's capacity, nothing moves. Otherwise each item type
- * is clamped on its own through {@link transferBetweenBags}.
+ * is clamped on its own through {@link transferBetweenBags}. Each item type's
+ * entry is the amount it moved, or `0` when it moved none.
  */
 export function transferAmountsBetweenBags(
   from: ResourceBag,
   to: ResourceBag,
   amounts: Record<string, DecimalSource>,
   allOrNothing = false,
-): Record<string, Decimal> {
+): Record<string, Decimal | 0> {
   if (allOrNothing) {
     for (const [typeId, amount] of Object.entries(amounts)) {
       if (!from.has(typeId, amount)) return {};
@@ -469,16 +470,15 @@ export function transferAmountsBetweenBags(
     const totalToAdd = sumAmountsAsDecimal(Object.values(amounts));
     if (Decimal.gt(totalToAdd, to.remainingCapacity())) return {};
 
-    const result: Record<string, Decimal> = {};
+    const result: Record<string, Decimal | 0> = {};
     for (const [typeId, amount] of Object.entries(amounts)) {
       from.subtract(typeId, amount);
-      to.add(typeId, amount);
-      result[typeId] = toFinalDecimal(amount);
+      result[typeId] = to.add(typeId, amount);
     }
     return result;
   }
 
-  const result: Record<string, Decimal> = {};
+  const result: Record<string, Decimal | 0> = {};
   for (const [typeId, amount] of Object.entries(amounts)) {
     result[typeId] = transferBetweenBags(from, to, typeId, amount);
   }

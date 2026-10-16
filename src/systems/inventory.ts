@@ -53,8 +53,10 @@ export interface Inventory {
 
   // --- Item operations ---
   get(itemId: string): Decimal;
-  add(itemId: string, amount: DecimalSource): Decimal;
-  subtract(itemId: string, amount: DecimalSource): Decimal;
+  /** Add up to the item's room. Returns the amount added, or `0` when none was. */
+  add(itemId: string, amount: DecimalSource): Decimal | 0;
+  /** Returns the amount subtracted, or `0` when none was. */
+  subtract(itemId: string, amount: DecimalSource): Decimal | 0;
   has(itemId: string, amount: DecimalSource): boolean;
   hasAll(requirements: Record<string, DecimalSource>): boolean;
   canFit(itemId: string, amount: DecimalSource): boolean;
@@ -173,21 +175,21 @@ export function createInventory(options: InventoryOptions): Inventory {
       return bag.get(itemId);
     },
 
-    add(itemId: string, amount: DecimalSource): Decimal {
+    add(itemId: string, amount: DecimalSource): Decimal | 0 {
       const toAdd = new Decimal(amount);
       const room = remainingForItem(itemId);
 
       if (overflow === 'block') {
-        if (toAdd.gt(room)) return Decimal.dZero;
+        if (toAdd.gt(room)) return 0;
         return bag.add(itemId, toAdd);
       } else {
         const actual = Decimal.min(toAdd, room);
-        if (!Decimal.gt(actual, 0)) return Decimal.dZero;
+        if (!Decimal.gt(actual, 0)) return 0;
         return bag.add(itemId, actual);
       }
     },
 
-    subtract(itemId: string, amount: DecimalSource): Decimal {
+    subtract(itemId: string, amount: DecimalSource): Decimal | 0 {
       return bag.subtract(itemId, amount);
     },
 

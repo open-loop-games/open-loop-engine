@@ -31,7 +31,7 @@ describe('Inventory', () => {
     it('add returns amount added', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 100 });
       const added = inv.add('wood', 15);
-      expect(added.eq(15)).toBe(true);
+      expect(Decimal.eq(added, 15)).toBe(true);
       expect(inv.get('wood').eq(15)).toBe(true);
     });
 
@@ -42,7 +42,7 @@ describe('Inventory', () => {
         initial: { wood: 20 },
       });
       const removed = inv.subtract('wood', 8);
-      expect(removed.eq(8)).toBe(true);
+      expect(Decimal.eq(removed, 8)).toBe(true);
       expect(inv.get('wood').eq(12)).toBe(true);
     });
 
@@ -53,7 +53,7 @@ describe('Inventory', () => {
         initial: { wood: 5 },
       });
       const removed = inv.subtract('wood', 20);
-      expect(removed.eq(5)).toBe(true);
+      expect(Decimal.eq(removed, 5)).toBe(true);
       expect(inv.get('wood').eq(0)).toBe(true);
     });
 
@@ -105,7 +105,7 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 10 });
       inv.add('wood', 8);
       const added = inv.add('wood', 5); // would exceed 10
-      expect(added.eq(0)).toBe(true);
+      expect(added).toBe(0);
       expect(inv.get('wood').eq(8)).toBe(true);
     });
 
@@ -113,7 +113,7 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 10 });
       inv.add('wood', 3);
       const added = inv.add('wood', 5); // 3 + 5 = 8 <= 10
-      expect(added.eq(5)).toBe(true);
+      expect(Decimal.eq(added, 5)).toBe(true);
       expect(inv.get('wood').eq(8)).toBe(true);
     });
 
@@ -121,7 +121,7 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 10, overflow: 'discard' });
       inv.add('wood', 8);
       const added = inv.add('wood', 5); // only 2 fits
-      expect(added.eq(2)).toBe(true);
+      expect(Decimal.eq(added, 2)).toBe(true);
       expect(inv.get('wood').eq(10)).toBe(true);
     });
 
@@ -129,7 +129,7 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 10 });
       inv.add('wood', 10);
       const added = inv.add('iron', 10); // different type, separate cap
-      expect(added.eq(10)).toBe(true);
+      expect(Decimal.eq(added, 10)).toBe(true);
       expect(inv.get('iron').eq(10)).toBe(true);
     });
 
@@ -175,7 +175,7 @@ describe('Inventory', () => {
       inv.add('wood', 10);
       // 5 remaining total, per-item cap is 100
       const added = inv.add('iron', 8); // only 5 fits (total)
-      expect(added.eq(0)).toBe(true); // block mode — all or nothing
+      expect(added).toBe(0); // block mode — all or nothing
     });
 
     it('isFull without totalCapacity is false when items have space', () => {
@@ -190,15 +190,15 @@ describe('Inventory', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: perItem, totalCapacity: total });
 
       expect(inv.capacity.value.eq(10)).toBe(true);
-      expect(inv.add('wood', 12).eq(0)).toBe(true);
+      expect(inv.add('wood', 12)).toBe(0);
 
       perItem.value = 20;
       expect(inv.capacity.value.eq(20)).toBe(true);
-      expect(inv.add('wood', 12).eq(12)).toBe(true);
-      expect(inv.add('iron', 5).eq(0)).toBe(true);
+      expect(Decimal.eq(inv.add('wood', 12), 12)).toBe(true);
+      expect(inv.add('iron', 5)).toBe(0);
 
       total.value = 20;
-      expect(inv.add('iron', 5).eq(5)).toBe(true);
+      expect(Decimal.eq(inv.add('iron', 5), 5)).toBe(true);
     });
   });
 
@@ -221,7 +221,7 @@ describe('Inventory', () => {
       expect(inv.remainingSpace('wood').eq(5)).toBe(true);
 
       const added = inv.add('wood', 5);
-      expect(added.eq(5)).toBe(true);
+      expect(Decimal.eq(added, 5)).toBe(true);
       expect(inv.get('wood').eq(15)).toBe(true);
     });
 

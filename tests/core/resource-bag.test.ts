@@ -46,49 +46,54 @@ describe('ResourceBag', () => {
     it('add increases amount and returns added', () => {
       const bag = createResourceBag({ initial: { wood: 10 } });
       const added = bag.add('wood', 5);
-      expect(added.eq(5)).toBe(true);
+      expect(Decimal.eq(added, 5)).toBe(true);
       expect(bag.get('wood').eq(15)).toBe(true);
     });
 
     it('add to new type works', () => {
       const bag = createResourceBag();
       const added = bag.add('gold', 100);
-      expect(added.eq(100)).toBe(true);
+      expect(Decimal.eq(added, 100)).toBe(true);
       expect(bag.get('gold').eq(100)).toBe(true);
     });
 
     it('subtract decreases amount and returns subtracted', () => {
       const bag = createResourceBag({ initial: { wood: 10 } });
       const removed = bag.subtract('wood', 3);
-      expect(removed.eq(3)).toBe(true);
+      expect(Decimal.eq(removed, 3)).toBe(true);
       expect(bag.get('wood').eq(7)).toBe(true);
     });
 
     it('subtract more than available clamps to zero', () => {
       const bag = createResourceBag({ initial: { wood: 5 } });
       const removed = bag.subtract('wood', 20);
-      expect(removed.eq(5)).toBe(true);
+      expect(Decimal.eq(removed, 5)).toBe(true);
       expect(bag.get('wood').eq(0)).toBe(true);
     });
 
     it('subtract with allowNegative goes below zero', () => {
       const bag = createResourceBag({ initial: { wood: 5 } });
       const removed = bag.subtract('wood', 20, true);
-      expect(removed.eq(20)).toBe(true);
+      expect(Decimal.eq(removed, 20)).toBe(true);
       expect(bag.get('wood').eq(-15)).toBe(true);
     });
 
     it('add with a negative amount is a no-op returning zero', () => {
       const bag = createResourceBag({ initial: { wood: 5 } });
-      expect(bag.add('wood', -10).toNumber()).toBe(0);
+      expect(bag.add('wood', -10)).toBe(0);
       expect(bag.get('wood').toNumber()).toBe(5);
     });
 
     it('subtract with a negative amount is a no-op, so it cannot bypass capacity', () => {
       const bag = createResourceBag({ capacity: 10, initial: { wood: 5 } });
-      expect(bag.subtract('wood', -100).toNumber()).toBe(0);
-      expect(bag.subtract('wood', -100, true).toNumber()).toBe(0);
+      expect(bag.subtract('wood', -100)).toBe(0);
+      expect(bag.subtract('wood', -100, true)).toBe(0);
       expect(bag.get('wood').toNumber()).toBe(5);
+    });
+
+    it('subtract from an empty type returns 0', () => {
+      const bag = createResourceBag({ initial: { wood: 5 } });
+      expect(bag.subtract('iron', 3)).toBe(0);
     });
 
     it('total sums all types', () => {
@@ -185,7 +190,7 @@ describe('ResourceBag', () => {
     it('block overflow: add beyond total capacity returns zero', () => {
       const bag = createResourceBag({ capacity: 10, initial: { wood: 8 }, overflow: 'block' });
       const added = bag.add('iron', 5);
-      expect(added.eq(0)).toBe(true);
+      expect(added).toBe(0);
       expect(bag.get('iron').eq(0)).toBe(true);
       expect(bag.get('wood').eq(8)).toBe(true);
     });
@@ -193,14 +198,14 @@ describe('ResourceBag', () => {
     it('block overflow: add within total capacity succeeds', () => {
       const bag = createResourceBag({ capacity: 10, initial: { wood: 5 }, overflow: 'block' });
       const added = bag.add('iron', 3);
-      expect(added.eq(3)).toBe(true);
+      expect(Decimal.eq(added, 3)).toBe(true);
       expect(bag.get('iron').eq(3)).toBe(true);
     });
 
     it('destroy overflow: add beyond total capacity caps', () => {
       const bag = createResourceBag({ capacity: 10, initial: { wood: 8 }, overflow: 'discard' });
       const added = bag.add('iron', 5);
-      expect(added.eq(2)).toBe(true);
+      expect(Decimal.eq(added, 2)).toBe(true);
       expect(bag.get('iron').eq(2)).toBe(true);
     });
 
@@ -226,7 +231,7 @@ describe('ResourceBag', () => {
       const bag = createResourceBag({ capacityPerType: { wood: 10 }, overflow: 'block' });
       bag.set('wood', 8);
       const added = bag.add('wood', 5);
-      expect(added.eq(0)).toBe(true);
+      expect(added).toBe(0);
       expect(bag.get('wood').eq(8)).toBe(true);
     });
 
@@ -234,7 +239,7 @@ describe('ResourceBag', () => {
       const bag = createResourceBag({ capacityPerType: { wood: 10 }, overflow: 'discard' });
       bag.set('wood', 8);
       const added = bag.add('wood', 5);
-      expect(added.eq(2)).toBe(true);
+      expect(Decimal.eq(added, 2)).toBe(true);
       expect(bag.get('wood').eq(10)).toBe(true);
     });
 
@@ -267,7 +272,7 @@ describe('ResourceBag', () => {
       });
       // type cap is tighter (2 remaining vs 92 total remaining)
       const added = bag.add('wood', 5);
-      expect(added.eq(0)).toBe(true);
+      expect(added).toBe(0);
     });
   });
 
@@ -276,7 +281,7 @@ describe('ResourceBag', () => {
       const from = createResourceBag({ initial: { wood: 20 } });
       const to = createResourceBag();
       const transferred = transferBetweenBags(from, to, 'wood', 10);
-      expect(transferred.eq(10)).toBe(true);
+      expect(Decimal.eq(transferred, 10)).toBe(true);
       expect(from.get('wood').eq(10)).toBe(true);
       expect(to.get('wood').eq(10)).toBe(true);
     });
@@ -285,7 +290,7 @@ describe('ResourceBag', () => {
       const from = createResourceBag({ initial: { wood: 3 } });
       const to = createResourceBag();
       const transferred = transferBetweenBags(from, to, 'wood', 10);
-      expect(transferred.eq(3)).toBe(true);
+      expect(Decimal.eq(transferred, 3)).toBe(true);
       expect(from.get('wood').eq(0)).toBe(true);
       expect(to.get('wood').eq(3)).toBe(true);
     });
@@ -294,7 +299,7 @@ describe('ResourceBag', () => {
       const from = createResourceBag({ initial: { wood: 20 } });
       const to = createResourceBag({ capacity: 5, overflow: 'discard' });
       const transferred = transferBetweenBags(from, to, 'wood', 10);
-      expect(transferred.eq(5)).toBe(true);
+      expect(Decimal.eq(transferred, 5)).toBe(true);
       expect(from.get('wood').eq(15)).toBe(true);
       expect(to.get('wood').eq(5)).toBe(true);
     });
@@ -304,7 +309,7 @@ describe('ResourceBag', () => {
       const to = createResourceBag({ capacity: 5, initial: { wood: 3 }, overflow: 'block' });
       // only 2 remaining, and block mode means 10 > 2 so nothing transfers
       const transferred = transferBetweenBags(from, to, 'wood', 10);
-      expect(transferred.eq(0)).toBe(true);
+      expect(transferred).toBe(0);
       expect(from.get('wood').eq(20)).toBe(true);
       expect(to.get('wood').eq(3)).toBe(true);
     });
@@ -317,6 +322,13 @@ describe('ResourceBag', () => {
       const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 10 });
       expect(new Decimal(result['wood']).eq(5)).toBe(true);
       expect(new Decimal(result['iron']).eq(3)).toBe(true);
+    });
+
+    it('a type that moves nothing reports 0', () => {
+      const from = createResourceBag({ initial: { wood: 10 } });
+      const to = createResourceBag();
+      const result = transferAmountsBetweenBags(from, to, { wood: 5, iron: 2 });
+      expect(result['iron']).toBe(0);
     });
 
     it('allOrNothing: succeeds when all fit', () => {
@@ -752,7 +764,7 @@ describe('ResourceBag', () => {
       expect(bag.remainingCapacity().eq(0)).toBe(true);
       // Further adds should fail (no room)
       const added = bag.add('z', 1);
-      expect(added.eq(0)).toBe(true);
+      expect(added).toBe(0);
       expect(bag.total().eq(100)).toBe(true);
     });
 
@@ -774,7 +786,7 @@ describe('ResourceBag', () => {
       expect(bag.isEmpty()).toBe(true);
       expect(bag.total().toNumber()).toBe(0);
       expect(bag.remainingCapacity().toNumber()).toBe(1);
-      expect(bag.add('z', 1).toNumber()).toBe(1);
+      expect(Decimal.eq(bag.add('z', 1), 1)).toBe(true);
     });
 
     it('total() keeps a small slot once a much larger one leaves', () => {
