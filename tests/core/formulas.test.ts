@@ -1332,6 +1332,19 @@ describe('Buy Max', () => {
       const formula = F.abs(Formula.variable(purchases));
       expect(() => calculateCost(formula, 1e6, true)).toLogError();
     });
+    test('One level costs the curve at the current level', () => {
+      const purchases = ref(7);
+      const variable = Formula.variable(purchases);
+      const geometric = Formula.exponential(purchases, 10, 1.15);
+      const polynomial = variable.add(1).pow(2.3).mul(7);
+      expect(Decimal.eq(calculateCost(geometric, 1), geometric.evaluate())).toBe(true);
+      expect(Decimal.eq(calculateCost(polynomial, 1), polynomial.evaluate())).toBe(true);
+    });
+    test('One level whose cost is undefined has no price', () => {
+      const formula = F.sqrt(Formula.variable(ref(-4)));
+      expect(() => calculateCost(formula, 1, true)).toLogError();
+      expect(calculateCost(formula, 1, true)).compare_tolerance(0);
+    });
     test('Max affordable and cost agree exactly with 0 purchases', () => {
       const purchases = ref(0);
       const variable = Formula.variable(purchases);

@@ -267,6 +267,12 @@ function priceLevels(
 ): DecimalSource | null {
   if (Decimal.lte(n, 0)) return Decimal.dZero;
   if (!sumLevels) return formula.evaluate(Decimal.add(from, n));
+  // One term is its own definition, and skips the closed form's pow and
+  // division on the most common call. An undefined term has no sum.
+  if (Decimal.lte(n, 1)) {
+    const cost = formula.evaluate(from);
+    return Decimal.isNaN(cost) ? null : cost;
+  }
   return formula.sum(from, n).value;
 }
 
