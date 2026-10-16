@@ -1082,7 +1082,7 @@ describe('SaveManager — events', () => {
 
       const result = mgr.load();
 
-      expect(result.success).toBe(false);
+      expect(result).toEqual({ success: false, reason: 'parse-error' });
       expect(handler).toHaveBeenCalledTimes(1);
       const [arg] = handler.mock.calls[0];
       expect(arg.reason).toBe('parse-error');

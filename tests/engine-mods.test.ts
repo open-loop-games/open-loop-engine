@@ -292,8 +292,15 @@ describe("a save's mod", () => {
     const failed = vi.fn();
     engine.saveManager!.on('save:load-failed', failed);
 
-    expect(engine.saveManager!.importSave(text).success).toBe(false);
-    expect(failed).toHaveBeenCalledWith(expect.objectContaining({ reason: 'wrong-mod' }));
+    // The save's mod, so the game can reopen the slot under it
+    expect(engine.saveManager!.importSave(text)).toEqual({
+      success: false,
+      reason: 'wrong-mod',
+      modId: 'lloyd',
+    });
+    expect(failed).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'wrong-mod', modId: 'lloyd' }),
+    );
     expect(counters.get('omsi')!.value).toBe(3);
     engine.dispose();
   });

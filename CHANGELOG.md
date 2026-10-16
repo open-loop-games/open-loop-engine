@@ -2,6 +2,16 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.1 (2026-10-16)
+
+### Fixes
+
+* **systems:** a purchase that buys nothing returns 0, so its result is falsy (f7f551f)
+
+### Performance
+
+* **core:** a single summed level costs f(from), not the series sum (a3486dd)
+
 ## 0.7.0 (2026-10-15)
 
 ### ⚠ Breaking changes

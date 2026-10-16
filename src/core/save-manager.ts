@@ -166,6 +166,14 @@ export interface SaveManagerOptions {
 export interface SaveLoadResult {
   success: boolean;
   timestamp?: number;
+  /** Why the load failed. The save manager sets it on every failure it reports. */
+  reason?: SaveLoadFailureReason;
+  /**
+   * On a `wrong-mod` failure, the mod the save names. The active mod is the
+   * manager's `modId`. A running engine can't change its mod, so a game
+   * reopens the save under this one.
+   */
+  modId?: string;
 }
 
 /** Lightweight save metadata returned without full deserialization */
@@ -186,7 +194,8 @@ export interface SaveSlot {
 
 /**
  * Reason a load or import operation failed. It reports the failure mode that
- * the catch-all `{success: false}` return cannot express.
+ * a bare `{success: false}` return cannot express. A failed result and the
+ * `save:load-failed` event both contain it.
  *
  * - `not-found`: no envelope exists at the target storage key
  * - `parse-error`: raw data was not valid JSON
@@ -225,6 +234,8 @@ export interface SaveEvents {
     slotId: number;
     reason: SaveLoadFailureReason;
     detail?: unknown;
+    /** On a `wrong-mod` failure, the mod the save names. */
+    modId?: string;
   }) => void;
   /**
    * A newer game build or engine wrote the save. `kind: 'game'` compares the
@@ -481,6 +492,8 @@ class LoadFailure extends Error {
   constructor(
     public readonly reason: SaveLoadFailureReason,
     public readonly detail?: unknown,
+    /** The mod a `wrong-mod` save names. */
+    public readonly modId?: string,
   ) {
     super(`Save load failed: ${reason}`);
   }
@@ -797,14 +810,17 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
 
   /** Announce a failed load or import of `slotId`, protecting the slot when asked. */
   function failLoad(slotId: number, err: unknown, protect: boolean): SaveLoadResult {
-    const [reason, detail]: [SaveLoadFailureReason, unknown] =
-      err instanceof LoadFailure ? [err.reason, err.detail] : ['unknown', err];
-    handle.emit('save:load-failed', { slotId, reason, detail });
+    const [reason, detail, modId]: [SaveLoadFailureReason, unknown, string | undefined] =
+      err instanceof LoadFailure
+        ? [err.reason, err.detail, err.modId]
+        : ['unknown', err, undefined];
+    const named = modId === undefined ? {} : { modId };
+    handle.emit('save:load-failed', { slotId, reason, detail, ...named });
     if (protect) {
       _protectedSlots.add(slotId);
       handle.emit('save:slot-protected', { slotId, reason });
     }
-    return { success: false };
+    return { success: false, reason, ...named };
   }
 
   /**
@@ -819,7 +835,9 @@ export function createSaveManager(options: SaveManagerOptions): SaveManager {
         try {
           e = readEnvelope(raw);
           // Another mod's save would load only the refs both mods share.
-          if (e.modId !== undefined && e.modId !== _modId.value) throw new LoadFailure('wrong-mod');
+          if (e.modId !== undefined && e.modId !== _modId.value) {
+            throw new LoadFailure('wrong-mod', undefined, e.modId);
+          }
           applyEnvelope(e, slotId);
         } catch (err) {
           return failLoad(slotId, err, protectOnFail);
