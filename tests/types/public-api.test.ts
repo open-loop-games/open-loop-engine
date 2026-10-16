@@ -299,6 +299,16 @@ describe('Producer type surface', () => {
   });
 });
 
+describe('purchase result type surface', () => {
+  it('returns a Decimal count, or a literal 0 when nothing was purchased', () => {
+    expectTypeOf<ReturnType<Purchasable['purchase']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf<ReturnType<Purchasable['purchaseMax']>>().toEqualTypeOf<Decimal | 0>();
+    expectTypeOf<
+      ReturnType<PurchasableCategory<{ id: string }, unknown>['purchaseAffordable']>
+    >().toEqualTypeOf<Decimal | 0>();
+  });
+});
+
 describe('auto-purchase helper type surface', () => {
   it('both helpers take an optional id and a category or a fixed list', async () => {
     const { setupSweepAutoPurchase, setupPolicyAutoPurchase } = await import('@/index');

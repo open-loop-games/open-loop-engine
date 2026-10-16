@@ -409,6 +409,7 @@ describe('createPurchasableCategory (one-shot, limit: 1)', () => {
     expect(category.getPurchasable('a')!.active.value).toBe(true);
     expect(category.getPurchasable('b')!.active.value).toBe(true);
     expect(category.getPurchasable('c')!.active.value).toBe(false);
+    expect(category.purchaseAffordable()).toBe(0);
   });
 });
 

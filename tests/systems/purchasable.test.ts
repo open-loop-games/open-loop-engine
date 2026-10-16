@@ -27,7 +27,8 @@ describe('Purchasable (one-shot, limit: 1)', () => {
     });
     expect(p.canPurchase.value).toBe(true);
     const result = p.purchase();
-    expect(Decimal.gte(result, 1)).toBe(true);
+    expect(result).toBeInstanceOf(Decimal);
+    expect(Decimal.eq(result, 1)).toBe(true);
     expect(p.active.value).toBe(true);
   });
 
@@ -41,8 +42,9 @@ describe('Purchasable (one-shot, limit: 1)', () => {
     p.purchase();
     expect(p.canPurchase.value).toBe(false);
     expect(p.maxed.value).toBe(true);
-    const result = p.purchase();
-    expect(Decimal.eq(result, 0)).toBe(true);
+    // A literal 0, so a truthiness read of the result is correct
+    expect(p.purchase()).toBe(0);
+    expect(p.purchaseMax()).toBe(0);
   });
 
   it('calls onPurchase callback', () => {

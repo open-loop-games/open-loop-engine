@@ -307,11 +307,12 @@ export interface Purchasable {
    * Purchase. A passed count caps the purchase. Omitted, it purchases max when
    * `purchaseMaxByDefault` is on (the default for anything but a one-shot), up
    * to the cost's `maxBulkCount`, and one when it's off.
-   * Returns the bulk count: how many units this purchase took.
+   * Returns how many units this purchase took, or `0` when it took none. So
+   * `if (p.purchase())` reads as "something was purchased".
    */
-  purchase: (count?: DecimalSource) => DecimalSource;
-  /** Purchase max, or one unit when `purchaseMaxByDefault` is off. Returns the count purchased. */
-  purchaseMax: () => DecimalSource;
+  purchase: (count?: DecimalSource) => Decimal | 0;
+  /** Purchase max, or one unit when `purchaseMaxByDefault` is off. Returns the count purchased, or `0` for none. */
+  purchaseMax: () => Decimal | 0;
   /**
    * Estimate the total cost of the next `count` purchases. Default count: `1`.
    * Sums every cost requirement, whatever resource each charges. So for a
@@ -602,8 +603,8 @@ function assemblePurchasable(
     on: handle.on,
     getCost,
 
-    purchase(purchaseCount?: DecimalSource): DecimalSource {
-      if (!canPurchase.value) return Decimal.dZero;
+    purchase(purchaseCount?: DecimalSource): Decimal | 0 {
+      if (!canPurchase.value) return 0;
 
       let toPurchase: DecimalSource;
       if (purchaseCount !== undefined) {
@@ -617,17 +618,17 @@ function assemblePurchasable(
       // `!gt(0)` rather than `lte(0)`: this guard fronts `payRequirements`, so
       // admitting an indeterminate count would spend before the count could be
       // rejected downstream. `lte` admits NaN, `gt` rejects it.
-      if (!Decimal.gt(toPurchase, 0)) return Decimal.dZero;
+      if (!Decimal.gt(toPurchase, 0)) return 0;
 
       payRequirements(allRequirements, toPurchase);
       count.value = Decimal.add(count.value, toPurchase);
       onPurchase?.(toPurchase);
       handle.emit('purchased', toPurchase);
 
-      return toPurchase;
+      return new Decimal(toPurchase);
     },
 
-    purchaseMax(): DecimalSource {
+    purchaseMax(): Decimal | 0 {
       return purchasable.purchase(countToPurchase.value);
     },
   };

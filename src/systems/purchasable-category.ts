@@ -167,8 +167,8 @@ export interface PurchasableCategory<
   /** Return every purchasable whose `canPurchase` is true */
   getAffordable(): Purchasable[];
 
-  /** Purchase max on every purchasable whose `canPurchase` is true. Returns the total count purchased. */
-  purchaseAffordable(): DecimalSource;
+  /** Purchase max on every purchasable whose `canPurchase` is true. Returns the total count purchased, or `0` for none. */
+  purchaseAffordable(): Decimal | 0;
 
   /** Number of registered entries */
   readonly size: number;
@@ -288,11 +288,12 @@ export function createPurchasableCategory<Def extends { id: string }, DefState =
       return list().filter((p) => p.canPurchase.value);
     },
 
-    purchaseAffordable(): DecimalSource {
-      let total: DecimalSource = Decimal.dZero;
+    purchaseAffordable(): Decimal | 0 {
+      let total: Decimal | 0 = 0;
       for (const p of list()) {
         if (p.canPurchase.value) {
-          total = Decimal.add(total, p.purchaseMax());
+          const bought = p.purchaseMax();
+          if (bought) total = Decimal.add(total, bought);
         }
       }
       return total;
