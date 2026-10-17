@@ -107,8 +107,9 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
   const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
-    apply: (gain: DecimalSource) => Decimal.add(gain, unref(processedAddend)),
-    invert: (gain: DecimalSource) => Decimal.sub(gain, unref(processedAddend)),
+    // A small Decimal operand renormalizes to a number, so the static's fast path can fire.
+    apply: (gain: DecimalSource) => Decimal.add(gain, renormIfLayer0(unref(processedAddend))),
+    invert: (gain: DecimalSource) => Decimal.sub(gain, renormIfLayer0(unref(processedAddend))),
     enabled: processedEnabled,
     description:
       description == null
@@ -179,8 +180,9 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
   const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
-    apply: (gain: DecimalSource) => Decimal.times(gain, unref(processedMultiplier)),
-    invert: (gain: DecimalSource) => Decimal.div(gain, unref(processedMultiplier)),
+    // A small Decimal operand renormalizes to a number, so the static's fast path can fire.
+    apply: (gain: DecimalSource) => Decimal.mul(gain, renormIfLayer0(unref(processedMultiplier))),
+    invert: (gain: DecimalSource) => Decimal.div(gain, renormIfLayer0(unref(processedMultiplier))),
     enabled: processedEnabled,
     description:
       description == null

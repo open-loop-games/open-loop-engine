@@ -41,6 +41,22 @@ describe('Modifier system', () => {
     const inverted = seq.invert!(bn(220));
     expect(new Decimal(inverted).eq(100)).toBe(true);
   });
+  it('hands a small Decimal operand to the number fast path as a number', () => {
+    const spies = (['add', 'sub', 'mul', 'div'] as const).map((name) => vi.spyOn(Decimal, name));
+    const [add, sub, mul, div] = spies;
+    try {
+      createAdditiveModifier({ addend: bn(3) }).apply(2);
+      createAdditiveModifier({ addend: bn(3) }).invert!(5);
+      createMultiplicativeModifier({ multiplier: bn(3) }).apply(2);
+      createMultiplicativeModifier({ multiplier: bn(3) }).invert!(6);
+      expect(add).toHaveBeenCalledWith(2, 3);
+      expect(sub).toHaveBeenCalledWith(5, 3);
+      expect(mul).toHaveBeenCalledWith(2, 3);
+      expect(div).toHaveBeenCalledWith(6, 3);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
   it('disabled modifiers are skipped', () => {
     const enabled = ref(false);
     const mod = createAdditiveModifier({ addend: bn(999), enabled });

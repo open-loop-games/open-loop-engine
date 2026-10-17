@@ -5,8 +5,9 @@
  * numbers. Large numbers are formatted by the active notation through
  * notationManager (from eternal_notations). Small numbers use the regular format.
  *
- * Arithmetic statics (add/sub/mul/div/min/max) are patched onto the imported
- * break_eternity class with typeof-dispatched fast paths. When both operands
+ * Arithmetic statics (add/sub/mul/div/min/max, and break_eternity's aliases of
+ * them) are patched onto the imported break_eternity class with
+ * typeof-dispatched fast paths. When both operands
  * are raw `number` and the result fits within IEEE 754 double precision, the
  * math runs in number-space. The result is then promoted to a fresh `Decimal`
  * via `new OrigDecimal(r)` before return. Otherwise the call falls through to
@@ -292,6 +293,31 @@ OrigDecimal.lt = function lt(a: DecimalSource, b: DecimalSource): boolean {
 OrigDecimal.lte = function lte(a: DecimalSource, b: DecimalSource): boolean {
   if (typeof a === 'number' && typeof b === 'number') return a <= b;
   return origLte(a, b);
+};
+
+// break_eternity's aliases call its instance methods, never the statics above,
+// so each is rebound to the patched static it names. A named wrapper rather than
+// the same function keeps the alias's `.name` for formula stringification.
+OrigDecimal.plus = function plus(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.add(a, b);
+};
+OrigDecimal.subtract = function subtract(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.sub(a, b);
+};
+OrigDecimal.minus = function minus(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.sub(a, b);
+};
+OrigDecimal.multiply = function multiply(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.mul(a, b);
+};
+OrigDecimal.times = function times(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.mul(a, b);
+};
+OrigDecimal.divide = function divide(a: DecimalSource, b: DecimalSource): Decimal {
+  return OrigDecimal.div(a, b);
+};
+OrigDecimal.equals = function equals(a: DecimalSource, b: DecimalSource): boolean {
+  return OrigDecimal.eq(a, b);
 };
 
 export const Decimal: DecimalClass = OrigDecimal;

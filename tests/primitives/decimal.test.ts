@@ -63,6 +63,32 @@ describe('Decimal static fast-path chain contract', () => {
   });
 });
 
+describe('Decimal static aliases', () => {
+  const aliases = [
+    ['plus', 'add'],
+    ['subtract', 'sub'],
+    ['minus', 'sub'],
+    ['multiply', 'mul'],
+    ['times', 'mul'],
+    ['divide', 'div'],
+    ['equals', 'eq'],
+  ] as const;
+
+  it.each(aliases)('%s runs the patched %s', (alias, name) => {
+    const patched = vi.spyOn(Decimal, name);
+    try {
+      Decimal[alias](6, 3);
+      expect(patched).toHaveBeenCalledWith(6, 3);
+    } finally {
+      patched.mockRestore();
+    }
+  });
+
+  it('keeps its own name, which formula stringification reads', () => {
+    for (const [alias] of aliases) expect(Decimal[alias].name).toBe(alias);
+  });
+});
+
 describe('Decimal static fast paths agree with the instance forms on tiny results', () => {
   // Law: the patched number-space static equals the unpatched instance method
   // wherever the product or quotient leaves the normal float range from below,
