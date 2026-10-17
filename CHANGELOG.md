@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.4 (2026-10-17)
+
+### Performance
+
+* **core:** Vue never wraps a Decimal in a reactive proxy (03babcc)
+
 ## 0.7.3 (2026-10-17)
 
 ### Fixes
