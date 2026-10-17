@@ -25,6 +25,9 @@
  *
  * The `"number"` conversion hint answers `toNumber()`, so a relational operator
  * between two Decimals compares magnitudes, not strings. See NUMBER CONVERSION.
+ *
+ * Vue never makes a Decimal reactive: a ref holding one holds the instance
+ * itself, and a change is a new Decimal. See REACTIVITY.
  */
 
 import OrigDecimal from 'break_eternity.js';
@@ -193,6 +196,15 @@ function losesMagnitude(d: Decimal, n: number): boolean {
   if (n === Infinity || n === -Infinity) return d.isFinite();
   return n === 0 && d.sign !== 0;
 }
+
+// === REACTIVITY ===
+
+// A Decimal is a value: no engine code mutates one in place, and a write
+// replaces it. So Vue never wraps one in a reactive proxy. A proxy is built on
+// every write into a ref, and each read of `sign`, `layer` or `mag` through it
+// is tracked. `__v_skip` is the flag Vue's `markRaw` sets; on the prototype,
+// every instance has it.
+Object.defineProperty(OrigDecimal.prototype, '__v_skip', { value: true });
 
 const origAdd = OrigDecimal.add;
 const origSub = OrigDecimal.sub;

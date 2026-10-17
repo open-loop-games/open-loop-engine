@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { isProxy, reactive, ref, watch } from 'vue';
 import {
   Decimal,
   bn,
@@ -263,6 +264,24 @@ describe('number conversion', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe('reactivity', () => {
+  it('stores a Decimal in a ref as the instance itself, not a proxy', () => {
+    const d = new Decimal(5);
+    const r = ref(d);
+    expect(r.value).toBe(d);
+    expect(isProxy(r.value)).toBe(false);
+    expect(isProxy(reactive({ d }).d)).toBe(false);
+  });
+
+  it('still triggers a watcher when a ref gets a new Decimal', () => {
+    const r = ref(new Decimal(1));
+    const seen: string[] = [];
+    watch(r, (value) => seen.push(value.toString()), { flush: 'sync' });
+    r.value = new Decimal(2);
+    expect(seen).toEqual(['2']);
   });
 });
 
