@@ -52,6 +52,21 @@ describe('TickDriver', () => {
     for (const [dt] of fn.mock.calls) expect(dt).toBeCloseTo(2.5 / 3, 12);
     expect(overflow).not.toHaveBeenCalled();
   });
+  it('processInterval splits a speed-scaled dt above maxDeltaTime into equal ticks under the cap', () => {
+    const overflow = vi.fn();
+    const tickDriver = createTickDriver({
+      intervalRate: 20,
+      maxDeltaTime: 1,
+      onDeltaOverflow: overflow,
+    });
+    const fn = vi.fn();
+    tickDriver.onTick(fn);
+    tickDriver.speedMultiplier = 100;
+    tickDriver.processInterval(0.05);
+    expect(fn).toHaveBeenCalledTimes(5);
+    for (const [dt] of fn.mock.calls) expect(dt).toBeCloseTo(1, 12);
+    expect(overflow).not.toHaveBeenCalled();
+  });
   it('advanceTime does not add a tick for a quotient a rounding error above an integer', () => {
     // 2.1 / 0.7 is 3.0000000000000004, which a bare Math.ceil turns into 4.
     const tickDriver = createTickDriver({ intervalRate: 20, maxDeltaTime: 0.7 });

@@ -46,12 +46,12 @@ Typed per-instance event emitter primitive
 
 the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: variable (the default and the genre standard) and a fixed-dt accumulator (opt-in, for faithful ports of tick math that clamps on overshoot)
 
-- `function createTickDriver(options?: TickDriverOptions): TickDriver` — Creates the game loop: a TickDriver with EWMA lag compensation, game speed, tick phases, and a variable-dt (default) or fixed-dt tick mode. `src/core/tick-driver.ts:267`
-- `interface PhaseHandlers` — Handlers for a tick phase, registered with `tickDriver.registerPhase()`. `src/core/tick-driver.ts:134`
-- `interface TickDriver` — The TickDriver returned by createTickDriver. `src/core/tick-driver.ts:153`
-- `interface TickDriverOptions` `src/core/tick-driver.ts:65`
-- `type TickHandler = (dt: number) => void` — A tick handler for `tickDriver.onTick`. `src/core/tick-driver.ts:145`
-- `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:55`
+- `function createTickDriver(options?: TickDriverOptions): TickDriver` — Creates the game loop: a TickDriver with EWMA lag compensation, game speed, tick phases, and a variable-dt (default) or fixed-dt tick mode. `src/core/tick-driver.ts:271`
+- `interface PhaseHandlers` — Handlers for a tick phase, registered with `tickDriver.registerPhase()`. `src/core/tick-driver.ts:138`
+- `interface TickDriver` — The TickDriver returned by createTickDriver. `src/core/tick-driver.ts:157`
+- `interface TickDriverOptions` `src/core/tick-driver.ts:67`
+- `type TickHandler = (dt: number) => void` — A tick handler for `tickDriver.onTick`. `src/core/tick-driver.ts:149`
+- `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:57`
 
 ## Ambient game-state accessor
 

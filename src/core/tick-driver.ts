@@ -9,7 +9,9 @@
  *
  * Variable mode (`tickMode: 'variable'`, the default): each interval runs one
  * tick. Its dt is the raw dt, capped at `maxDeltaTime` and scaled by game speed.
- * This matches the genre-standard loop.
+ * This matches the genre-standard loop. A game speed that lifts the dt above
+ * `maxDeltaTime` runs it as the fewest equal ticks under the cap, as
+ * `advanceTime` does, so no tick spans more game time than the cap.
  *
  * Fixed mode (`tickMode: 'fixed'`): each interval adds its raw dt, capped at
  * `maxDeltaTime` and scaled by game speed, to an accumulator. It then runs ticks
@@ -66,8 +68,9 @@ export interface TickDriverOptions {
   /** Intervals per second (default 20): the `setInterval` cadence. */
   intervalRate?: number;
   /**
-   * Maximum seconds of game time per tick (default 1). Live variable-mode play clamps
-   * to it; `advanceTime` splits a longer dt into several ticks instead.
+   * Maximum seconds of game time per tick (default 1). Live variable-mode play
+   * clamps the raw dt to it, then splits a dt that game speed lifts above it into
+   * several ticks; `advanceTime` splits a longer dt the same way.
    */
   maxDeltaTime?: number;
   /** Initial game speed (default 1). It scales dt in live play only. */
@@ -75,6 +78,7 @@ export interface TickDriverOptions {
   /**
    * Tick mode. `'variable'` (the default and the genre standard) runs one tick per
    * interval, with the raw dt capped and scaled by game speed, so any dt works.
+   * A game speed that lifts it above `maxDeltaTime` splits it into several ticks.
    * `'fixed'` accumulates that dt and runs ticks of `fixedDt` from it. It suits
    * faithful ports whose tick math presumes a small constant dt. Examples are jobs
    * that clamp on overshoot, and decay formulas written for 20 ms or 120 ms ticks.
@@ -366,7 +370,20 @@ export function createTickDriver(options: TickDriverOptions = {}): TickDriver {
       return;
     }
 
-    processTick(cappedDt * speedMultiplier.value);
+    processSplit(cappedDt * speedMultiplier.value);
+  }
+
+  // A variable-mode dt above maxDeltaTime runs as the fewest equal ticks under
+  // the cap, so game speed and offline time never hand a handler one long step.
+  function processSplit(dt: number): void {
+    if (!(dt > maxDeltaTime)) {
+      processTick(dt);
+      return;
+    }
+    const q = dt / maxDeltaTime;
+    const ticks = Math.ceil(q - q * SPLIT_QUOTIENT_EPSILON);
+    const step = dt / ticks;
+    for (let i = 0; i < ticks; i++) processTick(step);
   }
 
   function intervalTick(): void {
@@ -386,14 +403,7 @@ export function createTickDriver(options: TickDriverOptions = {}): TickDriver {
       }
       return;
     }
-    if (!(rawDt > maxDeltaTime)) {
-      processTick(rawDt);
-      return;
-    }
-    const q = rawDt / maxDeltaTime;
-    const ticks = Math.ceil(q - q * SPLIT_QUOTIENT_EPSILON);
-    const dt = rawDt / ticks;
-    for (let i = 0; i < ticks; i++) processTick(dt);
+    processSplit(rawDt);
   }
 
   function startInterval(): void {
