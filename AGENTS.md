@@ -6,7 +6,7 @@ home for the content; edit here. Both files ship in the published package.
 
 Open Loop Engine — headless incremental game substrate. The API surface grows from real consumer pressure, continuously and selectively. It is never a one-time extraction, and never a promise to absorb every gap a consumer reports.
 
-**Stack:** TypeScript + Vue 3 (reactivity only) + break_eternity.js (`Decimal` for all game quantities — no plain `number`) + nanoevents + Vitest.
+**Stack:** TypeScript + Vue 3 (reactivity only) + break_eternity.js (`Decimal` for game quantities) + nanoevents + Vitest.
 **Peers:** not bundled — consumers own the versions. `peerDependencies` in `package.json` is the list.
 **Subpaths:** `@open-loop/engine` (full API surface), `/primitives`, `/core`, `/systems`, `/harness`, `/types` (types-only). The package is `@open-loop/engine`; `open-loop-engine` is the repo.
 **Functional core:** Pure evaluation (condition IR, effects, formulas) separated from reactive state (resources, persistent refs). The headless runner shows it: the same engine logic runs with or without a browser.
