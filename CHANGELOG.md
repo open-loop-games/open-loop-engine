@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.2 (2026-10-17)
+
+### Fixes
+
+* **core:** a game speed above the tick cap runs as several ticks (9770a72)
+
 ## 0.7.1 (2026-10-16)
 
 ### Features
