@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.3 (2026-10-17)
+
+### Fixes
+
+* **core:** modifiers and break_eternity's aliases take the number fast path (564b9f1)
+
 ## 0.7.2 (2026-10-17)
 
 ### Fixes
