@@ -17,6 +17,7 @@ import { createResource } from '@/core/resource';
 import { createResourceBag } from '@/core/resource-bag';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
+import { createReset } from '@/systems/reset';
 import { createTuningRegistry, tunable } from '@/core/override-registry';
 import { ref, unref, watch } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
@@ -1365,6 +1366,36 @@ describe('producer inputs (a continuous converter)', () => {
     expect(amount(bars)).toBeCloseTo(10);
     expect(amount(ore)).toBeCloseTo(94);
     expect(smelters.getProducer('smelter')!.limit!.value).toBe('room');
+  });
+
+  it('starts its last-tick report over on a reset and on a load', () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore', 100);
+    const bars = createTestResource('bars', 7);
+    createResourceBag({ capacityPerType: { bars: 10 } }).link('bars', bars);
+    const smelters = createProducerCategory<RecipeDef>({
+      id: 'smelters-hydrated',
+      mapProducer: (def) => ({
+        resource: bars,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { ore: { resource: ore, per: 2 } },
+      }),
+      registerTick,
+    });
+    smelters.register({ id: 'smelter', rate: 5 });
+    const smelter = smelters.getProducer('smelter')!;
+    const report = () => [smelter.limit!.value, amount(smelter.realizedRate!)];
+
+    tick(1);
+    expect(report()).toEqual(['room', 3]);
+    createReset({ thingsToReset: [smelters] }).reset();
+    expect(report()).toEqual(['rate', 0]);
+
+    tick(1);
+    expect(report()[0]).toBe('room');
+    deserializePersistents(getAllPersistentRefs(), {});
+    expect(report()).toEqual(['rate', 0]);
   });
 
   it('is not room-bound when the bag has room, whatever the float error of held + made − held', () => {

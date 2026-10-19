@@ -21,6 +21,7 @@ import {
   type CategoryEntrySignals,
 } from './category-base';
 import { type ContentRegistryView } from './content-registry';
+import { onHydrated } from '@/core/persistence';
 import { Resettable, type ResettableObject } from '@/core/resettable';
 import {
   createScalingPurchasable,
@@ -213,8 +214,9 @@ export interface Producer {
   readonly inputs: Readonly<Record<string, ResolvedProducerInput>> | undefined;
   /**
    * A converter's output per second on its last tick, after its inputs bound
-   * it. `computedRate × count` is what it would make unbounded. Present only
-   * when `inputs` is set.
+   * it. `computedRate × count` is what it would make unbounded. A load or a
+   * reset starts it over at 0, with `limit` at `'rate'`, until the next tick.
+   * Present only when `inputs` is set.
    */
   readonly realizedRate?: Readonly<Ref<DecimalSource>>;
   /** What bound a converter's last tick. Present only when `inputs` is set. */
@@ -719,6 +721,16 @@ export function createProducerCategory<Def extends { id: string }, DefState = vo
 
     [Resettable]: base[Resettable],
   };
+
+  // A load or a reset rewrites the state the last tick read, so its report no longer holds.
+  onHydrated(() => {
+    for (const { instance } of base.getAll()) {
+      const converter = converterStates.get(instance);
+      if (!converter) continue;
+      converter.realizedRate.value = Decimal.dZero;
+      converter.limit.value = 'rate';
+    }
+  });
 
   const ec = getCurrentEngineCategories();
   if (ec) (ec.producers ??= []).push(category);
