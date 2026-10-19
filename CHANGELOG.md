@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.5 (2026-10-19)
+
+### Fixes
+
+* **systems:** a converter's last-tick report starts over on a reset and a load (1327be2)
+
 ## 0.7.4 (2026-10-17)
 
 ### Performance
