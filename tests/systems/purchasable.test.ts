@@ -208,7 +208,22 @@ describe('createScalingPurchasable — effectDescription', () => {
     });
 
     p.purchase(3);
-    expect(unref(p.display.effectDescription)).toBe('×8.00');
+    expect(unref(p.display.effectDescription)).toBe('×8');
+  });
+
+  it('keeps two decimals in the default readout of a fractional effect', () => {
+    const points = createResource(1e6, { id: 'Points', displayName: 'Points' });
+    const p = createScalingPurchasable({
+      id: 'display-default-fractional',
+      description: 'Multiplier',
+      resource: points,
+      baseCost: 10,
+      costRatio: 1.15,
+      effect: 1.5,
+    });
+
+    p.purchase(3);
+    expect(unref(p.display.effectDescription)).toBe('×3.38');
   });
 
   it('takes an override for effects that are not multipliers', () => {

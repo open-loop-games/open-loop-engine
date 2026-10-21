@@ -14,14 +14,7 @@
  */
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
-import {
-  Decimal,
-  formatSmall,
-  formatWhole,
-  isIntegerValue,
-  renormIfLayer0,
-  toFinalDecimal,
-} from '@/primitives/decimal';
+import { Decimal, formatOperand, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
 import { resolveComputable, toMaybeRef, type Computable } from './computed';
@@ -71,11 +64,6 @@ export type OperationModifier<T> = WithRequired<
   Modifier,
   'invert' | Extract<RequiredKeys<T>, keyof Modifier>
 >;
-
-/** Format a modifier's operand for its description: a whole value with no decimals, any other with `formatSmall`'s. */
-function formatOperand(value: DecimalSource): string {
-  return isIntegerValue(value) ? formatWhole(value) : formatSmall(value);
-}
 
 // === ADDITIVE MODIFIER ===
 

@@ -863,3 +863,18 @@ export function formatTime(seconds: DecimalSource): string {
 export function formatSmall(num: DecimalSource, decimals?: number): string {
   return format(num, decimals, true);
 }
+
+/**
+ * Format an operand for a modifier or effect readout: a value that shows as
+ * whole at two decimals prints with none, any other with {@link formatSmall}'s.
+ * The test runs on the shown value, so a `pow` result an ulp off 8 prints 8.
+ *
+ * @internal
+ */
+export function formatOperand(value: DecimalSource): string {
+  const d = toFinalDecimal(value);
+  const shown = d.mul(100).round().div(100);
+  // A nonzero value that shows as 0.00 keeps formatSmall's small notation.
+  const whole = isIntegerValue(shown) && (shown.neq(0) || d.eq(0));
+  return whole ? formatWhole(value) : formatSmall(value);
+}

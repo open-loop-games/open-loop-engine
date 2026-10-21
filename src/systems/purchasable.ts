@@ -20,7 +20,7 @@
  */
 
 import { computed, isRef, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
-import { Decimal, type DecimalSource, formatSmall } from '@/primitives/decimal';
+import { Decimal, type DecimalSource, formatOperand } from '@/primitives/decimal';
 import { toMaybeRef, type Computable } from '@/core/computed';
 import {
   persistent,
@@ -767,7 +767,7 @@ export function createScalingPurchasable(
         description,
         effectDescription:
           effectDescription ??
-          (effectFn ? computed(() => `×${formatSmall(effectFn(count.value), 2)}`) : undefined),
+          (effectFn ? computed(() => `×${formatOperand(effectFn(count.value))}`) : undefined),
         showCount,
       },
       requirements: costRequirement,

@@ -58,8 +58,8 @@ Algebraic expression trees with evaluate / invert / antiderivative / cumulative.
 - `function calculateMaxAffordable(formula: GenericFormula, resource: Resource, sumLevels?: Computable<boolean>, maxBulkCount?: Computable<DecimalSource>): import("vue").ComputedRef<DecimalSource>` — Count how many levels a resource can currently afford on a cost curve — the "purchase max" for repeatables and conversions. `src/core/formulas/affordability.ts:98`
 - `type ConstantFormulaOptions` — Options for creating a constant formula (a fixed numeric value). `src/core/formulas/types.ts:72`
 - `type EvaluateFunction<T extends FormulaSource[]> = (this: Formula<T>, ...inputs: GuardedFormulasToDecimals<T>) => DecimalSource` — Forward evaluation function signature — used in GeneralFormulaOptions. `src/core/formulas/types.ts:25`
-- `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1372`
-- `function findNonInvertible(formula: GenericFormula): GenericFormula | null` — Debug utility: find the operation that breaks invertibility in a formula chain. `src/core/formulas/formulas.ts:1418`
+- `const F: typeof Formula & FormulaStaticOps` — Formula constructor with full static typings for dynamically-registered operations. `src/core/formulas/formulas.ts:1379`
+- `function findNonInvertible(formula: GenericFormula): GenericFormula | null` — Debug utility: find the operation that breaks invertibility in a formula chain. `src/core/formulas/formulas.ts:1425`
 - `interface FirstPassageOptions` — Bracket tuning for a first-passage search. `src/core/formulas/passage.ts:41`
 - `class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]>` — A composable math expression that supports forward evaluation, backward inversion, the discrete sum and the continuous cumulative. `src/core/formulas/formulas.ts:362`
 - `interface FormulaInstanceOps` — Instance-side mirror of FormulaStaticOps — the methods `registerOps` adds to `Formula.prototype`. `src/core/formulas/formulas.ts:163`
@@ -94,35 +94,37 @@ Algebraic expression trees with evaluate / invert / antiderivative / cumulative.
 
 the typed, serializable yes/no test, as data. The type union and its pure-data projection are in core, so `E.branch` and other core builders can accept a Gate without breaking the one-way imports. The evaluator, predictor, ambient Gate services and requirement adapter are in `systems/gate.ts`, because they read `EngineCategories`, which is in systems
 
-- `interface ActiveGate` — True when the category entry's `active` signal is true. `src/core/gate.ts:57`
-- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:94`
-- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:100`
-- `interface CountGteGate` — True when the category entry's `count` signal is `>= value`. `src/core/gate.ts:45`
-- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:34`
-- `interface FlagGate` — True when `accessor.getFlag(id)` returns true. `src/core/gate.ts:88`
-- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | ActiveGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — The typed, serializable yes/no test. `src/core/gate.ts:119`
-- `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — A Gate service: a named engine service a Gate kind reads. `src/core/gate.ts:173`
-- `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — The Gate services that evaluating `gate` reads. `src/core/gate.ts:190`
-- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:149`
-- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:106`
-- `type Predicate = Computable<boolean> | Gate` — A yes/no test in any authoring form. `src/core/gate.ts:136`
-- `interface ResourceGteGate` — True when `accessor.getAmount(resource) >= value`. `src/core/gate.ts:21`
-- `interface StateGate` — True when the comparison `accessor.getStateAt(path) <op> value` holds. `src/core/gate.ts:69`
-- `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:386`
-- `function assertGateServices(gate: Gate, services: GateServices, label: string): void` — Throw unless `services` has every Gate service that evaluating `gate` reads. `src/systems/gate.ts:372`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate holds. `src/systems/gate.ts:509`
-- `function createPredicateResolver(override?: GateServices): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:435`
-- `function evaluateGate(gate: Gate, services: GateServices): boolean` — Evaluate a Gate against the engine's live state now. `src/systems/gate.ts:178`
-- `function evaluatePredicate(predicate: Predicate, services: GateServices): boolean` — Evaluate a Predicate once against `services` — for consumer code that reads a predicate field back off a def. `src/systems/gate.ts:469`
-- `interface GateRequirementOptions` `src/systems/gate.ts:476`
-- `interface GateServices` — The Gate services evaluateGate and timeUntilGateFlip read. `src/systems/gate.ts:127`
-- `function getAmbientGateServices(override?: GateServices): GateServices` — Snapshot the ambient Gate services wired now into a GateServices bundle. `src/systems/gate.ts:152`
-- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateServices. `src/systems/gate.ts:399`
-- `function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance` — Transition distance until `gate` flips, at current rates. `src/systems/gate.ts:241`
+- `interface ActiveGate` — True when the category entry's `active` signal is true. `src/core/gate.ts:64`
+- `interface AllGate` — True when every child Gate is true. `src/core/gate.ts:101`
+- `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:107`
+- `interface CountGteGate` — True when the category entry's `count` signal is `>= value`. `src/core/gate.ts:52`
+- `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:41`
+- `interface FlagGate` — True when `accessor.getFlag(id)` returns true. `src/core/gate.ts:95`
+- `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | ActiveGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — The typed, serializable yes/no test. `src/core/gate.ts:126`
+- `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — A Gate service: a named engine service a Gate kind reads. `src/core/gate.ts:180`
+- `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — The Gate services that evaluating `gate` reads. `src/core/gate.ts:202`
+- `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:156`
+- `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:113`
+- `type Predicate = Computable<boolean> | Gate` — A yes/no test in any authoring form. `src/core/gate.ts:143`
+- `interface ResourceGteGate` — True when the resource's amount is `>= value`. `src/core/gate.ts:28`
+- `interface StateGate` — True when the comparison `accessor.getStateAt(path) <op> value` holds. `src/core/gate.ts:76`
+- `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:399`
+- `function assertGateServices(gate: Gate, services: GateServices, label: string): void` — Throw unless `services` has every Gate service that evaluating `gate` reads. `src/systems/gate.ts:378`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate holds. `src/systems/gate.ts:522`
+- `function createPredicateResolver(override?: GateServices): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:448`
+- `function evaluateGate(gate: Gate, services: GateServices): boolean` — Evaluate a Gate against the engine's live state now. `src/systems/gate.ts:183`
+- `function evaluatePredicate(predicate: Predicate, services: GateServices): boolean` — Evaluate a Predicate once against `services` — for consumer code that reads a predicate field back off a def. `src/systems/gate.ts:482`
+- `interface GateRequirementOptions` `src/systems/gate.ts:489`
+- `interface GateServices` — The Gate services evaluateGate and timeUntilGateFlip read. `src/systems/gate.ts:131`
+- `function getAmbientGateServices(override?: GateServices): GateServices` — Snapshot the ambient Gate services wired now into a GateServices bundle. `src/systems/gate.ts:156`
+- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateServices. `src/systems/gate.ts:412`
+- `function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance` — Transition distance until `gate` flips, at current rates. `src/systems/gate.ts:245`
 
 ## Modifier
 
 composable apply/invert steps and modifier chains
+
+Two forms order modifiers. A `ModifierChain` (`createModifierChain`) is the named form. Built at install, it enters the `ChainRegistry`, where the picker and balance-harness perturbation reach it. An ordered list built per evaluation is `applyModifiers(list, value)`, or one composite from `createSequentialModifier`.
 
 - `interface AdditiveModifierOptions` `src/core/modifier.ts:71`
 - `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:928`
