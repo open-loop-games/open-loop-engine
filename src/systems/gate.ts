@@ -12,17 +12,19 @@
  *   signals every category factory builds for each category entry. The
  *   `count-gte` and `active` kinds read through it, with no consumer-side
  *   path conventions and no synthetic state paths.
- * - {@link ResourceRegistry} via `findById(...).cumulative` — `cumulative-gte`
- *   reads the resource's `cumulative` ref.
- * - {@link GameStateAccessor} — the `resource-gte`, `state` and `flag` kinds
- *   read through it (consumer-defined path and value meaning, as in
- *   `StateCondition`).
+ * - {@link ResourceRegistry} via `findById` — `cumulative-gte` reads the
+ *   resource's `cumulative` ref, and `resource-gte` reads its value when no
+ *   accessor is wired.
+ * - {@link GameStateAccessor} — the `state` and `flag` kinds read through it
+ *   (consumer-defined path and value meaning, as in `StateCondition`), and
+ *   `resource-gte` reads `getAmount` when it is wired. A prediction of
+ *   `resource-gte` or `cumulative-gte` reads the accessor's rates.
  *
  * Per-kind dispatch:
  *
  * | Kind           | Evaluator                                           | Predictor                                |
  * |----------------|-----------------------------------------------------|------------------------------------------|
- * | resource-gte   | accessor.getAmount(id) >= value                   | timeUntilConditionFlip over projection   |
+ * | resource-gte   | getAmount(id), else findById(id).value, >= value    | timeUntilConditionFlip over projection   |
  * | cumulative-gte | registry.findById(id).cumulative.value >= value     | gap in the cumulative total ÷ inflow     |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | active         | findCategoryEntrySignals(...).active                | 'opaque-predicate'                       |
@@ -52,7 +54,7 @@
  */
 
 import { computed, type ComputedRef } from 'vue';
-import { Decimal } from '@/primitives/decimal';
+import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
 import { compareState } from '@/core/conditions';
 import { resolveComputable, type Computable } from '@/core/computed';
@@ -69,7 +71,7 @@ import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/regist
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
 import {
   forEachGateLeaf,
-  getRequiredGateServices,
+  getLeafGateServices,
   isGate,
   type AllGate,
   type AnyGate,
@@ -78,6 +80,7 @@ import {
   type GateService,
   type NotGate,
   type Predicate,
+  type ResourceGteGate,
 } from '@/core/gate';
 import {
   findCategoryEntrySignals,
@@ -117,7 +120,8 @@ export { isGate, gateToCondition, getRequiredGateServices } from '@/core/gate';
  * Every field is optional, because the bundle describes what's *available*,
  * not what a given Gate needs. The Gate services a Gate requires are a
  * function of its kinds ({@link getRequiredGateServices}). A consumer whose
- * Gates are all category kinds needs no {@link GameStateAccessor} at all.
+ * Gates are all category or resource kinds needs no {@link GameStateAccessor}
+ * to evaluate them.
  * Each kind checks its Gate services at evaluation, so a Gate that needs a
  * missing one throws, naming both.
  *
@@ -163,8 +167,9 @@ export function getAmbientGateServices(override?: GateServices): GateServices {
  * Evaluate a Gate against the engine's live state now.
  *
  * @throws when a `cumulative-gte` names a resource id that's not
- *   registered in the resource registry. The throw catches the authoring
- *   error at first evaluation, rather than silently returning `false`.
+ *   registered in the resource registry, or a `resource-gte` does with no
+ *   accessor wired. The throw catches the authoring error at first
+ *   evaluation, rather than silently returning `false`.
  *
  * @example
  * ```ts
@@ -178,10 +183,7 @@ export function getAmbientGateServices(override?: GateServices): GateServices {
 export function evaluateGate(gate: Gate, services: GateServices): boolean {
   switch (gate.kind) {
     case 'resource-gte':
-      return Decimal.gte(
-        demand(services, 'accessor', gate.kind).getAmount(gate.resource),
-        gate.value,
-      );
+      return Decimal.gte(amountOf(gate, services), gate.value);
     case 'cumulative-gte': {
       const ref = cumulativeRefFor(gate.resource, services, 'evaluateGate');
       return Decimal.gte(ref.value, gate.value);
@@ -221,6 +223,8 @@ export function evaluateGate(gate: Gate, services: GateServices): boolean {
  *
  * - `resource-gte` — projects to `ResourceCondition` and delegates to
  *   {@link timeUntilConditionFlip}, which owns the rate × operator truth table.
+ *   It reads the accessor's amount and rate, so it needs an accessor even
+ *   where evaluation falls back to the resource registry.
  * - `cumulative-gte` — divides the gap in the cumulative total by the
  *   resource's inflow rate, since the total counts gains and ignores
  *   subtractions. With {@link GameStateAccessor.getInflowRate} the answer is
@@ -355,6 +359,8 @@ export function getBoundGateServices(owner: object): GateServices | undefined {
 
 /**
  * Throw unless `services` has every Gate service that evaluating `gate` reads.
+ * A `resource-gte` leaf passes with either the accessor or the resource
+ * registry.
  *
  * This moves a first-evaluation throw to the registration callsite. The first
  * evaluation is often inside a `computed`, where the stack is far from the
@@ -370,13 +376,20 @@ export function getBoundGateServices(owner: object): GateServices | undefined {
  * ```
  */
 export function assertGateServices(gate: Gate, services: GateServices, label: string): void {
-  const missing = [...getRequiredGateServices(gate)].filter((handle) => !services[handle]);
-  if (missing.length === 0) return;
+  const missing = new Set<string>();
+  const remedies = new Set<GateService>();
   const kinds = new Set<Gate['kind']>();
-  forEachGateLeaf(gate, (leaf) => kinds.add(leaf.kind));
+  forEachGateLeaf(gate, (leaf) => {
+    kinds.add(leaf.kind);
+    const options = getLeafGateServices(leaf);
+    if (options.some((service) => services[service])) return;
+    missing.add(options.join(' or '));
+    for (const service of options) remedies.add(service);
+  });
+  if (missing.size === 0) return;
   throw new Error(
-    `${label}: this Gate reads the ${missing.join(' and ')}, which the GateServices bundle lacks. ` +
-      `Gate kinds in play: ${[...kinds].join(', ')}. ${missing.map(serviceRemedy).join(' ')}`,
+    `${label}: this Gate reads the ${[...missing].join(' and ')}, which the GateServices bundle lacks. ` +
+      `Gate kinds in play: ${[...kinds].join(', ')}. ${[...remedies].map(serviceRemedy).join(' ')}`,
   );
 }
 
@@ -530,17 +543,24 @@ function demand<K extends GateService>(
   caller: GateCaller = 'evaluateGate',
 ): NonNullable<GateServices[K]> {
   const value = services[service];
-  if (!value) {
-    throw new Error(
-      `${caller}: a '${kind}' Gate needs the ${service}, which the GateServices bundle lacks. ` +
-        serviceRemedy(service),
-    );
-  }
+  if (!value) throw missingServicesError(caller, kind, [service]);
   return value;
 }
 
 /** The public entry point a Gate service error names. */
 type GateCaller = 'evaluateGate' | 'timeUntilGateFlip';
+
+function missingServicesError(
+  caller: GateCaller,
+  kind: Gate['kind'],
+  options: readonly GateService[],
+  purpose = '',
+): Error {
+  return new Error(
+    `${caller}: a '${kind}' Gate needs the ${options.join(' or ')}${purpose}, which the GateServices bundle lacks. ` +
+      options.map(serviceRemedy).join(' '),
+  );
+}
 
 /**
  * The accessor a prediction reads rates through, or throw saying so. Rates
@@ -549,10 +569,28 @@ type GateCaller = 'evaluateGate' | 'timeUntilGateFlip';
  */
 function demandRateAccessor(services: GateServices, kind: Gate['kind']): GameStateAccessor {
   if (services.accessor) return services.accessor;
-  throw new Error(
-    `timeUntilGateFlip: predicting a '${kind}' Gate reads the accessor's getRate, and the GateServices bundle lacks the accessor. ` +
-      serviceRemedy('accessor'),
-  );
+  throw missingServicesError('timeUntilGateFlip', kind, ['accessor'], ' to read its getRate');
+}
+
+/** The registered resource a resource Gate names, or throw naming the id. */
+function findResource(
+  services: GateServices,
+  resourceId: string,
+  kind: Gate['kind'],
+  caller: GateCaller,
+) {
+  const resource = demand(services, 'resourceRegistry', kind, caller).findById(resourceId);
+  if (!resource) throw new Error(`Gate ${kind}: no resource '${resourceId}' registered`);
+  return resource;
+}
+
+/** A `resource-gte` amount: the wired accessor's, else the registered resource's. */
+function amountOf(gate: ResourceGteGate, services: GateServices): DecimalSource {
+  if (services.accessor) return services.accessor.getAmount(gate.resource);
+  if (!services.resourceRegistry) {
+    throw missingServicesError('evaluateGate', gate.kind, getLeafGateServices(gate));
+  }
+  return findResource(services, gate.resource, gate.kind, 'evaluateGate').value;
 }
 
 /** Where an author gets a missing Gate service from, for the error messages. */
@@ -563,12 +601,7 @@ function serviceRemedy(service: GateService): string {
 }
 
 function cumulativeRefFor(resourceId: string, services: GateServices, caller: GateCaller) {
-  const resource = demand(services, 'resourceRegistry', 'cumulative-gte', caller).findById(
-    resourceId,
-  );
-  if (!resource) {
-    throw new Error(`Gate cumulative-gte: no resource '${resourceId}' registered`);
-  }
+  const resource = findResource(services, resourceId, 'cumulative-gte', caller);
   // createResource builds a `cumulative` ref for every persistent resource.
   // A missing one means the resource came from the ref-wrapping overload
   // (derived/computed), which keeps no cumulative total.

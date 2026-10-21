@@ -187,6 +187,15 @@ describe('evaluateGate — per-kind dispatch', () => {
     f.stop();
   });
 
+  it('resource-gte reads a wired accessor over the resource registry', () => {
+    const f = buildFixture();
+    f.points.value = 0;
+    const accessor: GameStateAccessor = { ...f.runtime.accessor!, getAmount: () => bn(100) };
+    const gate: Gate = { kind: 'resource-gte', resource: 'points', value: 50 };
+    expect(evaluateGate(gate, { ...f.runtime, accessor })).toBe(true);
+    f.stop();
+  });
+
   it('cumulative-gte reads resource.cumulative', () => {
     const f = buildFixture();
     f.points.value = 10;
@@ -627,11 +636,32 @@ describe('evaluateGate — no ambient accessor', () => {
     f.stop();
   });
 
+  it('resource-gte reads the amount from the resource registry', () => {
+    const f = buildAccessorlessFixture();
+    f.runtime.resourceRegistry!.findById('points')!.value = 50;
+    expect(evaluateGate({ kind: 'resource-gte', resource: 'points', value: 49 }, f.runtime)).toBe(
+      true,
+    );
+    expect(evaluateGate({ kind: 'resource-gte', resource: 'points', value: 51 }, f.runtime)).toBe(
+      false,
+    );
+    f.stop();
+  });
+
+  it('resource-gte on an unregistered id throws, naming the id', () => {
+    const f = buildAccessorlessFixture();
+    expect(() =>
+      evaluateGate({ kind: 'resource-gte', resource: 'ghost', value: 1 }, f.runtime),
+    ).toThrow(/resource-gte.*'ghost'/);
+    f.stop();
+  });
+
   it('predicting a resource-gte demands the accessor, labelled by the predictor', () => {
     const f = buildAccessorlessFixture();
     const gate: Gate = { kind: 'resource-gte', resource: 'points', value: 1 };
+    expect(() => assertGateServices(gate, f.runtime, 'site')).not.toThrow();
     expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(
-      /^timeUntilGateFlip: predicting a 'resource-gte' Gate reads the accessor's getRate/,
+      /^timeUntilGateFlip: a 'resource-gte' Gate needs the accessor to read its getRate/,
     );
     f.stop();
   });
@@ -639,7 +669,6 @@ describe('evaluateGate — no ambient accessor', () => {
   it('accessor-backed kinds throw at evaluation, naming both the handle and the kind', () => {
     const f = buildAccessorlessFixture();
     for (const gate of [
-      { kind: 'resource-gte', resource: 'points', value: 1 },
       { kind: 'flag', id: 'some-flag' },
       { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
     ] as Gate[]) {
@@ -656,7 +685,7 @@ describe('evaluateGate — no ambient accessor', () => {
     expect(evaluateGate(gate, f.runtime)).toBe(false);
     expect(() => assertGateServices(gate, f.runtime, 'site')).not.toThrow();
     expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(
-      /^timeUntilGateFlip: predicting a 'cumulative-gte' Gate reads the accessor's getRate/,
+      /^timeUntilGateFlip: a 'cumulative-gte' Gate needs the accessor to read its getRate/,
     );
     f.stop();
   });
@@ -697,6 +726,37 @@ describe('evaluateGate — no ambient accessor', () => {
 // getRequiredGateServices — per-kind handle demand
 // ============================================================================
 
+describe('assertGateServices', () => {
+  const gate: Gate = { kind: 'resource-gte', resource: 'gold', value: 50 };
+
+  it('a resource-gte passes with the accessor alone or the registry alone', () => {
+    const accessor = {} as GameStateAccessor;
+    const resourceRegistry = {} as ResourceRegistry;
+    expect(() => assertGateServices(gate, { accessor }, 'site')).not.toThrow();
+    expect(() => assertGateServices(gate, { resourceRegistry }, 'site')).not.toThrow();
+  });
+
+  it('a resource-gte with neither names both and the kind', () => {
+    expect(() => assertGateServices(gate, {}, 'site')).toThrow(
+      /^site: this Gate reads the accessor or resourceRegistry, .*Gate kinds in play: resource-gte\./,
+    );
+  });
+
+  it('a wired accessor does not stand in for a cumulative-gte registry', () => {
+    const accessor = {} as GameStateAccessor;
+    expect(() =>
+      assertGateServices(
+        {
+          kind: 'all',
+          of: [gate, { kind: 'cumulative-gte', resource: 'gold', value: 1 }],
+        },
+        { accessor },
+        'site',
+      ),
+    ).toThrow(/reads the resourceRegistry,/);
+  });
+});
+
 describe('getRequiredGateServices', () => {
   const handles = (gate: Gate) => [...getRequiredGateServices(gate)].sort();
 
@@ -709,8 +769,7 @@ describe('getRequiredGateServices', () => {
     ]);
   });
 
-  it('accessor-backed leaves demand the accessor only', () => {
-    expect(handles({ kind: 'resource-gte', resource: 'gold', value: 50 })).toEqual(['accessor']);
+  it('flag and state demand the accessor only', () => {
     expect(handles({ kind: 'flag', id: 'knowledge-rask' })).toEqual(['accessor']);
     expect(handles({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' })).toEqual([
       'accessor',
@@ -719,6 +778,12 @@ describe('getRequiredGateServices', () => {
 
   it('cumulative-gte evaluates through the registry', () => {
     expect(handles({ kind: 'cumulative-gte', resource: 'gold', value: 50 })).toEqual([
+      'resourceRegistry',
+    ]);
+  });
+
+  it('resource-gte reports the registry, its fallback when no accessor is wired', () => {
+    expect(handles({ kind: 'resource-gte', resource: 'gold', value: 50 })).toEqual([
       'resourceRegistry',
     ]);
   });

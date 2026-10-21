@@ -17,7 +17,14 @@ import type { Computable } from './computed';
 
 // === GATE TYPE UNION ===
 
-/** True when `accessor.getAmount(resource) >= value`. Rate-aware. */
+/**
+ * True when the resource's amount is `>= value`. Rate-aware. The amount is
+ * `accessor.getAmount(resource)` when an accessor is wired, else the
+ * registered resource's value. So a wired accessor must serve every id a
+ * `resource-gte` names: it shadows the resource registry, and the condition
+ * IR this kind projects to reads it too. A prediction reads the accessor's
+ * `getRate`, so it needs an accessor either way.
+ */
 export interface ResourceGteGate {
   kind: 'resource-gte';
   resource: string;
@@ -178,34 +185,51 @@ export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
  *
  * The Gate services a Gate needs are a function of its kinds, not of the
  * union as a whole. Category-aware kinds (`count-gte`, `active`) read only
- * `EngineCategories` and never an accessor. So a consumer whose Gates are
- * all category kinds needs no `GameStateAccessor` at all. Adoption sites
+ * `EngineCategories`, and the resource kinds can read the resource registry.
+ * So a consumer whose Gates are all category or resource kinds needs no
+ * `GameStateAccessor` to evaluate them. Adoption sites
  * that hold the Gate at construction call this to fail early and precisely,
  * instead of requiring every Gate service up front.
  *
- * These are the Gate services `evaluateGate` reads. For `cumulative-gte`,
- * `timeUntilGateFlip` also reads the resource's rate through the accessor,
- * and requires it when it runs.
+ * A `resource-gte` leaf reports the `resourceRegistry`, which every engine
+ * sets during install/connect. A wired accessor stands in for it: the leaf
+ * reads `getAmount` first, and the registry only when no accessor is wired.
+ *
+ * These are the Gate services `evaluateGate` reads. For `resource-gte` and
+ * `cumulative-gte`, `timeUntilGateFlip` also reads the resource's rate
+ * through the accessor, and requires it when it runs.
  */
 export function getRequiredGateServices(gate: Gate): ReadonlySet<GateService> {
   const out = new Set<GateService>();
   forEachGateLeaf(gate, (leaf) => {
-    switch (leaf.kind) {
-      case 'resource-gte':
-      case 'state':
-      case 'flag':
-        out.add('accessor');
-        return;
-      case 'cumulative-gte':
-        out.add('resourceRegistry');
-        return;
-      case 'count-gte':
-      case 'active':
-        out.add('categories');
-        return;
-    }
+    const options = getLeafGateServices(leaf);
+    out.add(options[options.length - 1]);
   });
   return out;
+}
+
+/**
+ * The Gate services one leaf can evaluate through, preferred first; any one
+ * of them suffices. The last is the fallback {@link getRequiredGateServices}
+ * reports.
+ *
+ * @internal
+ */
+export function getLeafGateServices(
+  leaf: Exclude<Gate, AllGate | AnyGate | NotGate>,
+): readonly GateService[] {
+  switch (leaf.kind) {
+    case 'resource-gte':
+      return ['accessor', 'resourceRegistry'];
+    case 'state':
+    case 'flag':
+      return ['accessor'];
+    case 'cumulative-gte':
+      return ['resourceRegistry'];
+    case 'count-gte':
+    case 'active':
+      return ['categories'];
+  }
 }
 
 /**
