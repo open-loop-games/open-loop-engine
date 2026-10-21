@@ -52,8 +52,15 @@ The sketch encodes four rules:
 
 A run ends at a crossing: a live comparison that changes over time. Two variants occur.
 
-- **A hard crossing** is a buffer that bleeds to zero, such as a wall's integrity or a crew's morale. End the run on the tick it reaches zero.
+- **A hard crossing** is a buffer that bleeds to zero, such as a wall's integrity or a crew's morale. End the run on the tick it reaches zero. Write the loss as a continuous producer of that resource with a negative `baseRate`, not as a subtraction in a tick handler:
+  - its tick subtracts, and stops at zero unless `allowNegative` keeps the deficit;
+  - `getTotalRate` sums it into the resource's net rate;
+  - `timeUntilGateFlip` predicts the crossing once your accessor's `getRate` serves that net rate. The engine does not wire it there for you.
+
+  Gate has no less-than kind. So "below 1" is `not` over a `resource-gte` at 1.
 - **A soft crossing** is a rate race, such as an upkeep rate that overtakes production. Give it a grace clock that runs while the race is lost and resets when it recovers. Compare the rates without the penalty the crossing applies. Otherwise the penalty feeds the race it is measured by.
+
+**A crossing that ends the game,** not only the run, needs a record that no reset clears. The engine has no ended state. Keep the outcome in a lifetime ref, `persistent(false, { id: 'game-won', lifetime: true })`, or in an achievement whose goal is the crossing. Then stop play with a guard at the head of each tick handler, or with `engine.stop()`. `stop()` also stops autosave, so call `engine.save()` first. `stop()` is not saved, so after a load that finds the record set, stop again.
 
 ### The run around the phases
 

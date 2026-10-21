@@ -83,6 +83,10 @@ export const CLUSTER_TITLES = {
     title: 'Solvers',
     blurb: 'Tune a value until a predicate holds (bisection, and others).',
   },
+  'producer-category': {
+    prologue:
+      'A negative `baseRate` makes a producer subtract each tick: upkeep, or a buffer that loses an amount over time. The subtraction stops at zero unless `allowNegative` is set, and `getTotalRate` sums it into the net rate. See ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run.',
+  },
   purchasable: {
     prologue:
       "Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. `createPurchasable` is the raw factory both build on. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.",
