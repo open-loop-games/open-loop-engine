@@ -30,6 +30,8 @@ import {
   getPersistentContextRefs,
   getPersistentRefs,
   bindPersistenceNamespace,
+  findPersistenceNamespaces,
+  getActivePersistenceNamespace,
 } from '@/core/persistence';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { isFormula } from '@/core/formulas';
@@ -287,12 +289,23 @@ export function createReset(options: ResetOptions): Reset {
   const retention = hasRetention ? createRetention({ keep, retain }) : undefined;
 
   const warnedContexts = new Set<string>();
+  // Runs inside resolveModules, so the active persistence namespace is the reset's.
   function warnUnknownContext(contextId: string): void {
     if (warnedContexts.has(contextId)) return;
     warnedContexts.add(contextId);
+    const label = (ns: string | undefined) =>
+      ns === undefined ? 'no persistence namespace' : `persistence namespace "${ns}"`;
+    const own = getActivePersistenceNamespace();
+    const elsewhere = findPersistenceNamespaces(contextId);
+    const where = own === undefined ? '' : ` in ${label(own)}`;
+    const hint =
+      elsewhere.length > 0
+        ? ` It is registered under ${elsewhere.map(label).join(', ')}. Create the reset inside a ` +
+          `module's install() or connect(), so it resolves ids in that engine's persistence namespace.`
+        : ' Check the id.';
     console.warn(
       `createReset: resetPersistentContexts names "${contextId}", which has no registered persistent ` +
-        `context — nothing under that id is reset. Check the id.`,
+        `context${where} — nothing under that id is reset.${hint}`,
     );
   }
   const resolveModules = bindPersistenceNamespace(

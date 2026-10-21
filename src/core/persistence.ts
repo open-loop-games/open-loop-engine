@@ -495,6 +495,30 @@ export function bindPersistenceNamespace<A extends unknown[], R>(
 }
 
 /**
+ * The persistence namespace active now, undefined for none.
+ *
+ * @internal
+ */
+export function getActivePersistenceNamespace(): string | undefined {
+  return activeNamespace;
+}
+
+/**
+ * Every persistence namespace a raw persistent context id is registered in,
+ * undefined for none. A warning about an id unknown in one persistence
+ * namespace reads it to say where the id is.
+ *
+ * @internal
+ */
+export function findPersistenceNamespaces(contextId: string): (string | undefined)[] {
+  const found: (string | undefined)[] = [];
+  for (const [fullId, ns] of Object.entries(contextNamespaces)) {
+    if (stripNamespace(fullId) === contextId) found.push(ns || undefined);
+  }
+  return found;
+}
+
+/**
  * Strip the persistence namespace prefix from a full persistent context id,
  * leaving the raw id the caller passed to `beginPersistentContext`. Code that
  * displays or routes on the id (such as system fallback ids) reads this, not

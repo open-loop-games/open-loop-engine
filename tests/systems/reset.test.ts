@@ -458,6 +458,39 @@ describe('Reset with resetPersistentContexts', () => {
     }
   });
 
+  it('names the persistence namespace an unknown id is registered under', () => {
+    withPersistenceNamespace('rm-ns1', () =>
+      withPersistentContext('rm-elsewhere', () => persistent(0)),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      createReset({ resetPersistentContexts: ['rm-elsewhere'] }).reset();
+      expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+        'createReset: resetPersistentContexts names "rm-elsewhere", which has no registered persistent ' +
+          'context — nothing under that id is reset. It is registered under persistence namespace ' +
+          '"rm-ns1". Create the reset inside a module\'s install() or connect(), so it resolves ids ' +
+          "in that engine's persistence namespace.",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("names the reset's persistence namespace when an unknown id is registered nowhere", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      withPersistenceNamespace('rm-ns2', () =>
+        createReset({ resetPersistentContexts: ['rm-nowhere'] }),
+      ).reset();
+      expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+        'createReset: resetPersistentContexts names "rm-nowhere", which has no registered persistent context ' +
+          'in persistence namespace "rm-ns2" — nothing under that id is reset. Check the id.',
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('warns about an unknown id inside a composed reset or cycle, but not on a scope read', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const warningsFor = (id: string) =>
