@@ -183,7 +183,7 @@ export function evaluateGate(gate: Gate, services: GateServices): boolean {
         gate.value,
       );
     case 'cumulative-gte': {
-      const ref = cumulativeRefFor(gate.resource, services, gate.kind);
+      const ref = cumulativeRefFor(gate.resource, services, 'evaluateGate');
       return Decimal.gte(ref.value, gate.value);
     }
     case 'count-gte': {
@@ -243,7 +243,7 @@ export function timeUntilGateFlip(gate: Gate, services: GateServices): Transitio
     case 'resource-gte':
       return timeUntilConditionFlip(
         { kind: 'resource', target: gate.resource, operator: 'gte', value: gate.value },
-        demand(services, 'accessor', gate.kind),
+        demandRateAccessor(services, gate.kind),
       );
     case 'cumulative-gte':
       return timeUntilCumulativeFlip(gate, services);
@@ -302,8 +302,8 @@ function timeUntilCumulativeFlip(
   gate: CumulativeGteGate,
   services: GateServices,
 ): TransitionDistance {
-  const total = cumulativeRefFor(gate.resource, services, gate.kind).value;
-  const accessor = demand(services, 'accessor', gate.kind);
+  const total = cumulativeRefFor(gate.resource, services, 'timeUntilGateFlip').value;
+  const accessor = demandRateAccessor(services, gate.kind);
   if (Decimal.gte(total, gate.value)) return { seconds: null, reason: 'no-rate' };
   const inflow = accessor.getInflowRate?.(gate.resource);
   const rate = inflow ?? accessor.getRate(gate.resource);
@@ -527,15 +527,32 @@ function demand<K extends GateService>(
   services: GateServices,
   service: K,
   kind: Gate['kind'],
+  caller: GateCaller = 'evaluateGate',
 ): NonNullable<GateServices[K]> {
   const value = services[service];
   if (!value) {
     throw new Error(
-      `evaluateGate: a '${kind}' Gate needs the ${service}, which the GateServices bundle lacks. ` +
+      `${caller}: a '${kind}' Gate needs the ${service}, which the GateServices bundle lacks. ` +
         serviceRemedy(service),
     );
   }
   return value;
+}
+
+/** The public entry point a Gate service error names. */
+type GateCaller = 'evaluateGate' | 'timeUntilGateFlip';
+
+/**
+ * The accessor a prediction reads rates through, or throw saying so. Rates
+ * have no registry source, so a Gate that evaluates without an accessor
+ * still needs one to predict.
+ */
+function demandRateAccessor(services: GateServices, kind: Gate['kind']): GameStateAccessor {
+  if (services.accessor) return services.accessor;
+  throw new Error(
+    `timeUntilGateFlip: predicting a '${kind}' Gate reads the accessor's getRate, and the GateServices bundle lacks the accessor. ` +
+      serviceRemedy('accessor'),
+  );
 }
 
 /** Where an author gets a missing Gate service from, for the error messages. */
@@ -545,8 +562,10 @@ function serviceRemedy(service: GateService): string {
     : `The ${service} is set only inside engine install/connect; build the predicate resolver there.`;
 }
 
-function cumulativeRefFor(resourceId: string, services: GateServices, kind: Gate['kind']) {
-  const resource = demand(services, 'resourceRegistry', kind).findById(resourceId);
+function cumulativeRefFor(resourceId: string, services: GateServices, caller: GateCaller) {
+  const resource = demand(services, 'resourceRegistry', 'cumulative-gte', caller).findById(
+    resourceId,
+  );
   if (!resource) {
     throw new Error(`Gate cumulative-gte: no resource '${resourceId}' registered`);
   }

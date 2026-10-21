@@ -627,6 +627,15 @@ describe('evaluateGate — no ambient accessor', () => {
     f.stop();
   });
 
+  it('predicting a resource-gte demands the accessor, labelled by the predictor', () => {
+    const f = buildAccessorlessFixture();
+    const gate: Gate = { kind: 'resource-gte', resource: 'points', value: 1 };
+    expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(
+      /^timeUntilGateFlip: predicting a 'resource-gte' Gate reads the accessor's getRate/,
+    );
+    f.stop();
+  });
+
   it('accessor-backed kinds throw at evaluation, naming both the handle and the kind', () => {
     const f = buildAccessorlessFixture();
     for (const gate of [
@@ -646,7 +655,9 @@ describe('evaluateGate — no ambient accessor', () => {
     const gate: Gate = { kind: 'cumulative-gte', resource: 'points', value: 1 };
     expect(evaluateGate(gate, f.runtime)).toBe(false);
     expect(() => assertGateServices(gate, f.runtime, 'site')).not.toThrow();
-    expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(/cumulative-gte.*accessor/);
+    expect(() => timeUntilGateFlip(gate, f.runtime)).toThrow(
+      /^timeUntilGateFlip: predicting a 'cumulative-gte' Gate reads the accessor's getRate/,
+    );
     f.stop();
   });
 
