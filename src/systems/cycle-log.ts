@@ -92,7 +92,11 @@ export interface CycleLogEvents {
  * per-run metric deltas in a reactive ring buffer.
  */
 export interface CycleLog {
-  /** Reactive history buffer — newest entry is last */
+  /**
+   * Reactive history buffer — newest entry is last. It belongs to one play
+   * session: no save contains it, and a load keeps it. A game whose load
+   * replaces its state clears it in `ctx.onLoad`: `log.history.value = []`.
+   */
   readonly history: Ref<CycleLogEntry[]>;
   /** Subscribe to CycleLog events */
   on: Emittable<CycleLogEvents>['on'];
@@ -129,6 +133,12 @@ function readMetric(metric: Persistent<DecimalSource> | (() => DecimalSource)): 
  * changes is re-snapshotted once the load or reset settles. So the first run
  * after a load counts growth since the load, and a reset mid-run doesn't
  * show up as a negative delta.
+ *
+ * `history` is not saved either, and a load keeps it, through `engine.load()`
+ * and `saveManager.importSave()` alike. So after a load of a different save it
+ * still lists the earlier runs. A game whose load replaces its state, as a
+ * slot switch does, clears `log.history.value` in `ctx.onLoad`. The log cannot
+ * clear it itself: it sees a load and a reset as one signal.
  *
  * @param options - Cycle to observe, metrics to track, and optional ring buffer size
  * @returns A CycleLog with reactive history, `finalized` event, and pin/unpin controls
