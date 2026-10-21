@@ -2,7 +2,7 @@
 
 Recurring shapes that consumers assemble from engine primitives. Each is a worked pattern from the consumer corpus, not an engine symbol. Each is a hand-roll in one consumer, where an engine helper would over-fit. A second consumer that independently writes the same wrapper is the signal to move it out of this file.
 
-This is the companion cookbook to [consumer-guide.md](./consumer-guide.md). Read the guide for *how to think* about composing the engine. Read this file for the full worked pattern when you build one. These bulky examples are here so that the guide stays a continuous read. Shapes a tick handler runs, or that read what ticks wrote, are in [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md). They cover phases inside a run, drawing ticking game state, and a player switch over a tier-gated policy.
+This is the companion cookbook to [consumer-guide.md](./consumer-guide.md). Read the guide for *how to think* about composing the engine. Read this file for the full worked pattern when you build one. Shapes a tick handler runs, or that read what ticks wrote, are in [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md).
 
 ## Action execution: ActionCategory, worker bundle, or Loadout
 
@@ -57,7 +57,7 @@ Shared across the pool:
 
 Single-worker case: the same shape with one worker (`id: 'player'`).
 
-Why no engine helper: the claim axis varies widely across games. Round-robin, distance, skill filter, priority rank and class lockout all occur. Recall and cancel semantics vary as widely. The primitives above are the stable subset. A `createSharedTaskPool` that tried to cover claim, recall and wake-idle would over-fit to one game's design. Per worker, the bundle is thin: two computeds and a one-line dispose. So inlining it costs less than an identity wrapper shipped as a primitive. Worker-shaped wiring does not fit a game whose placed units act on a per-tick cooldown. Such a game bypasses it entirely.
+Why no engine helper: the claim axis varies widely across games. Round-robin, distance, skill filter, priority rank and class lockout all occur. Recall and cancel semantics vary as widely. The primitives above are the stable subset. A `createSharedTaskPool` that tried to cover claim, recall and wake-idle would over-fit to one game's design. Per worker, the bundle is thin: two computeds and a one-line dispose. So inlining it costs less than an identity wrapper shipped as a primitive. Placed units that act on a per-tick cooldown are § Placement and occupancy instead.
 
 ## Pre-completion checks in ActionCategory
 
@@ -294,7 +294,7 @@ Subject-aware atoms (a `SubjectGate` kind, `E.subject`) are deliberately **not**
 
 ## Spatial grids: board state, placement, and adjacency
 
-`createSpatialGrid` (see `api/spatial.md` for every method) is a bounded 2D grid of typed cells. The central idea for a game built on it: **the grid is a derived index over the authoritative entity state, not the state itself.** Occupancy is rebuilt from your entity list, such as a roster or a `persistent<Instance[]>`. So a save serializes the entities, not the board. A board-size change rebuilds the grid and places the entities again.
+`createSpatialGrid` (see `api/spatial.md` for every method) is a bounded 2D grid of typed cells. The central idea for a game built on it: **the grid is a derived index over the authoritative entity state, not the state itself.** Occupancy is rebuilt from your entity list (§ Placement and occupancy). So a save serializes the entities, not the board. A board-size change rebuilds the grid and places the entities again.
 
 ### Owning the grid
 
@@ -318,33 +318,6 @@ grid.bfs({ x, y }, (cell) => cell.type !== 'blocked');   // PassabilityFn → pa
 ```
 
 The `passable` / `explored` / `visible` bitmaps and their `*Count` properties are for FOV and terrain. The commit of `beginFovUpdate()` writes `visible` and `explored`, and keeps the counts current. You write `passable` by hand: board generation, a door opening, a wall going up. After each batch of hand writes, call `grid.markMaskChanged('passable')`. It derives the counts again and emits `maskChanged` for the renderer. Without it, the counts go wrong and nothing repaints. `restore()` derives everything again, and emits `gridChanged` plus one `maskChanged` per bitmap.
-
-### Placement and occupancy (placed and removed in play)
-
-Entities the player places and removes during play (towers, seated pieces) are the case the modifier-chain model does *not* fit. A chain created per entity registers itself in the `ChainRegistry`, which has **no unregister path**. Sell the entity, and its chain leaks. So do not model per-entity stats as per-entity chains. The shape games ship is a plain instance list plus a per-tick handler:
-
-```ts
-const placed = persistent<Instance[]>([], { id: 'placed' });
-
-function place(defId: string, x: number, y: number): boolean {
-  const cell = grid.at(x, y);
-  if (cell.type !== 'open' || cell.occupantId != null) return false;
-  if (!spend(costOf(defId))) return false;               // pay; on refusal, return before any change
-  const id = `e-${nextId.value++}`;
-  grid.set(x, y, { ...cell, occupantId: id });
-  placed.value = [...placed.value, { id, defId, x, y, cooldown: 0 }];
-  return true;
-}
-
-function remove(id: string): void {
-  const e = placed.value.find((p) => p.id === id);
-  if (!e) return;
-  grid.set(e.x, e.y, { ...grid.at(e.x, e.y), occupantId: null });
-  placed.value = placed.value.filter((p) => p.id !== id);
-}
-```
-
-A per-entity stat that the balance harness must perturb reads through `tunable()`, keyed by `type/<defId>/<stat>`, not through a chain. See [consumer-guide.md § Tunables](./consumer-guide.md#tunables). Occupancy is rebuilt in `connect()` / `onLoad` from `placed`, so only `placed` is saved. To save the board directly, wrap `grid.serialize()` in one `persistent()` ref; the serialized form is JSON-native.
 
 ### Grid change events — and the replacement gotcha
 
@@ -435,6 +408,33 @@ Build the table with K *sequential* calls. `cost` must not call `distanceField` 
 ```
 
 Both corrections are endpoint-only. So the optimal path is unchanged, and the result stays admissible *and* consistent, which is safe with a closed set. Skipping them inflates `h` by up to the spread of traversal cost. An inadmissible heuristic does not fail loudly: A\* quietly returns paths that are not shortest.
+
+## Placement and occupancy (placed and removed in play)
+
+Entities the player makes and removes during play fit one shape, on a grid or not: towers, seated pieces, cards, a roster, villages. Keep them in one saved list, and resolve what they do in a per-tick handler. A per-entity modifier chain built during play works, and is garbage once dropped. But it never enters the `ChainRegistry`, because the engine sets that ambient value only during install and connect. So `walkChainRegistry` and balance-harness perturbation cannot reach it. On a grid, placing and removing also write the cell's occupant:
+
+```ts
+const placed = persistent<Instance[]>([], { id: 'placed' });
+
+function place(defId: string, x: number, y: number): boolean {
+  const cell = grid.at(x, y);
+  if (cell.type !== 'open' || cell.occupantId != null) return false;
+  if (!spend(costOf(defId))) return false;               // pay; on refusal, return before any change
+  const id = `e-${nextId.value++}`;
+  grid.set(x, y, { ...cell, occupantId: id });
+  placed.value = [...placed.value, { id, defId, x, y, cooldown: 0 }];
+  return true;
+}
+
+function remove(id: string): void {
+  const e = placed.value.find((p) => p.id === id);
+  if (!e) return;
+  grid.set(e.x, e.y, { ...grid.at(e.x, e.y), occupantId: null });
+  placed.value = placed.value.filter((p) => p.id !== id);
+}
+```
+
+Without a grid, drop the cell check and the `grid.set` calls. A per-entity stat that the balance harness must perturb reads through `tunable()`, keyed by `type/<defId>/<stat>`, not through a chain. See [consumer-guide.md § Tunables](./consumer-guide.md#tunables). Occupancy is rebuilt in `connect()` / `onLoad` from `placed`, so only `placed` is saved. To save the board directly, wrap `grid.serialize()` in one `persistent()` ref; the serialized form is JSON-native.
 
 ## Cross-action modifiers
 

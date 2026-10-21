@@ -85,7 +85,15 @@ export const CLUSTER_TITLES = {
   },
   'producer-category': {
     prologue:
-      'A negative `baseRate` makes a producer subtract each tick: upkeep, or a buffer that loses an amount over time. The subtraction stops at zero unless `allowNegative` is set, and `getTotalRate` sums it into the net rate. See ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run.',
+      'A negative `baseRate` makes a producer subtract each tick: upkeep, or a buffer that loses an amount over time. The subtraction stops at zero unless `allowNegative` is set, and `getTotalRate` sums it into the net rate. See ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run. A count that play grows rather than purchases, such as a production cascade tier, is `ProducerMapping.extraCount`: the count is then `owned + extraCount`.',
+  },
+  skill: {
+    prologue:
+      '`skill.xpCurve` is the built XP-to-level `Formula`. For the XP at which level L begins, ask it: `xpCurve.tryInvert(L)` grades the answer, and `invert(L)` returns it unchecked. An integer level evaluates back to itself when `floor`, `ceil` or `trunc` is the outermost op of the curve.',
+  },
+  modifier: {
+    prologue:
+      'Two forms order modifiers. A `ModifierChain` (`createModifierChain`) is the named form. Built at install, it enters the `ChainRegistry`, where the picker and balance-harness perturbation reach it. An ordered list built per evaluation is `applyModifiers(list, value)`, or one composite from `createSequentialModifier`.',
   },
   purchasable: {
     prologue:

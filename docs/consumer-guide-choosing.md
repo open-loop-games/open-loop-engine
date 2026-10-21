@@ -86,7 +86,7 @@ Consumers use three paths, and each fits a different shape of need. "Purchase-sh
 | Repeatable purchases customized per instance (a different `effect` / `onPurchase` per instance, wiring after creation) | raw `createScalingPurchasable` |
 | A purchase that owns nothing afterwards (a unit sent to a queue, a consumable) | `createPurchasableCategory` with no `limit` and a static cost, whose `onPurchase` does the work |
 
-**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `costRatio` is the cost ratio: each purchase multiplies the next cost by it. A producer category with a purchase:
+**Rate-bearing → producer category.** When ownership produces a continuous resource flow, use `createProducerCategory`. It bundles cost, count, rate aggregation and a beat-time read (`purchaseBeatSeconds`) in one def shape. `costRatio` is the cost ratio: each purchase multiplies the next cost by it. A count that play grows rather than purchases, such as a production cascade tier, is `extraCount` on the mapping; the count is then `owned + extraCount`. A producer category with a purchase:
 
 ```ts
 const buildings = createProducerCategory<ProducerDef>({

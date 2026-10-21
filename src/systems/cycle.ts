@@ -194,7 +194,12 @@ export interface Cycle extends ScopedReset {
   /** Start or resume ticking (sets `running = true`) */
   resume(): void;
 
-  /** Pause ticking (sets `running = false`). Elapsed time and `endCondition` evaluation stop. */
+  /**
+   * Pause ticking (sets `running = false`). Elapsed time and `endCondition`
+   * evaluation stop, and nothing else: producers and other tick handlers keep
+   * ticking. To switch a set of mechanics off with the run, hold their grants
+   * in one {@link createConditionalEffectSystem} def.
+   */
   pause(): void;
 
   /** Subscribe to cycle lifecycle events */
