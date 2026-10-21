@@ -2,6 +2,23 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.6 (2026-10-21)
+
+### Fixes
+
+* **core:** a second engine in one persistence namespace names both fixes (ccf1643)
+* **core:** start() warns when registered mods install nothing (2a4a76a)
+* **systems:** a Gate prediction's missing-accessor error names the predictor (88daee0)
+* **systems:** a resource-gte Gate evaluates from the resource registry when no accessor is wired (69b42f5)
+* **core:** floor, ceil and trunc invert onto an integer level (b72647e)
+* **systems:** a category entry belongs to the module that built the category (9652fc5)
+* **systems:** a reset's unknown-id warning names the persistence namespace (f311539)
+* **systems:** register takes a readonly array of defs (5d036b3)
+* **scripts:** a type merged with a same-named value lists both (724ecf0)
+* **primitives:** dev builds warn when a Decimal from a second break_eternity copy reaches the engine (78f1c0d)
+* **core:** a modifier description prints a whole number without decimals (89aebaa)
+* **systems:** a purchasable's default effect readout prints a whole multiplier without decimals (d567422)
+
 ## 0.7.5 (2026-10-19)
 
 ### Fixes
