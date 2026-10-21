@@ -237,9 +237,9 @@ const unaryOps: Record<string, OpDescriptor> = {
   },
   sign: { evaluate: Decimal.sign },
   round: { evaluate: Decimal.round, invert: ops.invertPassthrough },
-  floor: { evaluate: Decimal.floor, invert: ops.invertPassthrough },
-  ceil: { evaluate: Decimal.ceil, invert: ops.invertPassthrough },
-  trunc: { evaluate: Decimal.trunc, invert: ops.invertPassthrough },
+  floor: { evaluate: Decimal.floor, invert: ops.makeRoundingInvert(Decimal.floor) },
+  ceil: { evaluate: Decimal.ceil, invert: ops.makeRoundingInvert(Decimal.ceil) },
+  trunc: { evaluate: Decimal.trunc, invert: ops.makeRoundingInvert(Decimal.trunc) },
   abs: { evaluate: Decimal.abs },
   recip: {
     evaluate: Decimal.recip,
@@ -480,7 +480,7 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    *
    * Chain capability only. It deliberately says nothing about whether inverting
    * a *particular target* is sound, because that isn't a property of the chain:
-   * a curve ending in `.floor()` inverts exactly for integer targets and has no
+   * a curve ending in `.floor()` inverts onto an integer level and has no
    * pre-image at all for 3.5. For that question use {@link tryInvert}, which
    * grades the answer against the target it was given.
    */
@@ -553,6 +553,13 @@ class Formula<T extends [FormulaSource] | FormulaSource[] = FormulaSource[]> {
    * is reachable. When the target may lie outside the formula's image (anything
    * with an interior `.floor()`, a `step`/`if` splice, or a saturating `min`/`max`)
    * use {@link tryInvert}, which grades the answer.
+   *
+   * When `floor`, `ceil` or `trunc` is the curve's outermost op, an integer
+   * target in the image evaluates back to itself: `evaluate(invert(L))` is `L`.
+   * The answer is an input of that level near its edge, not necessarily the
+   * first; {@link firstPassage} answers the first. An inexact op above the
+   * rounding op, as in `.floor().mul(0.1)`, can still move the answer one
+   * level off.
    *
    * Reports and returns `0` when no inverse exists at all.
    */

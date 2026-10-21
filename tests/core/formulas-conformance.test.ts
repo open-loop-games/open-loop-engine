@@ -91,10 +91,10 @@ type UnaryCase = Tolerance & {
 
 /**
  * Every unary op in the table that binds an `invert`. Rounding ops
- * (`round`/`floor`/`ceil`/`trunc`) are excluded deliberately — their invert is
- * `invertPassthrough`, whose contract is target-dependent rather than a
- * round-trip law, and it is under decision. `sign`/`abs`/`factorial`/`gamma`/
- * `lngamma`/`pLog10`/`absLog10` bind no invert at all.
+ * (`round`/`floor`/`ceil`/`trunc`) are excluded here — a rounding op loses its
+ * input, so its law runs the other way, `evaluate(invert(L)) === L`, in its own
+ * block below. `sign`/`abs`/`factorial`/`gamma`/`lngamma`/`pLog10`/`absLog10`
+ * bind no invert at all.
  */
 const UNARY: Record<string, UnaryCase> = {
   neg: { op: (v) => F.neg(v), domain: 'real' },
@@ -428,6 +428,128 @@ describe('round-trip through a clamp: min / max over a composed chain', () => {
     expect(errors).toEqual([]);
     expect(value.reason).toBe('outside-image');
     expect(Decimal.lte(relativeError(value.value!, '1.5'), DEFAULT_TOL)).toBe(true);
+  });
+});
+
+describe('round-trip through a rounding op: evaluate(invert(L)) === L at integer targets', () => {
+  // A rounding op's pre-image is a whole interval, and the inner curve's
+  // algebraic inverse lands within ulps of that interval's edge — on either
+  // side, because `pow` and `log` round. So the law is the round trip itself,
+  // on the returned Decimal, with no tolerance: the output coordinate is the
+  // integers. An oracle cannot stand in for it. The engine's forward
+  // `evaluate` reaches a level some ulps before the true threshold does, and a
+  // game reads `evaluate`. The guarantee covers a rounding op that is the
+  // curve's outermost op; an inexact op above it (`.floor().mul(0.1)`) can
+  // still miss.
+  const bestiaryG = 1.2471425368773532;
+  const bestiaryX1 = 56.07894901669249;
+  const leviesG = 1.5;
+  const leviesBase = 2.123222748815166;
+
+  /** An inner curve, the integer levels swept through it, and whether it rises with x. */
+  type RoundingFamily = {
+    inner: () => GenericFormula;
+    levels: [number, number];
+    decreasing?: boolean;
+  };
+  const FAMILIES: Record<string, RoundingFamily> = {
+    'geometric thresholds, g = 1.2471…': {
+      inner: () =>
+        F.variable(0)
+          .mul((bestiaryG - 1) / bestiaryX1)
+          .add(1)
+          .log(bestiaryG)
+          .add(1),
+      levels: [2, 100],
+    },
+    'geometric thresholds, g = 1.5': {
+      inner: () =>
+        F.variable(0)
+          .mul((leviesG - 1) / leviesBase)
+          .add(1)
+          .log(leviesG),
+      levels: [1, 60],
+    },
+    'log base 1.15': { inner: () => F.variable(0).mul(0.015).add(1).log(1.15), levels: [1, 400] },
+    'cube root, root(3)': { inner: () => F.variable(0).root(3), levels: [1, 500] },
+    'cube root, pow(1/3)': { inner: () => F.variable(0).pow(1 / 3), levels: [1, 500] },
+    'x^1.5': { inner: () => F.variable(0).pow(1.5), levels: [1, 500] },
+    'x^(2/3) / 7': {
+      inner: () =>
+        F.variable(0)
+          .pow(2 / 3)
+          .div(7),
+      levels: [1, 500],
+    },
+    'non-dyadic scale x / 3': { inner: () => F.variable(0).div(3), levels: [1, 500] },
+    'log10 with x at layer 1': { inner: () => F.variable(0).log10().div(7), levels: [50, 1000] },
+    'decreasing, 1000·1.1^−x': {
+      inner: () => F.variable(0).neg().pow_base(1.1).mul(1000),
+      levels: [1, 999],
+      decreasing: true,
+    },
+    'negative cube root': {
+      inner: () => F.variable(0).root(3).neg(),
+      levels: [-500, -1],
+      decreasing: true,
+    },
+  };
+  const ROUNDING: Record<string, (inner: GenericFormula) => GenericFormula> = {
+    floor: (inner) => inner.floor(),
+    ceil: (inner) => inner.ceil(),
+    trunc: (inner) => inner.trunc(),
+    round: (inner) => inner.round(),
+  };
+
+  for (const [family, { inner: build, levels, decreasing }] of Object.entries(FAMILIES)) {
+    for (const [opName, wrap] of Object.entries(ROUNDING)) {
+      test(`${opName} over ${family}`, () => {
+        const curve = wrap(build());
+        const { value: misses, errors } = withoutEngineErrors(() => {
+          const found: string[] = [];
+          let previous: Decimal | null = null;
+          for (let level = levels[0]; level <= levels[1]; level++) {
+            const x = new Decimal(curve.invert(level));
+            const back = new Decimal(curve.evaluate(x));
+            if (!Decimal.eq(back, level))
+              found.push(`L=${level}: invert=${x} evaluates to ${back}`);
+            const graded = curve.tryInvert(level);
+            if (graded.reason !== 'on-target') found.push(`L=${level}: tryInvert ${graded.reason}`);
+            // A skill window's span is invert(L+1) − invert(L), so it must not
+            // collapse or turn negative.
+            if (previous !== null && !(decreasing ? x.lt(previous) : x.gt(previous))) {
+              found.push(`L=${level}: invert=${x} out of order after ${previous}`);
+            }
+            previous = x;
+          }
+          return found;
+        });
+        expect(errors).toEqual([]);
+        expect(misses).toEqual([]);
+      });
+    }
+  }
+
+  test('the search stays bounded: evaluations per call at break_eternity layer 0', () => {
+    // Measured worst over the families above: 12 on a rising curve, 17 on a
+    // falling one (trunc over the negative cube root). The bound sits a little
+    // above, so an unbounded walk fails while a step or two of tuning does not.
+    const BOUND = 20;
+    for (const [family, { inner: build, levels }] of Object.entries(FAMILIES)) {
+      if (family.includes('layer 1')) continue;
+      for (const opName of ['floor', 'ceil', 'trunc']) {
+        const inner = build();
+        const curve = ROUNDING[opName](inner);
+        const evaluate = vi.spyOn(inner, 'evaluate');
+        let worst = 0;
+        for (let level = levels[0]; level <= levels[1]; level++) {
+          evaluate.mockClear();
+          curve.invert(level);
+          worst = Math.max(worst, evaluate.mock.calls.length);
+        }
+        expect(worst, `${opName} over ${family}`).toBeLessThanOrEqual(BOUND);
+      }
+    }
   });
 });
 
@@ -915,10 +1037,10 @@ describe('invert contract: tryInvert grades the answer', () => {
   describe('outside-image — the target has no pre-image', () => {
     test('interior rounding: a fractional level through the documented Skill curve', () => {
       // `xpToLevel: variable(xp).div(scale).sqrt().floor()` is the pattern
-      // `skill.ts` documents. Passthrough inversion is *correct* for integer
-      // targets — that is what the progress-bar callers ask for — and silently
-      // wrong for anything between breakpoints. Same chain, both outcomes,
-      // which is why no chain-only boolean can answer.
+      // `skill.ts` documents. An integer level inverts onto the level — that is
+      // what the progress-bar callers ask for — and anything between
+      // breakpoints has no pre-image. Same chain, both outcomes, which is why
+      // no chain-only boolean can answer.
       const xpToLevel = F.variable(0).div(50).sqrt().floor();
 
       for (const [level, xp] of [
@@ -1091,8 +1213,8 @@ describe('first passage: the smallest input that reaches the target', () => {
   });
 
   test('answers the next breakpoint where an interior floor has no pre-image', () => {
-    // The documented Skill curve. At an integer level the two agree, because
-    // that is exactly what rounding passthrough answers exactly for. At 3.5 the
+    // The documented Skill curve. At an integer level the two agree here,
+    // because the exact-squares path lands on the level's first input. At 3.5 the
     // level axis has no such value: nothing evaluates to 3.5, so the smallest
     // XP that *reaches* it is the start of level 4, while `invert` hands back a
     // number from inside the gap.

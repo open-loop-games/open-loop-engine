@@ -393,8 +393,22 @@ const SNAP_CEILING = 1e-3;
  *
  * Measured, not `Number.MAX_SAFE_INTEGER` — that is 9007199254740991, already
  * past this ceiling and already indistinguishable from its successor.
+ *
+ * @internal
  */
-const MAX_DISTINGUISHABLE_INTEGER = 9e15;
+export const MAX_DISTINGUISHABLE_INTEGER = 9e15;
+
+/**
+ * Whether `x` is an integer, without allocating for a number or a Decimal.
+ * Past break_eternity layer 0 every finite value is one.
+ *
+ * @internal
+ */
+export function isIntegerValue(x: DecimalSource): boolean {
+  if (typeof x === 'number') return Number.isInteger(x);
+  const d = toFinalDecimal(x);
+  return d.layer > 0 || Number.isInteger(d.mag);
+}
 
 /**
  * How far, in integers, `value.root(degree)` can sit from the true root.

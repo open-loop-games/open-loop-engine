@@ -435,12 +435,12 @@ export function createSkill(options: SkillOptions): Skill {
  * XP the current level starts and ends at, or `null` when `xpCurve` has no
  * inverse to ask.
  *
- * A `.floor()`ed curve is fine here, and precisely because these callers only
- * ever ask for integer levels: an interior rounding op inverts to the exact
- * breakpoint below the target, which for an integer target *is* the pre-image.
- * A fractional target would come back `outside-image` instead — see
- * `Formula.tryInvert`, which is what makes the distinction visible rather than
- * leaving it to a passthrough that answers either way.
+ * A `.floor()`ed curve is fine here, because these callers only ever ask for
+ * integer levels: an outermost `floor`, `ceil` or `trunc` inverts an integer
+ * level to an input that evaluates back to it, near the level's edge. A
+ * fractional target would come back `outside-image` instead — see
+ * `Formula.tryInvert`. Both bounds are used whatever the grade, so an inexact
+ * op above the rounding op can still shift them by a level.
  */
 function getLevelXPBounds(
   skill: Skill,

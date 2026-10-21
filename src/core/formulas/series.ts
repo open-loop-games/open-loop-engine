@@ -31,7 +31,7 @@
  * the curve has no antiderivative to correct from.
  */
 
-import { Decimal, type DecimalSource } from '@/primitives/decimal';
+import { Decimal, isIntegerValue, type DecimalSource } from '@/primitives/decimal';
 
 // === CONTRACT ===
 
@@ -144,7 +144,7 @@ export function powerSeries(
 const MAX_POWER = 12;
 
 function isNonNegativeInteger(value: DecimalSource): boolean {
-  return Decimal.gte(value, 0) && Decimal.eq(Decimal.floor(value), value);
+  return Decimal.gte(value, 0) && isIntegerValue(value);
 }
 
 /**

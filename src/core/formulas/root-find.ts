@@ -151,3 +151,93 @@ export function solveMonotone(
   }
   return hi;
 }
+
+/** First relative offset {@link findLevelInput} steps by: one float64 ulp. */
+const LEVEL_STEP_START = 2 ** -52;
+
+/**
+ * Largest relative offset {@link findLevelInput} steps by before it gives up on
+ * a direction. The farthest edge measured across the rounding-op round-trip
+ * law's curve families sat about 2⁻⁴⁴ from the algebraic pre-image.
+ */
+const LEVEL_STEP_CAP = 2 ** -20;
+
+/** Halving cap for {@link findLevelInput}; the bracket starts at most `LEVEL_STEP_CAP` wide, so it collapses far earlier. */
+const LEVEL_BISECTIONS = 64;
+
+/**
+ * An input near `seed` where `round(inner(x))` is exactly `level`, or `null`
+ * when none is found within `LEVEL_STEP_CAP` of it on either side.
+ *
+ * `seed` is an algebraic pre-image that rounding left a few ulps outside the
+ * level. The search steps away from it by doubling relative offsets, then
+ * bisects back to the level's edge, so the answer is the input of the level
+ * nearest `seed`. A `seed` of 0 cannot step relatively and gets `null`.
+ *
+ * @param inner - The curve under the rounding op. Its unrounded value tells a
+ *   rising curve from a falling one after one probe.
+ * @param round - The rounding op itself.
+ *
+ * @internal — the inverse of a rounding op (`floor`, `ceil`, `trunc`).
+ */
+export function findLevelInput(
+  inner: (x: Decimal) => DecimalSource,
+  round: (value: DecimalSource) => DecimalSource,
+  level: DecimalSource,
+  seed: Decimal,
+): Decimal | null {
+  const innerAtSeed = inner(seed);
+  const atSeed = round(innerAtSeed);
+  if (Decimal.eq(atSeed, level)) return seed;
+  const short = Decimal.lt(atSeed, level);
+  let turnedBack = false;
+
+  const scale = seed.abs();
+
+  const searchSide = (direction: number, turnBackEarly: boolean): Decimal | null => {
+    let miss = seed;
+    let hit: Decimal | null = null;
+    for (let delta = LEVEL_STEP_START; delta <= LEVEL_STEP_CAP; delta *= 2) {
+      const probe = seed.add(scale.mul(delta * direction));
+      // Past break_eternity layer 0 the smallest offsets don't move `seed`.
+      if (probe.eq(miss)) continue;
+      const innerAtProbe = inner(probe);
+      const atProbe = round(innerAtProbe);
+      if (Decimal.eq(atProbe, level)) {
+        hit = probe;
+        break;
+      }
+      // Stepped over the level without landing in it: nothing on this side.
+      if (Decimal.lt(atProbe, level) !== short) return null;
+      // The curve moves away from the level this way, so it falls where it was
+      // assumed to rise. The other side goes next.
+      const away = short
+        ? Decimal.lt(innerAtProbe, innerAtSeed)
+        : Decimal.gt(innerAtProbe, innerAtSeed);
+      if (turnBackEarly && away) {
+        turnedBack = true;
+        return null;
+      }
+      miss = probe;
+    }
+    if (hit === null) return null;
+    // Invariant: `round(inner(hit))` is `level` and `round(inner(miss))` is not.
+    for (let i = 0; i < LEVEL_BISECTIONS; i++) {
+      const mid = miss.add(hit).div(2);
+      if (mid.eq(miss) || mid.eq(hit)) break;
+      if (Decimal.eq(round(inner(mid)), level)) hit = mid;
+      else miss = mid;
+    }
+    return hit;
+  };
+
+  // A rising curve needs larger inputs when `seed` falls short, so that side
+  // goes first. An unrounded value that turns back may be ulp-scale noise
+  // rather than a falling curve, so that side is retried in full last.
+  const toward = short ? 1 : -1;
+  return (
+    searchSide(toward, true) ??
+    searchSide(-toward, false) ??
+    (turnedBack ? searchSide(toward, false) : null)
+  );
+}

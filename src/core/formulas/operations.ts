@@ -9,11 +9,11 @@
  * Operations with unique math (log antiderivatives, tetration, etc.) are hand-written.
  */
 
-import { Decimal } from '@/primitives/decimal';
+import { Decimal, MAX_DISTINGUISHABLE_INTEGER, isIntegerValue } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
-import { solveMonotone } from './root-find';
+import { findLevelInput, solveMonotone } from './root-find';
 import { NOT_SUMMABLE, exactSeries, geometricSeries, powerSeries, type Series } from './series';
 import type { FormulaSource, GenericFormula, InvertFunction, SubstitutionStack } from './types';
 
@@ -146,6 +146,32 @@ export function invertPassthrough(value: DecimalSource, ...inputs: FormulaSource
     return 0;
   }
   return variable.invert(value);
+}
+
+// === ROUNDING ===
+
+/**
+ * Inverse of a rounding op (`floor`, `ceil`, `trunc`): the inner curve's
+ * algebraic pre-image, moved onto the level when rounding misses it.
+ *
+ * `pow` and `log` leave that pre-image a few ulps either side of the level's
+ * edge, so `floor` alone would read it one level low and `ceil` one level high.
+ * Only an integer target below `MAX_DISTINGUISHABLE_INTEGER` is searched for. A
+ * fractional one is outside the image and keeps its algebraic pre-image, which
+ * `tryInvert` grades `outside-image`.
+ */
+export function makeRoundingInvert(round: (value: DecimalSource) => DecimalSource) {
+  return (value: DecimalSource, lhs: FormulaSource) => {
+    if (!hasVariable(lhs)) {
+      reportInversionFailure('not-invertible', 'Could not invert due to no input being a variable');
+      return 0;
+    }
+    const candidate = new Decimal(lhs.invert(value));
+    const isLevel =
+      isIntegerValue(value) && Decimal.lt(Decimal.abs(value), MAX_DISTINGUISHABLE_INTEGER);
+    if (!isLevel || !Decimal.isFinite(candidate)) return candidate;
+    return findLevelInput((x) => lhs.evaluate(x), round, value, candidate) ?? candidate;
+  };
 }
 
 // === SUMMATION ===
