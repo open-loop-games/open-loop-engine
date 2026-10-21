@@ -118,6 +118,19 @@ describe('createEngine type surface', () => {
     const key = Symbol('test') as InjectionKey<{ hello: string }>;
     expectTypeOf(engine.tryInject(key)).toEqualTypeOf<{ hello: string } | undefined>();
   });
+
+  it('accessor takes an object or a factory over the engine services', async () => {
+    const { createGameStateAccessor, GameStateAccessorKey } = await import('@/index');
+    type Accessor = import('@/index').GameStateAccessorMutator;
+    type Services = import('@/index').AccessorServices;
+    expectTypeOf<import('@/engine').EngineOptions['accessor']>().toEqualTypeOf<
+      Accessor | ((services: Services) => Accessor) | undefined
+    >();
+    expectTypeOf(createGameStateAccessor).returns.toEqualTypeOf<Accessor>();
+    expectTypeOf(createGameStateAccessor).parameter(0).toEqualTypeOf<Services>();
+    const engine = createEngine({ gameId: 'type-test' });
+    expectTypeOf(engine.tryInject(GameStateAccessorKey)).toEqualTypeOf<Accessor | undefined>();
+  });
 });
 
 describe('persistent value types', () => {

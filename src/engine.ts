@@ -41,9 +41,12 @@ import {
   withTuningRegistries,
   type TuningRegistry,
 } from './core/override-registry';
-import { withGameStateAccessor } from './core/game-state-accessor';
-import type { GameStateAccessor } from './primitives/types';
-import type { GameStateMutator } from './core/effects';
+import {
+  GameStateAccessorKey,
+  withGameStateAccessor,
+  type AccessorServices,
+  type GameStateAccessorMutator,
+} from './core/game-state-accessor';
 import {
   CategoriesKey,
   withEngineCategories,
@@ -310,13 +313,16 @@ export interface EngineOptions {
    */
   persistenceNamespace?: string;
   /**
-   * Consumer-supplied game-state accessor and mutator. When provided, category
-   * factories (`createChallengeCategory`, etc.) read it as an ambient value
-   * when a category has no `accessor` option. The accessor is a stateless
-   * vtable, built before any module installs. Its methods are called only
+   * The game-state accessor and mutator: an object, or a factory the engine
+   * calls once at `start()`, before any module installs, with the engine's
+   * services. Pass `(services) => createGameStateAccessor(services, { … })` to
+   * build one over this engine's resource registry. Category factories
+   * (`createChallengeCategory`, etc.) read it as an ambient value when a
+   * category has no `accessor` option. After `start()`, read it with
+   * `engine.tryInject(GameStateAccessorKey)`. Its methods are called only
    * during play, not during install/connect.
    */
-  accessor?: GameStateAccessor & GameStateMutator;
+  accessor?: GameStateAccessorMutator | ((services: AccessorServices) => GameStateAccessorMutator);
 }
 
 /**
@@ -379,8 +385,8 @@ export interface Engine {
    *
    * Introspection tools outside the engine (the picker, devtools, balance
    * workbenches) read opt-in injection keys with it, such as
-   * {@link CategoriesKey}, {@link ChainRegistryKey}, and
-   * {@link EffectSystemRegistryKey}. They need no module installed only to
+   * {@link CategoriesKey}, {@link ChainRegistryKey},
+   * {@link EffectSystemRegistryKey} and {@link GameStateAccessorKey}. They need no module installed only to
    * capture them.
    */
   tryInject<T>(key: InjectionKey<T>): T | undefined;
@@ -657,6 +663,12 @@ export function createEngine(options: EngineOptions): Engine {
         // calls via the ambient set below. Per-engine, so scratch engines never
         // see each other's resources.
         const resourceRegistry = createResourceRegistry();
+        // Built here, so a factory accessor reads this engine's registry and
+        // no other. Its reads are lazy, so the registry may still be empty.
+        const accessor =
+          typeof options.accessor === 'function'
+            ? options.accessor({ resourceRegistry })
+            : options.accessor;
         // Per-engine categories collection — auto-populated by the
         // category factories (createProducerCategory etc.) via the ambient
         // set below. Pre-provided under CategoriesKey so balance-harness tooling
@@ -679,6 +691,7 @@ export function createEngine(options: EngineOptions): Engine {
           [ChainRegistryKey, chainRegistry],
           [EffectSystemRegistryKey, effectSystemRegistry],
           [ResourceRegistryKey, resourceRegistry],
+          [GameStateAccessorKey, accessor],
           [CategoriesKey, engineCategories],
           [TuningRegistriesKey, tuningRegistries],
         ]);
@@ -726,7 +739,7 @@ export function createEngine(options: EngineOptions): Engine {
                 withResourceRegistry(resourceRegistry, () =>
                   withEngineCategories(engineCategories, () =>
                     withTuningRegistries(tuningRegistries, () =>
-                      withGameStateAccessor(options.accessor, () =>
+                      withGameStateAccessor(accessor, () =>
                         withPersistenceNamespace(options.persistenceNamespace, () => {
                           for (const mod of sorted) {
                             withPersistentContext(mod.id, () => mod.install(sharedContext));
