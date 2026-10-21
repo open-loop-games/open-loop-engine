@@ -15,23 +15,23 @@ authored dialog graphs and the native dialog adapter that walks them. The adapte
 
 - `function createDialogCategory<Def extends { id: string; }>(options: DialogCategoryOptions<Def>): DialogCategory<Def>` — Create a dialog category — batch-registered NPC / scene dialog content with a content registry and per-def DialogGraph production. `src/systems/dialog-category.ts:89`
 - `function createDialogSession(options: DialogSessionOptions): DialogSession` — Create a dialog session — the envelope that drives a UI through a DialogGraph. `src/systems/dialog-session.ts:166`
-- `function createNativeDialogAdapter(options: NativeDialogAdapterOptions): NativeDialogAdapter` — Create a native dialog adapter over the supplied graphs, accessor and mutator. `src/systems/dialog.ts:224`
-- `interface DialogAdapter` — Adapter contract: anything that can drive a dialog conversation against game state. `src/systems/dialog.ts:122`
-- `interface DialogAdapterEvents` — Lifecycle events emitted by a NativeDialogAdapter instance. `src/systems/dialog.ts:159`
+- `function createNativeDialogAdapter(options: NativeDialogAdapterOptions): NativeDialogAdapter` — Create a native dialog adapter over the supplied graphs, accessor and mutator. `src/systems/dialog.ts:227`
+- `interface DialogAdapter` — Adapter contract: anything that can drive a dialog conversation against game state. `src/systems/dialog.ts:126`
+- `interface DialogAdapterEvents` — Lifecycle events emitted by a NativeDialogAdapter instance. `src/systems/dialog.ts:162`
 - `type DialogAdapterFactory = (graphs: DialogGraph[], accessor: GameStateAccessor, mutator: GameStateMutator) => DialogAdapter` — Factory signature for alternative DialogAdapter implementations (Ink, Yarn, etc.). `src/systems/dialog-session.ts:68`
 - `interface DialogCategory<Def extends { id: string; }> extends ResettableObject` — A dialog category — batch-registered NPC/scene dialog content. `src/systems/dialog-category.ts:43`
 - `interface DialogCategoryEntry<Def extends { id: string; }>` — A category entry: the def and its dialog graphs (no def state). `src/systems/dialog-category.ts:37`
 - `interface DialogCategoryOptions<Def extends { id: string; }>` `src/systems/dialog-category.ts:25`
-- `interface DialogChoice` — A single response option attached to a DialogNode. `src/systems/dialog.ts:56`
-- `interface DialogGraph` — A complete authored conversation: nodes plus an entry pointer. `src/systems/dialog.ts:71`
+- `interface DialogChoice` — A single response option attached to a DialogNode. `src/systems/dialog.ts:61`
+- `interface DialogGraph` — A complete authored conversation: nodes plus an entry pointer. `src/systems/dialog.ts:76`
 - `interface DialogNode` — One line or branch in a dialog graph. `src/systems/dialog.ts:30`
-- `interface DialogPresentation` — Snapshot of a presented line — what the UI binds to. `src/systems/dialog.ts:80`
+- `interface DialogPresentation` — Snapshot of a presented line — what the UI binds to. `src/systems/dialog.ts:85`
 - `interface DialogSession extends Emittable<DialogSessionEvents>` — A dialog session — the public surface for driving conversations from a UI / module. `src/systems/dialog-session.ts:101`
 - `interface DialogSessionEvents` — Lifecycle events emitted by a DialogSession. `src/systems/dialog-session.ts:49`
 - `interface DialogSessionOptions` — Options for createDialogSession — the persistent context id, the authored graphs, and an optional adapter factory and accessor for another dialog backend. `src/systems/dialog-session.ts:79`
-- `interface NativeDialogAdapter extends DialogAdapter, Emittable<DialogAdapterEvents>` — Native dialog adapter instance — implements DialogAdapter plus event subscription. `src/systems/dialog.ts:191`
-- `interface NativeDialogAdapterOptions` — Options for createNativeDialogAdapter — the authored graphs plus the read/write side (GameStateAccessor for predicates, GameStateMutator for outcome effects). `src/systems/dialog.ts:177`
-- `interface SerializedDialogAdapter` — The adapter's serialized form: the fields every DialogAdapter writes on `serialize()`. `src/systems/dialog.ts:104`
+- `interface NativeDialogAdapter extends DialogAdapter, Emittable<DialogAdapterEvents>` — Native dialog adapter instance — implements DialogAdapter plus event subscription. `src/systems/dialog.ts:194`
+- `interface NativeDialogAdapterOptions` — Options for createNativeDialogAdapter — the authored graphs plus the read/write side (GameStateAccessor for predicates, GameStateMutator for outcome effects). `src/systems/dialog.ts:180`
+- `interface SerializedDialogAdapter` — The adapter's serialized form: the fields every DialogAdapter writes on `serialize()`. `src/systems/dialog.ts:108`
 
 ## Subject Category
 

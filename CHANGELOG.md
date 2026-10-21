@@ -2,6 +2,57 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.8.0 (2026-10-21)
+
+### ⚠ Breaking changes
+
+* **core:** a bag or inventory move that moves nothing returns 0 (b8d5f28)
+
+  ResourceBag.add and subtract, Inventory.add and
+  subtract, and transferBetweenBags return Decimal | 0: the amount moved,
+  or the literal 0 when nothing moved. transferAmountsBetweenBags returns
+  Record<string, Decimal | 0>. A truthiness read of the result now means
+  "something moved". A method call on the result no longer typechecks.
+
+  Migration:
+    // before
+    if (inventory.add(id, amount).gt(0)) ...
+    added.eq(5)
+    // after
+    if (inventory.add(id, amount)) ...
+    Decimal.eq(added, 5)
+
+  Why: an action that may do nothing returns 0 when it does, so its result
+  can be read as a success flag. Purchasable.purchase follows the same
+  rule as a patch, because its return narrowed from DecimalSource; these
+  widened from Decimal, so every reader that called a method breaks.
+
+  Refs studio/open-loop-engine#76
+
+* **systems:** every dialog node presents its line; fallThrough opts a node out (60df616)
+
+  a DialogNode with no visible choice now presents on
+  arrival instead of entering `next`. `advance()` enters `next` from it,
+  then presents the node it stops on. `DialogNode.fallThrough?: boolean`
+  restores the old walk for one node. The cycle error now names a
+  fallThrough cycle, since only such a chain can loop.
+
+  Migration:
+    // a routing or onEnter-only node meant to be skipped
+    { id: 'route', text: '', onEnter: [...], next: 'ask' }
+    // after
+    { id: 'route', text: '', onEnter: [...], next: 'ask', fallThrough: true }
+    // a synthetic "continue" choice on a line can go; offer a continue
+    // button when present() reports no choices and terminal: false, and
+    // call session.advance()
+
+  Why: `text` is required on every node, so silently not showing it is
+  the wrong default. Ink and Yarn present every line and route through
+  text-free diverts; fall-through's one recorded motive, a stall on
+  gated-off choices, is now served by `advance()`.
+
+  Refs studio/open-loop-engine#84
+
 ## 0.7.7 (2026-10-21)
 
 ### Features

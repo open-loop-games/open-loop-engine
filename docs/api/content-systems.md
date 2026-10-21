@@ -108,7 +108,7 @@ per-run metric delta recording
 
 game-dev-friendly wrapper over ResourceBag
 
-- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional automatic persistence. `src/systems/inventory.ts:111`
+- `function createInventory(options: InventoryOptions): Inventory` — Creates a game inventory with per-item capacity driven by modifier chains, backed by a ResourceBag with optional automatic persistence. `src/systems/inventory.ts:113`
 - `interface Inventory` — Inventory instance created by createInventory. `src/systems/inventory.ts:49`
 - `interface InventoryOptions` — Options for createInventory — capacity, overflow behavior, and the initial item list. `src/systems/inventory.ts:21`
 
