@@ -63,7 +63,7 @@ the opt-in builder over the resource registry, the record of the methods an acce
 - `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's resource registry. `src/core/game-state-accessor.ts:182`
 - `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:84`
 - `type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateMutator` — A method name of GameStateAccessor or GameStateMutator. `src/core/game-state-accessor.ts:30`
-- `type GameStateAccessorMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:59`
+- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator & WithAccessorMethods` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:59`
 - `interface GameStateAccessorOptions` — What the consumer supplies to createGameStateAccessor. `src/core/game-state-accessor.ts:67`
 
 ## Throttle
