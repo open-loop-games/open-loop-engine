@@ -12,7 +12,8 @@ import type {
   StateEffect,
   CompositeEffect,
 } from '@/primitives/types';
-import { evaluateCondition } from './conditions';
+import { collectConditionMethods, evaluateCondition } from './conditions';
+import { assertAccessorMethods, type GameStateAccessorMethod } from './game-state-accessor';
 import { gateToCondition, type Gate } from './gate';
 
 // === TYPES ===
@@ -123,6 +124,75 @@ export function applyEffect(
       mutator.setStateAt(effect.path, effect.value);
       return;
   }
+}
+
+// === METHOD CHECKS ===
+
+/**
+ * The methods applying `effects` calls: mutator writes, plus branch-condition reads.
+ *
+ * @internal
+ */
+export function collectEffectMethods(
+  effects: readonly IEffectInternal[],
+): Set<GameStateAccessorMethod> {
+  const into = new Set<GameStateAccessorMethod>();
+  const visit = (effect: IEffectInternal): void => {
+    switch (effect.kind) {
+      case 'composite':
+        effect.effects.forEach(visit);
+        return;
+      case 'branch':
+        collectConditionMethods(effect.condition, into);
+        visit(effect.then);
+        if (effect.else) visit(effect.else);
+        return;
+      case 'resource':
+        into.add('applyResourceOp');
+        return;
+      case 'flag':
+        into.add('setFlag');
+        return;
+      case 'state':
+        into.add('setStateAt');
+        return;
+    }
+  };
+  effects.forEach(visit);
+  return into;
+}
+
+const MUTATOR_METHODS: ReadonlySet<GameStateAccessorMethod> = new Set<keyof GameStateMutator>([
+  'applyResourceOp',
+  'setFlag',
+  'setStateAt',
+]);
+
+/**
+ * Throw unless `accessor` implements every read and `mutator` every write
+ * that applying `effects` calls. Systems call it when a def with effects is
+ * built, so a missing method fails there rather than when the effect applies.
+ *
+ * @param label prefix for the error, e.g. `"challenge 'c1' completionEffects"`.
+ * @internal
+ */
+export function assertEffectMethods(
+  effects: readonly IEffectInternal[],
+  accessor: GameStateAccessor,
+  mutator: GameStateMutator,
+  label: string,
+): void {
+  const methods = [...collectEffectMethods(effects)];
+  assertAccessorMethods(
+    accessor,
+    methods.filter((m) => !MUTATOR_METHODS.has(m)),
+    label,
+  );
+  assertAccessorMethods(
+    mutator,
+    methods.filter((m) => MUTATOR_METHODS.has(m)),
+    label,
+  );
 }
 
 // === EFFECT BUILDERS ===

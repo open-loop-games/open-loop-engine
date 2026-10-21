@@ -28,11 +28,11 @@ shared generic type utilities and Vue effect scope ownership
 
 declarative game-state mutations from `IEffect` ASTs
 
-- `function applyEffect(effect: IEffectInternal, accessor: GameStateAccessor, mutator: GameStateMutator): void` — Apply an effect to game state via the mutator. `src/core/effects.ts:102`
-- `const E` — Ergonomic factories for constructing IEffect values. `src/core/effects.ts:145`
-- `interface GameStateMutator` — The write side of game state, which applies resolved effects. `src/core/effects.ts:32`
-- `interface ResolvedEffect` — One concrete effect step, with every formula evaluated, ready to write. `src/core/effects.ts:20`
-- `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:66`
+- `function applyEffect(effect: IEffectInternal, accessor: GameStateAccessor, mutator: GameStateMutator): void` — Apply an effect to game state via the mutator. `src/core/effects.ts:103`
+- `const E` — Ergonomic factories for constructing IEffect values. `src/core/effects.ts:215`
+- `interface GameStateMutator` — The write side of game state, which applies resolved effects. `src/core/effects.ts:33`
+- `interface ResolvedEffect` — One concrete effect step, with every formula evaluated, ready to write. `src/core/effects.ts:21`
+- `function resolveEffect(effect: IEffectInternal, accessor: GameStateAccessor): ResolvedEffect[]` — Flatten a declarative IEffectInternal into a list of concrete ResolvedEffect steps. `src/core/effects.ts:67`
 - `interface ConditionalEffectDef` — A conditional effect's def, registered at startup. `src/systems/conditional-effect.ts:51`
 - `interface ConditionalEffectEvents` — Events emitted by the conditional effect system. `src/systems/conditional-effect.ts:83`
 - `interface ConditionalEffectSystem` — Manages conditional effects: registration, predicate watching, and binding on activation. `src/systems/conditional-effect.ts:97`

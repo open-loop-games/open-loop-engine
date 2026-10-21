@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { bn, Decimal } from '@/primitives/decimal';
 import type { IEffect, IEffectInternal, GameStateAccessor } from '@/primitives/types';
-import { resolveEffect, applyEffect, E, type GameStateMutator } from '@/core/effects';
+import {
+  resolveEffect,
+  applyEffect,
+  assertEffectMethods,
+  collectEffectMethods,
+  E,
+  type GameStateMutator,
+} from '@/core/effects';
+import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 
 function mockAccessor(): GameStateAccessor {
   return {
@@ -202,5 +210,56 @@ describe('applyEffect', () => {
     );
     expect(mutator.calls).toHaveLength(1);
     expect(new Decimal(mutator.calls[0].args[2] as number).eq(99)).toBe(true);
+  });
+});
+
+describe('collectEffectMethods', () => {
+  it('maps each leaf kind to the mutator method that applies it', () => {
+    const methods = collectEffectMethods([
+      E.resource('gold', 'add', 1),
+      E.composite(E.flag('door'), E.state('player.phase', 'late')),
+    ]);
+    expect([...methods].sort()).toEqual(['applyResourceOp', 'setFlag', 'setStateAt']);
+  });
+
+  it("adds a branch condition's reads and walks both arms", () => {
+    const branch: IEffectInternal = {
+      kind: 'branch',
+      condition: {
+        kind: 'all',
+        conditions: [
+          { kind: 'flag', target: 'met-rask' },
+          {
+            kind: 'not',
+            condition: { kind: 'state', path: 'mood', operator: 'eq', value: 'angry' },
+          },
+        ],
+      },
+      then: E.resource('gold', 'add', 5),
+      else: E.flag('snubbed'),
+    };
+    expect([...collectEffectMethods([branch])].sort()).toEqual(
+      ['applyResourceOp', 'getFlag', 'getStateAt', 'setFlag'].sort(),
+    );
+  });
+});
+
+describe('assertEffectMethods', () => {
+  const full: GameStateAccessorMutator = {
+    ...mockAccessor(),
+    applyResourceOp: () => {},
+    setFlag: () => {},
+    setStateAt: () => {},
+  };
+
+  it('checks reads against the accessor and writes against the mutator', () => {
+    const readsOnly = { ...full, [AccessorMethods]: new Set(['getAmount', 'getFlag'] as const) };
+    const effects: IEffectInternal[] = [
+      { kind: 'branch', condition: { kind: 'flag', target: 'f' }, then: E.flag('g') },
+    ];
+    // Reads served by the accessor, writes by a separate full mutator: passes.
+    expect(() => assertEffectMethods(effects, readsOnly, full, 'x')).not.toThrow();
+    // The same partial object as the mutator: setFlag is missing.
+    expect(() => assertEffectMethods(effects, readsOnly, readsOnly, 'x')).toThrow(/needs setFlag/);
   });
 });

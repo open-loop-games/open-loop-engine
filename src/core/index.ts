@@ -141,7 +141,19 @@ export type { TransitionDistance, TransitionDeps, AffordableLike } from './trans
 export { timeUntilResource, timeUntilAffordable } from './transitions';
 
 // === GAME STATE ACCESSOR ===
-export type { GameStateAccessorMutator } from './game-state-accessor';
+// implementsAccessorMethod / assertAccessorMethods / assertEffectMethods are
+// the systems' construction checks, imported by path. Not part of the API surface.
+export type {
+  AccessorServices,
+  GameStateAccessorMethod,
+  GameStateAccessorMutator,
+  GameStateAccessorOptions,
+} from './game-state-accessor';
+export {
+  AccessorMethods,
+  GameStateAccessorKey,
+  createGameStateAccessor,
+} from './game-state-accessor';
 
 // === TICK DRIVER ===
 export type {

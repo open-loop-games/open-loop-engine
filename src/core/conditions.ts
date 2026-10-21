@@ -14,6 +14,7 @@ import type {
   AnyCondition,
   NotCondition,
 } from '@/primitives/types';
+import type { GameStateAccessorMethod } from './game-state-accessor';
 
 function compareDecimal(
   a: Decimal,
@@ -116,6 +117,35 @@ function collectDependencies(condition: ICondition, deps: string[]): void {
     case 'not':
       collectDependencies(condition.condition, deps);
       break;
+  }
+}
+
+/**
+ * Add the accessor methods evaluating `condition` calls to `into`.
+ *
+ * @internal
+ */
+export function collectConditionMethods(
+  condition: ICondition,
+  into: Set<GameStateAccessorMethod>,
+): void {
+  switch (condition.kind) {
+    case 'resource':
+      into.add('getAmount');
+      return;
+    case 'flag':
+      into.add('getFlag');
+      return;
+    case 'state':
+      into.add('getStateAt');
+      return;
+    case 'all':
+    case 'any':
+      for (const c of condition.conditions) collectConditionMethods(c, into);
+      return;
+    case 'not':
+      collectConditionMethods(condition.condition, into);
+      return;
   }
 }
 

@@ -255,7 +255,7 @@ How an engine instance is assembled and ticks: `createEngine` and its module, ev
 - `reactivity` → runtime.md#reactivity-re-exports
 - `events` → runtime.md#events
 - `tick-driver` → runtime.md#tickdriver
-- `game-state-accessor` → runtime.md#ambient-game-state-accessor
+- `game-state-accessor` → runtime.md#game-state-accessor
 - `throttle` → runtime.md#throttle
 - `time` → runtime.md#time-tracking
 - `transitions` → runtime.md#transition-distance-primitives

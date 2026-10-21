@@ -53,11 +53,11 @@ the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: va
 - `type TickHandler = (dt: number) => void` — A tick handler for `tickDriver.onTick`. `src/core/tick-driver.ts:149`
 - `interface TimerProvider` — Timer functions for scheduling. `src/core/tick-driver.ts:57`
 
-## Ambient game-state accessor
+## Game-state accessor
 
-one of the cross-cutting ambient values `createEngine` sets around `install()` / `connect()`. The others are the chain, effect-system, resource and tuning registries, the engine categories, and the persistence namespace
+the opt-in builder over the resource registry, the record of the methods an accessor implements, and the ambient accessor `createEngine` sets around `install()` / `connect()`
 
-- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:27`
+- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:49`
 
 ## Throttle
 
