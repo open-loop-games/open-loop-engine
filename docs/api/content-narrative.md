@@ -15,7 +15,7 @@ authored dialog graphs and the native dialog adapter that walks them. The adapte
 
 - `function createDialogCategory<Def extends { id: string; }>(options: DialogCategoryOptions<Def>): DialogCategory<Def>` — Create a dialog category — batch-registered NPC / scene dialog content with a content registry and per-def DialogGraph production. `src/systems/dialog-category.ts:89`
 - `function createDialogSession(options: DialogSessionOptions): DialogSession` — Create a dialog session — the envelope that drives a UI through a DialogGraph. `src/systems/dialog-session.ts:166`
-- `function createNativeDialogAdapter(options: NativeDialogAdapterOptions): NativeDialogAdapter` — Create a native dialog adapter over the supplied graphs, accessor and mutator. `src/systems/dialog.ts:222`
+- `function createNativeDialogAdapter(options: NativeDialogAdapterOptions): NativeDialogAdapter` — Create a native dialog adapter over the supplied graphs, accessor and mutator. `src/systems/dialog.ts:224`
 - `interface DialogAdapter` — Adapter contract: anything that can drive a dialog conversation against game state. `src/systems/dialog.ts:122`
 - `interface DialogAdapterEvents` — Lifecycle events emitted by a NativeDialogAdapter instance. `src/systems/dialog.ts:159`
 - `type DialogAdapterFactory = (graphs: DialogGraph[], accessor: GameStateAccessor, mutator: GameStateMutator) => DialogAdapter` — Factory signature for alternative DialogAdapter implementations (Ink, Yarn, etc.). `src/systems/dialog-session.ts:68`

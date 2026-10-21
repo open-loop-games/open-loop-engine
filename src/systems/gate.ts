@@ -66,7 +66,12 @@ import {
   type TransitionDeps,
   type TransitionDistance,
 } from '@/core/transitions';
-import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
+import {
+  ACCESSOR_METHOD_REMEDY,
+  getCurrentGameStateAccessor,
+  implementsAccessorMethod,
+  type GameStateAccessorMethod,
+} from '@/core/game-state-accessor';
 import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/registries';
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
 import {
@@ -360,7 +365,8 @@ export function getBoundGateServices(owner: object): GateServices | undefined {
 /**
  * Throw unless `services` has every Gate service that evaluating `gate` reads.
  * A `resource-gte` leaf passes with either the accessor or the resource
- * registry.
+ * registry. The accessor counts for a leaf only if it implements the method
+ * the leaf calls, by its `AccessorMethods` record.
  *
  * This moves a first-evaluation throw to the registration callsite. The first
  * evaluation is often inside a `computed`, where the stack is far from the
@@ -378,18 +384,35 @@ export function getBoundGateServices(owner: object): GateServices | undefined {
 export function assertGateServices(gate: Gate, services: GateServices, label: string): void {
   const missing = new Set<string>();
   const remedies = new Set<GateService>();
+  const unimplemented = new Set<GameStateAccessorMethod>();
   const kinds = new Set<Gate['kind']>();
   forEachGateLeaf(gate, (leaf) => {
     kinds.add(leaf.kind);
     const options = getLeafGateServices(leaf);
-    if (options.some((service) => services[service])) return;
-    missing.add(options.join(' or '));
-    for (const service of options) remedies.add(service);
+    if (options.some((service) => servesLeaf(services, service, leaf))) return;
+    let lacking = options;
+    const method = leafMethod(leaf);
+    if (services.accessor && method && options.includes('accessor')) {
+      unimplemented.add(method);
+      lacking = options.filter((service) => service !== 'accessor');
+    }
+    if (lacking.length === 0) return;
+    missing.add(lacking.join(' or '));
+    for (const service of lacking) remedies.add(service);
   });
-  if (missing.size === 0) return;
+  if (missing.size === 0 && unimplemented.size === 0) return;
+  const problems = [
+    ...(missing.size > 0
+      ? [`this Gate reads the ${[...missing].join(' and ')}, which the GateServices bundle lacks`]
+      : []),
+    ...(unimplemented.size > 0
+      ? [`the accessor does not implement ${[...unimplemented].join(', ')}`]
+      : []),
+  ];
+  const fixes = [...remedies].map(serviceRemedy);
+  if (unimplemented.size > 0) fixes.push(ACCESSOR_METHOD_REMEDY);
   throw new Error(
-    `${label}: this Gate reads the ${[...missing].join(' and ')}, which the GateServices bundle lacks. ` +
-      `Gate kinds in play: ${[...kinds].join(', ')}. ${[...remedies].map(serviceRemedy).join(' ')}`,
+    `${label}: ${problems.join('; ')}. Gate kinds in play: ${[...kinds].join(', ')}. ${fixes.join(' ')}`,
   );
 }
 
@@ -568,8 +591,16 @@ function missingServicesError(
  * still needs one to predict.
  */
 function demandRateAccessor(services: GateServices, kind: Gate['kind']): GameStateAccessor {
-  if (services.accessor) return services.accessor;
-  throw missingServicesError('timeUntilGateFlip', kind, ['accessor'], ' to read its getRate');
+  const { accessor } = services;
+  if (!accessor) {
+    throw missingServicesError('timeUntilGateFlip', kind, ['accessor'], ' to read its getRate');
+  }
+  if (!implementsAccessorMethod(accessor, 'getRate')) {
+    throw new Error(
+      `timeUntilGateFlip: a '${kind}' Gate needs getRate, which the accessor does not implement. ${ACCESSOR_METHOD_REMEDY}`,
+    );
+  }
+  return accessor;
 }
 
 /** The registered resource a resource Gate names, or throw naming the id. */
@@ -584,13 +615,48 @@ function findResource(
   return resource;
 }
 
-/** A `resource-gte` amount: the wired accessor's, else the registered resource's. */
+/**
+ * A `resource-gte` amount: the wired accessor's when it implements
+ * `getAmount`, else the registered resource's.
+ */
 function amountOf(gate: ResourceGteGate, services: GateServices): DecimalSource {
-  if (services.accessor) return services.accessor.getAmount(gate.resource);
+  const { accessor } = services;
+  if (accessor && implementsAccessorMethod(accessor, 'getAmount')) {
+    return accessor.getAmount(gate.resource);
+  }
   if (!services.resourceRegistry) {
     throw missingServicesError('evaluateGate', gate.kind, getLeafGateServices(gate));
   }
   return findResource(services, gate.resource, gate.kind, 'evaluateGate').value;
+}
+
+/** The accessor method a leaf calls, if it reads the accessor at all. */
+function leafMethod(
+  leaf: Exclude<Gate, AllGate | AnyGate | NotGate>,
+): GameStateAccessorMethod | undefined {
+  switch (leaf.kind) {
+    case 'resource-gte':
+      return 'getAmount';
+    case 'flag':
+      return 'getFlag';
+    case 'state':
+      return 'getStateAt';
+    default:
+      return undefined;
+  }
+}
+
+/** Whether `service` in `services` can serve `leaf`; the accessor must implement its method. */
+function servesLeaf(
+  services: GateServices,
+  service: GateService,
+  leaf: Exclude<Gate, AllGate | AnyGate | NotGate>,
+): boolean {
+  if (service !== 'accessor') return Boolean(services[service]);
+  const { accessor } = services;
+  if (!accessor) return false;
+  const method = leafMethod(leaf);
+  return !method || implementsAccessorMethod(accessor, method);
 }
 
 /** Where an author gets a missing Gate service from, for the error messages. */

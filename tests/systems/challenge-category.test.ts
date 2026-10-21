@@ -9,6 +9,7 @@ import {
 } from '@/core/persistence';
 import { createOverrideRegistry } from '@/core/override-registry';
 import { E } from '@/core/effects';
+import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createContentRegistry } from '@/systems/content-registry';
 import { createReset, type Reset } from '@/systems/reset';
@@ -358,5 +359,36 @@ describe('ChallengeCategory — completionEffects need a mutator', () => {
         completionEffects: [E.resource('gold', 'add', 1)],
       }),
     ).toThrow(/completionEffects/);
+  });
+});
+
+describe('ChallengeCategory — completionEffects and the AccessorMethods record', () => {
+  const resourcesOnly: GameStateAccessorMutator = {
+    getAmount: () => Decimal.dZero,
+    getRate: () => Decimal.dZero,
+    getFlag: () => false,
+    getStateAt: () => undefined,
+    applyResourceOp: () => {},
+    setFlag: () => {},
+    setStateAt: () => {},
+    [AccessorMethods]: new Set(['getAmount', 'applyResourceOp']),
+  };
+
+  it('throws at register when a completion effect needs a method the mutator lacks', () => {
+    const challenges = createChallengeCategory({
+      id: 'ch-record',
+      accessor: resourcesOnly,
+      mutator: resourcesOnly,
+    });
+    expect(() =>
+      challenges.register({ id: 'c1', displayName: 'C1', completionEffects: [E.flag('won')] }),
+    ).toThrow(/challenge 'c1' completionEffects: needs setFlag/);
+    expect(() =>
+      challenges.register({
+        id: 'c2',
+        displayName: 'C2',
+        completionEffects: [E.resource('gold', 'add', 1)],
+      }),
+    ).not.toThrow();
   });
 });

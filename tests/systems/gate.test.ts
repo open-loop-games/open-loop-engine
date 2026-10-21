@@ -26,6 +26,7 @@ import {
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { evaluateCondition } from '@/core/conditions';
 import { E } from '@/core/effects';
+import { AccessorMethods, createGameStateAccessor } from '@/core/game-state-accessor';
 import {
   assertGateServices,
   gateToCondition,
@@ -754,6 +755,73 @@ describe('assertGateServices', () => {
         'site',
       ),
     ).toThrow(/reads the resourceRegistry,/);
+  });
+});
+
+describe('assertGateServices — the AccessorMethods record', () => {
+  const flagGate: Gate = { kind: 'flag', id: 'met-rask' };
+  const stateGate: Gate = { kind: 'state', path: 'phase', operator: 'eq', value: 'late' };
+
+  it('a flag Gate over a built accessor without getFlag fails at the check, naming getFlag', () => {
+    const f = buildAccessorlessFixture();
+    const accessor = createGameStateAccessor({ resourceRegistry: f.runtime.resourceRegistry! });
+    expect(() => assertGateServices(flagGate, { ...f.runtime, accessor }, 'site')).toThrow(
+      /^site: .*the accessor does not implement getFlag.*Gate kinds in play: flag/,
+    );
+    const withFlag = createGameStateAccessor(
+      { resourceRegistry: f.runtime.resourceRegistry! },
+      { getFlag: () => true },
+    );
+    expect(() => assertGateServices(flagGate, { accessor: withFlag }, 'site')).not.toThrow();
+    expect(() => assertGateServices(stateGate, { accessor: withFlag }, 'site')).toThrow(
+      /does not implement getStateAt/,
+    );
+    f.stop();
+  });
+
+  it('a full hand-rolled accessor without a record passes every leaf', () => {
+    const accessor = {
+      getFlag: () => false,
+      getStateAt: () => undefined,
+    } as unknown as GameStateAccessor;
+    expect(() =>
+      assertGateServices({ kind: 'all', of: [flagGate, stateGate] }, { accessor }, 'site'),
+    ).not.toThrow();
+  });
+
+  it('a resource-gte falls through to the registry when the record leaves out getAmount', () => {
+    const f = buildAccessorlessFixture();
+    f.runtime.resourceRegistry!.findById('points')!.value = 50;
+    const partial = {
+      getAmount: () => {
+        throw new Error('getAmount should not be read');
+      },
+      getFlag: () => true,
+      [AccessorMethods]: new Set(['getFlag']),
+    } as unknown as GameStateAccessor;
+    const gate: Gate = { kind: 'resource-gte', resource: 'points', value: 49 };
+    const services = { ...f.runtime, accessor: partial };
+    expect(() => assertGateServices(gate, services, 'site')).not.toThrow();
+    expect(evaluateGate(gate, services)).toBe(true);
+    expect(() => assertGateServices(gate, { accessor: partial }, 'site')).toThrow(
+      /does not implement getAmount/,
+    );
+    f.stop();
+  });
+
+  it('predicting over an accessor without getRate throws, naming getRate', () => {
+    const f = buildAccessorlessFixture();
+    const accessor = createGameStateAccessor({ resourceRegistry: f.runtime.resourceRegistry! });
+    const services = { ...f.runtime, accessor };
+    for (const gate of [
+      { kind: 'resource-gte', resource: 'points', value: 1e9 },
+      { kind: 'cumulative-gte', resource: 'points', value: 1e9 },
+    ] as Gate[]) {
+      expect(() => timeUntilGateFlip(gate, services)).toThrow(
+        new RegExp(`^timeUntilGateFlip: a '${gate.kind}' Gate needs .*getRate`),
+      );
+    }
+    f.stop();
   });
 });
 

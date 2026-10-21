@@ -93,6 +93,14 @@ const CALLERS: Record<Exclude<GameStateAccessorMethod, 'getAmount' | 'applyResou
 // === RECORD ===
 
 /**
+ * How to fix a method an accessor does not implement, for the errors.
+ *
+ * @internal
+ */
+export const ACCESSOR_METHOD_REMEDY =
+  'Supply it to createGameStateAccessor, or add it to the accessor and its AccessorMethods record.';
+
+/**
  * Whether `accessor` implements `method`. True for an accessor without an
  * {@link AccessorMethods} record.
  *
@@ -120,7 +128,7 @@ export function assertAccessorMethods(
   if (missing.length === 0) return;
   throw new Error(
     `${label}: needs ${missing.join(', ')}, which the accessor does not implement. ` +
-      'Supply it to createGameStateAccessor, or add it to the accessor and its AccessorMethods record.',
+      ACCESSOR_METHOD_REMEDY,
   );
 }
 

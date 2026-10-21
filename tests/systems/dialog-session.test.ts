@@ -7,7 +7,7 @@ import {
   type Persistent,
   type Serializable,
 } from '@/core/persistence';
-import { type GameStateAccessorMutator } from '@/core/game-state-accessor';
+import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 import { createEngine, type EngineModule } from '@/index';
 import { createDialogSession } from '@/systems/dialog-session';
 import type { DialogGraph, SerializedDialogAdapter } from '@/systems/dialog';
@@ -385,5 +385,46 @@ describe('createDialogSession', () => {
         graphs: [greetingGraph],
       }),
     ).toThrow(/requires an ambient GameStateAccessor/);
+  });
+});
+
+describe('createDialogSession — the AccessorMethods record', () => {
+  const graph = (onEnter: DialogGraph['nodes'][number]['onEnter']): DialogGraph => ({
+    id: 'g',
+    entry: 'a',
+    nodes: [
+      {
+        id: 'a',
+        text: 'hi',
+        onEnter,
+        choices: [
+          { id: 'bye', text: 'Bye', outcomes: [{ kind: 'flag', target: 'met', value: true }] },
+        ],
+      },
+    ],
+  });
+
+  it('a state effect over an accessor without setStateAt fails when the session is built', () => {
+    const accessor = {
+      ...buildAccessor(),
+      [AccessorMethods]: new Set(['getAmount', 'applyResourceOp', 'setFlag'] as const),
+    };
+    expect(() =>
+      createDialogSession({
+        id: 'record',
+        graphs: [graph([{ kind: 'state', path: 'mood', value: 'warm' }])],
+        accessor,
+      }),
+    ).toThrow(/dialog 'g' node 'a' onEnter: needs setStateAt/);
+  });
+
+  it("a choice's outcomes are checked too", () => {
+    const accessor = {
+      ...buildAccessor(),
+      [AccessorMethods]: new Set(['getAmount', 'applyResourceOp'] as const),
+    };
+    expect(() =>
+      createDialogSession({ id: 'record-choice', graphs: [graph(undefined)], accessor }),
+    ).toThrow(/dialog 'g' node 'a' choice 'bye' outcomes: needs setFlag/);
   });
 });

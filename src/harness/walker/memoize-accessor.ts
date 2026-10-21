@@ -9,6 +9,7 @@
  */
 
 import type { GameStateAccessor } from '@/primitives/types';
+import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
 
 /** Cache `read` per id; keyed on `has`, so an `undefined` read stays cached. */
 function cached<V>(read: (id: string) => V): (id: string) => V {
@@ -32,5 +33,8 @@ export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor 
   // tells a predictor to fall back to the net rate.
   const { getInflowRate } = accessor;
   if (getInflowRate) memo.getInflowRate = cached((id) => getInflowRate.call(accessor, id));
+  // The record too, so a partial accessor's construction checks see the same methods.
+  const methods = (accessor as Partial<GameStateAccessorMutator>)[AccessorMethods];
+  if (methods) Object.assign(memo, { [AccessorMethods]: methods });
   return memo;
 }

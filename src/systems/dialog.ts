@@ -16,7 +16,7 @@
  */
 
 import type { IEffect, GameStateAccessor } from '@/primitives/types';
-import { applyEffect, type GameStateMutator } from '@/core/effects';
+import { applyEffect, assertEffectMethods, type GameStateMutator } from '@/core/effects';
 import { createEmitHandle, type Emittable } from '@/core/events';
 import { createPredicateResolver, evaluateGate, type Gate } from './gate';
 
@@ -197,7 +197,9 @@ export interface NativeDialogAdapter extends DialogAdapter, Emittable<DialogAdap
  *
  * A node's `when` and a choice's `visible` are Gates. They evaluate through
  * {@link evaluateGate} against {@link GateServices} captured once, here,
- * where each Gate's services are asserted. Create the adapter inside
+ * where each Gate's services are asserted. Each `onEnter` and `outcomes`
+ * effect is checked against the methods the accessor and mutator implement
+ * here too. Create the adapter inside
  * `createEngine`'s install/connect, where the ambient Gate services are
  * wired. Player input drives dialog long after install/connect ends, so
  * Gate services read later would be empty.
@@ -244,9 +246,12 @@ export function createNativeDialogAdapter(
       nodes.set(node.id, node);
       const label = `dialog '${g.id}' node '${node.id}'`;
       if (node.when) predicates.assert(node.when, `${label} when`);
+      if (node.onEnter) assertEffectMethods(node.onEnter, accessor, mutator, `${label} onEnter`);
       for (const choice of node.choices ?? []) {
-        if (choice.visible) {
-          predicates.assert(choice.visible, `${label} choice '${choice.id}' visible`);
+        const choiceLabel = `${label} choice '${choice.id}'`;
+        if (choice.visible) predicates.assert(choice.visible, `${choiceLabel} visible`);
+        if (choice.outcomes) {
+          assertEffectMethods(choice.outcomes, accessor, mutator, `${choiceLabel} outcomes`);
         }
       }
     }

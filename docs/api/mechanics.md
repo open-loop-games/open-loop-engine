@@ -108,17 +108,17 @@ the typed, serializable yes/no test, as data. The type union and its pure-data p
 - `type Predicate = Computable<boolean> | Gate` — A yes/no test in any authoring form. `src/core/gate.ts:143`
 - `interface ResourceGteGate` — True when the resource's amount is `>= value`. `src/core/gate.ts:28`
 - `interface StateGate` — True when the comparison `accessor.getStateAt(path) <op> value` holds. `src/core/gate.ts:76`
-- `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:399`
-- `function assertGateServices(gate: Gate, services: GateServices, label: string): void` — Throw unless `services` has every Gate service that evaluating `gate` reads. `src/systems/gate.ts:378`
-- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate holds. `src/systems/gate.ts:522`
-- `function createPredicateResolver(override?: GateServices): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:448`
-- `function evaluateGate(gate: Gate, services: GateServices): boolean` — Evaluate a Gate against the engine's live state now. `src/systems/gate.ts:183`
-- `function evaluatePredicate(predicate: Predicate, services: GateServices): boolean` — Evaluate a Predicate once against `services` — for consumer code that reads a predicate field back off a def. `src/systems/gate.ts:482`
-- `interface GateRequirementOptions` `src/systems/gate.ts:489`
-- `interface GateServices` — The Gate services evaluateGate and timeUntilGateFlip read. `src/systems/gate.ts:131`
-- `function getAmbientGateServices(override?: GateServices): GateServices` — Snapshot the ambient Gate services wired now into a GateServices bundle. `src/systems/gate.ts:156`
-- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateServices. `src/systems/gate.ts:412`
-- `function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance` — Transition distance until `gate` flips, at current rates. `src/systems/gate.ts:245`
+- `interface AdoptedPredicate` — A Predicate adopted by a system at its register site. `src/systems/gate.ts:422`
+- `function assertGateServices(gate: Gate, services: GateServices, label: string): void` — Throw unless `services` has every Gate service that evaluating `gate` reads. `src/systems/gate.ts:384`
+- `function createGateRequirement(options: GateRequirementOptions): Requirement` — Build a Requirement that's met whenever its Gate holds. `src/systems/gate.ts:545`
+- `function createPredicateResolver(override?: GateServices): PredicateResolver` — Build the resolver a system adopts its predicate fields through. `src/systems/gate.ts:471`
+- `function evaluateGate(gate: Gate, services: GateServices): boolean` — Evaluate a Gate against the engine's live state now. `src/systems/gate.ts:188`
+- `function evaluatePredicate(predicate: Predicate, services: GateServices): boolean` — Evaluate a Predicate once against `services` — for consumer code that reads a predicate field back off a def. `src/systems/gate.ts:505`
+- `interface GateRequirementOptions` `src/systems/gate.ts:512`
+- `interface GateServices` — The Gate services evaluateGate and timeUntilGateFlip read. `src/systems/gate.ts:136`
+- `function getAmbientGateServices(override?: GateServices): GateServices` — Snapshot the ambient Gate services wired now into a GateServices bundle. `src/systems/gate.ts:161`
+- `interface PredicateResolver` — Adopts a system's predicate fields against one captured GateServices. `src/systems/gate.ts:435`
+- `function timeUntilGateFlip(gate: Gate, services: GateServices): TransitionDistance` — Transition distance until `gate` flips, at current rates. `src/systems/gate.ts:250`
 
 ## Modifier
 

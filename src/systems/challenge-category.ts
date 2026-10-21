@@ -53,7 +53,7 @@ import type { OverrideRegistry } from '@/core/override-registry';
 import type { Reset } from './reset';
 import type { IEffect, GameStateAccessor } from '@/primitives/types';
 import type { GameStateMutator } from '@/core/effects';
-import { applyEffect } from '@/core/effects';
+import { applyEffect, assertEffectMethods } from '@/core/effects';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { getCurrentEngineCategories } from './engine-categories';
 import { bindGateServices, createPredicateResolver, type Predicate } from './gate';
@@ -429,10 +429,18 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
   const base: CategoryBase<Def, Challenge, DefState> = createCategoryBase({
     id: categoryId,
     buildInstance(def: Def): Challenge {
-      if (def.completionEffects?.length && !(accessor && mutator)) {
-        throw new Error(
-          `Challenge "${def.id}" has completionEffects but category "${categoryId}" has no ` +
-            'accessor and mutator to apply them; pass both, or build it inside createEngine',
+      if (def.completionEffects?.length) {
+        if (!(accessor && mutator)) {
+          throw new Error(
+            `Challenge "${def.id}" has completionEffects but category "${categoryId}" has no ` +
+              'accessor and mutator to apply them; pass both, or build it inside createEngine',
+          );
+        }
+        assertEffectMethods(
+          def.completionEffects,
+          accessor,
+          mutator,
+          `challenge '${def.id}' completionEffects`,
         );
       }
 
