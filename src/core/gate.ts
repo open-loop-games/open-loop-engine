@@ -14,6 +14,7 @@
 import type { DecimalSource } from '@/primitives/decimal';
 import type { ICondition, ResourceCondition, StateCondition } from '@/primitives/types';
 import type { Computable } from './computed';
+import type { GameStateAccessorMethod } from './game-state-accessor';
 
 // === GATE TYPE UNION ===
 
@@ -192,8 +193,8 @@ export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
  * instead of requiring every Gate service up front.
  *
  * A `resource-gte` leaf reports the `resourceRegistry`, which every engine
- * sets during install/connect. A wired accessor stands in for it: the leaf
- * reads `getAmount` first, and the registry only when no accessor is wired.
+ * sets during install/connect. A wired accessor that implements `getAmount`
+ * stands in for it: the leaf reads the accessor first, else the registry.
  *
  * These are the Gate services `evaluateGate` reads. For `resource-gte` and
  * `cumulative-gte`, `timeUntilGateFlip` also reads the resource's rate
@@ -229,6 +230,29 @@ export function getLeafGateServices(
     case 'count-gte':
     case 'active':
       return ['categories'];
+  }
+}
+
+/**
+ * The accessor method one leaf calls, for the leaves whose Gate services
+ * include the accessor.
+ *
+ * @internal
+ */
+export function getLeafAccessorMethod(
+  leaf: Exclude<Gate, AllGate | AnyGate | NotGate>,
+): GameStateAccessorMethod | undefined {
+  switch (leaf.kind) {
+    case 'resource-gte':
+      return 'getAmount';
+    case 'flag':
+      return 'getFlag';
+    case 'state':
+      return 'getStateAt';
+    case 'cumulative-gte':
+    case 'count-gte':
+    case 'active':
+      return undefined;
   }
 }
 

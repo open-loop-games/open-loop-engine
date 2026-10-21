@@ -9,16 +9,27 @@ import {
   createResource,
   type AccessorServices,
   type EngineModule,
+  type EngineOptions,
   type GameStateAccessorMutator,
 } from '@/index';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { resetAllPersistentContexts } from '@/core/persistence';
+import { createResourceRegistry } from '@/core/registries';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
 
 let ns = 0;
+function engineWith(gameId: string, accessor: EngineOptions['accessor']) {
+  return createEngine({
+    gameId,
+    persistence: false,
+    persistenceNamespace: `accessor-${ns++}`,
+    accessor,
+  });
+}
+
 function goldModule(amount: number, install?: () => void): EngineModule {
   return {
     id: 'gold-mod',
@@ -34,14 +45,9 @@ describe('EngineOptions.accessor — the factory form', () => {
     const calls: AccessorServices[] = [];
     let ambient: GameStateAccessorMutator | undefined;
     let built: GameStateAccessorMutator | undefined;
-    const engine = createEngine({
-      gameId: 'accessor-factory',
-      persistence: false,
-      persistenceNamespace: `accessor-${ns++}`,
-      accessor: (services) => {
-        calls.push(services);
-        return (built = createGameStateAccessor(services));
-      },
+    const engine = engineWith('accessor-factory', (services) => {
+      calls.push(services);
+      return (built = createGameStateAccessor(services));
     });
     engine.use(
       goldModule(5, () => {
@@ -59,12 +65,9 @@ describe('EngineOptions.accessor — the factory form', () => {
 
   it("two engines' built accessors never see each other's resources", () => {
     const build = (amount: number) => {
-      const engine = createEngine({
-        gameId: 'accessor-isolation',
-        persistence: false,
-        persistenceNamespace: `accessor-${ns++}`,
-        accessor: (services) => createGameStateAccessor(services),
-      });
+      const engine = engineWith('accessor-isolation', (services) =>
+        createGameStateAccessor(services),
+      );
       engine.use(goldModule(amount));
       engine.start();
       return engine;
@@ -78,33 +81,20 @@ describe('EngineOptions.accessor — the factory form', () => {
   });
 
   it('a flag Gate over a built accessor without getFlag fails at construction', () => {
-    const engine = createEngine({
-      gameId: 'accessor-flag',
-      persistence: false,
-      persistenceNamespace: `accessor-${ns++}`,
-      accessor: (services) => createGameStateAccessor(services),
-    });
+    const engine = engineWith('accessor-flag', (services) => createGameStateAccessor(services));
     engine.use(
       goldModule(0, () => {
         createGateRequirement({ gate: { kind: 'flag', id: 'met-rask' } });
       }),
     );
     expect(() => engine.start()).toThrow(
-      /createGateRequirement: the accessor does not implement getFlag/,
+      /createGateRequirement: this Gate reads the accessor's getFlag,/,
     );
   });
 
   it('a plain accessor object is published under GameStateAccessorKey too', () => {
-    const resourceRegistry = {
-      findById: () => undefined,
-    } as unknown as AccessorServices['resourceRegistry'];
-    const accessor = createGameStateAccessor({ resourceRegistry });
-    const engine = createEngine({
-      gameId: 'accessor-plain',
-      persistence: false,
-      persistenceNamespace: `accessor-${ns++}`,
-      accessor,
-    });
+    const accessor = createGameStateAccessor({ resourceRegistry: createResourceRegistry() });
+    const engine = engineWith('accessor-plain', accessor);
     engine.start();
     expect(engine.tryInject(GameStateAccessorKey)).toBe(accessor);
     engine.stop();

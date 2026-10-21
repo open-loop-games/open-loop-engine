@@ -13,7 +13,12 @@ import type {
   CompositeEffect,
 } from '@/primitives/types';
 import { collectConditionMethods, evaluateCondition } from './conditions';
-import { assertAccessorMethods, type GameStateAccessorMethod } from './game-state-accessor';
+import {
+  AccessorMethods,
+  assertAccessorMethods,
+  type GameStateAccessorMethod,
+  type WithAccessorMethods,
+} from './game-state-accessor';
 import { gateToCondition, type Gate } from './gate';
 
 // === TYPES ===
@@ -128,45 +133,45 @@ export function applyEffect(
 
 // === METHOD CHECKS ===
 
+/** The accessor methods applying an effect tree calls, split by the object that serves them. */
+export interface EffectMethods {
+  /** Branch-condition reads, served by the accessor. */
+  reads: Set<GameStateAccessorMethod>;
+  /** Effect writes, served by the mutator. */
+  writes: Set<GameStateAccessorMethod>;
+}
+
 /**
  * The methods applying `effects` calls: mutator writes, plus branch-condition reads.
  *
  * @internal
  */
-export function collectEffectMethods(
-  effects: readonly IEffectInternal[],
-): Set<GameStateAccessorMethod> {
-  const into = new Set<GameStateAccessorMethod>();
+export function collectEffectMethods(effects: readonly IEffectInternal[]): EffectMethods {
+  const out: EffectMethods = { reads: new Set(), writes: new Set() };
   const visit = (effect: IEffectInternal): void => {
     switch (effect.kind) {
       case 'composite':
         effect.effects.forEach(visit);
         return;
       case 'branch':
-        collectConditionMethods(effect.condition, into);
+        collectConditionMethods(effect.condition, out.reads);
         visit(effect.then);
         if (effect.else) visit(effect.else);
         return;
       case 'resource':
-        into.add('applyResourceOp');
+        out.writes.add('applyResourceOp');
         return;
       case 'flag':
-        into.add('setFlag');
+        out.writes.add('setFlag');
         return;
       case 'state':
-        into.add('setStateAt');
+        out.writes.add('setStateAt');
         return;
     }
   };
   effects.forEach(visit);
-  return into;
+  return out;
 }
-
-const MUTATOR_METHODS: ReadonlySet<GameStateAccessorMethod> = new Set<keyof GameStateMutator>([
-  'applyResourceOp',
-  'setFlag',
-  'setStateAt',
-]);
 
 /**
  * Throw unless `accessor` implements every read and `mutator` every write
@@ -178,21 +183,15 @@ const MUTATOR_METHODS: ReadonlySet<GameStateAccessorMethod> = new Set<keyof Game
  */
 export function assertEffectMethods(
   effects: readonly IEffectInternal[],
-  accessor: GameStateAccessor,
-  mutator: GameStateMutator,
+  accessor: GameStateAccessor & WithAccessorMethods,
+  mutator: GameStateMutator & WithAccessorMethods,
   label: string,
 ): void {
-  const methods = [...collectEffectMethods(effects)];
-  assertAccessorMethods(
-    accessor,
-    methods.filter((m) => !MUTATOR_METHODS.has(m)),
-    label,
-  );
-  assertAccessorMethods(
-    mutator,
-    methods.filter((m) => MUTATOR_METHODS.has(m)),
-    label,
-  );
+  // Without a record either object implements every method, so skip the walk.
+  if (!accessor[AccessorMethods] && !mutator[AccessorMethods]) return;
+  const { reads, writes } = collectEffectMethods(effects);
+  assertAccessorMethods(accessor, reads, label);
+  assertAccessorMethods(mutator, writes, label);
 }
 
 // === EFFECT BUILDERS ===

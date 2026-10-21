@@ -59,12 +59,12 @@ the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: va
 the opt-in builder over the resource registry, the record of the methods an accessor implements, and the ambient accessor `createEngine` sets around `install()` / `connect()`
 
 - `const AccessorMethods: unique symbol` — Keys the record of the methods an accessor implements, a `ReadonlySet<GameStateAccessorMethod>`. `src/core/game-state-accessor.ts:46`
-- `interface AccessorServices` — The engine services an accessor factory receives from `createEngine`. `src/core/game-state-accessor.ts:56`
-- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's resource registry. `src/core/game-state-accessor.ts:167`
-- `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:78`
+- `interface AccessorServices` — The engine services an accessor factory receives from `createEngine`. `src/core/game-state-accessor.ts:62`
+- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's resource registry. `src/core/game-state-accessor.ts:182`
+- `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:84`
 - `type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateMutator` — A method name of GameStateAccessor or GameStateMutator. `src/core/game-state-accessor.ts:30`
-- `type GameStateAccessorMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:49`
-- `interface GameStateAccessorOptions` — What the consumer supplies to createGameStateAccessor. `src/core/game-state-accessor.ts:61`
+- `type GameStateAccessorMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:59`
+- `interface GameStateAccessorOptions` — What the consumer supplies to createGameStateAccessor. `src/core/game-state-accessor.ts:67`
 
 ## Throttle
 

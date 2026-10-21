@@ -35,7 +35,7 @@ import { fractional } from '@/systems/retention';
 import {
   AUTOMATION_TIER_DEFS,
   buildRecommendationStack,
-  dialogAccessorStub,
+  accessorStub,
   noopRegisterTick as registerTick,
 } from './fixtures/stateful-systems';
 
@@ -742,7 +742,7 @@ describe('Reset — system-owned cross-run state survives a reset of its own mod
       const dialog = createDialogSession({
         id: 'm-dialog',
         graphs: [],
-        accessor: dialogAccessorStub,
+        accessor: accessorStub,
       });
       const achievements = createAchievementCategory<{ id: string }>({
         id: 'm-achievements',

@@ -35,7 +35,7 @@ import { createManualTicks } from '../helpers/manual-ticks';
 import {
   AUTOMATION_TIER_DEFS,
   buildRecommendationStack,
-  dialogAccessorStub,
+  accessorStub,
   noopRegisterTick as registerTick,
 } from './fixtures/stateful-systems';
 
@@ -154,7 +154,7 @@ const cases: Case[] = [
       createDialogSession({
         id: 'm-dialog',
         graphs: [],
-        accessor: dialogAccessorStub,
+        accessor: accessorStub,
       }),
     dirty: () => {},
   },

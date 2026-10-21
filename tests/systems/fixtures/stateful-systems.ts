@@ -14,8 +14,8 @@ export const AUTOMATION_TIER_DEFS = [
   { id: 'basic', displayName: 'Basic', order: 1 },
 ];
 
-/** A stateless GameStateAccessorMutator stub for a DialogSession under test. */
-export const dialogAccessorStub: GameStateAccessorMutator = {
+/** A stateless GameStateAccessorMutator stub that implements every method. */
+export const accessorStub: GameStateAccessorMutator = {
   getAmount: () => bn(0),
   getFlag: () => false,
   getStateAt: () => undefined,

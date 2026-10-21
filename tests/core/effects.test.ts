@@ -215,11 +215,12 @@ describe('applyEffect', () => {
 
 describe('collectEffectMethods', () => {
   it('maps each leaf kind to the mutator method that applies it', () => {
-    const methods = collectEffectMethods([
+    const { reads, writes } = collectEffectMethods([
       E.resource('gold', 'add', 1),
       E.composite(E.flag('door'), E.state('player.phase', 'late')),
     ]);
-    expect([...methods].sort()).toEqual(['applyResourceOp', 'setFlag', 'setStateAt']);
+    expect(reads.size).toBe(0);
+    expect([...writes].sort()).toEqual(['applyResourceOp', 'setFlag', 'setStateAt']);
   });
 
   it("adds a branch condition's reads and walks both arms", () => {
@@ -238,9 +239,9 @@ describe('collectEffectMethods', () => {
       then: E.resource('gold', 'add', 5),
       else: E.flag('snubbed'),
     };
-    expect([...collectEffectMethods([branch])].sort()).toEqual(
-      ['applyResourceOp', 'getFlag', 'getStateAt', 'setFlag'].sort(),
-    );
+    const { reads, writes } = collectEffectMethods([branch]);
+    expect([...reads].sort()).toEqual(['getFlag', 'getStateAt']);
+    expect([...writes].sort()).toEqual(['applyResourceOp', 'setFlag']);
   });
 });
 

@@ -10,6 +10,7 @@ import {
 import { createOverrideRegistry } from '@/core/override-registry';
 import { E } from '@/core/effects';
 import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
+import { accessorStub } from './fixtures/stateful-systems';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createContentRegistry } from '@/systems/content-registry';
 import { createReset, type Reset } from '@/systems/reset';
@@ -364,13 +365,7 @@ describe('ChallengeCategory — completionEffects need a mutator', () => {
 
 describe('ChallengeCategory — completionEffects and the AccessorMethods record', () => {
   const resourcesOnly: GameStateAccessorMutator = {
-    getAmount: () => Decimal.dZero,
-    getRate: () => Decimal.dZero,
-    getFlag: () => false,
-    getStateAt: () => undefined,
-    applyResourceOp: () => {},
-    setFlag: () => {},
-    setStateAt: () => {},
+    ...accessorStub,
     [AccessorMethods]: new Set(['getAmount', 'applyResourceOp']),
   };
 

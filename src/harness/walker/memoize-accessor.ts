@@ -9,7 +9,7 @@
  */
 
 import type { GameStateAccessor } from '@/primitives/types';
-import { AccessorMethods, type GameStateAccessorMutator } from '@/core/game-state-accessor';
+import { AccessorMethods, type WithAccessorMethods } from '@/core/game-state-accessor';
 
 /** Cache `read` per id; keyed on `has`, so an `undefined` read stays cached. */
 function cached<V>(read: (id: string) => V): (id: string) => V {
@@ -22,19 +22,20 @@ function cached<V>(read: (id: string) => V): (id: string) => V {
   };
 }
 
-export function memoizeAccessor(accessor: GameStateAccessor): GameStateAccessor {
-  const memo: GameStateAccessor = {
+export function memoizeAccessor(
+  accessor: GameStateAccessor & WithAccessorMethods,
+): GameStateAccessor & WithAccessorMethods {
+  const memo: GameStateAccessor & WithAccessorMethods = {
     getAmount: cached((id) => accessor.getAmount(id)),
     getRate: cached((id) => accessor.getRate(id)),
     getFlag: cached((id) => accessor.getFlag(id)),
     getStateAt: cached((path) => accessor.getStateAt(path)),
+    // The record too, so a partial accessor's construction checks see the same methods.
+    [AccessorMethods]: accessor[AccessorMethods],
   };
   // Only where the wrapped accessor has it: an absent `getInflowRate` is what
   // tells a predictor to fall back to the net rate.
   const { getInflowRate } = accessor;
   if (getInflowRate) memo.getInflowRate = cached((id) => getInflowRate.call(accessor, id));
-  // The record too, so a partial accessor's construction checks see the same methods.
-  const methods = (accessor as Partial<GameStateAccessorMutator>)[AccessorMethods];
-  if (methods) Object.assign(memo, { [AccessorMethods]: methods });
   return memo;
 }

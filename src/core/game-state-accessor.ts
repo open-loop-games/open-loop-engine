@@ -45,12 +45,18 @@ export type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateM
  */
 export const AccessorMethods: unique symbol = Symbol('AccessorMethods');
 
+/**
+ * An object that may carry an {@link AccessorMethods} record.
+ *
+ * @internal
+ */
+export interface WithAccessorMethods {
+  /** The methods this accessor implements; absent means every method. */
+  readonly [AccessorMethods]?: ReadonlySet<GameStateAccessorMethod>;
+}
+
 /** Combined accessor + mutator — every consumer unifies these into one object. */
-export type GameStateAccessorMutator = GameStateAccessor &
-  GameStateMutator & {
-    /** The methods this accessor implements; absent means every method. */
-    readonly [AccessorMethods]?: ReadonlySet<GameStateAccessorMethod>;
-  };
+export type GameStateAccessorMutator = GameStateAccessor & GameStateMutator & WithAccessorMethods;
 
 /** The engine services an accessor factory receives from `createEngine`. */
 export interface AccessorServices {
@@ -80,14 +86,23 @@ export const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator> =
 
 // === CONSTANTS ===
 
-/** What calls each optional method, for the error a missing one throws. */
-const CALLERS: Record<Exclude<GameStateAccessorMethod, 'getAmount' | 'applyResourceOp'>, string> = {
+/** The methods a consumer may supply; each one supplied joins the record. */
+const OPTIONAL_METHODS = [
+  'getFlag',
+  'setFlag',
+  'getStateAt',
+  'setStateAt',
+  'getRate',
+  'getInflowRate',
+] as const satisfies readonly (keyof GameStateAccessorOptions)[];
+
+/** What calls each method that gets a throwing stub, for the error it throws. */
+const CALLERS: Record<Exclude<(typeof OPTIONAL_METHODS)[number], 'getInflowRate'>, string> = {
   getFlag: "a 'flag' Gate or condition",
   setFlag: "a 'flag' effect",
   getStateAt: "a 'state' Gate or condition",
   setStateAt: "a 'state' effect",
   getRate: 'a Gate prediction (timeUntilGateFlip)',
-  getInflowRate: "a 'cumulative-gte' prediction",
 };
 
 // === RECORD ===
@@ -216,12 +231,14 @@ export function createGameStateAccessor(
   }
 
   const methods = new Set<GameStateAccessorMethod>(['getAmount', 'applyResourceOp']);
-  for (const method of Object.keys(CALLERS) as (keyof typeof CALLERS)[]) {
-    if (options[method]) methods.add(method);
-  }
+  for (const method of OPTIONAL_METHODS) if (options[method]) methods.add(method);
 
   return {
-    getAmount: (id) => new Decimal(resourceFor(id).value),
+    getAmount: (id) => {
+      // Read per Gate evaluation, so skip the copy when the value is already a Decimal.
+      const { value } = resourceFor(id);
+      return value instanceof Decimal ? value : new Decimal(value);
+    },
     applyResourceOp,
     getFlag: getFlag ?? (() => missing('getFlag')),
     setFlag: setFlag ?? (() => missing('setFlag')),

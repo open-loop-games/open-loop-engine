@@ -10,6 +10,7 @@ import {
   assertAccessorMethods,
   type GameStateAccessorMutator,
 } from '@/core/game-state-accessor';
+import { accessorStub } from '../systems/fixtures/stateful-systems';
 
 beforeEach(() => {
   resetAllPersistentContexts();
@@ -132,15 +133,7 @@ describe('createGameStateAccessor — supplied and omitted methods', () => {
 });
 
 describe('AccessorMethods record', () => {
-  const handRolled: GameStateAccessorMutator = {
-    getAmount: () => Decimal.dZero,
-    getRate: () => Decimal.dZero,
-    getFlag: () => false,
-    getStateAt: () => undefined,
-    applyResourceOp: () => {},
-    setFlag: () => {},
-    setStateAt: () => {},
-  };
+  const handRolled = accessorStub;
 
   it('an accessor without a record implements every method', () => {
     expect(implementsAccessorMethod(handRolled, 'setStateAt')).toBe(true);
