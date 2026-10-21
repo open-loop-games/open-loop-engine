@@ -17,6 +17,8 @@ import { computed, getCurrentScope, ref, unref, type ComputedRef, type MaybeRef 
 import type { DecimalSource } from '@/primitives/decimal';
 import {
   withPersistentContext,
+  bindPersistenceNamespace,
+  getCurrentFullPersistentContext,
   deletePersistentContextRefs,
   isPersistent,
   setPersistentId,
@@ -128,10 +130,15 @@ export interface CategoryBase<
   /**
    * Register defs: validate the whole batch, then build instances. It can be
    * called more than once; a later call adds defs, such as content registered
-   * after install. A builder that throws
-   * stops the batch at its def: the defs before it stay registered, and it
-   * and the ones after it are not. The refs its build created are deleted,
-   * so the same def can be registered again.
+   * after install. Each entry is a child of the persistent context the
+   * category was built in, whoever calls `register`. So a reset that names the
+   * building module reaches it, and one that names the caller's module does
+   * not. A category built outside any persistent context makes each entry a
+   * child of the enclosing persistent context of the `register` call.
+   *
+   * A builder that throws stops the batch at its def: the defs before it stay
+   * registered, and it and the ones after it are not. The refs its build
+   * created are deleted, so the same def can be registered again.
    */
   register(defs: Def | Def[]): void;
 
@@ -192,37 +199,62 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
   // here, so they stop with the Vue effect scope that built the category (the
   // engine's `moduleScope`) instead of outliving `engine.dispose()`.
   const scope = getCurrentScope();
+  // Each entry's persistent context is a child of the one the category was
+  // built in, whoever calls register, so a reset that names the building
+  // module reaches every entry. Its persistence namespace is captured with it,
+  // so an entry registered after install is in that engine's save. A category
+  // built outside any persistent context (at import) leaves both to the caller.
+  const owner = getCurrentFullPersistentContext();
+
+  const entryContextId = (def: Def) => `${categoryId}/${def.id}`;
 
   function registerOne(def: Def): void {
-    const contextId = `${categoryId}/${def.id}`;
-    // withPersistentContext guarantees the context is popped even if a builder
-    // throws — a leaked context silently mis-scopes the save keys of every
-    // persistent ref created afterward.
+    const contextId = entryContextId(def);
     const { instance, state, signals } = runInEffectScope(scope, () =>
-      withPersistentContext(contextId, () => {
-        const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
-        const state = buildState ? buildState(def, instance) : (undefined as DefState);
+      withPersistentContext(
+        contextId,
+        () => {
+          const instance = buildInstance ? buildInstance(def) : (undefined as Instance);
+          const state = buildState ? buildState(def, instance) : (undefined as DefState);
 
-        // Auto-name persistent fields on the returned def state so save keys
-        // are stable across field reorders. Each def is in its own persistent
-        // context (`${categoryId}/${def.id}`), so the field name alone is unique.
-        if (state !== null && typeof state === 'object') {
-          for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
-            if (isPersistent(value) && value[PersistentId] === undefined) {
-              setPersistentId(value, fieldName);
+          // Auto-name persistent fields on the returned def state so save keys
+          // are stable across field reorders. Each def is in its own persistent
+          // context (`${categoryId}/${def.id}`), so the field name alone is unique.
+          if (state !== null && typeof state === 'object') {
+            for (const [fieldName, value] of Object.entries(state as Record<string, unknown>)) {
+              if (isPersistent(value) && value[PersistentId] === undefined) {
+                setPersistentId(value, fieldName);
+              }
             }
           }
-        }
 
-        const signals = buildSignals?.(def, instance, state);
-        return { instance, state, signals };
-      }),
+          const signals = buildSignals?.(def, instance, state);
+          return { instance, state, signals };
+        },
+        owner,
+      ),
     );
 
     entries.set(def.id, { def, instance, state, signals });
     contextResets.push(attachPersistentContextReset({}, contextId));
     entriesVersion.value++;
   }
+
+  // Each def enters the registry before its build, so builders can read it
+  // back through getDef; one whose build throws leaves again with the refs
+  // it created, and the defs after it stay unregistered, so registry and
+  // entries never disagree and the def can be registered again.
+  function addDef(def: Def): void {
+    registry.register(def);
+    try {
+      registerOne(def);
+    } catch (error) {
+      remove(def.id);
+      deletePersistentContextRefs(entryContextId(def));
+      throw error;
+    }
+  }
+  const addOwnedDef = owner === undefined ? addDef : bindPersistenceNamespace(addDef);
 
   return {
     id: categoryId,
@@ -231,20 +263,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
     register(defs: Def | Def[]): void {
       const arr = Array.isArray(defs) ? defs : [defs];
       assertRegistrable(arr);
-      // Each def enters the registry before its build, so builders can read it
-      // back through getDef; one whose build throws leaves again with the refs
-      // it created, and the defs after it stay unregistered, so registry and
-      // entries never disagree and the def can be registered again.
-      for (const def of arr) {
-        registry.register(def);
-        try {
-          registerOne(def);
-        } catch (error) {
-          remove(def.id);
-          deletePersistentContextRefs(`${categoryId}/${def.id}`);
-          throw error;
-        }
-      }
+      for (const def of arr) addOwnedDef(def);
     },
 
     getDef(id: string): Def | undefined {

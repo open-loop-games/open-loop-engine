@@ -406,15 +406,20 @@ function checkNaNAndWrite<T>(persistentRef: Persistent<T>, value: T): void {
  *
  * @param id - Unique id for this persistent context, such as a node id. It must
  *   not contain `.`, which save paths split on; such an id throws.
+ * @param parent - Full id of the persistent context it becomes a child of,
+ *   when that is not the enclosing one. It decides only which walks reach the
+ *   new persistent context (reset scope, dispose), never a save key.
  */
-export function beginPersistentContext(id: string): void {
+export function beginPersistentContext(
+  id: string,
+  parent: string | undefined = addingContexts[addingContexts.length - 1],
+): void {
   // Save keys are `${contextId}.${refId}` and split on "." into nested save
   // data, so a dotted persistent context id would save and validate at the wrong path.
   if (id.includes('.')) {
     throw new Error(`Persistent context id "${id}" contains ".", which save paths split on.`);
   }
   const fullId = toFullContextId(id);
-  const parent = addingContexts[addingContexts.length - 1];
   addingContexts.push(fullId);
   if (!(fullId in persistentRefs)) {
     persistentRefs[fullId] = new Set();
@@ -438,10 +443,16 @@ export function endPersistentContext(): void {
  *
  * @param id - Persistent context id (as for {@link beginPersistentContext})
  * @param fn - Block to execute inside the context
+ * @param parent - Full id of the persistent context it becomes a child of,
+ *   when that is not the enclosing one (as for {@link beginPersistentContext})
  * @returns The return value of `fn`
  */
-export function withPersistentContext<T>(id: string, fn: () => T): T {
-  beginPersistentContext(id);
+export function withPersistentContext<T>(
+  id: string,
+  fn: () => T,
+  parent: string | undefined = addingContexts[addingContexts.length - 1],
+): T {
+  beginPersistentContext(id, parent);
   try {
     return fn();
   } finally {
