@@ -87,7 +87,7 @@ batch-create Challenges from content defs
 
 bounded runs that end, reset, and start the next run
 
-- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — bounded runs that end, reset, and start the next run. `src/systems/cycle.ts:243`
+- `function createCycle(options: CycleOptions): Cycle` — Create a cycle — bounded runs that end, reset, and start the next run. `src/systems/cycle.ts:248`
 - `interface Cycle extends ScopedReset` — A cycle instance — the returned object from createCycle. `src/systems/cycle.ts:140`
 - `interface CycleEvents` — Events emitted by a Cycle instance. `src/systems/cycle.ts:39`
 - `interface CycleOptions` `src/systems/cycle.ts:52`
@@ -96,7 +96,7 @@ bounded runs that end, reset, and start the next run
 
 per-run metric delta recording
 
-- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-run metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:153`
+- `function createCycleLog(options: CycleLogOptions): CycleLog` — Create a CycleLog that records per-run metric deltas from a Cycle's lifecycle. `src/systems/cycle-log.ts:163`
 - `interface CycleLog` — A CycleLog instance — the returned object from createCycleLog. `src/systems/cycle-log.ts:94`
 - `interface CycleLogDelta` — Per-metric change recorded during one run. `src/systems/cycle-log.ts:61`
 - `interface CycleLogEntry` — One run's recorded outcome. `src/systems/cycle-log.ts:70`
@@ -115,6 +115,8 @@ game-dev-friendly wrapper over ResourceBag
 ## Producer Category
 
 batch-create Producers from defs
+
+A negative `baseRate` makes a producer subtract each tick: upkeep, or a buffer that loses an amount over time. The subtraction stops at zero unless `allowNegative` is set, and `getTotalRate` sums it into the net rate. See ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run. A count that play grows rather than purchases, such as a production cascade tier, is `ProducerMapping.extraCount`: the count is then `owned + extraCount`.
 
 - `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:643`
 - `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:190`
@@ -167,6 +169,8 @@ core primitive for managing a collection of opaque, addressable pool runs with i
 ## Skill
 
 XP, a level and a modifier per skill, in a level-driven or an accumulator mode
+
+`skill.xpCurve` is the built XP-to-level `Formula`. For the XP at which level L begins, ask it: `xpCurve.tryInvert(L)` grades the answer, and `invert(L)` returns it unchecked. An integer level evaluates back to itself when `floor`, `ceil` or `trunc` is the outermost op of the curve.
 
 - `interface AccumulatorSkill extends SkillBase` — Accumulator skill — modifier = 1 + lifetimeBonus. `src/systems/skill.ts:172`
 - `interface AccumulatorSkillOptions extends SkillOptionsBase` — Accumulator mode — a lifetime bonus accumulates across runs. `src/systems/skill.ts:101`

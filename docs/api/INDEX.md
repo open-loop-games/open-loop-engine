@@ -21,7 +21,7 @@ Start at the highest abstraction level that fits. Drop down only when it does no
 
 A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
-- **Cycle** — the repeating structure of runs: a run ends, its reset scope resets, and the next run starts. `createCycle`. → content-systems.md#cycle. It is named for the lifecycle, not a genre. A short run that a game repeats many times, a prestige layer's reincarnation and a new-game-plus all have the same shape. A cycle starts paused: `resume()` starts the first run, and `pause()` holds `elapsed` and the end check. `end()` resets at the run's end, then emits `afterEnd`, and the clock keeps running, so the next run starts at once. `elapsed` is the run's seconds, a saved ref that resets to 0 at each end. `count` and `bestTime` are saved too; `running` is not, so call `resume()` on load. For a run that stays on a results screen until the player restarts, call `pause()` in `afterEnd`. The screen reads what `onBeforeEnd` or a `CycleLog` entry captured, because the reset scope is already reset. A run can instead keep its end state live until the player starts the next one. That run resets on start: it is `createReset` plus a guarded `onTick`, not Cycle. Phases inside a run do not have Cycle's shape either (§ tick phase, below).
+- **Cycle** — the repeating structure of runs: a run ends, its reset scope resets, and the next run starts. `createCycle`. → content-systems.md#cycle. It is named for the lifecycle, not a genre. A short run that a game repeats many times, a prestige layer's reincarnation and a new-game-plus all have the same shape. A cycle starts paused: `resume()` starts the first run, and `pause()` holds `elapsed` and the end check. Nothing else pauses: producers and other tick handlers keep ticking. To switch a set of mechanics off with the run, see the mechanic set for one phase in § Concept index. `end()` resets at the run's end, then emits `afterEnd`, and the clock keeps running, so the next run starts at once. `elapsed` is the run's seconds, a saved ref that resets to 0 at each end. `count` and `bestTime` are saved too; `running` is not, so call `resume()` on load. For a run that stays on a results screen until the player restarts, call `pause()` in `afterEnd`. The screen reads what `onBeforeEnd` or a `CycleLog` entry captured, because the reset scope is already reset. A run can instead keep its end state live until the player starts the next one. That run resets on start: it is `createReset` plus a guarded `onTick`, not Cycle. Phases inside a run do not have Cycle's shape either (§ tick phase, below).
 - **CycleLog** — records each tracked metric's change across one run; observes a `Cycle`'s lifecycle. `createCycleLog`. → content-systems.md#cyclelog
 - **Challenge** — also a lifecycle with an entry, a goal and an exit, but it *enters a modified ruleset*; it does not replay with a reset. `createChallengeCategory`. → content-systems.md#challenge-category
 - **`createReset`** vs **`Cycle`** — `createReset` is the standalone reset mechanic (reset scope, retention, `canReset` predicate). `Cycle` drives one, and adds the run's timer, counter and restart cadence. `CycleOptions` has shorthand for the common reset fields, and a `reset` field for a pre-built reset. It is deliberately not a mirror of `ResetOptions`.
@@ -37,7 +37,7 @@ A few symbols share a stem and are easy to confuse. Each links to its anchor:
 
 Common consumer tasks, each with its starting API tier. Open the API tier file, and follow its `##` sections to the cluster.
 
-Deliberately absent: real-time combat between units (positioning, collision, per-tick action resolution). The engine is a headless incremental substrate, so combat resolution stays consumer-side. spatial.md covers only adjacency and traversal.
+Deliberately absent: real-time combat between units (positioning, collision, per-tick action resolution). The engine is a headless incremental substrate, so combat resolution stays consumer-side. spatial.md covers only adjacency and traversal. Units made in play keep their state in one saved list → ../consumer-guide-recipes.md#placement-and-occupancy-placed-and-removed-in-play.
 
 | Task | Starting API tier |
 | --- | --- |
@@ -46,9 +46,10 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | convert resources / crafting recipe / market trade | resources.md#conversion |
 | turn stock into output each tick / a smelter or workshop that draws inputs | `ProducerMapping.inputs` → content-systems.md#producer-category |
 | cap a resource / storage capacity / overflow | `createResourceBag` (capacity + `link`) → resources.md#resource |
-| random pick / draw k items / shuffle / weighted roll | `randomItem` / `shuffle` / `weightedPick` → resources.md#rng |
+| random pick / draw k items / shuffle / weighted roll | `randomItem` and `weightedPick` draw one item, and `shuffle` returns a shuffled copy. Only an unweighted k is covered: `shuffle(items).slice(0, k)` → resources.md#rng |
 | building / producer (a "generator" elsewhere) / passive production | content-systems.md#producer-category |
 | total production rate of a resource | `ProducerCategory.getTotalRate` → content-systems.md#producer-category |
+| upkeep / an amount lost each tick (a "drain" elsewhere) | a continuous producer with a negative `baseRate` → content-systems.md#producer-category, ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run |
 | upgrade / perk / unlock / capped repeatable | content-systems.md#purchasable |
 | achievement with a one-time reward | content-systems.md#achievement |
 | skill XP / level curve | content-systems.md#skill |
@@ -57,8 +58,10 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | constrained loadout / saved selection | content-systems.md#loadout |
 | saved queues / layout templates / named saves of a state slice | ../consumer-guide-recipes.md#named-saves-of-a-state-slice |
 | automation unlock ladder | content-systems.md#automation-tiers |
+| auto-reset / auto-prestige / an automation policy the player switches | ../consumer-guide-recipes-tick.md#a-player-switch-over-a-tier-gated-policy |
 | stack modifiers on a chain | mechanics.md#modifier |
 | timed buff / temporary multiplier / an effect with a duration | `createTemporaryEffectSystem` → mechanics.md#effects |
+| cooldown / recharge timer | plain state counted down in `onTick`; a temporary effect (`isActive`, saved `timeRemaining`) when the timer also holds grants → mechanics.md#effects |
 | speed up one action / a rate chain per action | `rateChain: true` on the action mapping → content-systems.md#action-category |
 | "purchase max" count / bulk purchase cost preview | mechanics.md#formulas |
 | softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |
@@ -72,6 +75,7 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | offline catch-up after a long time away | lifecycle.md#offline |
 | prestige / reset with retention | lifecycle.md#reset |
 | phases inside a run (build ↔ wave, day ↔ night) / waves on a timer | ../consumer-guide-recipes-tick.md#phases-inside-a-run |
+| the game is won / an ending no reset clears | ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run |
 | retire / switch off a set of mechanics when a phase or chapter ends | mechanics.md#effects |
 | register a module | runtime.md#engine-assembly |
 | subscribe to engine or category events | runtime.md#events |
@@ -81,6 +85,7 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | upcoming unlock / "what changes next?" | harness.md#transition-walker, runtime.md#transition-distance-primitives |
 | schedule jobs / persona rotation / ordered queue | composition.md#sequencer |
 | recommendation between runs | advisors.md#recommendation |
+| things made in play, each with its own state (towers, cards, a roster, villages) | ../consumer-guide-recipes.md#placement-and-occupancy-placed-and-removed-in-play |
 | draw ticking game state on a canvas / smooth it between ticks | ../consumer-guide-recipes-tick.md#drawing-ticking-game-state-a-read-only-projection |
 | spatial adjacency / adjacency modifiers on a grid | spatial.md#grid, spatial.md#graph |
 | routing / pathfinding / traversal cost over a board | `SpatialGrid.distanceField` (weighted, multi-source, descend the field) or `SpatialGrid.bfs` (reachability + parent links) → spatial.md#grid |
@@ -127,6 +132,7 @@ Cross-cutting shapes, not symbol names: "where do I read about X?" when X has no
 - **run-shaped APIs** — `Cycle` (runs and the resets between them) vs `CycleLog` (their tracked metrics) vs `RunPool` (many concurrent pool runs) vs `TickDriver` (tick scheduler) → INDEX.md#reserved-names
 - **recommendation arbitration** — recommenders ranked between runs; the winner is applied automatically or presented → advisors.md#recommendation
 - **spatial unit steering** — steer a unit over a board. Influence layers give a per-cell influence; the goal picker scores and ranks candidates built from it → spatial.md#influence-layer, advisors.md#goal-picker
+- **entity list** — entities the player makes and removes during play, kept in one saved list and resolved in a tick handler, on a grid or not → ../consumer-guide-recipes.md#placement-and-occupancy-placed-and-removed-in-play
 - **distance field / flow field** — the least-cost distance from a set of source cells to every cell; units move by descending it. `SpatialGrid.distanceField`; the step direction is derived consumer-side, so routing and rendering share one tie-break → spatial.md#grid
 
 ## Common disambiguators
@@ -161,7 +167,7 @@ Engine fields that hold a yes/no test accept one of three forms. Choose the most
 | `Requirement` | a predicate with a cost and a pay function | the predicate also spends a resource (cost, bulk purchase via inversion, pay by reset / pay by division) | partial | no (closures) | mechanics.md#requirements |
 | `Computable<boolean>` | ref / computed / getter | typed refs are already at hand; no introspection needed; the predicate does not fit state paths | no | no | mechanics.md#computed |
 
-Systems-layer predicate fields take `Predicate` (`Gate` | `Computable<boolean>`). Challenge `visible` / `canEnter` / `goal` take it, as do achievement `goal` / `visible` / `hidden` and purchasable and producer `visible`. So do automation tier `unlockWhen`, cycle `endCondition`, reset `canReset` and time-bank `when`. So do subject ladder `advanceWhen`, conditional effect `active` and `Grant.when`. The Gate services a Gate reads are asserted when the def is registered. Core fields stay `Computable<boolean>`, dialog conditions stay `Gate`, and `PurchasableOptions.requirements` takes `Requirement[]`. When a field accepts a `Gate`, prefer it. `Gate` is the only form with both transition-distance introspection and category awareness, without a `GameStateAccessor` mapping.
+Systems-layer predicate fields take `Predicate` (`Gate` | `Computable<boolean>`). Challenge `visible` / `canEnter` / `goal` take it, as do achievement `goal` / `visible` / `hidden` and purchasable and producer `visible`. So do automation tier `unlockWhen`, cycle `endCondition`, reset `canReset` and time-bank `when`. So do subject ladder `advanceWhen`, conditional effect `active` and `Grant.when`. The Gate services a Gate reads are asserted when the def is registered. A `visible` Predicate is evaluated live, so the item hides again when it stops holding. For a reveal that stays shown, point it at a latch: a `flag` Gate over a saved flag of your own, the `earned` ref of an achievement, or an automation tier that `unlockWhen` unlocked. Core fields stay `Computable<boolean>`, dialog conditions stay `Gate`, and `PurchasableOptions.requirements` takes `Requirement[]`. When a field accepts a `Gate`, prefer it. `Gate` is the only form with both transition-distance introspection and category awareness, without a `GameStateAccessor` mapping.
 
 **Converting between forms.** A field may want a `Requirement` where the predicate is declarative. Then `createGateRequirement({ gate })` converts a `Gate` into a no-cost `Requirement`, and the Gate stays the source of truth for serializability and `timeUntilGateFlip`. Where the predicate is an opaque closure, `createBooleanRequirement({ met })` is the escape hatch: the same shape, with no introspection. Both keep the chosen form on the *Gate / Computable* side of the boundary. Only `createCostRequirement` adds real cost behavior.
 

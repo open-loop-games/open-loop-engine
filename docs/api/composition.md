@@ -12,11 +12,11 @@ The substrate the content systems build on. `CategoryBase` + `ContentRegistry` a
 
 shared skeleton for batch-registration categories
 
-- `interface CategoryBase<Def extends { id: string; }, Instance, DefState = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:114`
-- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, DefState = void>` `src/systems/category-base.ts:80`
-- `interface CategoryEntry<Def extends { id: string; }, Instance, DefState = void>` — A category entry: the record a category keeps per def — its def, instance, optional def state and optional signals. `src/systems/category-base.ts:72`
-- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:55`
-- `function createCategoryBase<Def extends { id: string; }, Instance, DefState = void>(options: CategoryBaseOptions<Def, Instance, DefState>): CategoryBase<Def, Instance, DefState>` — Create the shared category base — registry + category-entry map + persistent context. `src/systems/category-base.ts:174`
+- `interface CategoryBase<Def extends { id: string; }, Instance, DefState = void> extends ResettableObject` — The shared base returned by createCategoryBase. `src/systems/category-base.ts:116`
+- `interface CategoryBaseOptions<Def extends { id: string; }, Instance, DefState = void>` `src/systems/category-base.ts:82`
+- `interface CategoryEntry<Def extends { id: string; }, Instance, DefState = void>` — A category entry: the record a category keeps per def — its def, instance, optional def state and optional signals. `src/systems/category-base.ts:74`
+- `interface CategoryEntrySignals` — Uniform per-entry introspection axes — the engine's cohesive cross-cut over heterogeneous category types. `src/systems/category-base.ts:57`
+- `function createCategoryBase<Def extends { id: string; }, Instance, DefState = void>(options: CategoryBaseOptions<Def, Instance, DefState>): CategoryBase<Def, Instance, DefState>` — Create the shared category base — registry + category-entry map + persistent context. `src/systems/category-base.ts:181`
 
 ## Content Registry
 

@@ -15,17 +15,18 @@ Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatt
 
 big-number arithmetic and formatting on break_eternity.js
 
-- `function bn(x: DecimalSource): Decimal` — Create a Decimal from a number, string, or Decimal. `src/primitives/decimal.ts:339`
-- `type Decimal = InstanceType<DecimalClass>` — Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. `src/primitives/decimal.ts:46`
-- `type DecimalSource = Decimal | number | string` — Anything bn accepts — a live `Decimal`, a `number`, or a numeric string. `src/primitives/decimal.ts:48`
-- `function format(num: DecimalSource, decimals?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:662`
-- `function formatSmall(num: DecimalSource, decimals?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:795`
-- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:741`
-- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:713`
-- `function integerRoot(x: DecimalSource, degree: number): Decimal` — The floored integer `degree`-th root of `x` — the largest integer `m` with `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `src/primitives/decimal.ts:580`
-- `type IntegerRoot` — Graded result of tryIntegerRoot. `src/primitives/decimal.ts:468`
-- `function toNumber(x: DecimalSource): number` — Coerce a DecimalSource to a native number. `src/primitives/decimal.ts:350`
-- `function tryIntegerRoot(x: DecimalSource, degree: number): IntegerRoot` — The floored integer `degree`-th root of `x`, **graded** — the same answer integerRoot returns, plus whether the representation could actually resolve it. `src/primitives/decimal.ts:506`
+- `function bn(x: DecimalSource): Decimal` — Create a Decimal from a number, string, or Decimal. `src/primitives/decimal.ts:392`
+- `type Decimal = InstanceType<DecimalClass>` — Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. `src/primitives/decimal.ts:49`
+- `const Decimal: DecimalClass` — The `Decimal` class break_eternity default-exports; import it from the engine, so consumer and engine construct one class. `src/primitives/decimal.ts:388`
+- `type DecimalSource = Decimal | number | string` — Anything bn accepts — a live `Decimal`, a `number`, or a numeric string. `src/primitives/decimal.ts:51`
+- `function format(num: DecimalSource, decimals?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:730`
+- `function formatSmall(num: DecimalSource, decimals?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:863`
+- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:809`
+- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:781`
+- `function integerRoot(x: DecimalSource, degree: number): Decimal` — The floored integer `degree`-th root of `x` — the largest integer `m` with `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `src/primitives/decimal.ts:648`
+- `type IntegerRoot` — Graded result of tryIntegerRoot. `src/primitives/decimal.ts:536`
+- `function toNumber(x: DecimalSource): number` — Coerce a DecimalSource to a native number. `src/primitives/decimal.ts:404`
+- `function tryIntegerRoot(x: DecimalSource, degree: number): IntegerRoot` — The floored integer `degree`-th root of `x`, **graded** — the same answer integerRoot returns, plus whether the representation could actually resolve it. `src/primitives/decimal.ts:574`
 
 ## Notation
 
@@ -33,6 +34,7 @@ re-exports eternal_notations as the engine's number notations
 
 - `const HTMLPresets` — This object is where all of the notation presets are stored. `src/primitives/notations.ts`
 - `const Notation: typeof _Notation` — Abstract base class for notations — re-exported from `eternal_notations`. `src/primitives/notations.ts:18`
+- `type Notation = InstanceType<typeof _Notation>` — Instance type of Notation. `src/primitives/notations.ts:20`
 - `const notationManager: NotationManager` — Global notation manager instance. `src/primitives/notation-manager.ts:92`
 - `class NotationManager` — Singleton that holds the named notations and controls which Notation `format()` uses for a `Decimal`. `src/primitives/notation-manager.ts:31`
 - `const Presets` — This object is where all of the notation presets are stored. `src/primitives/notations.ts`
