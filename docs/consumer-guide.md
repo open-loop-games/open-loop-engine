@@ -80,24 +80,21 @@ Two predicate-requirement forms, in preference order:
 - `createGateRequirement({ gate })` — the Gate form. Write the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`). The factory wraps it in the `Requirement` contract. Only a Gate is serializable for saves, mods and the balance harness. Only a Gate supports `timeUntilGateFlip` for predictor UIs. Use this form whenever a Gate can express the predicate.
 - `createBooleanRequirement({ met })` — the closure form. Use it when no Gate kind fits the predicate: arbitrary computation across systems, or opaque consumer state. It returns the same requirement shape as the Gate form, but the predicate is not introspectable.
 
-**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. `state` and `flag` Gates, and every prediction of a resource Gate, need a `GameStateAccessor` you supply ([§ Data and live state separation](#data-and-live-state-separation)):
+**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. `state` and `flag` Gates, effects, and every prediction of a resource Gate need an accessor ([§ Data and live state separation](#data-and-live-state-separation)). `createGameStateAccessor` builds one from the registry plus the flags, state paths and rates you supply:
 
 ```ts
 const engine = createEngine({
   gameId: 'my-game',
-  // Category and resource-amount Gates evaluate without it; skip it unless you need more.
-  accessor: {
-    getAmount: (id) => resourcesById[id]?.value ?? Decimal.dZero,
-    getRate: (id) => ratesById[id] ?? Decimal.dZero,
-    getInflowRate: (id) => grossById[id] ?? Decimal.dZero, // optional; exact cumulative-gte predictions
-    getFlag: (id) => flags[id] ?? false,
-    getStateAt: (path) => readPath(gameState, path),
-    ...mutator, // applyResourceOp / setFlag / setStateAt, for the effect side
-  },
+  accessor: (services) => // opt-in: category and resource-amount Gates need none
+    createGameStateAccessor(services, {
+      getFlag: (id) => flags[id] ?? false,
+      setFlag: (id, value) => (flags[id] = value),
+      getRate: (id) => ratesById[id] ?? Decimal.dZero,
+    }),
 });
 ```
 
-A Gate that needs a Gate service you did not wire throws, and names the service and the Gate kinds in play. It throws where you wrote it: at construction for `createGateRequirement`, and at register for a system's predicate field. Every predicate field of the systems layer takes a `Predicate`: a boolean, a ref, a getter or a Gate. `api/INDEX.md#predicate-forms` lists the fields. To read one back off a def, evaluate it with `evaluatePredicate(def.goal, services)`, or read the instance's reactive field.
+A method you leave out is not in its `AccessorMethods` record. A Gate, effect or prediction that needs it throws, as does a Gate service you did not wire, naming what is missing where you wrote it: at construction for `createGateRequirement`, at register for a system's predicate field or effects. After `start()`, `engine.tryInject(GameStateAccessorKey)` reads it. Every predicate field of the systems layer takes a `Predicate`: a boolean, a ref, a getter or a Gate. `api/INDEX.md#predicate-forms` lists the fields. To read one back off a def, evaluate it with `evaluatePredicate(def.goal, services)`, or read the instance's reactive field.
 
 ```ts
 const unlocks = createPurchasableCategory<UnlockDef>({

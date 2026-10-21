@@ -125,13 +125,14 @@ export const TIER_MANIFEST = [
     tier: 'runtime',
     title: 'Runtime',
     scope:
-      'How an engine instance is assembled and ticks: `createEngine` and its module, event and save wiring. Also TickDriver (variable and fixed tick modes), the typed event emitter, throttle, play time, transition-distance math and the ambient accessor.',
+      'How an engine instance is assembled and ticks: `createEngine` and its module, event and save wiring. Also TickDriver (variable and fixed tick modes), the typed event emitter, throttle, play time, transition-distance math and the game-state accessor.',
     entrypoints: [
       '`createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.',
       '`EngineModule` / `EngineContext` — install/connect game content and share engine services.',
       '`createTickDriver` — standalone tick scheduler when not using the full engine facade.',
       '`createEmitHandle` — typed per-instance events for systems and categories.',
       '`timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
+      '`createGameStateAccessor` — an accessor over the resource registry plus your flags, state paths and rates; pass it to `createEngine({ accessor })`.',
       "`ref` / `computed` / `watch` / `effect` — Vue's reactivity API, re-exported. Import it from the engine, not from `vue`, so subscriptions share the engine's `activeEffect`.",
     ],
     clusters: [

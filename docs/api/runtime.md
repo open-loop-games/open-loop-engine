@@ -1,6 +1,6 @@
 # Runtime
 
-How an engine instance is assembled and ticks: `createEngine` and its module, event and save wiring. Also TickDriver (variable and fixed tick modes), the typed event emitter, throttle, play time, transition-distance math and the ambient accessor.
+How an engine instance is assembled and ticks: `createEngine` and its module, event and save wiring. Also TickDriver (variable and fixed tick modes), the typed event emitter, throttle, play time, transition-distance math and the game-state accessor.
 
 ## Canonical entrypoints
 
@@ -9,6 +9,7 @@ How an engine instance is assembled and ticks: `createEngine` and its module, ev
 - `createTickDriver` — standalone tick scheduler when not using the full engine facade.
 - `createEmitHandle` — typed per-instance events for systems and categories.
 - `timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
+- `createGameStateAccessor` — an accessor over the resource registry plus your flags, state paths and rates; pass it to `createEngine({ accessor })`.
 - `ref` / `computed` / `watch` / `effect` — Vue's reactivity API, re-exported. Import it from the engine, not from `vue`, so subscriptions share the engine's `activeEffect`.
 
 ## Engine assembly
@@ -57,7 +58,13 @@ the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: va
 
 the opt-in builder over the resource registry, the record of the methods an accessor implements, and the ambient accessor `createEngine` sets around `install()` / `connect()`
 
-- `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:49`
+- `const AccessorMethods: unique symbol` — Keys the record of the methods an accessor implements, a `ReadonlySet<GameStateAccessorMethod>`. `src/core/game-state-accessor.ts:46`
+- `interface AccessorServices` — The engine services an accessor factory receives from `createEngine`. `src/core/game-state-accessor.ts:56`
+- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's resource registry. `src/core/game-state-accessor.ts:167`
+- `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:78`
+- `type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateMutator` — A method name of GameStateAccessor or GameStateMutator. `src/core/game-state-accessor.ts:30`
+- `type GameStateAccessorMutator` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:49`
+- `interface GameStateAccessorOptions` — What the consumer supplies to createGameStateAccessor. `src/core/game-state-accessor.ts:61`
 
 ## Throttle
 

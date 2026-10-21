@@ -341,6 +341,7 @@ function renderIndex(byCluster) {
     '| "purchase max" count / bulk purchase cost preview | mechanics.md#formulas |',
     '| softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |',
     '| declarative Gate (data-driven predicate) | mechanics.md#gate |',
+    '| wire a game-state accessor / flags, state paths and rates for Gates and effects | `createGameStateAccessor`, passed as `createEngine({ accessor: (services) => … })` → runtime.md#game-state-accessor |',
     '| new content category (skill, purchasable, producer, …) | composition.md#category-base |',
     '| branching dialog graph | content-narrative.md#dialog |',
     '| dialog choice effects / authored outcomes | content-narrative.md#dialog, mechanics.md#effects |',
