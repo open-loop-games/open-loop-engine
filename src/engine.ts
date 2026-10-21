@@ -289,7 +289,10 @@ export interface EngineOptions {
    * saves stay protected).
    */
   strictValidation?: boolean;
-  /** Available game mods. One may be selected before start(). */
+  /**
+   * Available game mods. One may be selected with `selectMod()` before
+   * `start()`. An unselected mod installs nothing.
+   */
   mods?: ModDef[];
   /**
    * Keep this engine instance's persistent refs apart from any other engine in
@@ -627,6 +630,17 @@ export function createEngine(options: EngineOptions): Engine {
     start() {
       if (disposed) throw new Error('Cannot start a disposed engine');
       if (!installed) {
+        if (
+          registeredMods.length > 0 &&
+          selectedModId === null &&
+          modules.length === 0 &&
+          isDev()
+        ) {
+          console.warn(
+            `[engine] "${options.gameId}" started with no module: mods are registered, but an ` +
+              'unselected mod installs nothing. Call engine.selectMod() before start().',
+          );
+        }
         const sorted = topologicalSort(modules);
         const injections = new Map<symbol, unknown>();
         publicInjections = injections;

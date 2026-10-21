@@ -134,6 +134,53 @@ describe('engine mod support', () => {
     engine.stop();
   });
 
+  describe('start() with registered mods', () => {
+    const mods: ModDef[] = [
+      { id: 'omsi', displayName: 'OMSI', modules: [{ id: 'omsi-mod', install() {} }] },
+    ];
+
+    it('warns once when no mod is selected and no module is registered', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const engine = createEngine({ gameId: 'unmodded', persistence: false, mods });
+      engine.start();
+      engine.stop();
+      engine.start();
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatch(/"unmodded".*selectMod\(\)/s);
+      engine.dispose();
+      warn.mockRestore();
+    });
+
+    it('does not warn when a mod is selected', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const engine = createEngine({ gameId: 'modded', persistence: false, mods });
+      engine.selectMod('omsi');
+      engine.start();
+      expect(warn).not.toHaveBeenCalled();
+      engine.dispose();
+      warn.mockRestore();
+    });
+
+    it('does not warn when use() registered a module', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const engine = createEngine({ gameId: 'picker', persistence: false, mods });
+      engine.use({ id: 'base', install() {} });
+      engine.start();
+      expect(warn).not.toHaveBeenCalled();
+      engine.dispose();
+      warn.mockRestore();
+    });
+
+    it('does not warn when no mod is registered', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const engine = createEngine({ gameId: 'plain', persistence: false });
+      engine.start();
+      expect(warn).not.toHaveBeenCalled();
+      engine.dispose();
+      warn.mockRestore();
+    });
+  });
+
   it('selectMod pushes modules into the registration list before start()', () => {
     const installed: string[] = [];
     const engine = createEngine({
