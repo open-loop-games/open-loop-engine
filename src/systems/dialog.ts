@@ -38,18 +38,23 @@ export interface DialogNode {
    */
   when?: Gate;
   /**
-   * Player-facing choices. A node with none visible falls through to `next`,
-   * and is terminal without one.
+   * Player-facing choices. A node with none visible presents as a line that
+   * `advance()` continues through `next`, and is terminal without one.
    */
   choices?: DialogChoice[];
   /** Effects applied on node entry, before its choices are presented. */
   onEnter?: IEffect[];
   /**
-   * Fall-through target, entered when this node has no visible choice — on
-   * arrival, or through `advance()` once its presented choices are blocked.
-   * When the target's `when` does not hold, the conversation stops at this node.
+   * The node `advance()` enters when this node has no visible choice. When
+   * the target's `when` does not hold, the conversation stops at this node.
    */
   next?: string;
+  /**
+   * Skip presenting this node when it has no visible choice: on arrival it
+   * runs `onEnter`, then enters `next`. For a routing or `onEnter`-only node.
+   * Without it, every node presents, so its `text` is shown.
+   */
+  fallThrough?: boolean;
 }
 
 /** A single response option attached to a {@link DialogNode}. */
@@ -85,9 +90,8 @@ export interface DialogPresentation {
   /**
    * True when the line offers no visible choice and no enterable `next`. The
    * conversation stays active until the UI calls `finish()`. False with no
-   * visible choice means the choices were blocked after the line presented,
-   * and `next` can be entered. The UI then offers a continue that calls
-   * `advance()`.
+   * visible choice means `next` can be entered: the UI offers a continue that
+   * calls `advance()`.
    */
   terminal: boolean;
 }
@@ -122,7 +126,7 @@ export interface SerializedDialogAdapter {
 export interface DialogAdapter {
   /**
    * Start a graph at its entry node (or an explicit node), running onEnter
-   * effects and falling through `next` until a node presents. Replaces an
+   * effects and walking past `fallThrough` nodes until a node presents. Replaces an
    * active conversation without finishing it. Does nothing when the entry
    * node's `when` does not hold, and returns `false` to say so. An adapter
    * that returns nothing counts as started.
@@ -133,9 +137,8 @@ export interface DialogAdapter {
   /** Apply the chosen choice's outcomes and advance the pointer. */
   choose(choiceId: string): void;
   /**
-   * Fall through `next` from a line that presents no visible choice and isn't
-   * terminal: its choices were blocked after it presented them. Throws on any
-   * other line. Optional; a session over an adapter without it throws from
+   * Enter `next` from a line that presents no visible choice and isn't
+   * terminal, then present the node it stops on. Throws on any other line. Optional; a session over an adapter without it throws from
    * its own `advance()`.
    */
   advance?(): void;
@@ -309,31 +312,34 @@ export function createNativeDialogAdapter(
     }
   }
 
-  /** Whether a node's fall-through `next` exists and its `when` holds. */
+  /** Whether a node's `next` exists and its `when` holds. */
   function canEnterNext(graphId: string, node: DialogNode): boolean {
     return !!node.next && canEnter(graphId, node.next);
   }
 
   /**
-   * Auto-advance through fall-through nodes — no visible choices and an
-   * enterable `next` — until it stops on a node with a visible choice, or one
-   * whose `next` is absent or blocked. Each entered node applies its onEnter
-   * and increments its visit count.
+   * Walk past `fallThrough` nodes with no visible choice and an enterable
+   * `next`, until it stops on a node that presents. Each entered node applies
+   * its onEnter and increments its visit count.
    */
   function settle(): void {
     const graphId = state.activeGraphId;
     let nodeId = state.activeNodeId;
     if (!graphId || !nodeId) return;
-    // Guard against an authored next-only cycle (a → b → a): without it the
-    // fall-through walk spins forever. Checked before entering, so no node's
+    // Guard against an authored cycle of fallThrough nodes (a → b → a):
+    // without it the walk spins forever. Checked before entering, so no node's
     // onEnter runs twice on the way to the throw.
     const seen = new Set<string>([nodeId]);
     for (;;) {
       const node = lookupNode(graphId, nodeId);
-      if (gatedChoices(node).length > 0 || !canEnterNext(graphId, node)) return;
+      if (!node.fallThrough || gatedChoices(node).length > 0 || !canEnterNext(graphId, node)) {
+        return;
+      }
       nodeId = node.next!;
       if (seen.has(nodeId)) {
-        throw new Error(`Dialog graph "${graphId}" has a next-only cycle through node "${nodeId}"`);
+        throw new Error(
+          `Dialog graph "${graphId}" has a fallThrough cycle through node "${nodeId}"`,
+        );
       }
       seen.add(nodeId);
       activate(graphId, nodeId);
@@ -405,6 +411,8 @@ export function createNativeDialogAdapter(
     if (snap.choices.length > 0 || snap.terminal) {
       throw new Error(`Dialog node ${snap.nodeId} has nothing to advance through`);
     }
+    const graphId = state.activeGraphId!;
+    activate(graphId, lookupNode(graphId, snap.nodeId).next!);
     settle();
     emitPresented();
   }

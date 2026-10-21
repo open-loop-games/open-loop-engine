@@ -111,9 +111,9 @@ export interface DialogSession extends Emittable<DialogSessionEvents> {
   /** Apply the chosen choice's outcomes and advance the pointer. */
   choose(choiceId: string): void;
   /**
-   * Continue past a line whose choices were blocked after it presented them:
-   * the line `present()` reports with no choices and `terminal: false`.
-   * Enters `next` and presents the node it stops on; throws on any other line.
+   * Continue past a line: the line `present()` reports with no choices and
+   * `terminal: false`. Enters `next` and presents the node it stops on;
+   * throws on any other line.
    */
   advance(): void;
   /** End the conversation; clears the active pointer. */

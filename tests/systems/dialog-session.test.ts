@@ -110,8 +110,8 @@ const cycleGraph: DialogGraph = {
   id: 'loop-graph',
   entry: 'a',
   nodes: [
-    { id: 'a', text: 'A', next: 'b' },
-    { id: 'b', text: 'B', next: 'a' },
+    { id: 'a', text: 'A', next: 'b', fallThrough: true },
+    { id: 'b', text: 'B', next: 'a', fallThrough: true },
   ],
 };
 
@@ -138,7 +138,7 @@ describe('createDialogSession', () => {
     expect(() => buildSession([graph])).toThrow(/duplicate node id "n" in dialog graph "twice"/);
   });
 
-  it('throws on an authored next-only cycle instead of hanging settle()', () => {
+  it('throws on an authored fallThrough cycle instead of hanging settle()', () => {
     const session = buildSession([cycleGraph]);
     expect(() => session.start('loop-graph')).toThrow(/cycle/);
   });
@@ -150,8 +150,14 @@ describe('createDialogSession', () => {
       id: 'loop-with-effect',
       entry: 'a',
       nodes: [
-        { id: 'a', text: 'A', next: 'b', onEnter: [{ kind: 'state', path: 'met', value: 1 }] },
-        { id: 'b', text: 'B', next: 'a' },
+        {
+          id: 'a',
+          text: 'A',
+          next: 'b',
+          fallThrough: true,
+          onEnter: [{ kind: 'state', path: 'met', value: 1 }],
+        },
+        { id: 'b', text: 'B', next: 'a', fallThrough: true },
       ],
     };
     const session = buildSession([graph], { id: 'cycle-sync', accessor });
@@ -262,7 +268,40 @@ describe('createDialogSession', () => {
     }
   });
 
-  it('reports finished when a fall-through target is gated off', () => {
+  it('presents each line, and advance() steps to the next one, walking past a fallThrough node', () => {
+    const accessor = buildAccessor();
+    const setStateSpy = vi.spyOn(accessor, 'setStateAt');
+    const graph: DialogGraph = {
+      id: 'scene',
+      entry: 'l1',
+      nodes: [
+        { id: 'l1', text: 'She laughs.', next: 'l2' },
+        { id: 'l2', text: 'Then she frowns.', next: 'route' },
+        {
+          id: 'route',
+          text: '',
+          fallThrough: true,
+          onEnter: [{ kind: 'state', path: 'routed', value: 1 }],
+          next: 'ask',
+        },
+        { id: 'ask', text: 'Well?', choices: [{ id: 'yes', text: 'Yes' }] },
+      ],
+    };
+    const session = buildSession([graph], { accessor });
+    const presented = vi.fn();
+    session.on('presented', presented);
+    session.start('scene');
+    expect(session.present()).toMatchObject({ nodeId: 'l1', choices: [], terminal: false });
+    session.advance();
+    expect(session.present()).toMatchObject({ nodeId: 'l2', terminal: false });
+    session.advance();
+    expect(session.present()?.nodeId).toBe('ask');
+    expect(setStateSpy).toHaveBeenCalledWith('routed', 1);
+    expect(presented.mock.calls.map(([snap]) => snap.nodeId)).toEqual(['l1', 'l2', 'ask']);
+    expect(session.getVisitCount('scene', 'route')).toBe(1);
+  });
+
+  it('reports a line terminal when its next is gated off', () => {
     const graph: DialogGraph = {
       id: 'optional-follow-up',
       entry: 'a',
@@ -276,9 +315,9 @@ describe('createDialogSession', () => {
     expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], terminal: true });
   });
 
-  it('falls through a node whose choices are all gated off', () => {
-    const graph: DialogGraph = {
-      id: 'gated-aside',
+  it('presents a node whose choices are all gated off, unless it is fallThrough', () => {
+    const aside = (fallThrough: boolean): DialogGraph => ({
+      id: `gated-aside-${fallThrough}`,
       entry: 'a',
       nodes: [
         {
@@ -286,12 +325,15 @@ describe('createDialogSession', () => {
           text: 'A',
           choices: [{ id: 'aside', text: 'Aside', visible: { kind: 'flag', id: 'never' } }],
           next: 'b',
+          fallThrough,
         },
         { id: 'b', text: 'B' },
       ],
-    };
-    const session = buildSession([graph]);
-    session.start('gated-aside');
+    });
+    const session = buildSession([aside(false), aside(true)]);
+    session.start('gated-aside-false');
+    expect(session.present()).toMatchObject({ nodeId: 'a', choices: [], terminal: false });
+    session.start('gated-aside-true');
     expect(session.present()).toMatchObject({ nodeId: 'b', choices: [], terminal: true });
   });
 

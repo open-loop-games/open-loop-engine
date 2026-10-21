@@ -208,7 +208,7 @@ Dialog content is a graph of nodes with text, Gates, choices and outcomes. The e
 
 - An authored data shape (`DialogGraph`: `DialogNode[]` with an `entry` pointer). It is declarative and serializable, with no closures.
 - An adapter contract (`DialogAdapter`): anything that can drive a conversation, through `start` / `present` / `choose` / `finish` plus `serialize` / `restore`.
-- A native adapter (`createNativeDialogAdapter`). It walks `DialogGraph` nodes, and evaluates the `Gate`s on choices and nodes through the ambient Gate services. It applies `IEffect` outcomes and keeps visit counts.
+- A native adapter (`createNativeDialogAdapter`). It walks `DialogGraph` nodes, and evaluates the `Gate`s on choices and nodes through the ambient Gate services. It applies `IEffect` outcomes and keeps visit counts. Every node presents its line; a routing or `onEnter`-only node sets `fallThrough` to be skipped.
 - A category (`createDialogCategory`) that registers dialog graphs from defs.
 - A dialog session (`createDialogSession`) that wraps the adapter in a saved envelope and emits `presented` / `chosen` / `finished` events.
 
