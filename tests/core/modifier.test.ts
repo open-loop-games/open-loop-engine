@@ -57,6 +57,26 @@ describe('Modifier system', () => {
       for (const spy of spies) spy.mockRestore();
     }
   });
+  it('a description prints a whole value without decimals, and any other value with them', () => {
+    const value = (m: { description?: unknown }) =>
+      (m.description as () => { formattedValue: string })().formattedValue;
+    const add = (addend: DecimalSource) =>
+      value(createAdditiveModifier({ addend, description: 'a' }));
+    const mul = (multiplier: DecimalSource) =>
+      value(createMultiplicativeModifier({ multiplier, description: 'm' }));
+    const exp = (exponent: DecimalSource) =>
+      value(createExponentialModifier({ exponent, description: 'e' }));
+
+    expect([add(10), add(bn(-3)), add(0), add(1.5), add(0.5)]).toEqual([
+      '+10',
+      '-3',
+      '+0',
+      '+1.50',
+      '+0.50',
+    ]);
+    expect([mul(2), mul(bn(1.25))]).toEqual(['×2', '×1.25']);
+    expect([exp(2), exp(0.9)]).toEqual(['^2', '^0.90']);
+  });
   it('disabled modifiers are skipped', () => {
     const enabled = ref(false);
     const mod = createAdditiveModifier({ addend: bn(999), enabled });

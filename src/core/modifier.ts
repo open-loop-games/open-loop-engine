@@ -14,7 +14,14 @@
  */
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef } from 'vue';
-import { Decimal, formatSmall, renormIfLayer0, toFinalDecimal } from '@/primitives/decimal';
+import {
+  Decimal,
+  formatSmall,
+  formatWhole,
+  isIntegerValue,
+  renormIfLayer0,
+  toFinalDecimal,
+} from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import type { RequiredKeys } from './common';
 import { resolveComputable, toMaybeRef, type Computable } from './computed';
@@ -64,6 +71,11 @@ export type OperationModifier<T> = WithRequired<
   Modifier,
   'invert' | Extract<RequiredKeys<T>, keyof Modifier>
 >;
+
+/** Format a modifier's operand for its description: a whole value with no decimals, any other with `formatSmall`'s. */
+function formatOperand(value: DecimalSource): string {
+  return isIntegerValue(value) ? formatWhole(value) : formatSmall(value);
+}
 
 // === ADDITIVE MODIFIER ===
 
@@ -119,7 +131,7 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
             const isPositive = Decimal.gte(value, 0);
             return {
               text: resolveComputable(description),
-              formattedValue: (isPositive ? '+' : '') + formatSmall(value),
+              formattedValue: (isPositive ? '+' : '') + formatOperand(value),
               isBad: smallerIsBetter ? isPositive : Decimal.lt(value, 0),
             };
           },
@@ -191,7 +203,7 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
             const value = unref(processedMultiplier);
             return {
               text: resolveComputable(description),
-              formattedValue: '×' + formatSmall(value),
+              formattedValue: '×' + formatOperand(value),
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
@@ -282,7 +294,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
             const text = resolveComputable(description);
             return {
               text: supportLowNumbers ? text + ' (+1 effective)' : text,
-              formattedValue: '^' + formatSmall(value),
+              formattedValue: '^' + formatOperand(value),
               isBad: smallerIsBetter ? Decimal.gt(value, 1) : Decimal.lt(value, 1),
             };
           },
