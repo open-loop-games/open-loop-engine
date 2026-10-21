@@ -53,6 +53,9 @@ const KIND_FROM_NODE = new Map([
   [ts.SyntaxKind.EnumDeclaration, 'enum'],
 ]);
 
+/** Kinds whose one declaration names both a type and a value. */
+const BOTH_TYPE_AND_VALUE = new Set(['class', 'abstract-class', 'enum']);
+
 /**
  * Resolve an exported symbol to two declarations:
  *   - `terminal`: the actual declaration (provides kind, JSDoc, signature).
@@ -306,33 +309,46 @@ export function parseEntrypoint(rootDts, opts = {}) {
     const cluster = clusterFor(srcPath, header);
 
     // Overloaded functions emit one record per overload declaration, so every
-    // shape is visible in the API tier files. Only in-project same-file
-    // FunctionDeclaration sets qualify — external re-exports (Vue's `ref`,
-    // `watch`, …) and mixed declaration lists collapse to the terminal as
-    // before; their overload detail belongs to the upstream package.
+    // shape is visible in the API tier files. A type merged with a same-named
+    // value (`type Decimal` + `const Decimal`) emits one record per kind, so the
+    // value is listed beside the type. A class or enum is already both, so an
+    // interface merged into one only adds members and stays one record. Only
+    // in-project same-file sets qualify — external re-exports (Vue's `ref`,
+    // `watch`, …) collapse to the terminal as before; their detail belongs to
+    // the upstream package.
     const terminalFile = terminal.getSourceFile();
-    const overloadDecls =
-      kind === 'function' &&
+    const sameFileDecls =
       symbol.declarations?.length > 1 &&
       isInProject(terminalFile.fileName) &&
-      symbol.declarations.every(
-        (d) => ts.isFunctionDeclaration(d) && d.getSourceFile() === terminalFile,
-      )
+      symbol.declarations.every((d) => d.getSourceFile() === terminalFile)
         ? symbol.declarations
-        : [terminal];
+        : null;
+    const overloadDecls =
+      kind === 'function' && sameFileDecls?.every((d) => ts.isFunctionDeclaration(d))
+        ? sameFileDecls
+        : null;
+    const declsByKind = new Map();
+    for (const d of sameFileDecls ?? []) {
+      const k = kindFromDeclaration(d);
+      if (k && !declsByKind.has(k)) declsByKind.set(k, d);
+    }
+    const splitByKind =
+      declsByKind.size > 1 && ![...declsByKind.keys()].some((k) => BOTH_TYPE_AND_VALUE.has(k));
+    const decls = overloadDecls ?? (splitByKind ? [...declsByKind.values()] : [terminal]);
 
-    for (const [i, decl] of overloadDecls.entries()) {
+    for (const [i, decl] of decls.entries()) {
+      const declKind = kindFromDeclaration(decl);
       records.push({
         name,
-        kind,
+        kind: declKind,
         signature: extractSignature(decl),
         tsdocSummary: extractTsdocSummary(decl),
         sourcePath: srcPath,
-        line: findDeclarationLine(srcPath, name, kind, projectRoot, i + 1),
+        line: findDeclarationLine(srcPath, name, declKind, projectRoot, i + 1),
         layer,
         cluster,
-        tag: hasInternalTag(terminal) ? 'internal' : 'public',
-        ...(overloadDecls.length > 1 ? { overloadIndex: i } : {}),
+        tag: hasInternalTag(overloadDecls ? terminal : decl) ? 'internal' : 'public',
+        ...(overloadDecls?.length > 1 ? { overloadIndex: i } : {}),
       });
     }
   }

@@ -13,3 +13,10 @@ export declare class WidgetRegistry extends BaseStore<Widget> {
 export default class DefaultStore {
   reset(): void;
 }
+/** Store for widgets an operator pinned. */
+export declare class PinnedStore {
+  pin(item: Widget): void;
+}
+export interface PinnedStore {
+  unpin(item: Widget): void;
+}

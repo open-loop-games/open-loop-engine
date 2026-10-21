@@ -97,6 +97,22 @@ describe('parseEntrypoint', () => {
     expect(r.signature).toMatch(/^export declare abstract class BaseStore/);
   });
 
+  it('a type merged with a const emits one record per kind', () => {
+    const merged = records.filter((r: Record) => r.name === 'WidgetSize');
+    expect(merged.map((r: Record) => r.kind)).toEqual(['type', 'const']);
+    const [type, value] = merged;
+    expect(type.signature).toMatch(/^export type WidgetSize = \{/);
+    expect(type.tsdocSummary).toBe("A widget's size on screen.");
+    expect(value.signature).toMatch(/^export declare const WidgetSize: \(/);
+    expect(value.tsdocSummary).toBe('Construct a widget size, one per call.');
+    expect(value.line).toBeGreaterThan(type.line!);
+  });
+
+  it('a class merged with an interface stays one class record', () => {
+    const merged = records.filter((r: Record) => r.name === 'PinnedStore');
+    expect(merged.map((r: Record) => r.kind)).toEqual(['class']);
+  });
+
   it('@internal tag flips `tag` field to internal', () => {
     const r = byName.get('internalHelper')!;
     expect(r.tag).toBe('internal');

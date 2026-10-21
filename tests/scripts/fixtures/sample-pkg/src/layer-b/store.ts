@@ -1,5 +1,5 @@
 /**
- * Store — covers class, abstract-class, and default-export kinds.
+ * Store — covers class, abstract-class, and default-export kinds, and a class merged with an interface.
  *
  * @cluster store
  */
@@ -25,4 +25,15 @@ export default class DefaultStore {
   reset(): void {
     // no-op
   }
+}
+
+/** Store for widgets an operator pinned. */
+export class PinnedStore {
+  pin(_item: Widget): void {
+    // no-op
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PinnedStore {
+  unpin(item: Widget): void;
 }

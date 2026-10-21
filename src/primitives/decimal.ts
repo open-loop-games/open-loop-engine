@@ -332,6 +332,7 @@ OrigDecimal.equals = function equals(a: DecimalSource, b: DecimalSource): boolea
   return OrigDecimal.eq(a, b);
 };
 
+/** The `Decimal` class break_eternity default-exports; import it from the engine, so consumer and engine construct one class. */
 export const Decimal: DecimalClass = OrigDecimal;
 export default Decimal;
 

@@ -1,5 +1,5 @@
 /**
- * Widgets — covers function, interface, type, const, enum kinds.
+ * Widgets — covers function, interface, type, const, enum kinds, and a type merged with a const.
  *
  * @cluster widgets
  */
@@ -21,6 +21,12 @@ export interface Widget {
 
 /** Maximum allowed widgets per session. */
 export const WIDGET_LIMIT = 100;
+
+/** A widget's size on screen. */
+export type WidgetSize = { width: number; height: number };
+
+/** Construct a widget size, one per call. */
+export const WidgetSize = (width: number, height: number): WidgetSize => ({ width, height });
 
 /**
  * Create a new widget with the given kind. Used by callers that need a
