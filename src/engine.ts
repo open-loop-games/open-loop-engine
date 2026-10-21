@@ -21,6 +21,7 @@ import {
   withPersistentContext,
   withPersistenceNamespace,
   deletePersistenceNamespace,
+  hasLivePersistentRefs,
 } from './core/persistence';
 import { isDev } from './primitives/dev';
 import { createEmitHandle } from './core/events';
@@ -298,7 +299,8 @@ export interface EngineOptions {
    * same `gameId` never share a save.
    *
    * Leave it undefined for a single-engine app; its saves then have no
-   * persistence namespace prefix.
+   * persistence namespace prefix. A second live engine in the same persistence
+   * namespace throws at `createEngine`.
    *
    * The main use is scratch engines: for balance workbenches, override
    * comparisons and A/B predictive displays.
@@ -414,6 +416,26 @@ export interface Engine {
 /** Autosave period in ms when persistence is on and `autoSaveInterval` is omitted. */
 const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
 
+/** The TickDriver's persistent context id, a stable save key inside each persistence namespace. */
+const TICK_DRIVER_CONTEXT_ID = 'tick-driver';
+
+/**
+ * Throw when a live engine already holds the active persistence namespace.
+ * The TickDriver is the first persistent context an engine opens, so its
+ * live refs mark the persistence namespace as taken.
+ */
+function assertPersistenceNamespaceFree(options: EngineOptions): void {
+  if (!hasLivePersistentRefs(TICK_DRIVER_CONTEXT_ID)) return;
+  const where =
+    options.persistenceNamespace === undefined
+      ? 'the unnamespaced persistent contexts'
+      : `persistence namespace "${options.persistenceNamespace}"`;
+  throw new Error(
+    `[engine] createEngine("${options.gameId}"): another live engine already uses ${where}. ` +
+      'Give each engine its own `persistenceNamespace`, or call `dispose()` on the first engine before creating this one.',
+  );
+}
+
 /**
  * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
@@ -423,6 +445,8 @@ const DEFAULT_AUTO_SAVE_INTERVAL = 30_000;
  * @returns An engine instance that accepts modules via `use()`, then `start()` to begin
  *   ticking. Exposes the TickDriver, save manager, and mod selection. With persistence
  *   on (the default) the game autosaves every 30 s once a `load()` has run.
+ * @throws When another live engine uses the same persistence namespace. Give each
+ *   engine its own `persistenceNamespace`, or `dispose()` the first one.
  *
  * @example
  * ```ts
@@ -451,8 +475,9 @@ export function createEngine(options: EngineOptions): Engine {
   // deleted by `dispose()`'s `deletePersistenceNamespace`. Outside the
   // persistence namespace it would be in the default one, which this engine's
   // save excludes.
-  const tickDriver = withPersistenceNamespace(options.persistenceNamespace, () =>
-    createTickDriver({
+  const tickDriver = withPersistenceNamespace(options.persistenceNamespace, () => {
+    assertPersistenceNamespaceFree(options);
+    return createTickDriver({
       intervalRate: options.intervalRate,
       maxDeltaTime: options.maxDeltaTime,
       speedMultiplier: options.speedMultiplier,
@@ -462,9 +487,9 @@ export function createEngine(options: EngineOptions): Engine {
       onTicksOverflow: options.onTicksOverflow,
       onDeltaOverflow: options.onDeltaOverflow,
       timerProvider: options.timerProvider,
-      persistentContextId: 'tick-driver',
-    }),
-  );
+      persistentContextId: TICK_DRIVER_CONTEXT_ID,
+    });
+  });
   const saveManager =
     options.persistence !== false
       ? createSaveManager({

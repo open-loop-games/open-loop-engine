@@ -329,6 +329,25 @@ describe('dispose() — persistent-context teardown', () => {
     engineB.dispose();
   });
 
+  it('a second live engine in one persistence namespace throws, naming both fixes', () => {
+    const first = createEngine({ gameId: 'g', persistence: false });
+    expect(() => createEngine({ gameId: 'g', persistence: false })).toThrow(
+      /"g".*persistenceNamespace.*dispose\(\)/s,
+    );
+    createEngine({ gameId: 'g', persistence: false, persistenceNamespace: 'other' }).dispose();
+    first.dispose();
+    expect(getPersistentRefs('tick-driver')).toBeUndefined();
+    expect(() => createEngine({ gameId: 'g', persistence: false }).dispose()).not.toThrow();
+  });
+
+  it('a second engine in a named persistence namespace names that namespace', () => {
+    const first = createEngine({ gameId: 'g', persistence: false, persistenceNamespace: 'alpha' });
+    expect(() =>
+      createEngine({ gameId: 'h', persistence: false, persistenceNamespace: 'alpha' }),
+    ).toThrow(/"h".*"alpha"/s);
+    first.dispose();
+  });
+
   it('a start() whose install throws disposes the engine, so the next one can start', () => {
     const failing = createEngine({ gameId: 'g', persistence: false });
     failing.use(makeNamedModule().mod);

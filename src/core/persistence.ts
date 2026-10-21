@@ -969,6 +969,18 @@ export function getPersistentRefs(contextId: string): Set<Persistent> | undefine
 }
 
 /**
+ * Whether a persistent context in the active persistence namespace holds a
+ * ref that is neither deleted nor unowned, so a new ref of the same id would
+ * collide.
+ *
+ * @internal
+ */
+export function hasLivePersistentRefs(contextId: string): boolean {
+  const refs = persistentRefs[toFullContextId(contextId)];
+  return refs !== undefined && [...refs].some((r) => !r[Deleted] && !r[Unowned]);
+}
+
+/**
  * Get every non-lifetime persistent ref under a persistent context, child
  * persistent contexts included (categories, def states and the like).
  *
