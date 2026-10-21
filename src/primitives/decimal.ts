@@ -28,6 +28,9 @@
  *
  * Vue never makes a Decimal reactive: a ref holding one holds the instance
  * itself, and a change is a new Decimal. See REACTIVITY.
+ *
+ * Dev builds warn when a Decimal from a second break_eternity copy reaches the
+ * engine, which would read it as 0. See FOREIGN DECIMALS.
  */
 
 import OrigDecimal from 'break_eternity.js';
@@ -93,7 +96,9 @@ export function renormIfLayer0(x: DecimalSource): DecimalSource {
  * @internal
  */
 export function toFinalDecimal(x: DecimalSource): Decimal {
-  return x instanceof OrigDecimal ? x : new OrigDecimal(x);
+  if (x instanceof OrigDecimal) return x;
+  if (checkForeignDecimals) warnIfForeignDecimal(x);
+  return new OrigDecimal(x);
 }
 
 // === ORDERING CORRECTIONS ===
@@ -206,17 +211,64 @@ function losesMagnitude(d: Decimal, n: number): boolean {
 // every instance has it.
 Object.defineProperty(OrigDecimal.prototype, '__v_skip', { value: true });
 
-const origAdd = OrigDecimal.add;
-const origSub = OrigDecimal.sub;
-const origMul = OrigDecimal.mul;
-const origDiv = OrigDecimal.div;
-const origMin = OrigDecimal.min;
-const origMax = OrigDecimal.max;
-const origEq = OrigDecimal.eq;
-const origGt = OrigDecimal.gt;
-const origGte = OrigDecimal.gte;
-const origLt = OrigDecimal.lt;
-const origLte = OrigDecimal.lte;
+// === FOREIGN DECIMALS ===
+
+// break_eternity has no `exports` map: `main` is its UMD build and `module` its
+// ESM build. vite-node inlines a consumer, which resolves `module`, and leaves
+// the engine to Node, which resolves `main`. So the consumer's `Decimal` is a
+// second class, and break_eternity reads any instance of it as 0, with no error.
+//
+// Dev builds warn once per foreign class, at the coercions the engine owns: the
+// static fall-throughs below (through `checked`), `bn` and `toFinalDecimal`. Modifier `apply` and
+// resource writes reach one of them. break_eternity's own coercion cannot be
+// wrapped: its methods call a function captured at load. So an instance method
+// given a foreign argument, and `new Decimal(foreign)`, go unchecked. The gate
+// is read once, at load; in production each site reads one false boolean.
+const checkForeignDecimals = isDev();
+const warnedForeignClasses = new WeakSet<object>();
+
+/** Warn once per class when `x` is Decimal-shaped but not an engine Decimal. */
+function warnIfForeignDecimal(x: unknown): void {
+  if (typeof x !== 'object' || x === null || x instanceof OrigDecimal) return;
+  if (!('sign' in x && 'layer' in x && 'mag' in x)) return;
+  const foreignClass = Object.getPrototypeOf(x) ?? x;
+  if (warnedForeignClasses.has(foreignClass)) return;
+  warnedForeignClasses.add(foreignClass);
+  console.warn(
+    `A Decimal from a second copy of break_eternity.js reached the engine, which reads it as 0. ` +
+      `Write import { Decimal } from '@open-loop/engine', not from 'break_eternity.js'. ` +
+      `Under vite-node, also set ssr: { noExternal: ['@open-loop/engine'] } in the Vite config.`,
+  );
+}
+
+/** {@link warnIfForeignDecimal} for both operands of a static. */
+function warnIfForeignOperands(a: unknown, b: unknown): void {
+  warnIfForeignDecimal(a);
+  warnIfForeignDecimal(b);
+}
+
+// === STATIC FAST PATHS ===
+
+/** A captured static that warns about foreign operands first, in dev builds only. */
+function checked<R>(fn: (a: DecimalSource, b: DecimalSource) => R) {
+  if (!checkForeignDecimals) return fn;
+  return (a: DecimalSource, b: DecimalSource): R => {
+    warnIfForeignOperands(a, b);
+    return fn(a, b);
+  };
+}
+
+const origAdd = checked(OrigDecimal.add);
+const origSub = checked(OrigDecimal.sub);
+const origMul = checked(OrigDecimal.mul);
+const origDiv = checked(OrigDecimal.div);
+const origMin = checked(OrigDecimal.min);
+const origMax = checked(OrigDecimal.max);
+const origEq = checked(OrigDecimal.eq);
+const origGt = checked(OrigDecimal.gt);
+const origGte = checked(OrigDecimal.gte);
+const origLt = checked(OrigDecimal.lt);
+const origLte = checked(OrigDecimal.lte);
 
 // Fast-path bodies return `Decimal` directly — the native-math result is
 // promoted via `new OrigDecimal(r)` before return. No widened type, no cast:
@@ -338,6 +390,7 @@ export default Decimal;
 
 /** Create a Decimal from a number, string, or Decimal */
 export function bn(x: DecimalSource): Decimal {
+  if (checkForeignDecimals) warnIfForeignDecimal(x);
   return new OrigDecimal(x);
 }
 
