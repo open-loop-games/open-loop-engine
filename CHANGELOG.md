@@ -2,6 +2,18 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.7.7 (2026-10-21)
+
+### Features
+
+* **core:** createGameStateAccessor builds an accessor over the resource registry, with an AccessorMethods record (5a8fd39)
+* **systems:** Gate, dialog and challenge checks read the accessor's AccessorMethods record (9ef137f)
+* EngineOptions.accessor accepts a factory, and the engine publishes the accessor under GameStateAccessorKey (bc5e5f9)
+
+### Refactors
+
+* **systems:** one failure track for the AccessorMethods Gate check, and leaf methods beside leaf services (2aa4888)
+
 ## 0.7.6 (2026-10-21)
 
 ### Fixes
