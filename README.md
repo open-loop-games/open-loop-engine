@@ -21,8 +21,8 @@ pnpm add @open-loop/engine vue break_eternity.js eternal_notations
 ## Quick start
 
 ```ts
-import { createEngine, createResource } from '@open-loop/engine';
-import Decimal from 'break_eternity.js';
+// Decimal comes from the engine: a second break_eternity copy's Decimal reads as 0.
+import { createEngine, createResource, Decimal } from '@open-loop/engine';
 
 const engine = createEngine({ gameId: 'my-idle-game' });
 

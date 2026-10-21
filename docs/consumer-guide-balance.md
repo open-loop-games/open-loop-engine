@@ -2,11 +2,11 @@
 
 How a game built on `@open-loop/engine` chooses and verifies its numbers. Read this before you change a balance constant or write your first probe.
 
-This is the third companion to [consumer-guide.md](./consumer-guide.md). That guide explains **how to compose** the engine. [consumer-guide-recipes.md](./consumer-guide-recipes.md) contains the worked shapes consumers build from it. This file contains the discipline for **what the numbers should be**, and how you know. Its own companion, [consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md), applies when an automated player plays the game your probe measures. It is engineering process over the engine's balance harness; game-design theory is outside this package (§ Cite-out). Directory layout and naming are your repo's decision.
+This is the third companion to [consumer-guide.md](./consumer-guide.md). That guide explains **how to compose** the engine. [consumer-guide-recipes.md](./consumer-guide-recipes.md) contains the worked shapes consumers build from it. This file contains the discipline for **what the numbers should be**, and how you know. Its own companion, [consumer-guide-balance-automated-player.md](./consumer-guide-balance-automated-player.md), applies when an automated player plays the game your probe measures. It is engineering process over the engine's balance harness; game-design theory is outside this package (§ Cite-out).
 
 ## The balance floor
 
-The short version. If you read nothing else here, for a first balance pass, a prototype or a spike, this part must be true.
+If you read nothing else here, for a first balance pass, a prototype or a spike, this part must be true.
 
 1. **Write the spine first.** Derive every balance constant from a closed-form expression, with a one-line derivation comment at the value. Use plain arithmetic and no engine. If you cannot predict the shape on paper, that is the finding: the mechanic is probably mis-specified.
 
@@ -46,13 +46,13 @@ Nothing else pins the result. The diff *is* the check, and it runs when a human 
 
 The spine is the closed-form expression behind every constant, written next to it. It names what the constant couples to, and what you would re-tune if the shape came out wrong.
 
-Keep it in plain arithmetic. Engine math is not forbidden. But the spine's job is to be *read*, by you in six months or by a reviewer, and plain arithmetic reads in one pass. Use `Decimal` when magnitudes need more precision than the native number type has.
+Keep it in plain arithmetic. Engine math is not forbidden, but the spine's job is to be *read*, and plain arithmetic reads in one pass. Use `Decimal` when magnitudes need more precision than the native number type has.
 
 Keep the engine out of it. A prediction that builds an engine and reads live state has stopped predicting and started measuring. Then prediction and measurement agree vacuously, because they are the same observation twice. The rule is not "no engine import". It is **no engine construction and no live-state read**. Pure algebra in the engine is still algebra.
 
 A closed form can be worth executing. It predicts a run length, sizes a parameter, or projects a horizon no headless run reaches in reasonable time. Then make it a runnable function, not a comment. That is still the spine in executable form, not a second source of truth.
 
-**What a derivation comment must contain.** A one-line derivation is worth having only if the line is checkable. A comment that says `// measured` is not a receipt. It claims a measurement that may never have happened, and it looks identical to one that did. A receipt names the source: the expression it came from. For a value fitted from headless runs, it names those runs, the date and the seed count. If you chose a number by feel, say *that*. An honest guess is more useful than a guess in derivation language, because the next person knows which numbers to attack first.
+**What a derivation comment must contain.** A one-line derivation is worth having only if the line is checkable. A comment that says `// measured` is not a receipt: it looks the same whether or not the measurement happened. A receipt names the source: the expression it came from. For a value fitted from headless runs, it names those runs, the date and the seed count. If you chose a number by feel, say *that*. An honest guess is more useful than a guess in derivation language, because the next person knows which numbers to attack first.
 
 **A solved quantity has one home, and the code that grows reads it.** The spine may *solve* for a rate: the per-purchase gain that holds time-to-kill flat, or the ladder that puts beats on schedule. Then the implementation must read that solved value, not re-author the growth beside it. Two authored copies drift silently. The failure looks like a permanent deficit and a game that is too hard, not like arithmetic. It gets tuned with the wrong constants. The second face of the rule: **every term that multiplies a solved curve belongs inside the solve.** A term left out is not a small error, because the rest of the model assumes the solve is delivered. The divergence compounds, and nothing reports it.
 
@@ -70,7 +70,7 @@ The exception is deliberate. Behavior that exists *only* to perturb the game, su
 
 **A watcher the probe depends on needs `flush: 'sync'`.** A probe drives `tickDriver.tickOnce()` in a tight loop, with no microtask boundary between ticks. So a watcher on Vue's default flush never runs during the headless run, and state it maintains goes stale with no error. A resource's own `cumulative` and `best` trackers flush sync for this reason. A watch that must also hold through a reset, such as one that records what a reset is about to clear, needs sync in the browser too.
 
-A probe worth keeping is worth committing. Wire it into your scripts (`"sim": "vite-node scripts/…"`), not a scratch directory. A balance script outside the repo is rebuilt from memory whenever the economy moves. Fold one-off diagnostic scans into it once they have served.
+A probe worth keeping is worth committing. Wire it into your scripts (`"sim": "vite-node scripts/…"`), not a scratch directory. Import `Decimal` from `@open-loop/engine`, not from `break_eternity.js`. Under vite-node, also set `ssr: { noExternal: ['@open-loop/engine'] }`. Otherwise the probe holds a second `Decimal` class, which the engine reads as 0; dev builds warn. A balance script outside the repo is rebuilt from memory whenever the economy moves. Fold one-off diagnostic scans into it once they have served.
 
 A useful probe has three passes:
 
@@ -183,8 +183,6 @@ Neighbors split on tests you can run against the code. A set of choices whose op
 
 A subsystem can classify two ways at once. The common pair is coupled-state deterministic per fixed policy, and optimal stopping across policies. Name both, because they imply different tooling.
 
-Some subsystems close and some do not; that is a correct reading of the design, not a failure of the method.
-
 ### The orthogonal axis: simulation
 
 A bucket classifies a subsystem's **spine math**. Whether the game integrates it continuously or through discrete-event simulation is a separate note, and does not change the bucket.
@@ -219,7 +217,7 @@ The unifying rule: **your prediction never re-implements game mechanics.** The m
 const engine = createEngine({
   gameId: 'my-game',
   storageAdapter: createMemoryStorage(), // nothing reaches the player's storage
-  persistenceNamespace: `probe-${cell}-${seed}`, // unique among engines not yet disposed
+  persistenceNamespace: `probe-${cell}-${seed}`, // unique among live engines, or createEngine throws
   autoSaveInterval: 0,
   timerProvider: { setInterval: () => 0, clearInterval: () => {} }, // no live interval
 });

@@ -69,8 +69,6 @@ const skills = createSkillCategory<MySkillDef>({
 skills.register([{ id: 'woodcutting', xpDivisor: 10 }, { id: 'mining', xpDivisor: 12 }]);
 ```
 
-The `map*` function is where your game's def shape meets the engine's options shape.
-
 A category gives you a persistent context per def, typed reads (`getDef` / `getAll`) and a per-def lifecycle. A mod adds defs through the category's own `register`, which builds each def's instance and def state. The category's `registry` is a read-and-patch `ContentRegistryView` with no `register`. A mod changes a def with `registry.patch()`, without touching the original module. A patch rewrites the def, not what was built from it. Value fields and closures over `def` are copied or frozen at register. So a live instance sees a patch only where its mapping reads the def back through `getDef(id)` inside a getter.
 
 **Categories self-register.** A new category enrolls itself in `EngineCategories`. So UIs, balance workbenches, the balance harness and mods can walk your content without importing its module. Like every other ambient value, `EngineCategories` is wired only during `install()` / `connect()`. Content built from raw primitives still works, but tooling and mods do not see it.
@@ -82,12 +80,12 @@ Two predicate-requirement forms, in preference order:
 - `createGateRequirement({ gate })` — the Gate form. Write the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`). The factory wraps it in the `Requirement` contract. Only a Gate is serializable for saves, mods and the balance harness. Only a Gate supports `timeUntilGateFlip` for predictor UIs. Use this form whenever a Gate can express the predicate.
 - `createBooleanRequirement({ met })` — the closure form. Use it when no Gate kind fits the predicate: arbitrary computation across systems, or opaque consumer state. It returns the same requirement shape as the Gate form, but the predicate is not introspectable.
 
-**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. The accessor-backed kinds need a `GameStateAccessor`, and you supply it. [§ Data and live state separation](#data-and-live-state-separation) lists which kinds need it:
+**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. `state` and `flag` Gates, and every prediction of a resource Gate, need a `GameStateAccessor` you supply ([§ Data and live state separation](#data-and-live-state-separation)):
 
 ```ts
 const engine = createEngine({
   gameId: 'my-game',
-  // Only needed if you author accessor-backed Gate kinds. Category-only games skip it.
+  // Category and resource-amount Gates evaluate without it; skip it unless you need more.
   accessor: {
     getAmount: (id) => resourcesById[id]?.value ?? Decimal.dZero,
     getRate: (id) => ratesById[id] ?? Decimal.dZero,
@@ -132,7 +130,7 @@ This is the normal path for one-off constructs, not a failure. The systems layer
 
 ## Data and live state separation
 
-Content modules keep `data/*.ts` free of engine objects. A data file describes what content exists, and never builds engine refs. That makes content swappable, because a mod replaces the data module and the module code stays the same. It makes content serializable, because data is plain values. It makes content analyzable, because a balance tool can read data without booting the engine.
+Content modules keep `data/*.ts` free of engine objects. A data file describes what content exists, and never builds engine refs. That keeps content swappable (a mod replaces the data module), serializable (plain values) and analyzable (a balance tool reads it without booting the engine).
 
 The difficulty is a predicate over live state. An achievement's `goal` must look at a resource amount. An unlock must compare a lifetime total with a threshold. A dialog node's condition must read relationship state. The engine answers those questions while the game runs, but the *shape* of each question is part of the def.
 
@@ -140,8 +138,8 @@ The difficulty is a predicate over live state. An achievement's `goal` must look
 
 Gate kinds split by what they read, and the split decides what you wire:
 
-- **Accessor-backed leaves** (`resource-gte`, `state`, `flag`) are declarative over the accessor. Where the kind permits it, `timeUntilGateFlip` predicts their transition distance. These are the kinds that require a `GameStateAccessor`.
-- **`cumulative-gte`** reads the resource's lifetime total from the resource registry, so it evaluates without an accessor. A prediction needs one, and divides by the resource's inflow rate. That rate is `getInflowRate` where your accessor serves it, else the net rate. The net rate overstates the time while anything subtracts from the resource.
+- **Accessor-backed leaves** (`state`, `flag`) read the accessor, so they require a `GameStateAccessor`. `timeUntilGateFlip` cannot predict them.
+- **Resource leaves** (`resource-gte`, `cumulative-gte`) evaluate without an accessor. `resource-gte` reads the registered resource's amount, unless a wired accessor's `getAmount` serves it. `cumulative-gte` reads the resource's lifetime total. A prediction of either needs the accessor's `getRate`. `cumulative-gte` divides by the inflow rate: `getInflowRate` where your accessor serves it, else the net rate, which overstates the time while anything subtracts.
 - **Category-aware leaves** (`count-gte`, `active`) read through `CategoryEntrySignals`, and need no accessor. Use them when the unlock or the count *is* a category entry.
 - **Combinators** (`all`, `any`, `not`) combine either kind. Children go in an `of` field: `of: Gate[]` for `all` / `any`, `of: Gate` for `not`.
 
@@ -205,7 +203,7 @@ const prestigeReset = createReset({
 });
 ```
 
-So a resource, purchasable, producer or category entry you add inside a module joins every reset that names that module.
+So a resource, purchasable or producer you add inside a module joins every reset that names that module. A category entry joins the resets that name the module that built its category. Build the reset in `install()` or `connect()`: under a `persistenceNamespace`, one built elsewhere resolves no module id, and warns.
 
 **The systems' lifetime refs.** These system refs are tagged `lifetime`:
 
@@ -234,7 +232,7 @@ A `Resource` from `createResource` is itself the `Persistent` handle (`Resource<
 
 ### Categories own their persistent contexts
 
-Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory` and the others) wrap each def in its own persistent context, `{categoryId}/{def.id}`. That id starts the **save key** as given. The enclosing module does not prefix it, so keep category ids unique across the game. The **reset scope** is a separate question. The per-def persistent context is still recorded as a child of the module that built the category. So a reset that names that module reaches every entry's run state. Only `lifetime` refs are outside it (§ Resetting persistent refs in bulk). Put a category whose run state must survive a reset in a module that no reset names.
+Category factories (`createSkillCategory`, `createChallengeCategory`, `createPurchasableCategory` and the others) wrap each def in its own persistent context, `{categoryId}/{def.id}`. That id starts the **save key** as given. The enclosing module does not prefix it, so keep category ids unique across the game. The **reset scope** is a separate question. The per-def persistent context is still recorded as a child of the module that built the category, whoever calls `register()`, even after `start()`. So a reset that names that module reaches every entry's run state; only `lifetime` refs are outside it (§ Resetting persistent refs in bulk). That engine's save holds the entry too. A category built outside any module gives each entry to the module that registers it. Put a category whose run state must survive a reset in a module that no reset names.
 
 For challenges, `active` and `completions` survive every prestige layer, which is the genre convention. A challenge also stays entered through every reset played inside it. Naming `'my-challenges/no-upgrades'` in `resetPersistentContexts` does not reset them. To clear completions, name the refs: `thingsToReset: challenges.getAll().map((e) => e.challenge.completions)`.
 
@@ -252,7 +250,7 @@ These option callbacks differ between play and a load:
 
 The modifiers on a chain are not serialized, because closures cannot round-trip. That covers bindings (`chain.bind`, a category's grants) and an effect system's lowered grants. They are in module install code, which runs once at `start()`, before `load()` writes anything. So install sees ref defaults. Bind unconditionally, with `active` / `multiplier` reading persistent refs. Those are reactive, so the chain follows the refs through every load, import and reset in the same tick.
 
-The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads the default once at install and never runs again. `active` is a `Computable<boolean>` (`T | Readonly<Ref<T>> | () => T`), so all three forms are valid:
+The mistake to avoid: `if (upgrade.active.value) chain.bind(...)` reads the default once at install and never runs again. `active` takes all three `Computable` forms:
 
 ```ts
 // Ref in hand — preferred, no closure
@@ -267,7 +265,7 @@ Use the getter only when the predicate derives from more than one source.
 
 ### Writing save migrations
 
-When you bump `EngineOptions.saveVersion`, supply a `saveMigrations` entry per version, which transforms the save data from `v` to `v+1`. Save migrations run in order over the raw decoded save data, before validation and deserialization. A step must return the data. One that returns nothing does not compile, and fails the load at runtime. A changed ref default needs a save migration too. A leaf at the old default was pruned from the save, so it loads as the new default. A save migration sees `undefined` for it, which means "the writing build's default". The engine ships a small kit of pure transforms. Compose them in the step instead of writing a traversal each time.
+When you bump `EngineOptions.saveVersion`, supply a `saveMigrations` entry per version, which transforms the save data from `v` to `v+1`. Save migrations run in order over the raw decoded save data, before validation and deserialization. A step must return the data. One that returns nothing does not compile, and fails the load at runtime. A changed ref default needs a save migration too. A leaf at the old default was pruned from the save, so it loads as the new default. A save migration sees `undefined` for it, which means "the writing build's default". Compose the engine's pure transforms in the step, instead of writing a traversal.
 
 ```ts
 import { renameField, forEachDef, type SaveMigration } from '@open-loop/engine';
@@ -322,7 +320,7 @@ const prestige = createConversion({
 // At the call site: if (prestige.canConvert.value) prestige.convert();
 ```
 
-**Prestige does not require a Conversion.** `createReset` plus a gain function is the whole composition, and several shipping games build it that way without this factory. Use a Conversion to put the test, the gain and the reset behind one `convert()`. It gives the UI `canConvert` / `currentGain`. Use `createReset` alone when you do not. Neither path is preferred.
+**Prestige does not require a Conversion.** `createReset` plus a gain function is the whole composition. Use a Conversion to put the test, the gain and the reset behind one `convert()`. It gives the UI `canConvert` / `currentGain`. Use `createReset` alone when you do not. Neither path is preferred.
 
 For the gain curve itself, compose the arithmetic you need. The engine ships no prestige-formula helper. A floored root with a fixed exponent is `integerRoot`. A curve whose exponent changes during play is a `Formula`, which also inverts for a "next at" display. The recipe [consumer-guide-recipes.md §Sublinear per-source prestige payouts](./consumer-guide-recipes.md#sublinear-per-source-prestige-payouts) builds a per-source sublinear payout on `integerRoot`.
 
@@ -432,13 +430,13 @@ export const prestigeEligibleThreshold = 1_000_000;
 - **The wraps document *what is a tunable*.** Wrap the values that external tools should change. Leave structural constants unwrapped: architectural thresholds, fixed step counts, level boundaries. A reviewer who scans the tuning registry then sees exactly what is safe to perturb.
 - **Temporary overrides need no manual cleanup.** Headless runs, what-if probes and balance bisections push overrides, run and pop them.
 
-Name a key by slash-separated segments for category, def and field (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Such keys are greppable, sortable, and clear about what each one controls when the tuning registry is listed.
+Name a key by slash-separated segments for category, def and field (`'producers/tier1/baseRate'`, `'upgrades/double-gold/effect'`). Such keys grep and sort, and say what each one controls.
 
 Built inside install/connect, `createTuningRegistry` enrolls itself in `TuningRegistriesKey`, which the picker enumerates. A registry built at a file's top level, outside install/connect, still serves `tunable()`, but the picker and a balance workbench do not find it. `createOverrideRegistry` is the broader primitive beneath it. Use it directly when the override target is a non-numeric function that the picker should not show. To replace a modifier, prefer `replacementGrants` over a raw `OverrideRegistry` override, because it keeps chain attribution intact.
 
 ## Introspection
 
-External tools, such as devtools panels, balance probes, UI hints and mods, walk the live engine through opt-in injection keys: `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. Nothing couples them at install. Anything with an engine instance can enumerate them without being wired into its module graph.
+External tools, such as devtools panels, balance probes, UI hints and mods, walk the live engine through opt-in injection keys: `CategoriesKey`, `ChainRegistryKey`, `EffectSystemRegistryKey`, `TuningRegistriesKey`. Anything with an engine instance can enumerate them, without being wired into its module graph.
 
 The rule that game code never imports the balance harness is for gameplay modules: per-tick logic, content registration, effect bindings. Tooling may import the balance harness's walkers and picker freely. Keep tooling imports in their own module, so the line between gameplay and tooling stays clear.
 
@@ -449,11 +447,11 @@ Two query shapes recur:
 
 A null `distance.seconds` is intentional, and the consumer interprets it. A stasis analyzer treats it as "cannot rule out this transition", and a countdown UI hides null rows.
 
-Neither snapshot subscribes to reactive changes, so consumers decide when to recompute. Broader "can this predicate still hold?" coverage would need a search with a budget that combines the walker with rate and input checks. It is absent on purpose, not by oversight.
+Neither snapshot subscribes to reactive changes, so consumers decide when to recompute. A "can this predicate still hold?" search, which would combine the walker with rate and input checks, is absent on purpose.
 
 ## Composition recipes
 
-Two companions contain the recurring shapes consumers build from engine primitives. [consumer-guide-recipes.md](./consumer-guide-recipes.md) covers content, queues, grids and payouts. [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md) covers what a tick handler runs, and drawing what ticks change. Read one when you build one.
+Two companions contain the recurring shapes consumers build from engine primitives. [consumer-guide-recipes.md](./consumer-guide-recipes.md) covers content, queues, grids and payouts. [consumer-guide-recipes-tick.md](./consumer-guide-recipes-tick.md) covers what a tick handler runs, and drawing what ticks change.
 
 ## When the engine should grow
 
