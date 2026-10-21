@@ -135,7 +135,7 @@ export interface PurchasableCategory<
    * Register defs and create their Purchasable instances.
    * Can be called more than once (base game, then a mod's content).
    */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /** Get the Purchasable instance for a def id */
   getPurchasable(id: string): Purchasable | undefined;

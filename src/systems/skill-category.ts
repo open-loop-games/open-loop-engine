@@ -117,7 +117,7 @@ export interface SkillCategory<
    * Register defs and create their Skill instances.
    * Can be called more than once (base game, then a mod's content).
    */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /** Get the Skill instance for a def id */
   getSkill(id: string): Skill | undefined;

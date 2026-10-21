@@ -234,7 +234,7 @@ export interface AchievementCategory<
    * Register defs and create their Achievement instances.
    * Can be called more than once (base game, then a mod's content).
    */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /**
    * Fan a single value-getter into N achievements, each blocked by a

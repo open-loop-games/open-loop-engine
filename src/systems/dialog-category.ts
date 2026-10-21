@@ -47,7 +47,7 @@ export interface DialogCategory<Def extends { id: string }> extends ResettableOb
    * def's dialog graphs.
    */
   readonly registry: ContentRegistryView<Def>;
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
   getDef(id: string): Def | undefined;
   getEntry(id: string): DialogCategoryEntry<Def> | undefined;
   getAll(): DialogCategoryEntry<Def>[];

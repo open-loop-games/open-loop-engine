@@ -318,7 +318,7 @@ export interface ProducerCategory<
    *
    * Can be called more than once (base game, then a mod's content).
    */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /** Get the Producer instance for a def id */
   getProducer(id: string): Producer | undefined;

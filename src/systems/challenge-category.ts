@@ -306,7 +306,7 @@ export interface ChallengeCategory<
   readonly registry: ContentRegistryView<Def>;
 
   /** Register challenge defs. Can be called multiple times. */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /** Get the Challenge instance by def id */
   getChallenge(id: string): Challenge | undefined;
@@ -609,7 +609,7 @@ export function createChallengeCategory<Def extends ChallengeDef, DefState = voi
     registry: base.registry,
     // A def that registers already entered, as after a take-over, pushes its
     // scoped overrides here: no load or reset will run hydrateOverrides for it.
-    register(defs: Def | Def[]): void {
+    register(defs: Def | readonly Def[]): void {
       try {
         base.register(defs);
       } catch (error) {

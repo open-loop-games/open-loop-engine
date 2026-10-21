@@ -283,7 +283,7 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
    */
   readonly registry: ContentRegistryView<SubjectDef<S>>;
   /** Register subjects against the shared schema. Can be called multiple times (base content, then later content). */
-  register(defs: SubjectDef<S> | SubjectDef<S>[]): void;
+  register(defs: SubjectDef<S> | readonly SubjectDef<S>[]): void;
   /** Get the authored def for a subject id (delegates to the registry). */
   getDef(id: string): SubjectDef<S> | undefined;
   /** Get the typed live instance for a subject id. */

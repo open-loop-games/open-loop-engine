@@ -193,7 +193,7 @@ export interface ActionCategory<Def extends { id: string }, DefState = void, Pay
 
   // --- Registration ---
 
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
   getDef(id: string): Def | undefined;
   getEntry(id: string): ActionCategoryEntry<Def, DefState, Payload> | undefined;
   getAll(): ActionCategoryEntry<Def, DefState, Payload>[];
@@ -379,7 +379,7 @@ export function createActionCategory<Def extends { id: string }, DefState = void
   // and installed only for defs that registered: a duplicate id or a throw later
   // in the batch must neither replace a live def's mapping nor leave one behind.
   const baseRegister = base.register;
-  function registerWithMapping(defs: Def | Def[]): void {
+  function registerWithMapping(defs: Def | readonly Def[]): void {
     const arr = Array.isArray(defs) ? defs : [defs];
     const staged = new Map<Def, ActionMapping<Def, DefState, Payload>>();
     // `mapAction` runs in the caller's persistent context, not the def's:

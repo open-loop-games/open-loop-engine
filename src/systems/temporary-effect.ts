@@ -163,7 +163,7 @@ export interface TemporaryEffectSystem {
   /** The variant `kind` the effect-system registry and picker discovery read */
   readonly kind: 'temporary';
   /** Register one or more effect defs. Throws on an id already registered. */
-  register(def: TemporaryEffectDef | TemporaryEffectDef[]): void;
+  register(def: TemporaryEffectDef | readonly TemporaryEffectDef[]): void;
   /** Get a registered def by id */
   getDef(id: string): TemporaryEffectDef | undefined;
   /** Snapshot of every registered def in insertion order. */
@@ -367,7 +367,7 @@ export function createTemporaryEffectSystem(
   // Public API
   // --------------------------------------------------------------------
 
-  function register(def: TemporaryEffectDef | TemporaryEffectDef[]): void {
+  function register(def: TemporaryEffectDef | readonly TemporaryEffectDef[]): void {
     const list = Array.isArray(def) ? def : [def];
     for (const d of list) {
       if (defs.has(d.id)) {

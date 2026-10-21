@@ -208,7 +208,9 @@ describe('createSkillCategory generic inference', () => {
     expectTypeOf<Cat['getDef']>().returns.toEqualTypeOf<MySkillDef | undefined>();
     expectTypeOf<Cat['getState']>().returns.toEqualTypeOf<MySkillState | undefined>();
     expectTypeOf<Cat['getAll']>().returns.toBeArray();
-    expectTypeOf<Cat['register']>().parameter(0).toMatchTypeOf<MySkillDef | MySkillDef[]>();
+    expectTypeOf<Cat['register']>()
+      .parameter(0)
+      .toEqualTypeOf<MySkillDef | readonly MySkillDef[]>();
   });
 
   it('createSkillCategory itself is generic over Def/State', () => {
@@ -257,7 +259,9 @@ describe('createActionCategory generic inference', () => {
 
     expectTypeOf<Cat['getDef']>().returns.toEqualTypeOf<MyActionDef | undefined>();
     expectTypeOf<Cat['getState']>().returns.toEqualTypeOf<MyActionState | undefined>();
-    expectTypeOf<Cat['register']>().parameter(0).toMatchTypeOf<MyActionDef | MyActionDef[]>();
+    expectTypeOf<Cat['register']>()
+      .parameter(0)
+      .toEqualTypeOf<MyActionDef | readonly MyActionDef[]>();
     expectTypeOf<Cat['currentItem']>().toEqualTypeOf<ActionItemMetadata<MyActionPayload> | null>();
     expectTypeOf<Cat['updateItemPayload']>()
       .parameter(1)
@@ -1285,6 +1289,39 @@ describe('A category registry is a read-and-patch view', () => {
     expectTypeOf<SubjectCategory<Record<string, never>>['registry']>().toEqualTypeOf<
       ContentRegistryView<SubjectDef<Record<string, never>>>
     >();
+  });
+
+  it('every register takes one def or a readonly array of them', () => {
+    type Defs = Def | readonly Def[];
+    expectTypeOf<CategoryBase<Def, unknown>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<AchievementCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<ActionCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<ChallengeCategory<ChallengeDef>['register']>()
+      .parameter(0)
+      .toEqualTypeOf<ChallengeDef | readonly ChallengeDef[]>();
+    expectTypeOf<DialogCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<ProducerCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<PurchasableCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    expectTypeOf<SkillCategory<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+    type Subject = SubjectDef<Record<string, never>>;
+    expectTypeOf<SubjectCategory<Record<string, never>>['register']>()
+      .parameter(0)
+      .toEqualTypeOf<Subject | readonly Subject[]>();
+    type ConditionalDef = import('@/systems/conditional-effect').ConditionalEffectDef;
+    expectTypeOf<import('@/systems/conditional-effect').ConditionalEffectSystem['register']>()
+      .parameter(0)
+      .toEqualTypeOf<ConditionalDef | readonly ConditionalDef[]>();
+    type TemporaryDef = import('@/systems/temporary-effect').TemporaryEffectDef;
+    expectTypeOf<import('@/systems/temporary-effect').TemporaryEffectSystem['register']>()
+      .parameter(0)
+      .toEqualTypeOf<TemporaryDef | readonly TemporaryDef[]>();
+    expectTypeOf<ContentRegistry<Def>['register']>().parameter(0).toEqualTypeOf<Defs>();
+  });
+
+  it('registers an as-const data array', () => {
+    const SKILLS = [{ id: 'mining' }, { id: 'fishing' }] as const;
+    const check = (skills: SkillCategory<Def>) => skills.register(SKILLS);
+    void check;
   });
 
   it('adds defs through the category, not its registry', () => {

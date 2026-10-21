@@ -54,7 +54,7 @@ export interface ContentRegistry<T extends { id: string }> {
    * @throws If any def's id is empty or already exists in the registry
    */
   register(entry: T): void;
-  register(entries: T[]): void;
+  register(entries: readonly T[]): void;
 
   /**
    * Shallow-patch an existing def's fields (Object.assign semantics).
@@ -119,7 +119,7 @@ export type ContentRegistryView<T extends { id: string }> = Omit<ContentRegistry
 export interface ContentRegistryHandle<T extends { id: string }> {
   readonly registry: ContentRegistry<T>;
   /** Throw exactly as `register(entries)` would, without adding anything. */
-  assertRegistrable(entries: T[]): void;
+  assertRegistrable(entries: readonly T[]): void;
   /** Remove a def, for undoing a registration its owner failed to build. */
   remove(id: string): void;
 }
@@ -188,7 +188,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
     if (base.size === 0) bases.delete(id);
   }
 
-  function assertRegistrable(entries: T[]): void {
+  function assertRegistrable(entries: readonly T[]): void {
     const seen = new Set<string>();
     for (const entry of entries) {
       if (entry.id === '') {
@@ -221,7 +221,7 @@ export function createContentRegistryHandle<T extends { id: string }>(
   const registry: ContentRegistry<T> = {
     id: registryId,
 
-    register(entryOrEntries: T | T[]): void {
+    register(entryOrEntries: T | readonly T[]): void {
       const entries = Array.isArray(entryOrEntries) ? entryOrEntries : [entryOrEntries];
       // Validate all before inserting any (atomic batch)
       assertRegistrable(entries);

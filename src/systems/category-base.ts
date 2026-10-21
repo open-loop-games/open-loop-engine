@@ -140,7 +140,7 @@ export interface CategoryBase<
    * registered, and it and the ones after it are not. The refs its build
    * created are deleted, so the same def can be registered again.
    */
-  register(defs: Def | Def[]): void;
+  register(defs: Def | readonly Def[]): void;
 
   /** Get the def for an id (delegates to registry.get) */
   getDef(id: string): Def | undefined;
@@ -260,7 +260,7 @@ export function createCategoryBase<Def extends { id: string }, Instance, DefStat
     id: categoryId,
     registry,
 
-    register(defs: Def | Def[]): void {
+    register(defs: Def | readonly Def[]): void {
       const arr = Array.isArray(defs) ? defs : [defs];
       assertRegistrable(arr);
       for (const def of arr) addOwnedDef(def);
