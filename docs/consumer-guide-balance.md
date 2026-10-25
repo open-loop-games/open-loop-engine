@@ -20,7 +20,7 @@ If you read nothing else here, for a first balance pass, a prototype or a spike,
 
 6. **Balance verification is a script that prints, not a test that asserts.** It reports deltas for a human to read. See § Why this isn't a test suite.
 
-7. **Coarsen the tick.** Balance is measured in minutes, and the engine's default dt is built for live play. See § `tickDelta`.
+7. **Coarsen the tick once a coarser dt plays the same arc.** Balance is measured in minutes, and the engine's default dt is built for live play. See § `tickDelta`.
 
 8. **An automated player that plays the game for you is part of the instrument.** Every number its probe prints is a joint claim about the design *and* the automated player. You cannot tell the two apart until you calibrate the automated player separately. See § When an automated player is the instrument.
 
@@ -59,6 +59,8 @@ A closed form can be worth executing. It predicts a run length, sizes a paramete
 **Solve a threshold from the walk at its scheduled time.** A threshold the player must reach, such as an unlock price or an ending, is what the spine's walk holds at its scheduled moment. Solve it in the same pass that walks the arc. A threshold chosen first and timed afterwards drifts with every retune, and its timing becomes a measurement nobody re-runs. When reaching it changes later income, walk the arc with that change applied at its time. Past the walk's horizon there is no walk to solve from. Extrapolate by the walk's last ratio, and say so at the value.
 
 **Keep the retired shape where it was retired.** A headless run can show that the spine was the wrong *family*, not the wrong constant. Then write down what the old shape assumed and what contradicted it, at the value that replaced it. Three lines are the cheapest guard against re-deriving a refuted shape a year later. By then the conclusion is remembered and the refutation is not.
+
+**Print each stated claim beside what the game does.** That rule covers prose retired on purpose; this one covers prose nobody noticed going stale. A comment beside a balance constant states an intent: an early payback dip, costs that outgrow the payoff, a cap that never stops play. The data then moves away from the prose, and nothing compares the two. A suite does not catch it, because it compares data with data, never with the stated intent. So a probe prints each claim, the value it describes and the gap, for a human to read. One kind of claim is mechanical: whether a limit or a cap ever stops play. Count the ticks on which it stops a purchase, and print the count. A limit designed to shape play that the arc never reaches is inert. A cap documented as a safety maximum, which the arc does reach, is part of the rule. So the spine models it.
 
 ### The probe — real engine, real policies
 
@@ -132,6 +134,8 @@ That subject has its own file, [consumer-guide-balance-automated-player.md](./co
 **Grading** is the bottleneck of a balance pass, not running: headless runs parallelize, and judgment does not. Most of a pass's cost is headless runs spent on questions a cheaper instrument, or none, already answers.
 
 **Read before you run.** A source read that settles a question is a finding. Read the file header, not only the symbol you arrived with. It often records a standing refusal of exactly the proposed change.
+
+**Keep a probe that a pass reruns to seconds.** A slow probe is run less, so its findings arrive late. When one grows slow, profile it before you change it. The cost can be in the spine's own solve, in the shipped policy or in the game's own modules. It is rarely where a guess puts it. A spine solved at module load costs that time at every boot of the game, not only in the probe. Fix a slow shipped policy in the game, never in a probe-side copy. Then diff the printed report before and after.
 
 **Name the content that could answer it.** A question is gradeable only where something in your game can express it, and two thresholds differ. A channel with **one carrier** gives an address, not a finding: one carrier cannot separate a mechanism from its own shape. A channel with **zero carriers** gives no result at all. A flat sweep there describes your content, so the honest output is a content request, not a refutation. Generate the carrier list; do not recall it, because recalled lists are often wrong. When a line of work stops producing findings, ask what your content can express. Adding a carrier is often cheaper than another mechanism.
 
@@ -252,27 +256,13 @@ Both are probe tools, not spine tools, because both build an engine.
 
 ## Balance harness API
 
-A selection; `docs/api/harness.md` has the full balance harness API.
+`docs/api/harness.md` has the full balance harness API. Most balance work uses three parts of it:
 
-| Function | Use for |
-| --- | --- |
-| `runUntil` | The workhorse: one headless run that a predicate ends, in a `RunMode`. |
-| `runBeatProbe` | Termination-time distributions per beat over a seed sweep. |
-| `runWaypointProbe` | A snapshot per seed × waypoint across an arc. |
-| `runHeadless` | A headless run of a fixed tick count. Pass `seed` to make it replayable. |
-| `runMatrix` / `runMatrixUntil` | Cartesian headless runs over a parameter grid, for many cells at once. |
-| `runSensitivity` | One parameter swept across a range, with per-variant deltas against the baseline. |
-| `bisectTuner` | 1-D bisection of a fire-time sampler onto a target time, for the scalar when the spine gives the shape. |
-| `applyPerturbation` | Apply a perturbation to a `PickerEntry`; returns an idempotent cleanup. |
-| `createPickerSnapshot` | Enumerate the engine's perturbable addresses: the effect system's lowered grants, chain-registry chains, tunables. |
-| `createSensitivityCell` | Build a matrix cell from save text, a module factory per headless run and an analyzer factory. |
-| `createEngineFromSave` | Load a save into a scratch engine, to simulate ahead of the live game. |
-| `diffAggregates` | The delta per metric between a variant cell and the baseline. |
-| `createTransitionSnapshot` / `createIncrementalSnapshot` | Pending content transitions; a cached form that rebuilds only what changed. |
-| `defaultAnalyzerPack` / `timeSeriesAnalyzerPack` | Run-finalize and resource-peak analyzers; per-resource trajectory capture. |
-| `classifyFlowChannel` / `getFlowChannelBoundaries` | Classify a beat time into its flow channel; read the threshold table. |
+- `runUntil`, one headless run that a predicate ends, in a `RunMode`;
+- `runBeatProbe`, termination-time distributions per beat over a seed sweep;
+- the analyzer packs, `defaultAnalyzerPack` and `timeSeriesAnalyzerPack`.
 
-Most balance work uses the first two and the analyzer packs. Keep the sweep runners for questions about a curve across a range.
+Keep the sweep runners, `runMatrix` and `runSensitivity`, for questions about a curve across a range. `bisectTuner` fits the scalar when the spine gives the shape. `createEngineFromSave` loads a banked save into a scratch engine.
 
 ### Flow channels
 
@@ -282,9 +272,9 @@ The objective is **shape of play, not beat-second targets**. "Reach beat 3 at mi
 
 ### `tickDelta`
 
-A two-hour arc at the engine's default dt runs about a hundred thousand ticks per probe. At `tickDelta: 1` it runs a few thousand, with minute-scale timing unchanged.
+A two-hour arc at the engine's default dt runs about a hundred thousand ticks per probe. At `tickDelta: 1` it runs a few thousand.
 
-Default to `1` for arc probes. Go lower only when sub-second timing is part of the design, such as click cadence or real-time combat.
+**Coarsen only an arc that a coarser dt leaves unchanged, and measure that.** Play the arc at two or three dt values, such as 0.5, 1 and 2, and compare the beats. Where each beat moves by seconds, default to `1` for arc probes. Elsewhere, each dt plays a different game. The usual causes are real-time combat, a decision made once per tick, and a cap counted per tick. Probe that arc at the live dt, and get the speed back from a seed sweep run in parallel. Check again when a mechanic that acts once per tick changes.
 
 The engine's `maxDeltaTime` (option default `1`) bounds the speedup, not the timing. A `tickDelta` above it reaches the engine as the fewest equal ticks under the cap. Every second is simulated, but past the cap coarsening stops making the probe faster. Raise `maxDeltaTime` on the probe engine to coarsen further.
 
