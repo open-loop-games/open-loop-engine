@@ -138,7 +138,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | SV8 | **revive** | decode one save leaf against its ref's default | rehydrate, for a leaf |
 | SV9 | **settle**, **settle guard** | the end of a load's or a reset's writes; the hold that keeps those writes out of lifetime refs such as `cumulative` and `best` | load guard |
 | SV10 | **save migration**, **API migration** | a step from save version N to N+1; the consumer code change a breaking release needs | bare "migration" |
-| SV11 | **save version**, **engine save version**, **format version**, **version ref** | the consumer's save-format number; the engine's; a serialized form's own schema number; a counter ref every mutation bumps | bare "version", game version |
+| SV11 | **save version**, **engine save version**, **format version** | the consumer's save-format number; the engine's; a serialized form's own schema number. A version ref is ST10 | bare "version", game version |
 | SV12 | **game build**, **writing build**, **loading build** | the shipped code of a game; the build that wrote a save; the build that loads it | saving build |
 | SV13 | **checkpoint** | save text plus RNG state, taken before an advance so a bisection can replay it | save checkpoint |
 
@@ -154,6 +154,8 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | LT6 | **keep**, **retain**, **retention** | one reset's options to keep a value through it verbatim, or transformed; both together (`createRetention`) | retention policy |
 | LT7 | **retention factor**, **decay** | an influence layer's fraction kept per tick (`retentionFactor`); a fraction lost over time | decay or bare retention, for a kept fraction; evaporate |
 | LT8 | **best** | a resource's high-water mark (`Resource.best`), or a best-of record | — |
+| LT9 | **since reset** | a resource's gain since the last reset whose scope contains it (`Resource.sinceReset`). Run state: the per-run counterpart of `cumulative` | — |
+| LT10 | **tracker** | a resource ref that a watch on its amount keeps current: `cumulative`, `best`, `sinceReset` | tracker, for a BestOf or a timed progress |
 
 ### VC — values and their changes
 
@@ -198,7 +200,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | CI7 | **content**, **content registry** | the game content a consumer supplies; a category's id-to-def store, with patching | content, for lowered grants |
 | CI8 | **chain registry**, **effect-system registry**, **resource registry**, **override registry**, **tuning registry**, **persistent-ref registry** | the per-engine registries, always qualified | bare "registry", global engine registry |
 | CI9 | **category** | a batch-registration system for one kind of content | category system |
-| CI10 | **Gate service**, **handle** | a named engine service a Gate kind reads (`GateService`); an object returned to control one thing | handle, for a Gate service |
+| CI10 | **Gate service**, **accessor services**, **handle** | a named engine service a Gate kind reads (`GateService`); the engine services an accessor factory receives (`AccessorServices`); an object returned to control one thing | handle, for a Gate service |
 | CI11 | **subject**, **achievement**, **threshold** | a named thing in a subject category; an item earned once its goal holds; the value a tracked quantity must reach | entity (for a subject), milestone (for an achievement) |
 
 ### BB — the engine's building blocks
@@ -234,7 +236,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | TM6 | **dt**, **raw dt**, **fixed dt** | the game seconds one tick advances; the wall-clock seconds one interval measured; the dt of every fixed-mode tick | elapsed time, delta, step size |
 | TM7 | **game time**, **sim-time**, **sim-seconds**, **wall-clock time**, **play time** | seconds the engine simulated, scaled by game speed; game time in a balance-harness run, in sim-seconds; elapsed time on the system clock; how long the player has played | real, real time, simulated time, play-clock |
 | TM8 | **offline** | time away: time the game was not running, replayed on return | absence, idle |
-| TM9 | **rate** | a quantity's change per second: net rate, inflow rate, a progress rate | speed (for progress), income, yield |
+| TM9 | **rate** | a quantity's change per second: net rate, inflow rate, a converter's realized rate (`realizedRate`), a progress rate | speed (for progress), income, yield |
 | TM10 | **game speed** | `TickDriver.speedMultiplier`, which scales dt in live play | boost, acceleration (as the setting's noun) |
 | TM11 | **duration**, **needed** | seconds a thing lasts; the progress a timed progress needs to complete | duration, for progress |
 | TM12 | **accumulator**, **accumulator skill** | a value ticks add to and a threshold drains; a skill whose lifetime bonus accumulates across runs | accumulator, for the category set (say collection) |
@@ -351,7 +353,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | ST5 | **live state** | the in-memory values a save is written from and loaded into | runtime state, current state |
 | ST6 | **state** | everyday: what an object keeps between calls | — |
 | ST7 | **stateless** | keeps no data between calls | stateless, for "saves nothing" |
-| ST8 | **accessor**, **mutator** | `GameStateAccessor`, the read side; `GameStateMutator`, the write side | accessor, for any read method |
+| ST8 | **game-state accessor**, **accessor**, **mutator** | the object that reads and writes game state, which a consumer supplies or `createGameStateAccessor` builds (`GameStateAccessorMutator`). Its read side is `GameStateAccessor`; its write side is the mutator (`GameStateMutator`) | accessor, for any read method |
 | ST9 | **view** | a read-only interface over an object (`InfluenceLayerView`) | reader, for an interface |
 | ST10 | **ref**, **version ref**, **backing ref** | a Vue ref (external); a counter every mutation bumps; the inner ref behind a persistent ref | state ref |
 | ST11 | **reactive** | tracked by Vue: a `computed` over it recomputes when it changes | live, dynamic (for this sense) |
@@ -384,6 +386,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | SP8 | **influence layer**, **influence**, **influence source** | the object that propagates numbers over a grid; the number at a cell; an emitter | influence map, field |
 | SP9 | **source** | an input form accepted where an X is read (`FormulaSource`, `CapacitySource`) | source, for provenance (→ BH8's walkers) |
 | SP10 | **card** | the UI item that shows one achievement or purchasable | tile |
+| SP11 | **fall-through node** | a dialog node with `fallThrough` set. With no visible choice, it runs `onEnter` and enters `next` without presenting | skip node, silent node |
 
 ### LV — lifecycle verbs
 
@@ -413,6 +416,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | RF6 | **produce**, **production**, **producer** | a producer's output and the act; the engine's word for a generator | generator |
 | RF7 | **gain**, **prestige gain** | any increase; the prestige currency a reset pays | gain, for a modifier's input (say value) |
 | RF8 | **earn** | an achievement's attainment | earn, for a resource inflow |
+| RF9 | **converter**, **Conversion** | a continuous producer that draws its `inputs` per unit of output, and makes less when one runs short; one atomic exchange that refuses a shortfall (`createConversion`) | converter, for a Conversion |
 
 ### FM — formula math
 
