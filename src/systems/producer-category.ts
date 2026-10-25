@@ -63,7 +63,7 @@ export interface ProducerPurchaseOptions {
   /** Whether this producer is visible in the UI. Default: `true` */
   visible?: Predicate;
   /**
-   * Whether a bare `repeatable.purchase()` purchases max rather than one;
+   * Whether a bare `purchasable.purchase()` purchases max rather than one;
    * `purchase(1)` purchases one either way. Default: `true` (`false` at `limit: 1`)
    */
   purchaseMaxByDefault?: Computable<boolean>;
@@ -100,7 +100,7 @@ export interface ProducerMapping {
    */
   purchase?: ProducerPurchaseOptions;
   /**
-   * The repeatable's display, when `purchase` is set: a {@link PurchasableDisplay},
+   * The purchasable's display, when `purchase` is set: a {@link PurchasableDisplay},
    * or a string, ref or getter for its description. Default: the def's id.
    */
   display?: PurchasableDisplay | Computable<string>;
@@ -213,20 +213,20 @@ export interface Producer {
   /** The stocks a converter draws per unit of output; undefined for a plain producer */
   readonly inputs: Readonly<Record<string, ResolvedProducerInput>> | undefined;
   /**
-   * A converter's output per second on its last tick, after its inputs bound
-   * it. `computedRate × count` is what it would make unbounded. A load or a
-   * reset starts it over at 0, with `limit` at `'rate'`, until the next tick.
+   * A converter's output per second on its last tick, after its inputs held it
+   * back. `computedRate × count` is what it would make unbounded. A load or a
+   * reset starts it over at 0, with `bottleneck` at `'rate'`, until the next tick.
    * Present only when `inputs` is set.
    */
   readonly realizedRate?: Readonly<Ref<DecimalSource>>;
-  /** What bound a converter's last tick. Present only when `inputs` is set. */
-  readonly limit?: Readonly<Ref<ProducerLimit>>;
+  /** What held back a converter's last tick. Present only when `inputs` is set. */
+  readonly bottleneck?: Readonly<Ref<ProducerBottleneck>>;
   /** The `onProduce` option callback, if set */
   readonly onProduce?: (amount: DecimalSource) => void;
   /** Trigger mode */
   readonly trigger: 'continuous' | 'manual';
   /** The Purchasable, when `purchase` was set */
-  readonly repeatable: Purchasable | undefined;
+  readonly purchasable: Purchasable | undefined;
   /** For manual producers: produce once (`computedRate × count`) */
   readonly activate: (() => void) | undefined;
   /**
@@ -274,11 +274,11 @@ export interface Producer {
 }
 
 /**
- * What bound a converter's last tick: `'rate'` when it made what its rate
- * wants, `'input:<key>'` when that input ran short, `'room'` when the output's
+ * What held back a converter's last tick: `'rate'` when it made what its rate
+ * wants, `'input:<key>'` when that input ran short, `'capacity'` when the output's
  * resource bag was full.
  */
-export type ProducerLimit = 'rate' | `input:${string}` | 'room';
+export type ProducerBottleneck = 'rate' | `input:${string}` | 'capacity';
 
 /** A {@link ProducerInput} with its per-unit draw resolved to a ref. */
 export interface ResolvedProducerInput {
@@ -356,7 +356,7 @@ interface ConverterState {
     readonly per: ComputedRef<DecimalSource>;
   }[];
   readonly realizedRate: ShallowRef<DecimalSource>;
-  readonly limit: ShallowRef<ProducerLimit>;
+  readonly bottleneck: ShallowRef<ProducerBottleneck>;
 }
 
 /** One tick's writes, collected by the walk and applied after it. */
@@ -397,13 +397,13 @@ function buildProducer<Def extends { id: string }>(
   const baseRate = toMaybeRef(mapping.baseRate);
   const computedRate = computed(() => Decimal.fromValue(rateChain.apply(unref(baseRate))));
 
-  let repeatable: Purchasable | undefined;
+  let purchasable: Purchasable | undefined;
   if (mapping.purchase) {
     const pc = mapping.purchase;
     const { title, description, effectDescription, showCount } = toPurchasableDisplay(
       mapping.display ?? def.id,
     );
-    repeatable = createScalingPurchasable(
+    purchasable = createScalingPurchasable(
       {
         id: def.id,
         title,
@@ -427,13 +427,13 @@ function buildProducer<Def extends { id: string }>(
     mapping.extraCount !== undefined ? toMaybeRef(mapping.extraCount) : undefined;
 
   const ownedCount = computed<DecimalSource>(() =>
-    repeatable ? repeatable.count.value : Decimal.dZero,
+    purchasable ? purchasable.count.value : Decimal.dZero,
   );
   const extraCount = computed<DecimalSource>(() =>
     processedExtraCount ? unref(processedExtraCount) : Decimal.dZero,
   );
   const count = computed<DecimalSource>(() => {
-    if (!repeatable && !processedExtraCount) return 1;
+    if (!purchasable && !processedExtraCount) return 1;
     return Decimal.add(ownedCount.value, extraCount.value);
   });
 
@@ -443,7 +443,7 @@ function buildProducer<Def extends { id: string }>(
       return { key, resource: input.resource, per: computed(() => unref(per)) };
     }),
     realizedRate: shallowRef<DecimalSource>(Decimal.dZero),
-    limit: shallowRef<ProducerLimit>('rate'),
+    bottleneck: shallowRef<ProducerBottleneck>('rate'),
   };
 
   let activate: (() => void) | undefined;
@@ -458,11 +458,11 @@ function buildProducer<Def extends { id: string }>(
   // second to amortize against) so consumers can branch on a finite check
   // without wrapping the call.
   const purchaseBeatSeconds = computed<number>(() => {
-    if (!repeatable || mapping.trigger !== 'continuous') return Infinity;
+    if (!purchasable || mapping.trigger !== 'continuous') return Infinity;
     const rate = Decimal.fromValue(computedRate.value);
     if (!rate.gt(0)) return Infinity;
     const effCount = Decimal.max(1, count.value);
-    const cost = Decimal.fromValue(repeatable.getCost(1));
+    const cost = Decimal.fromValue(purchasable.getCost(1));
     return cost.div(rate.mul(effCount)).toNumber();
   });
 
@@ -478,9 +478,9 @@ function buildProducer<Def extends { id: string }>(
         converter.inputs.map(({ key, resource, per }) => [key, { resource, per }]),
       ),
     onProduce: mapping.onProduce,
-    ...(converter && { realizedRate: converter.realizedRate, limit: converter.limit }),
+    ...(converter && { realizedRate: converter.realizedRate, bottleneck: converter.bottleneck }),
     trigger: mapping.trigger,
-    repeatable,
+    purchasable,
     activate,
     ownedCount,
     extraCount,
@@ -553,7 +553,7 @@ function applyProducerTick(batch: ProducerTickBatch): void {
   }
 }
 
-/** One converter's tick: make what the rate wants, bounded by the inputs. */
+/** One converter's tick: make what the rate wants, held back by its inputs. */
 function tickConverter(
   producer: Producer,
   converter: ConverterState,
@@ -561,14 +561,14 @@ function tickConverter(
   dt: number,
 ): void {
   let made = Decimal.max(want, Decimal.dZero);
-  let limit: ProducerLimit = 'rate';
+  let bottleneck: ProducerBottleneck = 'rate';
   for (const { key, resource, per } of converter.inputs) {
     const draw = Decimal.fromValue_noAlloc(per.value);
     if (!draw.gt(Decimal.dZero)) continue;
     const feeds = Decimal.div(resource.value, draw);
     if (feeds.lt(made)) {
       made = feeds;
-      limit = `input:${key}`;
+      bottleneck = `input:${key}`;
     }
   }
   // A full bin throttles the converter, so no input is burned into the overflow.
@@ -580,10 +580,10 @@ function tickConverter(
     const landed = clamp(target);
     if (Decimal.lt(landed, target)) {
       made = Decimal.max(Decimal.sub(landed, held), Decimal.dZero);
-      limit = 'room';
+      bottleneck = 'capacity';
     }
   }
-  converter.limit.value = limit;
+  converter.bottleneck.value = bottleneck;
   if (!made.gt(Decimal.dZero)) {
     converter.realizedRate.value = Decimal.dZero;
     return;
@@ -728,7 +728,7 @@ export function createProducerCategory<Def extends { id: string }, DefState = vo
       const converter = converterStates.get(instance);
       if (!converter) continue;
       converter.realizedRate.value = Decimal.dZero;
-      converter.limit.value = 'rate';
+      converter.bottleneck.value = 'rate';
     }
   });
 

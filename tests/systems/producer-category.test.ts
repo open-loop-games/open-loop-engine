@@ -329,7 +329,7 @@ describe('createProducerCategory', () => {
     expect(new Decimal(cookies.value).eq(10)).toBe(true);
   });
 
-  it('continuous producer scales with repeatable count', () => {
+  it("continuous producer scales with its purchasable's count", () => {
     const { registerTick, tick } = createManualTicks();
     const cookies = createTestResource('cookies', 1000);
     const gold = createTestResource('gold');
@@ -353,7 +353,7 @@ describe('createProducerCategory', () => {
 
     const producer = category.getProducer('mine')!;
     // Purchase 3 units
-    producer.repeatable!.purchase(3);
+    producer.purchasable!.purchase(3);
 
     expect(new Decimal(producer.count.value).eq(3)).toBe(true);
 
@@ -362,7 +362,7 @@ describe('createProducerCategory', () => {
     expect(new Decimal(gold.value).eq(7.5)).toBe(true);
   });
 
-  it("passes a display object to the producer's repeatable", () => {
+  it("passes a display object to the producer's purchasable", () => {
     const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
@@ -379,14 +379,14 @@ describe('createProducerCategory', () => {
     });
     category.register({ id: 'mine', name: 'Mine', baseRate: 5, baseCost: 10, costRatio: 1.15 });
 
-    const { display } = category.getProducer('mine')!.repeatable!;
+    const { display } = category.getProducer('mine')!.purchasable!;
     expect(unref(display.title)).toBe('Mine');
     expect(unref(display.description)).toBe('');
     expect(unref(display.effectDescription)).toBe('+5/s each');
     expect(display.showCount).toBe(false);
   });
 
-  it("reads a string display as the repeatable's description, defaulting to the def id", () => {
+  it("reads a string display as the purchasable's description, defaulting to the def id", () => {
     const { registerTick } = createManualTicks();
     const cookies = createTestResource('cookies');
 
@@ -406,8 +406,8 @@ describe('createProducerCategory', () => {
       { id: 'well', name: 'Well', baseRate: 1, baseCost: 10, costRatio: 1.15 },
     ]);
 
-    expect(unref(category.getProducer('mine')!.repeatable!.display.description)).toBe('Mine');
-    expect(unref(category.getProducer('well')!.repeatable!.display.description)).toBe('well');
+    expect(unref(category.getProducer('mine')!.purchasable!.display.description)).toBe('Mine');
+    expect(unref(category.getProducer('well')!.purchasable!.display.description)).toBe('well');
   });
 
   it('continuous producer without purchase has count 1', () => {
@@ -427,7 +427,7 @@ describe('createProducerCategory', () => {
     category.register({ id: 'passive', name: 'Passive', baseRate: 3 });
 
     const producer = category.getProducer('passive')!;
-    expect(producer.repeatable).toBeUndefined();
+    expect(producer.purchasable).toBeUndefined();
     expect(new Decimal(producer.count.value).eq(1)).toBe(true);
 
     tick(2.0);
@@ -485,7 +485,7 @@ describe('createProducerCategory', () => {
 
     category.register({ id: 'click', name: 'Click', baseRate: 2 });
     const producer = category.getProducer('click')!;
-    producer.repeatable!.purchase(2);
+    producer.purchasable!.purchase(2);
     const before = new Decimal(cookies.value);
 
     producer.activate!();
@@ -623,8 +623,8 @@ describe('createProducerCategory', () => {
     ]);
 
     // Buy 2 cursors, 3 grandmas
-    category.getProducer('cursor')!.repeatable!.purchase(2);
-    category.getProducer('grandma')!.repeatable!.purchase(3);
+    category.getProducer('cursor')!.purchasable!.purchase(2);
+    category.getProducer('grandma')!.purchasable!.purchase(3);
 
     // Total = (1 * 2) + (5 * 3) = 2 + 15 = 17
     const total = category.getTotalRate(cookies);
@@ -708,11 +708,11 @@ describe('createProducerCategory', () => {
     });
 
     const producer = category.getProducer('cursor')!;
-    expect(producer.repeatable).toBeDefined();
-    expect(new Decimal(producer.repeatable!.count.value).eq(0)).toBe(true);
+    expect(producer.purchasable).toBeDefined();
+    expect(new Decimal(producer.purchasable!.count.value).eq(0)).toBe(true);
 
-    producer.repeatable!.purchase(1);
-    expect(new Decimal(producer.repeatable!.count.value).eq(1)).toBe(true);
+    producer.purchasable!.purchase(1);
+    expect(new Decimal(producer.purchasable!.count.value).eq(1)).toBe(true);
   });
 
   // ==========================================================================
@@ -744,7 +744,7 @@ describe('createProducerCategory', () => {
     category.register({ id: 'mine', name: 'Mine', baseRate: 2, baseCost: 10, costRatio: 1.15 });
 
     const producer = category.getProducer('mine')!;
-    producer.repeatable!.purchase(3); // owned = 3, extra = 4 → count = 7
+    producer.purchasable!.purchase(3); // owned = 3, extra = 4 → count = 7
 
     // Both axes addressable separately for owned-only / generated-only effects
     expect(new Decimal(producer.ownedCount.value).eq(3)).toBe(true);
@@ -775,7 +775,7 @@ describe('createProducerCategory', () => {
     category.register({ id: 'cascade', name: 'Cascade', baseRate: 3 });
 
     const producer = category.getProducer('cascade')!;
-    expect(producer.repeatable).toBeUndefined();
+    expect(producer.purchasable).toBeUndefined();
     expect(new Decimal(producer.ownedCount.value).eq(0)).toBe(true);
     expect(new Decimal(producer.extraCount.value).eq(5)).toBe(true);
     expect(new Decimal(producer.count.value).eq(5)).toBe(true);
@@ -851,8 +851,8 @@ describe('createProducerCategory', () => {
 
     const t1 = category.getProducer('t1')!;
     const t2 = category.getProducer('t2')!;
-    t1.repeatable!.purchase(1);
-    t2.repeatable!.purchase(1);
+    t1.purchasable!.purchase(1);
+    t2.purchasable!.purchase(1);
 
     // Sub-tick to keep Euler error tiny against the closed form below.
     const dt = 0.001;
@@ -888,7 +888,7 @@ describe('createProducerCategory', () => {
     category.register({ id: 'click', name: 'Click', baseRate: 1 });
 
     const producer = category.getProducer('click')!;
-    expect(producer.repeatable).toBeUndefined();
+    expect(producer.purchasable).toBeUndefined();
   });
 
   it('reads a reactive costRatio into the next purchase cost', () => {
@@ -908,7 +908,7 @@ describe('createProducerCategory', () => {
     });
     category.register({ id: 'mine', name: 'Mine', baseRate: 1, baseCost: 10, costRatio: 0 });
 
-    const repeatable = category.getProducer('mine')!.repeatable!;
+    const repeatable = category.getProducer('mine')!.purchasable!;
     repeatable.purchase(1);
     expect(new Decimal(repeatable.getCost(1)).toNumber()).toBeCloseTo(20, 5);
     scaling.value = 3;
@@ -1091,7 +1091,7 @@ describe('Producer.purchaseBeatSeconds', () => {
     // count=0 → max(1, 0)=1; cost(1)=10; rate=1 → beat = 10
     expect(producer.purchaseBeatSeconds.value).toBe(10);
 
-    producer.repeatable!.purchase(1);
+    producer.purchasable!.purchase(1);
     // count=1; rate=1; cost(1)=10 * 1.15 = 11.5 → beat = 11.5
     expect(producer.purchaseBeatSeconds.value).toBeCloseTo(11.5, 5);
   });
@@ -1333,12 +1333,12 @@ describe('producer inputs (a continuous converter)', () => {
 
     tick(2);
     expect(amount(smelter.realizedRate!)).toBeCloseTo(4);
-    expect(smelter.limit!.value).toBe('rate');
+    expect(smelter.bottleneck!.value).toBe('rate');
 
     // 20 ore left feeds 2 bars, against the 8 that 2 s at rate 4 wants.
     tick(2);
     expect(amount(smelter.realizedRate!)).toBeCloseTo(1);
-    expect(smelter.limit!.value).toBe('input:ore');
+    expect(smelter.bottleneck!.value).toBe('input:ore');
 
     tick(2);
     expect(amount(smelter.realizedRate!)).toBe(0);
@@ -1365,7 +1365,7 @@ describe('producer inputs (a continuous converter)', () => {
 
     expect(amount(bars)).toBeCloseTo(10);
     expect(amount(ore)).toBeCloseTo(94);
-    expect(smelters.getProducer('smelter')!.limit!.value).toBe('room');
+    expect(smelters.getProducer('smelter')!.bottleneck!.value).toBe('capacity');
   });
 
   it('starts its last-tick report over on a reset and on a load', () => {
@@ -1385,15 +1385,15 @@ describe('producer inputs (a continuous converter)', () => {
     });
     smelters.register({ id: 'smelter', rate: 5 });
     const smelter = smelters.getProducer('smelter')!;
-    const report = () => [smelter.limit!.value, amount(smelter.realizedRate!)];
+    const report = () => [smelter.bottleneck!.value, amount(smelter.realizedRate!)];
 
     tick(1);
-    expect(report()).toEqual(['room', 3]);
+    expect(report()).toEqual(['capacity', 3]);
     createReset({ thingsToReset: [smelters] }).reset();
     expect(report()).toEqual(['rate', 0]);
 
     tick(1);
-    expect(report()[0]).toBe('room');
+    expect(report()[0]).toBe('capacity');
     deserializePersistents(getAllPersistentRefs(), {});
     expect(report()).toEqual(['rate', 0]);
   });
@@ -1418,7 +1418,7 @@ describe('producer inputs (a continuous converter)', () => {
 
     tick(1);
 
-    expect(smelters.getProducer('smelter')!.limit!.value).toBe('rate');
+    expect(smelters.getProducer('smelter')!.bottleneck!.value).toBe('rate');
     expect(amount(ore)).toBe(new Decimal(100).sub(0.36059794958967123).toNumber());
   });
 
@@ -1471,7 +1471,7 @@ describe('producer inputs (a continuous converter)', () => {
 
     expect(amount(steel)).toBeCloseTo(4);
     expect(amount(coke)).toBeCloseTo(2);
-    expect(works.getProducer('oven')!.limit!.value).toBe('input:coal');
+    expect(works.getProducer('oven')!.bottleneck!.value).toBe('input:coal');
   });
 
   it('refuses inputs on a manual producer or beside allowNegative', () => {
@@ -1527,7 +1527,7 @@ describe('producer save keys', () => {
   }
 
   it('owned counts load back when the build creates another purchasable first', () => {
-    build(false).getProducer('mine')!.repeatable!.purchase(3);
+    build(false).getProducer('mine')!.purchasable!.purchase(3);
     const saved = JSON.parse(JSON.stringify(serializePersistents(getAllPersistentRefs())));
 
     const rebuilt = build(true);

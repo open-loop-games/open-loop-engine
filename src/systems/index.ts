@@ -232,7 +232,7 @@ export {
   type SubjectCategoryOptions,
   type SubjectCategoryEntry,
   type SubjectDef,
-  type SubjectInstance,
+  type Subject,
   type FieldDef,
   type FieldSchema,
   type FieldInstance,

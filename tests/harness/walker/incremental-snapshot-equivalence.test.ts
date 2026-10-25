@@ -233,7 +233,7 @@ describe('createIncrementalSnapshot — entity gating changes', () => {
 
   it('a maxed producer returns after a reset un-maxes it', () => {
     const { buildings, config, inc, check } = setup('inc-gate-producer', { gold: 40, gems: 0 });
-    const mill = buildings.getProducer('mill')!.repeatable!;
+    const mill = buildings.getProducer('mill')!.purchasable!;
 
     mill.count.value = 1;
     config.resources.gold = 10;

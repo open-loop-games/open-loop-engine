@@ -416,7 +416,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | RF6 | **produce**, **production**, **producer** | a producer's output and the act; the engine's word for a generator | generator |
 | RF7 | **gain**, **prestige gain** | any increase; the prestige currency a reset pays | gain, for a modifier's input (say value) |
 | RF8 | **earn** | an achievement's attainment | earn, for a resource inflow |
-| RF9 | **converter**, **Conversion** | a continuous producer that draws its `inputs` per unit of output, and makes less when one runs short; one atomic exchange that refuses a shortfall (`createConversion`) | converter, for a Conversion |
+| RF9 | **converter**, **bottleneck**, **Conversion** | a continuous producer that draws its `inputs` per unit of output, and makes less when one runs short; what held back its last tick (`Producer.bottleneck`); one atomic exchange that refuses a shortfall (`createConversion`) | converter, for a Conversion; limit, for a bottleneck |
 
 ### FM — formula math
 

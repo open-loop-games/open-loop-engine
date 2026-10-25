@@ -177,7 +177,7 @@ describe('Scenario 2 — multi-loop persistence', () => {
 
       // Player unlocks the first protocol step's knowledge and advances trust.
       accessor.setFlag('knowledge-rask-approach', true);
-      const rask = cat.get('mentor-rask')!;
+      const rask = cat.getSubject('mentor-rask')!;
       expect(rask.fields.trust.tryAdvance()).toBe('acquaintance');
       expect(rask.fields.trust.getIndex()).toBe(1);
 
@@ -345,7 +345,7 @@ describe('Scenario 4 — save round-trip', () => {
       });
       cat.register({ id: 'mentor-rask' });
 
-      const rask = cat.get('mentor-rask')!;
+      const rask = cat.getSubject('mentor-rask')!;
       // The ref exists and is addressable by field name — that's the contract
       // save/load relies on. Tier value survives export/import because
       // persistent refs in a known namespace are automatically serialized.

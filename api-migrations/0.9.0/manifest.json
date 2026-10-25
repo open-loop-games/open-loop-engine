@@ -1,0 +1,136 @@
+[
+  {
+    "family": "bottleneck-capacity",
+    "old": "room",
+    "new": "capacity",
+    "kind": "literal",
+    "owners": ["ProducerLimit"],
+    "files": ["src/systems/producer-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "capacity is the one word for headroom under a capacity (QT7)",
+    "note": "a string comparison such as `producer.limit?.value === 'room'` passes typecheck only after the bottleneck rename; search for 'room'"
+  },
+  {
+    "family": "bottleneck",
+    "old": "limit",
+    "new": "bottleneck",
+    "kind": "property",
+    "owners": ["Producer"],
+    "files": ["src/systems/producer-category.ts"],
+    "optional": true,
+    "public": true,
+    "clause": "QT7 owns limit as a purchase cap; what held a converter's tick back is its bottleneck"
+  },
+  {
+    "family": "bottleneck",
+    "old": "ProducerLimit",
+    "new": "ProducerBottleneck",
+    "kind": "type",
+    "owners": [],
+    "files": ["src/systems/producer-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "QT7 owns limit as a purchase cap; what held a converter's tick back is its bottleneck"
+  },
+  {
+    "family": "inventory-capacity",
+    "old": "remainingSpace",
+    "new": "remainingCapacity",
+    "kind": "method",
+    "owners": ["Inventory"],
+    "files": ["src/systems/inventory.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "capacity is the one word for headroom under a capacity (QT7)",
+    "note": "the item id is now optional; without it, the answer is the remaining combined capacity, as isFull() reads"
+  },
+  {
+    "family": "producer-purchasable",
+    "old": "repeatable",
+    "new": "purchasable",
+    "kind": "property",
+    "owners": ["Producer"],
+    "files": ["src/systems/producer-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "a Purchasable is named purchasable, as on PurchasableCategoryEntry"
+  },
+  {
+    "family": "subject",
+    "old": "instance",
+    "new": "subject",
+    "kind": "property",
+    "owners": ["SubjectCategoryEntry"],
+    "files": ["src/systems/subject-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "a subject category follows the per-kind shape: entry.<kind>, get<Kind>(id), and the kind's type"
+  },
+  {
+    "family": "subject",
+    "old": "get",
+    "new": "getSubject",
+    "kind": "method",
+    "owners": ["SubjectCategory"],
+    "files": ["src/systems/subject-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "a subject category follows the per-kind shape: entry.<kind>, get<Kind>(id), and the kind's type"
+  },
+  {
+    "family": "subject",
+    "old": "SubjectInstance",
+    "new": "Subject",
+    "kind": "type",
+    "owners": [],
+    "files": ["src/systems/subject-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "a subject category follows the per-kind shape: entry.<kind>, get<Kind>(id), and the kind's type"
+  },
+  {
+    "family": "capacity-options",
+    "old": "maxSelections",
+    "new": "capacity",
+    "kind": "property",
+    "owners": ["LoadoutOptions"],
+    "files": ["src/systems/loadout.ts"],
+    "optional": true,
+    "public": true,
+    "clause": "capacity is the most a container holds (QT7)"
+  },
+  {
+    "family": "capacity-options",
+    "old": "maxRuns",
+    "new": "capacity",
+    "kind": "property",
+    "owners": ["RunPoolOptions"],
+    "files": ["src/core/run-pool.ts"],
+    "optional": true,
+    "public": true,
+    "clause": "capacity is the most a container holds (QT7)"
+  },
+  {
+    "family": "base-title",
+    "old": "baseName",
+    "new": "baseTitle",
+    "kind": "property",
+    "owners": ["AchievementLadderBaseOptions"],
+    "files": ["src/systems/achievement-category.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "it builds each rung's title; name is not display text (ID2)"
+  },
+  {
+    "family": "grid-version",
+    "old": "revision",
+    "new": "gridVersion",
+    "kind": "property",
+    "owners": ["SpatialGrid"],
+    "files": ["src/core/spatial/grid.ts"],
+    "optional": false,
+    "public": true,
+    "clause": "a version ref names its owner, as overrideVersion does (ST10)"
+  }
+]

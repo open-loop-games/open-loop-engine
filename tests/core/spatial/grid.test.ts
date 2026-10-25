@@ -87,11 +87,11 @@ describe('createSpatialGrid — construction & access', () => {
   });
 });
 
-describe('createSpatialGrid — revision', () => {
+describe('createSpatialGrid — gridVersion', () => {
   it('set() advances it, so a computed that reads it recomputes; setSilent() does not', () => {
     const grid = createSpatialGrid<Tile>({ width: 2, height: 1, initializer: floor });
     const walls = computed(() => {
-      void grid.revision.value;
+      void grid.gridVersion.value;
       return [grid.at(0, 0), grid.at(1, 0)].filter((t) => t.kind === 'wall').length;
     });
     expect(walls.value).toBe(0);
@@ -103,7 +103,7 @@ describe('createSpatialGrid — revision', () => {
 
   it('every other emitting write advances it, and an FOV commit does with no subscriber', () => {
     const grid = createSpatialGrid<number>({ width: 2, height: 2, initializer: () => 0 });
-    const seen = computed(() => grid.revision.value);
+    const seen = computed(() => grid.gridVersion.value);
     const advances = (write: () => void): boolean => {
       const before = seen.value;
       write();
@@ -123,12 +123,12 @@ describe('createSpatialGrid — revision', () => {
     expect(advances(() => grid.restore(saved))).toBe(true);
   });
 
-  it('a handler sees the advanced revision', () => {
+  it('a handler sees the advanced gridVersion', () => {
     const grid = createSpatialGrid<number>({ width: 1, height: 1, initializer: () => 0 });
     let read = -1;
-    grid.on('cellChanged', () => (read = grid.revision.value));
+    grid.on('cellChanged', () => (read = grid.gridVersion.value));
     grid.set(0, 0, 1);
-    expect(read).toBe(grid.revision.value);
+    expect(read).toBe(grid.gridVersion.value);
     expect(read).toBeGreaterThan(0);
   });
 });

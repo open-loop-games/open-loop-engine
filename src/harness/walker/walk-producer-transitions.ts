@@ -1,22 +1,22 @@
 /**
  * Producer transition walker — enumerate pending producer transitions.
  *
- * Returns one {@link Transition} per producer whose repeatable is not yet
+ * Returns one {@link Transition} per producer whose purchasable is not yet
  * maxed. It answers "when can the player afford the next purchase of this
  * producer?" The prediction uses the cost resource's current amount and
  * accessor-reported rate, as the purchasable walker does.
  *
  * Transitions per producer:
  *
- * - `producer-becomes-affordable` — the producer has a `repeatable` with
+ * - `producer-becomes-affordable` — the producer has a `purchasable` with
  *   at least one {@link CostRequirement}. Distance is
- *   `timeUntilResource(costReq.resource.id, producer.repeatable.getCost(1),
+ *   `timeUntilResource(costReq.resource.id, producer.purchasable.getCost(1),
  *   accessor)`. Returns `{ seconds: null, reason: 'no-rate' }` when the
  *   cost resource has no positive rate.
  *
- * Manual producers with no `repeatable` give nothing, because there's no
- * purchase to become affordable. Neither does a producer whose repeatable is
- * maxed. A producer whose repeatable has no cost requirement (only boolean
+ * Manual producers with no `purchasable` give nothing, because there's no
+ * purchase to become affordable. Neither does a producer whose purchasable is
+ * maxed. A producer whose purchasable has no cost requirement (only boolean
  * requirements) is skipped too: the walker can't compute a distance without
  * a cost resource to meter against.
  *
@@ -34,7 +34,7 @@
  * consumer read the value its question needs: the beat time on the instance,
  * the transition distance on the snapshot.
  *
- * A repeatable with several costs uses the first cost requirement's
+ * A purchasable with several costs uses the first cost requirement's
  * resource, as `walk-purchasable-transitions` does. `count-threshold` and
  * `rate-chain-crosses-threshold` lookaheads are deliberately absent: they
  * need a planner on top of the walker, not more cases inside it.
@@ -90,10 +90,10 @@ function collectForEntity(
   const { def, producer } = entity;
   const defId = def.id;
 
-  // Manual producers with no `repeatable` have no "next purchase" transition
+  // Manual producers with no `purchasable` have no "next purchase" transition
   // to describe. Skip them entirely rather than return a null/no-rate placeholder.
-  if (!producer.repeatable) return;
-  const affordable = predictAffordable(producer.repeatable, accessor);
+  if (!producer.purchasable) return;
+  const affordable = predictAffordable(producer.purchasable, accessor);
   if (!affordable) return;
 
   out.push({

@@ -209,7 +209,7 @@ describe('createGoalPicker — mode: fresh-each-cycle', () => {
   });
 
   it('fires slot.deselect for every previously-active candidate each cycle', () => {
-    const slot = createTestSlot({ id: 's', mode: 'multi', maxSelections: 2 });
+    const slot = createTestSlot({ id: 's', mode: 'multi', capacity: 2 });
     const onDeselect = vi.fn();
     slot.on('deselected', onDeselect);
 
@@ -284,7 +284,7 @@ describe('createGoalPicker — reactive capacity', () => {
 
 describe('createGoalPicker — slot composition', () => {
   it('writes selections through the slot', () => {
-    const slot = createTestSlot({ id: 's', mode: 'multi', maxSelections: 3 });
+    const slot = createTestSlot({ id: 's', mode: 'multi', capacity: 3 });
     const picker = createGoalPicker<string, void, Record<string, number>>({
       pool: () => ['a', 'b', 'c'],
       weights: { a: 5, b: 3, c: 1 },
@@ -302,7 +302,7 @@ describe('createGoalPicker — slot composition', () => {
     const slot = createTestSlot({
       id: 's',
       mode: 'multi',
-      maxSelections: 2,
+      capacity: 2,
       canSelect: (id) => !blocked.has(id),
     });
     const picker = createGoalPicker<string, void, Record<string, number>>({
@@ -317,7 +317,7 @@ describe('createGoalPicker — slot composition', () => {
   });
 
   it('sweeps via slot.deselect when completion fires', () => {
-    const slot = createTestSlot({ id: 's', mode: 'multi', maxSelections: 2 });
+    const slot = createTestSlot({ id: 's', mode: 'multi', capacity: 2 });
     const onDeselect = vi.fn();
     slot.on('deselected', onDeselect);
     let doneIds = new Set<string>();
@@ -435,7 +435,7 @@ describe('createGoalPicker — multi-slot linear-weighted scoring', () => {
       return w.pressure;
     }
 
-    const slot = createTestSlot({ id: 'faction-a', mode: 'multi', maxSelections: 2 });
+    const slot = createTestSlot({ id: 'faction-a', mode: 'multi', capacity: 2 });
     const picker = createGoalPicker<GoalId, void, AiWeights>({
       pool: () => ['claim:h1', 'defend:s1', 'pressure:f1'],
       weights,

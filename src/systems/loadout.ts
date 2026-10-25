@@ -33,7 +33,7 @@
  * const support = createLoadout({
  *   id: 'support',
  *   mode: 'multi',
- *   maxSelections: () => 2 + purchasedCapacity.value,
+ *   capacity: () => 2 + purchasedCapacity.value,
  *   pool: () => unlockedSpells.value,
  * });
  * support.select('fireball');
@@ -57,7 +57,7 @@ export interface LoadoutOptions {
   /**
    * Selection behavior.
    * - `'single'`: at most one item selected; selecting a new item auto-deselects the previous
-   * - `'multi'`: multiple items up to `maxSelections`
+   * - `'multi'`: multiple items up to `capacity`
    */
   mode: 'single' | 'multi';
   /**
@@ -65,7 +65,7 @@ export interface LoadoutOptions {
    * Ignored for single mode (always 1). Can be a ref or getter for dynamic capacity
    * (e.g., growing via purchases). Default: `Infinity`.
    */
-  maxSelections?: Computable<DecimalSource>;
+  capacity?: Computable<DecimalSource>;
   /**
    * Valid item ids for this loadout. Can be a ref or getter for dynamic pools
    * (e.g., unlockable items). If omitted, any string id is accepted.
@@ -170,7 +170,7 @@ export interface Loadout {
  * focus.select('fireball');
  * focus.current.value; // 'fireball'
  *
- * const support = createLoadout({ id: 'support', mode: 'multi', maxSelections: 3 });
+ * const support = createLoadout({ id: 'support', mode: 'multi', capacity: 3 });
  * support.select('heal');
  * support.select('shield');
  * support.count.value; // 2
@@ -180,7 +180,7 @@ export function createLoadout(options: LoadoutOptions): Loadout {
   const { id, mode } = options;
 
   // --- Resolve reactive options ---
-  const processedMax = mode === 'single' ? 1 : toMaybeRef(options.maxSelections ?? Decimal.dInf);
+  const processedMax = mode === 'single' ? 1 : toMaybeRef(options.capacity ?? Decimal.dInf);
   const processedPool = options.pool != null ? toMaybeRef(options.pool) : undefined;
 
   // --- Persistence ---

@@ -119,8 +119,8 @@ export interface RunPoolEvents<Id = string> {
 
 /**
  * Options for {@link createRunPool}. `deathDisposition` picks the post-death
- * disposition (`'destroy'` or `'park'`); the optional `maxRuns` sets the
- * run pool's capacity.
+ * disposition (`'destroy'` or `'park'`); the optional `capacity` is the most
+ * pool runs it holds at once.
  */
 export interface RunPoolOptions {
   /** Unique id; the run pool's persistent context id. */
@@ -137,7 +137,7 @@ export interface RunPoolOptions {
    * it. Default: unlimited. `0` is a valid empty capacity (always throws),
    * not "unlimited".
    */
-  readonly maxRuns?: number;
+  readonly capacity?: number;
 }
 
 /**
@@ -157,7 +157,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
   /** Reactive count of handles with `alive.value === true`. */
   readonly liveCount: Readonly<Ref<number>>;
   /**
-   * Register a new pool run. Throws on an id collision or past `maxRuns`.
+   * Register a new pool run. Throws on an id collision or past `capacity`.
    * Emits `run:added`.
    */
   addRun(registration: RunRegistration<Id>): RunHandle<Id>;
@@ -184,7 +184,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * Creates a run pool: opaque pool runs with saved aliveness and lifecycle events.
  *
  * @param options - Run pool options: `id`, `deathDisposition`, and the
- *   optional `maxRuns` capacity
+ *   optional `capacity`
  * @returns A run pool with `addRun`/`getRun`/`removeRun`/`reset`
  *   operations, reactive `runs` and `liveCount`, and typed event
  *   subscription
@@ -206,7 +206,7 @@ export interface RunPool<Id = string> extends Emittable<RunPoolEvents<Id>> {
  * ```
  */
 export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id> {
-  const { id: poolId, deathDisposition, maxRuns = Infinity } = options;
+  const { id: poolId, deathDisposition, capacity = Infinity } = options;
 
   // Pool-level persistence: the per-id aliveness map, in the run pool's own
   // persistent context so it's in the persistent-ref registry when a save
@@ -340,8 +340,8 @@ export function createRunPool<Id = string>(options: RunPoolOptions): RunPool<Id>
     if (entries.has(reg.id)) {
       throw new Error(`RunPool(${poolId}): duplicate run id ${String(reg.id)}`);
     }
-    if (handleArray.length >= maxRuns) {
-      throw new Error(`RunPool(${poolId}): maxRuns (${maxRuns}) exceeded`);
+    if (handleArray.length >= capacity) {
+      throw new Error(`RunPool(${poolId}): capacity (${capacity}) exceeded`);
     }
 
     // Take the initial aliveness from the run pool's saved map. A fresh id

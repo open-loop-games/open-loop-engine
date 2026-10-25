@@ -209,7 +209,7 @@ const CATEGORY_WALKS: Partial<Record<keyof EngineCategories, CategoryWalk>> = {
   producers: {
     collect: collectProducerTransitionsForEntity,
     readSignature: (entity, gate) =>
-      readPurchasableGate((entity as { producer: Producer }).producer.repeatable, gate),
+      readPurchasableGate((entity as { producer: Producer }).producer.purchasable, gate),
   },
 };
 

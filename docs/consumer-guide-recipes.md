@@ -321,12 +321,12 @@ The `passable` / `explored` / `visible` bitmaps and their `*Count` properties ar
 
 ### Grid change events — and the replacement gotcha
 
-SpatialGrid cells are **not** reactive per cell. For a reactive read, read `grid.revision` at the head of the computed. It advances on every write that emits an event, so the computed recomputes after each. The grid may also be **replaced**, for board growth or for a challenge that swaps in a masked shape. Hold it in a `shallowRef`; a computed that reads `revision` through that ref then tracks the swap too:
+SpatialGrid cells are **not** reactive per cell. For a reactive read, read `grid.gridVersion` at the head of the computed. It advances on every write that emits an event, so the computed recomputes after each. The grid may also be **replaced**, for board growth or for a challenge that swaps in a masked shape. Hold it in a `shallowRef`; a computed that reads `revision` through that ref then tracks the swap too:
 
 ```ts
 const grid = shallowRef(createSpatialGrid({ /* … */ }));
 const walls = computed(() => {
-  void grid.value.revision.value;
+  void grid.value.gridVersion.value;
   return countWalls(grid.value);
 });
 ```
@@ -349,8 +349,8 @@ interface OccupancyView { width: number; height: number; occupantAt(x: number, y
 // Pure: (view) → bonuses keyed by entity id. No module state, no reactivity.
 function evaluate(view: OccupancyView): Map<string, Bonus> { /* walk cells, read neighbors, sum */ }
 
-// Live wrapper: a computed over the grid's revision. It also tracks any other reactive input.
-const synergy = computed(() => { void grid.value.revision.value; return evaluate(liveView()); });
+// Live wrapper: a computed over the grid's gridVersion. It also tracks any other reactive input.
+const synergy = computed(() => { void grid.value.gridVersion.value; return evaluate(liveView()); });
 export const getBonus = (id: string) => synergy.value.get(id) ?? NONE;
 
 // Preview: the same evaluator, over a list of cell changes laid on the live view.
@@ -368,7 +368,7 @@ The view is a seam in your code, not engine API. Each evaluator reads its own se
 - **Declare on the view exactly what the evaluator reads.** Bounds plus `occupantAt` is the minimum. A board with a mask, or a directed reach such as a ray that stops at a void, puts `reach(x, y, relation)` on the view. The preview and the live board then resolve reach the same way.
 - **Preview a list of changes.** One verb then covers place, remove, move (vacate, then occupy) and swap. The overlay patches every occupancy read the view has: `occupantAt`, and any iterator over occupied cells. Present the difference between the two results, so the player sees what the change moves.
 - **Attribute each term to its source,** as `{ fromId, kind, value }`. A preview, a "what feeds this" highlight and a marginal value all read it. The marginal value is the result evaluated again without the piece.
-- **Choose the live wrapper by what changes.** A `computed` that reads `grid.revision` covers a grid replacement and every other reactive input. When the authoritative list is one reactive ref instead of the grid, a `computed` over that ref is enough. Subscribe to `cellChanged` only to update the result per cell.
+- **Choose the live wrapper by what changes.** A `computed` that reads `grid.gridVersion` covers a grid replacement and every other reactive input. When the authoritative list is one reactive ref instead of the grid, a `computed` over that ref is enough. Subscribe to `cellChanged` only to update the result per cell.
 - **A search may re-express the evaluator.** A search that scores many boards can resolve reach to cell indices once, and evaluate over those. Lock the two equal by test.
 
 Two disciplines keep this stable. First, **recompute on placement events, not per tick**. Structural bonuses change only when the board changes. So apply time-varying factors (freshness, decay) at read time, not inside the recomputed result. Second, the grid ships no connection shapes such as a full row, a full column, a ray or radial arcs. For those, hand-roll a small `coveredCells(shape, x, y, w, h)` that returns clipped coordinates. It stays pure and testable beside the evaluator. A fixed offset set (knight moves, hex, one-way lattices) is a `neighborhood`, or an ad-hoc `neighbors(x, y, neighborhood)` call, not a hand-roll.

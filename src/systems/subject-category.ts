@@ -238,15 +238,15 @@ export interface SubjectDef<S extends FieldSchema> {
 }
 
 /** Live subject — typed fields keyed by schema field name. */
-export interface SubjectInstance<S extends FieldSchema> {
+export interface Subject<S extends FieldSchema> {
   readonly id: string;
   readonly fields: { [K in keyof S]: FieldInstance<S[K]> };
 }
 
-/** One category entry of a {@link SubjectCategory} — authored def, live instance and signals. */
+/** One category entry of a {@link SubjectCategory} — authored def, subject and signals. */
 export interface SubjectCategoryEntry<S extends FieldSchema> {
   readonly def: SubjectDef<S>;
-  readonly instance: SubjectInstance<S>;
+  readonly subject: Subject<S>;
   readonly signals?: CategoryEntrySignals;
 }
 
@@ -286,9 +286,9 @@ export interface SubjectCategory<S extends FieldSchema> extends ResettableObject
   register(defs: SubjectDef<S> | readonly SubjectDef<S>[]): void;
   /** Get the authored def for a subject id (delegates to the registry). */
   getDef(id: string): SubjectDef<S> | undefined;
-  /** Get the typed live instance for a subject id. */
-  get(id: string): SubjectInstance<S> | undefined;
-  /** Get the category entry (def, instance, signals) for a subject id. */
+  /** Get the subject for an id. */
+  getSubject(id: string): Subject<S> | undefined;
+  /** Get the category entry (def, subject, signals) for a subject id. */
   getEntry(id: string): SubjectCategoryEntry<S> | undefined;
   /** All entries in registration order. */
   getAll(): SubjectCategoryEntry<S>[];
@@ -615,7 +615,7 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  *   ] } },
  * });
  *
- * const rask = npcs.get('mentor-rask')!;
+ * const rask = npcs.getSubject('mentor-rask')!;
  * rask.fields.trust.tryAdvance();          // typed; no narrowing
  * ```
  *
@@ -634,7 +634,7 @@ function normalizeField(field: FieldInstance<FieldDef>, schema: FieldDef): void 
  *
  * entity.register({ id: 'the-entity' });
  *
- * const e = entity.get('the-entity')!;
+ * const e = entity.getSubject('the-entity')!;
  * e.fields.trust.add(0.05);
  * e.fields.pathTendency.add('cooperative', 1);
  * e.fields.pathLocked.set('scientific');
@@ -649,9 +649,9 @@ export function createSubjectCategory<S extends FieldSchema>(
   // layers a per-call accessor on top.
   const predicates = createPredicateResolver({ accessor });
 
-  const base: CategoryBase<SubjectDef<S>, SubjectInstance<S>, void> = createCategoryBase<
+  const base: CategoryBase<SubjectDef<S>, Subject<S>, void> = createCategoryBase<
     SubjectDef<S>,
-    SubjectInstance<S>,
+    Subject<S>,
     void
   >({
     id: categoryId,
@@ -670,7 +670,7 @@ export function createSubjectCategory<S extends FieldSchema>(
       }
       return { id: def.id, fields };
     },
-    buildSignals: (_def, instance) => buildSubjectSignals(instance),
+    buildSignals: (_def, subject) => buildSubjectSignals(subject),
   });
 
   // A load writes field refs directly, past set()'s clamp and enum check,
@@ -689,15 +689,15 @@ export function createSubjectCategory<S extends FieldSchema>(
     registry: base.registry,
     register: base.register,
     getDef: base.getDef,
-    get(id) {
+    getSubject(id) {
       return base.getEntry(id)?.instance;
     },
     getEntry(id) {
       const e = base.getEntry(id);
-      return e ? { def: e.def, instance: e.instance, signals: e.signals } : undefined;
+      return e ? { def: e.def, subject: e.instance, signals: e.signals } : undefined;
     },
     getAll() {
-      return base.getAll().map((e) => ({ def: e.def, instance: e.instance, signals: e.signals }));
+      return base.getAll().map((e) => ({ def: e.def, subject: e.instance, signals: e.signals }));
     },
     get size() {
       return base.size;
@@ -714,16 +714,14 @@ export function createSubjectCategory<S extends FieldSchema>(
 // === PUBLIC UTILITIES ===
 
 /**
- * Default signals for a subject instance — `active = any field off its ref
+ * Default signals for a subject — `active = any field off its ref
  * default`, `count = number of fields off their ref default`. Coarse by
  * design: "active" doesn't map cleanly onto a multi-field subject the way it
  * does for purchasables and achievements. Consumers needing different
  * semantics can layer their own ComputedRefs in the consumer module.
  */
-function buildSubjectSignals<S extends FieldSchema>(
-  instance: SubjectInstance<S>,
-): CategoryEntrySignals {
-  const fields = Object.values(instance.fields) as FieldInstance<FieldDef>[];
+function buildSubjectSignals<S extends FieldSchema>(subject: Subject<S>): CategoryEntrySignals {
+  const fields = Object.values(subject.fields) as FieldInstance<FieldDef>[];
 
   // "Default" is the value the field was seeded with — the ref's default, which
   // already resolves the per-subject override and the clamp.

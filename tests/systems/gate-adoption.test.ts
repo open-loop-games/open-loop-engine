@@ -524,7 +524,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
       id: 'late',
       fields: { trust: { advanceWhen: [{ kind: 'resource-gte', resource: 'points', value: 10 }] } },
     });
-    expect(result.get('late')!.fields.trust.tryAdvance()).toBe('friend');
+    expect(result.getSubject('late')!.fields.trust.tryAdvance()).toBe('friend');
     stop();
   });
 
@@ -560,7 +560,7 @@ describe('Gate-accepting categories — content registered after start()', () =>
     });
 
     expect(result.achievements.getAchievement('flagged')!.earned.value).toBe(true);
-    expect(result.subjects.get('rask')!.fields.trust.tryAdvance()).toBe('friend');
+    expect(result.subjects.getSubject('rask')!.fields.trust.tryAdvance()).toBe('friend');
     stop();
   });
 });
@@ -831,7 +831,7 @@ describe('Predicate fields — every arm reaches the system', () => {
       return {
         api,
         upgrade: upgrades.getPurchasable('u')!,
-        farm: producers.getProducer('farm')!.repeatable!,
+        farm: producers.getProducer('farm')!.purchasable!,
       };
     });
 
@@ -852,7 +852,7 @@ describe('Predicate fields — every arm reaches the system', () => {
       },
     });
     npcs.register({ id: 'rask' });
-    const trust = npcs.get('rask')!.fields.trust;
+    const trust = npcs.getSubject('rask')!.fields.trust;
 
     expect(trust.tryAdvance()).toBeNull();
     open.value = true;

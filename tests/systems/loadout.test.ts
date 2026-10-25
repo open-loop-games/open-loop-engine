@@ -99,8 +99,8 @@ describe('single-select mode', () => {
 // ============================================================================
 
 describe('multi-select mode', () => {
-  it('selects up to maxSelections', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 2 });
+  it('selects up to capacity', () => {
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 2 });
     expect(slot.select('a')).toBe(true);
     expect(slot.select('b')).toBe(true);
     expect(slot.select('c')).toBe(false);
@@ -108,14 +108,14 @@ describe('multi-select mode', () => {
   });
 
   it('select returns false at capacity', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 1 });
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 1 });
     slot.select('a');
     expect(slot.select('b')).toBe(false);
     expect(slot.isFull.value).toBe(true);
   });
 
   it('isFull toggles correctly', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 2 });
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 2 });
     expect(slot.isFull.value).toBe(false);
     slot.select('a');
     expect(slot.isFull.value).toBe(false);
@@ -126,7 +126,7 @@ describe('multi-select mode', () => {
   });
 
   it('preserves insertion order', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 4 });
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 4 });
     slot.select('c');
     slot.select('a');
     slot.select('b');
@@ -134,7 +134,7 @@ describe('multi-select mode', () => {
   });
 
   it('deselect removes targeted item only, preserves order', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 4 });
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 4 });
     slot.select('a');
     slot.select('b');
     slot.select('c');
@@ -143,7 +143,7 @@ describe('multi-select mode', () => {
   });
 
   it('count is reactive', () => {
-    const slot = createTestSlot({ id: 'm', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'm', mode: 'multi', capacity: 5 });
     expect(slot.count.value).toBe(0);
     slot.select('a');
     expect(slot.count.value).toBe(1);
@@ -153,7 +153,7 @@ describe('multi-select mode', () => {
     expect(slot.count.value).toBe(1);
   });
 
-  it('defaults to unlimited when maxSelections omitted', () => {
+  it('defaults to unlimited when capacity omitted', () => {
     const slot = createTestSlot({ id: 'm', mode: 'multi' });
     for (let i = 0; i < 20; i++) {
       expect(slot.select(`item${i}`)).toBe(true);
@@ -163,13 +163,13 @@ describe('multi-select mode', () => {
 });
 
 // ============================================================================
-// Reactive maxSelections
+// Reactive capacity
 // ============================================================================
 
-describe('reactive maxSelections', () => {
+describe('reactive capacity', () => {
   it('increasing max unblocks select', () => {
     const max = ref(2);
-    const slot = createTestSlot({ id: 'r', mode: 'multi', maxSelections: max });
+    const slot = createTestSlot({ id: 'r', mode: 'multi', capacity: max });
     slot.select('a');
     slot.select('b');
     expect(slot.select('c')).toBe(false);
@@ -181,7 +181,7 @@ describe('reactive maxSelections', () => {
 
   it('decreasing max below current count blocks new selects but keeps existing', () => {
     const max = ref(3);
-    const slot = createTestSlot({ id: 'r', mode: 'multi', maxSelections: max });
+    const slot = createTestSlot({ id: 'r', mode: 'multi', capacity: max });
     slot.select('a');
     slot.select('b');
     slot.select('c');
@@ -214,7 +214,7 @@ describe('pool validation', () => {
 
   it('reactive pool change: existing selections persist, new selects gated', () => {
     const pool = ref(['a', 'b', 'c']);
-    const slot = createTestSlot({ id: 'p', mode: 'multi', pool, maxSelections: 5 });
+    const slot = createTestSlot({ id: 'p', mode: 'multi', pool, capacity: 5 });
     slot.select('a');
     slot.select('b');
 
@@ -229,7 +229,7 @@ describe('pool validation', () => {
   });
 
   it('no pool: any ID accepted', () => {
-    const slot = createTestSlot({ id: 'p', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'p', mode: 'multi', capacity: 5 });
     expect(slot.select('anything')).toBe(true);
     expect(slot.select('goes')).toBe(true);
     expect(slot.canSelect('here')).toBe(true);
@@ -245,7 +245,7 @@ describe('canSelect predicate', () => {
     const slot = createTestSlot({
       id: 'c',
       mode: 'multi',
-      maxSelections: 5,
+      capacity: 5,
       canSelect: (id) => id !== 'blocked',
     });
     expect(slot.select('ok')).toBe(true);
@@ -258,7 +258,7 @@ describe('canSelect predicate', () => {
     const slot = createTestSlot({
       id: 'c',
       mode: 'multi',
-      maxSelections: 1,
+      capacity: 1,
       pool: ['a', 'b'],
       canSelect: (id) => {
         predicateCalls.push(id);
@@ -287,7 +287,7 @@ describe('canSelect predicate', () => {
 
 describe('deselectAll', () => {
   it('fires deselected per item then cleared', () => {
-    const slot = createTestSlot({ id: 'd', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'd', mode: 'multi', capacity: 5 });
     slot.select('a');
     slot.select('b');
     slot.select('c');
@@ -318,7 +318,7 @@ describe('deselectAll', () => {
 describe('callbacks', () => {
   it('onSelect fires after successful selection', () => {
     const onSelect = vi.fn();
-    const slot = createTestSlot({ id: 'cb', mode: 'multi', maxSelections: 5, onSelect });
+    const slot = createTestSlot({ id: 'cb', mode: 'multi', capacity: 5, onSelect });
     slot.select('a');
     expect(onSelect).toHaveBeenCalledWith('a');
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -326,7 +326,7 @@ describe('callbacks', () => {
 
   it('onDeselect fires after successful deselection', () => {
     const onDeselect = vi.fn();
-    const slot = createTestSlot({ id: 'cb', mode: 'multi', maxSelections: 5, onDeselect });
+    const slot = createTestSlot({ id: 'cb', mode: 'multi', capacity: 5, onDeselect });
     slot.select('a');
     slot.deselect('a');
     expect(onDeselect).toHaveBeenCalledWith('a');
@@ -377,7 +377,7 @@ describe('hook resync', () => {
   it('fires no selected events on a load', () => {
     const onSelected = vi.fn();
     resetAllPersistentContexts();
-    const slot = createLoadout({ id: 'ev', mode: 'multi', maxSelections: 5, onSelect: vi.fn() });
+    const slot = createLoadout({ id: 'ev', mode: 'multi', capacity: 5, onSelect: vi.fn() });
     slot.on('selected', onSelected);
 
     deserializePersistents(getAllPersistentRefs(), { 'loadout:ev': { selected: ['a', 'b'] } });
@@ -398,7 +398,7 @@ describe('hook resync', () => {
 
 describe('persistence / restore', () => {
   it('restore replaces selections', () => {
-    const slot = createTestSlot({ id: 'pr', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'pr', mode: 'multi', capacity: 5 });
     slot.select('a');
     slot.restore(['x', 'y']);
     expect(slot.selected.value).toEqual(['x', 'y']);
@@ -409,21 +409,21 @@ describe('persistence / restore', () => {
     const slot = createTestSlot({
       id: 'pr',
       mode: 'multi',
-      maxSelections: 5,
+      capacity: 5,
       pool: ['a', 'b', 'c'],
     });
     slot.restore(['a', 'invalid', 'b']);
     expect(slot.selected.value).toEqual(['a', 'b']);
   });
 
-  it('restore truncates to maxSelections', () => {
-    const slot = createTestSlot({ id: 'pr', mode: 'multi', maxSelections: 2 });
+  it('restore truncates to capacity', () => {
+    const slot = createTestSlot({ id: 'pr', mode: 'multi', capacity: 2 });
     slot.restore(['a', 'b', 'c', 'd']);
     expect(slot.selected.value).toEqual(['a', 'b']);
   });
 
   it('snapshot returns independent copy', () => {
-    const slot = createTestSlot({ id: 'pr', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'pr', mode: 'multi', capacity: 5 });
     slot.select('a');
     slot.select('b');
     const snap = slot.snapshot();
@@ -441,7 +441,7 @@ describe('persistence / restore', () => {
 
 describe('events', () => {
   it('on("selected") fires with correct itemId', () => {
-    const slot = createTestSlot({ id: 'e', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'e', mode: 'multi', capacity: 5 });
     const handler = vi.fn();
     slot.on('selected', handler);
 
@@ -450,7 +450,7 @@ describe('events', () => {
   });
 
   it('on("deselected") fires with correct itemId', () => {
-    const slot = createTestSlot({ id: 'e', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'e', mode: 'multi', capacity: 5 });
     slot.select('a');
 
     const handler = vi.fn();
@@ -461,7 +461,7 @@ describe('events', () => {
   });
 
   it('unsubscribe works', () => {
-    const slot = createTestSlot({ id: 'e', mode: 'multi', maxSelections: 5 });
+    const slot = createTestSlot({ id: 'e', mode: 'multi', capacity: 5 });
     const handler = vi.fn();
     const unsub = slot.on('selected', handler);
 

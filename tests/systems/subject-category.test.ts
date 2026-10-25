@@ -58,12 +58,12 @@ describe('createSubjectCategory', () => {
       });
       cat.register([{ id: 'fluffy' }, { id: 'rocky' }]);
 
-      const fluffy = cat.get('fluffy')!;
+      const fluffy = cat.getSubject('fluffy')!;
       expect(fluffy.fields.bond.get()).toBe(25);
       fluffy.fields.bond.add(80); // 25 + 80 = 105 → clamped to 100
       expect(fluffy.fields.bond.get()).toBe(100);
 
-      const rocky = cat.get('rocky')!;
+      const rocky = cat.getSubject('rocky')!;
       rocky.fields.bond.add(-50); // 25 - 50 = -25 → clamped to 0
       expect(rocky.fields.bond.get()).toBe(0);
     });
@@ -74,7 +74,7 @@ describe('createSubjectCategory', () => {
         fields: { bond: { kind: 'scalar', initial: 0 } },
       });
       cat.register({ id: 'fluffy' });
-      const fluffy = cat.get('fluffy')!;
+      const fluffy = cat.getSubject('fluffy')!;
       const handler = vi.fn();
       fluffy.fields.bond.on('changed', handler);
       fluffy.fields.bond.set(5);
@@ -93,7 +93,7 @@ describe('createSubjectCategory', () => {
         },
       });
       cat.register({ id: 'explorer' });
-      const e = cat.get('explorer')!;
+      const e = cat.getSubject('explorer')!;
       e.fields.score.set(7);
       expect(e.fields.score.read()).toBe(7);
       e.fields.score.set(50);
@@ -108,8 +108,8 @@ describe('createSubjectCategory', () => {
         fields: { bond: { kind: 'scalar', initial: 0, min: 0, max: 100 } },
       });
       cat.register([{ id: 'fluffy' }, { id: 'rocky', fields: { bond: { initial: 75 } } }]);
-      expect(cat.get('fluffy')!.fields.bond.get()).toBe(0);
-      expect(cat.get('rocky')!.fields.bond.get()).toBe(75);
+      expect(cat.getSubject('fluffy')!.fields.bond.get()).toBe(0);
+      expect(cat.getSubject('rocky')!.fields.bond.get()).toBe(75);
     });
   });
 
@@ -126,7 +126,7 @@ describe('createSubjectCategory', () => {
         },
       });
       cat.register({ id: 'npc-1' });
-      const npc = cat.get('npc-1')!;
+      const npc = cat.getSubject('npc-1')!;
       npc.fields.opinion.set('trust', -10);
       npc.fields.opinion.set('fear', -5); // clamped to 0
       npc.fields.opinion.add('anger', 7);
@@ -159,7 +159,7 @@ describe('createSubjectCategory', () => {
             },
           },
         });
-        return cat.get('mentor-rask')!;
+        return cat.getSubject('mentor-rask')!;
       });
       expect(rask.fields.trust.getRung()).toBe('stranger');
 
@@ -214,7 +214,7 @@ describe('createSubjectCategory', () => {
           },
         });
         return {
-          subject: cat.get('mentor-rask')!,
+          subject: cat.getSubject('mentor-rask')!,
           charm: upgrades.getEntry('charm')!.purchasable,
         };
       });
@@ -231,7 +231,7 @@ describe('createSubjectCategory', () => {
           fields: { rank: { kind: 'ladder', rungs: ['novice', 'apprentice', 'master'] } },
         });
         cat.register({ id: 'mages-guild' });
-        const g = cat.get('mages-guild')!;
+        const g = cat.getSubject('mages-guild')!;
         const handler = vi.fn();
         g.fields.rank.on('advanced', handler);
         g.fields.rank.setIndex(2);
@@ -256,7 +256,7 @@ describe('createSubjectCategory', () => {
             },
           },
         });
-        const g = cat.get('mages-guild')!;
+        const g = cat.getSubject('mages-guild')!;
         // tryAdvance would be blocked, but setIndex bypasses
         g.fields.rank.setIndex(2);
         expect(g.fields.rank.getRung()).toBe('master');
@@ -271,7 +271,7 @@ describe('createSubjectCategory', () => {
         fields: { met: { kind: 'flag' }, hired: { kind: 'flag', initial: true } },
       });
       cat.register({ id: 'gordon' });
-      const g = cat.get('gordon')!;
+      const g = cat.getSubject('gordon')!;
       expect(g.fields.met.get()).toBe(false);
       expect(g.fields.hired.get()).toBe(true);
 
@@ -293,7 +293,7 @@ describe('createSubjectCategory', () => {
         },
       });
       cat.register({ id: 'the-entity' });
-      const e = cat.get('the-entity')!;
+      const e = cat.getSubject('the-entity')!;
       expect(e.fields.pathLocked.get()).toBeNull();
 
       const handler = vi.fn();
@@ -319,7 +319,7 @@ describe('createSubjectCategory', () => {
         fields: { pathLocked: { kind: 'enum', values: ['a', 'b'] as const } },
       });
       cat.register({ id: 'preset', fields: { pathLocked: { initial: 'b' } } });
-      expect(cat.get('preset')!.fields.pathLocked.get()).toBe('b');
+      expect(cat.getSubject('preset')!.fields.pathLocked.get()).toBe('b');
     });
   });
 
@@ -334,7 +334,7 @@ describe('createSubjectCategory', () => {
       expect(cat.size).toBe(3);
       expect(cat.getAll().map((e) => e.def.id)).toEqual(['a', 'b', 'c']);
       expect(cat.getDef('b')?.id).toBe('b');
-      expect(cat.getEntry('c')?.instance.id).toBe('c');
+      expect(cat.getEntry('c')?.subject.id).toBe('c');
     });
 
     it('signals project unlock = any non-default, count = non-default-field count', () => {
@@ -350,11 +350,11 @@ describe('createSubjectCategory', () => {
       expect(entry.signals?.active.value).toBe(false);
       expect(Decimal.fromValue(entry.signals!.count.value).toNumber()).toBe(0);
 
-      cat.get('the-entity')!.fields.met.set(true);
+      cat.getSubject('the-entity')!.fields.met.set(true);
       expect(entry.signals?.active.value).toBe(true);
       expect(Decimal.fromValue(entry.signals!.count.value).toNumber()).toBe(1);
 
-      cat.get('the-entity')!.fields.trust.set(5);
+      cat.getSubject('the-entity')!.fields.trust.set(5);
       expect(Decimal.fromValue(entry.signals!.count.value).toNumber()).toBe(2);
     });
 
@@ -388,7 +388,7 @@ describe('createSubjectCategory', () => {
       });
       cat.register({ id: 'fluffy' });
       // Seed must already be clamped — not sitting at 999 until the first set().
-      expect(cat.get('fluffy')!.fields.bond.get()).toBe(100);
+      expect(cat.getSubject('fluffy')!.fields.bond.get()).toBe(100);
     });
 
     it('clamps an out-of-range tier initial so getRung() is defined', () => {
@@ -397,8 +397,8 @@ describe('createSubjectCategory', () => {
         fields: { rank: { kind: 'ladder', rungs: ['novice', 'apprentice', 'master'], initial: 9 } },
       });
       cat.register({ id: 'mages' });
-      expect(cat.get('mages')!.fields.rank.getIndex()).toBe(2);
-      expect(cat.get('mages')!.fields.rank.getRung()).toBe('master');
+      expect(cat.getSubject('mages')!.fields.rank.getIndex()).toBe(2);
+      expect(cat.getSubject('mages')!.fields.rank.getRung()).toBe('master');
     });
 
     it('honors an explicit null enum override against a non-null schema default', () => {
@@ -408,7 +408,7 @@ describe('createSubjectCategory', () => {
       });
       cat.register({ id: 'neo', fields: { path: { initial: null } } });
       // `?? ` used to swallow the null and fall back to the schema's 'light'.
-      expect(cat.get('neo')!.fields.path.get()).toBeNull();
+      expect(cat.getSubject('neo')!.fields.path.get()).toBeNull();
     });
 
     it('reports a subject at its own override initial as default (unlock=false)', () => {
@@ -423,7 +423,7 @@ describe('createSubjectCategory', () => {
       expect(cat.getEntry('plain')!.signals!.active.value).toBe(false);
       expect(cat.getEntry('special')!.signals!.active.value).toBe(false);
       // A real change still registers.
-      cat.get('special')!.fields.bond.set(60);
+      cat.getSubject('special')!.fields.bond.set(60);
       expect(cat.getEntry('special')!.signals!.active.value).toBe(true);
     });
 
@@ -444,7 +444,7 @@ describe('createSubjectCategory', () => {
       const signals = cat.getEntry('fresh')!.signals!;
       expect(signals.active.value).toBe(false);
       expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(0);
-      cat.get('fresh')!.fields.mood.set('calm', 3);
+      cat.getSubject('fresh')!.fields.mood.set('calm', 3);
       expect(Decimal.fromValue(signals.count.value).toNumber()).toBe(1);
     });
   });
@@ -465,7 +465,7 @@ describe('createSubjectCategory', () => {
         },
       });
       cat.register({ id: 'rask' });
-      const f = cat.get('rask')!.fields;
+      const f = cat.getSubject('rask')!.fields;
       const changed = vi.fn();
       f.trust.on('changed', changed);
       f.mood.on('changed', changed);
@@ -495,7 +495,7 @@ describe('createSubjectCategory', () => {
         },
       });
       cat.register({ id: 'rask' });
-      const f = cat.get('rask')!.fields;
+      const f = cat.getSubject('rask')!.fields;
       loadInto(() => {
         f.trust.ref.value = 30;
         f.path.ref.value = 'dark';

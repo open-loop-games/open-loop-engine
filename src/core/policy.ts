@@ -115,12 +115,12 @@ export interface HybridPaybackContext<T> {
  * The "purchase whatever I can" baseline policy. Pairs naturally with a
  * pre-filtered affordable-only candidate list.
  *
- * @param getCost - Cost extractor. Typically `(p) => p.repeatable.getCost(1)`.
+ * @param getCost - Cost extractor. Typically `(p) => p.purchasable.getCost(1)`.
  *
  * @example
  * ```ts
  * const policy = selectionCheapest<Producer>(
- *   (p) => p.repeatable!.getCost(1),
+ *   (p) => p.purchasable!.getCost(1),
  * );
  * ```
  */
@@ -203,7 +203,7 @@ export function selectionPaybackPeriod<T>(getSeconds: (t: T) => number): Selecti
  * @example
  * ```ts
  * const policy = selectionHybridPayback<Producer>({
- *   getCost: (p) => p.repeatable!.getCost(1),
+ *   getCost: (p) => p.purchasable!.getCost(1),
  *   getRate: (p) => p.computedRate.value,
  *   getAmount: (p) => p.resource.value,
  *   getReserve: () => 0,
@@ -257,7 +257,7 @@ export function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): Select
  * ```ts
  * const policy = selectionComposite(
  *   selectionPaybackPeriod<Producer>((p) => p.purchaseBeatSeconds.value),
- *   selectionCheapest<Producer>((p) => p.repeatable!.getCost(1)),
+ *   selectionCheapest<Producer>((p) => p.purchasable!.getCost(1)),
  * );
  * ```
  */

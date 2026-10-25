@@ -228,16 +228,16 @@ describe('RunPool — addRun / removeRun', () => {
     expect(() => pool.addRun({ id: 'x', step: aliveStep })).toThrow(/duplicate/i);
   });
 
-  it('enforces maxRuns cap', () => {
-    const pool = makePool({ deathDisposition: 'destroy', maxRuns: 2 });
+  it('enforces capacity', () => {
+    const pool = makePool({ deathDisposition: 'destroy', capacity: 2 });
     pool.addRun({ id: 'a', step: aliveStep });
     pool.addRun({ id: 'b', step: aliveStep });
-    expect(() => pool.addRun({ id: 'c', step: aliveStep })).toThrow(/maxRuns/i);
+    expect(() => pool.addRun({ id: 'c', step: aliveStep })).toThrow(/capacity/i);
   });
 
-  it('treats maxRuns:0 as valid-but-empty (always throws)', () => {
-    const pool = makePool({ deathDisposition: 'destroy', maxRuns: 0 });
-    expect(() => pool.addRun({ id: 'a', step: aliveStep })).toThrow(/maxRuns/i);
+  it('treats capacity: 0 as valid-but-empty (always throws)', () => {
+    const pool = makePool({ deathDisposition: 'destroy', capacity: 0 });
+    expect(() => pool.addRun({ id: 'a', step: aliveStep })).toThrow(/capacity/i);
   });
 
   it('removeRun fires instance:died then instance:removed', () => {

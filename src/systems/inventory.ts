@@ -69,8 +69,8 @@ export interface Inventory {
   capacity: ComputedRef<Decimal>;
   /** Add a modifier to the per-item capacity chain; returns its cleanup. */
   addCapacityModifier(modifier: Modifier): () => void;
-  /** How much more of this item can fit */
-  remainingSpace(itemId: string): Decimal;
+  /** How much more of this item can fit; without an item id, how much more fits overall */
+  remainingCapacity(itemId?: string): Decimal;
   /** Is the inventory full for a specific item, or overall if no itemId */
   isFull(itemId?: string): boolean;
 
@@ -225,8 +225,8 @@ export function createInventory(options: InventoryOptions): Inventory {
       return capacityChain.add(modifier);
     },
 
-    remainingSpace(itemId: string): Decimal {
-      return remainingForItem(itemId);
+    remainingCapacity(itemId?: string): Decimal {
+      return itemId != null ? remainingForItem(itemId) : bag.remainingCapacity();
     },
 
     isFull(itemId?: string): boolean {

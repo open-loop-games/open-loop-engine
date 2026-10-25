@@ -31,7 +31,7 @@
  *   changed outside the FOV path: once per `markMaskChanged(mask)`, and once
  *   per bitmap on `restore()`.
  *
- * `revision` is the reactive form of the same writes: a computed that reads
+ * `gridVersion` is the reactive form of the same writes: a computed that reads
  * it recomputes after each, with no subscription to dispose.
  */
 
@@ -179,7 +179,7 @@ export interface SpatialGrid<T> {
    * a bitmap do not advance it; follow them with `markMaskChanged` or a
    * `fill()`.
    */
-  readonly revision: Readonly<Ref<number>>;
+  readonly gridVersion: Readonly<Ref<number>>;
 
   /**
    * Number of cells whose `explored` bit is set. Maintained incrementally by
@@ -193,7 +193,7 @@ export interface SpatialGrid<T> {
    * handle or `markMaskChanged`.
    *
    * A snapshot: typed-array hot-path state, so a computed over it alone never
-   * recomputes. Read `revision` at the head of the computed, or re-read the
+   * recomputes. Read `gridVersion` at the head of the computed, or re-read the
    * count after the write that changed it. Same for `passableCount` and
    * `exploredPassableCount`.
    */
@@ -460,7 +460,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
   const handle = createEmitHandle<SpatialGridEvents<T>>();
   // Advanced before each emit, so a handler that reads it sees the new value.
-  const revision = shallowRef(0);
+  const gridVersion = shallowRef(0);
   // Skip change-list computation in commit() when no fovUpdated handler is
   // attached — headless consumers (no display) would otherwise run an
   // O(w × h) scan per FOV update for arrays that nothing reads.
@@ -569,7 +569,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
   const grid: SpatialGrid<T> = {
     width,
     height,
-    revision,
+    gridVersion,
     cells,
     passable,
     explored,
@@ -603,7 +603,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
       const i = idx(x, y);
       const prev = cells[i];
       cells[i] = value;
-      revision.value++;
+      gridVersion.value++;
       handle.emit('cellChanged', x, y, prev, value);
     },
 
@@ -620,7 +620,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
           cells[i] = mapper(x, y, cells[i]);
         }
       }
-      revision.value++;
+      gridVersion.value++;
       handle.emit('gridChanged');
     },
 
@@ -800,7 +800,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
                 }
               }
             }
-            revision.value++;
+            gridVersion.value++;
             handle.emit('fovUpdated', deltaIn, deltaOut);
           } else {
             visible.set(fovStaging);
@@ -811,7 +811,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
                 if (passable[i] === 1) exploredPassableCount++;
               }
             }
-            revision.value++;
+            gridVersion.value++;
           }
           fovInFlight = false;
         },
@@ -833,7 +833,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
 
     markMaskChanged(mask) {
       if (mask !== 'visible') recountMasks();
-      revision.value++;
+      gridVersion.value++;
       handle.emit('maskChanged', mask);
     },
 
@@ -877,7 +877,7 @@ export function createSpatialGrid<T>(options: SpatialGridOptions<T>): SpatialGri
         cells[i] = toRaw(serialized.cells[i]);
       }
       recountMasks();
-      revision.value++;
+      gridVersion.value++;
       handle.emit('gridChanged');
       handle.emit('maskChanged', 'passable');
       handle.emit('maskChanged', 'explored');

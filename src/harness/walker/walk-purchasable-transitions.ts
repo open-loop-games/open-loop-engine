@@ -51,7 +51,7 @@ interface PurchasableEntity {
 
 /**
  * The shared parts of a purchasable's affordability transition (a producer's
- * `repeatable` included). Undefined when it's maxed or has no cost resource
+ * `purchasable` included). Undefined when it's maxed or has no cost resource
  * to meter against.
  *
  * @internal

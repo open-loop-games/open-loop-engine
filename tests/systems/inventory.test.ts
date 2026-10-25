@@ -147,10 +147,10 @@ describe('Inventory', () => {
       expect(inv.isFull('iron')).toBe(false);
     });
 
-    it('remainingSpace returns correct value', () => {
+    it('remainingCapacity returns what one item can still take', () => {
       const inv = createInventory({ id: 'inv', baseCapacity: 20 });
       inv.add('wood', 13);
-      expect(inv.remainingSpace('wood').eq(7)).toBe(true);
+      expect(inv.remainingCapacity('wood').eq(7)).toBe(true);
     });
   });
 
@@ -164,6 +164,17 @@ describe('Inventory', () => {
       inv.add('wood', 10);
       inv.add('iron', 5);
       expect(inv.isFull()).toBe(true);
+    });
+
+    it('remainingCapacity with no arg reads total capacity', () => {
+      const inv = createInventory({
+        id: 'inv',
+        baseCapacity: 100,
+        totalCapacity: 15,
+      });
+      inv.add('wood', 10);
+      expect(inv.remainingCapacity().eq(5)).toBe(true);
+      expect(inv.remainingCapacity('iron').eq(5)).toBe(true);
     });
 
     it('total capacity limits add across types', () => {
@@ -218,7 +229,7 @@ describe('Inventory', () => {
       await nextTick();
       expect(inv.capacity.value.eq(15)).toBe(true);
       expect(inv.isFull('wood')).toBe(false);
-      expect(inv.remainingSpace('wood').eq(5)).toBe(true);
+      expect(inv.remainingCapacity('wood').eq(5)).toBe(true);
 
       const added = inv.add('wood', 5);
       expect(Decimal.eq(added, 5)).toBe(true);

@@ -106,7 +106,7 @@ function makeMutationPool(rng: () => number): Mutation[] {
       axis: 'entity',
       key: `farms.${id}`,
       apply: (_c, f) => {
-        f.buildings.getProducer(id)!.repeatable!.count.value = Math.floor(rng() * 3);
+        f.buildings.getProducer(id)!.purchasable!.count.value = Math.floor(rng() * 3);
       },
     });
   }

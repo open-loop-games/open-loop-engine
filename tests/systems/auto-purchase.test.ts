@@ -47,7 +47,7 @@ interface BuildingDef {
 // ============================================================================
 
 const cheapestPolicy = (): SelectionPolicy<Producer> =>
-  selectionCheapest<Producer>((p) => p.repeatable!.getCost(1));
+  selectionCheapest<Producer>((p) => p.purchasable!.getCost(1));
 
 const paybackPeriodPolicy = (): SelectionPolicy<Producer> =>
   selectionPaybackPeriod<Producer>((p) => p.purchaseBeatSeconds.value);
@@ -57,7 +57,7 @@ const hybridPaybackPolicy = (
   reserveRef?: { value: DecimalSource },
 ): SelectionPolicy<Producer> =>
   selectionHybridPayback<Producer>({
-    getCost: (p) => p.repeatable!.getCost(1),
+    getCost: (p) => p.purchasable!.getCost(1),
     getRate: (p) => p.computedRate.value,
     getAmount: (p) => p.resource.value,
     getReserve: () => reserveRef?.value ?? 0,
@@ -373,8 +373,10 @@ describe('setupPolicyAutoPurchase', () => {
     setupPolicyAutoPurchase(category, { enabled: true, policy: cheapestPolicy() }, registerTick);
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
-    expect(new Decimal(category.getProducer('grandma')!.repeatable!.count.value).toNumber()).toBe(
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
+    expect(new Decimal(category.getProducer('grandma')!.purchasable!.count.value).toNumber()).toBe(
       0,
     );
   });
@@ -400,8 +402,10 @@ describe('setupPolicyAutoPurchase', () => {
     setupPolicyAutoPurchase(category, { enabled: true, policy: cheapestPolicy() }, registerTick);
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('click')!.repeatable!.count.value).toNumber()).toBe(0);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('click')!.purchasable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
   });
 
   it('payback-period policy picks by shortest purchaseBeatSeconds', () => {
@@ -424,9 +428,11 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('farm')!.repeatable!.count.value).toNumber()).toBe(1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
-    expect(new Decimal(category.getProducer('tower')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('farm')!.purchasable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
+    expect(new Decimal(category.getProducer('tower')!.purchasable!.count.value).toNumber()).toBe(0);
   });
 
   it('does nothing when disabled', () => {
@@ -445,11 +451,15 @@ describe('setupPolicyAutoPurchase', () => {
     setupPolicyAutoPurchase(category, { enabled }, registerTick);
 
     tick(1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
 
     enabled.value = true;
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
   });
 
   it('throttles purchases by interval', () => {
@@ -469,19 +479,27 @@ describe('setupPolicyAutoPurchase', () => {
     tick(0.5);
     tick(0.5);
     tick(0.5);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
 
     tick(0.5); // accumulator now 2 → purchase fires
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
 
     tick(1.9);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
 
     tick(0.2); // accumulator crosses 2 again
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(2);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      2,
+    );
   });
 
-  it('skips producers without repeatable and producers that cannot be afforded', () => {
+  it('skips producers without a purchasable and producers that cannot be afforded', () => {
     const cookies = createTestResource('cookies', 5);
     const { category, registerTick, tick } = makeCategory(cookies);
 
@@ -498,10 +516,10 @@ describe('setupPolicyAutoPurchase', () => {
 
     // Expensive has smaller beat but isn't affordable → cheap wins by fallback.
     tick(0.1);
-    expect(new Decimal(category.getProducer('cheap')!.repeatable!.count.value).toNumber()).toBe(1);
-    expect(new Decimal(category.getProducer('expensive')!.repeatable!.count.value).toNumber()).toBe(
-      0,
-    );
+    expect(new Decimal(category.getProducer('cheap')!.purchasable!.count.value).toNumber()).toBe(1);
+    expect(
+      new Decimal(category.getProducer('expensive')!.purchasable!.count.value).toNumber(),
+    ).toBe(0);
   });
 
   it('cleanup unregisters the tick handler', () => {
@@ -518,12 +536,16 @@ describe('setupPolicyAutoPurchase', () => {
 
     const cleanup = setupPolicyAutoPurchase(category, { enabled: true }, registerTick);
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
 
     cleanup();
     addResource(cookies, 1_000_000);
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
   });
 
   it('hybrid-payback ranks affordable producers by payback when headline rate is zero', () => {
@@ -544,8 +566,10 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('farm')!.repeatable!.count.value).toNumber()).toBe(1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('farm')!.purchasable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
   });
 
   it('hybrid-payback prefers higher-payback producers once headline rate is positive', () => {
@@ -557,7 +581,7 @@ describe('setupPolicyAutoPurchase', () => {
       { id: 'farm', name: 'Farm', baseRate: 10, baseCost: 110, costRatio: 1.15 },
     ]);
 
-    const cursor = category.getProducer('cursor')!.repeatable!;
+    const cursor = category.getProducer('cursor')!.purchasable!;
     for (let i = 0; i < 10; i++) cursor.purchase(1);
 
     setupPolicyAutoPurchase(
@@ -567,7 +591,7 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('farm')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('farm')!.purchasable!.count.value).toNumber()).toBe(1);
   });
 
   it('drains multiple purchases when dt exceeds the interval', () => {
@@ -585,7 +609,9 @@ describe('setupPolicyAutoPurchase', () => {
     setupPolicyAutoPurchase(category, { enabled: true, interval: 1 }, registerTick);
 
     tick(3); // dt = 3 × interval → 3 drained slots
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(3);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      3,
+    );
   });
 
   it('bails on the attempt cap and reports dropped attempts via onAttemptsOverflow', () => {
@@ -621,7 +647,7 @@ describe('setupPolicyAutoPurchase', () => {
     tick(1); // dt = 1, interval = 1e-6 → 1M iters wanted, but capped at 100.
 
     // Exactly 100 purchases happen (cap), and the remainder is reported.
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
       100,
     );
     expect(droppedReported).toBeGreaterThan(0);
@@ -639,8 +665,8 @@ describe('setupPolicyAutoPurchase', () => {
         { id: 'cursor', name: 'Cursor', baseRate: 1, baseCost: 10, costRatio: 1 },
         { id: 'farm', name: 'Farm', baseRate: 200, baseCost: 200, costRatio: 1 },
       ]);
-      const cursor = category.getProducer('cursor')!.repeatable!;
-      const farm = category.getProducer('farm')!.repeatable!;
+      const cursor = category.getProducer('cursor')!.purchasable!;
+      const farm = category.getProducer('farm')!.purchasable!;
       for (let i = 0; i < 20; i++) cursor.purchase(1);
       cookies.value = 50;
       return { cookies, category, registerTick, tick, cursor, farm };
@@ -725,14 +751,14 @@ describe('setupPolicyAutoPurchase', () => {
 
     // A producer over a hand-built purchasable, for requirement shapes a
     // category's purchase config can't express.
-    function producerOver(id: string, resource: Resource, repeatable: Purchasable): Producer {
+    function producerOver(id: string, resource: Resource, purchasable: Purchasable): Producer {
       return {
         id,
         trigger: 'continuous',
         resource,
-        repeatable,
+        purchasable,
         computedRate: computed(() => Decimal.dOne),
-        count: computed(() => repeatable.count.value),
+        count: computed(() => purchasable.count.value),
       } as unknown as Producer;
     }
 
@@ -848,7 +874,9 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(5);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(2);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      2,
+    );
   });
 
   it('clamps bulkCount to the reserve floor instead of buying through it', () => {
@@ -881,7 +909,7 @@ describe('setupPolicyAutoPurchase', () => {
     tick(5);
     expect(Decimal.gte(cookies.value, 70)).toBe(true);
     // ...and it bought as much as the floor allowed, rather than nothing.
-    expect(Decimal.gt(category.getProducer('cursor')!.repeatable!.count.value, 0)).toBe(true);
+    expect(Decimal.gt(category.getProducer('cursor')!.purchasable!.count.value, 0)).toBe(true);
   });
 
   it('holds the floor on the cost resource, not the produced resource', () => {
@@ -908,7 +936,7 @@ describe('setupPolicyAutoPurchase', () => {
 
     tick(5);
     expect(Decimal.eq(chips.value, 100)).toBe(true);
-    expect(Decimal.eq(category.getProducer('cursor')!.repeatable!.count.value, 0)).toBe(true);
+    expect(Decimal.eq(category.getProducer('cursor')!.purchasable!.count.value, 0)).toBe(true);
   });
 
   it('hybrid-payback re-scores per drained slot so the winner can flip mid-drain', () => {
@@ -924,7 +952,7 @@ describe('setupPolicyAutoPurchase', () => {
       { id: 'steady', name: 'Steady', baseRate: 1, baseCost: 50, costRatio: 1.01 },
     ]);
 
-    const steadySeed = category.getProducer('steady')!.repeatable!;
+    const steadySeed = category.getProducer('steady')!.purchasable!;
     for (let i = 0; i < 10; i++) steadySeed.purchase(1);
 
     setupPolicyAutoPurchase(
@@ -940,10 +968,10 @@ describe('setupPolicyAutoPurchase', () => {
     tick(3);
 
     const burstCount = new Decimal(
-      category.getProducer('burst')!.repeatable!.count.value,
+      category.getProducer('burst')!.purchasable!.count.value,
     ).toNumber();
     const steadyCount = new Decimal(
-      category.getProducer('steady')!.repeatable!.count.value,
+      category.getProducer('steady')!.purchasable!.count.value,
     ).toNumber();
 
     expect(burstCount).toBe(1);
@@ -970,11 +998,15 @@ describe('setupPolicyAutoPurchase', () => {
     );
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
 
     addResource(cookies, 10); // resource now 110; effective 110−95 = 15 ≥ 10
     tick(0.1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      1,
+    );
   });
 
   it('interval accumulator round-trips through exportSave/importSave', () => {
@@ -1016,7 +1048,7 @@ describe('setupPolicyAutoPurchase', () => {
     );
     endPersistentContext();
 
-    const cursor = category.getProducer('cursor')!.repeatable!;
+    const cursor = category.getProducer('cursor')!.purchasable!;
 
     tick(1.3);
     expect(new Decimal(cursor.count.value).toNumber()).toBe(0);
@@ -1113,8 +1145,10 @@ describe('setupPolicyAutoPurchase', () => {
     setupPolicyAutoPurchase(category, { enabled: true, policy: highestRate }, registerTick);
 
     tick(0.1);
-    expect(new Decimal(category.getProducer('farm')!.repeatable!.count.value).toNumber()).toBe(1);
-    expect(new Decimal(category.getProducer('cursor')!.repeatable!.count.value).toNumber()).toBe(0);
-    expect(new Decimal(category.getProducer('tower')!.repeatable!.count.value).toNumber()).toBe(0);
+    expect(new Decimal(category.getProducer('farm')!.purchasable!.count.value).toNumber()).toBe(1);
+    expect(new Decimal(category.getProducer('cursor')!.purchasable!.count.value).toNumber()).toBe(
+      0,
+    );
+    expect(new Decimal(category.getProducer('tower')!.purchasable!.count.value).toNumber()).toBe(0);
   });
 });

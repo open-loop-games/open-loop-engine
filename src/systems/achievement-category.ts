@@ -137,7 +137,7 @@ export interface AchievementRung<T = number> {
    * the default description formats the threshold once, at registration.
    */
   threshold: DecimalSource | FormulaSource;
-  /** Appended to `baseName` for this rung's display title (e.g. `"I"`, `"II"`). */
+  /** Appended to `baseTitle` for this rung's display title (e.g. `"I"`, `"II"`). */
   suffix: string;
   /** Override the auto-generated description for this rung. */
   description?: string;
@@ -154,7 +154,7 @@ export interface AchievementLadderBaseOptions<T = number> {
   /** Prefix for generated achievement ids (e.g. `"gold-hoarder"` → `"gold-hoarder-1"`). */
   baseId: string;
   /** Display name prefix shared by all rungs. */
-  baseName: string;
+  baseTitle: string;
   /** Reactive getter for the tracked value compared against each rung's threshold. */
   getValue: () => DecimalSource;
   /** Ordered list of thresholds, each producing one achievement. */
@@ -340,7 +340,7 @@ export function createAchievementCategory<Def extends { id: string }, DefState =
     getDef: base.getDef,
 
     registerLadder<T = number>(spec: AchievementLadderOptions<Def, T>): Achievement<T>[] {
-      const { baseId, baseName, getValue, rungs } = spec;
+      const { baseId, baseTitle, getValue, rungs } = spec;
       const buildDef = (spec as { buildDef?: AchievementLadderBuildDef<Def, T> }).buildDef;
 
       const defs: Def[] = [];
@@ -356,7 +356,7 @@ export function createAchievementCategory<Def extends { id: string }, DefState =
 
         const params: AchievementLadderBuildDefParams<T> = {
           id: rungId,
-          title: `${baseName} ${rung.suffix}`,
+          title: `${baseTitle} ${rung.suffix}`,
           description: rung.description ?? `Reach ${formatted}`,
           goal: () => Decimal.gte(getValue(), evalThreshold()),
           rungIndex: index,

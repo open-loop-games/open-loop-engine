@@ -42,12 +42,12 @@ import type { PurchasableCategory } from './purchasable-category';
 import type { Producer, ProducerCategory } from './producer-category';
 import { cachedCategoryList } from './category-base';
 
-// Default policy: cheapest by `repeatable.getCost(1)`. Module-level singleton
+// Default policy: cheapest by `purchasable.getCost(1)`. Module-level singleton
 // so identity is stable across `toMaybeRef` calls when `options.policy`
 // is omitted; the utility's own filter guarantees every candidate has a
-// `repeatable` by the time the policy sees it.
+// `purchasable` by the time the policy sees it.
 const defaultCheapestPolicy: SelectionPolicy<Producer> = selectionCheapest<Producer>((p) =>
-  p.repeatable!.getCost(1),
+  p.purchasable!.getCost(1),
 );
 
 // === SHARED BUILDERS ===
@@ -363,7 +363,7 @@ export interface SetupPolicyAutoPurchaseOptions {
   interval?: Computable<number>;
   /**
    * Selection policy used to pick one producer per attempt. Defaults
-   * to {@link selectionCheapest} over `repeatable.getCost(1)`. Pass any
+   * to {@link selectionCheapest} over `purchasable.getCost(1)`. Pass any
    * built-in factory ({@link selectionPaybackPeriod},
    * {@link selectionHybridPayback}, {@link selectionComposite}) or a
    * consumer-defined `SelectionPolicy<Producer>` for custom scoring.
@@ -372,7 +372,7 @@ export interface SetupPolicyAutoPurchaseOptions {
   /**
    * Bulk count per selected producer. Default: `1`.
    *
-   * The engine passes this to `repeatable.purchase(bulkCount)`, after any
+   * The engine passes this to `purchasable.purchase(bulkCount)`, after any
    * {@link reserve} clamp; the Purchasable decides the bulk semantics. Use `1`
    * for one deterministic pick per attempt (policy testing, correctness).
    */
@@ -461,7 +461,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  * Behavior per tick:
  * 1. If `enabled` is false, set the accumulator to zero and return.
  * 2. Add `dt` to the accumulator. If below `interval`, return.
- * 3. Filter continuous producers by `canPurchase.value && repeatable !== undefined`
+ * 3. Filter continuous producers by `canPurchase.value && purchasable !== undefined`
  *    and, when `reserve > 0`, whether a single unit is affordable with every
  *    cost resource left at or above the reserve. A manual producer produces
  *    only when activated, so its purchase is the player's choice. Under
@@ -486,7 +486,7 @@ export interface SetupPolicyAutoPurchaseOptions {
  *   {
  *     enabled: () => autoPurchaseUnlocked.value,
  *     policy: selectionHybridPayback({
- *       getCost: (p) => p.repeatable!.getCost(1),
+ *       getCost: (p) => p.purchasable!.getCost(1),
  *       getRate: (p) => p.computedRate.value,
  *       getAmount: (p) => p.resource.value,
  *       getReserve: () => reserveRef.value,
@@ -602,19 +602,19 @@ export function setupPolicyAutoPurchase(
       const scanStart = profileStart();
       const candidates: Producer[] = [];
       for (const producer of list) {
-        const { repeatable } = producer;
-        if (!repeatable || producer.trigger !== 'continuous') continue;
+        const { purchasable } = producer;
+        if (!purchasable || producer.trigger !== 'continuous') continue;
 
         if (waitForCost) {
           // Affordability and the reserve move to the pick, below.
-          if (!isUnlockedButForCost(repeatable)) continue;
+          if (!isUnlockedButForCost(purchasable)) continue;
         } else {
-          if (!repeatable.canPurchase.value) continue;
+          if (!purchasable.canPurchase.value) continue;
           // Screened through the same helper the bulk clamp uses, so filter
           // and clamp cannot disagree about what the reserve admits.
           // `producer.resource` is the *produced* resource; the reserve belongs
           // on whatever the purchase spends, which only the requirements know.
-          if (useReserve && Decimal.lte(reserveClampedAmount(repeatable, reserve, 1), 0)) continue;
+          if (useReserve && Decimal.lte(reserveClampedAmount(purchasable, reserve, 1), 0)) continue;
         }
 
         candidates.push(producer);
@@ -627,8 +627,8 @@ export function setupPolicyAutoPurchase(
       // what the policy is saving toward, so the attempt purchases nothing:
       // falling through to an affordable runner-up would spend the savings.
       // The reserve half of that check is the clamp below coming out at zero.
-      if (best?.repeatable?.canPurchase.value) {
-        const buyTarget = best.repeatable;
+      if (best?.purchasable?.canPurchase.value) {
+        const buyTarget = best.purchasable;
         const bulk = unref(processedBulk);
 
         // The candidate filter above only proved that a *single* unit fits

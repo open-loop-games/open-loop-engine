@@ -83,7 +83,7 @@ describe('AchievementCategory.registerLadder', () => {
     const cat = makeTieredCategory('gold-hoarder-cat');
     const achievements = cat.registerLadder({
       baseId: 'gold-hoarder',
-      baseName: 'Gold Hoarder',
+      baseTitle: 'Gold Hoarder',
       getValue: () => gold.value,
       rungs: [
         { threshold: 100, suffix: 'I' },
@@ -110,7 +110,7 @@ describe('AchievementCategory.registerLadder', () => {
     const cat = makeTieredCategory('scaling-hoarder-cat');
     const [ach] = cat.registerLadder({
       baseId: 'scaling-hoarder',
-      baseName: 'Scaling Hoarder',
+      baseTitle: 'Scaling Hoarder',
       getValue: () => gold.value,
       rungs: [{ threshold: dynamicThreshold, suffix: 'I' }],
     });
@@ -127,7 +127,7 @@ describe('AchievementCategory.registerLadder', () => {
     const cat2 = makeTieredCategory('scaling-hoarder-2-cat');
     const [ach2] = cat2.registerLadder({
       baseId: 'scaling-hoarder-2',
-      baseName: 'Scaling Hoarder',
+      baseTitle: 'Scaling Hoarder',
       getValue: () => gold2.value,
       rungs: [{ threshold: threshold2, suffix: 'I' }],
     });
@@ -150,7 +150,7 @@ describe('AchievementCategory.registerLadder', () => {
     });
     const tiers = cat.registerLadder({
       baseId: 'tier-effect',
-      baseName: 'Tier Effect',
+      baseTitle: 'Tier Effect',
       getValue: () => 50,
       rungs: [
         { threshold: 10, suffix: 'I', effect: 2 },
@@ -168,7 +168,7 @@ describe('AchievementCategory.registerLadder', () => {
     const cat = makeTieredCategory('const-formula-cat');
     const [ach] = cat.registerLadder({
       baseId: 'const-formula',
-      baseName: 'Const Formula',
+      baseTitle: 'Const Formula',
       getValue: () => gold.value,
       rungs: [{ threshold: staticFormula, suffix: 'I' }],
     });

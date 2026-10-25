@@ -304,11 +304,11 @@ describe('Producer type surface', () => {
     expectTypeOf<Producer['purchaseBeatSeconds']>().toEqualTypeOf<ComputedRef<number>>();
   });
 
-  it('keeps repeatable optional on the Producer shape', () => {
-    // Manual producers have no repeatable. Auto-buy code must branch on
+  it('keeps purchasable optional on the Producer shape', () => {
+    // Manual producers have no purchasable. Auto-buy code must branch on
     // `undefined`, and the type pin guards against a refactor that marks
     // it required and silently breaks click-style producers.
-    expectTypeOf<Producer['repeatable']>().toEqualTypeOf<Purchasable | undefined>();
+    expectTypeOf<Producer['purchasable']>().toEqualTypeOf<Purchasable | undefined>();
   });
 
   it('carries the definition id it was registered from', () => {
@@ -518,9 +518,9 @@ describe('Subject category surface type pins', () => {
         trust: { kind: 'ladder', rungs: ['stranger', 'friend'] } as const,
       },
     });
-    // get() returns the typed SubjectInstance; fields.trust narrows to LadderFieldInstance
+    // getSubject() returns the typed Subject; fields.trust narrows to LadderFieldInstance
     // without runtime narrowing helpers — the schema literal drives inference.
-    const inst = cat.get('x');
+    const inst = cat.getSubject('x');
     expectTypeOf(inst?.fields.trust).toEqualTypeOf<LadderFieldInstance | undefined>();
   });
 
@@ -530,7 +530,7 @@ describe('Subject category surface type pins', () => {
     expectTypeOf<Kinds>().toEqualTypeOf<'scalar' | 'vector' | 'ladder' | 'flag' | 'enum'>();
   });
 
-  it('SubjectInstance.fields preserves per-kind accessor shape for each schema field', async () => {
+  it('Subject.fields preserves per-kind accessor shape for each schema field', async () => {
     const { createSubjectCategory } = await import('@/systems/subject-category');
     const cat = createSubjectCategory({
       id: 'entity',
@@ -541,7 +541,7 @@ describe('Subject category surface type pins', () => {
         path: { kind: 'enum', values: ['scientific', 'cooperative'] as const },
       },
     });
-    const e = cat.get('the-entity');
+    const e = cat.getSubject('the-entity');
     // Each field narrows to its kind-specific instance — no getRun<K> ceremony.
     expectTypeOf(e?.fields.trust).toEqualTypeOf<ScalarFieldInstance | undefined>();
     expectTypeOf(e?.fields.rank).toEqualTypeOf<LadderFieldInstance | undefined>();
@@ -1274,7 +1274,7 @@ describe('Achievement and challenge categories — required options and generics
     });
     const tiers = cat.registerLadder({
       baseId: 'gold',
-      baseName: 'Gold',
+      baseTitle: 'Gold',
       getValue: () => 0,
       rungs: [{ threshold: 10, suffix: 'I' }],
     });

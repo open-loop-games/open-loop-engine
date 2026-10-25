@@ -238,7 +238,7 @@ Two kinds of query use the same engine instance.
 
 - `ProducerCategory.getTotalRate(resource)` for the total rate of a resource;
 - `Purchasable.count` and `.active` for purchase state;
-- `Purchasable.countToPurchase` and `getCost(n)` for what a purchase would take and cost (a producer's purchasable is `producer.repeatable`);
+- `Purchasable.countToPurchase` and `getCost(n)` for what a purchase would take and cost (a producer's purchasable is `producer.purchasable`);
 - the core functions `calculateCost` and `calculateMaxAffordable`, over a cost `Formula`;
 - `ModifierChain.bindings()` for the attribution of bindings, and `EffectSystemRegistryKey` for lowered grants.
 

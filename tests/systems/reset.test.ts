@@ -653,7 +653,7 @@ describe('Reset — Resettable protocol on category wrappers', () => {
       registerTick: () => () => {},
     });
     bakeries.register({ id: 'mill' });
-    bakeries.getProducer('mill')!.repeatable!.purchase(2);
+    bakeries.getProducer('mill')!.purchasable!.purchase(2);
     flour.value = 7;
 
     createReset({ thingsToReset: [bakeries] }).reset();

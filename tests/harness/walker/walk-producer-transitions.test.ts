@@ -80,7 +80,7 @@ function buildEngineWithProducers(
 
 /**
  * Build a single manual producer with no purchase config — covers the
- * "no repeatable, no emission" branch.
+ * "no purchasable, no emission" branch.
  */
 function buildEngineWithManualProducer(gameId: string, categoryId: string) {
   const handle: { category?: ReturnType<typeof createProducerCategory<ManualDef>> } = {};
@@ -228,17 +228,17 @@ describe('walkProducerTransitions — producer-becomes-affordable (no-rate)', ()
 });
 
 // ---------------------------------------------------------------------------
-// Maxed repeatable — no emission
+// Maxed purchasable — no emission
 // ---------------------------------------------------------------------------
 
 describe('walkProducerTransitions — maxed skip', () => {
-  it('skips a producer whose repeatable has reached its limit', () => {
+  it('skips a producer whose purchasable has reached its limit', () => {
     const { engine, category } = buildEngineWithProducers('wpd-maxed', 'buildings', 'cookies', [
       { id: 'mill', baseRate: 1, baseCost: 10, limit: 1 },
     ]);
-    const repeatable = category.getProducer('mill')!.repeatable!;
-    repeatable.count.value = 1;
-    expect(repeatable.maxed.value).toBe(true);
+    const purchasable = category.getProducer('mill')!.purchasable!;
+    purchasable.count.value = 1;
+    expect(purchasable.maxed.value).toBe(true);
 
     const accessor = mockAccessor({ resources: { cookies: 1000 }, rates: { cookies: 2 } });
     expect(walkProducerTransitions(engine, accessor)).toEqual([]);
@@ -246,14 +246,14 @@ describe('walkProducerTransitions — maxed skip', () => {
 });
 
 // ---------------------------------------------------------------------------
-// No repeatable — no emission
+// No purchasable — no emission
 // ---------------------------------------------------------------------------
 
-describe('walkProducerTransitions — no-repeatable skip', () => {
-  it('skips manual producers that have no repeatable (no purchase config)', () => {
+describe('walkProducerTransitions — no-purchasable skip', () => {
+  it('skips manual producers that have no purchasable (no purchase config)', () => {
     const { engine, category } = buildEngineWithManualProducer('wpd-manual', 'clicks');
-    // Sanity: the producer exists and has no repeatable, so nothing to emit.
-    expect(category.getProducer('click')!.repeatable).toBeUndefined();
+    // Sanity: the producer exists and has no purchasable, so nothing to emit.
+    expect(category.getProducer('click')!.purchasable).toBeUndefined();
 
     const out = walkProducerTransitions(engine, mockAccessor());
     expect(out).toEqual([]);
