@@ -50,10 +50,10 @@ addressable subjects with typed multi-field state
 - `type PerSubjectOverride<F extends FieldDef>` — Per-subject overrides — only the obviously-per-subject bits (initial values, a ladder's `advanceWhen`). `src/systems/subject-category.ts:219`
 - `interface ScalarFieldDef` — Single persistent number per subject. `src/systems/subject-category.ts:52`
 - `interface ScalarFieldInstance extends Emittable<ScalarFieldEvents>` — Live scalar field built from a ScalarFieldDef. `src/systems/subject-category.ts:115`
+- `interface Subject<S extends FieldSchema>` — Live subject — typed fields keyed by schema field name. `src/systems/subject-category.ts:241`
 - `interface SubjectCategory<S extends FieldSchema> extends ResettableObject` — Container that registers subjects against a shared schema and builds the matching typed instance for each. `src/systems/subject-category.ts:274`
-- `interface SubjectCategoryEntry<S extends FieldSchema>` — One category entry of a SubjectCategory — authored def, live instance and signals. `src/systems/subject-category.ts:247`
+- `interface SubjectCategoryEntry<S extends FieldSchema>` — One category entry of a SubjectCategory — authored def, subject and signals. `src/systems/subject-category.ts:247`
 - `interface SubjectCategoryOptions<S extends FieldSchema>` `src/systems/subject-category.ts:254`
 - `interface SubjectDef<S extends FieldSchema>` — Authoring shape for one subject in a SubjectCategory. `src/systems/subject-category.ts:234`
-- `interface SubjectInstance<S extends FieldSchema>` — Live subject — typed fields keyed by schema field name. `src/systems/subject-category.ts:241`
 - `interface VectorFieldDef<Dims extends string = string>` — N persistent numbers per subject, one per named dimension. `src/systems/subject-category.ts:61`
 - `interface VectorFieldInstance<Dims extends string = string> extends Emittable<VectorFieldEvents<Dims>>` — Live vector field built from a VectorFieldDef. `src/systems/subject-category.ts:130`

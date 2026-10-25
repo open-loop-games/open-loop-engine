@@ -2,6 +2,40 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.9.0 (2026-10-25)
+
+### ⚠ Breaking changes
+
+* names follow the term list: bottleneck, capacity, purchasable, subject, baseTitle, gridVersion (2729edc)
+
+  Public names change to the engine's terms. Run the
+  API migration codemod (api-migrations/run.mjs in the engine repo) before
+  the bump; it renames these across a consumer's .ts files.
+
+  Migration:
+    (* an optional key: a stale one passes typecheck, so search for it)
+    ProducerLimit → ProducerBottleneck
+    SubjectInstance → Subject
+    remainingSpace → remainingCapacity (Inventory)
+    get → getSubject (SubjectCategory)
+    limit → bottleneck (Producer) *
+    repeatable → purchasable (Producer)
+    instance → subject (SubjectCategoryEntry)
+    maxSelections → capacity (LoadoutOptions) *
+    maxRuns → capacity (RunPoolOptions) *
+    baseName → baseTitle (AchievementLadderBaseOptions)
+    revision → gridVersion (SpatialGrid)
+    'room' → 'capacity' (ProducerLimit)
+
+  A string comparison such as `producer.limit?.value === 'room'` keeps
+  passing typecheck until the key is renamed. Search for 'room' after the
+  bump. `Inventory.remainingCapacity()` with no item id now answers the
+  remaining combined capacity, as `isFull()` does.
+
+### Refactors
+
+* a modifier's input is a value, a conversion's output is its gain (61caebf)
+
 ## 0.8.0 (2026-10-21)
 
 ### ⚠ Breaking changes
