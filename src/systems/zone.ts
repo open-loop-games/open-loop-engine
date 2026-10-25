@@ -100,9 +100,9 @@ export interface ZoneSystem {
 
   /** Unlock a zone by id. No-op if already unlocked. */
   unlock(zoneId: string): void;
-  // TODO(expansion): add `unlockGate?: Gate` to ZoneDef when a consumer wants declarative
-  // auto-unlock instead of imperative `zones.unlock(id)` calls. Gate already exists
-  // (src/systems/gate.ts); only consumer demand is pending.
+  // TODO(expansion): add `unlockWhen?: Predicate` to ZoneDef, as on AutomationTierDef, when a
+  // consumer wants declarative auto-unlock instead of imperative `zones.unlock(id)` calls.
+  // Predicate and its resolver already exist; only consumer demand is pending.
 
   /** Check if a zone is unlocked */
   isUnlocked(zoneId: string): boolean;

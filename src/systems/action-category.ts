@@ -313,7 +313,7 @@ function buildInitialMetadata<Payload>(
  *   mapState: () => ({ timesCast: persistent(0) }),
  *   mapAction: (def) => ({
  *     signals: {
- *       unlock: computed(() => true),
+ *       active: computed(() => true),
  *       // Read state lazily: mapAction runs before the entry exists.
  *       count: computed(() => spells.getState(def.id)?.timesCast.value ?? 0),
  *     },

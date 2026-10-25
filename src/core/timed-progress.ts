@@ -8,13 +8,13 @@
  * calls `onComplete(overflow)` once when progress reaches `needed`, and not
  * again while progress stays there.
  *
- * The tracker never resets on its own, never moves overflow into the next
+ * The timed progress never resets on its own, never moves overflow into the next
  * completion, and never stalls or fails. Those are consumer decisions — this
  * is a value that grows over time, nothing more.
  *
  * Built for N parallel passive progressions, where a one-at-a-time state
  * machine (like Sequencer-driven execution) doesn't fit. Example: passive
- * jobs, one tracker per job, ticking beside the action queue.
+ * jobs, one timed progress per job, ticking beside the action queue.
  */
 
 import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
@@ -36,9 +36,9 @@ import type { RegisterTick } from './sequencer';
 export type { RegisterTick };
 
 /**
- * Options for {@link createTimedProgress}. A saved tracker needs an `id`,
- * unique among the trackers built in the same module: its progress saves
- * under `${module}/${id}`. Only an `ephemeral` tracker may omit it.
+ * Options for {@link createTimedProgress}. A saved timed progress needs an `id`,
+ * unique among the timed progresses built in the same module: its progress saves
+ * under `${module}/${id}`. Only an `ephemeral` timed progress may omit it.
  */
 export type TimedProgressOptions = TimedProgressBaseOptions &
   (
@@ -47,20 +47,20 @@ export type TimedProgressOptions = TimedProgressBaseOptions &
         id?: string;
         /**
          * `progress` is a plain Vue ref instead of a persistent one: the
-         * tracker works the same but never appears in save data — for
+         * timed progress works the same but never appears in save data — for
          * predictors and headless runs.
          */
         ephemeral: true;
       }
   );
 
-/** Options every {@link createTimedProgress} tracker shares. */
+/** Options every timed progress shares. */
 export interface TimedProgressBaseOptions {
   /** Total progress needed before `onComplete` fires. */
   needed: Computable<DecimalSource>;
   /** Progress gained per second (default 1). */
   rate?: Computable<DecimalSource>;
-  /** Tick registration function — tracker self-wires its tick. */
+  /** Tick registration function — a timed progress wires its own tick. */
   registerTick: RegisterTick;
   /**
    * Called after each tick that advanced progress. `delta` is the full
@@ -73,11 +73,11 @@ export interface TimedProgressBaseOptions {
    * whether progress crossed the boundary or a shrinking `needed` dropped
    * below it. `overflow` is how far past `needed` progress now stands.
    * Consumers decide what to do next — reset, keep the overflow as progress,
-   * leave progress where it is, etc. A tracker at or past `needed` is not
+   * leave progress where it is, etc. A timed progress at or past `needed` is not
    * called again until progress falls below `needed` and reaches it anew. A
    * `reset()`, kept overflow or a larger `needed` brings it below. Progress a load
    * restores at or past `needed` counts as already complete.
-   * The tracker does nothing else on completion.
+   * The timed progress does nothing else on completion.
    */
   onComplete?: (overflow: DecimalSource) => void;
 }
@@ -106,8 +106,8 @@ export interface TimedProgress {
   reset(): void;
   /**
    * Unsubscribe from the game loop. The saved `progress` becomes unowned: it
-   * keeps saving, and a tracker built with the same id in the same persistent
-   * context takes it over and resumes. Call it when the tracker's owner is
+   * keeps saving, and a timed progress built with the same id in the same persistent
+   * context takes it over and resumes. Call it when the timed progress's owner is
    * disposed.
    */
   dispose(): void;
@@ -129,8 +129,8 @@ function buildTimedProgressState(id: string, ephemeral: boolean | undefined): Ti
       progress: ref<DecimalSource>(0),
     };
   }
-  // Nest this tracker's id under the enclosing persistent context rather than
-  // using that context as is: N parallel trackers built inside one module's
+  // Nest this timed progress's id under the enclosing persistent context rather than
+  // using that context as is: N parallel timed progresses built inside one module's
   // install() share it, and their 'progress' refs would collide there.
   // Mirrors category-base's `${parent}/${local}` nesting.
   const parent = getCurrentPersistentContext();
@@ -178,10 +178,10 @@ function buildComputeds(
 }
 
 // === PRIVATE TICK ===
-/** Ephemeral record of whether the tracker has already completed at its current progress. */
+/** Ephemeral record of whether the timed progress has already completed at its current progress. */
 interface CompletionLatch {
   completed: boolean;
-  /** The progress this tracker last wrote; any other value was written from outside. */
+  /** The progress value it last wrote; any other value was written from outside. */
   lastWritten: DecimalSource | undefined;
 }
 
@@ -240,7 +240,7 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  * advancing `progress` by `rate * dt` each time. Use for parallel "many things
  * progressing at once" patterns, where one-at-a-time execution doesn't fit.
  *
- * The tracker has no opinion about what happens on completion — it calls
+ * The timed progress has no opinion about what happens on completion — it calls
  * `onComplete(overflow)` once per completion and leaves everything else
  * to the consumer. Reset, keep the overflow, grant rewards, subtract one
  * completion's worth, or do nothing: all are valid.
@@ -253,7 +253,7 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  *
  * @example
  * ```ts
- * const tracker = createTimedProgress({
+ * const job = createTimedProgress({
  *   id: 'job:mine-ore',
  *   needed: () => def.requiredProgress,
  *   rate: () => skillMultiplier.value,
@@ -261,7 +261,7 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  *   onComplete: (overflow) => {
  *     if (!canDeliverRewards()) return; // stall: progress stays at `needed`
  *     grantRewards();
- *     tracker.progress.value = overflow; // keep overflow for the next completion
+ *     job.progress.value = overflow; // keep overflow for the next completion
  *   },
  * });
  * ```

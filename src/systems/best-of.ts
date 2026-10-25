@@ -1,5 +1,5 @@
 /**
- * BestOf tracker — per-metric best-of-run recording
+ * BestOf — per-metric best-of-run records
  *
  * Tracks which run produced the best outcome for each registered metric,
  * with optional configuration snapshot capture for reproducibility.
@@ -158,7 +158,7 @@ export interface BestOfOptions {
 export interface BestOf {
   /** Reactive map of current best per metric key (null if no best recorded) */
   readonly entries: ComputedRef<Record<string, BestOfEntry | null>>;
-  /** The metric defs this tracker was created with, by key */
+  /** The metric defs this BestOf was created with, by key */
   readonly metrics: Readonly<Record<string, BestOfMetricDef>>;
   /** Subscribe to BestOf events */
   on: Emittable<BestOfEvents>['on'];
@@ -230,7 +230,7 @@ function computePerSecond(value: DecimalSource, elapsed: number): Decimal {
 // === FACTORIES ===
 
 /**
- * Create a BestOf tracker that records the best run outcome per metric.
+ * Create a BestOf that records the best run outcome per metric.
  *
  * Compares each new run's result against the stored best and replaces it when
  * the new result wins. Supports both automatic tracking via CycleLog and manual

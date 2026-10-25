@@ -219,7 +219,7 @@ export interface Cycle extends ScopedReset {
  * Create a cycle — bounded runs that end, reset, and start the next run.
  *
  * Wires up a {@link Reset} with an elapsed timer, run counter, and best-time
- * tracker. The end sequence is: `onBeforeEnd` → `beforeEnd` →
+ * record. The end sequence is: `onBeforeEnd` → `beforeEnd` →
  * reset persistent refs → `onEnd` → stats → zero elapsed → `afterEnd`.
  *
  * Fits any lifecycle shaped that way, whatever the game calls it — a run in a
