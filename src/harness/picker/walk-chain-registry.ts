@@ -42,7 +42,7 @@ export function walkChainRegistry(engine: Engine): ModifierPickerEntry[] {
 
   forEachChainRegistryEntry(registry, ({ chain, modifier, indexInChain }) => {
     if (modifier === undefined) {
-      const marker: Modifier = { apply: (gain: DecimalSource) => gain };
+      const marker: Modifier = { apply: (value: DecimalSource) => value };
       entries.push({
         kind: 'modifier',
         modifier: marker,

@@ -108,8 +108,8 @@ export function createAdditiveModifier<T extends AdditiveModifierOptions>(
 
   return {
     // A small Decimal operand renormalizes to a number, so the static's fast path can fire.
-    apply: (gain: DecimalSource) => Decimal.add(gain, renormIfLayer0(unref(processedAddend))),
-    invert: (gain: DecimalSource) => Decimal.sub(gain, renormIfLayer0(unref(processedAddend))),
+    apply: (value: DecimalSource) => Decimal.add(value, renormIfLayer0(unref(processedAddend))),
+    invert: (value: DecimalSource) => Decimal.sub(value, renormIfLayer0(unref(processedAddend))),
     enabled: processedEnabled,
     description:
       description == null
@@ -181,8 +181,9 @@ export function createMultiplicativeModifier<T extends MultiplicativeModifierOpt
 
   return {
     // A small Decimal operand renormalizes to a number, so the static's fast path can fire.
-    apply: (gain: DecimalSource) => Decimal.mul(gain, renormIfLayer0(unref(processedMultiplier))),
-    invert: (gain: DecimalSource) => Decimal.div(gain, renormIfLayer0(unref(processedMultiplier))),
+    apply: (value: DecimalSource) => Decimal.mul(value, renormIfLayer0(unref(processedMultiplier))),
+    invert: (value: DecimalSource) =>
+      Decimal.div(value, renormIfLayer0(unref(processedMultiplier))),
     enabled: processedEnabled,
     description:
       description == null
@@ -246,13 +247,13 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
   const processedEnabled = enabled == null ? undefined : toMaybeRef(enabled);
 
   return {
-    apply: (gain: DecimalSource) => {
+    apply: (value: DecimalSource) => {
       // renormIfLayer0 between steps keeps the value in number-space so each
       // Decimal.X op's typeof fast path can fire. pow has no fast path of its
       // own, but renorming before it keeps its internal `D()` wrap cheap and
       // the following sub in number-space. Final wrap honors the chain-form
       // contract for consumers of modifier.apply.
-      let result: DecimalSource = gain;
+      let result: DecimalSource = value;
       if (supportLowNumbers) {
         result = renormIfLayer0(Decimal.add(result, 1));
       }
@@ -262,8 +263,8 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
       }
       return toFinalDecimal(result);
     },
-    invert: (gain: DecimalSource) => {
-      let result: DecimalSource = gain;
+    invert: (value: DecimalSource) => {
+      let result: DecimalSource = value;
       if (supportLowNumbers) {
         result = renormIfLayer0(Decimal.add(result, 1));
       }
@@ -323,11 +324,14 @@ export function createSequentialModifier<T extends Modifier>(
 ): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
   readonly children: readonly T[];
 } {
-  const invertAll = (gain: DecimalSource): Decimal =>
+  const invertAll = (value: DecimalSource): Decimal =>
     toFinalDecimal(
       modifiers
         .filter((m) => unref(m.enabled) !== false)
-        .reduceRight<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.invert!(acc)), gain),
+        .reduceRight<DecimalSource>(
+          (acc, modifier) => renormIfLayer0(modifier.invert!(acc)),
+          value,
+        ),
     );
 
   const describeAll = (): ModifierDescription[] =>
@@ -339,19 +343,19 @@ export function createSequentialModifier<T extends Modifier>(
   // typeof fast path can fire; the final return wraps once to Decimal so
   // consumers chaining `.mul()/.gt()/.toNumber()` on the output see the
   // instance form.
-  const applyAll = (gain: DecimalSource): Decimal =>
+  const applyAll = (value: DecimalSource): Decimal =>
     toFinalDecimal(
       modifiers
         .filter((m) => unref(m.enabled) !== false)
-        .reduce<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.apply(acc)), gain),
+        .reduce<DecimalSource>((acc, modifier) => renormIfLayer0(modifier.apply(acc)), value),
     );
 
   return {
     // Hot path: a start/end pair, so no closure is built per apply.
-    apply: (gain: DecimalSource) => {
+    apply: (value: DecimalSource) => {
       const t0 = profileStart();
       try {
-        return applyAll(gain);
+        return applyAll(value);
       } finally {
         profileEnd('modifier.chain.apply', t0);
       }
@@ -472,7 +476,7 @@ export type Grant =
       chain: ModifierChain | ModifierChain[];
       /** Multiplier value (or reactive source). */
       multiplier: Computable<DecimalSource>;
-      /** Stable display text for UI breakdowns, also used as the attribution text. */
+      /** Display text for UI breakdowns. A category passes it to `chain.bind` as the binding's attribution text, so keep it stable. */
       description: string;
       /**
        * Optional additional predicate AND-composed with the owner's implicit
@@ -498,7 +502,7 @@ export type Grant =
       chain: ModifierChain | ModifierChain[];
       /** Hand-built modifier (or factory). */
       modifier: Modifier | (() => Modifier);
-      /** Stable display text for UI breakdowns, also used as the attribution text. A category's grant requires it. */
+      /** Display text for UI breakdowns. A category passes it to `chain.bind` as the binding's attribution text, so keep it stable. A category's grant requires it. */
       description?: string;
       when?: Predicate;
     };
@@ -717,11 +721,11 @@ export function createModifierChain(id: string): ModifierChain {
 
   const chain: ModifierChain = {
     id,
-    get apply(): (gain: DecimalSource) => DecimalSource {
+    get apply(): (value: DecimalSource) => DecimalSource {
       void itemsVersion.value;
       return composed.apply;
     },
-    get invert(): ((gain: DecimalSource) => DecimalSource) | undefined {
+    get invert(): ((value: DecimalSource) => DecimalSource) | undefined {
       void itemsVersion.value;
       return composed.invert;
     },
@@ -900,10 +904,10 @@ export function delegateModifier(
         ? own
         : computed(() => unref(own) !== false && unref(when) !== false);
   // Forwarders are built once; the getters only decide whether `raw` has the member now.
-  const invert = (gain: DecimalSource) => raw.invert!(gain);
+  const invert = (value: DecimalSource) => raw.invert!(value);
   const describe = () => (raw.description as () => ModifierDescription | ModifierDescription[])();
   return {
-    apply: (gain) => raw.apply(gain),
+    apply: (value) => raw.apply(value),
     get invert() {
       return raw.invert == null ? undefined : invert;
     },

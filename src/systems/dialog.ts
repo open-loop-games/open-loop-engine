@@ -322,7 +322,7 @@ export function createNativeDialogAdapter(
    * `next`, until it stops on a node that presents. Each entered node applies
    * its onEnter and increments its visit count.
    */
-  function settle(): void {
+  function passFallThroughNodes(): void {
     const graphId = state.activeGraphId;
     let nodeId = state.activeNodeId;
     if (!graphId || !nodeId) return;
@@ -360,7 +360,7 @@ export function createNativeDialogAdapter(
     const targetId = entryNode ?? graph.entry;
     if (!canEnter(graphId, targetId)) return false;
     activate(graphId, targetId);
-    settle();
+    passFallThroughNodes();
     emitPresented();
     return true;
   }
@@ -401,7 +401,7 @@ export function createNativeDialogAdapter(
       return;
     }
     activate(graphId, choice.next);
-    settle();
+    passFallThroughNodes();
     emitPresented();
   }
 
@@ -413,7 +413,7 @@ export function createNativeDialogAdapter(
     }
     const graphId = state.activeGraphId!;
     activate(graphId, lookupNode(graphId, snap.nodeId).next!);
-    settle();
+    passFallThroughNodes();
     emitPresented();
   }
 

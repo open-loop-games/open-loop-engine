@@ -128,7 +128,7 @@ Cross-cutting shapes, not symbol names: "where do I read about X?" when X has no
 - **batch-registered category** — `createCategoryBase`, per-def persistent context + patch → composition.md#category-base, ../consumer-guide.md#level-2-categories-the-default-for-content
 - **dialog session vs adapter** — the `DialogSession` envelope over a swappable `DialogAdapter` → content-narrative.md#dialog, ../consumer-guide-recipes.md#dialog-contract-first-adapter-second
 - **subject schema fields** — typed multi-field state per subject: scalar / vector / ladder / flag / enum → content-narrative.md#subject-category, ../consumer-guide-recipes.md#character-interaction-surface
-- **best-of record** — a per-metric best with an optional projection, and BestOf events → content-systems.md#bestof-tracker
+- **best-of record** — a per-metric best with an optional projection, and BestOf events → content-systems.md#bestof
 - **run end events** — `beforeEnd` / `afterEnd` around a cycle's end, reset and next run → content-systems.md#cycle
 - **run-shaped APIs** — `Cycle` (runs and the resets between them) vs `CycleLog` (their tracked metrics) vs `RunPool` (many concurrent pool runs) vs `TickDriver` (tick scheduler) → INDEX.md#reserved-names
 - **recommendation arbitration** — recommenders ranked between runs; the winner is applied automatically or presented → advisors.md#recommendation
@@ -217,7 +217,7 @@ The validated incremental primitives, each a typed registration contract over th
 - `achievement` → content-systems.md#achievement
 - `action-category` → content-systems.md#action-category
 - `automation` → content-systems.md#automation-tiers
-- `best-of` → content-systems.md#bestof-tracker
+- `best-of` → content-systems.md#bestof
 - `challenge-category` → content-systems.md#challenge-category
 - `cycle` → content-systems.md#cycle
 - `cycle-log` → content-systems.md#cyclelog

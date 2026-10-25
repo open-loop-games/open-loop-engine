@@ -260,14 +260,14 @@ function buildScalarModifier(perturbation: Perturbation): Modifier {
   if (perturbation.kind === 'scalar-multiply') {
     const { factor } = perturbation;
     return {
-      apply: (gain: DecimalSource) => Decimal.times(gain, factor),
-      invert: (gain: DecimalSource) => Decimal.div(gain, factor),
+      apply: (value: DecimalSource) => Decimal.times(value, factor),
+      invert: (value: DecimalSource) => Decimal.div(value, factor),
     };
   }
   const { delta } = perturbation;
   return {
-    apply: (gain: DecimalSource) => Decimal.add(gain, delta),
-    invert: (gain: DecimalSource) => Decimal.sub(gain, delta),
+    apply: (value: DecimalSource) => Decimal.add(value, delta),
+    invert: (value: DecimalSource) => Decimal.sub(value, delta),
   };
 }
 
@@ -275,9 +275,9 @@ function wrapModifier(original: Modifier, perturbation: Perturbation): Modifier 
   if (perturbation.kind === 'scalar-multiply') {
     const { factor } = perturbation;
     return {
-      apply: (gain: DecimalSource) => Decimal.times(original.apply(gain), factor),
+      apply: (value: DecimalSource) => Decimal.times(original.apply(value), factor),
       invert: original.invert
-        ? (gain: DecimalSource) => original.invert!(Decimal.div(gain, factor))
+        ? (value: DecimalSource) => original.invert!(Decimal.div(value, factor))
         : undefined,
       enabled: original.enabled,
       description: original.description,
@@ -286,9 +286,9 @@ function wrapModifier(original: Modifier, perturbation: Perturbation): Modifier 
 
   const { delta } = perturbation;
   return {
-    apply: (gain: DecimalSource) => Decimal.add(original.apply(gain), delta),
+    apply: (value: DecimalSource) => Decimal.add(original.apply(value), delta),
     invert: original.invert
-      ? (gain: DecimalSource) => original.invert!(Decimal.sub(gain, delta))
+      ? (value: DecimalSource) => original.invert!(Decimal.sub(value, delta))
       : undefined,
     enabled: original.enabled,
     description: original.description,

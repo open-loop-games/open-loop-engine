@@ -80,13 +80,13 @@ export interface ConversionOptions<
    * Option callback run before payment and output. Receives the predicted
    * output amounts. Returning `false` cancels the conversion (no mutation occurs).
    */
-  onConvert?: (conversion: Conversion, produced: Record<string, Decimal>) => boolean | void;
+  onConvert?: (conversion: Conversion, gain: Record<string, Decimal>) => boolean | void;
   /**
    * Option callback run after the outputs are added. Compose prestige-layer
    * resets here, log to telemetry, or start animations. Receives the actual
    * output amounts.
    */
-  afterConvert?: (conversion: Conversion, produced: Record<string, Decimal>) => void;
+  afterConvert?: (conversion: Conversion, gain: Record<string, Decimal>) => void;
 }
 
 /** The conversion {@link createConversion} returns. */
@@ -115,12 +115,12 @@ export interface Conversion {
  * Execution order in `convert()`:
  * 1. Bail with `{}` if `!canConvert.value`.
  * 2. Build snapshot from `getCost(1)` per CostRequirement input.
- * 3. Compute `produced` from outputs against the snapshot.
+ * 3. Compute `gain` from outputs against the snapshot.
  * 4. Call `onConvert`. Bail with `{}` if it returns `false`.
  * 5. Pay all input requirements (left-to-right via `payRequirements`).
- * 6. Add `produced[key]` to each output resource.
+ * 6. Add `gain[key]` to each output resource.
  * 7. Call `afterConvert`.
- * 8. Return `produced`.
+ * 8. Return `gain`.
  *
  * Steps 2–3 run before step 5, so an output reading the snapshot is
  * deterministic even when an input and an output share a resource.
@@ -205,11 +205,11 @@ export function createConversion<
 
   const currentGain = computed((): Record<string, Decimal> => {
     const snapshot = buildSnapshot();
-    const produced: Record<string, Decimal> = {};
+    const gain: Record<string, Decimal> = {};
     for (const key of Object.keys(outputs)) {
-      produced[key] = evaluateOutput(outputs[key], snapshot);
+      gain[key] = evaluateOutput(outputs[key], snapshot);
     }
-    return produced;
+    return gain;
   });
 
   const conversion: Conversion = {
@@ -222,13 +222,13 @@ export function createConversion<
       if (!canConvert.value) return {};
 
       const snapshot = buildSnapshot();
-      const produced: Record<string, Decimal> = {};
+      const gain: Record<string, Decimal> = {};
       for (const key of Object.keys(outputs)) {
-        produced[key] = evaluateOutput(outputs[key], snapshot);
+        gain[key] = evaluateOutput(outputs[key], snapshot);
       }
 
       if (onConvert) {
-        const result = onConvert(conversion, produced);
+        const result = onConvert(conversion, gain);
         if (result === false) return {};
       }
 
@@ -236,12 +236,12 @@ export function createConversion<
 
       for (const key of Object.keys(outputs)) {
         const resource = outputs[key].resource;
-        resource.value = Decimal.add(resource.value, produced[key]);
+        resource.value = Decimal.add(resource.value, gain[key]);
       }
 
-      afterConvert?.(conversion, produced);
+      afterConvert?.(conversion, gain);
 
-      return produced;
+      return gain;
     },
   };
 

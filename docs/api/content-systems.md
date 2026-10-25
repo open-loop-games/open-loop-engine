@@ -57,9 +57,9 @@ progressive unlock of automation features
 - `interface AutomationTiersOptions` `src/systems/automation.ts:83`
 - `function createAutomationTiers(options: AutomationTiersOptions): AutomationTiers` — Create an automation tier system for progressive automation unlocks. `src/systems/automation.ts:177`
 
-## BestOf tracker
+## BestOf
 
-per-metric best-of-run recording
+per-metric best-of-run records
 
 - `interface BestOf` — A BestOf instance — the returned object from createBestOf. `src/systems/best-of.ts:158`
 - `interface BestOfCandidate` — A candidate submission for best-of comparison. `src/systems/best-of.ts:118`
@@ -70,7 +70,7 @@ per-metric best-of-run recording
 - `type BestOfStatus = 'valid' | 'stale'` — Validity status of a best-of entry. `src/systems/best-of.ts:83`
 - `type CompareBy = 'observed' | 'projected'` — Which value to use for comparison when a projection function is provided. `src/systems/best-of.ts:43`
 - `type ComparisonMode = 'absolute' | 'perSecond'` — How to compare candidates: highest absolute delta or highest delta/second. `src/systems/best-of.ts:40`
-- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf tracker that records the best run outcome per metric. `src/systems/best-of.ts:259`
+- `function createBestOf(options: BestOfOptions): BestOf` — Create a BestOf that records the best run outcome per metric. `src/systems/best-of.ts:259`
 
 ## Challenge Category
 

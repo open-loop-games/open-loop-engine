@@ -127,23 +127,23 @@ composable apply/invert steps and modifier chains
 Two forms order modifiers. A `ModifierChain` (`createModifierChain`) is the named form. Built at install, it enters the `ChainRegistry`, where the picker and balance-harness perturbation reach it. An ordered list built per evaluation is `applyModifiers(list, value)`, or one composite from `createSequentialModifier`.
 
 - `interface AdditiveModifierOptions` `src/core/modifier.ts:71`
-- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:928`
-- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:942`
-- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:440`
-- `type BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:398`
-- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:981`
+- `function applyModifier(modifier: Modifier, value: DecimalSource): DecimalSource` — Apply a single modifier to a value. `src/core/modifier.ts:932`
+- `function applyModifiers(modifiers: Modifier[], value: DecimalSource): DecimalSource` — Apply multiple modifiers in sequence to a value (left to right). `src/core/modifier.ts:946`
+- `interface BindingRecord` — Attribution record for a single bound modifier, returned by ModifierChain.bindings. `src/core/modifier.ts:444`
+- `type BindOptions` — Options for ModifierChain.bind. `src/core/modifier.ts:402`
+- `function computeModifiedValue(base: Computable<DecimalSource>, modifiers: Modifier[]): ComputedRef<DecimalSource>` — Create a computed ref that applies modifiers to a base value. `src/core/modifier.ts:985`
 - `function createAdditiveModifier<T extends AdditiveModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that adds a value to the input. `src/core/modifier.ts:101`
-- `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:240`
-- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:662`
+- `function createExponentialModifier<T extends ExponentialModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that raises the input to a power. `src/core/modifier.ts:241`
+- `function createModifierChain(id: string): ModifierChain` — Create a named modifier chain that other modules can push modifiers into. `src/core/modifier.ts:666`
 - `function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(options: T): OperationModifier<T>` — Create a modifier that multiplies the input by a value. `src/core/modifier.ts:174`
-- `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose modifiers into one sequential modifier that applies them in order. `src/core/modifier.ts:321`
-- `interface ExponentialModifierOptions` `src/core/modifier.ts:204`
-- `type Grant` — A grant — the authored entry consumers use in a category's declarative fields (`grants` / `restricts` / `rewards`) and an effect-system def's `grants`. `src/core/modifier.ts:469`
-- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:955`
+- `function createSequentialModifier<T extends Modifier>(modifiers: T[]): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & { readonly children: readonly T[]; }` — Compose modifiers into one sequential modifier that applies them in order. `src/core/modifier.ts:322`
+- `interface ExponentialModifierOptions` `src/core/modifier.ts:205`
+- `type Grant` — A grant — the authored entry consumers use in a category's declarative fields (`grants` / `restricts` / `rewards`) and an effect-system def's `grants`. `src/core/modifier.ts:473`
+- `function invertModifier(modifier: Modifier, value: DecimalSource): DecimalSource | undefined` — Invert a modifier: given a desired output, find the input that produces it. `src/core/modifier.ts:959`
 - `interface Modifier` — One apply/invert step on a value. `src/core/modifier.ts:34`
-- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that other modules add to, via `add()` (raw) or `bind()` (with attribution). `src/core/modifier.ts:522`
-- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:384`
-- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:599`
+- `interface ModifierChain extends Modifier` — A named, auto-composing sequential modifier that other modules add to, via `add()` (raw) or `bind()` (with attribution). `src/core/modifier.ts:526`
+- `interface ModifierChainEvents` — Events emitted by a ModifierChain. `src/core/modifier.ts:388`
+- `interface ModifierChainSlot` — A position reserved in a ModifierChain by ModifierChain.reserve. `src/core/modifier.ts:603`
 - `interface ModifierDescription` — A single line in a modifier breakdown, suitable for rendering in a tooltip or info panel. `src/core/modifier.ts:51`
 - `interface MultiplicativeModifierOptions` `src/core/modifier.ts:132`
 - `type OperationModifier<T> = WithRequired<Modifier, 'invert' | Extract<RequiredKeys<T>, keyof Modifier>>` — Utility type for modifiers that have all optional methods defined. `src/core/modifier.ts:63`
@@ -180,7 +180,7 @@ tickable progress toward a needed value, with no state machine
 - `function resourcePaidAt(progress: DecimalSource, needed: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units are paid at a given progress. `src/core/timed-progress.ts:316`
 - `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; needed: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:438`
 - `interface TimedProgress` — Ticking progress toward a needed value, created by createTimedProgress. `src/core/timed-progress.ts:88`
-- `interface TimedProgressBaseOptions` — Options every createTimedProgress tracker shares. `src/core/timed-progress.ts:58`
+- `interface TimedProgressBaseOptions` — Options every timed progress shares. `src/core/timed-progress.ts:58`
 - `type TimedProgressOptions` `src/core/timed-progress.ts:43`
 
 ## Trace
