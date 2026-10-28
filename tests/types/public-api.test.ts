@@ -24,6 +24,7 @@ import {
   createActionCategory,
   createChallengeCategory,
   createCostRequirement,
+  createFlag,
   createEngine,
   createOverrideRegistry,
   createResource,
@@ -36,6 +37,8 @@ import {
   getRate,
   getRateSources,
   type RateSource,
+  type DerivedFlag,
+  type SavedFlag,
   type Engine,
   type EngineContext,
   type InjectionKey,
@@ -1683,5 +1686,20 @@ describe('rate sources', () => {
     expectTypeOf(addRateSource).returns.toEqualTypeOf<() => void>();
     expectTypeOf(getRate).returns.toEqualTypeOf<Decimal>();
     expectTypeOf(getRateSources).returns.toEqualTypeOf<readonly RateSource[]>();
+  });
+});
+
+describe('createFlag overloads', () => {
+  it('{ id } makes a settable saved flag; { id, value } a read-only derived one', () => {
+    const saved = createFlag({ id: 'seen' });
+    const derived = createFlag({ id: 'rich', value: () => true });
+    expectTypeOf(saved).toEqualTypeOf<SavedFlag>();
+    expectTypeOf(derived).toEqualTypeOf<DerivedFlag>();
+    // Type-level only: assigning a getter-only value throws at runtime.
+    void (() => {
+      saved.value = true;
+      // @ts-expect-error a derived flag's value is read-only
+      derived.value = true;
+    });
   });
 });

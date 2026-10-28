@@ -1,5 +1,5 @@
 /**
- * Engine-internal registries — three per-engine enumerable collections that
+ * Engine-internal registries — four per-engine enumerable collections that
  * external introspection tools (balance workbenches, the picker, devtools)
  * read to walk "every X this engine knows about":
  *
@@ -10,6 +10,8 @@
  *   `createConditionalEffectSystem`.
  * - **Resource registry** — every {@link Resource} created via
  *   `createResource`.
+ * - **Flag registry** — every {@link Flag} created via `createFlag`. A `flag`
+ *   Gate and the game-state accessor read flags from it.
  *
  * Its factory fills each one while {@link createEngine} sets the registry as
  * an ambient value, during install/connect. An object built outside an
@@ -41,6 +43,7 @@ import type { DecimalSource } from '@/primitives/decimal';
 import type { InjectionKey } from '@/primitives/types';
 import type { Grant, ModifierChain } from './modifier';
 import type { Resource } from './resource';
+import type { Flag } from './flag';
 import { createAmbientValue, createNamedRegistry, type NamedRegistry } from './named-registry';
 
 // === CHAIN REGISTRY ===
@@ -269,3 +272,49 @@ export const withResourceRegistry = resourceAmbient.with;
  * @internal Used by {@link createResource} to auto-register.
  */
 export const getCurrentResourceRegistry = resourceAmbient.getCurrent;
+
+// === FLAG REGISTRY ===
+/**
+ * Registry of the {@link Flag}s of a single engine, keyed by flag id. Flag ids
+ * are flat: unique across the engine, whatever module created them.
+ */
+export type FlagRegistry = NamedRegistry<Flag>;
+
+/**
+ * Injection key for the per-engine {@link FlagRegistry}. The engine provides
+ * it before any module installs.
+ */
+export const FlagRegistryKey: InjectionKey<FlagRegistry> = Symbol('engine:flag-registry');
+
+/**
+ * Create a fresh, empty flag registry. Called once per engine instance in
+ * {@link createEngine}.
+ *
+ * @internal Read the engine's registry via `FlagRegistryKey`.
+ */
+export function createFlagRegistry(): FlagRegistry {
+  return createNamedRegistry<Flag>({
+    label: 'FlagRegistry',
+    noun: 'flag',
+    idOf: (flag) => flag.id,
+  });
+}
+
+const flagAmbient = createAmbientValue<FlagRegistry>();
+
+/**
+ * Run `fn` with `registry` set as the ambient flag registry. Any `createFlag`
+ * called inside `fn` registers into `registry`.
+ *
+ * @internal Used by {@link createEngine} during `install()` / `connect()`, and
+ *   by tests that create flags without an engine.
+ */
+export const withFlagRegistry = flagAmbient.with;
+
+/**
+ * Read the current ambient flag registry, or `undefined` outside a
+ * `withFlagRegistry` block.
+ *
+ * @internal Used by {@link createFlag} to register, and by the Gate services.
+ */
+export const getCurrentFlagRegistry = flagAmbient.getCurrent;

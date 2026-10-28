@@ -28,12 +28,15 @@ import { createEmitHandle } from './core/events';
 import {
   ChainRegistryKey,
   EffectSystemRegistryKey,
+  FlagRegistryKey,
   ResourceRegistryKey,
   createChainRegistry,
   createEffectSystemRegistry,
+  createFlagRegistry,
   createResourceRegistry,
   withChainRegistry,
   withEffectSystemRegistry,
+  withFlagRegistry,
   withResourceRegistry,
 } from './core/registries';
 import {
@@ -663,11 +666,14 @@ export function createEngine(options: EngineOptions): Engine {
         // calls via the ambient set below. Per-engine, so scratch engines never
         // see each other's resources.
         const resourceRegistry = createResourceRegistry();
-        // Built here, so a factory accessor reads this engine's registry and
-        // no other. Its reads are lazy, so the registry may still be empty.
+        // Per-engine flag registry — auto-populated by createFlag calls via
+        // the ambient set below.
+        const flagRegistry = createFlagRegistry();
+        // Built here, so a factory accessor reads this engine's registries and
+        // no other. Its reads are lazy, so the registries may still be empty.
         const accessor =
           typeof options.accessor === 'function'
-            ? options.accessor({ resourceRegistry })
+            ? options.accessor({ resourceRegistry, flagRegistry })
             : options.accessor;
         // Per-engine categories collection — auto-populated by the
         // category factories (createProducerCategory etc.) via the ambient
@@ -691,6 +697,7 @@ export function createEngine(options: EngineOptions): Engine {
           [ChainRegistryKey, chainRegistry],
           [EffectSystemRegistryKey, effectSystemRegistry],
           [ResourceRegistryKey, resourceRegistry],
+          [FlagRegistryKey, flagRegistry],
           [GameStateAccessorKey, accessor],
           [CategoriesKey, engineCategories],
           [TuningRegistriesKey, tuningRegistries],
@@ -737,20 +744,22 @@ export function createEngine(options: EngineOptions): Engine {
             withChainRegistry(chainRegistry, () =>
               withEffectSystemRegistry(effectSystemRegistry, () =>
                 withResourceRegistry(resourceRegistry, () =>
-                  withEngineCategories(engineCategories, () =>
-                    withTuningRegistries(tuningRegistries, () =>
-                      withGameStateAccessor(accessor, () =>
-                        withPersistenceNamespace(options.persistenceNamespace, () => {
-                          for (const mod of sorted) {
-                            withPersistentContext(mod.id, () => mod.install(sharedContext));
-                          }
-                          // Connect phase: all modules installed, now wire cross-module refs
-                          for (const mod of sorted) {
-                            if (mod.connect) {
-                              withPersistentContext(mod.id, () => mod.connect!(sharedContext));
+                  withFlagRegistry(flagRegistry, () =>
+                    withEngineCategories(engineCategories, () =>
+                      withTuningRegistries(tuningRegistries, () =>
+                        withGameStateAccessor(accessor, () =>
+                          withPersistenceNamespace(options.persistenceNamespace, () => {
+                            for (const mod of sorted) {
+                              withPersistentContext(mod.id, () => mod.install(sharedContext));
                             }
-                          }
-                        }),
+                            // Connect phase: all modules installed, now wire cross-module refs
+                            for (const mod of sorted) {
+                              if (mod.connect) {
+                                withPersistentContext(mod.id, () => mod.connect!(sharedContext));
+                              }
+                            }
+                          }),
+                        ),
                       ),
                     ),
                   ),

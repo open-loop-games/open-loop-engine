@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   Decimal,
+  FlagRegistryKey,
   GameStateAccessorKey,
   ResourceRegistryKey,
   createEngine,
+  createFlag,
   createGameStateAccessor,
   createGateRequirement,
   createResource,
@@ -57,6 +59,7 @@ describe('EngineOptions.accessor — the factory form', () => {
     engine.start();
     expect(calls).toHaveLength(1);
     expect(calls[0]!.resourceRegistry).toBe(engine.tryInject(ResourceRegistryKey));
+    expect(calls[0]!.flagRegistry).toBe(engine.tryInject(FlagRegistryKey));
     expect(ambient).toBe(built);
     expect(engine.tryInject(GameStateAccessorKey)).toBe(built);
     expect(Decimal.eq(built!.getAmount('gold'), 5)).toBe(true);
@@ -97,6 +100,22 @@ describe('EngineOptions.accessor — the factory form', () => {
     const engine = engineWith('accessor-plain', accessor);
     engine.start();
     expect(engine.tryInject(GameStateAccessorKey)).toBe(accessor);
+    engine.stop();
+  });
+});
+
+describe('the flag registry', () => {
+  it("flags a module creates register into that engine's flag registry", () => {
+    const engine = engineWith('flag-registry', undefined);
+    engine.use({
+      id: 'story',
+      install() {
+        createFlag({ id: 'seen-shop' });
+      },
+    });
+    engine.start();
+    const flags = engine.tryInject(FlagRegistryKey)!;
+    expect(flags.all().map((f) => f.id)).toEqual(['seen-shop']);
     engine.stop();
   });
 });

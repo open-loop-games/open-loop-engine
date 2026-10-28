@@ -63,16 +63,26 @@ export {
   computeModifiedValue,
 } from './modifier';
 
-// === PER-ENGINE REGISTRIES (CHAIN, EFFECT-SYSTEM, RESOURCE) ===
+// === PER-ENGINE REGISTRIES (CHAIN, EFFECT-SYSTEM, RESOURCE, FLAG) ===
 export type {
   ChainRegistry,
   EffectSystemRegistry,
   EnumerableEffectSystem,
   EffectDefLike,
+  FlagRegistry,
   ResourceRegistry,
   ResourceRegistryEntry,
 } from './registries';
-export { ChainRegistryKey, EffectSystemRegistryKey, ResourceRegistryKey } from './registries';
+export {
+  ChainRegistryKey,
+  EffectSystemRegistryKey,
+  FlagRegistryKey,
+  ResourceRegistryKey,
+} from './registries';
+
+// === FLAGS ===
+export type { Flag, SavedFlag, DerivedFlag, SavedFlagOptions, DerivedFlagOptions } from './flag';
+export { createFlag } from './flag';
 
 // === REQUIREMENTS ===
 export type {

@@ -44,17 +44,17 @@ generic typed registry with scoped overrides, plus the typed `TuningRegistry` na
 
 ## Engine-internal registries
 
-three per-engine enumerable collections that external introspection tools (balance workbenches, the picker, devtools) read to walk "every X this engine knows about":
+four per-engine enumerable collections that external introspection tools (balance workbenches, the picker, devtools) read to walk "every X this engine knows about":
 
-- `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:53`
-- `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:61`
-- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `ConditionalEffectDef` that the picker needs. `src/core/registries.ts:119`
-- `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:128`
-- `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:131`
-- `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:105`
-- `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:191`
-- `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:174`
-- `const ResourceRegistryKey: InjectionKey<ResourceRegistry>` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:214`
+- `type ChainRegistry = NamedRegistry<ModifierChain>` — Enumerable registry of ModifierChains for a single engine. `src/core/registries.ts:56`
+- `const ChainRegistryKey: InjectionKey<ChainRegistry>` — Injection key for the per-engine ChainRegistry. `src/core/registries.ts:64`
+- `interface EffectDefLike` — Structural shape shared by `TemporaryEffectDef` and `ConditionalEffectDef` that the picker needs. `src/core/registries.ts:122`
+- `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:131`
+- `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:134`
+- `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:108`
+- `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:194`
+- `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:177`
+- `const ResourceRegistryKey: InjectionKey<ResourceRegistry>` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:217`
 
 ## Engine safeguards
 

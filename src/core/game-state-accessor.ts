@@ -21,7 +21,7 @@
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import type { GameStateAccessor, InjectionKey, ResourceEffect } from '@/primitives/types';
 import type { GameStateMutator } from './effects';
-import type { ResourceRegistry } from './registries';
+import type { FlagRegistry, ResourceRegistry } from './registries';
 import { addResource, subtractResource, type Resource } from './resource';
 
 // === TYPES ===
@@ -61,6 +61,8 @@ export type GameStateAccessorMutator = GameStateAccessor & GameStateMutator & Wi
 /** The engine services an accessor factory receives from `createEngine`. */
 export interface AccessorServices {
   resourceRegistry: ResourceRegistry;
+  /** Serves `getFlag` and `setFlag` when the options leave them out. `createEngine` always passes it. */
+  flagRegistry?: FlagRegistry;
 }
 
 /** What the consumer supplies to {@link createGameStateAccessor}. */
