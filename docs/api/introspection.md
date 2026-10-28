@@ -6,7 +6,7 @@ The cross-cutting "walk every X" API surface that external tools read: devtools,
 
 - `EngineCategories` / `CategoriesKey` — discover auto-registered content categories.
 - `createOverrideRegistry` / `createTuningRegistry` / `tunable` — expose designer-approved tunables.
-- `ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey` — the chain, resource and effect-system registries for tools, read through `engine.tryInject` or `ctx.inject`.
+- `ChainRegistryKey`, `ResourceRegistryKey`, `EffectSystemRegistryKey`, `FlagRegistryKey` — the chain, resource, effect-system and flag registries for tools, read through `engine.tryInject` or `ctx.inject`.
 - `enableProfiling` / `getProfileReport` — profile engine calls.
 - `enableDevMode` / `getSafeguardDiagnostics` — dev-mode safeguards and safeguard diagnostics.
 
@@ -52,6 +52,8 @@ four per-engine enumerable collections that external introspection tools (balanc
 - `type EffectSystemRegistry = NamedRegistry<EnumerableEffectSystem>` — Enumerable registry of effect systems for a single engine. `src/core/registries.ts:131`
 - `const EffectSystemRegistryKey: InjectionKey<EffectSystemRegistry>` — Injection key for the per-engine EffectSystemRegistry. `src/core/registries.ts:134`
 - `interface EnumerableEffectSystem` — Minimal shape an effect system must expose to be enumerable. `src/core/registries.ts:108`
+- `type FlagRegistry = NamedRegistry<Flag>` — Registry of the Flags of a single engine, keyed by flag id. `src/core/registries.ts:281`
+- `const FlagRegistryKey: InjectionKey<FlagRegistry>` — Injection key for the per-engine FlagRegistry. `src/core/registries.ts:287`
 - `interface ResourceRegistry` — Enumerable registry of Resources for a single engine. `src/core/registries.ts:194`
 - `interface ResourceRegistryEntry<T = DecimalSource>` — One entry in a ResourceRegistry. `src/core/registries.ts:177`
 - `const ResourceRegistryKey: InjectionKey<ResourceRegistry>` — Injection key for the per-engine ResourceRegistry. `src/core/registries.ts:217`

@@ -198,7 +198,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | CI5 | **sequencer item**, **inventory**, **inventory item** | one element of a sequencer queue; the `Inventory` system; one kind of thing it holds | instance, for a queued action; inventory, for any full list |
 | CI6 | **entry** | everyday: one element of a list, log or table | sequencer entry |
 | CI7 | **content**, **content registry** | the game content a consumer supplies; a category's id-to-def store, with patching | content, for lowered grants |
-| CI8 | **chain registry**, **effect-system registry**, **resource registry**, **override registry**, **tuning registry**, **persistent-ref registry** | the per-engine registries, always qualified | bare "registry", global engine registry |
+| CI8 | **chain registry**, **effect-system registry**, **resource registry**, **flag registry**, **override registry**, **tuning registry**, **persistent-ref registry** | the per-engine registries, always qualified | bare "registry", global engine registry |
 | CI9 | **category** | a batch-registration system for one kind of content | category system |
 | CI10 | **Gate service**, **accessor services**, **handle** | a named engine service a Gate kind reads (`GateService`); the engine services an accessor factory receives (`AccessorServices`); an object returned to control one thing | handle, for a Gate service |
 | CI11 | **subject**, **achievement**, **threshold** | a named thing in a subject category; an item earned once its goal holds; the value a tracked quantity must reach | entity (for a subject), milestone (for an achievement) |
@@ -334,7 +334,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 
 | ID | term | meaning | not |
 |---|---|---|---|
-| AV1 | **flag** | a named boolean in the game-state accessor (`getFlag`, `FlagGate`) | unlock flag |
+| AV1 | **flag**, **saved flag**, **derived flag** | a named boolean in the flag registry (`createFlag`), read by `getFlag` and `FlagGate`; one the game sets, saved; one read-only over game state | unlock flag |
 | AV2 | **active** | a category entry is on, or a binding or effect is in force (`ActiveGate`) | owned, unlocked (for the entry signal) |
 | AV3 | **entered**, **current** | a challenge's state while it runs; the selected one of a category or container | active, for these |
 | AV4 | **unlock** | content becomes available; a system's unlock set and the act of adding to it | — |
@@ -368,7 +368,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | DS1 | **format** | the one formatter verb (`formatResource`) | display, as a formatter verb |
 | DS2 | **notation**, **regular format**, **save format** | the number style (external); its default style; a stored layout | notation format |
 | DS3 | **display**, **effect description** | a def's display-text bundle; the text that describes an effect value | effect display |
-| DS4 | **label** | a display-only string on a harness row or a profiler entry | label, for a unique key |
+| DS4 | **label** | a display-only string on a harness row, a profiler entry or a rate source (`text`) | label, for a unique key |
 | DS5 | **decimals**, **sig figs**, **precision** | decimal places; significant figures; numerical precision only (external) | precision, for decimal places or significant figures |
 | DS6 | **compact**, **small** | an achievement's smaller card; a resource's display of tiny values | small, for a card size |
 
@@ -417,6 +417,7 @@ A research pattern is cited by its roster handle, with no prevalence claim and n
 | RF7 | **gain**, **prestige gain** | any increase; the prestige currency a reset pays | gain, for a modifier's input (say value) |
 | RF8 | **earn** | an achievement's attainment | earn, for a resource inflow |
 | RF9 | **converter**, **bottleneck**, **Conversion** | a continuous producer that draws its `inputs` per unit of output, and makes less when one runs short; what held back its last tick (`Producer.bottleneck`); one atomic exchange that refuses a shortfall (`createConversion`) | converter, for a Conversion; limit, for a bottleneck |
+| RF10 | **rate source** | one labeled rate per second on a resource; the resource's rate is the sum of its rate sources (`addRateSource`, `getRate`) | flow, income source, drain (for a negative one) |
 
 ### FM — formula math
 

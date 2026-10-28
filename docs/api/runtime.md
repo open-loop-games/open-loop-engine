@@ -60,7 +60,7 @@ the opt-in builder over the resource registry, the record of the methods an acce
 
 - `const AccessorMethods: unique symbol` — Keys the record of the methods an accessor implements, a `ReadonlySet<GameStateAccessorMethod>`. `src/core/game-state-accessor.ts:49`
 - `interface AccessorServices` — The engine services an accessor factory receives from `createEngine`. `src/core/game-state-accessor.ts:65`
-- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's resource registry. `src/core/game-state-accessor.ts:184`
+- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's registries. `src/core/game-state-accessor.ts:184`
 - `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:94`
 - `type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateMutator` — A method name of GameStateAccessor or GameStateMutator. `src/core/game-state-accessor.ts:33`
 - `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator & WithAccessorMethods` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:62`

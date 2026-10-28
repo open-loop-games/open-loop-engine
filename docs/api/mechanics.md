@@ -8,6 +8,7 @@ The composable evaluation primitives: modifier chains, requirements, formulas, c
 - `createCostRequirement` / `createBooleanRequirement` — requirements with a cost, and requirements that only test.
 - `F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews.
 - `Gate` / `E` — declarative predicates and effects, where save, mod or balance-harness data needs a serializable shape.
+- `createFlag` — a saved or derived named boolean, which `flag` Gates, conditions and effects reach by id.
 - `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.
 
 ## Common
@@ -46,6 +47,18 @@ declarative game-state mutations from `IEffect` ASTs
 - `interface TemporaryEffectInstance` — A live instance of a temporary effect, created by TemporaryEffectSystem.activate. `src/systems/temporary-effect.ts:122`
 - `interface TemporaryEffectSystem` — Manages temporary effects: registration, activation, tick countdown, and cleanup. `src/systems/temporary-effect.ts:160`
 - `interface TemporaryEffectSystemOptions` `src/systems/temporary-effect.ts:152`
+
+## Flags
+
+the game's named booleans, which a `flag` Gate, condition and effect read and write
+
+- `function createFlag(options: SavedFlagOptions): SavedFlag` — Create a flag: a named boolean that `flag` Gates, conditions and effects reach by id through the engine's flag registry. `src/core/flag.ts:77`
+- `function createFlag(options: DerivedFlagOptions): DerivedFlag` `src/core/flag.ts:78`
+- `interface DerivedFlag extends Flag` — A read-only flag over game state. `src/core/flag.ts:38`
+- `interface DerivedFlagOptions` `src/core/flag.ts:49`
+- `interface Flag` — A named boolean in the engine's flag registry. `src/core/flag.ts:23`
+- `interface SavedFlag extends Flag` — A flag the game sets, saved. `src/core/flag.ts:32`
+- `interface SavedFlagOptions` `src/core/flag.ts:43`
 
 ## Formulas
 
@@ -99,9 +112,9 @@ the typed, serializable yes/no test, as data. The type union and its pure-data p
 - `interface AnyGate` — True when at least one child Gate is true. `src/core/gate.ts:110`
 - `interface CountGteGate` — True when the category entry's `count` signal is `>= value`. `src/core/gate.ts:53`
 - `interface CumulativeGteGate` — True when `resource.cumulative.value >= value`. `src/core/gate.ts:42`
-- `interface FlagGate` — True when `accessor.getFlag(id)` returns true. `src/core/gate.ts:98`
+- `interface FlagGate` — True when the flag `id` is set: a flag made by `createFlag`, read through the accessor's `getFlag` when one is wired, else the engine's flag registry. `src/core/gate.ts:98`
 - `type Gate = ResourceGteGate | CumulativeGteGate | CountGteGate | ActiveGate | StateGate | FlagGate | AllGate | AnyGate | NotGate` — The typed, serializable yes/no test. `src/core/gate.ts:129`
-- `type GateService = 'accessor' | 'categories' | 'resourceRegistry'` — A Gate service: a named engine service a Gate kind reads. `src/core/gate.ts:183`
+- `type GateService = 'accessor' | 'categories' | 'resourceRegistry' | 'flagRegistry'` — A Gate service: a named engine service a Gate kind reads. `src/core/gate.ts:183`
 - `function getRequiredGateServices(gate: Gate): ReadonlySet<GateService>` — The Gate services that evaluating `gate` reads. `src/core/gate.ts:206`
 - `function isGate(value: unknown): value is Gate` — Type guard for Gate. `src/core/gate.ts:159`
 - `interface NotGate` — True when the wrapped Gate is false. `src/core/gate.ts:116`

@@ -80,19 +80,23 @@ Two predicate-requirement forms, in preference order:
 - `createGateRequirement({ gate })` — the Gate form. Write the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`). The factory wraps it in the `Requirement` contract. Only a Gate is serializable for saves, mods and the balance harness. Only a Gate supports `timeUntilGateFlip` for predictor UIs. Use this form whenever a Gate can express the predicate.
 - `createBooleanRequirement({ met })` — the closure form. Use it when no Gate kind fits the predicate: arbitrary computation across systems, or opaque consumer state. It returns the same requirement shape as the Gate form, but the predicate is not introspectable.
 
-**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. `state` and `flag` Gates, effects, and every prediction of a resource Gate need an accessor ([§ Data and live state separation](#data-and-live-state-separation)). `createGameStateAccessor` builds one from the registry plus the flags, state paths and rates you supply:
+**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. A `flag` Gate reads the engine's flag registry, which `createFlag` fills. `state` Gates, effects, and every prediction of a resource Gate need an accessor ([§ Data and live state separation](#data-and-live-state-separation)). `createGameStateAccessor` builds one over the engine's registries: amounts from the resource registry, rates from each resource's rate sources, flags from the flag registry. You supply state paths, and any flag or rate read your game keeps itself, which then wins:
 
 ```ts
 const engine = createEngine({
   gameId: 'my-game',
-  accessor: (services) => // opt-in: category and resource-amount Gates need none
+  accessor: (services) => // opt-in: category, resource-amount and flag Gates need none
     createGameStateAccessor(services, {
-      getFlag: (id) => flags[id] ?? false,
-      setFlag: (id, value) => (flags[id] = value),
-      getRate: (id) => ratesById[id] ?? Decimal.dZero,
+      getStateAt: (path) => state[path],
+      setStateAt: (path, value) => (state[path] = value),
     }),
 });
+// in a module's install():
+createFlag({ id: 'seen-shop' }); // saved; a 'flag' effect sets it
+createFlag({ id: 'rich', value: () => Decimal.gte(gold.value, 1000) }); // derived, read-only
 ```
+
+Producers add rate sources for their output and their converter draws. Add one for any rate no producer models: `addRateSource(food, { text: 'Upkeep', rate: () => … })`. A display reads `getRate(resource)`, zero without rate sources; the accessor's `getRate` throws there instead.
 
 A method you leave out is not in its `AccessorMethods` record. A Gate, effect or prediction that needs it throws, as does a Gate service you did not wire, naming what is missing where you wrote it: at construction for `createGateRequirement`, at register for a system's predicate field or effects. After `start()`, `engine.tryInject(GameStateAccessorKey)` reads it. Every predicate field of the systems layer takes a `Predicate`: a boolean, a ref, a getter or a Gate. `api/INDEX.md#predicate-forms` lists the fields. To read one back off a def, evaluate it with `evaluatePredicate(def.goal, services)`, or read the instance's reactive field.
 
@@ -135,8 +139,8 @@ The difficulty is a predicate over live state. An achievement's `goal` must look
 
 Gate kinds split by what they read, and the split decides what you wire:
 
-- **Accessor-backed leaves** (`state`, `flag`) read the accessor, so they require a `GameStateAccessor`. `timeUntilGateFlip` cannot predict them.
-- **Resource leaves** (`resource-gte`, `cumulative-gte`) evaluate without an accessor. `resource-gte` reads the registered resource's amount, unless a wired accessor's `getAmount` serves it. `cumulative-gte` reads the resource's lifetime total. A prediction of either needs the accessor's `getRate`. `cumulative-gte` divides by the inflow rate: `getInflowRate` where your accessor serves it, else the net rate, which overstates the time while anything subtracts.
+- **Accessor-backed leaves** (`state`, `flag`) read the accessor. A `flag` leaf falls back to the flag registry where no accessor serves `getFlag`, so it needs no accessor. `timeUntilGateFlip` cannot predict them.
+- **Resource leaves** (`resource-gte`, `cumulative-gte`) evaluate without an accessor. `resource-gte` reads the registered resource's amount, unless a wired accessor's `getAmount` serves it. `cumulative-gte` reads the resource's lifetime total. A prediction of either needs the accessor's `getRate`. `cumulative-gte` divides by the inflow rate: the accessor's `getInflowRate`, which `createGameStateAccessor` serves from rate sources. An accessor given its own `getRate` alone uses the net rate instead, which overstates the time while anything subtracts.
 - **Category-aware leaves** (`count-gte`, `active`) read through `CategoryEntrySignals`, and need no accessor. Use them when the unlock or the count *is* a category entry.
 - **Combinators** (`all`, `any`, `not`) combine either kind. Children go in an `of` field: `of: Gate[]` for `all` / `any`, `of: Gate` for `not`.
 

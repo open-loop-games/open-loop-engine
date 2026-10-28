@@ -1,14 +1,14 @@
 /**
  * Rate sources — a resource's rate per second, as the sum of labeled parts.
  *
- * A producer, an upkeep or any other flow adds a rate source to the resource
- * it moves. The resource's rate is then a fact about the resource, read the
+ * A producer, an upkeep or any other change per second adds a rate source to
+ * the resource it moves. The resource's rate is then a fact about the resource, read the
  * same way wherever it is shown or predicted:
  *
  * - {@link addRateSource} attaches a labeled rate and returns its cleanup.
  *   A source may be added after the resource exists.
  * - {@link getRate} is the net rate, and {@link getInflowRate} the sum of the
- *   positive sources. Both read zero where the stock cannot move: at a linked
+ *   positive sources. Both read zero where the amount cannot move: at a linked
  *   bag's capacity with a positive net, and at zero with a negative net that
  *   no source lets go below it.
  * - {@link getRateSources} lists the sources unclamped, for a breakdown that
@@ -16,6 +16,8 @@
  *
  * Every read is reactive. Rate sources are derived each session, not saved.
  * Producer categories add theirs automatically.
+ *
+ * @cluster resource
  */
 
 import { computed, ref, unref, type ComputedRef, type Ref } from 'vue';
@@ -29,11 +31,11 @@ import { getResourceClamp, type Resource } from './resource';
 export interface RateSourceOptions {
   /** The label a breakdown shows for this source. */
   text: string;
-  /** Per second; negative for a drain. Can be a ref or a getter, for a reactive rate. */
+  /** Per second; negative to subtract. Can be a ref or a getter, for a reactive rate. */
   rate: Computable<DecimalSource>;
   /**
-   * Whether this drain may take the stock below zero, as a producer's
-   * `allowNegative` does. Default `false`: at zero, a negative net reads zero.
+   * Whether this negative rate source may take the amount below zero, as a
+   * producer's `allowNegative` does. Default `false`: at zero, a negative net reads zero.
    */
   allowNegative?: boolean;
 }
@@ -83,9 +85,9 @@ function readEntries(resource: Resource<DecimalSource>): readonly RateSourceEntr
 /**
  * Add a labeled rate to a resource's rate.
  *
- * @param resource the resource the flow moves.
- * @param options the label, the rate per second, and whether a drain may go
- *   below zero.
+ * @param resource the resource whose amount the rate changes.
+ * @param options the label, the rate per second, and whether a negative rate
+ *   may take the amount below zero.
  * @returns the cleanup, which removes the source.
  *
  * @example
@@ -133,7 +135,7 @@ export function getRate(resource: Resource<DecimalSource>): Decimal {
 
 /**
  * The gross inflow rate per second of `resource`: the sum of its positive rate
- * sources. Exact when each source is a pure gain or a pure drain; a source
+ * sources. Exact when each source only adds or only subtracts; a source
  * whose rate nets both understates it. Reads zero at a linked bag's capacity
  * with a positive net.
  */
@@ -178,7 +180,7 @@ function withoutNegativeZero(value: Decimal): Decimal {
   return value.eq(Decimal.dZero) ? Decimal.dZero : value;
 }
 
-/** Whether the stock cannot move in the direction of `net`. */
+/** Whether the amount cannot move in the direction of `net`. */
 function isHeld(
   resource: Resource<DecimalSource>,
   net: Decimal,
