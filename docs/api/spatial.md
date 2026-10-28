@@ -4,7 +4,7 @@ Coordinate primitives for adjacency-driven games: grid, graph, scope stack and i
 
 ## Canonical entrypoints
 
-- `createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.revision` to recompute after each write.
+- `createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.gridVersion` to recompute after each write. `findOpen` returns a random matching cell, from the seeded RNG.
 - `createGraph` — arbitrary node/edge topology with nested child graphs.
 - `createScopeStack` — track the graph scope entered in a nested graph.
 - `createInfluenceLayer` — propagation and decay over a numeric grid.

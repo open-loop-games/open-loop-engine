@@ -143,6 +143,12 @@ export interface ProducerMapping {
    * A converter claims its inputs after the tick's gains and losses are
    * written. Converters that share an input claim it in registration order:
    * an earlier one takes its full draw first.
+   *
+   * A producer with a negative rate on a converter's output subtracts before
+   * the converter adds. Without `allowNegative`, a subtraction larger than the
+   * amount stops at zero. The converter then adds its output, so the amount
+   * never reads zero and the shortfall is lost. Model that draw as a converter
+   * input instead: `inputs` on the producer the draw feeds.
    */
   inputs?: Record<string, ProducerInput>;
   /**
@@ -640,6 +646,10 @@ function tickConverter(
  * the tick, and each resource takes its producers' summed gain in one write.
  * So the tick's result does not depend on registration order, except where
  * converters share an input: they claim it in registration order.
+ *
+ * The writes do run in a fixed order: gains, then each negative rate's
+ * subtraction, then converters. So a negative rate on a converter's output
+ * sees the amount from before the converter adds (see {@link ProducerMapping.inputs}).
  *
  * @param options - Category id, `mapProducer`, and tick registration
  * @returns A {@link ProducerCategory} with registry, lookup, and registration

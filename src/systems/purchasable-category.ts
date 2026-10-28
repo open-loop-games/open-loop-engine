@@ -16,10 +16,11 @@
  *     display: { title: def.name, description: `Upgrade ${def.name}` },
  *     // `count` is the perk's own count ref — a Formula over it stays
  *     // invertible, so purchase max costs each unit at its own step.
+ *     // `.floor()` keeps every cost a whole number of gold.
  *     requirements: (count) =>
  *       createCostRequirement({
  *         resource: gold,
- *         cost: Formula.exponential(count, def.baseCost, 1.15),
+ *         cost: Formula.exponential(count, def.baseCost, 1.15).floor(),
  *         maxBulkCount: Decimal.dInf,
  *       }),
  *     limit: def.maxCount,

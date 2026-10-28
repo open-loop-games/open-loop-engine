@@ -57,6 +57,11 @@ export type StartResult = 'now' | 'notNow' | 'never';
  * Tick registration — subscribes a tick handler and returns its unsubscribe.
  * Matches `EngineContext.onTick`; pass `ctx.onTick` directly.
  *
+ * The handler's `dt` is game seconds. A hand-built one must pass seconds too,
+ * because the rates it drives are per second (`ProducerMapping.baseRate`, for
+ * one). To fire on a game event such as a day boundary, pass the seconds since
+ * the last call, or use a manual producer's `activate()` instead.
+ *
  * It must accept any number of handlers and run every one each tick. A
  * factory may register several: `createActionCategory` registers its
  * sequencer's advance-cap reset and its own tick handler. A wrapper that keeps

@@ -321,7 +321,7 @@ The `passable` / `explored` / `visible` bitmaps and their `*Count` properties ar
 
 ### Grid change events — and the replacement gotcha
 
-SpatialGrid cells are **not** reactive per cell. For a reactive read, read `grid.gridVersion` at the head of the computed. It advances on every write that emits an event, so the computed recomputes after each. The grid may also be **replaced**, for board growth or for a challenge that swaps in a masked shape. Hold it in a `shallowRef`; a computed that reads `revision` through that ref then tracks the swap too:
+SpatialGrid cells are **not** reactive per cell. For a reactive read, read `grid.gridVersion` at the head of the computed. It advances on every write that emits an event, so the computed recomputes after each. The grid may also be **replaced**, for board growth or for a challenge that swaps in a masked shape. Hold it in a `shallowRef`; a computed that reads `gridVersion` through that ref then tracks the swap too:
 
 ```ts
 const grid = shallowRef(createSpatialGrid({ /* … */ }));

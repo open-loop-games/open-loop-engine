@@ -51,7 +51,8 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | building / producer (a "generator" elsewhere) / passive production | content-systems.md#producer-category |
 | rate of a resource / its income per second / a rate breakdown | `getRate` (net of every producer, converter draw and rate source), `getRateSources` → resources.md#resource |
 | a rate no producer models (upkeep by hand, a custom draw) in the shown rate | `addRateSource` → resources.md#resource |
-| upkeep / an amount lost each tick (a "drain" elsewhere) | a continuous producer with a negative `baseRate` → content-systems.md#producer-category, ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run |
+| upkeep / an amount lost each tick (a "drain" elsewhere) | a continuous producer with a negative `baseRate` → content-systems.md#producer-category, ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run. On a converter's output, make the draw a converter input: a negative producer there is clamped at zero before the converter adds its output |
+| credit a second resource from a producer's output / a counter beside production | `ProducerMapping.onProduce`, called with each tick's output → content-systems.md#producer-category |
 | upgrade / perk / unlock / capped repeatable | content-systems.md#purchasable |
 | achievement with a one-time reward | content-systems.md#achievement |
 | skill XP / level curve | content-systems.md#skill |
@@ -61,6 +62,7 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | saved queues / layout templates / named saves of a state slice | ../consumer-guide-recipes.md#named-saves-of-a-state-slice |
 | automation unlock ladder | content-systems.md#automation-tiers |
 | auto-reset / auto-prestige / an automation policy the player switches | ../consumer-guide-recipes-tick.md#a-player-switch-over-a-tier-gated-policy |
+| pick one candidate by a rule / a targeting rule the player sets (nearest, weakest, cheapest) | `SelectionPolicy` (`pick`), and `selectionComposite` for a fallback → advisors.md#selection-policies |
 | stack modifiers on a chain | mechanics.md#modifier |
 | timed buff / temporary multiplier / an effect with a duration | `createTemporaryEffectSystem` → mechanics.md#effects |
 | cooldown / recharge timer | plain state counted down in `onTick`; a temporary effect (`isActive`, saved `timeRemaining`) when the timer also holds grants → mechanics.md#effects |
@@ -69,6 +71,7 @@ Deliberately absent: real-time combat between units (positioning, collision, per
 | softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |
 | declarative Gate (data-driven predicate) | mechanics.md#gate |
 | saved flag / progression flag / a flag derived from game state | `createFlag` → mechanics.md#flags |
+| read another module's flag by id | a `flag` Gate by id, or the flag object its module exposes; `FlagRegistryKey` for tools that walk every flag → mechanics.md#flags, introspection.md#engine-internal-registries |
 | wire a game-state accessor / state paths for Gates and effects | the engine builds it: flags and rates from the flag registry and rate sources; state paths as `createEngine({ accessor: { getStateAt, setStateAt } })`, and `wrap` to decorate it → runtime.md#game-state-accessor |
 | new content category (skill, purchasable, producer, …) | composition.md#category-base |
 | branching dialog graph | content-narrative.md#dialog |

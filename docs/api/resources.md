@@ -8,7 +8,7 @@ Numeric foundation and the named-quantity factory. `Decimal` arithmetic, formatt
 - `addResource` / `subtractResource` / `hasResource` / `formatResource` — change, check and present resources through the standard utilities.
 - `Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource. `Resource.sinceReset` (opt in with `trackSinceReset`) is the gain since the last reset.
 - `addRateSource` / `getRate` / `getRateSources` — a resource's rate per second, the sum of labeled rate sources. Producer categories add theirs, converter draws included.
-- `createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.
+- `createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. It reads the capacity at once, so the inputs of a capacity getter must exist before `link`. Use `createInventory` for item-facing gameplay.
 - `randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.
 - `createConversion` — model atomic recipes, trades, and prestige-style exchanges.
 
@@ -66,7 +66,7 @@ the reactive, saved quantities an incremental game is built on
 - `type CapacitySource = Computable<DecimalSource>` — A capacity: a value, or a ref or getter for a reactive capacity. `src/core/resource-bag.ts:19`
 - `function createResource<T>(existingRef: Ref<T>, options?: ResourceOptions): Resource<T>` — Wrap an existing ref as a resource that saves nothing. `src/core/resource.ts:156`
 - `function createResource<T>(defaultValue: T, options: IfSerializable<T, PersistentResourceOptions>): Resource<T> & Persistent<T> & { [PersistentAlias]: Resource<T>; }` — Create a persistent resource — the standard way to define a game resource. `src/core/resource.ts:183`
-- `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Create a container of amounts by item type, with an optional total capacity and optional per-type capacities. `src/core/resource-bag.ts:152`
+- `function createResourceBag(options?: ResourceBagOptions): ResourceBag` — Create a container of amounts by item type, with an optional total capacity and optional per-type capacities. `src/core/resource-bag.ts:154`
 - `function formatResource(resource: Resource, overrideAmount?: DecimalSource): string` — Format a resource's amount with its `decimals` and `small` settings. `src/core/resource.ts:393`
 - `function getInflowRate(resource: Resource<DecimalSource>): Decimal` — The gross inflow rate per second of `resource`: the sum of its positive rate sources. `src/core/rate-source.ts:142`
 - `function getRate(resource: Resource<DecimalSource>): Decimal` — The net rate per second of `resource`: the sum of its rate sources. `src/core/rate-source.ts:129`
@@ -82,8 +82,8 @@ the reactive, saved quantities an incremental game is built on
 - `interface ResourceOptions` `src/core/resource.ts:106`
 - `function subtractResource(resource: Resource<DecimalSource>, amount: DecimalSource, options?: SubtractResourceOptions): boolean` — Subtract an amount from a resource, failing gracefully if insufficient. `src/core/resource.ts:456`
 - `interface SubtractResourceOptions` `src/core/resource.ts:437`
-- `function transferAmountsBetweenBags(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal | 0>` — Transfer several item types between bags in one call. `src/core/resource-bag.ts:458`
-- `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal | 0` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's amount and the destination's remaining capacity. `src/core/resource-bag.ts:434`
+- `function transferAmountsBetweenBags(from: ResourceBag, to: ResourceBag, amounts: Record<string, DecimalSource>, allOrNothing?: boolean): Record<string, Decimal | 0>` — Transfer several item types between bags in one call. `src/core/resource-bag.ts:460`
+- `function transferBetweenBags(from: ResourceBag, to: ResourceBag, typeId: string, amount: DecimalSource): Decimal | 0` — Move up to `amount` of `typeId` from one ResourceBag to another, clamped by both the source's amount and the destination's remaining capacity. `src/core/resource-bag.ts:436`
 - `function unwrapResource(resource: Resource | Ref<Resource>): Resource` — Unwrap a resource that may or may not be inside a ref. `src/core/resource.ts:408`
 
 ## Conversion

@@ -35,11 +35,11 @@ core primitive for ordered execution of items with optional metadata
 - `function createConditionalStrategy<M = void>(getRules: () => ConditionalRule<M>[]): FillStrategy<M>` — Pick the first item whose condition evaluates to `true` (top-to-bottom). `src/core/sequencer-strategies.ts:72`
 - `function createPriorityStrategy<M = void>(getCandidates: () => (SequencerItem<M> & { priority: number; })[]): FillStrategy<M>` — Pick the highest-priority candidate each time. `src/core/sequencer-strategies.ts:96`
 - `function createRoundRobinStrategy<M = void>(id: string, getCandidates: () => SequencerItem<M>[]): FillStrategy<M>` — Cycle through candidates in round-robin order. `src/core/sequencer-strategies.ts:121`
-- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:407`
-- `interface FillStrategy<M = void>` — Fill strategy: the sequencer's next-item chooser when it has nothing to run. `src/core/sequencer.ts:74`
-- `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration — subscribes a tick handler and returns its unsubscribe. `src/core/sequencer.ts:67`
-- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:184`
-- `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:80`
+- `function createSequencer<M = void>(options: SequencerOptions<M>): Sequencer<M>` — Creates a persistent sequencer that manages ordered execution of items, supporting both FIFO queue mode and repeating list mode with cursor. `src/core/sequencer.ts:412`
+- `interface FillStrategy<M = void>` — Fill strategy: the sequencer's next-item chooser when it has nothing to run. `src/core/sequencer.ts:79`
+- `type RegisterTick = (callback: (dt: number) => void) => () => void` — Tick registration — subscribes a tick handler and returns its unsubscribe. `src/core/sequencer.ts:72`
+- `interface Sequencer<M = void>` — Sequencer instance produced by createSequencer. `src/core/sequencer.ts:189`
+- `interface SequencerEvents<M = void>` — Events emitted during sequencer lifecycle. `src/core/sequencer.ts:85`
 - `interface SequencerItem<M = void>` — A sequencer item: a string id plus typed metadata. `src/core/sequencer.ts:37`
-- `interface SequencerOptions<M = void>` `src/core/sequencer.ts:113`
+- `interface SequencerOptions<M = void>` `src/core/sequencer.ts:118`
 - `type StartResult = 'now' | 'notNow' | 'never'` — Tri-state precondition result from a SequencerOptions.canStart check. `src/core/sequencer.ts:54`

@@ -22,7 +22,7 @@ export const TIER_MANIFEST = [
       '`addResource` / `subtractResource` / `hasResource` / `formatResource` — change, check and present resources through the standard utilities.',
       '`Resource.cumulative` / `Resource.best` — read the lifetime gain and the high-water mark of a persistent resource. `Resource.sinceReset` (opt in with `trackSinceReset`) is the gain since the last reset.',
       "`addRateSource` / `getRate` / `getRateSources` — a resource's rate per second, the sum of labeled rate sources. Producer categories add theirs, converter draws included.",
-      '`createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. Use `createInventory` for item-facing gameplay.',
+      '`createResourceBag` — cap resources: per-type and total storage capacity, with `block` or `discard` overflow. `link` clamps a linked `Resource` on write. It reads the capacity at once, so the inputs of a capacity getter must exist before `link`. Use `createInventory` for item-facing gameplay.',
       '`randomItem` / `shuffle` / `weightedPick` / `chance` — random picks, draws and rolls, seedable through `seedRNG` or `createSeededRNG`.',
       '`createConversion` — model atomic recipes, trades, and prestige-style exchanges.',
     ],
@@ -36,7 +36,7 @@ export const TIER_MANIFEST = [
     entrypoints: [
       '`createModifierChain` plus `chain.bind` — shared modifier chains and attributed conditional modifiers.',
       '`createCostRequirement` / `createBooleanRequirement` — requirements with a cost, and requirements that only test.',
-      '`F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews.',
+      '`F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews. End a cost curve in `.floor()` for whole-unit costs; purchase max still works.',
       '`Gate` / `E` — declarative predicates and effects, where save, mod or balance-harness data needs a serializable shape.',
       '`createFlag` — a saved or derived named boolean, which `flag` Gates, conditions and effects reach by id.',
       '`createTimedProgress` — tick-driven progress for actions, workers, and staged costs.',
@@ -182,7 +182,7 @@ export const TIER_MANIFEST = [
     scope:
       'Coordinate primitives for adjacency-driven games: grid, graph, scope stack and influence layer. Headless: adjacency and traversal, no rendering. Rank influence through advisors.md to steer a unit.',
     entrypoints: [
-      '`createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.revision` to recompute after each write.',
+      '`createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.gridVersion` to recompute after each write. `findOpen` returns a random matching cell, from the seeded RNG.',
       '`createGraph` — arbitrary node/edge topology with nested child graphs.',
       '`createScopeStack` — track the graph scope entered in a nested graph.',
       '`createInfluenceLayer` — propagation and decay over a numeric grid.',

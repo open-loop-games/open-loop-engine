@@ -116,6 +116,8 @@ export interface ResourceBag {
    * Keep this bag's amount for an item type and a Resource ref in two-way
    * reactive sync. Writes to the resource are clamped to capacity, except
    * during a save load or reset, when the written value is taken as saved.
+   * The first sync runs inside `link`, so it reads the capacity at once: a
+   * capacity getter's inputs, such as a tunable, must exist before the call.
    * Returns the cleanup, which removes the watchers and the link. A resource
    * links into one bag at a time; linking it into a second throws.
    */
