@@ -5,6 +5,8 @@
  * and manual click sources: a base rate, a modifier chain, an optional
  * Purchasable for the count, and a target resource. Two trigger modes
  * (`'continuous'`, `'manual'`); each def gets its own persistent context.
+ * Each continuous producer adds a rate source to the resource it produces,
+ * and a converter one to each input it draws, so `getRate` sees them.
  *
  * See {@link createProducerCategory} for a worked example.
  */
@@ -14,6 +16,7 @@ import { toMaybeRef, type Computable } from '@/core/computed';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { createModifierChain, type ModifierChain } from '@/core/modifier';
 import { addResource, getResourceClamp, type Resource } from '@/core/resource';
+import { addRateSource } from '@/core/rate-source';
 import {
   createCategoryBase,
   setupCategoryTick,
@@ -216,7 +219,8 @@ export interface Producer {
    * A converter's output per second on its last tick, after its inputs held it
    * back. `computedRate × count` is what it would make unbounded. A load or a
    * reset starts it over at 0, with `bottleneck` at `'rate'`, until the next tick.
-   * Present only when `inputs` is set.
+   * The converter's rate sources read it, so for that tick they read 0 too, and a
+   * prediction over its output finds no rate. Present only when `inputs` is set.
    */
   readonly realizedRate?: Readonly<Ref<DecimalSource>>;
   /** What held back a converter's last tick. Present only when `inputs` is set. */
@@ -341,6 +345,9 @@ export interface ProducerCategory<
    * is each producer's effective count, `owned + extraCount`. A converter
    * counts at that nominal rate, even when its inputs starve it; its
    * `realizedRate` is what it made. Its draws do not count against its inputs.
+   * For a resource's net rate across every category, converter draws and
+   * hand-added flows, read `getRate(resource)`: each continuous producer adds
+   * its rate source.
    */
   getTotalRate(resource: Resource): DecimalSource;
 
@@ -488,7 +495,34 @@ function buildProducer<Def extends { id: string }>(
     purchaseBeatSeconds,
   };
   if (converter) converterStates.set(producer, converter);
+  if (mapping.trigger === 'continuous') addProducerRateSources(producer, converter);
   return producer;
+}
+
+/**
+ * Add a continuous producer's rate sources, labeled with its id: a plain
+ * producer's output at its nominal rate, or a converter's output and input
+ * draws at its realized rate. A category never removes a producer, so the
+ * cleanups are dropped; the sources go with the engine's resources.
+ */
+function addProducerRateSources(producer: Producer, converter: ConverterState | undefined): void {
+  const text = producer.id;
+  if (!converter) {
+    addRateSource(producer.resource, {
+      text,
+      rate: () => Decimal.mul(producer.computedRate.value, producer.count.value),
+      allowNegative: producer.allowNegative,
+    });
+    return;
+  }
+  const { realizedRate } = converter;
+  addRateSource(producer.resource, { text, rate: realizedRate });
+  for (const { resource, per } of converter.inputs) {
+    addRateSource(resource, {
+      text,
+      rate: () => Decimal.neg(Decimal.mul(realizedRate.value, per.value)),
+    });
+  }
 }
 
 // === PRIVATE TICK ===

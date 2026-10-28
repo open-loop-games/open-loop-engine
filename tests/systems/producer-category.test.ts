@@ -17,6 +17,7 @@ import { createResource } from '@/core/resource';
 import { createResourceBag } from '@/core/resource-bag';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
 import { createProducerCategory } from '@/systems/producer-category';
+import { getInflowRate, getRate, getRateSources } from '@/core/rate-source';
 import { createReset } from '@/systems/reset';
 import { createTuningRegistry, tunable } from '@/core/override-registry';
 import { ref, unref, watch } from 'vue';
@@ -1493,6 +1494,103 @@ describe('producer inputs (a continuous converter)', () => {
 
     expect(() => build({ trigger: 'manual' })).toThrow(/smelter.*inputs/);
     expect(() => build({ allowNegative: true })).toThrow(/smelter.*inputs/);
+  });
+});
+
+describe('producer rate sources', () => {
+  interface FlowDef {
+    id: string;
+    rate: number;
+  }
+  const n = (v: DecimalSource) => new Decimal(v).toNumber();
+
+  it('each continuous producer adds its output, at rate times count', () => {
+    const { registerTick } = createManualTicks();
+    const gold = createTestResource('gold', 0);
+    const mines = createProducerCategory<FlowDef>({
+      id: 'mines',
+      mapProducer: (def) => ({
+        resource: gold,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        extraCount: 2,
+      }),
+      registerTick,
+    });
+    const traders = createProducerCategory<FlowDef>({
+      id: 'traders',
+      mapProducer: (def) => ({ resource: gold, baseRate: def.rate, trigger: 'continuous' }),
+      registerTick,
+    });
+    mines.register({ id: 'mine', rate: 3 });
+    traders.register({ id: 'trader', rate: 1 });
+
+    expect(n(getRate(gold))).toBe(7);
+    expect(getRateSources(gold).map((s) => [s.text, n(s.rate)])).toEqual([
+      ['mine', 6],
+      ['trader', 1],
+    ]);
+  });
+
+  it('a manual producer adds none', () => {
+    const { registerTick } = createManualTicks();
+    const gold = createTestResource('gold', 0);
+    const clicks = createProducerCategory<FlowDef>({
+      id: 'clicks',
+      mapProducer: (def) => ({ resource: gold, baseRate: def.rate, trigger: 'manual' }),
+      registerTick,
+    });
+    clicks.register({ id: 'click', rate: 1 });
+    expect(getRateSources(gold)).toEqual([]);
+  });
+
+  it('a negative producer carries its allowNegative', () => {
+    const { registerTick } = createManualTicks();
+    const food = createTestResource('food', 0);
+    const debt = createTestResource('debt', 0);
+    const upkeep = createProducerCategory<FlowDef & { into: 'food' | 'debt' }>({
+      id: 'upkeep',
+      mapProducer: (def) => ({
+        resource: def.into === 'food' ? food : debt,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        allowNegative: def.into === 'debt',
+      }),
+      registerTick,
+    });
+    upkeep.register([
+      { id: 'eat', rate: -2, into: 'food' },
+      { id: 'interest', rate: -2, into: 'debt' },
+    ]);
+    expect(n(getRate(food))).toBe(0);
+    expect(n(getRate(debt))).toBe(-2);
+  });
+
+  it('a converter adds its output and its draws at the realized rate', () => {
+    const { registerTick, tick } = createManualTicks();
+    const ore = createTestResource('ore', 100);
+    const bars = createTestResource('bars', 0);
+    const smelters = createProducerCategory<FlowDef>({
+      id: 'smelters',
+      mapProducer: (def) => ({
+        resource: bars,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        inputs: { ore: { resource: ore, per: 2 } },
+      }),
+      registerTick,
+    });
+    smelters.register({ id: 'smelter', rate: 4 });
+
+    // Nothing realized before the first tick.
+    expect(n(getRate(bars))).toBe(0);
+    expect(n(getRate(ore))).toBe(0);
+
+    tick(1);
+    expect(n(getRate(bars))).toBeCloseTo(4);
+    expect(n(getRate(ore))).toBeCloseTo(-8);
+    expect(n(getInflowRate(ore))).toBe(0);
+    expect(getRateSources(ore).map((s) => s.text)).toEqual(['smelter']);
   });
 });
 

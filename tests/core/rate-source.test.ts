@@ -21,6 +21,13 @@ describe('rate sources', () => {
     expect(getRate(gold).eq(2)).toBe(true);
   });
 
+  it('a net that cancels reads zero, not negative zero', () => {
+    const gold = stock(5);
+    addRateSource(gold, { text: 'mines', rate: 3 });
+    addRateSource(gold, { text: 'upkeep', rate: () => -3 });
+    expect(Object.is(getRate(gold).toNumber(), 0)).toBe(true);
+  });
+
   it('reads zero with no rate sources', () => {
     const gold = stock(5);
     expect(getRate(gold).eq(0)).toBe(true);

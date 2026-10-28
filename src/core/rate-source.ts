@@ -105,7 +105,7 @@ export function addRateSource(
   const rate = toMaybeRef(options.rate);
   const entry: RateSourceEntry = {
     text,
-    rate: computed(() => Decimal.fromValue(unref(rate))),
+    rate: computed(() => withoutNegativeZero(Decimal.fromValue(unref(rate)))),
     allowNegative,
   };
   const list = listFor(resource);
@@ -128,7 +128,7 @@ export function getRate(resource: Resource<DecimalSource>): Decimal {
   const entries = readEntries(resource);
   let net = Decimal.dZero;
   for (const entry of entries) net = Decimal.add(net, entry.rate.value);
-  return isHeld(resource, net, entries) ? Decimal.dZero : net;
+  return isHeld(resource, net, entries) ? Decimal.dZero : withoutNegativeZero(net);
 }
 
 /**
@@ -169,6 +169,14 @@ export function hasRateSources(resource: Resource<DecimalSource>): boolean {
 }
 
 // === PRIVATE ===
+
+/**
+ * `value`, with a negative zero read as zero. Decimal subtraction and negation
+ * of zero give -0, which a rate display would show as "-0/s".
+ */
+function withoutNegativeZero(value: Decimal): Decimal {
+  return value.eq(Decimal.dZero) ? Decimal.dZero : value;
+}
 
 /** Whether the stock cannot move in the direction of `net`. */
 function isHeld(
