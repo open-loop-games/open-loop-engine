@@ -2,6 +2,47 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.10.0 (2026-10-28)
+
+### ⚠ Breaking changes
+
+* **core:** the engine always builds the accessor; options plus wrap, no flag or rate reads (54ab528)
+
+  `EngineOptions.accessor` is now an options object, `EngineAccessorOptions`: `getStateAt`, `setStateAt`, `allowNegative` and an optional `wrap(built)`. The engine always builds the accessor at `start()`, from its registries. Amounts and rates come from the resource registry, rates as rate sources; flags come from the flag registry. The factory form and the built-accessor form are removed. `createEngine` throws, naming the new shape, when it is given either. `GameStateAccessorOptions` loses `getFlag`, `setFlag`, `getRate` and `getInflowRate`. `GameStateAccessorKey` is set on every started engine.
+
+  Migration:
+    // before: flags kept by the game, handed to a factory
+    createEngine({ gameId, accessor: (services) =>
+      createGameStateAccessor(services, { getFlag, setFlag, getStateAt }) });
+    // after: each flag is created in a module's install(); state paths are options
+    createFlag({ id: 'seen-shop' });                           // saved
+    createFlag({ id: 'rich', value: () => gold.value >= 1000 }); // derived
+    createEngine({ gameId, accessor: { getStateAt } });
+
+    // before: rates handed to the accessor
+    createGameStateAccessor(services, { getRate: (id) => ratesById[id] });
+    // after: producers add their rate sources; add one for any other rate
+    addRateSource(food, { text: 'Upkeep', rate: () => -upkeep.value });
+
+    // before: a factory that wraps the built accessor
+    accessor: (services) => {
+      const built = createGameStateAccessor(services, { getStateAt, allowNegative: true });
+      return { ...built, applyResourceOp: myOp };
+    }
+    // after
+    accessor: { getStateAt, allowNegative: true, wrap: (built) => ({ ...built, applyResourceOp: myOp }) }
+
+    // a hand-rolled accessor (tests): return it from wrap
+    accessor: { wrap: () => stub }
+
+  Why: the accessor was built at start(), before any module installed, so the
+  flags and rates it served had to be bound late, through module-level
+  variables that threw if read too early. Flags and rate sources now register
+  into the engine's registries as modules create them, and the engine-built
+  accessor reads them when called. wrap exists because one consumer needs
+  state paths, allowNegative and a wrapper together, which neither "options"
+  nor "a factory over the built default" alone can express.
+
 ## 0.9.1 (2026-10-28)
 
 ### Features

@@ -16,17 +16,18 @@ How an engine instance is assembled and ticks: `createEngine` and its module, ev
 
 the module-system façade that composes core + systems into a runnable game: _createEngine_, _EngineContext_, _EngineModule_, _EngineOptions_, and the built-in injection keys
 
-- `function createEngine(options: EngineOptions): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:472`
-- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:337`
-- `interface EngineContext` — The engine context: the object each EngineModule's `install` and `connect` receive. `src/engine.ts:130`
-- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:108`
-- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:194`
-- `interface EngineOptions` `src/engine.ts:237`
-- `type LoadHandler = (result: SaveLoadResult) => void` — A handler called after a save loads successfully, by any entry point. `src/engine.ts:86`
-- `interface ModDef` — A mod: a whole-game ruleset the player selects when a new game starts, with its metadata and its modules. `src/engine.ts:216`
-- `type SaveHandler = () => void` — A handler called before live state is serialized, so it can write derived state into persistent refs. `src/engine.ts:74`
-- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:117`
-- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:114`
+- `function createEngine(options: EngineOptions): Engine` — Creates the top-level engine orchestrator that wires together the TickDriver, save manager, module system, and mod support. `src/engine.ts:522`
+- `interface Engine` — The assembled engine instance returned by createEngine. `src/engine.ts:354`
+- `interface EngineAccessorOptions extends GameStateAccessorOptions` — The options of the engine-built game-state accessor: the state paths and subtract policy of GameStateAccessorOptions, and a hook that decorates the built accessor. `src/engine.ts:338`
+- `interface EngineContext` — The engine context: the object each EngineModule's `install` and `connect` receive. `src/engine.ts:131`
+- `interface EngineEvents` — Engine-wide event map — extend via declaration merging to add game events. `src/engine.ts:109`
+- `interface EngineModule` — A registerable unit of game content. `src/engine.ts:195`
+- `interface EngineOptions` `src/engine.ts:238`
+- `type LoadHandler = (result: SaveLoadResult) => void` — A handler called after a save loads successfully, by any entry point. `src/engine.ts:87`
+- `interface ModDef` — A mod: a whole-game ruleset the player selects when a new game starts, with its metadata and its modules. `src/engine.ts:217`
+- `type SaveHandler = () => void` — A handler called before live state is serialized, so it can write derived state into persistent refs. `src/engine.ts:75`
+- `const SaveManagerKey: InjectionKey<SaveManager>` — Inject the save manager. `src/engine.ts:118`
+- `const TickDriverKey: InjectionKey<TickDriver>` — Inject the TickDriver instance. `src/engine.ts:115`
 
 ## Reactivity re-exports
 
@@ -56,15 +57,15 @@ the game loop: timer-driven ticks with EWMA lag compensation. Two tick modes: va
 
 ## Game-state accessor
 
-the opt-in builder over the resource registry, the record of the methods an accessor implements, and the ambient accessor `createEngine` sets around `install()` / `connect()`
+the builder over the engine's registries, the record of the methods an accessor implements, and the ambient accessor `createEngine` sets around `install()` / `connect()`
 
 - `const AccessorMethods: unique symbol` — Keys the record of the methods an accessor implements, a `ReadonlySet<GameStateAccessorMethod>`. `src/core/game-state-accessor.ts:49`
-- `interface AccessorServices` — The engine services an accessor factory receives from `createEngine`. `src/core/game-state-accessor.ts:65`
-- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over the engine's registries. `src/core/game-state-accessor.ts:184`
-- `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` was given or built. `src/core/game-state-accessor.ts:94`
+- `interface AccessorServices` — The registries createGameStateAccessor reads. `src/core/game-state-accessor.ts:65`
+- `function createGameStateAccessor(services: AccessorServices, options?: GameStateAccessorOptions): GameStateAccessorMutator` — Build a game-state accessor and mutator over an engine's registries. `src/core/game-state-accessor.ts:176`
+- `const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator>` — Injection key for the accessor `createEngine` built. `src/core/game-state-accessor.ts:84`
 - `type GameStateAccessorMethod = keyof GameStateAccessor | keyof GameStateMutator` — A method name of GameStateAccessor or GameStateMutator. `src/core/game-state-accessor.ts:33`
 - `type GameStateAccessorMutator = GameStateAccessor & GameStateMutator & WithAccessorMethods` — Combined accessor + mutator — every consumer unifies these into one object. `src/core/game-state-accessor.ts:62`
-- `interface GameStateAccessorOptions` — What the consumer supplies to createGameStateAccessor. `src/core/game-state-accessor.ts:72`
+- `interface GameStateAccessorOptions` — What the game supplies to the accessor beyond its registries: state paths and the subtract policy. `src/core/game-state-accessor.ts:72`
 
 ## Throttle
 
