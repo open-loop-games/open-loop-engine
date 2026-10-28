@@ -82,16 +82,18 @@ export interface StateGate {
 }
 
 /**
- * True when `accessor.getFlag(id)` returns true. The escape hatch for
- * progression flags the engine doesn't model as category entries
+ * True when the flag `id` is set: a flag made by `createFlag`, read through
+ * the accessor's `getFlag` when one is wired, else the engine's flag
+ * registry. The escape hatch for progression flags the engine doesn't model
+ * as category entries
  * (knowledge-discovery ids, UI-panel reveals, info-reveals). Peer to
  * {@link StateGate} for flags — projects 1:1 to `FlagCondition` via
  * {@link gateToCondition}. Predictor-opaque, as a flag is in the condition IR.
  *
  * Use the category-aware {@link ActiveGate} when the test reads a registered
  * category entry — that path gets introspection from
- * `CategoryEntrySignals`. Use this when the flag is a consumer-side
- * progression flag with no category structure.
+ * `CategoryEntrySignals`. Use this for a progression flag with no category
+ * structure.
  */
 export interface FlagGate {
   kind: 'flag';
@@ -178,7 +180,7 @@ export function isGate(value: unknown): value is Gate {
  * rather than in `systems/gate.ts`, so the pure walker below can stay in
  * core. `GateServices` keys off this union.
  */
-export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
+export type GateService = 'accessor' | 'categories' | 'resourceRegistry' | 'flagRegistry';
 
 /**
  * The Gate services that evaluating `gate` reads. Pure data → data;
@@ -194,7 +196,8 @@ export type GateService = 'accessor' | 'categories' | 'resourceRegistry';
  *
  * A `resource-gte` leaf reports the `resourceRegistry`, which every engine
  * sets during install/connect. A wired accessor that implements `getAmount`
- * stands in for it: the leaf reads the accessor first, else the registry.
+ * stands in for it: the leaf reads the accessor first, else the registry. A
+ * `flag` leaf reports the `flagRegistry` the same way, with `getFlag`.
  *
  * These are the Gate services `evaluateGate` reads. For `resource-gte` and
  * `cumulative-gte`, `timeUntilGateFlip` also reads the resource's rate
@@ -222,8 +225,9 @@ export function getLeafGateServices(
   switch (leaf.kind) {
     case 'resource-gte':
       return ['accessor', 'resourceRegistry'];
-    case 'state':
     case 'flag':
+      return ['accessor', 'flagRegistry'];
+    case 'state':
       return ['accessor'];
     case 'cumulative-gte':
       return ['resourceRegistry'];

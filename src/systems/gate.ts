@@ -15,10 +15,12 @@
  * - {@link ResourceRegistry} via `findById` — `cumulative-gte` reads the
  *   resource's `cumulative` ref, and `resource-gte` reads its value when no
  *   accessor is wired.
- * - {@link GameStateAccessor} — the `state` and `flag` kinds read through it
+ * - {@link FlagRegistry} via `get` — the `flag` kind reads a flag's value
+ *   when no accessor implementing `getFlag` is wired.
+ * - {@link GameStateAccessor} — the `state` kind reads through it
  *   (consumer-defined path and value meaning, as in `StateCondition`), and
- *   `resource-gte` reads `getAmount` when it is wired. A prediction of
- *   `resource-gte` or `cumulative-gte` reads the accessor's rates.
+ *   `resource-gte` and `flag` read `getAmount` and `getFlag` when it is wired.
+ *   A prediction of `resource-gte` or `cumulative-gte` reads the accessor's rates.
  *
  * Per-kind dispatch:
  *
@@ -28,7 +30,7 @@
  * | cumulative-gte | registry.findById(id).cumulative.value >= value     | gap in the cumulative total ÷ inflow     |
  * | count-gte      | findCategoryEntrySignals(...).count >= value        | 'opaque-predicate'                       |
  * | active         | findCategoryEntrySignals(...).active                | 'opaque-predicate'                       |
- * | flag           | accessor.getFlag(id)                                | 'opaque-predicate'                       |
+ * | flag           | getFlag(id), else flagRegistry.get(id).value        | 'opaque-predicate'                       |
  * | state          | compareState(accessor.getStateAt(...), op, val)     | 'opaque-predicate'                       |
  * | all/any/not    | recurse                                             | combineFlipDistances over Gate children  |
  *
@@ -72,7 +74,12 @@ import {
   getCurrentGameStateAccessor,
   implementsAccessorMethod,
 } from '@/core/game-state-accessor';
-import { getCurrentResourceRegistry, type ResourceRegistry } from '@/core/registries';
+import {
+  getCurrentFlagRegistry,
+  getCurrentResourceRegistry,
+  type FlagRegistry,
+  type ResourceRegistry,
+} from '@/core/registries';
 import { createBooleanRequirement, type Requirement } from '@/core/requirements';
 import {
   forEachGateLeaf,
@@ -82,6 +89,7 @@ import {
   type AllGate,
   type AnyGate,
   type CumulativeGteGate,
+  type FlagGate,
   type Gate,
   type GateService,
   type NotGate,
@@ -138,6 +146,7 @@ export interface GateServices {
   accessor?: GameStateAccessor;
   categories?: EngineCategories;
   resourceRegistry?: ResourceRegistry;
+  flagRegistry?: FlagRegistry;
 }
 
 /**
@@ -145,7 +154,7 @@ export interface GateServices {
  * {@link GateServices} bundle.
  *
  * Reads `getCurrentGameStateAccessor()` / `getCurrentEngineCategories()` /
- * `getCurrentResourceRegistry()` — the same ambient values every category
+ * `getCurrentResourceRegistry()` / `getCurrentFlagRegistry()` — the same ambient values every category
  * factory reads during install/connect. `override` replaces any of them, for
  * tests or for callers that pass a non-ambient accessor (the
  * option-then-ambient shape of `createChallengeCategory`).
@@ -164,6 +173,7 @@ export function getAmbientGateServices(override?: GateServices): GateServices {
     accessor: override?.accessor ?? getCurrentGameStateAccessor(),
     categories: override?.categories ?? getCurrentEngineCategories(),
     resourceRegistry: override?.resourceRegistry ?? getCurrentResourceRegistry(),
+    flagRegistry: override?.flagRegistry ?? getCurrentFlagRegistry(),
   };
 }
 
@@ -212,7 +222,7 @@ export function evaluateGate(gate: Gate, services: GateServices): boolean {
         gate.value,
       );
     case 'flag':
-      return demand(services, 'accessor', gate.kind).getFlag(gate.id);
+      return flagOf(gate, services);
     case 'all':
       return gate.of.every((g) => evaluateGate(g, services));
     case 'any':
@@ -623,6 +633,23 @@ function amountOf(gate: ResourceGteGate, services: GateServices): DecimalSource 
     throw missingServicesError('evaluateGate', gate.kind, getLeafGateServices(gate));
   }
   return findResource(services, gate.resource, gate.kind, 'evaluateGate').value;
+}
+
+/**
+ * A `flag` value: the wired accessor's when it implements `getFlag`, else the
+ * flag registry's. So a flag Gate and a flag condition read the same source.
+ */
+function flagOf(gate: FlagGate, services: GateServices): boolean {
+  const { accessor } = services;
+  if (accessor && implementsAccessorMethod(accessor, 'getFlag')) {
+    return accessor.getFlag(gate.id);
+  }
+  if (!services.flagRegistry) {
+    throw missingServicesError('evaluateGate', gate.kind, getLeafGateServices(gate));
+  }
+  const flag = services.flagRegistry.get(gate.id);
+  if (!flag) throw new Error(`Gate flag: no flag '${gate.id}' registered`);
+  return flag.value;
 }
 
 /** Where an author gets a missing Gate service from, for the error messages. */

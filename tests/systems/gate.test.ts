@@ -8,6 +8,7 @@ import {
   createAchievementCategory,
   createChallengeCategory,
   createEngine,
+  createFlag,
   createProducerCategory,
   createPurchasableCategory,
   createResource,
@@ -21,6 +22,7 @@ import {
   type GameStateAccessor,
   type GameStateAccessorMutator,
   type GateServices,
+  type FlagRegistry,
   type ResourceRegistry,
 } from '@/index';
 import { resetAllPersistentContexts } from '@/core/persistence';
@@ -573,6 +575,7 @@ function buildAccessorlessFixture(): { runtime: GateServices; stop: () => void }
     id: 'game',
     install() {
       createResource(0, { id: 'points', displayName: 'points' });
+      createFlag({ id: 'met-rask' });
       const upgCat = createPurchasableCategory<UpgDef>({
         id: 'upgrades',
         mapPurchasable: () => ({
@@ -608,6 +611,28 @@ describe('evaluateGate — no ambient accessor', () => {
     expect(f.runtime.accessor).toBeUndefined();
     expect(f.runtime.categories).toBeDefined();
     expect(f.runtime.resourceRegistry).toBeDefined();
+    expect(f.runtime.flagRegistry).toBeDefined();
+    f.stop();
+  });
+
+  it('flag reads the flag registry', () => {
+    const f = buildAccessorlessFixture();
+    const gate: Gate = { kind: 'flag', id: 'met-rask' };
+    expect(() => assertGateServices(gate, f.runtime, 'site')).not.toThrow();
+    expect(evaluateGate(gate, f.runtime)).toBe(false);
+    (f.runtime.flagRegistry!.get('met-rask') as { value: boolean }).value = true;
+    expect(evaluateGate(gate, f.runtime)).toBe(true);
+    expect(() => evaluateGate({ kind: 'flag', id: 'ghost' }, f.runtime)).toThrow(/flag.*'ghost'/);
+    f.stop();
+  });
+
+  it("an accessor's getFlag wins over the flag registry", () => {
+    const f = buildAccessorlessFixture();
+    const accessor = createGameStateAccessor(
+      { resourceRegistry: f.runtime.resourceRegistry! },
+      { getFlag: () => true },
+    );
+    expect(evaluateGate({ kind: 'flag', id: 'met-rask' }, { ...f.runtime, accessor })).toBe(true);
     f.stop();
   });
 
@@ -668,17 +693,17 @@ describe('evaluateGate — no ambient accessor', () => {
     f.stop();
   });
 
-  it('accessor-backed kinds throw at evaluation, naming both the handle and the kind', () => {
+  it('a state Gate throws at evaluation, naming both the handle and the kind', () => {
     const f = buildAccessorlessFixture();
-    for (const gate of [
-      { kind: 'flag', id: 'some-flag' },
-      { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
-    ] as Gate[]) {
-      expect(() => evaluateGate(gate, f.runtime)).toThrow(
-        new RegExp(`accessor.*${gate.kind}|${gate.kind}.*accessor`),
-      );
-    }
+    const gate: Gate = { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' };
+    expect(() => evaluateGate(gate, f.runtime)).toThrow(/accessor.*state|state.*accessor/);
     f.stop();
+  });
+
+  it('a flag Gate with neither the accessor nor the flag registry throws, naming both', () => {
+    expect(() => evaluateGate({ kind: 'flag', id: 'met-rask' }, {})).toThrow(
+      /'flag' Gate needs the accessor or flagRegistry/,
+    );
   });
 
   it('cumulative-gte evaluates without an accessor, and predicting it demands one', () => {
@@ -701,7 +726,7 @@ describe('evaluateGate — no ambient accessor', () => {
           kind: 'any',
           of: [
             { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
-            { kind: 'flag', id: 'some-flag' },
+            { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
           ],
         },
         f.runtime,
@@ -714,7 +739,7 @@ describe('evaluateGate — no ambient accessor', () => {
           kind: 'all',
           of: [
             { kind: 'count-gte', category: 'upgrades', entry: 'fast', value: 1 },
-            { kind: 'flag', id: 'some-flag' },
+            { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
           ],
         },
         f.runtime,
@@ -763,12 +788,15 @@ describe('assertGateServices — the AccessorMethods record', () => {
   const flagGate: Gate = { kind: 'flag', id: 'met-rask' };
   const stateGate: Gate = { kind: 'state', path: 'phase', operator: 'eq', value: 'late' };
 
-  it('a flag Gate over a built accessor without getFlag fails at the check, naming getFlag', () => {
+  it('a flag Gate over a built accessor without getFlag or a flag registry fails at the check', () => {
     const f = buildAccessorlessFixture();
     const accessor = createGameStateAccessor({ resourceRegistry: f.runtime.resourceRegistry! });
-    expect(() => assertGateServices(flagGate, { ...f.runtime, accessor }, 'site')).toThrow(
-      /^site: this Gate reads the accessor's getFlag, .*Gate kinds in play: flag\. Supply it to createGameStateAccessor/,
+    expect(() => assertGateServices(flagGate, { accessor }, 'site')).toThrow(
+      /^site: this Gate reads the accessor's getFlag or flagRegistry, .*Gate kinds in play: flag\. Supply it to createGameStateAccessor/,
     );
+    expect(() =>
+      assertGateServices(flagGate, { accessor, flagRegistry: {} as FlagRegistry }, 'site'),
+    ).not.toThrow();
     const withFlag = createGameStateAccessor(
       { resourceRegistry: f.runtime.resourceRegistry! },
       { getFlag: () => true },
@@ -805,7 +833,7 @@ describe('assertGateServices — the AccessorMethods record', () => {
     f.stop();
   });
 
-  it('predicting over an accessor without getRate throws, naming getRate', () => {
+  it('predicting over a resource with no rate sources throws, naming it', () => {
     const f = buildAccessorlessFixture();
     const accessor = createGameStateAccessor({ resourceRegistry: f.runtime.resourceRegistry! });
     const services = { ...f.runtime, accessor };
@@ -813,11 +841,7 @@ describe('assertGateServices — the AccessorMethods record', () => {
       { kind: 'resource-gte', resource: 'points', value: 1e9 },
       { kind: 'cumulative-gte', resource: 'points', value: 1e9 },
     ] as Gate[]) {
-      expect(() => timeUntilGateFlip(gate, services)).toThrow(
-        new RegExp(
-          `^timeUntilGateFlip \\('${gate.kind}' Gate\\): needs getRate, which the accessor does not implement`,
-        ),
-      );
+      expect(() => timeUntilGateFlip(gate, services)).toThrow(/'points' has no rate sources/);
     }
     f.stop();
   });
@@ -835,8 +859,11 @@ describe('getRequiredGateServices', () => {
     ]);
   });
 
-  it('flag and state demand the accessor only', () => {
-    expect(handles({ kind: 'flag', id: 'knowledge-rask' })).toEqual(['accessor']);
+  it('flag reports the flag registry, its fallback when no accessor is wired', () => {
+    expect(handles({ kind: 'flag', id: 'knowledge-rask' })).toEqual(['flagRegistry']);
+  });
+
+  it('state demands the accessor only', () => {
     expect(handles({ kind: 'state', path: 'phase', operator: 'eq', value: 'idle' })).toEqual([
       'accessor',
     ]);
@@ -865,7 +892,7 @@ describe('getRequiredGateServices', () => {
             kind: 'any',
             of: [
               { kind: 'active', category: 'achievements', entry: 'first' },
-              { kind: 'flag', id: 'knowledge-rask' },
+              { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
             ],
           },
         },

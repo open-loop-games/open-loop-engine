@@ -468,7 +468,9 @@ describe('createGateRequirement — no ambient accessor', () => {
   it('throws at construction for an accessor-backed gate, naming the handle', () => {
     expect(() =>
       bootstrapAccessorless(() =>
-        createGateRequirement({ gate: { kind: 'flag', id: 'some-flag' } }),
+        createGateRequirement({
+          gate: { kind: 'state', path: 'phase', operator: 'eq', value: 'idle' },
+        }),
       ),
     ).toThrow(/accessor/);
   });

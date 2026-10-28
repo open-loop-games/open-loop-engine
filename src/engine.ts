@@ -319,7 +319,7 @@ export interface EngineOptions {
    * The game-state accessor and mutator: an object, or a factory the engine
    * calls once at `start()`, before any module installs, with the engine's
    * services. Pass `(services) => createGameStateAccessor(services, { … })` to
-   * build one over this engine's resource registry. Category factories
+   * build one over this engine's resource and flag registries. Category factories
    * (`createChallengeCategory`, etc.) read it as an ambient value when a
    * category has no `accessor` option. After `start()`, read it with
    * `engine.tryInject(GameStateAccessorKey)`. Its methods are called only

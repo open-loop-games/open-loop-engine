@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { toRef } from 'vue';
 import {
   Decimal,
   FlagRegistryKey,
@@ -83,16 +84,23 @@ describe('EngineOptions.accessor — the factory form', () => {
     b.stop();
   });
 
-  it('a flag Gate over a built accessor without getFlag fails at construction', () => {
+  it("a flag Gate over a built accessor reads the engine's flag registry", () => {
     const engine = engineWith('accessor-flag', (services) => createGameStateAccessor(services));
+    let met: { value: unknown } | undefined;
+    let unknown: { value: unknown } | undefined;
     engine.use(
       goldModule(0, () => {
-        createGateRequirement({ gate: { kind: 'flag', id: 'met-rask' } });
+        const flag = createFlag({ id: 'met-rask' });
+        met = toRef(createGateRequirement({ gate: { kind: 'flag', id: 'met-rask' } }).met);
+        unknown = toRef(createGateRequirement({ gate: { kind: 'flag', id: 'met-nobody' } }).met);
+        flag.value = true;
       }),
     );
-    expect(() => engine.start()).toThrow(
-      /createGateRequirement: this Gate reads the accessor's getFlag,/,
-    );
+    engine.start();
+    expect(met!.value).toBe(true);
+    // An unknown flag id throws at evaluation, as an unknown resource id does.
+    expect(() => unknown!.value).toThrow(/no flag 'met-nobody'/);
+    engine.stop();
   });
 
   it('a plain accessor object is published under GameStateAccessorKey too', () => {

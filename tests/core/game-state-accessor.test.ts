@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Decimal } from '@/primitives/decimal';
 import { createResource } from '@/core/resource';
-import { createResourceRegistry, withResourceRegistry } from '@/core/registries';
+import {
+  createFlagRegistry,
+  createResourceRegistry,
+  withFlagRegistry,
+  withResourceRegistry,
+} from '@/core/registries';
+import { createFlag } from '@/core/flag';
+import { addRateSource, getRate } from '@/core/rate-source';
 import { resetAllPersistentContexts, withPersistentContext } from '@/core/persistence';
 import {
   AccessorMethods,
@@ -109,26 +116,96 @@ describe('createGameStateAccessor — supplied and omitted methods', () => {
     const accessor = createGameStateAccessor(services);
     expect(() => accessor.getFlag('x')).toThrow(/'flag' Gate or condition called getFlag/);
     expect(() => accessor.setStateAt('a.b', 1)).toThrow(/'state' effect called setStateAt/);
-    expect(() => accessor.getRate('gold')).toThrow(/timeUntilGateFlip/);
   });
 
   it('the record lists the registry methods plus exactly the supplied ones', () => {
     const { services } = registryWith({});
-    const accessor = createGameStateAccessor(services, {
-      getFlag: () => false,
-      getRate: () => Decimal.dZero,
-    });
+    const accessor = createGameStateAccessor(services, { getFlag: () => false });
     expect([...accessor[AccessorMethods]!].sort()).toEqual(
-      ['applyResourceOp', 'getAmount', 'getFlag', 'getRate'].sort(),
+      ['applyResourceOp', 'getAmount', 'getFlag', 'getInflowRate', 'getRate'].sort(),
     );
   });
 
-  it('leaves getInflowRate absent unless supplied', () => {
+  it('a supplied getRate without getInflowRate leaves getInflowRate absent', () => {
     const { services } = registryWith({});
-    expect(createGameStateAccessor(services).getInflowRate).toBeUndefined();
-    const withInflow = createGameStateAccessor(services, { getInflowRate: () => Decimal.dOne });
-    expect(withInflow.getInflowRate).toBeDefined();
+    const accessor = createGameStateAccessor(services, { getRate: () => Decimal.dOne });
+    expect(accessor.getInflowRate).toBeUndefined();
+    expect(accessor[AccessorMethods]!.has('getInflowRate')).toBe(false);
+    const withInflow = createGameStateAccessor(services, {
+      getRate: () => Decimal.dOne,
+      getInflowRate: () => Decimal.dOne,
+    });
     expect(withInflow[AccessorMethods]!.has('getInflowRate')).toBe(true);
+  });
+});
+
+describe('createGameStateAccessor — rates from rate sources', () => {
+  it("getRate and getInflowRate read the resource's rate sources", () => {
+    const { services, resources } = registryWith({ gold: 5 });
+    addRateSource(resources.gold!, { text: 'mines', rate: 3 });
+    addRateSource(resources.gold!, { text: 'upkeep', rate: -1 });
+    const accessor = createGameStateAccessor(services);
+    expect(Decimal.eq(accessor.getRate('gold'), 2)).toBe(true);
+    expect(Decimal.eq(accessor.getInflowRate!('gold'), 3)).toBe(true);
+  });
+
+  it('a resource with no rate sources throws, naming it, where the core getRate reads zero', () => {
+    const { services, resources } = registryWith({ gold: 5 });
+    const accessor = createGameStateAccessor(services);
+    expect(() => accessor.getRate('gold')).toThrow(/'gold'.*no rate sources/);
+    expect(() => accessor.getInflowRate!('gold')).toThrow(/'gold'.*no rate sources/);
+    expect(getRate(resources.gold!).eq(0)).toBe(true);
+  });
+
+  it('a supplied getRate wins over the rate sources', () => {
+    const { services, resources } = registryWith({ gold: 5 });
+    addRateSource(resources.gold!, { text: 'mines', rate: 3 });
+    const accessor = createGameStateAccessor(services, { getRate: () => Decimal.dTen });
+    expect(Decimal.eq(accessor.getRate('gold'), 10)).toBe(true);
+  });
+});
+
+describe('createGameStateAccessor — flags from the flag registry', () => {
+  function flagsWith(build: () => void) {
+    const flagRegistry = createFlagRegistry();
+    withFlagRegistry(flagRegistry, () => withPersistentContext('flags-test', build));
+    return { resourceRegistry: createResourceRegistry(), flagRegistry };
+  }
+
+  it('getFlag and setFlag read and write a saved flag', () => {
+    const services = flagsWith(() => createFlag({ id: 'seen-shop' }));
+    const accessor = createGameStateAccessor(services);
+    expect(accessor.getFlag('seen-shop')).toBe(false);
+    accessor.setFlag('seen-shop', true);
+    expect(accessor.getFlag('seen-shop')).toBe(true);
+    expect(accessor[AccessorMethods]!.has('getFlag')).toBe(true);
+    expect(accessor[AccessorMethods]!.has('setFlag')).toBe(true);
+  });
+
+  it('getFlag reads a derived flag; setFlag on one throws', () => {
+    const services = flagsWith(() => createFlag({ id: 'rich', value: true }));
+    const accessor = createGameStateAccessor(services);
+    expect(accessor.getFlag('rich')).toBe(true);
+    expect(() => accessor.setFlag('rich', false)).toThrow(/'rich'.*derived/);
+  });
+
+  it('an id the flag registry lacks throws, naming it', () => {
+    const accessor = createGameStateAccessor(flagsWith(() => {}));
+    expect(() => accessor.getFlag('nope')).toThrow(/no flag 'nope'/);
+    expect(() => accessor.setFlag('nope', true)).toThrow(/no flag 'nope'/);
+  });
+
+  it('a supplied getFlag wins over the flag registry', () => {
+    const services = flagsWith(() => createFlag({ id: 'seen-shop' }));
+    const accessor = createGameStateAccessor(services, { getFlag: () => true });
+    expect(accessor.getFlag('seen-shop')).toBe(true);
+  });
+
+  it('without a flag registry, getFlag and setFlag are left out of the record', () => {
+    const { services } = registryWith({});
+    const accessor = createGameStateAccessor(services);
+    expect(accessor[AccessorMethods]!.has('getFlag')).toBe(false);
+    expect(accessor[AccessorMethods]!.has('setFlag')).toBe(false);
   });
 });
 

@@ -4,9 +4,10 @@
  * `createEngine` sets around `install()` / `connect()`.
  *
  * - {@link createGameStateAccessor} builds a `GameStateAccessorMutator` whose
- *   amounts and resource writes come from the engine's resource registry. The
- *   consumer supplies flags, state paths and rates; a method left out throws,
- *   naming the kind that called it.
+ *   amounts, resource writes and rates come from the engine's resource
+ *   registry, and whose flags come from its flag registry. The consumer
+ *   supplies state paths, and may supply flags and rates of its own, which
+ *   win. A method with no source throws, naming the kind that called it.
  * - {@link AccessorMethods} keys the record of methods an accessor
  *   implements. Construction checks read it, so a `flag` Gate over an accessor
  *   without `getFlag` fails where it is registered, not inside a `computed`.
@@ -23,6 +24,8 @@ import type { GameStateAccessor, InjectionKey, ResourceEffect } from '@/primitiv
 import type { GameStateMutator } from './effects';
 import type { FlagRegistry, ResourceRegistry } from './registries';
 import { addResource, subtractResource, type Resource } from './resource';
+import { getInflowRate, getRate, hasRateSources } from './rate-source';
+import type { Flag, SavedFlag } from './flag';
 
 // === TYPES ===
 
@@ -67,13 +70,18 @@ export interface AccessorServices {
 
 /** What the consumer supplies to {@link createGameStateAccessor}. */
 export interface GameStateAccessorOptions {
+  /** Replaces the flag registry's reads. */
   getFlag?: GameStateAccessor['getFlag'];
+  /** Replaces the flag registry's writes. */
   setFlag?: GameStateMutator['setFlag'];
   getStateAt?: GameStateAccessor['getStateAt'];
   setStateAt?: GameStateMutator['setStateAt'];
-  /** Net rate per second. Without it, every Gate prediction throws. */
+  /** Net rate per second, replacing the resources' rate sources. */
   getRate?: GameStateAccessor['getRate'];
-  /** Gross inflow rate. Without it, `cumulative-gte` predictions use the net rate. */
+  /**
+   * Gross inflow rate, replacing the rate sources' inflow. With a supplied
+   * `getRate` and no `getInflowRate`, `cumulative-gte` predictions use the net rate.
+   */
   getInflowRate?: GameStateAccessor['getInflowRate'];
   /** Let a `subtract` take a resource below zero. Default `false`: such a subtract throws. */
   allowNegative?: boolean;
@@ -88,24 +96,13 @@ export const GameStateAccessorKey: InjectionKey<GameStateAccessorMutator> =
 
 // === CONSTANTS ===
 
-/** The methods a consumer may supply; each one supplied joins the record. */
-const OPTIONAL_METHODS = [
-  'getFlag',
-  'setFlag',
-  'getStateAt',
-  'setStateAt',
-  'getRate',
-  'getInflowRate',
-] as const satisfies readonly (keyof GameStateAccessorOptions)[];
-
-/** What calls each method that gets a throwing stub, for the error it throws. */
-const CALLERS: Record<Exclude<(typeof OPTIONAL_METHODS)[number], 'getInflowRate'>, string> = {
+/** What calls each method that may get a throwing stub, for the error it throws. */
+const CALLERS = {
   getFlag: "a 'flag' Gate or condition",
   setFlag: "a 'flag' effect",
   getStateAt: "a 'state' Gate or condition",
   setStateAt: "a 'state' effect",
-  getRate: 'a Gate prediction (timeUntilGateFlip)',
-};
+} as const satisfies Partial<Record<keyof GameStateAccessorOptions, string>>;
 
 // === RECORD ===
 
@@ -152,19 +149,23 @@ export function assertAccessorMethods(
 // === BUILDER ===
 
 /**
- * Build a game-state accessor and mutator over the engine's resource registry.
- * Amounts and resource writes come from the registry; flags, state paths and
- * rates come from `options`. Nothing is wired unless you pass it to
- * `createEngine`.
+ * Build a game-state accessor and mutator over the engine's registries.
+ * Amounts, resource writes and rates come from the resource registry, rates
+ * as each resource's rate sources. Flags come from the flag registry. State
+ * paths, and any flag or rate reads the game keeps itself, come from
+ * `options`, and a supplied method wins. Nothing is wired unless you pass it
+ * to `createEngine`.
  *
- * Every read is at call time, so the registry may still be empty when this
- * runs. A resource id the registry lacks throws. A method `options` leaves out
- * throws, naming the kind that called it, and is missing from the
- * {@link AccessorMethods} record, so construction checks fail first.
+ * Every read is at call time, so the registries may still be empty when this
+ * runs. A resource or flag id the registries lack throws. `getRate` throws for
+ * a resource with no rate sources, so a Gate prediction over one fails loudly;
+ * a display reads the core `getRate(resource)`, which reads zero. A method
+ * with no source throws, naming the kind that called it, and is missing from
+ * the {@link AccessorMethods} record, so construction checks fail first.
  *
  * @param services the engine services; `createEngine` passes them to an
  *   `accessor` factory.
- * @param options the reads and writes the registry cannot answer, and the
+ * @param options the reads and writes the registries cannot answer, and the
  *   subtract policy.
  * @returns a `GameStateAccessorMutator` with an {@link AccessorMethods} record.
  *
@@ -174,9 +175,8 @@ export function assertAccessorMethods(
  *   gameId: 'my-game',
  *   accessor: (services) =>
  *     createGameStateAccessor(services, {
- *       getFlag: (id) => flags[id] ?? false,
- *       setFlag: (id, value) => { flags[id] = value; },
- *       getRate: (id) => ratesById[id] ?? Decimal.dZero,
+ *       getStateAt: (path) => state[path],
+ *       setStateAt: (path, value) => { state[path] = value; },
  *     }),
  * });
  * ```
@@ -185,16 +185,8 @@ export function createGameStateAccessor(
   services: AccessorServices,
   options: GameStateAccessorOptions = {},
 ): GameStateAccessorMutator {
-  const {
-    allowNegative = false,
-    getFlag,
-    setFlag,
-    getStateAt,
-    setStateAt,
-    getRate,
-    getInflowRate,
-  } = options;
-  const { resourceRegistry } = services;
+  const { allowNegative = false, getStateAt, setStateAt } = options;
+  const { resourceRegistry, flagRegistry } = services;
 
   function resourceFor(id: string): Resource {
     const resource = resourceRegistry.findById(id);
@@ -232,8 +224,16 @@ export function createGameStateAccessor(
     }
   }
 
+  const flags = buildFlagMethods(options, flagRegistry);
+  const rates = buildRateMethods(options, resourceFor);
+
   const methods = new Set<GameStateAccessorMethod>(['getAmount', 'applyResourceOp']);
-  for (const method of OPTIONAL_METHODS) if (options[method]) methods.add(method);
+  if (flags.getFlag) methods.add('getFlag');
+  if (flags.setFlag) methods.add('setFlag');
+  if (getStateAt) methods.add('getStateAt');
+  if (setStateAt) methods.add('setStateAt');
+  methods.add('getRate');
+  if (rates.getInflowRate) methods.add('getInflowRate');
 
   return {
     getAmount: (id) => {
@@ -242,14 +242,67 @@ export function createGameStateAccessor(
       return value instanceof Decimal ? value : new Decimal(value);
     },
     applyResourceOp,
-    getFlag: getFlag ?? (() => missing('getFlag')),
-    setFlag: setFlag ?? (() => missing('setFlag')),
+    getFlag: flags.getFlag ?? (() => missing('getFlag')),
+    setFlag: flags.setFlag ?? (() => missing('setFlag')),
     getStateAt: getStateAt ?? (() => missing('getStateAt')),
     setStateAt: setStateAt ?? (() => missing('setStateAt')),
-    getRate: getRate ?? (() => missing('getRate')),
+    getRate: rates.getRate,
     // Absent, not a stub: an absent getInflowRate means "use the net rate".
-    ...(getInflowRate && { getInflowRate }),
+    ...(rates.getInflowRate && { getInflowRate: rates.getInflowRate }),
     [AccessorMethods]: methods,
+  };
+}
+
+/** The flag reads and writes: the options' own, else the flag registry's, else none. */
+function buildFlagMethods(
+  options: GameStateAccessorOptions,
+  flagRegistry: FlagRegistry | undefined,
+): Pick<GameStateAccessorOptions, 'getFlag' | 'setFlag'> {
+  const flagFor = (id: string): Flag => {
+    const flag = flagRegistry!.get(id);
+    if (!flag) throw new Error(`createGameStateAccessor: no flag '${id}' registered`);
+    return flag;
+  };
+  return {
+    getFlag: options.getFlag ?? (flagRegistry && ((id) => flagFor(id).value)),
+    setFlag:
+      options.setFlag ??
+      (flagRegistry &&
+        ((id, value) => {
+          const flag = flagFor(id);
+          if (flag.derived) {
+            throw new Error(
+              `createGameStateAccessor: a 'flag' effect set '${id}', a derived flag, which reads game state and cannot be set.`,
+            );
+          }
+          (flag as SavedFlag).value = value;
+        })),
+  };
+}
+
+/**
+ * The rate reads: the options' own, else the resources' rate sources. A
+ * supplied `getRate` alone leaves `getInflowRate` absent, so the consumer's
+ * net rate stands in for inflow rather than the rate sources'.
+ */
+function buildRateMethods(
+  options: GameStateAccessorOptions,
+  resourceFor: (id: string) => Resource,
+): { getRate: GameStateAccessor['getRate']; getInflowRate?: GameStateAccessor['getInflowRate'] } {
+  if (options.getRate) return { getRate: options.getRate, getInflowRate: options.getInflowRate };
+  const flowingResource = (id: string): Resource => {
+    const resource = resourceFor(id);
+    if (!hasRateSources(resource)) {
+      throw new Error(
+        `createGameStateAccessor: resource '${id}' has no rate sources, so no rate predicts it. ` +
+          'Add one with addRateSource, or produce it from a producer category.',
+      );
+    }
+    return resource;
+  };
+  return {
+    getRate: (id) => getRate(flowingResource(id)),
+    getInflowRate: options.getInflowRate ?? ((id) => getInflowRate(flowingResource(id))),
   };
 }
 
