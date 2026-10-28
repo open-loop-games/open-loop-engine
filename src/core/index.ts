@@ -33,6 +33,8 @@ export {
   hasResource,
   resetResource,
 } from './resource';
+export type { RateSource, RateSourceOptions } from './rate-source';
+export { addRateSource, getRate, getInflowRate, getRateSources } from './rate-source';
 
 // === MODIFIERS ===
 export type {

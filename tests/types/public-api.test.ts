@@ -20,6 +20,7 @@ import { Decimal } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 
 import {
+  addRateSource,
   createActionCategory,
   createChallengeCategory,
   createCostRequirement,
@@ -32,6 +33,9 @@ import {
   createSpatialGrid,
   createTuningRegistry,
   Formula,
+  getRate,
+  getRateSources,
+  type RateSource,
   type Engine,
   type EngineContext,
   type InjectionKey,
@@ -1671,5 +1675,13 @@ describe('Effect systems take Grants', () => {
   it('ModifierBinding no longer resolves from the root barrel', () => {
     // @ts-expect-error — removed; effect-system modifiers are Grants.
     type _ModifierBinding = import('@/index').ModifierBinding;
+  });
+});
+
+describe('rate sources', () => {
+  it('addRateSource returns its cleanup; the reads return Decimals', () => {
+    expectTypeOf(addRateSource).returns.toEqualTypeOf<() => void>();
+    expectTypeOf(getRate).returns.toEqualTypeOf<Decimal>();
+    expectTypeOf(getRateSources).returns.toEqualTypeOf<readonly RateSource[]>();
   });
 });
