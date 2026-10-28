@@ -24,6 +24,8 @@ import {
   createActionCategory,
   createChallengeCategory,
   createCostRequirement,
+  createMultiplicativeModifier,
+  selectionCheapest,
   createFlag,
   createEngine,
   createOverrideRegistry,
@@ -1483,6 +1485,28 @@ describe('ModifierChain.replace / reserve and slot surface (B5)', () => {
     expectTypeOf<ModifierChain['reserve']>().returns.toEqualTypeOf<ModifierChainSlot>();
     expectTypeOf<ModifierChainSlot['add']>().returns.toEqualTypeOf<() => void>();
     expectTypeOf<ModifierChainSlot['release']>().returns.toBeVoid();
+  });
+});
+
+describe('Modifier results are Decimal where the engine builds the modifier', () => {
+  it('a chain and the built-in factories return Decimal; a custom Modifier may return a number', () => {
+    // A numeric read off chain.apply needs no Decimal.fromValue. Modifier itself
+    // stays DecimalSource, so a hand-written modifier may still return a number.
+    expectTypeOf<ModifierChain['apply']>().returns.toEqualTypeOf<Decimal>();
+    expectTypeOf(
+      createMultiplicativeModifier({ multiplier: 2 }).apply,
+    ).returns.toEqualTypeOf<Decimal>();
+    expectTypeOf<Modifier['apply']>().returns.toEqualTypeOf<DecimalSource>();
+  });
+});
+
+describe('SelectionPolicy.pick takes a readonly list', () => {
+  it('accepts a readonly candidate list without a cast', () => {
+    const candidates: readonly { cost: number }[] = [{ cost: 1 }];
+    expectTypeOf(selectionCheapest<{ cost: number }>((c) => c.cost).pick)
+      .parameter(0)
+      .toEqualTypeOf<readonly { cost: number }[]>();
+    selectionCheapest<{ cost: number }>((c) => c.cost).pick(candidates);
   });
 });
 

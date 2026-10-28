@@ -61,9 +61,15 @@ type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
 
 /** Utility type for modifiers that have all optional methods defined */
 export type OperationModifier<T> = WithRequired<
-  Modifier,
+  DecimalModifier,
   'invert' | Extract<RequiredKeys<T>, keyof Modifier>
 >;
+
+/** A modifier the engine builds: its apply and invert return a `Decimal`, never a plain number. */
+type DecimalModifier = Omit<Modifier, 'apply' | 'invert'> & {
+  apply: (value: DecimalSource) => Decimal;
+  invert?: (value: DecimalSource) => Decimal;
+};
 
 // === ADDITIVE MODIFIER ===
 
@@ -321,7 +327,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
  */
 export function createSequentialModifier<T extends Modifier>(
   modifiers: T[],
-): WithRequired<Modifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
+): WithRequired<DecimalModifier, Extract<RequiredKeys<T>, keyof Modifier>> & {
   readonly children: readonly T[];
 } {
   const invertAll = (value: DecimalSource): Decimal =>
@@ -526,6 +532,10 @@ export type Grant =
 export interface ModifierChain extends Modifier {
   /** Unique id for this chain */
   readonly id: string;
+  /** Apply every enabled modifier in order, returning a `Decimal`. */
+  apply: (value: DecimalSource) => Decimal;
+  /** Invert every enabled modifier in reverse order; absent unless every modifier can invert. */
+  invert?: (value: DecimalSource) => Decimal;
   /**
    * Add a modifier to the chain. Returns a function to remove it.
    *
@@ -721,11 +731,11 @@ export function createModifierChain(id: string): ModifierChain {
 
   const chain: ModifierChain = {
     id,
-    get apply(): (value: DecimalSource) => DecimalSource {
+    get apply(): (value: DecimalSource) => Decimal {
       void itemsVersion.value;
       return composed.apply;
     },
-    get invert(): ((value: DecimalSource) => DecimalSource) | undefined {
+    get invert(): ((value: DecimalSource) => Decimal) | undefined {
       void itemsVersion.value;
       return composed.invert;
     },

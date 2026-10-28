@@ -61,7 +61,7 @@ export interface SelectionPolicy<T> {
    *   type in a custom policy.
    * @returns The chosen candidate, or `undefined` if no candidate scored.
    */
-  pick(candidates: T[], ctx?: unknown): T | undefined;
+  pick(candidates: readonly T[], ctx?: unknown): T | undefined;
 }
 
 /** Options for {@link selectionHybridPayback} */
