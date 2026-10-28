@@ -2,6 +2,16 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.9.1 (2026-10-28)
+
+### Features
+
+* **core:** rate sources on resources (9e4392e)
+* **systems:** producers add rate sources (37c6ba1)
+* **core:** flag registry and createFlag (b525f21)
+* the accessor and flag Gates fall back to the registries (1d694b7)
+* **harness:** fall back to the engine's accessor (c463e6e)
+
 ## 0.9.0 (2026-10-25)
 
 ### ⚠ Breaking changes
