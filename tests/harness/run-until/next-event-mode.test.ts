@@ -5,6 +5,8 @@ import { createMemoryStorage } from '@/core/save-manager';
 import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
+import { createProducerCategory } from '@/systems/producer-category';
+import { createGameStateAccessor } from '@/core/game-state-accessor';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -693,6 +695,67 @@ describe("runUntil({mode: 'next-event'}) guards", () => {
   const trackerAnalyzer = () => ({
     id: 'tracker',
     summarize: () => ({ id: 'tracker', metrics: {} }),
+  });
+
+  it("without options.accessor, reads the engine's accessor", () => {
+    resetAllPersistentContexts();
+    const engine = createEngine({
+      gameId: 'accessor-fallback',
+      persistence: false,
+      accessor: (services) => createGameStateAccessor(services),
+    });
+    engine.use({
+      id: 'gold',
+      install(ctx) {
+        const gold = createResource(0, { id: 'gold', displayName: 'gold' });
+        const mines = createProducerCategory<{ id: string }>({
+          id: 'mines',
+          mapProducer: () => ({ resource: gold, baseRate: 2, trigger: 'continuous' }),
+          registerTick: ctx.onTick,
+        });
+        mines.register({ id: 'mine' });
+        createPurchasableCategory<UpgradeDef>({
+          id: 'upgrades',
+          mapPurchasable: (def) => ({
+            display: { description: def.id },
+            requirements: [createCostRequirement({ resource: gold, cost: def.cost })],
+            limit: 1,
+          }),
+        }).register([{ id: 'pick', cost: 20 }]);
+        reached = () => bn(gold.value).gte(20);
+      },
+    });
+    let reached = () => false;
+    engine.start();
+    // The walker predicts 'pick' affordable from the mine's rate source, read
+    // through the engine's own accessor: 20 gold at 2/s.
+    const result = runUntil({
+      engine,
+      mode: 'next-event',
+      until: () => reached(),
+      maxSimTime: 60,
+      tickDelta: 1,
+    });
+    engine.stop();
+    expect(result.terminated).toBe('predicate');
+    expect(result.elapsedSimulated).toBeCloseTo(10, 0);
+  });
+
+  it('throws when neither options.accessor nor the engine has one', () => {
+    const engine = buildEmptyEngine('no-accessor');
+    expect(() =>
+      runUntil({ engine, mode: 'next-event', until: () => false, maxSimTime: 10 }),
+    ).toThrow(/runUntil: mode "next-event" needs an accessor/);
+    expect(() =>
+      runMatrixUntil({
+        cells: [{ id: 'c', buildEngine: () => buildEmptyEngine('no-accessor-cell') }],
+        seeds: [1],
+        until: () => false,
+        maxSimTime: 10,
+        mode: 'next-event',
+      }),
+    ).toThrow(/needs an accessor/);
+    engine.stop();
   });
 
   it('throws when setup returns analyzers', () => {

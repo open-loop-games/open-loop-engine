@@ -88,7 +88,7 @@ reduces the raw results of headless runs into per-metric stats, optional histogr
 - `function runMatrix(options: MatrixOptions): MatrixResult` — Run every `(cell, seed)` pair in deterministic cell-outer / seed-inner order. `src/harness/run-matrix.ts:45`
 - `function runMatrixUntil(options: MatrixUntilOptions): MatrixUntilResult` — Sync cartesian sweep over `cells × seeds` where each headless run terminates on a shared predicate (or `maxSimTime`). `src/harness/run-matrix-until.ts:58`
 - `function runSensitivity<C extends Cell | UntilCell = Cell>(options: SensitivityOptions<C>): SensitivityResult` — Run baseline plus every variant, then compute per-variant `{ absolute, relative }` deltas against the baseline per metric. `src/harness/run-sensitivity.ts:76`
-- `function runUntil(options: RunUntilOptions): RunUntilResult` — Drive `options.engine` via `engine.tickDriver.advanceTime(tickDelta)` until `options.until` returns `true` or `options.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:78`
+- `function runUntil(options: RunUntilOptions): RunUntilResult` — Drive `options.engine` via `engine.tickDriver.advanceTime(tickDelta)` until `options.until` returns `true` or `options.maxSimTime` sim-seconds have elapsed, whichever comes first. `src/harness/run-until.ts:81`
 - `interface TickCounter` — A live tick counter returned by createTickCounter. `src/harness/replay.ts:79`
 
 ## Solvers
@@ -111,21 +111,21 @@ the cartesian `cells × seeds` plan over `runHeadless`. It keeps the raw result 
 - `interface HistogramOptions` — Histogram options for one metric. `src/harness/types.ts:124`
 - `interface MatrixOptions` — Options for the matrix runner: N cells × M seeds, run synchronously in deterministic order. `src/harness/types.ts:210`
 - `interface MatrixResult` — Output of a runMatrix sweep — one CellResult per input cell, in cell order. `src/harness/types.ts:222`
-- `interface MatrixUntilOptions` — Options for runMatrixUntil, a `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:552`
-- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:578`
-- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:545`
+- `interface MatrixUntilOptions` — Options for runMatrixUntil, a `cells × seeds` predicate-bounded sweep. `src/harness/types.ts:554`
+- `interface MatrixUntilResult` — Output of a runMatrixUntil sweep — one CellResult per input cell. `src/harness/types.ts:580`
+- `type MatrixUntilWorkItem = WorkItem<UntilCell>` — One unit of work in a flat `cells × seeds` until-sweep. `src/harness/types.ts:547`
 - `interface MetricDelta` — Per-metric delta between a variant cell and the baseline. `src/harness/types.ts:320`
 - `interface MetricHistogram` — Counts of samples falling into consumer-declared buckets for one metric. `src/harness/types.ts:112`
 - `interface MetricStats` — Numeric summary of one metric across the headless runs of a cell. `src/harness/types.ts:92`
 - `interface RunContext` — The seed of one headless run, passed to the option callbacks that build, perturb and tear down that run, such as a Cell's `setup` and an UntilCell's `buildEngine`. `src/harness/types.ts:38`
 - `type RunMode = 'uniform' | 'next-event' | 'stasis-aware'` — The run mode shared by runUntil and runMatrixUntil. `src/harness/types.ts:30`
 - `interface RunUntilOptions` — Options for one predicate-bounded headless run. `src/harness/types.ts:398`
-- `interface RunUntilResult` — Result of a predicate-bounded headless run. `src/harness/types.ts:466`
+- `interface RunUntilResult` — Result of a predicate-bounded headless run. `src/harness/types.ts:468`
 - `interface SensitivityOptions<C extends Cell | UntilCell = Cell>` — Options for runSensitivity, a baseline-plus-variants sweep. `src/harness/types.ts:277`
 - `interface SensitivityResult` — Output of a sensitivity sweep — baseline cell plus one entry per variant, in the same order as SensitivityOptions.variants. `src/harness/types.ts:349`
 - `interface SensitivityVariantResult` — One variant's part of a SensitivityResult. `src/harness/types.ts:331`
 - `interface SweepAxis<V, C extends Cell | UntilCell = Cell>` — One sweep axis of a cartesian sensitivity sweep: an id, the values to try, and a `(baseline, value)` patch. `src/harness/types.ts:250`
-- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:505`
+- `interface UntilCell` — One cell in a runMatrixUntil sweep. `src/harness/types.ts:507`
 - `interface UntilContext` — Snapshot passed to an `until` predicate each time it is evaluated. `src/harness/types.ts:371`
 - `type UntilPredicate = (ctx: UntilContext) => boolean` — Predicate evaluated before each iteration of a runUntil loop. `src/harness/types.ts:390`
 - `interface Variant<C extends Cell | UntilCell = Cell>` — A named change to the baseline cell: the generic form of a domain-specific axis such as excluding upgrades. `src/harness/types.ts:235`

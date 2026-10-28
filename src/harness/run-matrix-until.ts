@@ -57,15 +57,6 @@ import type { CellResult, MatrixUntilOptions, MatrixUntilResult, RunUntilResult 
  */
 export function runMatrixUntil(options: MatrixUntilOptions): MatrixUntilResult {
   const mode = options.mode ?? 'uniform';
-  if (mode !== 'uniform') {
-    for (const cell of options.cells) {
-      if (!cell.buildAccessor) {
-        throw new Error(
-          `runMatrixUntil: mode "${mode}" requires UntilCell.buildAccessor on every cell (missing on "${cell.id}")`,
-        );
-      }
-    }
-  }
   const plan = createWorkPlan(options);
   const perCellRuns: RunUntilResult[][] = options.cells.map(() => []);
   const cellResults: (CellResult<RunUntilResult> | null)[] = options.cells.map(() => null);

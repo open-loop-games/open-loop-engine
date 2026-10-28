@@ -29,18 +29,21 @@
  *
  * - `'uniform'` (default) — the fixed-tick loop above. Content-blind.
  * - `'next-event'` — walker-visible event stepping with fast-tick fallbacks.
- *   Requires `options.accessor`, and takes no analyzers. `options.bisectTolSec`
+ *   Needs an accessor, and takes no analyzers. `options.bisectTolSec`
  *   can resolve the predicate's fire time within an advance.
  * - `'stasis-aware'` — the fixed-tick loop with a stasis check each iteration.
  *   When the walker reports no finite or opaque-predicate transition, it
- *   terminates with `terminated: 'unreachable'`. Requires `options.accessor`.
+ *   terminates with `terminated: 'unreachable'`. Needs an accessor.
  *
+ * The accessor is `options.accessor`, else the engine's own
+ * (`GameStateAccessorKey`).
  * {@link runMatrixUntil} is the `cells × seeds` counterpart.
  *
  * @cluster runners
  */
 
 import { seedRNG } from '@/primitives/rng';
+import { GameStateAccessorKey } from '@/core/game-state-accessor';
 import { createTransitionSnapshot } from './walker';
 import { runNextEventLoop, isStasis } from './run-until-helpers/next-event-mode';
 import { floorSteps } from './sim-time';
@@ -79,8 +82,12 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
   const { engine, until, maxSimTime } = options;
   const tickDelta = options.tickDelta ?? 0.05;
   const mode = options.mode ?? 'uniform';
-  if (mode !== 'uniform' && !options.accessor) {
-    throw new Error(`runUntil: mode "${mode}" requires options.accessor`);
+  // `tryInject?.` tolerates lightweight engine fakes.
+  const accessor = options.accessor ?? engine.tryInject?.(GameStateAccessorKey);
+  if (mode !== 'uniform' && !accessor) {
+    throw new Error(
+      `runUntil: mode "${mode}" needs an accessor. Pass options.accessor, or give the engine one with createEngine({ accessor }).`,
+    );
   }
   if (mode === 'next-event' && options.bisectTolSec !== undefined && !engine.saveManager) {
     throw new Error(
@@ -96,7 +103,7 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
   }
 
   if (mode === 'next-event') {
-    const out = runNextEventLoop(engine, options.accessor!, until, maxSimTime, tickDelta, {
+    const out = runNextEventLoop(engine, accessor!, until, maxSimTime, tickDelta, {
       bisectTolSec: options.bisectTolSec,
       stasisCheckInterval: options.stasisCheckInterval,
     });
@@ -112,7 +119,6 @@ export function runUntil(options: RunUntilOptions): RunUntilResult {
   const maxTicks = floorSteps(maxSimTime, tickDelta);
   let tick = 0;
   let terminated: 'predicate' | 'maxSimTime' | 'unreachable' = 'maxSimTime';
-  const accessor = options.accessor;
 
   while (tick <= maxTicks) {
     if (until({ iteration: tick, simTime: tick * tickDelta })) {

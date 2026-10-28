@@ -30,10 +30,10 @@ import type { BeatResult, BeatProbeOptions } from './types';
  * Mode dispatch (`options.mode`, default `'uniform'`):
  * - `'uniform'` — fixed-tick loop, content-blind. Default.
  * - `'next-event'` — walker-visible event stepping, for a beat whose live
- *   rate is too low to reach it soon. Requires `options.buildAccessor`.
+ *   rate is too low to reach it soon. Needs an accessor.
  * - `'stasis-aware'` — a stasis check each iteration; counts a seed in
- *   `counts.unreachable` when the walker confirms its beat cannot be reached. Requires
- *   `options.buildAccessor`.
+ *   `counts.unreachable` when the walker confirms its beat cannot be reached. Needs an
+ *   accessor: `options.buildAccessor`'s, else the engine's own.
  *
  * @param options — beats, seeds, new-engine factory, sim-time cap,
  *   optional `tickDelta`, optional `mode` + `buildAccessor`.
@@ -61,9 +61,6 @@ import type { BeatResult, BeatProbeOptions } from './types';
 export function runBeatProbe(options: BeatProbeOptions): BeatResult[] {
   const tickDelta = options.tickDelta ?? 1;
   const mode = options.mode ?? 'uniform';
-  if (mode !== 'uniform' && !options.buildAccessor) {
-    throw new Error(`runBeatProbe: mode "${mode}" requires options.buildAccessor`);
-  }
   const out: BeatResult[] = [];
   for (const beat of options.beats) {
     let engineForPredicate: Engine | undefined;

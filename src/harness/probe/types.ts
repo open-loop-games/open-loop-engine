@@ -64,9 +64,9 @@ export interface BeatResult {
 /**
  * Options for {@link runBeatProbe}. `buildEngine` is invoked per
  * `(beat, seed)` — the probe reuses the fresh-engine contract from
- * `runMatrixUntil`. `buildAccessor` is required when `mode !== 'uniform'`,
- * because the `'next-event'` and `'stasis-aware'` modes read content
- * through the walker.
+ * `runMatrixUntil`. The `'next-event'` and `'stasis-aware'` modes read
+ * content through the walker, with `buildAccessor`'s accessor, else the
+ * engine's own.
  */
 export interface BeatProbeOptions {
   /**
@@ -75,10 +75,10 @@ export interface BeatProbeOptions {
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**
-   * Build a read-side accessor for a newly built engine. Required when
-   * `mode !== 'uniform'`. Called once per `(beat, seed)` alongside
-   * `buildEngine`; the accessor must read the same state the engine ticks
-   * against.
+   * Build a read-side accessor for a newly built engine, for
+   * `mode !== 'uniform'`, in place of the engine's own. Called once per
+   * `(beat, seed)` alongside `buildEngine`; the accessor must read the same
+   * state the engine ticks against.
    */
   buildAccessor?: (engine: Engine) => GameStateAccessor;
   /**

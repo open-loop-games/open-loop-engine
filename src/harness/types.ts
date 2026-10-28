@@ -428,13 +428,15 @@ export interface RunUntilOptions {
   seed?: number;
   /**
    * Run mode. Defaults to `'uniform'`. See {@link RunMode}. Modes other than
-   * `'uniform'` require {@link accessor} to be set; throws at entry otherwise.
+   * `'uniform'` need an accessor: {@link accessor}, else the engine's own. With
+   * neither, throws at entry.
    */
   mode?: RunMode;
   /**
    * Read-side accessor used by `'next-event'` and `'stasis-aware'` modes to
-   * resolve resource amounts, rates, unlocks, and state paths into walker
+   * resolve resource amounts, rates, flags, and state paths into walker
    * transition distances. Must read the same state the engine ticks against.
+   * Defaults to the engine's own (`GameStateAccessorKey`).
    */
   accessor?: GameStateAccessor;
   /**
@@ -515,10 +517,10 @@ export interface UntilCell {
    */
   buildEngine: (ctx: RunContext) => Engine;
   /**
-   * Read-side accessor factory. Required when {@link MatrixUntilOptions.mode}
-   * is `'next-event'` or `'stasis-aware'` — those modes introspect content
-   * through the walker. Called once per `(cell, seed)` alongside
-   * `buildEngine`. The accessor must read the same state the engine ticks
+   * Read-side accessor factory, for the `'next-event'` and `'stasis-aware'`
+   * modes, which introspect content through the walker. Without it they read
+   * the engine's own accessor (`GameStateAccessorKey`). Called once per
+   * `(cell, seed)` alongside `buildEngine`. The accessor must read the same state the engine ticks
    * against. Stasis detection and event stepping are only as sound as the
    * distances the walker computes from it.
    */
@@ -562,10 +564,10 @@ export interface MatrixUntilOptions {
   onCellComplete?: (cell: CellResult<RunUntilResult>) => void;
   aggregate?: AggregateOptions;
   /**
-   * Run mode applied uniformly to every cell. Defaults to `'uniform'`. When
-   * `'next-event'` or `'stasis-aware'`, every {@link UntilCell} must supply
-   * {@link UntilCell.buildAccessor}; the runner throws at entry otherwise.
-   * See {@link RunMode}.
+   * Run mode applied uniformly to every cell. Defaults to `'uniform'`. In
+   * `'next-event'` and `'stasis-aware'`, a cell's accessor is
+   * {@link UntilCell.buildAccessor}'s, else its engine's own; a headless run
+   * with neither throws. See {@link RunMode}.
    */
   mode?: RunMode;
   /** See {@link RunUntilOptions.bisectTolSec}. Ignored when `mode !== 'next-event'`. */
