@@ -31,6 +31,7 @@ import {
   toPurchasableDisplay,
   type Purchasable,
   type PurchasableDisplay,
+  type ScalingPurchasableCost,
 } from './purchasable';
 import { getCurrentEngineCategories } from './engine-categories';
 import { createPredicateResolver, type Predicate, type PredicateResolver } from './gate';
@@ -48,15 +49,14 @@ export interface ProducerCategoryContext {
 
 /**
  * Purchase options for a producer purchased more than once.
- * Builds a {@link Purchasable} through `createScalingPurchasable`.
+ * Builds a {@link Purchasable} through `createScalingPurchasable`, and takes
+ * the same cost shapes ({@link ScalingPurchasableCost}). The geometric shape
+ * is not rounded. For whole-unit costs, pass
+ * `costFormula: (count) => Formula.exponential(count, baseCost, costRatio).floor()`.
  */
-export interface ProducerPurchaseOptions {
+export type ProducerPurchaseOptions = {
   /** Resource spent to purchase */
   costResource: Resource;
-  /** Cost of the first purchase. Can be a ref or getter, for a tunable or a scoped override. */
-  baseCost: Computable<DecimalSource>;
-  /** The cost ratio each purchase multiplies the next cost by. Can be a ref or getter, for a tunable or a scoped override. */
-  costRatio: Computable<DecimalSource>;
   /** The limit: the most purchases */
   limit?: Computable<DecimalSource>;
   /** Starting count (default 0) */
@@ -70,7 +70,7 @@ export interface ProducerPurchaseOptions {
    * `purchase(1)` purchases one either way. Default: `true` (`false` at `limit: 1`)
    */
   purchaseMaxByDefault?: Computable<boolean>;
-}
+} & ScalingPurchasableCost;
 
 /** A stock a converting producer draws for each unit of output. */
 export interface ProducerInput {
@@ -424,8 +424,7 @@ function buildProducer<Def extends { id: string }>(
         effectDescription,
         showCount,
         resource: pc.costResource,
-        baseCost: pc.baseCost,
-        costRatio: pc.costRatio,
+        ...buildPurchaseCost(pc),
         limit: pc.limit,
         initialCount: pc.initialCount,
         onPurchase: pc.onPurchase,
@@ -511,6 +510,13 @@ function buildProducer<Def extends { id: string }>(
  * draws at its realized rate. A category never removes a producer, so the
  * cleanups are dropped; the sources go with the engine's resources.
  */
+/** The one cost shape a producer's purchase options set, for its purchasable. */
+function buildPurchaseCost(pc: ProducerPurchaseOptions): ScalingPurchasableCost {
+  if (pc.costFormula !== undefined) return { costFormula: pc.costFormula };
+  if (pc.cost !== undefined) return { cost: pc.cost };
+  return { baseCost: pc.baseCost, costRatio: pc.costRatio };
+}
+
 function addProducerRateSources(producer: Producer, converter: ConverterState | undefined): void {
   const text = producer.id;
   if (!converter) {

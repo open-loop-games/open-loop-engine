@@ -13,6 +13,7 @@ import {
 } from '@/core/persistence';
 import type { DecimalSource } from '@/primitives/decimal';
 import { createScalingPurchasable } from '@/systems/purchasable';
+import { Formula } from '@/core/formulas/formulas';
 import { createResource } from '@/core/resource';
 import { createResourceBag } from '@/core/resource-bag';
 import { createMultiplicativeModifier, createAdditiveModifier } from '@/core/modifier';
@@ -361,6 +362,35 @@ describe('createProducerCategory', () => {
     tick(0.5);
     // 5 rate * 3 count * 0.5 dt = 7.5
     expect(new Decimal(gold.value).eq(7.5)).toBe(true);
+  });
+
+  it('takes a costFormula, so a floored cost ladder charges whole amounts', () => {
+    const { registerTick } = createManualTicks();
+    const coins = createTestResource('coins', 1000);
+
+    const category = createProducerCategory<BuildingDef>({
+      id: 'test-cost-formula',
+      mapProducer: (def) => ({
+        resource: coins,
+        baseRate: def.baseRate,
+        trigger: 'continuous',
+        purchase: {
+          costResource: coins,
+          costFormula: (count) => Formula.exponential(count, def.baseCost, def.costRatio).floor(),
+        },
+      }),
+      registerTick,
+    });
+    category.register({ id: 'hen', name: 'Hen', baseRate: 1, baseCost: 10, costRatio: 1.15 });
+    const hen = category.getProducer('hen')!.purchasable!;
+
+    hen.purchase(1);
+    hen.purchase(1);
+    // 10 + floor(11.5)
+    expect(new Decimal(coins.value).eq(1000 - 10 - 11)).toBe(true);
+    hen.purchaseMax();
+    expect(Decimal.eq(coins.value, Decimal.floor(coins.value))).toBe(true);
+    expect(Decimal.lt(coins.value, hen.getCost())).toBe(true);
   });
 
   it("passes a display object to the producer's purchasable", () => {

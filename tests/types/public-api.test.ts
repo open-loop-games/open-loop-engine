@@ -1086,7 +1086,12 @@ describe('Purchasable factories — id and options shape', () => {
       costRatio: () => scaling.value,
     });
     type Config = import('@/systems/producer-category').ProducerPurchaseOptions;
-    expectTypeOf<Config['costRatio']>().toEqualTypeOf<Computable<DecimalSource>>();
+    type Geometric = Extract<Config, { costRatio: unknown }>;
+    expectTypeOf<Geometric['costRatio']>().toEqualTypeOf<Computable<DecimalSource>>();
+    // A producer takes every cost shape a scaling purchasable takes.
+    type Cost = import('@/systems/purchasable').ScalingPurchasableCost;
+    expectTypeOf<Extract<Config, { costFormula: unknown }>>().toMatchTypeOf<Cost>();
+    expectTypeOf<Extract<Config, { cost: unknown }>>().toMatchTypeOf<Cost>();
   });
 
   it('each cost and effect shape takes its own key', async () => {
