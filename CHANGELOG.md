@@ -2,6 +2,16 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.10.1 (2026-10-28)
+
+### Features
+
+* **systems:** a producer's purchase takes every scaling cost shape, so its cost ladder can be floored (b703011)
+
+### Fixes
+
+* **core:** a modifier chain and the built-in modifiers return Decimal; pick takes a readonly list (62c6b41)
+
 ## 0.10.0 (2026-10-28)
 
 ### ⚠ Breaking changes
