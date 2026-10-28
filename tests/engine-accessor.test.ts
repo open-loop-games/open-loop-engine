@@ -1,30 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { toRef } from 'vue';
 import {
+  AccessorMethods,
   Decimal,
   FlagRegistryKey,
   GameStateAccessorKey,
-  ResourceRegistryKey,
   createEngine,
   createFlag,
-  createGameStateAccessor,
   createGateRequirement,
+  createProducerCategory,
   createResource,
-  type AccessorServices,
   type EngineModule,
   type EngineOptions,
   type GameStateAccessorMutator,
 } from '@/index';
 import { getCurrentGameStateAccessor } from '@/core/game-state-accessor';
 import { resetAllPersistentContexts } from '@/core/persistence';
-import { createResourceRegistry } from '@/core/registries';
 
 beforeEach(() => {
   resetAllPersistentContexts();
 });
 
 let ns = 0;
-function engineWith(gameId: string, accessor: EngineOptions['accessor']) {
+function engineWith(gameId: string, accessor?: EngineOptions['accessor']) {
   return createEngine({
     gameId,
     persistence: false,
@@ -36,42 +34,42 @@ function engineWith(gameId: string, accessor: EngineOptions['accessor']) {
 function goldModule(amount: number, install?: () => void): EngineModule {
   return {
     id: 'gold-mod',
-    install() {
-      createResource(amount, { id: 'gold' });
+    install(ctx) {
+      const gold = createResource(amount, { id: 'gold' });
+      createProducerCategory<{ id: string }>({
+        id: 'mines',
+        mapProducer: () => ({ resource: gold, baseRate: 2, trigger: 'continuous' }),
+        registerTick: ctx.onTick,
+      }).register({ id: 'mine' });
       install?.();
     },
   };
 }
 
-describe('EngineOptions.accessor — the factory form', () => {
-  it("is called once, before install, with the engine's resource registry", () => {
-    const calls: AccessorServices[] = [];
+describe('the engine-built accessor', () => {
+  it('without an accessor option, serves amounts, rates and flags from the registries', () => {
     let ambient: GameStateAccessorMutator | undefined;
-    let built: GameStateAccessorMutator | undefined;
-    const engine = engineWith('accessor-factory', (services) => {
-      calls.push(services);
-      return (built = createGameStateAccessor(services));
-    });
+    const engine = engineWith('accessor-default');
     engine.use(
       goldModule(5, () => {
+        createFlag({ id: 'seen-shop' }).value = true;
         ambient = getCurrentGameStateAccessor();
       }),
     );
     engine.start();
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.resourceRegistry).toBe(engine.tryInject(ResourceRegistryKey));
-    expect(calls[0]!.flagRegistry).toBe(engine.tryInject(FlagRegistryKey));
-    expect(ambient).toBe(built);
-    expect(engine.tryInject(GameStateAccessorKey)).toBe(built);
-    expect(Decimal.eq(built!.getAmount('gold'), 5)).toBe(true);
+    const accessor = engine.tryInject(GameStateAccessorKey)!;
+    expect(ambient).toBe(accessor);
+    expect(Decimal.eq(accessor.getAmount('gold'), 5)).toBe(true);
+    expect(Decimal.eq(accessor.getRate('gold'), 2)).toBe(true);
+    expect(Decimal.eq(accessor.getInflowRate!('gold'), 2)).toBe(true);
+    expect(accessor.getFlag('seen-shop')).toBe(true);
+    expect(accessor[AccessorMethods]!.has('getStateAt')).toBe(false);
     engine.stop();
   });
 
-  it("two engines' built accessors never see each other's resources", () => {
+  it("two engines' accessors never see each other's resources", () => {
     const build = (amount: number) => {
-      const engine = engineWith('accessor-isolation', (services) =>
-        createGameStateAccessor(services),
-      );
+      const engine = engineWith('accessor-isolation');
       engine.use(goldModule(amount));
       engine.start();
       return engine;
@@ -84,8 +82,8 @@ describe('EngineOptions.accessor — the factory form', () => {
     b.stop();
   });
 
-  it("a flag Gate over a built accessor reads the engine's flag registry", () => {
-    const engine = engineWith('accessor-flag', (services) => createGameStateAccessor(services));
+  it("a flag Gate reads the engine's flag registry", () => {
+    const engine = engineWith('accessor-flag');
     let met: { value: unknown } | undefined;
     let unknown: { value: unknown } | undefined;
     engine.use(
@@ -103,18 +101,93 @@ describe('EngineOptions.accessor — the factory form', () => {
     engine.stop();
   });
 
-  it('a plain accessor object is published under GameStateAccessorKey too', () => {
-    const accessor = createGameStateAccessor({ resourceRegistry: createResourceRegistry() });
-    const engine = engineWith('accessor-plain', accessor);
+  it('a state Gate without getStateAt fails at construction, naming it', () => {
+    const engine = engineWith('accessor-state-missing');
+    engine.use(
+      goldModule(0, () => {
+        createGateRequirement({
+          gate: { kind: 'state', path: 'phase', operator: 'eq', value: 'late' },
+        });
+      }),
+    );
+    expect(() => engine.start()).toThrow(/reads the accessor's getStateAt/);
+  });
+});
+
+describe('EngineOptions.accessor — options and wrap', () => {
+  it('the options build the default: state paths and allowNegative', () => {
+    const state: Record<string, unknown> = { phase: 'late' };
+    let late: { value: unknown } | undefined;
+    const engine = engineWith('accessor-options', {
+      getStateAt: (path) => state[path],
+      setStateAt: (path, value) => {
+        state[path] = value;
+      },
+      allowNegative: true,
+    });
+    engine.use(
+      goldModule(1, () => {
+        late = toRef(
+          createGateRequirement({
+            gate: { kind: 'state', path: 'phase', operator: 'eq', value: 'late' },
+          }).met,
+        );
+      }),
+    );
     engine.start();
-    expect(engine.tryInject(GameStateAccessorKey)).toBe(accessor);
+    const accessor = engine.tryInject(GameStateAccessorKey)!;
+    expect(late!.value).toBe(true);
+    accessor.applyResourceOp('gold', 'subtract', 3);
+    expect(Decimal.eq(accessor.getAmount('gold'), -2)).toBe(true);
     engine.stop();
+  });
+
+  it('wrap decorates the built default, and its result is the engine accessor', () => {
+    const seen: string[] = [];
+    let built: GameStateAccessorMutator | undefined;
+    const engine = engineWith('accessor-wrap', {
+      getStateAt: () => 'late',
+      wrap: (default_) => {
+        built = default_;
+        return {
+          ...default_,
+          applyResourceOp(id, op, value) {
+            seen.push(`${op} ${id}`);
+            default_.applyResourceOp(id, op, value);
+          },
+        };
+      },
+    });
+    engine.use(goldModule(1));
+    engine.start();
+    const accessor = engine.tryInject(GameStateAccessorKey)!;
+    expect(accessor).not.toBe(built);
+    // The spread keeps the built record, so the state path still counts as implemented.
+    expect(accessor[AccessorMethods]!.has('getStateAt')).toBe(true);
+    accessor.applyResourceOp('gold', 'add', 4);
+    expect(seen).toEqual(['add gold']);
+    expect(Decimal.eq(accessor.getAmount('gold'), 5)).toBe(true);
+    engine.stop();
+  });
+});
+
+describe('EngineOptions.accessor — the 0.9 forms', () => {
+  it('a factory or a built accessor throws at createEngine, naming the new shape', () => {
+    const factory = (() => ({})) as unknown as EngineOptions['accessor'];
+    expect(() => engineWith('accessor-old-factory', factory)).toThrow(
+      /accessor takes options plus wrap.*wrap: \(built\) =>/,
+    );
+    const object = {
+      getAmount: () => 0,
+      getFlag: () => false,
+    } as unknown as EngineOptions['accessor'];
+    expect(() => engineWith('accessor-old-object', object)).toThrow(/getAmount, getFlag/);
   });
 });
 
 describe('the flag registry', () => {
   it("flags a module creates register into that engine's flag registry", () => {
-    const engine = engineWith('flag-registry', undefined);
+    const engine = engineWith('flag-registry');
     engine.use({
       id: 'story',
       install() {

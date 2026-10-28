@@ -40,7 +40,11 @@ function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
       result = fn();
     },
   };
-  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  const engine = createEngine({
+    gameId: 'test',
+    persistence: false,
+    accessor: { wrap: () => accessor },
+  });
   engine.use(mod);
   engine.start();
   engine.stop();

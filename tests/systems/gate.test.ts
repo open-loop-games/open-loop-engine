@@ -155,7 +155,11 @@ function buildFixture(): {
     },
   };
 
-  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  const engine = createEngine({
+    gameId: 'test',
+    persistence: false,
+    accessor: { wrap: () => accessor },
+  });
   engine.use(game).use(observer);
   engine.start();
 
@@ -594,7 +598,8 @@ function buildAccessorlessFixture(): { runtime: GateServices; stop: () => void }
     id: 'observer',
     dependencies: ['game'],
     install() {
-      runtime = getAmbientGateServices();
+      // Every engine builds an accessor; drop it, to evaluate as a bundle without one does.
+      runtime = { ...getAmbientGateServices(), accessor: undefined };
     },
   };
 
@@ -628,10 +633,7 @@ describe('evaluateGate — no ambient accessor', () => {
 
   it("an accessor's getFlag wins over the flag registry", () => {
     const f = buildAccessorlessFixture();
-    const accessor = createGameStateAccessor(
-      { resourceRegistry: f.runtime.resourceRegistry! },
-      { getFlag: () => true },
-    );
+    const accessor = { ...accessorStub, getFlag: () => true };
     expect(evaluateGate({ kind: 'flag', id: 'met-rask' }, { ...f.runtime, accessor })).toBe(true);
     f.stop();
   });
@@ -792,15 +794,15 @@ describe('assertGateServices — the AccessorMethods record', () => {
     const f = buildAccessorlessFixture();
     const accessor = createGameStateAccessor({ resourceRegistry: f.runtime.resourceRegistry! });
     expect(() => assertGateServices(flagGate, { accessor }, 'site')).toThrow(
-      /^site: this Gate reads the accessor's getFlag or flagRegistry, .*Gate kinds in play: flag\. Supply it to createGameStateAccessor/,
+      /^site: this Gate reads the accessor's getFlag or flagRegistry, .*Gate kinds in play: flag\. Supply it in createEngine's accessor options/,
     );
     expect(() =>
       assertGateServices(flagGate, { accessor, flagRegistry: {} as FlagRegistry }, 'site'),
     ).not.toThrow();
-    const withFlag = createGameStateAccessor(
-      { resourceRegistry: f.runtime.resourceRegistry! },
-      { getFlag: () => true },
-    );
+    const withFlag = createGameStateAccessor({
+      resourceRegistry: f.runtime.resourceRegistry!,
+      flagRegistry: f.runtime.flagRegistry!,
+    });
     expect(() => assertGateServices(flagGate, { accessor: withFlag }, 'site')).not.toThrow();
     expect(() => assertGateServices(stateGate, { accessor: withFlag }, 'site')).toThrow(
       /reads the accessor's getStateAt,/,

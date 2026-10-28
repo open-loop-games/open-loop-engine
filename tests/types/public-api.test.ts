@@ -126,13 +126,17 @@ describe('createEngine type surface', () => {
     expectTypeOf(engine.tryInject(key)).toEqualTypeOf<{ hello: string } | undefined>();
   });
 
-  it('accessor takes an object or a factory over the engine services', async () => {
+  it('accessor takes options plus wrap; its options hold no flag or rate reads', async () => {
     const { createGameStateAccessor, GameStateAccessorKey } = await import('@/index');
     type Accessor = import('@/index').GameStateAccessorMutator;
     type Services = import('@/index').AccessorServices;
+    type Options = import('@/index').EngineAccessorOptions;
     expectTypeOf<import('@/engine').EngineOptions['accessor']>().toEqualTypeOf<
-      Accessor | ((services: Services) => Accessor) | undefined
+      Options | undefined
     >();
+    expectTypeOf<Options['wrap']>().toEqualTypeOf<((built: Accessor) => Accessor) | undefined>();
+    expectTypeOf<Options>().not.toHaveProperty('getFlag');
+    expectTypeOf<Options>().not.toHaveProperty('getRate');
     expectTypeOf(createGameStateAccessor).returns.toEqualTypeOf<Accessor>();
     expectTypeOf(createGameStateAccessor).parameter(0).toEqualTypeOf<Services>();
     const engine = createEngine({ gameId: 'type-test' });

@@ -83,7 +83,11 @@ function bootstrap<T>(install: (api: BootstrapApi) => T): { result: T; stop: () 
     },
   };
 
-  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  const engine = createEngine({
+    gameId: 'test',
+    persistence: false,
+    accessor: { wrap: () => accessor },
+  });
   engine.use(game);
   engine.start();
 

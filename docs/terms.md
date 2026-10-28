@@ -200,7 +200,7 @@ A loose "tier" or "layer" takes an everyday word: sort rank, test suite, "by aud
 | CI7 | **content**, **content registry** | the game content a consumer supplies; a category's id-to-def store, with patching | content, for lowered grants |
 | CI8 | **chain registry**, **effect-system registry**, **resource registry**, **flag registry**, **override registry**, **tuning registry**, **persistent-ref registry** | the per-engine registries, always qualified | bare "registry", global engine registry |
 | CI9 | **category** | a batch-registration system for one kind of content | category system |
-| CI10 | **Gate service**, **accessor services**, **handle** | a named engine service a Gate kind reads (`GateService`); the engine services an accessor factory receives (`AccessorServices`); an object returned to control one thing | handle, for a Gate service |
+| CI10 | **Gate service**, **accessor services**, **handle** | a named engine service a Gate kind reads (`GateService`); the registries `createGameStateAccessor` reads (`AccessorServices`); an object returned to control one thing | handle, for a Gate service |
 | CI11 | **subject**, **achievement**, **threshold** | a named thing in a subject category; an item earned once its goal holds; the value a tracked quantity must reach | entity (for a subject), milestone (for an achievement) |
 
 ### BB — the engine's building blocks

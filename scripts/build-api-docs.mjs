@@ -344,7 +344,7 @@ function renderIndex(byCluster) {
     '| softcap / bend a value past a threshold | `Formula.step` → mechanics.md#formulas |',
     '| declarative Gate (data-driven predicate) | mechanics.md#gate |',
     '| saved flag / progression flag / a flag derived from game state | `createFlag` → mechanics.md#flags |',
-    '| wire a game-state accessor / state paths for Gates and effects | flags and rates come from the flag registry and rate sources; `createGameStateAccessor` adds state paths, passed as `createEngine({ accessor: (services) => … })` → runtime.md#game-state-accessor |',
+    '| wire a game-state accessor / state paths for Gates and effects | the engine builds it: flags and rates from the flag registry and rate sources; state paths as `createEngine({ accessor: { getStateAt, setStateAt } })`, and `wrap` to decorate it → runtime.md#game-state-accessor |',
     '| new content category (skill, purchasable, producer, …) | composition.md#category-base |',
     '| branching dialog graph | content-narrative.md#dialog |',
     '| dialog choice effects / authored outcomes | content-narrative.md#dialog, mechanics.md#effects |',

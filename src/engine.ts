@@ -46,9 +46,10 @@ import {
 } from './core/override-registry';
 import {
   GameStateAccessorKey,
+  createGameStateAccessor,
   withGameStateAccessor,
-  type AccessorServices,
   type GameStateAccessorMutator,
+  type GameStateAccessorOptions,
 } from './core/game-state-accessor';
 import {
   CategoriesKey,
@@ -316,16 +317,32 @@ export interface EngineOptions {
    */
   persistenceNamespace?: string;
   /**
-   * The game-state accessor and mutator: an object, or a factory the engine
-   * calls once at `start()`, before any module installs, with the engine's
-   * services. Pass `(services) => createGameStateAccessor(services, { … })` to
-   * build one over this engine's resource and flag registries. Category factories
-   * (`createChallengeCategory`, etc.) read it as an ambient value when a
-   * category has no `accessor` option. After `start()`, read it with
+   * What the engine's game-state accessor adds to its registries. The engine
+   * always builds the accessor at `start()`, before any module installs:
+   * amounts and rates from the resource registry, flags from the flag
+   * registry. These options add state paths and the subtract policy, and
+   * `wrap` decorates the result. Category factories (`createChallengeCategory`,
+   * etc.) read the accessor as an ambient value when a category has no
+   * `accessor` option. After `start()`, read it with
    * `engine.tryInject(GameStateAccessorKey)`. Its methods are called only
    * during play, not during install/connect.
    */
-  accessor?: GameStateAccessorMutator | ((services: AccessorServices) => GameStateAccessorMutator);
+  accessor?: EngineAccessorOptions;
+}
+
+/**
+ * The options of the engine-built game-state accessor: the state paths and
+ * subtract policy of {@link GameStateAccessorOptions}, and a hook that
+ * decorates the built accessor.
+ */
+export interface EngineAccessorOptions extends GameStateAccessorOptions {
+  /**
+   * Decorate the built accessor, such as to route one resource's writes
+   * through a game rule. Its result is the engine's accessor. Spreading the
+   * built accessor keeps its `AccessorMethods` record; a method the wrapper
+   * adds joins that record too, or construction checks treat it as missing.
+   */
+  wrap?: (built: GameStateAccessorMutator) => GameStateAccessorMutator;
 }
 
 /**
@@ -448,6 +465,38 @@ function assertPersistenceNamespaceFree(options: EngineOptions): void {
   );
 }
 
+/** The keys {@link EngineAccessorOptions} accepts. */
+const ACCESSOR_OPTION_KEYS: ReadonlySet<string> = new Set<keyof EngineAccessorOptions>([
+  'getStateAt',
+  'setStateAt',
+  'allowNegative',
+  'wrap',
+]);
+
+/**
+ * Throw when `accessor` has an earlier engine's shape: a factory, or a built
+ * accessor. A built accessor shares `getStateAt` with the options, so the
+ * type alone does not catch one passed through a variable.
+ */
+function assertAccessorOptions(options: EngineOptions): void {
+  const { accessor } = options;
+  if (accessor === undefined) return;
+  const remedy =
+    'Flags come from createFlag and rates from rate sources; pass state paths as ' +
+    '`accessor: { getStateAt, setStateAt }`, and decorate the built accessor with `wrap: (built) => …`.';
+  if (typeof accessor === 'function') {
+    throw new Error(
+      `[engine] createEngine("${options.gameId}"): accessor takes options plus wrap, not a factory. ${remedy}`,
+    );
+  }
+  const unknown = Object.keys(accessor).filter((key) => !ACCESSOR_OPTION_KEYS.has(key));
+  if (unknown.length > 0) {
+    throw new Error(
+      `[engine] createEngine("${options.gameId}"): accessor has ${unknown.join(', ')}, which its options do not take. ${remedy}`,
+    );
+  }
+}
+
 /**
  * Creates the top-level engine orchestrator that wires together the TickDriver,
  * save manager, module system, and mod support.
@@ -458,7 +507,8 @@ function assertPersistenceNamespaceFree(options: EngineOptions): void {
  *   ticking. Exposes the TickDriver, save manager, and mod selection. With persistence
  *   on (the default) the game autosaves every 30 s once a `load()` has run.
  * @throws When another live engine uses the same persistence namespace. Give each
- *   engine its own `persistenceNamespace`, or `dispose()` the first one.
+ *   engine its own `persistenceNamespace`, or `dispose()` the first one. Also
+ *   when `accessor` is a factory or a built accessor, the shapes before 0.10.
  *
  * @example
  * ```ts
@@ -470,6 +520,7 @@ function assertPersistenceNamespaceFree(options: EngineOptions): void {
  * ```
  */
 export function createEngine(options: EngineOptions): Engine {
+  assertAccessorOptions(options);
   const modules: EngineModule[] = [];
   const saveCallbacks: SaveHandler[] = [];
   const loadCallbacks: LoadHandler[] = [];
@@ -669,12 +720,11 @@ export function createEngine(options: EngineOptions): Engine {
         // Per-engine flag registry — auto-populated by createFlag calls via
         // the ambient set below.
         const flagRegistry = createFlagRegistry();
-        // Built here, so a factory accessor reads this engine's registries and
-        // no other. Its reads are lazy, so the registries may still be empty.
-        const accessor =
-          typeof options.accessor === 'function'
-            ? options.accessor({ resourceRegistry, flagRegistry })
-            : options.accessor;
+        // Built here, over this engine's registries and no other. Its reads
+        // are lazy, so the registries may still be empty.
+        const { wrap, ...accessorOptions } = options.accessor ?? {};
+        const built = createGameStateAccessor({ resourceRegistry, flagRegistry }, accessorOptions);
+        const accessor = wrap ? wrap(built) : built;
         // Per-engine categories collection — auto-populated by the
         // category factories (createProducerCategory etc.) via the ambient
         // set below. Pre-provided under CategoriesKey so balance-harness tooling

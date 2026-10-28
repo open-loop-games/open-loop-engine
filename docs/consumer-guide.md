@@ -80,16 +80,15 @@ Two predicate-requirement forms, in preference order:
 - `createGateRequirement({ gate })` — the Gate form. Write the predicate as a `Gate` AST (`resource-gte`, `cumulative-gte`, `count-gte`, `active`, `flag`, `state`, `all`/`any`/`not`). The factory wraps it in the `Requirement` contract. Only a Gate is serializable for saves, mods and the balance harness. Only a Gate supports `timeUntilGateFlip` for predictor UIs. Use this form whenever a Gate can express the predicate.
 - `createBooleanRequirement({ met })` — the closure form. Use it when no Gate kind fits the predicate: arbitrary computation across systems, or opaque consumer state. It returns the same requirement shape as the Gate form, but the predicate is not introspectable.
 
-**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. A `flag` Gate reads the engine's flag registry, which `createFlag` fills. `state` Gates, effects, and every prediction of a resource Gate need an accessor ([§ Data and live state separation](#data-and-live-state-separation)). `createGameStateAccessor` builds one over the engine's registries: amounts from the resource registry, rates from each resource's rate sources, flags from the flag registry. You supply state paths, and any flag or rate read your game keeps itself, which then wins:
+**What a Gate needs wired.** A Gate reads only the Gate services its kinds use, from the ambient Gate services. So build Gates inside `install()` / `connect()`, and hold the result. The engine builds its game-state accessor at `start()` ([§ Data and live state separation](#data-and-live-state-separation)): amounts from the resource registry, rates from each resource's rate sources, flags from the flag registry. You supply only state paths, and `wrap` decorates the result:
 
 ```ts
 const engine = createEngine({
   gameId: 'my-game',
-  accessor: (services) => // opt-in: category, resource-amount and flag Gates need none
-    createGameStateAccessor(services, {
-      getStateAt: (path) => state[path],
-      setStateAt: (path, value) => (state[path] = value),
-    }),
+  accessor: { // optional: only state Gates and effects need it
+    getStateAt: (path) => state[path],
+    setStateAt: (path, value) => (state[path] = value),
+  },
 });
 // in a module's install():
 createFlag({ id: 'seen-shop' }); // saved; a 'flag' effect sets it
@@ -139,9 +138,10 @@ The difficulty is a predicate over live state. An achievement's `goal` must look
 
 Gate kinds split by what they read, and the split decides what you wire:
 
-- **Accessor-backed leaves** (`state`, `flag`) read the accessor. A `flag` leaf falls back to the flag registry where no accessor serves `getFlag`, so it needs no accessor. `timeUntilGateFlip` cannot predict them.
-- **Resource leaves** (`resource-gte`, `cumulative-gte`) evaluate without an accessor. `resource-gte` reads the registered resource's amount, unless a wired accessor's `getAmount` serves it. `cumulative-gte` reads the resource's lifetime total. A prediction of either needs the accessor's `getRate`. `cumulative-gte` divides by the inflow rate: the accessor's `getInflowRate`, which `createGameStateAccessor` serves from rate sources. An accessor given its own `getRate` alone uses the net rate instead, which overstates the time while anything subtracts.
-- **Category-aware leaves** (`count-gte`, `active`) read through `CategoryEntrySignals`, and need no accessor. Use them when the unlock or the count *is* a category entry.
+- **Accessor-backed leaves** (`state`, `flag`) read the accessor: state paths from its options, flags from the flag registry. `timeUntilGateFlip` cannot predict them.
+- **Resource leaves** (`resource-gte`, `cumulative-gte`) read the resource registry: the amount, or the lifetime total. A prediction of either reads the accessor's rates, which come from rate sources. `cumulative-gte` divides by the inflow rate.
+- **Category-aware leaves** (`count-gte`, `active`) read through `CategoryEntrySignals`. Use them when the unlock or the count *is* a category entry.
+- Outside an engine, as in a test, a bundle without an accessor still evaluates the resource, flag and category leaves, from the registries and categories it holds.
 - **Combinators** (`all`, `any`, `not`) combine either kind. Children go in an `of` field: `of: Gate[]` for `all` / `any`, `of: Gate` for `not`.
 
 **When NOT to use a Gate.** With typed refs at hand, `hasResource(wood, 50)` is clearer than `{ kind: 'resource-gte', resource: 'wood', value: 50 }`. The data-side discipline is for *defs*, where a closure cannot be anyway. Typed call sites inside module code stay typed.

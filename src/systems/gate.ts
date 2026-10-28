@@ -596,8 +596,8 @@ function missingServicesError(
 
 /**
  * The accessor a prediction reads rates through, or throw saying so. Rates
- * have no registry source, so a Gate that evaluates without an accessor
- * still needs one to predict.
+ * reach a prediction only through the accessor, so a bundle that evaluates
+ * without one still needs one to predict.
  */
 function demandRateAccessor(services: GateServices, kind: Gate['kind']): GameStateAccessor {
   const { accessor } = services;
@@ -655,7 +655,7 @@ function flagOf(gate: FlagGate, services: GateServices): boolean {
 /** Where an author gets a missing Gate service from, for the error messages. */
 function serviceRemedy(service: GateService): string {
   return service === 'accessor'
-    ? 'Pass the accessor to createEngine({ accessor }) or pass one explicitly, and collect the Gate services inside engine install/connect.'
+    ? 'Every engine provides one: collect the Gate services inside engine install/connect, or pass an accessor explicitly.'
     : `The ${service} is set only inside engine install/connect; build the predicate resolver there.`;
 }
 

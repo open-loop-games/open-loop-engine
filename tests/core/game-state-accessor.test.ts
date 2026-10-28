@@ -98,44 +98,36 @@ describe('createGameStateAccessor — resource writes', () => {
 });
 
 describe('createGameStateAccessor — supplied and omitted methods', () => {
-  it('forwards a supplied method', () => {
+  it('forwards supplied state paths', () => {
     const { services } = registryWith({});
-    const flags: Record<string, boolean> = {};
+    const state: Record<string, unknown> = {};
     const accessor = createGameStateAccessor(services, {
-      getFlag: (id) => flags[id] ?? false,
-      setFlag: (id, value) => {
-        flags[id] = value;
+      getStateAt: (path) => state[path],
+      setStateAt: (path, value) => {
+        state[path] = value;
       },
     });
-    accessor.setFlag('gate-open', true);
-    expect(accessor.getFlag('gate-open')).toBe(true);
+    accessor.setStateAt('phase', 'late');
+    expect(accessor.getStateAt('phase')).toBe('late');
   });
 
-  it('an omitted method throws, naming the kind that called it', () => {
+  it('an omitted method throws, naming the kind that called it and its remedy', () => {
     const { services } = registryWith({});
     const accessor = createGameStateAccessor(services);
-    expect(() => accessor.getFlag('x')).toThrow(/'flag' Gate or condition called getFlag/);
-    expect(() => accessor.setStateAt('a.b', 1)).toThrow(/'state' effect called setStateAt/);
-  });
-
-  it('the record lists the registry methods plus exactly the supplied ones', () => {
-    const { services } = registryWith({});
-    const accessor = createGameStateAccessor(services, { getFlag: () => false });
-    expect([...accessor[AccessorMethods]!].sort()).toEqual(
-      ['applyResourceOp', 'getAmount', 'getFlag', 'getInflowRate', 'getRate'].sort(),
+    expect(() => accessor.getFlag('x')).toThrow(
+      /'flag' Gate or condition called getFlag.*flagRegistry/,
+    );
+    expect(() => accessor.setStateAt('a.b', 1)).toThrow(
+      /'state' effect called setStateAt.*accessor: \{ setStateAt \}/,
     );
   });
 
-  it('a supplied getRate without getInflowRate leaves getInflowRate absent', () => {
+  it('the record lists the registry methods plus exactly the supplied state paths', () => {
     const { services } = registryWith({});
-    const accessor = createGameStateAccessor(services, { getRate: () => Decimal.dOne });
-    expect(accessor.getInflowRate).toBeUndefined();
-    expect(accessor[AccessorMethods]!.has('getInflowRate')).toBe(false);
-    const withInflow = createGameStateAccessor(services, {
-      getRate: () => Decimal.dOne,
-      getInflowRate: () => Decimal.dOne,
-    });
-    expect(withInflow[AccessorMethods]!.has('getInflowRate')).toBe(true);
+    const accessor = createGameStateAccessor(services, { getStateAt: () => undefined });
+    expect([...accessor[AccessorMethods]!].sort()).toEqual(
+      ['applyResourceOp', 'getAmount', 'getInflowRate', 'getRate', 'getStateAt'].sort(),
+    );
   });
 });
 
@@ -155,13 +147,6 @@ describe('createGameStateAccessor — rates from rate sources', () => {
     expect(() => accessor.getRate('gold')).toThrow(/'gold'.*no rate sources/);
     expect(() => accessor.getInflowRate!('gold')).toThrow(/'gold'.*no rate sources/);
     expect(getRate(resources.gold!).eq(0)).toBe(true);
-  });
-
-  it('a supplied getRate wins over the rate sources', () => {
-    const { services, resources } = registryWith({ gold: 5 });
-    addRateSource(resources.gold!, { text: 'mines', rate: 3 });
-    const accessor = createGameStateAccessor(services, { getRate: () => Decimal.dTen });
-    expect(Decimal.eq(accessor.getRate('gold'), 10)).toBe(true);
   });
 });
 
@@ -193,12 +178,6 @@ describe('createGameStateAccessor — flags from the flag registry', () => {
     const accessor = createGameStateAccessor(flagsWith(() => {}));
     expect(() => accessor.getFlag('nope')).toThrow(/no flag 'nope'/);
     expect(() => accessor.setFlag('nope', true)).toThrow(/no flag 'nope'/);
-  });
-
-  it('a supplied getFlag wins over the flag registry', () => {
-    const services = flagsWith(() => createFlag({ id: 'seen-shop' }));
-    const accessor = createGameStateAccessor(services, { getFlag: () => true });
-    expect(accessor.getFlag('seen-shop')).toBe(true);
   });
 
   it('without a flag registry, getFlag and setFlag are left out of the record', () => {

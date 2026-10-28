@@ -6,7 +6,6 @@ import { createCostRequirement } from '@/core/requirements';
 import { createPurchasableCategory } from '@/systems/purchasable-category';
 import { createChallengeCategory } from '@/systems/challenge-category';
 import { createProducerCategory } from '@/systems/producer-category';
-import { createGameStateAccessor } from '@/core/game-state-accessor';
 import { resetAllPersistentContexts } from '@/core/persistence';
 import { bn } from '@/primitives/decimal';
 import type { GameStateAccessor } from '@/primitives/types';
@@ -699,11 +698,7 @@ describe("runUntil({mode: 'next-event'}) guards", () => {
 
   it("without options.accessor, reads the engine's accessor", () => {
     resetAllPersistentContexts();
-    const engine = createEngine({
-      gameId: 'accessor-fallback',
-      persistence: false,
-      accessor: (services) => createGameStateAccessor(services),
-    });
+    const engine = createEngine({ gameId: 'accessor-fallback', persistence: false });
     engine.use({
       id: 'gold',
       install(ctx) {
@@ -742,19 +737,12 @@ describe("runUntil({mode: 'next-event'}) guards", () => {
   });
 
   it('throws when neither options.accessor nor the engine has one', () => {
+    // Every engine builds an accessor; a fake that injects nothing stands in for one without.
     const engine = buildEmptyEngine('no-accessor');
+    const bare: Engine = Object.assign(Object.create(engine), { tryInject: () => undefined });
     expect(() =>
-      runUntil({ engine, mode: 'next-event', until: () => false, maxSimTime: 10 }),
+      runUntil({ engine: bare, mode: 'next-event', until: () => false, maxSimTime: 10 }),
     ).toThrow(/runUntil: mode "next-event" needs an accessor/);
-    expect(() =>
-      runMatrixUntil({
-        cells: [{ id: 'c', buildEngine: () => buildEmptyEngine('no-accessor-cell') }],
-        seeds: [1],
-        until: () => false,
-        maxSimTime: 10,
-        mode: 'next-event',
-      }),
-    ).toThrow(/needs an accessor/);
     engine.stop();
   });
 

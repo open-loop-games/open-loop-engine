@@ -42,7 +42,11 @@ function withEngine<T>(accessor: GameStateAccessorMutator, fn: () => T): T {
       result = fn();
     },
   };
-  const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+  const engine = createEngine({
+    gameId: 'test',
+    persistence: false,
+    accessor: { wrap: () => accessor },
+  });
   engine.use(mod);
   engine.start();
   engine.stop();
@@ -360,7 +364,11 @@ describe('createSubjectCategory', () => {
 
     it('auto-registers into EngineCategories.subjects when constructed inside an engine', () => {
       const accessor = buildAccessor();
-      const engine = createEngine({ gameId: 'test', persistence: false, accessor });
+      const engine = createEngine({
+        gameId: 'test',
+        persistence: false,
+        accessor: { wrap: () => accessor },
+      });
       let categoryId: string | undefined;
       engine.use({
         id: 'test',
