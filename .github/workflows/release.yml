@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # GitHub mirrors this repo from Gitea, which runs .github/workflows/
+    # whenever .gitea/workflows/ is absent.
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      # npm publishes a tarball without running its lifecycle scripts, so the
+      # checks behind prepublishOnly, and the rest of CI's, run here.
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:nodenext
+
+      - name: docs/api matches a clean build
+        run: |
+          if [ -n "$(git status --porcelain -- docs/api)" ]; then
+            git status --short -- docs/api
+            echo "docs/api is stale: run pnpm build and commit the result."
+            exit 1
+          fi
+
+      # The release commit sets the version; a tag that disagrees was cut wrong,
+      # and publishing it would put the wrong code under that version.
+      - name: Tag matches package.json
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME#v}" != "$PKG_VERSION" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package.json ${PKG_VERSION}"
+            exit 1
+          fi
+
+      # pnpm pack rewrites pnpm-only specifiers. npm publish then does the
+      # trusted-publishing exchange and attaches provenance, which needs
+      # npm 11.5.1 or later.
+      - run: npm install -g npm@^11.5.1
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - run: npm publish "$RUNNER_TEMP"/*.tgz --access public
