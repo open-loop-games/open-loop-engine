@@ -66,8 +66,6 @@ The engine contains its own docs, in the repo and in the installed package under
 - **`docs/consumer-guide-balance.md`** — how numbers get chosen and verified: the closed-form spine, the probe that contradicts it, and the balance loop between them.
 - **`docs/consumer-guide-balance-automated-player.md`** — balance when an automated player plays the game your probe measures. It covers calibrating the automated player, what it can't measure, and the balance harness checks that keep its readings honest.
 
-- **`docs/domain-map.md`** — `ol-domain-map`, the bin that generates a vocabulary map of _your_ game's domain types from their structure.
-
 `docs/api/` is generated from TSDoc, and each entry ends in a `src/…:line` pointer. `src/` ships for exactly that reason, so those pointers resolve in an installed copy. It is reference material, not an import surface, because `exports` admits only the subpaths listed above.
 
 API migration guidance for a breaking change is in the body of its `feat!:`/`fix!:` commit. It is lifted verbatim into `CHANGELOG.md`; there is no separate migration doc. The changelog ships in the package. So after an upgrade, the installed copy lists every change between the version you left and the one you're on.
