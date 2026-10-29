@@ -2,6 +2,12 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.10.2 (2026-10-29)
+
+### Fixes
+
+* **package:** repository, homepage and bugs point at the GitHub repo (d072033)
+
 ## 0.10.1 (2026-10-28)
 
 ### Features
