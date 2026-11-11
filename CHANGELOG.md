@@ -2,6 +2,14 @@
 
 All notable changes to `@open-loop/engine`. Entries are generated from conventional commits by git-cliff; breaking changes carry their migration inline.
 
+## 0.10.3 (2026-11-11)
+
+### Fixes
+
+* **core:** a power is exact where doubles hold it (fefc91a)
+* **primitives:** formatTime prints whole seconds from one minute up (a765e95)
+* **systems:** a producer's rate source is labeled with its display title (a35b22a)
+
 ## 0.10.2 (2026-10-29)
 
 ### Fixes
