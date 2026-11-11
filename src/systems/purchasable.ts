@@ -265,7 +265,7 @@ export type ScalingPurchasableOptions = {
   ScalingPurchasableEffect;
 
 /**
- * A purchasable — the returned object from {@link createPurchasable}.
+ * A purchasable — the object every purchasable factory returns.
  *
  * Read `count.value` for the purchase count, or `active.value` for "is it on?" checks.
  * Call `purchase()` or `purchaseMax()` to purchase.
@@ -313,7 +313,8 @@ export interface Purchasable {
   /**
    * Purchase. A passed count caps the purchase. Omitted, it purchases max when
    * `purchaseMaxByDefault` is on (the default for anything but a one-shot), up
-   * to the cost's `maxBulkCount`, and one when it's off.
+   * to the cost's `maxBulkCount`, and one when it's off. With it off, a passed
+   * count above one still takes one unit: read `countToPurchase` for a quote.
    * Returns how many units this purchase took, or `0` when it took none. So
    * `if (p.purchase())` reads as "something was purchased".
    */
@@ -708,7 +709,7 @@ export function createPurchasable(
  * @param predicates - resolver `visible` adopts through. Defaults to one
  *   over the ambient Gate services, so build inside engine install/connect when
  *   `visible` is a Gate
- * @returns A {@link Purchasable} (same return type as createPurchasable)
+ * @returns A {@link Purchasable}, as a purchasable category builds
  *
  * @example Geometric (most common)
  * ```ts

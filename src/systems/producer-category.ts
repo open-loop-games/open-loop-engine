@@ -66,8 +66,9 @@ export type ProducerPurchaseOptions = {
   /** Whether this producer is visible in the UI. Default: `true` */
   visible?: Predicate;
   /**
-   * Whether a bare `purchasable.purchase()` purchases max rather than one;
-   * `purchase(1)` purchases one either way. Default: `true` (`false` at `limit: 1`)
+   * Whether a purchase purchases max. Off, every `purchase()` and
+   * `purchaseMax()` takes one unit, a passed count above one included.
+   * Default: `true` (`false` at `limit: 1`)
    */
   purchaseMaxByDefault?: Computable<boolean>;
 } & ScalingPurchasableCost;
@@ -188,7 +189,13 @@ export interface ProducerCategoryOptions<Def extends { id: string }, DefState = 
    */
   mapState?: (def: Def, producer: Producer) => DefState;
 
-  /** Tick registration function (typically ctx.onTick from the engine) */
+  /**
+   * Tick registration function (typically ctx.onTick from the engine). The
+   * rate sources presume it runs every tick. Under a registration that skips
+   * ticks, a plain producer's rate source still reads its nominal rate, and a
+   * converter's keeps its last realized rate. To stop production, bind a ×0
+   * modifier into each `rateChain` instead: every rate source then reads 0.
+   */
   registerTick: RegisterTick;
 }
 
@@ -228,7 +235,8 @@ export interface Producer {
    * back. `computedRate × count` is what it would make unbounded. A load or a
    * reset starts it over at 0, with `bottleneck` at `'rate'`, until the next tick.
    * The converter's rate sources read it, so for that tick they read 0 too, and a
-   * prediction over its output finds no rate. Present only when `inputs` is set.
+   * prediction over its output finds no rate. It keeps its last value while the
+   * category's tick does not run. Present only when `inputs` is set.
    */
   readonly realizedRate?: Readonly<Ref<DecimalSource>>;
   /** What held back a converter's last tick. Present only when `inputs` is set. */

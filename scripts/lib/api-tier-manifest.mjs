@@ -39,7 +39,7 @@ export const TIER_MANIFEST = [
       '`F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews. End a cost curve in `.round()` for whole-unit costs; purchase max still works. `.floor()` and `.ceil()` can read one off where a decimal cost ratio gives a whole cost.',
       '`Gate` / `E` — declarative predicates and effects, where save, mod or balance-harness data needs a serializable shape.',
       '`createFlag` — a saved or derived named boolean, which `flag` Gates, conditions and effects reach by id.',
-      '`createTimedProgress` — tick-driven progress for actions, workers, and staged costs.',
+      '`createTimedProgress` — tick-driven progress for actions, workers, staged costs, cooldowns and timers that repeat.',
     ],
     clusters: [
       'common',
@@ -132,7 +132,7 @@ export const TIER_MANIFEST = [
     entrypoints: [
       '`createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.',
       '`EngineModule` / `EngineContext` — install/connect game content and share engine services.',
-      '`createTickDriver` — standalone tick scheduler when not using the full engine facade.',
+      "`createTickDriver` — standalone tick scheduler when not using the full engine facade. `engine.tickDriver.speedMultiplier` is the game speed, and `tickMode: 'fixed'` gives every tick the same dt.",
       '`createEmitHandle` — typed per-instance events for systems and categories.',
       '`timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.',
       '`createGameStateAccessor` — an accessor over the resource registry plus your flags, state paths and rates; pass it to `createEngine({ accessor })`.',
@@ -169,7 +169,7 @@ export const TIER_MANIFEST = [
     scope:
       'Decision-support systems that observe the engine and rank actions: rule advisor, goal picker, recommendation system, and the selection policies they share. Candidates are abstract. Build board-based ones from influence layer readings in spatial.md.',
     entrypoints: [
-      '`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.',
+      '`selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates. The first two pick the least of any score, despite their purchase names. For the most, negate the score or implement `SelectionPolicy.pick`.',
       '`createGoalPicker` — pick weighted goals from a candidate pool.',
       '`createRecommendationSystem` — rank recommenders between runs, and present the winner.',
       '`createRuleAdvisor` — reduce history to a digest, and present ranked suggestions.',
@@ -185,7 +185,7 @@ export const TIER_MANIFEST = [
       '`createSpatialGrid` — bounded coordinate grids with adjacency, BFS, FOV updates and a serialized form. Cells are not reactive; a computed reads `grid.gridVersion` to recompute after each write. `findOpen` returns a random matching cell, from the seeded RNG.',
       '`createGraph` — arbitrary node/edge topology with nested child graphs.',
       '`createScopeStack` — track the graph scope entered in a nested graph.',
-      '`createInfluenceLayer` — propagation and decay over a numeric grid.',
+      '`createInfluenceLayer` — propagation and decay over a numeric grid. With a flat falloff, each cell reads the count of sources within a radius.',
     ],
     clusters: ['spatial-grid', 'graph', 'spatial-scope-stack', 'spatial-influence-layer'],
   },

@@ -231,6 +231,10 @@ function reserveClampedAmount(
  * Use this for upgrades and perks whose candidates don't compete. For
  * producers whose costs compete, see {@link setupPolicyAutoPurchase} instead.
  *
+ * Auto-purchases run each tick in the order they were set up. Where two spend
+ * one resource, the earlier one spends first, so set them up in the order the
+ * game means.
+ *
  * @param purchasables - A {@link PurchasableCategory}, whose later
  *   registrations join the sweep, or a fixed `Purchasable[]`
  * @param options - Toggle, throttle, and reserve options
@@ -357,8 +361,11 @@ export interface SetupPolicyAutoPurchaseOptions {
   /** Reactive toggle for the whole auto-purchase */
   enabled: Computable<boolean>;
   /**
-   * Throttle interval in seconds between purchase attempts. `0` (default)
-   * means "try every tick". Fractional values are allowed.
+   * Throttle interval in seconds between purchase attempts. Fractional values
+   * are allowed. `0` (default) makes one attempt per tick, so the pace follows
+   * the dt: one balance-harness tick of 1 s makes one attempt, where twenty
+   * live ticks of 50 ms make twenty. Set an interval for a pace that holds at
+   * any dt.
    */
   interval?: Computable<number>;
   /**
@@ -472,6 +479,10 @@ export interface SetupPolicyAutoPurchaseOptions {
  *    affordable purchases nothing.
  * 5. Subtract `interval` from the accumulator (so attempt timing stays stable),
  *    and scan again while the accumulator still holds a whole interval.
+ *
+ * Auto-purchases run each tick in the order they were set up. Where this one
+ * and a sweep spend one resource, the earlier one spends first, so set them up
+ * in the order the game means.
  *
  * @param producers - A {@link ProducerCategory} or a raw `Producer[]`
  * @param options - Policy, throttle and reserve options

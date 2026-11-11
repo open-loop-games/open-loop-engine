@@ -123,7 +123,7 @@ const perks = createPurchasableCategory<PerkDef>({
 });
 ```
 
-**A cost that scales with count takes the factory form of `requirements`.** The callback receives the purchasable's own `count` ref, which `def` alone cannot supply. The ref does not exist until `createPurchasable` runs, and `mapState` runs too late. For a cost in several resources, return an array over the same `count`; `maxRequirementsMet` takes the minimum across them.
+**A cost that scales with count takes the factory form of `requirements`.** The callback receives the purchasable's own `count` ref, which `def` alone cannot supply. The ref does not exist until the category builds the purchasable, and `mapState` runs too late. For a cost in several resources, return an array over the same `count`; `maxRequirementsMet` takes the minimum across them.
 
 The shape to avoid is a cost getter that reads the count back out of the category (`getPurchasable(def.id)?.count.value`). It evaluates correctly one purchase at a time, so nothing looks wrong. But a cost that is not a `Formula` costs a bulk purchase as a linear extrapolation of its current value. So purchase max undercharges any rising cost, and over-reports affordability by the same factor. A static cost has no such gap, because linear is exact when the cost does not move.
 

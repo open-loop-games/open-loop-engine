@@ -97,7 +97,7 @@ export const CLUSTER_TITLES = {
   },
   purchasable: {
     prologue:
-      "Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. `createPurchasable` is the raw factory both build on. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.",
+      "Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. Both build on an engine-internal factory, which the package does not export. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.",
   },
 };
 

@@ -322,6 +322,33 @@ describe('InfluenceLayer — update & accumulation', () => {
     expect(updated).toHaveBeenCalledWith({ cellsTouched: 0 });
     expect(layer.read().at(2, 2)).toBe(0);
   });
+
+  it('a flat falloff counts the sources within a radius of every cell', () => {
+    const grid = numericGrid(12, 9);
+    // An L-shaped route, one source per route cell.
+    const route = [
+      ...Array.from({ length: 8 }, (_, i) => ({ x: 1 + i, y: 2 })),
+      ...Array.from({ length: 5 }, (_, i) => ({ x: 8, y: 3 + i })),
+    ];
+    const radius = 2.5;
+    const layer = createInfluenceLayer(grid, {
+      defaultRadius: radius,
+      falloff: (dx, dy, r) => (Math.hypot(dx, dy) <= r ? 1 : 0),
+    });
+    for (const c of route) layer.addSource({ id: `${c.x},${c.y}`, x: c.x, y: c.y, strength: 1 });
+    layer.update();
+
+    const view = layer.read();
+    let nonZero = 0;
+    for (let y = 0; y < grid.height; y++) {
+      for (let x = 0; x < grid.width; x++) {
+        const inReach = route.filter((c) => Math.hypot(c.x - x, c.y - y) <= radius).length;
+        expect(view.at(x, y), `(${x}, ${y})`).toBe(inReach);
+        if (inReach > 0) nonZero++;
+      }
+    }
+    expect(nonZero).toBeGreaterThan(route.length);
+  });
 });
 
 describe('InfluenceLayer — reset', () => {

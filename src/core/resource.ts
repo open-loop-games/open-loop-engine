@@ -48,6 +48,10 @@ export type { ResourceRegistryEntry } from './registries';
  * Because Resource extends Ref, it can be used directly in Vue templates,
  * computed properties, and watchers — `resource.value` reads and writes
  * the current amount.
+ *
+ * A field typed bare `Resource` holds a `DecimalSource`, so `.value` has no
+ * Decimal methods. Wrap a read in `Decimal.fromValue`, or type the field
+ * `Resource<Decimal>` when the resource was created from a `Decimal`.
  */
 export interface Resource<T = DecimalSource> extends Ref<T> {
   /**

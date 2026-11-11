@@ -9,7 +9,7 @@ The composable evaluation primitives: modifier chains, requirements, formulas, c
 - `F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews. End a cost curve in `.round()` for whole-unit costs; purchase max still works. `.floor()` and `.ceil()` can read one off where a decimal cost ratio gives a whole cost.
 - `Gate` / `E` — declarative predicates and effects, where save, mod or balance-harness data needs a serializable shape.
 - `createFlag` — a saved or derived named boolean, which `flag` Gates, conditions and effects reach by id.
-- `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.
+- `createTimedProgress` — tick-driven progress for actions, workers, staged costs, cooldowns and timers that repeat.
 
 ## Common
 
@@ -187,11 +187,11 @@ the costs and tests that block purchases, unlocks and actions
 
 tickable progress toward a needed value, with no state machine
 
-- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates progress that ticks toward a needed value on every registered tick, advancing `progress` by `rate * dt` each time. `src/core/timed-progress.ts:269`
-- `interface ProgressiveCostEntry` — One progressive-cost entry — the total amount over one completion, plus a getter for the resource's current amount, which decides affordability. `src/core/timed-progress.ts:345`
-- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:353`
-- `function resourcePaidAt(progress: DecimalSource, needed: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units are paid at a given progress. `src/core/timed-progress.ts:316`
-- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; needed: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:438`
+- `function createTimedProgress(options: TimedProgressOptions): TimedProgress` — Creates progress that ticks toward a needed value on every registered tick, advancing `progress` by `rate * dt` each time. `src/core/timed-progress.ts:273`
+- `interface ProgressiveCostEntry` — One progressive-cost entry — the total amount over one completion, plus a getter for the resource's current amount, which decides affordability. `src/core/timed-progress.ts:349`
+- `interface ProgressiveCostStep` — Result of one stepProgressiveCosts evaluation. `src/core/timed-progress.ts:357`
+- `function resourcePaidAt(progress: DecimalSource, needed: DecimalSource, amount: DecimalSource): Decimal` — How many whole resource units are paid at a given progress. `src/core/timed-progress.ts:320`
+- `function stepProgressiveCosts(opts: { prevProgress: DecimalSource; proposedProgress: DecimalSource; needed: DecimalSource; costs: readonly ProgressiveCostEntry[]; }): ProgressiveCostStep` — Compute one tick of progressive-cost metering. `src/core/timed-progress.ts:442`
 - `interface TimedProgress` — Ticking progress toward a needed value, created by createTimedProgress. `src/core/timed-progress.ts:88`
 - `interface TimedProgressBaseOptions` — Options every timed progress shares. `src/core/timed-progress.ts:58`
 - `type TimedProgressOptions` `src/core/timed-progress.ts:43`

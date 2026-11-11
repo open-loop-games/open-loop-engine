@@ -245,6 +245,10 @@ function tickTimedProgress(ctx: TimedProgressTickContext, dt: number): void {
  * to the consumer. Reset, keep the overflow, grant rewards, subtract one
  * completion's worth, or do nothing: all are valid.
  *
+ * For a cooldown or a timer that repeats, write the overflow back to
+ * `progress` in `onComplete`, as the example does. A tick completes at most
+ * once, so keep `needed / rate` above the longest tick's dt.
+ *
  * @param options - Options: `needed`, optional `rate`, tick registration,
  *   optional `onProgress` / `onComplete` option callbacks, and optional
  *   `ephemeral` to skip saving.

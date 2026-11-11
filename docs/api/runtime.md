@@ -6,7 +6,7 @@ How an engine instance is assembled and ticks: `createEngine` and its module, ev
 
 - `createEngine` — assemble modules, TickDriver, persistence, events, registries, and mods.
 - `EngineModule` / `EngineContext` — install/connect game content and share engine services.
-- `createTickDriver` — standalone tick scheduler when not using the full engine facade.
+- `createTickDriver` — standalone tick scheduler when not using the full engine facade. `engine.tickDriver.speedMultiplier` is the game speed, and `tickMode: 'fixed'` gives every tick the same dt.
 - `createEmitHandle` — typed per-instance events for systems and categories.
 - `timeUntilResource` / `timeUntilGateFlip` / `timeUntilAffordable` — transition-distance math for previews and walkers.
 - `createGameStateAccessor` — an accessor over the resource registry plus your flags, state paths and rates; pass it to `createEngine({ accessor })`.

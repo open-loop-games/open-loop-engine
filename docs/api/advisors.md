@@ -4,7 +4,7 @@ Decision-support systems that observe the engine and rank actions: rule advisor,
 
 ## Canonical entrypoints
 
-- `selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates.
+- `selectionCheapest`, `selectionPaybackPeriod`, `selectionHybridPayback`, `selectionComposite` — choose among candidates. The first two pick the least of any score, despite their purchase names. For the most, negate the score or implement `SelectionPolicy.pick`.
 - `createGoalPicker` — pick weighted goals from a candidate pool.
 - `createRecommendationSystem` — rank recommenders between runs, and present the winner.
 - `createRuleAdvisor` — reduce history to a digest, and present ranked suggestions.
@@ -26,10 +26,10 @@ score-and-pick over a candidate list
 
 - `interface HybridPaybackContext<T>` — Per-call context that selectionHybridPayback understands. `src/core/policy.ts:103`
 - `interface HybridPaybackOptions<T>` — Options for selectionHybridPayback. `src/core/policy.ts:68`
-- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:127`
-- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:264`
-- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveAmount, 0) / totalRate + cost / Δrate`, where `effectiveAmount = amount − reserve`. `src/core/policy.ts:214`
-- `function selectionPaybackPeriod<T>(getSeconds: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest seconds figure, which the caller supplies per candidate; lower wins. `src/core/policy.ts:162`
+- `function selectionCheapest<T>(getCost: (t: T) => DecimalSource): SelectionPolicy<T>` — Pick the candidate with the smallest cost. `src/core/policy.ts:130`
+- `function selectionComposite<T>(...policies: SelectionPolicy<T>[]): SelectionPolicy<T>` — Chain policies with first-non-empty-pick semantics. `src/core/policy.ts:270`
+- `function selectionHybridPayback<T>(opts: HybridPaybackOptions<T>): SelectionPolicy<T>` — Pick the candidate with the smallest blended payback score: `max(cost − effectiveAmount, 0) / totalRate + cost / Δrate`, where `effectiveAmount = amount − reserve`. `src/core/policy.ts:220`
+- `function selectionPaybackPeriod<T>(getSeconds: (t: T) => number): SelectionPolicy<T>` — Pick the candidate with the smallest seconds figure, which the caller supplies per candidate; lower wins. `src/core/policy.ts:168`
 - `interface SelectionPolicy<T>` — Pick one item from a list of pre-filtered candidates, or `undefined` when none of the candidates are an acceptable choice under this policy. `src/core/policy.ts:48`
 
 ## Recommendation

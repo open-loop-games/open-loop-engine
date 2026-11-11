@@ -66,6 +66,26 @@ A run ends at a crossing: a live comparison that changes over time. Two variants
 
 The run itself is a `Cycle`, or a `Reset` from `createReset`, as [api/INDEX.md § Reserved names](./api/INDEX.md#reserved-names) decides under `Cycle`. On load, resume a saved run whose phase is past its rest value. An unsaved run starts at rest on every load, so a reload forfeits it.
 
+A third case saves the entities the player placed, and not the units that move. A load inside the active phase cannot rebuild those units. So write a checkpoint when the phase starts: each amount the phase changes, copied to a saved ref.
+
+```ts
+const coinAtWave = persistent(0, { id: 'coin-at-wave' });
+
+function enter(next: Phase) {
+  if (next === 'wave') coinAtWave.value = coin.value;   // the checkpoint
+  phase.value = next; clock.value = 0; landed.value = 0;
+}
+
+ctx.onLoad(() => {
+  units.length = 0;                                     // unsaved, so a load starts with none
+  if (phase.value !== 'wave') return;
+  coin.value = coinAtWave.value;                        // what the wave began with
+  enter('build');                                       // the phase before it
+});
+```
+
+The load returns the player to the phase before, with the amounts the active phase began with. So a reload inside the phase neither keeps its gains nor forfeits the run.
+
 ### When tick phases fit
 
 TickDriver tick phases (`registerPhase`, `enterPhase`, `exitPhase`) suit a phase that is not one module's own state. One module registers the handlers, and other modules enter and exit the tick phase. Several tick phases can be entered at once. Four facts decide the fit:
@@ -76,6 +96,27 @@ TickDriver tick phases (`registerPhase`, `enterPhase`, `exitPhase`) suit a phase
 - Each tick runs the `onTick` handlers first, then each entered tick phase's `onTick`.
 
 A phase that one module owns, saves and dispatches on gains nothing from them. It pays the second fact: a second record of the phase, which every load must rebuild.
+
+## Motion that holds at any dt
+
+A tick's dt is not one length. Live play, offline replay and a coarse balance-harness tick each give a different one. A unit that moves `speed × dt` in one write hits a target at one dt and passes it at another. Two forms bound or remove that dependence.
+
+**One module's motion: loop over the tick's dt in parts of a capped length.** Resolve each part in full: move, test for hits, land arrivals.
+
+```ts
+const MAX_PART = 0.1;   // seconds: the fastest unit crosses less than one cell in it
+
+ctx.onTick((dt) => {
+  const parts = Math.ceil(dt / MAX_PART);
+  for (let i = 0; i < parts; i++) resolve(dt / parts);
+});
+```
+
+The cap bounds how far a unit moves between two tests. The parts still differ a little in length from one dt to another. So results agree closely at any dt, and are not identical.
+
+**The whole game: fixed tick mode.** `createEngine({ tickMode: 'fixed', fixedDt })` gives every tick the same dt, in live play, offline replay and headless runs. Every tick handler then runs once per fixed tick, so a long offline replay runs many more ticks. Choose it when all of the game's tick math presumes a small constant dt.
+
+Why no engine helper: the loop is three lines, and the cap is the game's, because it follows the fastest unit.
 
 ## Drawing ticking game state: a read-only projection
 

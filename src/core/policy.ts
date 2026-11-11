@@ -115,6 +115,9 @@ export interface HybridPaybackContext<T> {
  * The "purchase whatever I can" baseline policy. Pairs naturally with a
  * pre-filtered affordable-only candidate list.
  *
+ * It is a general least-score pick: `getCost` can return any score, such as a
+ * distance to the nearest target. For a most-score rule, negate the score.
+ *
  * @param getCost - Cost extractor. Typically `(p) => p.purchasable.getCost(1)`.
  *
  * @example
@@ -144,6 +147,9 @@ export function selectionCheapest<T>(getCost: (t: T) => DecimalSource): Selectio
 /**
  * Pick the candidate with the smallest seconds figure, which the caller
  * supplies per candidate; lower wins.
+ *
+ * It is a general least-number pick: `getSeconds` can return any figure, and
+ * a negated one picks the largest.
  *
  * Candidates with a non-finite figure are skipped — the policy treats them
  * as having no defined payback. Treats each candidate in isolation; doesn't

@@ -118,27 +118,27 @@ batch-create Producers from defs
 
 A negative `baseRate` makes a producer subtract each tick: upkeep, or a buffer that loses an amount over time. The subtraction stops at zero unless `allowNegative` is set, and `getTotalRate` sums it into the net rate. See ../consumer-guide-recipes-tick.md#the-crossing-that-ends-the-run. A count that play grows rather than purchases, such as a production cascade tier, is `ProducerMapping.extraCount`: the count is then `owned + extraCount`.
 
-- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:700`
-- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:201`
-- `type ProducerBottleneck` — What held back a converter's last tick: `'rate'` when it made what its rate wants, `'input:<key>'` when that input ran short, `'capacity'` when the output's resource bag was full. `src/systems/producer-category.ts:293`
-- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:315`
+- `function createProducerCategory<Def extends { id: string; }, DefState = void>(options: ProducerCategoryOptions<Def, DefState>): ProducerCategory<Def, DefState>` — Create a producer category — batch registration of Producers from defs. `src/systems/producer-category.ts:708`
+- `interface Producer` — A producer instance — produces resources continuously or when activated. `src/systems/producer-category.ts:208`
+- `type ProducerBottleneck` — What held back a converter's last tick: `'rate'` when it made what its rate wants, `'input:<key>'` when that input ran short, `'capacity'` when the output's resource bag was full. `src/systems/producer-category.ts:301`
+- `interface ProducerCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A producer category — batch-registered Producers with a shared production shape. `src/systems/producer-category.ts:323`
 - `interface ProducerCategoryContext` — Context passed to the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:45`
-- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:302`
-- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:171`
-- `interface ProducerInput` — A stock a converting producer draws for each unit of output. `src/systems/producer-category.ts:76`
-- `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:86`
+- `interface ProducerCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Producer instance, def state and signals. `src/systems/producer-category.ts:310`
+- `interface ProducerCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/producer-category.ts:172`
+- `interface ProducerInput` — A stock a converting producer draws for each unit of output. `src/systems/producer-category.ts:77`
+- `interface ProducerMapping` — Return type of the ProducerCategoryOptions.mapProducer callback. `src/systems/producer-category.ts:87`
 - `type ProducerPurchaseOptions` — Purchase options for a producer purchased more than once. `src/systems/producer-category.ts:57`
-- `interface ResolvedProducerInput` — A ProducerInput with its per-unit draw resolved to a ref. `src/systems/producer-category.ts:296`
+- `interface ResolvedProducerInput` — A ProducerInput with its per-unit draw resolved to a ref. `src/systems/producer-category.ts:304`
 
 ## Purchasable
 
 unified purchase primitives for incremental games
 
-Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. `createPurchasable` is the raw factory both build on. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.
+Two factories for consumers. `createPurchasableCategory` batch-registers from defs and is the default. `createScalingPurchasable` is the per-instance escape hatch for costs that scale with purchase count. Both build on an engine-internal factory, which the package does not export. A cost that scales on the item's own purchase count goes through the factory form of `requirements`, which receives the live count ref. A getter that reads the count back out gives bulk purchases the wrong cost. See ../consumer-guide-choosing.md#choosing-among-purchasable-primitives.
 
 - `function createPurchasableCategory<Def extends { id: string; }, DefState = void>(options: PurchasableCategoryOptions<Def, DefState>): PurchasableCategory<Def, DefState>` — Create a purchasable category — batch registration of Purchasables from defs. `src/systems/purchasable-category.ts:202`
-- `function createScalingPurchasable(options: ScalingPurchasableOptions, predicates?: PredicateResolver): Purchasable` — Create a purchasable whose cost scales with its count — the L3 factory for one customized repeatable purchase. `src/systems/purchasable.ts:749`
-- `interface Purchasable` — A purchasable — the returned object from createPurchasable. `src/systems/purchasable.ts:273`
+- `function createScalingPurchasable(options: ScalingPurchasableOptions, predicates?: PredicateResolver): Purchasable` — Create a purchasable whose cost scales with its count — the L3 factory for one customized repeatable purchase. `src/systems/purchasable.ts:750`
+- `interface Purchasable` — A purchasable — the object every purchasable factory returns. `src/systems/purchasable.ts:273`
 - `interface PurchasableCategory<Def extends { id: string; }, DefState = void> extends ResettableObject` — A purchasable category — batch-registered Purchasables with a shared shape. `src/systems/purchasable-category.ts:122`
 - `interface PurchasableCategoryEntry<Def extends { id: string; }, DefState = void>` — A category entry: def, Purchasable instance, def state and signals. `src/systems/purchasable-category.ts:109`
 - `interface PurchasableCategoryOptions<Def extends { id: string; }, DefState = void>` `src/systems/purchasable-category.ts:69`
@@ -148,9 +148,9 @@ Two factories for consumers. `createPurchasableCategory` batch-registers from de
 - `type ScalingPurchasableCost` — Cost options for ScalingPurchasableOptions. `src/systems/purchasable.ts:161`
 - `type ScalingPurchasableEffect` — Effect options for ScalingPurchasableOptions — at most one of `effect` (a static base or a plain function) or `effectFormula` (a curve factory). `src/systems/purchasable.ts:202`
 - `type ScalingPurchasableOptions` — Shorthand options for createScalingPurchasable — repeatable purchases with a geometric, Formula or function cost. `src/systems/purchasable.ts:234`
-- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-purchases one producer per attempt, as a SelectionPolicy picks. `src/systems/auto-purchase.ts:503`
-- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:348`
-- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, purchasing every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:262`
+- `function setupPolicyAutoPurchase(producers: ProducerCategory<{ id: string; }, unknown> | Producer[], options: SetupPolicyAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that auto-purchases one producer per attempt, as a SelectionPolicy picks. `src/systems/auto-purchase.ts:514`
+- `interface SetupPolicyAutoPurchaseOptions` `src/systems/auto-purchase.ts:352`
+- `function setupSweepAutoPurchase(purchasables: PurchasableCategory<{ id: string; }, unknown> | Purchasable[], options: SetupSweepAutoPurchaseOptions, registerTick: RegisterTick): () => void` — Register a tick handler that sweeps a purchasable list, purchasing every candidate whose `canPurchase` is true. `src/systems/auto-purchase.ts:266`
 - `interface SetupSweepAutoPurchaseOptions` `src/systems/auto-purchase.ts:123`
 
 ## RunPool
