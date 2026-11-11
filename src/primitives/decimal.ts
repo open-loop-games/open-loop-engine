@@ -876,7 +876,9 @@ export function formatWhole(num: DecimalSource): string {
 }
 
 /**
- * Format a duration in seconds to a human-readable string
+ * Format a duration in seconds to a human-readable string. Below one minute
+ * it shows hundredths of a second (`12.34s`). From one minute up it shows
+ * whole seconds (`20m 25s`), and from one day up no seconds at all.
  */
 export function formatTime(seconds: DecimalSource): string {
   const d = new OrigDecimal(seconds);
@@ -899,7 +901,8 @@ export function formatTime(seconds: DecimalSource): string {
     return format(s) + 's';
   }
   if (s < 3600) {
-    return formatWhole(Math.floor(s / 60)) + 'm ' + format(s % 60) + 's';
+    const sec = Math.floor(s % 60);
+    return formatWhole(Math.floor(s / 60)) + 'm ' + String(sec).padStart(2, '0') + 's';
   }
   if (s < 86400) {
     const h = Math.floor(s / 3600);

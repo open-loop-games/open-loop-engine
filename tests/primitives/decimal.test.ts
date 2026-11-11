@@ -651,8 +651,12 @@ describe('formatTime()', () => {
     expect(formatTime(30)).toBe('30.00s');
   });
 
-  it('formats minutes and seconds', () => {
-    expect(formatTime(90)).toMatch(/1m.*30/);
+  it('formats minutes and whole seconds', () => {
+    expect(formatTime(90)).toBe('1m 30s');
+    expect(formatTime(1225)).toBe('20m 25s');
+    expect(formatTime(65)).toBe('1m 05s');
+    // A part of a second is dropped, as in the hour form.
+    expect(formatTime(89.6)).toBe('1m 29s');
   });
 
   it('formats hours', () => {
@@ -675,8 +679,8 @@ describe('formatTime()', () => {
   });
 
   it('carries a seconds field that rounds up to 60 into the next unit', () => {
-    expect(formatTime(59.999)).toBe('1m 0.00s');
-    expect(formatTime(119.999)).toBe('2m 0.00s');
+    expect(formatTime(59.999)).toBe('1m 00s');
+    expect(formatTime(119.999)).toBe('2m 00s');
     expect(formatTime(3599.999)).toBe('1h 00m 00s');
   });
 
