@@ -105,6 +105,8 @@ export interface ProducerMapping {
   /**
    * The purchasable's display, when `purchase` is set: a {@link PurchasableDisplay},
    * or a string, ref or getter for its description. Default: the def's id.
+   * Its `title` also labels a continuous producer's rate sources, with or
+   * without a `purchase`. Without a title, the label is the def's id.
    */
   display?: PurchasableDisplay | Computable<string>;
   /**
@@ -410,12 +412,12 @@ function buildProducer<Def extends { id: string }>(
   const baseRate = toMaybeRef(mapping.baseRate);
   const computedRate = computed(() => Decimal.fromValue(rateChain.apply(unref(baseRate))));
 
+  const display = toPurchasableDisplay(mapping.display ?? def.id);
+
   let purchasable: Purchasable | undefined;
   if (mapping.purchase) {
     const pc = mapping.purchase;
-    const { title, description, effectDescription, showCount } = toPurchasableDisplay(
-      mapping.display ?? def.id,
-    );
+    const { title, description, effectDescription, showCount } = display;
     purchasable = createScalingPurchasable(
       {
         id: def.id,
@@ -500,16 +502,12 @@ function buildProducer<Def extends { id: string }>(
     purchaseBeatSeconds,
   };
   if (converter) converterStates.set(producer, converter);
-  if (mapping.trigger === 'continuous') addProducerRateSources(producer, converter);
+  if (mapping.trigger === 'continuous') {
+    addProducerRateSources(producer, converter, display.title ?? def.id);
+  }
   return producer;
 }
 
-/**
- * Add a continuous producer's rate sources, labeled with its id: a plain
- * producer's output at its nominal rate, or a converter's output and input
- * draws at its realized rate. A category never removes a producer, so the
- * cleanups are dropped; the sources go with the engine's resources.
- */
 /** The one cost shape a producer's purchase options set, for its purchasable. */
 function buildPurchaseCost(pc: ProducerPurchaseOptions): ScalingPurchasableCost {
   if (pc.costFormula !== undefined) return { costFormula: pc.costFormula };
@@ -517,8 +515,17 @@ function buildPurchaseCost(pc: ProducerPurchaseOptions): ScalingPurchasableCost 
   return { baseCost: pc.baseCost, costRatio: pc.costRatio };
 }
 
-function addProducerRateSources(producer: Producer, converter: ConverterState | undefined): void {
-  const text = producer.id;
+/**
+ * Add a continuous producer's rate sources under one label: a plain
+ * producer's output at its nominal rate, or a converter's output and input
+ * draws at its realized rate. A category never removes a producer, so the
+ * cleanups are dropped; the sources go with the engine's resources.
+ */
+function addProducerRateSources(
+  producer: Producer,
+  converter: ConverterState | undefined,
+  text: Computable<string>,
+): void {
   if (!converter) {
     addRateSource(producer.resource, {
       text,

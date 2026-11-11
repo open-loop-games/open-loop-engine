@@ -21,7 +21,7 @@ import { createProducerCategory } from '@/systems/producer-category';
 import { getInflowRate, getRate, getRateSources } from '@/core/rate-source';
 import { createReset } from '@/systems/reset';
 import { createTuningRegistry, tunable } from '@/core/override-registry';
-import { ref, unref, watch } from 'vue';
+import { computed, ref, unref, watch } from 'vue';
 import { createManualTicks } from '../helpers/manual-ticks';
 import { createTestResource } from '../helpers/test-resource';
 
@@ -1560,6 +1560,43 @@ describe('producer rate sources', () => {
       ['mine', 6],
       ['trader', 1],
     ]);
+  });
+
+  it('labels a rate source with the display title, else with the def id', () => {
+    const { registerTick, tick } = createManualTicks();
+    const gold = createTestResource('gold', 0);
+    const ore = createTestResource('ore', 100);
+    const title = ref('Smelter');
+    const works = createProducerCategory<FlowDef>({
+      id: 'works',
+      mapProducer: (def) => ({
+        resource: gold,
+        baseRate: def.rate,
+        trigger: 'continuous',
+        // A title labels the rate sources with or without a purchase.
+        display:
+          def.id === 'mine'
+            ? { title: 'Gold mine' }
+            : def.id === 'smelter'
+              ? { title: () => title.value }
+              : 'A description alone is no title',
+        inputs: def.id === 'smelter' ? { ore: { resource: ore, per: 2 } } : undefined,
+      }),
+      registerTick,
+    });
+    works.register([
+      { id: 'mine', rate: 3 },
+      { id: 'smelter', rate: 4 },
+      { id: 'pan', rate: 1 },
+    ]);
+    tick(1);
+
+    const labels = computed(() => getRateSources(gold).map((s) => s.text));
+    expect(labels.value).toEqual(['Gold mine', 'Smelter', 'pan']);
+    expect(getRateSources(ore).map((s) => s.text)).toEqual(['Smelter']);
+
+    title.value = 'Blast furnace';
+    expect(labels.value).toEqual(['Gold mine', 'Blast furnace', 'pan']);
   });
 
   it('a manual producer adds none', () => {

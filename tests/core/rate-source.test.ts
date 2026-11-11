@@ -28,6 +28,16 @@ describe('rate sources', () => {
     expect(Object.is(getRate(gold).toNumber(), 0)).toBe(true);
   });
 
+  it('a label can be a ref or a getter, and a computed over the sources follows it', () => {
+    const gold = stock();
+    const name = ref('Mines');
+    addRateSource(gold, { text: () => name.value, rate: 3 });
+    const labels = computed(() => getRateSources(gold).map((s) => s.text));
+    expect(labels.value).toEqual(['Mines']);
+    name.value = 'Deep mines';
+    expect(labels.value).toEqual(['Deep mines']);
+  });
+
   it('reads zero with no rate sources', () => {
     const gold = stock(5);
     expect(getRate(gold).eq(0)).toBe(true);

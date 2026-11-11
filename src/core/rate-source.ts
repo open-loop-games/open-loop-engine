@@ -20,7 +20,7 @@
  * @cluster resource
  */
 
-import { computed, ref, unref, type ComputedRef, type Ref } from 'vue';
+import { computed, ref, unref, type ComputedRef, type MaybeRef, type Ref } from 'vue';
 import { Decimal, type DecimalSource } from '@/primitives/decimal';
 import { toMaybeRef, type Computable } from './computed';
 import { getResourceClamp, type Resource } from './resource';
@@ -29,8 +29,8 @@ import { getResourceClamp, type Resource } from './resource';
 
 /** What {@link addRateSource} attaches to a resource. */
 export interface RateSourceOptions {
-  /** The label a breakdown shows for this source. */
-  text: string;
+  /** The label a breakdown shows for this source. Can be a ref or a getter, for reactive text. */
+  text: Computable<string>;
   /** Per second; negative to subtract. Can be a ref or a getter, for a reactive rate. */
   rate: Computable<DecimalSource>;
   /**
@@ -49,7 +49,7 @@ export interface RateSource {
 }
 
 interface RateSourceEntry {
-  readonly text: string;
+  readonly text: MaybeRef<string>;
   readonly rate: ComputedRef<Decimal>;
   readonly allowNegative: boolean;
 }
@@ -103,10 +103,10 @@ export function addRateSource(
   resource: Resource<DecimalSource>,
   options: RateSourceOptions,
 ): () => void {
-  const { text, allowNegative = false } = options;
+  const { allowNegative = false } = options;
   const rate = toMaybeRef(options.rate);
   const entry: RateSourceEntry = {
-    text,
+    text: toMaybeRef(options.text),
     rate: computed(() => withoutNegativeZero(Decimal.fromValue(unref(rate)))),
     allowNegative,
   };
@@ -154,7 +154,7 @@ export function getInflowRate(resource: Resource<DecimalSource>): Decimal {
 /** The rate sources on `resource`, unclamped, in the order they were added. */
 export function getRateSources(resource: Resource<DecimalSource>): readonly RateSource[] {
   return readEntries(resource).map(({ text, rate, allowNegative }) => ({
-    text,
+    text: unref(text),
     rate: rate.value,
     allowNegative,
   }));
