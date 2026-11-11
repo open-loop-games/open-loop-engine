@@ -22,10 +22,11 @@ Owners of the details:
 ## Release a patch from main
 
 1. `pnpm release --dry-run`, and read the section.
-2. `pnpm release`. CI publishes the pushed tag.
+2. `pnpm release`. The GitHub mirror publishes the pushed tag, through `.github/workflows/release.yml`. Gitea runs only the checks.
 3. Confirm the publish:
-   - the Actions tasks endpoint, with the `agent-gitea-read` fnox profile: `$GITEA_URL/api/v1/repos/studio/open-loop-engine/actions/tasks`. The runs are in `workflow_runs`, and the publish run is named `publish`;
-   - `pnpm view @open-loop/engine dist-tags`, run from a consumer repo. The engine repo has no studio registry config, so there it asks npmjs.
+   - `pnpm view @open-loop/engine dist-tags`, run from the engine repo, shows the new version as `latest`. The engine repo has no registry config, so there it asks npmjs;
+   - the Gitea checks on the tag are the `CI` run. The Actions tasks endpoint lists it in `workflow_runs`, with the `agent-gitea-read` fnox profile: `$GITEA_URL/api/v1/repos/studio/open-loop-engine/actions/tasks`;
+   - if `latest` does not move, read the `Release` run on the mirror. It refuses a tag that fails a check, or that disagrees with `package.json`.
 4. If `next` has commits, rebase it (§ Rebase next).
 
 ## Collect a breaking change on next
