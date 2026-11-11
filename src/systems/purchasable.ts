@@ -97,7 +97,7 @@ export interface PurchasableOptions {
    * requirements: (count) =>
    *   createCostRequirement({
    *     resource: gold,
-   *     cost: Formula.exponential(count, def.baseCost, 1.15).floor(),
+   *     cost: Formula.exponential(count, def.baseCost, 1.15).round(),
    *     maxBulkCount: Decimal.dInf,
    *   })
    * ```
@@ -147,11 +147,16 @@ type CountCurve = (count: MaybeRef<DecimalSource>) => FormulaSource;
  *
  * - **Geometric** (`baseCost + costRatio`) — closed-form `baseCost × costRatio^count`,
  *   not rounded. For whole-unit costs, use `costFormula` with
- *   `Formula.exponential(count, baseCost, costRatio).floor()`.
+ *   `Formula.exponential(count, baseCost, costRatio).round()`.
  * - **Formula** (`costFormula`) — any curve the Formula vocabulary expresses.
- *   Invertible, so bulk purchasing walks the real curve, a `.floor()`ed one included.
+ *   Invertible, so bulk purchasing walks the real curve, a rounded one included.
  * - **Function** (`cost`) — any cost shape the Formula vocabulary can't
  *   express (super-exponential, piecewise, a table lookup). One unit per purchase only.
+ *
+ * End a whole-unit cost in `.round()`, not `.floor()` or `.ceil()`. A double
+ * does not hold a decimal cost ratio such as `1.1` exactly, so a whole cost
+ * evaluates a hair to one side of it. `100 × 1.1` then reads 111 under
+ * `.ceil()`, and `1000 × 1.2³` reads 1727 under `.floor()`.
  */
 export type ScalingPurchasableCost =
   | {
@@ -667,7 +672,7 @@ function assemblePurchasable(
  *   requirements: (count) =>
  *     createCostRequirement({
  *       resource: points,
- *       cost: Formula.exponential(count, 10, 1.15).floor(),
+ *       cost: Formula.exponential(count, 10, 1.15).round(),
  *       maxBulkCount: Decimal.dInf,
  *     }),
  *   effect: (count) => Decimal.pow(2, count),

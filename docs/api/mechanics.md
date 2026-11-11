@@ -6,7 +6,7 @@ The composable evaluation primitives: modifier chains, requirements, formulas, c
 
 - `createModifierChain` plus `chain.bind` — shared modifier chains and attributed conditional modifiers.
 - `createCostRequirement` / `createBooleanRequirement` — requirements with a cost, and requirements that only test.
-- `F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews. End a cost curve in `.floor()` for whole-unit costs; purchase max still works.
+- `F` / `Formula` / `calculateMaxAffordable` — cost curves, inversion and purchase max previews. End a cost curve in `.round()` for whole-unit costs; purchase max still works. `.floor()` and `.ceil()` can read one off where a decimal cost ratio gives a whole cost.
 - `Gate` / `E` — declarative predicates and effects, where save, mod or balance-harness data needs a serializable shape.
 - `createFlag` — a saved or derived named boolean, which `flag` Gates, conditions and effects reach by id.
 - `createTimedProgress` — tick-driven progress for actions, workers, and staged costs.

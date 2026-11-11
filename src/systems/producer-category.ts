@@ -52,7 +52,7 @@ export interface ProducerCategoryContext {
  * Builds a {@link Purchasable} through `createScalingPurchasable`, and takes
  * the same cost shapes ({@link ScalingPurchasableCost}). The geometric shape
  * is not rounded. For whole-unit costs, pass
- * `costFormula: (count) => Formula.exponential(count, baseCost, costRatio).floor()`.
+ * `costFormula: (count) => Formula.exponential(count, baseCost, costRatio).round()`.
  */
 export type ProducerPurchaseOptions = {
   /** Resource spent to purchase */
