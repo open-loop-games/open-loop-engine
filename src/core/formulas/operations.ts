@@ -9,7 +9,12 @@
  * Operations with unique math (log antiderivatives, tetration, etc.) are hand-written.
  */
 
-import { Decimal, MAX_DISTINGUISHABLE_INTEGER, isIntegerValue } from '@/primitives/decimal';
+import {
+  Decimal,
+  MAX_DISTINGUISHABLE_INTEGER,
+  isIntegerValue,
+  powExact,
+} from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { F as Formula, hasVariable, unrefFormulaSource } from './formulas';
 import { reportInversionFailure } from './inversion';
@@ -113,15 +118,16 @@ function makeBinarySubstitution(
 // ulp off on integers: pow(41, 2) = 1680.9999999999998, root(1681, 2) =
 // 40.99999999999999 (91k of the first 100k perfect squares miss). A floored
 // curve then reads an exact threshold one step low, so exponent 2 takes the
-// exact paths. Decimal.sqrt returns NaN below 1e-16 (sqrt(1e-16) = NaN), where
-// root still answers, so the root path stays the fallback.
+// exact paths at every magnitude. Decimal.sqrt returns NaN below 1e-16
+// (sqrt(1e-16) = NaN), where root still answers, so the root path stays the
+// fallback.
 function isTwo(n: DecimalSource): boolean {
   return typeof n === 'number' ? n === 2 : Decimal.eq(n, 2);
 }
 
-/** `value ^ exponent`, exact for squares. */
-export function powExact(value: DecimalSource, exponent: DecimalSource): Decimal {
-  return isTwo(exponent) ? Decimal.mul(value, value) : Decimal.pow(value, exponent);
+/** `value ^ exponent` for the `pow` op: a square multiplies, and any other power is {@link powExact}. */
+export function evaluatePow(value: DecimalSource, exponent: DecimalSource): Decimal {
+  return isTwo(exponent) ? Decimal.mul(value, value) : powExact(value, exponent);
 }
 
 /** The `degree`th root of `value`, exact for square roots of perfect squares. */
@@ -732,7 +738,7 @@ export const integratePowBase = makeBinaryIntegrate(
 );
 
 export const invertRoot = makeBinaryInvert(
-  (value, other) => powExact(value, other),
+  (value, other) => evaluatePow(value, other),
   (value, other) => Decimal.ln(other).div(Decimal.ln(value)),
 );
 

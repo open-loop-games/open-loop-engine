@@ -21,7 +21,7 @@
  */
 
 import { PersistentAlias } from '../persistence';
-import { Decimal, format, toNumber } from '@/primitives/decimal';
+import { Decimal, format, powExact, toNumber } from '@/primitives/decimal';
 import type { DecimalSource } from '@/primitives/decimal';
 import { toMaybeRef, type Computable } from '../computed';
 import { unref, type MaybeRef } from 'vue';
@@ -320,13 +320,13 @@ const binaryOps: Record<string, OpDescriptor> = {
     variableOnRight: () => ({ integrate: undefined }),
   },
   pow: {
-    evaluate: ops.powExact,
+    evaluate: ops.evaluatePow,
     invert: ops.invertPow,
     integrate: ops.integratePow,
     sum: ops.sumPow,
   },
   pow_base: {
-    evaluate: (value: DecimalSource, base: DecimalSource) => Decimal.pow(base, value),
+    evaluate: (value: DecimalSource, base: DecimalSource) => powExact(base, value),
     invert: ops.invertPowBase,
     integrate: ops.integratePowBase,
     sum: ops.sumPowBase,

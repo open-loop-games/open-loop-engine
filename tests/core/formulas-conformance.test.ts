@@ -1498,6 +1498,101 @@ describe('series: every grade Formula.sum gives holds against brute force', () =
   });
 });
 
+describe('exact powers: a power the doubles hold evaluates to its exact value', () => {
+  // The identity is `evaluate(b, n) = bⁿ` with no tolerance, on the domain
+  // where doubles compute it exactly: a whole exponent of 2 or more, and a base
+  // that is a whole number over a power of two, with the numerator's power
+  // below 9e15. The reference is BigInt: the numerator's power, then a division
+  // by a power of two, which a double does exactly. Equality is on the returned
+  // Decimal, in value space, because a rounding op reads that value.
+
+  /** Whole numbers, then whole numbers over 2, 4 and 8, of either sign. */
+  const BASES: Array<{ numerator: bigint; shift: number }> = [];
+  for (let m = 2; m <= 30; m++) BASES.push({ numerator: BigInt(m), shift: 0 });
+  for (const m of [1, 3, 5, 7, 9, 11, 15, 21]) {
+    for (const shift of [1, 2, 3]) BASES.push({ numerator: BigInt(m), shift });
+  }
+  BASES.push({ numerator: -2n, shift: 0 }, { numerator: -3n, shift: 1 });
+
+  const LIMIT = 9_000_000_000_000_000n;
+  const magnitude = (n: bigint) => (n < 0n ? -n : n);
+
+  /** Every `(base, exponent, exact value)` of the domain these bases reach. */
+  function* domain() {
+    for (const { numerator, shift } of BASES) {
+      const base = Number(numerator) / 2 ** shift;
+      for (let exponent = 2; exponent <= 60; exponent++) {
+        const power = numerator ** BigInt(exponent);
+        if (magnitude(power) >= LIMIT) break;
+        yield { base, exponent, want: Number(power) / 2 ** (shift * exponent) };
+      }
+    }
+  }
+
+  const exactly = (got: DecimalSource, want: number) => new Decimal(got).eq(want);
+
+  test('pow_base — a cost ratio raised to a count', () => {
+    for (const { base, exponent, want } of domain()) {
+      const got = F.variable(0).pow_base(base).evaluate(exponent);
+      expect(exactly(got, want), `${base}^${exponent}: got ${String(got)}, want ${want}`).toBe(
+        true,
+      );
+    }
+  });
+
+  test('pow — a level raised to a whole exponent', () => {
+    for (const { base, exponent, want } of domain()) {
+      const got = F.variable(0).pow(exponent).evaluate(base);
+      expect(exactly(got, want), `${base}^${exponent}: got ${String(got)}, want ${want}`).toBe(
+        true,
+      );
+    }
+  });
+
+  test('a rounding op over an exponential curve reads the exact cost', () => {
+    // `k · bⁿ` for a whole `k`, floored and ceiled against BigInt division.
+    for (const { numerator, shift } of BASES) {
+      if (numerator < 0n) continue;
+      const base = Number(numerator) / 2 ** shift;
+      for (const k of [1n, 3n, 8n, 100n]) {
+        const curve = Formula.exponential(0, Number(k), base);
+        for (let n = 2; n <= 60; n++) {
+          const top = k * numerator ** BigInt(n);
+          const bottom = 2n ** BigInt(shift * n);
+          if (numerator ** BigInt(n) >= LIMIT || top >= LIMIT) break;
+          const floor = top / bottom;
+          const ceil = top % bottom === 0n ? floor : floor + 1n;
+          const label = `${k} × ${base}^${n}`;
+          expect(exactly(curve.floor().evaluate(n), Number(floor)), `floor ${label}`).toBe(true);
+          expect(exactly(curve.ceil().evaluate(n), Number(ceil)), `ceil ${label}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  test('Formula.sum — the bulk cost of a whole curve is the whole sum', () => {
+    for (let ratio = 2; ratio <= 12; ratio++) {
+      for (const k of [1, 4, 20]) {
+        const curve = Formula.exponential(0, k, ratio);
+        for (const from of [0, 1, 5, 12]) {
+          for (let count = 2; count <= 12; count++) {
+            let want = 0n;
+            for (let i = 0; i < count; i++) want += BigInt(k) * BigInt(ratio) ** BigInt(from + i);
+            // The closed form raises the ratio to `from` and to `count`, and
+            // multiplies the two. All three stay below the limit here.
+            if (want >= LIMIT) break;
+            const got = curve.sum(from, count).value!;
+            const label = `${k} × ${ratio}^i from ${from}, ${count} levels`;
+            expect(exactly(got, Number(want)), `${label}: got ${String(got)}, want ${want}`).toBe(
+              true,
+            );
+          }
+        }
+      }
+    }
+  });
+});
+
 describe('oracle: Σ matches a high-precision reference where brute force cannot', () => {
   const SERIES_OP: Record<string, (k: string) => GenericFormula> = {
     pow: (k) => F.variable(0).pow(k),
@@ -1568,6 +1663,11 @@ describe('buy-max: the count is what buying one level at a time reaches', () => 
     'polynomial 10n^1.5': (l) => Formula.polynomial(l, 10, 1.5),
     '10√n + 5': (l) => F.variable(l).sqrt().mul(10).add(5),
     'clamped 10·1.15ⁿ ∨ 1': (l) => Formula.exponential(l, 10, 1.15).max(1),
+    // Whole-unit costs: the rounding op has no closed-form series, so the
+    // count comes from the search over summed terms.
+    'rounded 10·1.15ⁿ': (l) => Formula.exponential(l, 10, 1.15).round(),
+    'rounded 4·3ⁿ': (l) => Formula.exponential(l, 4, 3).round(),
+    'rounded 100·1.1ⁿ': (l) => Formula.exponential(l, 100, 1.1).round(),
   };
   /** Priced only cumulatively: flat (a single payment reaches any level) or not monotone. */
   const CUMULATIVE_ONLY: Record<string, Curve> = {

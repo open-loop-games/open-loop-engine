@@ -649,6 +649,78 @@ export function integerRoot(x: DecimalSource, degree: number): Decimal {
   return tryIntegerRoot(x, degree).value;
 }
 
+// === EXACT POWERS ===
+
+/**
+ * Scale that turns an in-domain base into a whole number in one multiplication.
+ * A numerator whose square stays below {@link MAX_DISTINGUISHABLE_INTEGER} is
+ * below `2^26.5`, so a base over a larger power of two has no exact power to find.
+ */
+const EXACT_BASE_SCALE = 2 ** 26;
+
+/** Largest `shift × exponent` for which dividing by `2^(shift × exponent)` stays a normal double. */
+const EXACT_SHIFT_LIMIT = 1000;
+
+/** A value at break_eternity layer 0 as a double, else `NaN`. */
+function readLayerZero(x: DecimalSource): number {
+  if (typeof x === 'number') return x;
+  const d = toFinalDecimal(x);
+  return d.layer === 0 ? d.sign * d.mag : NaN;
+}
+
+/**
+ * `base ^ exponent` where doubles compute it exactly, else `null`.
+ *
+ * The domain is a whole exponent of 2 or more and a base that is a whole number
+ * over a power of two (`3`, `1.5`, `2.5`, `1.25`), with the numerator's power
+ * below {@link MAX_DISTINGUISHABLE_INTEGER}. There every step is exact:
+ * doubling, a product of whole numbers a double holds, and a division by a
+ * power of two. The limit is the Decimal's and not the double's `2^53`: at
+ * `9e15` a Decimal leaves break_eternity layer 0 and stores a logarithm. A base
+ * no double holds, such as `1.1`, is outside the domain on purpose. Multiplying
+ * one is rounded at each step, and lands no closer to the decimal value than
+ * `Decimal.pow` does.
+ */
+function exactPower(base: number, exponent: number): number | null {
+  if (!Number.isInteger(exponent) || exponent < 2) return null;
+  let numerator = Math.abs(base);
+  if (numerator === 0 || !Number.isInteger(numerator * EXACT_BASE_SCALE)) return null;
+  let shift = 0;
+  while (!Number.isInteger(numerator)) {
+    numerator *= 2;
+    shift++;
+  }
+
+  let power = 1;
+  if (numerator > 1) {
+    // 2^53 is past the limit, so a longer loop never succeeds.
+    if (exponent > 52) return null;
+    for (let i = 0; i < exponent; i++) {
+      power *= numerator;
+      if (power >= MAX_DISTINGUISHABLE_INTEGER) return null;
+    }
+  }
+  const scale = shift * exponent;
+  if (scale > EXACT_SHIFT_LIMIT) return null;
+  const magnitude = power / 2 ** scale;
+  return base < 0 && exponent % 2 === 1 ? -magnitude : magnitude;
+}
+
+/**
+ * `base ^ exponent`, exact where doubles hold the operands and the result, and
+ * `Decimal.pow` everywhere else.
+ *
+ * `Decimal.pow` runs through `log10` and `pow10` for every operand, so it ends
+ * a few doubles off a whole value: `pow(4, 3)` is `63.999999999999986`. A
+ * rounding op over that reads one below or one above.
+ *
+ * @internal
+ */
+export function powExact(base: DecimalSource, exponent: DecimalSource): Decimal {
+  const exact = exactPower(readLayerZero(base), readLayerZero(exponent));
+  return exact === null ? Decimal.pow(base, exponent) : new OrigDecimal(exact);
+}
+
 const ZERO = new OrigDecimal(0);
 const NEAR_ONE = new OrigDecimal(0.98);
 const THOUSANDTH = new OrigDecimal(0.001);

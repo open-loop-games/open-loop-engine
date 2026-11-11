@@ -1938,3 +1938,64 @@ describe('squares and square roots are exact on integers', () => {
     expect(misses).toEqual([]);
   });
 });
+
+describe('a power is exact where doubles hold it', () => {
+  // Decimal.pow runs through log10 and pow10 for every operand, so 4³ reads
+  // 63.999999999999986 and a floored cost curve charges 63.
+  const read = (value: DecimalSource) => new Decimal(value).toNumber();
+
+  test('a floored whole base and cost ratio costs the whole value', () => {
+    expect(read(Formula.exponential(0, 1, 4).floor().evaluate(3))).toBe(64);
+    expect(read(Formula.exponential(0, 2, 3).floor().evaluate(5))).toBe(486);
+    expect(read(Formula.exponential(0, 1, 3).floor().evaluate(9))).toBe(19683);
+  });
+
+  test('a cost ratio a double holds costs the whole value under ceil and floor', () => {
+    // 2.5 = 5/2 and 1.5 = 3/2, so their powers are exact in doubles.
+    expect(read(Formula.exponential(0, 8, 2.5).ceil().evaluate(3))).toBe(125);
+    expect(read(Formula.exponential(0, 128, 1.5).floor().evaluate(7))).toBe(2187);
+  });
+
+  test('a whole exponent above 2 is exact on integers', () => {
+    const x = Formula.variable(0);
+    const ns = Array.from({ length: 2000 }, (_, i) => i + 1);
+    for (const k of [3, 4, 5]) {
+      const want = (n: number) => Number(BigInt(n) ** BigInt(k));
+      // 9e15 is where a Decimal stops holding a whole number.
+      const inRange = ns.filter((n) => want(n) < 9e15);
+      const misses = inRange.filter((n) => read(x.pow(k).evaluate(n)) !== want(n));
+      expect(misses, `exponent ${k}`).toEqual([]);
+    }
+    expect(read(x.cube().floor().evaluate(2))).toBe(8);
+  });
+
+  test('the bulk cost of an unrounded whole curve is the whole sum', () => {
+    // 1 + 2 + 4 = 7; the closed form read 6.999999999999999.
+    expect(read(Formula.exponential(0, 1, 2).sum(0, 3).value!)).toBe(7);
+    // 4·3² + 4·3³ + 4·3⁴ + 4·3⁵ = 36 + 108 + 324 + 972
+    expect(read(Formula.exponential(0, 4, 3).sum(2, 4).value!)).toBe(1440);
+    // 8·2.5 + 8·2.5² + 8·2.5³ = 20 + 50 + 125
+    expect(read(Formula.exponential(0, 8, 2.5).sum(1, 3).value!)).toBe(195);
+  });
+
+  test('a negative base keeps the sign its exponent gives it', () => {
+    const x = Formula.variable(0);
+    expect(read(x.pow(3).evaluate(-2))).toBe(-8);
+    expect(read(x.pow(4).evaluate(-2))).toBe(16);
+  });
+
+  test('a power outside that domain evaluates as Decimal.pow does', () => {
+    // 1.15 is not a whole number over a power of two, 1e20 is past 2^53, and
+    // 3^40 overflows it. None of them moves.
+    const same = (got: DecimalSource, want: DecimalSource) => new Decimal(got).eq(want);
+    const curve = Formula.exponential(0, 10, 1.15);
+    for (let n = 0; n <= 60; n++) {
+      expect(same(curve.evaluate(n), Decimal.pow(1.15, n).mul(10)), `1.15^${n}`).toBe(true);
+    }
+    const x = Formula.variable(0);
+    expect(same(x.pow(3).evaluate(1e20), Decimal.pow(1e20, 3))).toBe(true);
+    expect(same(x.pow(2.5).evaluate(7), Decimal.pow(7, 2.5))).toBe(true);
+    expect(same(x.pow_base(3).evaluate(40), Decimal.pow(3, 40))).toBe(true);
+    expect(same(x.pow_base(3).evaluate(2.5), Decimal.pow(3, 2.5))).toBe(true);
+  });
+});

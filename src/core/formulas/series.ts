@@ -31,7 +31,7 @@
  * the curve has no antiderivative to correct from.
  */
 
-import { Decimal, isIntegerValue, type DecimalSource } from '@/primitives/decimal';
+import { Decimal, isIntegerValue, powExact, type DecimalSource } from '@/primitives/decimal';
 
 // === CONTRACT ===
 
@@ -88,9 +88,9 @@ export function geometricSeries(
   from: DecimalSource,
   count: DecimalSource,
 ): DecimalSource {
-  const first = Decimal.pow(base, from);
+  const first = powExact(base, from);
   if (Decimal.eq(base, 1)) return Decimal.mul(count, first);
-  const ratio = Decimal.div(Decimal.sub(Decimal.pow(base, count), 1), Decimal.sub(base, 1));
+  const ratio = Decimal.div(Decimal.sub(powExact(base, count), 1), Decimal.sub(base, 1));
   return Decimal.mul(first, ratio);
 }
 

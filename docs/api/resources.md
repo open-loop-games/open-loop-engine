@@ -20,10 +20,10 @@ big-number arithmetic and formatting on break_eternity.js
 - `type Decimal = InstanceType<DecimalClass>` — Instance type of break_eternity's `Decimal`, re-exported under the engine's canonical name. `src/primitives/decimal.ts:49`
 - `const Decimal: DecimalClass` — The `Decimal` class break_eternity default-exports; import it from the engine, so consumer and engine construct one class. `src/primitives/decimal.ts:388`
 - `type DecimalSource = Decimal | number | string` — Anything bn accepts — a live `Decimal`, a `number`, or a numeric string. `src/primitives/decimal.ts:51`
-- `function format(num: DecimalSource, decimals?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:730`
-- `function formatSmall(num: DecimalSource, decimals?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:863`
-- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:809`
-- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:781`
+- `function format(num: DecimalSource, decimals?: number, small?: boolean): string` — Smart format that chooses the best representation based on magnitude. `src/primitives/decimal.ts:802`
+- `function formatSmall(num: DecimalSource, decimals?: number): string` — Format a number, always showing very small numbers. `src/primitives/decimal.ts:935`
+- `function formatTime(seconds: DecimalSource): string` — Format a duration in seconds to a human-readable string. `src/primitives/decimal.ts:881`
+- `function formatWhole(num: DecimalSource): string` — Format a number as a whole number (no decimals unless small). `src/primitives/decimal.ts:853`
 - `function integerRoot(x: DecimalSource, degree: number): Decimal` — The floored integer `degree`-th root of `x` — the largest integer `m` with `mᵈᵉᵍʳᵉᵉ ≤ x`, returned as a Decimal. `src/primitives/decimal.ts:648`
 - `type IntegerRoot` — Graded result of tryIntegerRoot. `src/primitives/decimal.ts:536`
 - `function toNumber(x: DecimalSource): number` — Coerce a DecimalSource to a native number. `src/primitives/decimal.ts:404`
